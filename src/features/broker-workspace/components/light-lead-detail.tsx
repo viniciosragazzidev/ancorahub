@@ -85,6 +85,7 @@ export type LightLeadDetailData = {
   tipo?: string | null;
   origem?: string | null;
   sourceCampaign?: string | null;
+  tipoCnpj?: string | null;
   beneficiaries?: Array<{
     id: string;
     name: string;
@@ -803,6 +804,12 @@ export function LightLeadDetail({
                       {lead.tipo === "PJ" || lead.tipo === "PME" ? "PJ / PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
                     </strong>
                   </div>
+                  {lead.tipoCnpj ? (
+                    <div>
+                      <span className="text-muted-foreground block text-[11px]">Tipo de CNPJ</span>
+                      <strong className="font-semibold text-foreground truncate block">{lead.tipoCnpj}</strong>
+                    </div>
+                  ) : null}
 
                   <div>
                     <span className="text-muted-foreground block text-[11px]">Origem / Campanha</span>

@@ -79,7 +79,7 @@ function normalizeFieldName(value: string) {
 
 function firstField(fields: MetaLeadField[], names: string[]) {
   const match = fields.find((field) => field.name && names.includes(normalizeFieldName(field.name)));
-  return match?.values?.find((value) => value.trim())?.trim() ?? "";
+  return match?.values?.find((value) => typeof value === "string" && value.trim())?.trim() ?? "";
 }
 
 /** Deterministic field mapping; unknown form answers are never sent to logs. */
@@ -88,6 +88,7 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   let nome = firstField(fields, ["full_name", "nome", "name"]) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
   let telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
   let email = firstField(fields, ["email", "email_address", "e_mail"]);
+  const tipoCnpj = firstField(fields, ["tipo_de_cnpj", "tipo_cnpj", "cnpj_type"]).slice(0, 120);
 
   // Fallbacks amigáveis para ferramentas de testes da Meta (Lead Gen Testing Tool)
   if (nome.includes("<test lead:") || nome.includes("dummy data")) {
@@ -112,6 +113,7 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   };
   return {
     ...normalized,
+    ...(tipoCnpj ? { tipoCnpj } : {}),
     ...(record.adset_id ? { adSetId: record.adset_id } : {}),
     ...(record.page_id ? { pageId: record.page_id } : {}),
   };
@@ -333,7 +335,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
           requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
           bypassPlantao,
-          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, campaign: lead.campaignId, ad: lead.adId, form: lead.formId, adSet: lead.adSetId, page: lead.pageId ?? entry.id, capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt, metadata: { pageId: lead.pageId ?? entry.id, campaignName: lead.campaignName ?? null } },
+          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, campaign: lead.campaignId, ad: lead.adId, form: lead.formId, adSet: lead.adSetId, page: lead.pageId ?? entry.id, capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt, metadata: { pageId: lead.pageId ?? entry.id, campaignName: lead.campaignName ?? null, ...(lead.tipoCnpj ? { tipoCnpj: lead.tipoCnpj } : {}) } },
         });
         console.log("[ingestMetaLeadAdsWebhook] createLeadFromWebhookSync result:", result);
         if (!result.success) throw new Error(result.code);

@@ -2,6 +2,15 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 22/09/2026 - Tipo de CNPJ capturado da Meta
+
+- A normalização de Meta Lead Ads agora identifica a resposta `Tipo de CNPJ`, sem
+  confundi-la com a classificação comercial PF/PME.
+- O dado é persistido nos metadados de origem Meta do lead; quando a entrada
+  corresponde a lead existente pelo telefone, os metadados são mesclados sem perda.
+- Os detalhes do lead mostram o campo somente quando ele veio da integração Meta.
+- Implementação: `docs/implementations/active/2026-09-22-meta-cnpj-type.md`.
+
 ---
 
 ## 03/08/2026 - Seletor de período 7/14/30/90 nas rotas de dados

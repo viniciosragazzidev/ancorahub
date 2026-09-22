@@ -67,6 +67,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       sourceCampaign: schema.leads.sourceCampaign,
       sourceAd: schema.leads.sourceAd,
       sourceForm: schema.leads.sourceForm,
+      sourceChannel: schema.leads.sourceChannel,
+      sourceMetadata: schema.leads.sourceMetadata,
       capturedAt: schema.leads.capturedAt,
       metaCampaignId: schema.leads.metaCampaignId,
       metaAdSetId: schema.leads.metaAdSetId,
@@ -122,6 +124,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const metaCampaignName = metaCampaign[0]?.name ?? null;
   const metaAdName = metaAd[0]?.name ?? null;
   const metaFormName = metaForm[0]?.name ?? null;
+  const metaLeadDetails = readMetaLeadSourceMetadata(lead.sourceChannel, lead.sourceMetadata);
   const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
 
   const [redistributionNotice] = context.role === "broker"
@@ -179,6 +182,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       tipo: lead.tipo,
       origem: lead.origem,
       sourceCampaign: lead.sourceCampaign,
+      tipoCnpj: metaLeadDetails.tipoCnpj,
       beneficiaries: lightBeneficiaries.map((b) => ({
         id: b.id,
         name: b.name,
@@ -573,6 +577,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                       <div><p className="text-muted-foreground">Campanha</p><p className="font-semibold text-foreground mt-0.5">{metaCampaignName || lead.sourceCampaign || lead.metaCampaignId || "Campanha Meta"}</p>{lead.metaCampaignId && metaCampaignName ? <p className="font-mono text-[10px] text-muted-foreground">ID: {lead.metaCampaignId}</p> : null}</div>
                       <div><p className="text-muted-foreground">Anúncio</p><p className="font-semibold text-foreground mt-0.5">{metaAdName || lead.sourceAd || lead.metaAdId || "Anúncio Padrão"}</p>{lead.metaAdId && metaAdName ? <p className="font-mono text-[10px] text-muted-foreground">ID: {lead.metaAdId}</p> : null}</div>
                       <div><p className="text-muted-foreground">Formulário</p><p className="font-semibold text-foreground mt-0.5">{metaFormName || lead.sourceForm || lead.metaFormId || "Formulário Direct"}</p>{lead.metaFormId && metaFormName ? <p className="font-mono text-[10px] text-muted-foreground">ID: {lead.metaFormId}</p> : null}</div>
+                      {metaLeadDetails.tipoCnpj ? <div><p className="text-muted-foreground">Tipo de CNPJ</p><p className="font-semibold text-foreground mt-0.5">{metaLeadDetails.tipoCnpj}</p></div> : null}
                       <div><p className="text-muted-foreground font-medium">Data de Captura</p><p className="font-mono text-foreground mt-0.5">{lead.capturedAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(lead.capturedAt) : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}</p></div>
                     </CardContent>
                   </Card>
@@ -733,4 +738,12 @@ function readFormData(value: unknown) {
     cnpj: typeof data.cnpj === "string" ? data.cnpj : null,
     funcionarios: typeof data.funcionarios === "string" ? data.funcionarios : null,
   };
+}
+
+function readMetaLeadSourceMetadata(sourceChannel: string, value: unknown) {
+  if (sourceChannel !== "meta_lead_ads" || !value || typeof value !== "object" || Array.isArray(value)) {
+    return { tipoCnpj: null as string | null };
+  }
+  const tipoCnpj = (value as Record<string, unknown>).tipoCnpj;
+  return { tipoCnpj: typeof tipoCnpj === "string" && tipoCnpj.trim() ? tipoCnpj.trim().slice(0, 120) : null };
 }

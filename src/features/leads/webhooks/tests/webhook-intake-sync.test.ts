@@ -4,7 +4,8 @@ const state = vi.hoisted(() => {
   const schema = { webhookDeliveries: Symbol("deliveries"), leads: Symbol("leads"), leadInteractions: Symbol("interactions"), auditLogs: Symbol("audit"), leadDistributionEvents: Symbol("events") };
   const inserts: Array<{ table: symbol; values: Record<string, unknown> }> = [];
   const updates: Array<{ table: symbol; values: Record<string, unknown> }> = [];
-  const createQueryMock = () => Object.assign(Promise.resolve([]), { limit: vi.fn(async () => []) });
+  let existingLeadRows: Array<Record<string, unknown>> = [];
+  const createQueryMock = () => Object.assign(Promise.resolve(existingLeadRows), { limit: vi.fn(async () => existingLeadRows) });
   const select = vi.fn(() => ({ from: vi.fn(() => ({ where: vi.fn(() => createQueryMock()) })) }));
   const db = {
     insert: vi.fn((table: symbol) => ({ values: vi.fn((values: Record<string, unknown>) => {
@@ -15,7 +16,7 @@ const state = vi.hoisted(() => {
     select,
     transaction: vi.fn(async (callback: (tx: typeof db) => Promise<unknown>) => callback(db)),
   };
-  return { schema, inserts, updates, db, select, resolveIdempotency: vi.fn(), resolveBranch: vi.fn(), enqueueTx: vi.fn(), enqueue: vi.fn() };
+  return { schema, inserts, updates, db, select, existingLeadRows: () => existingLeadRows, setExistingLeadRows: (rows: Array<Record<string, unknown>>) => { existingLeadRows = rows; }, resolveIdempotency: vi.fn(), resolveBranch: vi.fn(), enqueueTx: vi.fn(), enqueue: vi.fn() };
 });
 
 vi.mock("@/shared/db", () => ({ getDatabase: () => state.db, schema: state.schema }));
@@ -34,7 +35,7 @@ const payload = { nome: " Maria da Silva ", telefone: "+55 (11) 99999-9999", ema
 function inserted(table: symbol) { return state.inserts.filter((item) => item.table === table).map((item) => item.values); }
 
 describe("createLeadFromWebhookSync", () => {
-  beforeEach(() => { vi.clearAllMocks(); state.inserts.length = 0; state.updates.length = 0; state.resolveIdempotency.mockResolvedValue({ status: "new" }); });
+  beforeEach(() => { vi.clearAllMocks(); state.inserts.length = 0; state.updates.length = 0; state.setExistingLeadRows([]); state.resolveIdempotency.mockResolvedValue({ status: "new" }); });
 
   it("commits lead, audit, timeline, distribution event and effects without calling providers", async () => {
     const result = await createLeadFromWebhookSync({ ...input, payload });
@@ -44,6 +45,42 @@ describe("createLeadFromWebhookSync", () => {
     expect(inserted(state.schema.leadInteractions)).toHaveLength(1);
     expect(inserted(state.schema.leadDistributionEvents)).toEqual([expect.objectContaining({ action: "queued", strategy: "outbox" })]);
     expect(state.enqueueTx).toHaveBeenCalledTimes(2);
+  });
+
+  it("persists Meta source details with the lead", async () => {
+    const result = await createLeadFromWebhookSync({
+      ...input,
+      payload,
+      leadSource: { channel: "meta_lead_ads", externalId: "meta-1", metadata: { pageId: "page-1", tipoCnpj: "MEI" } },
+    });
+    expect(result.success).toBe(true);
+    expect(inserted(state.schema.leads)[0]).toMatchObject({
+      sourceChannel: "meta_lead_ads",
+      sourceMetadata: { pageId: "page-1", tipoCnpj: "MEI" },
+    });
+  });
+
+  it("merges Meta source details into an existing lead without erasing prior metadata", async () => {
+    state.setExistingLeadRows([{
+      id: "lead-existing",
+      status: "new",
+      telefone: "+5511999999999",
+      sourceMetadata: { legacyKey: "preserved", campaignName: "Campaign old" },
+    }]);
+
+    const result = await createLeadFromWebhookSync({
+      ...input,
+      payload,
+      leadSource: { channel: "meta_lead_ads", externalId: "meta-2", metadata: { pageId: "page-1", campaignName: null, tipoCnpj: "MEI" } },
+    });
+
+    expect(result).toEqual({ success: true, leadId: "lead-existing", duplicate: true });
+    expect(state.updates.find((update) => update.table === state.schema.leads)?.values.sourceMetadata).toEqual({
+      legacyKey: "preserved",
+      campaignName: "Campaign old",
+      pageId: "page-1",
+      tipoCnpj: "MEI",
+    });
   });
 
   it("returns the existing lead before creating effects on a replay", async () => {

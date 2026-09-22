@@ -86,6 +86,19 @@ describe("Meta Lead Ads normalization", () => {
       .toMatchObject({ campaignId: "campaign_1", campaignName: "PME Salvador" });
   });
 
+  it("captures the Meta Tipo de CNPJ answer without treating it as the PF/PME lead type", () => {
+    expect(normalizeMetaLead({
+      id: "leadgen_cnpj_type",
+      field_data: [
+        { name: "full_name", values: ["Ana Lima"] },
+        { name: "phone_number", values: ["+55 21 99999-0000"] },
+        { name: "Tipo de CNPJ", values: ["MEI"] },
+        { name: "medical_history", values: ["not persisted here"] },
+      ],
+    })).toMatchObject({ nome: "Ana Lima", tipoCnpj: "MEI" });
+    expect(normalizeMetaLead({ id: "leadgen_without_cnpj_type", field_data: [] })).not.toHaveProperty("tipoCnpj");
+  });
+
   it("preserves the complete Meta attribution chain when provided", () => {
     expect(normalizeMetaLead({
       id: "leadgen-chain",

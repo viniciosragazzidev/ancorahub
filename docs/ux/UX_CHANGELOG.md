@@ -6,6 +6,15 @@
 
 Este documento registra cronologicamente todas as alterações de UX/UI, estrutura de páginas, componentes e navegação realizadas no CRM Âncora.
 
+## 2026-09-22 — Tipo de CNPJ nas informações do lead
+
+- Os detalhes do lead exibem a resposta `Tipo de CNPJ` enviada pelo formulário Meta,
+  tanto na ficha de gestão quanto no painel de detalhes do Corretor Lite, sem
+  misturá-la à classificação PF/PME.
+- O campo só aparece quando a Meta realmente forneceu um valor, evitando espaço ou
+  rótulo vazio em leads de outras origens.
+- A hierarquia, os componentes e os tokens existentes foram preservados.
+
 ---
 
 ## 2026-09-21 — Diálogo de conexão WhatsApp (Lite): feedback por fase

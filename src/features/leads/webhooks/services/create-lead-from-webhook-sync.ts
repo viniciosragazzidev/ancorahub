@@ -114,7 +114,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
       return { conflict: true as const };
     }
     const existingLeads = await tx
-      .select({ id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone })
+      .select({ id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone, sourceMetadata: schema.leads.sourceMetadata })
       .from(schema.leads)
       .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt)));
 
@@ -137,6 +137,12 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
             metaFormId: input.leadSource.form ?? null,
             metaPageId: input.leadSource.page ?? null,
             capturedAt: input.leadSource.capturedAt ?? receivedAt,
+            ...(input.leadSource.metadata ? {
+              sourceMetadata: {
+                ...(existingLead.sourceMetadata && typeof existingLead.sourceMetadata === "object" && !Array.isArray(existingLead.sourceMetadata) ? existingLead.sourceMetadata as Record<string, unknown> : {}),
+                ...Object.fromEntries(Object.entries(input.leadSource.metadata).filter(([, value]) => value !== null)),
+              },
+            } : {}),
           } : {}),
           updatedAt: now,
         })
