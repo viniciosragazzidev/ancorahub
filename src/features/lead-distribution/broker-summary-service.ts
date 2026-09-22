@@ -303,3 +303,64 @@ export async function fetchBrokerDailySummary(
     items,
   };
 }
+
+export type DistributionLogRow = {
+  brokerCode: string;
+  brokerName: string;
+  queueName: string;
+  leadName: string;
+  leadPhone: string;
+  assignedAt: Date;
+};
+
+/**
+ * One row per lead actually handed to a broker in the period — the raw log
+ * behind the aggregate summary above, for a printable "quem recebeu o quê"
+ * export. Same distribution-window semantics as `fetchBrokerDailySummary`:
+ * "recebido" means assignedAt inside the range, not when the lead was
+ * created/imported.
+ */
+export async function fetchDistributionLog(
+  tenantId: string,
+  options: { startDate: Date; endDate: Date; branchId?: string | null },
+): Promise<DistributionLogRow[]> {
+  const db = getDatabase();
+  const rows = await db
+    .select({
+      brokerCode: schema.brokerProfiles.internalCode,
+      brokerName: schema.user.name,
+      queueName: schema.leadQueues.name,
+      leadName: schema.leads.nome,
+      leadPhone: schema.leads.telefone,
+      assignedAt: schema.leads.assignedAt,
+    })
+    .from(schema.leads)
+    .innerJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
+    .leftJoin(
+      schema.brokerProfiles,
+      and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, tenantId)),
+    )
+    .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
+    .where(
+      and(
+        eq(schema.leads.tenantId, tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
+        isNotNull(schema.leads.corretorId),
+        isNotNull(schema.leads.assignedAt),
+        gte(schema.leads.assignedAt, options.startDate),
+        lte(schema.leads.assignedAt, options.endDate),
+        options.branchId ? eq(schema.leads.branchId, options.branchId) : undefined,
+      ),
+    )
+    .orderBy(schema.leadQueues.name, schema.leads.assignedAt);
+
+  return rows.map((row) => ({
+    brokerCode: row.brokerCode ?? "—",
+    brokerName: row.brokerName,
+    queueName: row.queueName ?? "Sem fila",
+    leadName: row.leadName,
+    leadPhone: row.leadPhone,
+    assignedAt: row.assignedAt as Date,
+  }));
+}
