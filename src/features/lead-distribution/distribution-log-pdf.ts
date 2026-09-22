@@ -1,6 +1,9 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import type { DistributionLogRow } from "./broker-summary-service";
 
+// Palette from docs/design-system.md — accent/header reuse the tenant-report
+// styling already established in unassigned-leads-pdf.ts; the badge below
+// mirrors the "info" Status Badge variant (Powder Blue / Electric Blue).
 const colors = {
   ink: rgb(0.06, 0.09, 0.16),
   muted: rgb(0.36, 0.41, 0.49),
@@ -10,6 +13,8 @@ const colors = {
   stripe: rgb(0.97, 0.98, 0.99),
   accent: rgb(0.06, 0.58, 0.4),
   sectionBg: rgb(0.93, 0.96, 0.95),
+  badgeBg: rgb(0xdb / 255, 0xea / 255, 0xff / 255),
+  badgeText: rgb(0x25 / 255, 0x63 / 255, 0xeb / 255),
 };
 
 function printable(value: unknown, max = 100) {
@@ -29,6 +34,30 @@ function drawCell(page: PDFPage, value: string, x: number, y: number, width: num
 
 function dateTimeLabel(value: Date) {
   return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(value);
+}
+
+/** Pill-shaped "fila/plantão" badge (design system: 9999px radius, Powder Blue / Electric Blue "info" tone). */
+function drawBadge(page: PDFPage, text: string, x: number, y: number, maxWidth: number, font: PDFFont, size = 7.5) {
+  const paddingX = 6;
+  const badgeHeight = size + 6;
+  let label = printable(text, 40);
+  while (label.length > 1 && font.widthOfTextAtSize(label, size) + paddingX * 2 > maxWidth) {
+    label = `${label.slice(0, -2)}…`;
+  }
+  const textWidth = font.widthOfTextAtSize(label, size);
+  const badgeWidth = Math.min(maxWidth, textWidth + paddingX * 2);
+  const radius = badgeHeight / 2;
+  const badgeY = y + (22 - badgeHeight) / 2;
+  const centerY = badgeY + radius;
+
+  if (badgeWidth <= badgeHeight) {
+    page.drawEllipse({ x: x + badgeWidth / 2, y: centerY, xScale: badgeWidth / 2, yScale: radius, color: colors.badgeBg });
+  } else {
+    page.drawEllipse({ x: x + radius, y: centerY, xScale: radius, yScale: radius, color: colors.badgeBg });
+    page.drawEllipse({ x: x + badgeWidth - radius, y: centerY, xScale: radius, yScale: radius, color: colors.badgeBg });
+    page.drawRectangle({ x: x + radius, y: badgeY, width: badgeWidth - radius * 2, height: badgeHeight, color: colors.badgeBg });
+  }
+  page.drawText(label, { x: x + (badgeWidth - textWidth) / 2, y: badgeY + (badgeHeight - size) / 2 + 1, size, font, color: colors.badgeText });
 }
 
 /**
@@ -68,11 +97,12 @@ export async function encodeDistributionLogPdf(input: {
   const pageHeight = 595.28;
   const margin = 32;
   const columns = [
-    { label: "Código", width: 60 },
-    { label: "Corretor", width: 190 },
-    { label: "Lead", width: 230 },
-    { label: "Telefone", width: 150 },
-    { label: "Distribuído em", width: 147 },
+    { label: "Código", width: 55 },
+    { label: "Corretor", width: 155 },
+    { label: "Fila / Plantão", width: 130 },
+    { label: "Lead", width: 175 },
+    { label: "Telefone", width: 135 },
+    { label: "Distribuído em", width: 127 },
   ] as const;
   const tableWidth = columns.reduce((sum, column) => sum + column.width, 0);
   const rowHeight = 22;
@@ -100,10 +130,10 @@ export async function encodeDistributionLogPdf(input: {
     y = headerY;
   };
 
-  const drawSection = (queueName: string, count: number) => {
+  const drawSection = (fonteLabel: string, count: number) => {
     const sectionY = y - sectionHeight;
     page.drawRectangle({ x: margin, y: sectionY, width: tableWidth, height: sectionHeight, color: colors.sectionBg, borderColor: colors.border, borderWidth: 0.45 });
-    page.drawText(printable(queueName, 60), { x: margin + 8, y: sectionY + 7, size: 9, font: bold, color: colors.header });
+    page.drawText(printable(fonteLabel, 90), { x: margin + 8, y: sectionY + 7, size: 9, font: bold, color: colors.header });
     const countLabel = `${count} lead${count === 1 ? "" : "s"}`;
     page.drawText(countLabel, { x: margin + tableWidth - 8 - bold.widthOfTextAtSize(countLabel, 8), y: sectionY + 7, size: 8, font: regular, color: colors.muted });
     y = sectionY;
@@ -139,32 +169,39 @@ export async function encodeDistributionLogPdf(input: {
 
   addPage();
 
-  // "Separe por origem": group rows by queue, in the order they already
-  // arrive (the query sorts by queue name then assignedAt).
-  const sections: Array<{ queueName: string; rows: DistributionLogRow[] }> = [];
+  // "Separe por fonte": group rows by their acquisition source (channel +
+  // campaign/reference), in the order they already arrive (the service
+  // sorts by fonteLabel then assignedAt).
+  const sections: Array<{ fonteLabel: string; rows: DistributionLogRow[] }> = [];
   for (const row of input.rows) {
     const current = sections[sections.length - 1];
-    if (current && current.queueName === row.queueName) current.rows.push(row);
-    else sections.push({ queueName: row.queueName, rows: [row] });
+    if (current && current.fonteLabel === row.fonteLabel) current.rows.push(row);
+    else sections.push({ fonteLabel: row.fonteLabel, rows: [row] });
   }
 
   for (const section of sections) {
     if (y - sectionHeight - headerHeight < margin + footerHeight) addPage();
-    drawSection(section.queueName, section.rows.length);
+    drawSection(section.fonteLabel, section.rows.length);
     section.rows.forEach((row, index) => {
       if (y - rowHeight < margin + footerHeight) {
         addPage();
-        drawSection(section.queueName, section.rows.length);
+        drawSection(section.fonteLabel, section.rows.length);
       }
       const rowY = y - rowHeight;
       if (index % 2 === 1) page.drawRectangle({ x: margin, y: rowY, width: tableWidth, height: rowHeight, color: colors.stripe });
       page.drawRectangle({ x: margin, y: rowY, width: tableWidth, height: rowHeight, borderColor: colors.border, borderWidth: 0.4 });
-      const values = [row.brokerCode, row.brokerName, row.leadName, row.leadPhone, dateTimeLabel(row.assignedAt)];
       let x = margin;
-      values.forEach((value, columnIndex) => {
-        drawCell(page, value, x, rowY, columns[columnIndex].width, regular);
-        x += columns[columnIndex].width;
-      });
+      drawCell(page, row.brokerCode, x, rowY, columns[0].width, regular);
+      x += columns[0].width;
+      drawCell(page, row.brokerName, x, rowY, columns[1].width, regular);
+      x += columns[1].width;
+      drawBadge(page, row.queueName, x + 7, rowY, columns[2].width - 14, bold);
+      x += columns[2].width;
+      drawCell(page, row.leadName, x, rowY, columns[3].width, regular);
+      x += columns[3].width;
+      drawCell(page, row.leadPhone, x, rowY, columns[4].width, regular);
+      x += columns[4].width;
+      drawCell(page, dateTimeLabel(row.assignedAt), x, rowY, columns[5].width, regular);
       y = rowY;
     });
   }

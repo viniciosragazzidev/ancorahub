@@ -308,17 +308,43 @@ export type DistributionLogRow = {
   brokerCode: string;
   brokerName: string;
   queueName: string;
+  fonteLabel: string;
   leadName: string;
   leadPhone: string;
   assignedAt: Date;
 };
+
+/** Short, print-friendly label per sourceChannel — the fine-grained channel
+ * catalog in routing-catalog.ts is meant for the routing UI and already
+ * carries its own parenthetical (e.g. "Meta Ads (Facebook/Instagram)"),
+ * which would double up once the campaign/reference is appended here. */
+const SOURCE_CHANNEL_LABELS: Record<string, string> = {
+  meta_ads: "Meta Ads",
+  meta_lead_ads: "Meta Ads",
+  bulk_import: "Importação Manual",
+  webhook: "Webhook",
+  whatsapp: "WhatsApp Direto",
+  whatsapp_direct: "WhatsApp Direto",
+  google_ads: "Google Ads",
+  indicacao: "Indicação",
+  referral: "Indicação",
+  landing_page: "Site / Orgânico",
+};
+
+function buildFonteLabel(sourceChannel: string | null, sourceCampaign: string | null, origem: string) {
+  const channel = sourceChannel?.trim().toLowerCase() || null;
+  const base = (channel && SOURCE_CHANNEL_LABELS[channel]) ?? (origem === "manual" ? "Cadastro Manual" : "Outra origem");
+  const detail = sourceCampaign?.trim();
+  return detail ? `${base} (${detail})` : base;
+}
 
 /**
  * One row per lead actually handed to a broker in the period — the raw log
  * behind the aggregate summary above, for a printable "quem recebeu o quê"
  * export. Same distribution-window semantics as `fetchBrokerDailySummary`:
  * "recebido" means assignedAt inside the range, not when the lead was
- * created/imported.
+ * created/imported. Grouped and sorted by fonte (channel + campaign/reference)
+ * so consecutive rows share the same source section in the PDF.
  */
 export async function fetchDistributionLog(
   tenantId: string,
@@ -330,6 +356,9 @@ export async function fetchDistributionLog(
       brokerCode: schema.brokerProfiles.internalCode,
       brokerName: schema.user.name,
       queueName: schema.leadQueues.name,
+      origem: schema.leads.origem,
+      sourceChannel: schema.leads.sourceChannel,
+      sourceCampaign: schema.leads.sourceCampaign,
       leadName: schema.leads.nome,
       leadPhone: schema.leads.telefone,
       assignedAt: schema.leads.assignedAt,
@@ -352,15 +381,17 @@ export async function fetchDistributionLog(
         lte(schema.leads.assignedAt, options.endDate),
         options.branchId ? eq(schema.leads.branchId, options.branchId) : undefined,
       ),
-    )
-    .orderBy(schema.leadQueues.name, schema.leads.assignedAt);
+    );
 
-  return rows.map((row) => ({
-    brokerCode: row.brokerCode ?? "—",
-    brokerName: row.brokerName,
-    queueName: row.queueName ?? "Sem fila",
-    leadName: row.leadName,
-    leadPhone: row.leadPhone,
-    assignedAt: row.assignedAt as Date,
-  }));
+  return rows
+    .map((row) => ({
+      brokerCode: row.brokerCode ?? "—",
+      brokerName: row.brokerName,
+      queueName: row.queueName ?? "Sem fila",
+      fonteLabel: buildFonteLabel(row.sourceChannel, row.sourceCampaign, row.origem),
+      leadName: row.leadName,
+      leadPhone: row.leadPhone,
+      assignedAt: row.assignedAt as Date,
+    }))
+    .sort((a, b) => a.fonteLabel.localeCompare(b.fonteLabel, "pt-BR") || a.assignedAt.getTime() - b.assignedAt.getTime());
 }
