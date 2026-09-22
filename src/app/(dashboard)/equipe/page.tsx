@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ShieldCheck } from "@/components/huge-icons";
@@ -49,12 +49,12 @@ export default async function TeamPage() {
         id: sql<string>`coalesce(${schema.tenantMemberships.id}, ${schema.brokerProfiles.id})`,
         userId: schema.brokerProfiles.userId,
         name: schema.brokerProfiles.professionalName,
-        email: sql<string>`coalesce(${schema.brokerProfiles.invitedEmail}, 'E-mail será definido no cadastro')`,
+        email: sql<string>`coalesce(${schema.brokerProfiles.invitedEmail}, '')`,
         phone: schema.brokerProfiles.phone,
         role: sql<"director" | "manager" | "supervisor" | "broker">`coalesce(${schema.tenantMemberships.role}::text, ${schema.brokerInvitations.role}::text, 'broker')::tenant_role`,
         jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, ${schema.brokerInvitations.jobTitle}, 'broker')`,
         customRoleScope: schema.customRoles.scope,
-        customRoleId: schema.tenantMemberships.customRoleId,
+        customRoleId: sql<string | null>`coalesce(${schema.tenantMemberships.customRoleId}, ${schema.brokerInvitations.customRoleId})`,
         customRoleName: schema.customRoles.name,
         status: sql<"pending" | "active" | "disabled">`
           case
@@ -77,7 +77,13 @@ export default async function TeamPage() {
         eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId),
         eq(schema.brokerInvitations.status, "PENDING")
       ))
-      .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
+      .leftJoin(schema.customRoles, and(
+        eq(schema.customRoles.tenantId, context.tenantId),
+        or(
+          eq(schema.tenantMemberships.customRoleId, schema.customRoles.id),
+          eq(schema.brokerInvitations.customRoleId, schema.customRoles.id),
+        ),
+      ))
       .where(and(
         eq(schema.brokerProfiles.tenantId, context.tenantId),
         context.role === "manager" && context.branchId ? eq(schema.brokerProfiles.branchId, context.branchId) : undefined

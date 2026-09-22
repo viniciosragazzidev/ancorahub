@@ -29,7 +29,10 @@ const memberJobTitle = z.enum(schema.teamJobTitleValues);
 const updateMemberInput = z.object({
   memberId: z.string().uuid(),
   name: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  email: z.string().trim().max(254).refine(
+    (value) => value === "" || z.string().email().safeParse(value).success,
+    "Informe um e-mail válido.",
+  ).transform((value) => value.toLowerCase()),
   role: memberRole,
   jobTitle: memberJobTitle,
   branchId: z.preprocess(
@@ -79,9 +82,14 @@ export async function updateTeamMemberAction(
         customRoleScope: schema.customRoles.scope,
         branchId: schema.tenantMemberships.branchId,
         status: schema.user.status,
+        profileId: schema.brokerProfiles.id,
       })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+      .leftJoin(schema.brokerProfiles, and(
+        eq(schema.brokerProfiles.userId, schema.user.id),
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+      ))
       .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(
         and(
@@ -92,10 +100,161 @@ export async function updateTeamMemberAction(
       .limit(1);
 
     if (!member) {
-      throw new Error("Membro nao encontrado.");
+      const [pendingProfile] = await db
+        .select({
+          profileId: schema.brokerProfiles.id,
+          userId: schema.brokerProfiles.userId,
+          role: schema.brokerInvitations.role,
+          jobTitle: schema.brokerInvitations.jobTitle,
+          customRoleId: schema.brokerInvitations.customRoleId,
+          customRoleScope: schema.customRoles.scope,
+          branchId: schema.brokerProfiles.branchId,
+        })
+        .from(schema.brokerProfiles)
+        .leftJoin(schema.brokerInvitations, and(
+          eq(schema.brokerInvitations.brokerProfileId, schema.brokerProfiles.id),
+          eq(schema.brokerInvitations.tenantId, context.tenantId),
+          eq(schema.brokerInvitations.status, "PENDING"),
+        ))
+        .leftJoin(schema.customRoles, eq(schema.brokerInvitations.customRoleId, schema.customRoles.id))
+        .where(and(
+          eq(schema.brokerProfiles.id, input.memberId),
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+        ))
+        .limit(1);
+
+      if (!pendingProfile || !pendingProfile.role || !pendingProfile.jobTitle) {
+        throw new Error("Membro nao encontrado.");
+      }
+
+      const normalizedBranchId = input.branchId || null;
+      if (!normalizedBranchId) {
+        throw new Error("Convites pendentes precisam de uma unidade vinculada.");
+      }
+
+      let customRoleScope: "none" | "own" | "branch" | "tenant" | null = null;
+      if (input.customRoleId) {
+        if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
+        const [customRole] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope })
+          .from(schema.customRoles)
+          .where(and(
+            eq(schema.customRoles.id, input.customRoleId),
+            eq(schema.customRoles.tenantId, context.tenantId),
+            eq(schema.customRoles.status, "active"),
+          ))
+          .limit(1);
+        if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
+        customRoleScope = customRole.scope;
+      }
+
+      requireCanUpdateMemberAuthority({
+        actorContext: context,
+        targetMember: {
+          role: pendingProfile.role,
+          branchId: pendingProfile.branchId,
+          userId: pendingProfile.userId ?? pendingProfile.profileId,
+        },
+        proposed: { role: input.role, branchId: normalizedBranchId, customRoleScope },
+      });
+
+      const branch = await db
+        .select({ id: schema.branches.id })
+        .from(schema.branches)
+        .where(and(
+          eq(schema.branches.id, normalizedBranchId),
+          eq(schema.branches.tenantId, context.tenantId),
+          eq(schema.branches.status, "active"),
+        ))
+        .limit(1);
+      if (!branch[0]) throw new Error("A filial selecionada nao pertence ao tenant ativo ou esta inativa.");
+
+      if (input.email) {
+        const [emailOwner] = await db
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(and(
+            eq(schema.user.email, input.email),
+            pendingProfile.userId ? ne(schema.user.id, pendingProfile.userId) : undefined,
+          ))
+          .limit(1);
+        if (emailOwner) throw new Error("Ja existe uma identidade com este e-mail.");
+
+        const [profileEmailOwner] = await db
+          .select({ id: schema.brokerProfiles.id })
+          .from(schema.brokerProfiles)
+          .where(and(
+            eq(schema.brokerProfiles.tenantId, context.tenantId),
+            eq(schema.brokerProfiles.invitedEmail, input.email),
+            ne(schema.brokerProfiles.id, pendingProfile.profileId),
+          ))
+          .limit(1);
+        if (profileEmailOwner) throw new Error("Ja existe um convite com este e-mail nesta corretora.");
+      }
+
+      const authorityChanged =
+        pendingProfile.role !== input.role ||
+        pendingProfile.jobTitle !== input.jobTitle ||
+        pendingProfile.branchId !== normalizedBranchId ||
+        pendingProfile.customRoleId !== (input.customRoleId ?? null);
+
+      await db.transaction(async (tx) => {
+        await tx.update(schema.brokerProfiles).set({
+          professionalName: input.name,
+          invitedEmail: input.email || null,
+          branchId: normalizedBranchId,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(schema.brokerProfiles.id, pendingProfile.profileId),
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+        ));
+
+        if (pendingProfile.userId) {
+          await tx.update(schema.user).set({
+            name: input.name,
+            ...(input.email ? { email: input.email } : {}),
+            updatedAt: new Date(),
+          }).where(eq(schema.user.id, pendingProfile.userId));
+        }
+
+        await tx.update(schema.brokerInvitations).set({
+          email: input.email || null,
+          role: input.role,
+          jobTitle: input.jobTitle,
+          branchId: normalizedBranchId,
+          customRoleId: input.customRoleId ?? null,
+        }).where(and(
+          eq(schema.brokerInvitations.brokerProfileId, pendingProfile.profileId),
+          eq(schema.brokerInvitations.tenantId, context.tenantId),
+          eq(schema.brokerInvitations.status, "PENDING"),
+        ));
+
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "broker_profile",
+          entidadeId: pendingProfile.profileId,
+          acao: "atualizou_membro",
+        });
+
+        if (authorityChanged && pendingProfile.userId) {
+          await tx.delete(schema.session).where(eq(schema.session.userId, pendingProfile.userId));
+          await tx.insert(schema.auditLogs).values({
+            id: randomUUID(),
+            userId: context.userId,
+            entidade: "broker_profile",
+            entidadeId: pendingProfile.profileId,
+            acao: "revogou_sessoes_por_alteracao_de_autoridade",
+          });
+        }
+      });
+
+      return { success: true };
     }
 
     const normalizedBranchId = input.branchId || null;
+    if (!input.email) {
+      throw new Error("Membros com acesso ativo precisam de um e-mail.");
+    }
     let customRoleScope: "none" | "own" | "branch" | "tenant" | null = null;
     if (input.customRoleId) {
       if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
@@ -157,12 +316,38 @@ export async function updateTeamMemberAction(
       throw new Error("Ja existe uma identidade com este e-mail.");
     }
 
+    if (member.profileId) {
+      const [profileEmailOwner] = await db
+        .select({ id: schema.brokerProfiles.id })
+        .from(schema.brokerProfiles)
+        .where(and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          eq(schema.brokerProfiles.invitedEmail, input.email),
+          ne(schema.brokerProfiles.id, member.profileId),
+        ))
+        .limit(1);
+      if (profileEmailOwner) {
+        throw new Error("Ja existe um convite com este e-mail nesta corretora.");
+      }
+    }
+
     await db.transaction(async (tx) => {
       await tx.update(schema.user).set({
         name: input.name,
         email: input.email,
         updatedAt: new Date(),
       }).where(eq(schema.user.id, member.userId));
+
+      if (member.profileId) {
+        await tx.update(schema.brokerProfiles).set({
+          professionalName: input.name,
+          invitedEmail: input.email || null,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(schema.brokerProfiles.id, member.profileId),
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+        ));
+      }
 
       await tx.update(schema.tenantMemberships).set({
         role: input.role,

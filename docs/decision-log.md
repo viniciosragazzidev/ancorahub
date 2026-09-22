@@ -1226,3 +1226,14 @@ leads podem usar um plantão por origem, enquanto a escala mantém a unidade rea
 cada corretor para autorização e distribuição. Plantões legados com unidade/fila
 continuam compatíveis até serem editados. O arquivamento permanece reversível e a
 exclusão permanente é uma ação separada, confirmada e auditada.
+
+## DEC-112 — Destinatários completos para comunicação interna com corretores
+
+**Decisão aprovada em 2026-09-22.** A aba `/conversas?tab=corretores` deve
+listar todos os perfis de corretor elegíveis do tenant, mesmo quando ainda não
+existe uma mensagem no histórico. Isso inclui membros ativos e convites pendentes
+com telefone; perfis desativados, arquivados ou fora da filial do Gestor ficam
+fora da lista. O disparo em massa usa exatamente essa população, mas o servidor
+revalida os IDs, o tenant, a filial e o papel antes de enfileirar cada mensagem.
+O envio continua na outbox oficial Meta, com auditoria do lote e sem depender de
+um contato recebido anteriormente.

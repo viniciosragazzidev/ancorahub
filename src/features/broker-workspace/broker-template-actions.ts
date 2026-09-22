@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -42,10 +42,28 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
         phone: schema.brokerProfiles.phone,
       })
       .from(schema.brokerProfiles)
+      .leftJoin(schema.user, eq(schema.brokerProfiles.userId, schema.user.id))
+      .leftJoin(
+        schema.tenantMemberships,
+        and(
+          eq(schema.tenantMemberships.userId, schema.user.id),
+          eq(schema.tenantMemberships.tenantId, context.tenantId),
+        ),
+      )
       .where(
         and(
           eq(schema.brokerProfiles.tenantId, context.tenantId),
-          inArray(schema.brokerProfiles.id, parsed.brokerProfileIds)
+          inArray(schema.brokerProfiles.id, parsed.brokerProfileIds),
+          or(
+            inArray(schema.brokerProfiles.lifecycleStatus, ["DRAFT", "INVITED", "INVITATION_EXPIRED", "ONBOARDING"]),
+            and(
+              eq(schema.tenantMemberships.role, "broker"),
+              eq(schema.tenantMemberships.status, "active"),
+              eq(schema.user.active, true),
+              eq(schema.user.status, "active"),
+            ),
+          ),
+          context.role === "manager" ? eq(schema.brokerProfiles.branchId, context.branchId ?? "__missing_branch__") : undefined,
         )
       );
 
@@ -150,10 +168,27 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
         phone: schema.brokerProfiles.phone,
       })
       .from(schema.brokerProfiles)
+      .leftJoin(schema.user, eq(schema.brokerProfiles.userId, schema.user.id))
+      .leftJoin(
+        schema.tenantMemberships,
+        and(
+          eq(schema.tenantMemberships.userId, schema.user.id),
+          eq(schema.tenantMemberships.tenantId, context.tenantId),
+        ),
+      )
       .where(
         and(
           eq(schema.brokerProfiles.tenantId, context.tenantId),
           eq(schema.brokerProfiles.id, input.brokerProfileId),
+          or(
+            inArray(schema.brokerProfiles.lifecycleStatus, ["DRAFT", "INVITED", "INVITATION_EXPIRED", "ONBOARDING"]),
+            and(
+              eq(schema.tenantMemberships.role, "broker"),
+              eq(schema.tenantMemberships.status, "active"),
+              eq(schema.user.active, true),
+              eq(schema.user.status, "active"),
+            ),
+          ),
           context.role === "manager" ? eq(schema.brokerProfiles.branchId, context.branchId ?? "__missing_branch__") : undefined,
         )
       )

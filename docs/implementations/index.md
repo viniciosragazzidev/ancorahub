@@ -6,6 +6,8 @@
 | 2026-09-21 | `active/2026-09-21-distribuicao-redesign-plan.md` | em validação | Plano de redesign da Central de Distribuição (5 áreas, drawer lateral, kit `ds-*` com movimento) e Lote 0 do kit. |
 | 2026-09-21 | `active/2026-09-21-dashboard-erp-composition.md` | em validação | Composição ERP premium do `/dashboard` com widgets shadcn reutilizáveis, gráficos, estados de carregamento e motion acessível. |
 | 2026-09-21 | `active/2026-09-21-waha-lite-connection-flow.md` | em validação | Conexão WhatsApp Lite: QR renovado em tempo real, sessão nunca recriada ao abrir o diálogo, status por fases e verificação contínua com feedback visual. |
+| 2026-09-22 | `active/2026-09-22-broker-bulk-recipient-visibility.md` | em validação | `/conversas?tab=corretores` lista membros ativos e convites pendentes mesmo sem histórico e revalida o lote no servidor. |
+| 2026-09-22 | `active/2026-09-22-team-member-edit-persistence.md` | em validação | Edição de equipe atualiza perfil e membership, cobre convites pendentes e evita fallback inválido no campo de e-mail. |
 | 2026-09-15 | `completed/2026-09-15-routing-rule-persistence-fix.md` | concluído | Migration idempotente da tabela `lead_routing_rules`, que faltava para salvar regras da Matriz de Roteamento. |
 | 2026-09-18 | `active/2026-09-18-team-member-recreation.md` | em validação | Recriação de membro excluído com o mesmo e-mail reutiliza somente uma identidade global ativa sem vínculo no tenant. |
 | 2026-09-15 | `completed/2026-09-15-distribution-surface-refinement.md` | concluído | Hierarquia visual, espaçamento, padding, textos e organização refinados na central `/distribuicao`, sem alterar regras de negócio. |

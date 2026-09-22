@@ -211,7 +211,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
         <DataTableColumnHeader column={column} title="E-mail" />
       ),
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">{row.original.email}</span>
+        <span className="font-mono text-xs text-muted-foreground">{row.original.email || "E-mail será definido no cadastro"}</span>
       ),
     },
     {

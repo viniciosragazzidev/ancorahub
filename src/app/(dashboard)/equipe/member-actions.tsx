@@ -147,9 +147,9 @@ function EditMemberDialog({
             <Input
               id={`member-email-${member.id}`}
               name="email"
-              defaultValue={member.email}
+              defaultValue={member.email || ""}
               disabled={pending}
-              required
+              required={member.userId !== null}
               type="email"
             />
           </Field>

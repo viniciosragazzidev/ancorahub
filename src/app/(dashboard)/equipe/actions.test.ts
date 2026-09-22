@@ -36,19 +36,11 @@ const state = vi.hoisted(() => {
     const whereResult = useLimit
       ? { limit: vi.fn(async () => rows) }
       : { then: vi.fn(async (cb: (value: unknown[]) => unknown) => cb(rows)) };
-    return {
-      from: vi.fn(() => ({
-        innerJoin: vi.fn(() => ({
-          leftJoin: vi.fn(() => ({
-            where: vi.fn(() => ({
-              limit: vi.fn(async () => rows),
-            })),
-          })),
-          where: vi.fn(() => whereResult),
-        })),
-        where: vi.fn(() => whereResult),
-      })),
-    };
+    const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+    chain.innerJoin = vi.fn(() => chain);
+    chain.leftJoin = vi.fn(() => chain);
+    chain.where = vi.fn(() => whereResult);
+    return { from: vi.fn(() => chain) };
   }
 
   const db = {
@@ -178,6 +170,7 @@ describe("updateTeamMemberAction", () => {
           rows: [{
             membershipId: "membership-test",
             userId: "broker-test",
+            profileId: "profile-test",
             role: "broker",
             jobTitle: "broker",
             customRoleScope: null,
@@ -221,6 +214,50 @@ describe("updateTeamMemberAction", () => {
         acao: "revogou_sessoes_por_alteracao_de_autoridade",
       }),
     );
+  });
+
+  it("updates the broker profile when the member is rendered from broker_profiles", async () => {
+    let callCount = 0;
+    state.db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return state.queryChain({ rows: [], useLimit: true });
+      }
+      if (callCount === 2) {
+        return state.queryChain({
+          rows: [{
+            profileId: "00000000-0000-4000-8000-000000000030",
+            userId: null,
+            role: "broker",
+            jobTitle: "broker",
+            customRoleId: null,
+            customRoleScope: null,
+            branchId: "00000000-0000-4000-8000-000000000010",
+          }],
+          useLimit: true,
+        });
+      }
+      if (callCount === 3) {
+        return state.queryChain({ rows: [{ id: "00000000-0000-4000-8000-000000000010" }], useLimit: true });
+      }
+      return state.queryChain({ rows: [], useLimit: true });
+    });
+
+    const formData = new FormData();
+    formData.set("memberId", "00000000-0000-4000-8000-000000000030");
+    formData.set("name", "Corretora Atualizada");
+    formData.set("email", "corretora.atualizada@example.com");
+    formData.set("role", "broker");
+    formData.set("jobTitle", "broker");
+    formData.set("branchId", "00000000-0000-4000-8000-000000000010");
+
+    const result = await updateTeamMemberAction({}, formData);
+
+    expect(result).toEqual({ success: true });
+    expect(updated(state.schema.brokerProfiles)).toContainEqual(expect.objectContaining({
+      professionalName: "Corretora Atualizada",
+      invitedEmail: "corretora.atualizada@example.com",
+    }));
   });
 });
 

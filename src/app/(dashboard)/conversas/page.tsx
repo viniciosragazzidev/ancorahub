@@ -568,15 +568,32 @@ export default async function ConversationsPage({
           branchName: schema.branches.name,
         })
         .from(schema.brokerProfiles)
+        .leftJoin(schema.user, eq(schema.brokerProfiles.userId, schema.user.id))
+        .leftJoin(
+          schema.tenantMemberships,
+          and(
+            eq(schema.tenantMemberships.userId, schema.user.id),
+            eq(schema.tenantMemberships.tenantId, context.tenantId),
+          ),
+        )
         .leftJoin(
           schema.branches,
           and(
-            eq(schema.brokerProfiles.branchId, schema.branches.id),
+            eq(schema.tenantMemberships.branchId, schema.branches.id),
             eq(schema.branches.tenantId, context.tenantId),
           ),
         )
         .where(and(
           eq(schema.brokerProfiles.tenantId, context.tenantId),
+          or(
+            inArray(schema.brokerProfiles.lifecycleStatus, ["DRAFT", "INVITED", "INVITATION_EXPIRED", "ONBOARDING"]),
+            and(
+              eq(schema.tenantMemberships.role, "broker"),
+              eq(schema.tenantMemberships.status, "active"),
+              eq(schema.user.active, true),
+              eq(schema.user.status, "active"),
+            ),
+          ),
           context.role === "manager" ? eq(schema.brokerProfiles.branchId, context.branchId!) : undefined,
         ))
         .orderBy(asc(schema.brokerProfiles.professionalName));
@@ -779,10 +796,6 @@ export default async function ConversationsPage({
             messages: brokerMsgs,
           };
         })
-        .filter(
-          (conversation) =>
-            conversation.messages.length > 0,
-        )
         .sort((a, b) => {
           const lastA = a.messages.at(-1)?.sentAt;
           const lastB = b.messages.at(-1)?.sentAt;
