@@ -982,7 +982,7 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
         .where(eq(schema.user.id, offer.brokerId))
         .limit(1);
 
-      if (broker && broker.phone) {
+      if (broker && broker.phone && await tenantHasActiveMetaChannel(offer.tenantId)) {
         const expiredOutbound = await enqueueMetaTemplateMessage({
           tenantId: offer.tenantId,
           recipientType: "user",
