@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useState } from "react";
+import { useActionState, useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
+import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { getLeadDutyReassignmentOptions, reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
 import { routeLeadToBranchAction } from "@/features/lead-distribution/actions";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
@@ -52,6 +53,7 @@ export function LeadDrawerManagementActions({
   onSuccess,
   onReassignOptimistic,
   onReassignRollback,
+  manualAssignmentChoiceEnabled = true,
 }: {
   leadId: string;
   leadName?: string;
@@ -64,6 +66,7 @@ export function LeadDrawerManagementActions({
   qualificationStatus?: string | null;
   qualificationState?: string | null;
   currentOwner: string | null;
+  manualAssignmentChoiceEnabled?: boolean;
   onSuccess?: (result: ManagementCommit) => void;
   onReassignOptimistic?: (brokerId: string) => void;
   onReassignRollback?: () => void;
@@ -83,6 +86,7 @@ export function LeadDrawerManagementActions({
   const [openQualifyDialog, setOpenQualifyDialog] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
   const [removeAssignmentDialogOpen, setRemoveAssignmentDialogOpen] = useState(false);
+  const [manualAssignmentDialogOpen, setManualAssignmentDialogOpen] = useState(false);
 
   const isQualifiedOrDistributed =
     currentStatus === "distributed" ||
@@ -133,7 +137,7 @@ export function LeadDrawerManagementActions({
   }, [leadId, leadQueueId]);
 
   const handleReassignSuccess = useCallback((result: typeof reassignState) => {
-    toast.success("Lead reatribuído e SLA reiniciado.");
+    toast.success(result.message ?? "Lead atribuído e aviso enviado ao corretor.");
     setBrokerId("");
     onSuccess?.(result);
   }, [onSuccess, setBrokerId]);
@@ -232,6 +236,28 @@ export function LeadDrawerManagementActions({
   const selectedModeDescription = mode === "reassign"
     ? "Transfira a responsabilidade para outro corretor elegível. O SLA de primeiro contato será reiniciado."
     : "Assuma este caso para apurar uma exceção. Registre o motivo para manter a operação auditável.";
+
+  const shouldAskAssignmentMode = manualAssignmentChoiceEnabled && !currentOwner;
+  function handleReassignSubmit(event: FormEvent<HTMLFormElement>) {
+    if (shouldAskAssignmentMode) {
+      event.preventDefault();
+      setManualAssignmentDialogOpen(true);
+      return;
+    }
+    const canResolveOptimistically = !activeQueueDuty || brokers.some((broker) => broker.id === brokerId);
+    if (canResolveOptimistically) onReassignOptimistic?.(brokerId);
+  }
+
+  function submitManualAssignment(assignmentMode: "direct" | "offer") {
+    const data = new FormData();
+    data.set("leadId", leadId);
+    data.set("brokerId", brokerId);
+    data.set("assignmentMode", assignmentMode);
+    const canResolveOptimistically = !activeQueueDuty || assignmentBrokers.some((broker) => broker.id === brokerId);
+    if (canResolveOptimistically) onReassignOptimistic?.(brokerId);
+    setManualAssignmentDialogOpen(false);
+    reassign(data);
+  }
 
   return (
     <div className="space-y-4 pt-2">
@@ -379,10 +405,7 @@ export function LeadDrawerManagementActions({
           {dutyRosterError} Atualize o drawer para tentar novamente.
         </p>
       ) : mode === "reassign" ? (
-        <form action={reassign} className="space-y-3" onSubmit={() => {
-          const canResolveOptimistically = !activeQueueDuty || brokers.some((broker) => broker.id === brokerId);
-          if (canResolveOptimistically) onReassignOptimistic?.(brokerId);
-        }}>
+        <form action={reassign} className="space-y-3" onSubmit={handleReassignSubmit}>
           <input name="leadId" type="hidden" value={leadId} />
           <input name="brokerId" type="hidden" value={brokerId} />
           <div className="space-y-1.5">
@@ -428,6 +451,24 @@ export function LeadDrawerManagementActions({
           </Button>
         </form>
       )}
+
+      <Dialog open={manualAssignmentDialogOpen} onOpenChange={setManualAssignmentDialogOpen}>
+        <DialogPopup key={manualAssignmentDialogOpen ? "manual-assignment-open" : "manual-assignment-closed"} className="sm:max-w-md">
+          <DialogTitle>Como deseja atribuir este lead?</DialogTitle>
+          <DialogDescription>
+            Escolha se {brokerId ? assignmentBrokers.find((broker) => broker.id === brokerId)?.name ?? "o corretor selecionado" : "o corretor selecionado"} deve receber uma oferta para aceitar ou se a atribuição deve ser imediata.
+          </DialogDescription>
+          <div className="grid gap-2 pt-2">
+            <Button type="button" disabled={reassignPending || !brokerId || brokerId === "_none"} onClick={() => submitManualAssignment("offer")}>
+              {reassignPending ? "Enviando oferta…" : "Sim, enviar oferta para aceite"}
+            </Button>
+            <Button type="button" variant="outline" disabled={reassignPending || !brokerId || brokerId === "_none"} onClick={() => submitManualAssignment("direct")}>
+              Atribuir direto, sem mensagem de aceite
+            </Button>
+            <DialogClose render={<Button type="button" variant="ghost" disabled={reassignPending}>Cancelar</Button>} />
+          </div>
+        </DialogPopup>
+      </Dialog>
     </div>
   );
 }

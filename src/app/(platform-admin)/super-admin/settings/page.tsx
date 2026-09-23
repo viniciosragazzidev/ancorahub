@@ -30,6 +30,7 @@ import {
   updateWahaCadenceSettingsAction,
   updateWahaConnectionSettingsAction,
   updateLeadManagementActionsSettingsAction,
+  updateManualLeadAssignmentOfferChoiceSettingsAction,
   updateCustomRolesGlobalSettingsAction,
   updatePerformanceRankingSettingsAction,
   updateTeamMemberProfileSettingsAction,
@@ -96,6 +97,7 @@ export default async function SuperAdminSettingsPage() {
     "lead_intake_outbox_lease_seconds",
     META_OUTBOUND_STALE_AFTER_HOURS_SETTING,
     "feature_lead_management_actions_enabled",
+    "feature_manual_lead_assignment_offer_choice_enabled",
     FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
@@ -149,6 +151,7 @@ export default async function SuperAdminSettingsPage() {
     settingMap.get("feature_lead_distribution_jobs_enabled") !== "false";
   const leadManagementActionsEnabled =
     settingMap.get("feature_lead_management_actions_enabled") !== "false";
+  const manualLeadAssignmentOfferChoiceEnabled = settingMap.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false";
   const unlinkedConversationDeletionEnabled =
     settingMap.get(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key) !== "false";
   const distributionBatchSize = settingMap.get("lead_distribution_jobs_batch_size") ?? "25";
@@ -1100,6 +1103,35 @@ export default async function SuperAdminSettingsPage() {
                   <Button type="submit" variant="outline">
                     Salvar personalização
                   </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Escolha de oferta na atribuição manual</CardTitle>
+                <CardDescription>
+                  Permite que Gestores e Diretores escolham entre atribuição direta com aviso interno ou oferta exclusiva com aceite por WhatsApp.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateManualLeadAssignmentOfferChoiceSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="manualLeadAssignmentOfferChoiceEnabled"
+                      value="true"
+                      defaultChecked={manualLeadAssignmentOfferChoiceEnabled}
+                      className="size-4 accent-primary"
+                    />
+                    <span>
+                      <span className="font-medium">Escolha de oferta manual habilitada</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Ativada por padrão. Desative para restaurar a atribuição direta sem exibir o diálogo.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
                 </form>
               </CardContent>
             </Card>

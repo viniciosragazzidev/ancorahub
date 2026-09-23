@@ -1281,3 +1281,33 @@ unidades. A unidade e a fila do lead permanecem inalteradas; somente o corretor
 responsável muda. O servidor revalida tenant, acesso ao lead, fila, horário,
 origem e escala no momento da atribuição. Sem plantão correspondente ativo, a
 reatribuição permanece limitada à unidade atual do lead.
+
+## DEC-117 — Balanceamento automático entre unidades elegíveis
+
+**Decisão aprovada em 2026-09-23 por solicitação do Diretor.** Quando uma entrada
+automática puder ser atendida por mais de uma unidade ativa e permitida pela fila
+e pela política, o motor escolhe a unidade com menos leads não arquivados e não
+excluídos no tenant. A leitura de volume e a reserva da unidade acontecem sob
+lock transacional por tenant para impedir que workers concorrentes reutilizem o
+mesmo retrato de carga. O balanceamento é aplicado antes da escolha do corretor;
+regras com uma única unidade, campanhas explicitamente direcionadas e atribuições
+manuais continuam respeitando seu destino. O balanceamento não move leads já
+recebidos e não promete igualdade em períodos com conjuntos elegíveis diferentes.
+
+## DEC-118 — Escolha de aceite na atribuição manual individual
+
+**Decisão aprovada em 2026-09-23 pelo Diretor.** Ao atribuir individualmente um
+lead sem corretor, Diretor/Gestor escolhem entre vincular diretamente e enviar uma
+oferta de aceite. A opção direta confirma o owner sem WhatsApp de aceite, mas
+mantém a notificação interna/push. A opção de oferta cria uma oferta exclusiva
+para o corretor selecionado, com `new_lead_broker` e prazo igual ao valor
+`slaFirstContactMinutes` configurado para redistribuição. O prazo do SLA de
+primeiro contato após o aceite continua valendo normalmente; o toggle de
+redistribuição após falta de primeiro contato não desativa o retorno de uma oferta
+recusada, expirada ou definitivamente não entregue. Nesses casos, a oferta é
+encerrada de forma idempotente, o owner provisório só é liberado se ainda pertencer
+àquela tentativa e o lead volta ao motor normal. Falha transitória permanece na
+outbox até recuperação/expiração. O escopo é somente atribuição individual de lead
+sem owner; alterações de owner, lote e distribuição automática preservam seu
+comportamento. Um kill switch global do Super-admin controla a nova escolha e sua
+alteração é auditada.

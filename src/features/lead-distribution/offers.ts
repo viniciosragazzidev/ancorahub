@@ -11,7 +11,7 @@ import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy"
 import { reserveQueueCapacitySlot } from "./queue-capacity";
 
 import { normalizePhone } from "@/shared/utils/phone";
-import { buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
+import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
 
 function samePhone(left: string, right: string) {
   const a = normalizePhone(left);
@@ -51,9 +51,10 @@ export async function createLeadOffersForBrokers(input: {
   cycleStartedAt?: Date | null;
   queueId?: string | null;
   capacityPerBroker?: number | null;
+  assignmentSource?: "automatic_offer" | "manual_offer";
 }) {
   const db = getDatabase();
-  const timeoutMinutes = Math.max(1, Math.min(input.responseTimeoutMinutes ?? 3, 60));
+  const timeoutMinutes = Math.max(1, Math.min(input.responseTimeoutMinutes ?? 3, input.assignmentSource === "manual_offer" ? 1440 : 60));
   const now = new Date();
   const expiresAt = new Date(now.getTime() + timeoutMinutes * 60_000);
 
@@ -104,6 +105,7 @@ export async function createLeadOffersForBrokers(input: {
 
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
   let capacityReached = false;
+  let permanentDeliveryFailure = false;
 
   for (const broker of brokers) {
     const destinationPhone = broker.phone;
@@ -112,13 +114,17 @@ export async function createLeadOffersForBrokers(input: {
       // Serialize offer creation per lead. This is the final guard against two
       // workers creating simultaneous active offers for different brokers.
       const [lockedLead] = await tx
-        .select({ id: schema.leads.id, corretorId: schema.leads.corretorId })
+        .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, archivedAt: schema.leads.archivedAt, deletedAt: schema.leads.deletedAt, status: schema.leads.status })
         .from(schema.leads)
         .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
         .for("update")
         .limit(1);
 
       if (!lockedLead || lockedLead.corretorId !== (input.expectedCurrentBrokerId ?? null)) return null;
+      if (input.assignmentSource === "manual_offer" && (
+        lockedLead.archivedAt || lockedLead.deletedAt ||
+        !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lockedLead.status)
+      )) return null;
 
       const commitOffer = async () => {
       const activeOffers = await tx
@@ -178,6 +184,7 @@ export async function createLeadOffersForBrokers(input: {
           targetBranchId: input.targetBranchId,
           brokerId: broker.id,
           now,
+          assignmentSource: input.assignmentSource,
         })).where(and(
           eq(schema.leads.id, input.leadId),
           eq(schema.leads.tenantId, input.tenantId),
@@ -196,8 +203,8 @@ export async function createLeadOffersForBrokers(input: {
           previousOwnerId: input.expectedCurrentBrokerId ?? null,
           newOwnerId: broker.id,
           action: "offer_sent",
-          source: input.expectedCurrentBrokerId ? "redistribution" : "automatic",
-          strategy: "automatic",
+          source: input.assignmentSource === "manual_offer" ? "manual_manager" : input.expectedCurrentBrokerId ? "redistribution" : "automatic",
+          strategy: input.assignmentSource === "manual_offer" ? "manual" : "automatic",
           reason: input.expectedCurrentBrokerId
             ? "Responsabilidade provisória transferida ao próximo corretor elegível."
             : "Responsabilidade provisória atribuída ao primeiro corretor elegível.",
@@ -211,7 +218,7 @@ export async function createLeadOffersForBrokers(input: {
             userId: input.requestedBy,
             entidade: "lead_distribution",
             entidadeId: input.leadId,
-            acao: "lead.provisional_owner_assigned",
+            acao: input.assignmentSource === "manual_offer" ? "lead.manual_offer_provisional_owner_assigned" : "lead.provisional_owner_assigned",
           });
         }
       }
@@ -310,12 +317,12 @@ export async function createLeadOffersForBrokers(input: {
         // the lead; a concurrent manual assignment is never overwritten.
         await tx
           .update(schema.leads)
-          .set(buildDeclinedLeadReleaseUpdate(cancelledAt))
+          .set(input.assignmentSource === "manual_offer" ? buildManualOfferLeadReleaseUpdate(cancelledAt, now) : buildDeclinedLeadReleaseUpdate(cancelledAt))
           .where(and(
             eq(schema.leads.id, input.leadId),
             eq(schema.leads.tenantId, input.tenantId),
             eq(schema.leads.corretorId, broker.id),
-            eq(schema.leads.assignmentSource, "automatic_offer"),
+            eq(schema.leads.assignmentSource, input.assignmentSource ?? "automatic_offer"),
             isNull(schema.leads.deletedAt),
           ));
       });
@@ -347,6 +354,33 @@ export async function createLeadOffersForBrokers(input: {
       // unrelated backlog. The durable outbox remains the source of truth and
       // the cron worker continues to recover transient provider failures.
       const delivery = await processMetaOutboundBatch(1, input.tenantId, outbound.id);
+      if (delivery.failed > 0 && delivery.retried === 0) {
+        permanentDeliveryFailure = true;
+        const failedAt = new Date();
+        await db.transaction(async (tx) => {
+          await tx.update(schema.leadOffers)
+            .set({ status: "CANCELLED", updatedAt: failedAt })
+            .where(and(eq(schema.leadOffers.id, offerId), eq(schema.leadOffers.tenantId, input.tenantId), inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES)));
+          await tx.update(schema.leads)
+            .set(input.assignmentSource === "manual_offer" ? buildManualOfferLeadReleaseUpdate(failedAt, now) : buildDeclinedLeadReleaseUpdate(failedAt))
+            .where(and(
+              eq(schema.leads.id, input.leadId),
+              eq(schema.leads.tenantId, input.tenantId),
+              eq(schema.leads.corretorId, broker.id),
+              eq(schema.leads.assignmentSource, input.assignmentSource ?? "automatic_offer"),
+              isNull(schema.leads.deletedAt),
+              isNull(schema.leads.archivedAt),
+            ));
+        });
+        if (input.requestedBy) await db.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: input.requestedBy,
+          entidade: "lead_offer",
+          entidadeId: offerId,
+          acao: "lead_offer_delivery_failed_permanently",
+        });
+        continue;
+      }
       if (delivery.sent !== 1) {
         console.warn("[createLeadOffersForBrokers] Oferta enfileirada para recuperação do worker.", {
           tenantId: input.tenantId,
@@ -374,7 +408,7 @@ export async function createLeadOffersForBrokers(input: {
   // Delivery stays in the durable outbound queue. The scheduler owns retry and
   // provider I/O so offer creation never holds the operational interface open.
 
-  return { created: createdOffers.length, expiresAt, createdOffers, capacityReached };
+  return { created: createdOffers.length, expiresAt, createdOffers, capacityReached, permanentDeliveryFailure };
 }
 
 export async function handleLeadOfferWebhookResponse(input: {
@@ -511,14 +545,26 @@ export async function handleLeadOfferWebhookResponse(input: {
 
       if (!updatedOffer) return false;
 
-      await tx.update(schema.leads)
-        .set(buildDeclinedLeadReleaseUpdate(declinedAt))
+      const [provisionalLead] = await tx.select({
+        assignmentSource: schema.leads.assignmentSource,
+      }).from(schema.leads).where(and(
+        eq(schema.leads.id, offer.leadId),
+        eq(schema.leads.tenantId, input.tenantId),
+        eq(schema.leads.corretorId, broker.id),
+        inArray(schema.leads.assignmentSource, ["automatic_offer", "manual_offer"]),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
+      )).for("update").limit(1);
+
+      if (provisionalLead?.assignmentSource) await tx.update(schema.leads)
+        .set(provisionalLead.assignmentSource === "manual_offer" ? buildManualOfferLeadReleaseUpdate(declinedAt, offer.offeredAt) : buildDeclinedLeadReleaseUpdate(declinedAt))
         .where(and(
           eq(schema.leads.id, offer.leadId),
           eq(schema.leads.tenantId, input.tenantId),
           eq(schema.leads.corretorId, broker.id),
-          eq(schema.leads.assignmentSource, "automatic_offer"),
+          eq(schema.leads.assignmentSource, provisionalLead.assignmentSource),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
         ));
 
       return true;
@@ -781,8 +827,11 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
       leadId: schema.leadOffers.leadId,
       brokerId: schema.leadOffers.brokerId,
       outboundMessageId: schema.leadOffers.outboundMessageId,
+      assignmentSource: schema.leads.assignmentSource,
+      offeredAt: schema.leadOffers.offeredAt,
     })
     .from(schema.leadOffers)
+    .leftJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, schema.leadOffers.tenantId)))
     .where(
       and(
         tenantId ? eq(schema.leadOffers.tenantId, tenantId) : undefined,
@@ -827,6 +876,21 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
 
     if (updated) {
       expiredCount += 1;
+
+      const releasedManualOffer = offer.assignmentSource === "manual_offer"
+        ? await db.update(schema.leads)
+            .set(buildManualOfferLeadReleaseUpdate(now, offer.offeredAt))
+            .where(and(
+              eq(schema.leads.id, offer.leadId),
+              eq(schema.leads.tenantId, offer.tenantId),
+              eq(schema.leads.corretorId, offer.brokerId),
+              eq(schema.leads.assignmentSource, "manual_offer"),
+              isNull(schema.leads.deletedAt),
+              isNull(schema.leads.archivedAt),
+              inArray(schema.leads.status, ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]),
+            ))
+            .returning({ id: schema.leads.id })
+        : [];
 
       // DEC-049: an expired offer must never be delivered afterwards. Cancel
       // the queued outbox row immediately so the broker does not receive an
@@ -884,6 +948,15 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
         entidadeId: offer.id,
         acao: "lead_offer_expired",
       });
+
+      if (releasedManualOffer.length) {
+        const { enqueueAndProcessLeadDistribution } = await import("./jobs");
+        await enqueueAndProcessLeadDistribution({
+          tenantId: offer.tenantId,
+          leadId: offer.leadId,
+          source: "manual_offer_expired",
+        });
+      }
     }
   }
 

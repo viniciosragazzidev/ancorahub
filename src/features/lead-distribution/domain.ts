@@ -136,18 +136,34 @@ export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number)
   return { assigned, minimum, missing: Math.max(0, minimum - assigned), covered: assigned >= minimum };
 }
 
-export type DistributionBranchCandidate = { id: string; activeLeads: number; createdAt: Date };
+export type DistributionBranchCandidate = { id: string; receivedLeads: number; createdAt: Date };
 
-/** Stable load-based routing for intake that has no unit rule. */
+/** Balance automatic intake across the currently eligible units. */
 export function selectDistributionBranch(
   branches: DistributionBranchCandidate[],
   random: () => number = Math.random,
 ): DistributionBranchCandidate | null {
-  // Ties (near-empty units almost always tie at 0 active leads) used to fall
-  // back to createdAt/id, so the same single oldest unit absorbed every lead
-  // for as long as load stayed even across a 14-unit tenant. Shuffle first —
-  // Array.prototype.sort is stable, so the tie stays in this random order.
-  return shuffle(branches, random).sort((a, b) => a.activeLeads - b.activeLeads)[0] ?? null;
+  // Count received leads rather than only leads in active commercial statuses:
+  // closed and queued leads still contribute to the unit's share of intake.
+  // Shuffling first makes an equal-load tie fair without relying on insertion order.
+  return shuffle(branches, random).sort((a, b) => a.receivedLeads - b.receivedLeads)[0] ?? null;
+}
+
+/**
+ * Run branch selection and its durable reservation inside one caller-provided
+ * lock. Production uses a tenant-scoped PostgreSQL transaction lock; keeping
+ * the seam generic lets tests exercise the concurrent selection pattern.
+ */
+export async function reserveDistributionBranch<T>(input: {
+  withLock: <Result>(work: () => Promise<Result>) => Promise<Result>;
+  getCandidates: () => Promise<DistributionBranchCandidate[]>;
+  reserve: (branch: DistributionBranchCandidate) => Promise<T>;
+}): Promise<{ status: "empty" } | { status: "reserved"; branch: DistributionBranchCandidate; value: T }> {
+  return input.withLock(async () => {
+    const branch = selectDistributionBranch(await input.getCandidates());
+    if (!branch) return { status: "empty" } as const;
+    return { status: "reserved", branch, value: await input.reserve(branch) } as const;
+  });
 }
 
 export function isDeferredDistributionReason(reason: string) {
@@ -187,6 +203,7 @@ export function buildPendingLeadOfferLeadUpdate(input: {
   targetBranchId: string;
   brokerId: string;
   now: Date;
+  assignmentSource?: "automatic_offer" | "manual_offer";
 }) {
   return {
     branchId: input.targetBranchId,
@@ -194,7 +211,7 @@ export function buildPendingLeadOfferLeadUpdate(input: {
     status: "distributed" as const,
     distributionStatus: "assigned" as const,
     assignedAt: input.now,
-    assignmentSource: "automatic_offer" as const,
+    assignmentSource: input.assignmentSource ?? "automatic_offer" as const,
     assignmentStrategy: "whatsapp_offer" as const,
     distributionUpdatedAt: input.now,
     stageEnteredAt: input.now,
@@ -203,6 +220,20 @@ export function buildPendingLeadOfferLeadUpdate(input: {
     serviceStartedBy: null,
     motivoPerda: null,
     updatedAt: input.now,
+  };
+}
+
+/** Preserve a manually offered broker in the current cycle's attempt history when releasing its provisional owner. */
+export function buildManualOfferLeadReleaseUpdate(now: Date, cycleStartedAt: Date) {
+  return {
+    corretorId: null,
+    status: "distributed" as const,
+    distributionStatus: "queued" as const,
+    assignmentSource: "redistribution" as const,
+    distributionUpdatedAt: cycleStartedAt,
+    stageEnteredAt: now,
+    assignedAt: null,
+    updatedAt: now,
   };
 }
 

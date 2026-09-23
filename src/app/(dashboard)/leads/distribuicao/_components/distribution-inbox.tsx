@@ -12,6 +12,7 @@ import {
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { Archive, Download } from "lucide-react";
+import { MessageCircle, UserRoundCheck } from "lucide-react";
 import {
   ArrowRight,
   CheckCircle,
@@ -224,8 +225,122 @@ function ActionForm({
   );
 }
 
+function ManualAssignmentChoiceDialog({
+  lead,
+  brokerId,
+  onCommitted,
+}: {
+  lead: Lead;
+  brokerId: string;
+  onCommitted: (state: DistributionActionState) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const handleCommitted = (state: DistributionActionState) => {
+    onCommitted(state);
+    setOpen(false);
+    setSubmitting(false);
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={() => setOpen(true)}>
+        <UserList className="size-4" /> Atribuir
+      </Button>
+      <DialogPopup className="sm:max-w-lg">
+        <DialogPanel>
+          <DialogHeader>
+            <DialogTitle>Como deseja enviar este lead?</DialogTitle>
+            <DialogDescription>
+              {lead.name} será enviado para o corretor selecionado. Escolha se ele recebe uma oferta no WhatsApp ou uma atribuição direta.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <ChoiceSubmitForm
+              lead={lead}
+              brokerId={brokerId}
+              mode="direct"
+              title="Não enviar mensagem de aceite"
+              description="Atribui o lead imediatamente e mantém o aviso interno/push."
+              buttonLabel="Atribuir direto"
+              disabled={submitting}
+              onSubmitting={setSubmitting}
+              onCommitted={handleCommitted}
+            />
+            <ChoiceSubmitForm
+              lead={lead}
+              brokerId={brokerId}
+              mode="offer"
+              title="Enviar mensagem para aceite"
+              description="Envia a oferta exclusiva; sem aceite no prazo configurado, o lead volta à distribuição normal."
+              buttonLabel="Enviar oferta"
+              disabled={submitting}
+              onSubmitting={setSubmitting}
+              onCommitted={handleCommitted}
+            />
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
+          </DialogFooter>
+        </DialogPanel>
+      </DialogPopup>
+    </Dialog>
+  );
+}
+
+function ChoiceSubmitForm({
+  lead,
+  brokerId,
+  mode,
+  title,
+  description,
+  buttonLabel,
+  disabled,
+  onSubmitting,
+  onCommitted,
+}: {
+  lead: Lead;
+  brokerId: string;
+  mode: "direct" | "offer";
+  title: string;
+  description: string;
+  buttonLabel: string;
+  disabled: boolean;
+  onSubmitting: (value: boolean) => void;
+  onCommitted: (state: DistributionActionState) => void;
+}) {
+  const router = useRouter();
+  const [state, formAction, pending] = useActionState(assignLeadToBrokerAction, {});
+  useActionFeedback(state, "atribuir lead");
+  const handledMutationRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!state.mutationId || handledMutationRef.current === state.mutationId) return;
+    handledMutationRef.current = state.mutationId;
+    onSubmitting(false);
+    if (!state.success) return;
+    onCommitted(state);
+    startTransition(() => router.refresh());
+  }, [onCommitted, onSubmitting, router, state]);
+
+  return (
+    <form action={formAction} onSubmit={() => onSubmitting(true)} className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+      <input type="hidden" name="leadId" value={lead.id} />
+      <input type="hidden" name="brokerId" value={brokerId} />
+      <input type="hidden" name="assignmentMode" value={mode} />
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      </div>
+      <ActionButton pending={pending || disabled} variant={mode === "offer" ? "default" : "outline"}>
+        {mode === "offer" ? <MessageCircle className="size-4" /> : <UserRoundCheck className="size-4" />}
+        {buttonLabel}
+      </ActionButton>
+    </form>
+  );
+}
+
 export function DistributionInbox({
   role,
+  manualAssignmentChoiceEnabled,
   totalUnassigned,
   leads,
   branches,
@@ -233,6 +348,7 @@ export function DistributionInbox({
   initialStatusFilter = "all",
 }: {
   role: string;
+  manualAssignmentChoiceEnabled: boolean;
   totalUnassigned: number;
   leads: Lead[];
   branches: Branch[];
@@ -725,14 +841,22 @@ export function DistributionInbox({
                                     ]}
                                   />
                                   {brokerByLead[lead.id] ? (
-                                    <ActionForm
-                                      action={assignLeadToBrokerAction}
-                                      fields={{ leadId: lead.id, brokerId: brokerByLead[lead.id] }}
-                                      label={`atribuir lead ${lead.name}`}
-                                      onCommitted={applySingleCommit}
-                                    >
-                                      <UserList /> Atribuir
-                                    </ActionForm>
+                                    manualAssignmentChoiceEnabled ? (
+                                      <ManualAssignmentChoiceDialog
+                                        lead={lead}
+                                        brokerId={brokerByLead[lead.id]}
+                                        onCommitted={applySingleCommit}
+                                      />
+                                    ) : (
+                                      <ActionForm
+                                        action={assignLeadToBrokerAction}
+                                        fields={{ leadId: lead.id, brokerId: brokerByLead[lead.id] }}
+                                        label={`atribuir lead ${lead.name}`}
+                                        onCommitted={applySingleCommit}
+                                      >
+                                        <UserList /> Atribuir
+                                      </ActionForm>
+                                    )
                                   ) : null}
                                   {lead.distributionStatus !== "manual_hold" ? (
                                     <ActionForm

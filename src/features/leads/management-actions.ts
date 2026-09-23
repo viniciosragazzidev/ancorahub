@@ -17,13 +17,17 @@ import { withServerActionTiming } from "@/shared/observability/request-timing";
 import { canRemoveLeadAssignment, getLeadAssignmentBlockedReason } from "./assignment-domain";
 import { getActiveQueueDutyRoster } from "@/features/lead-distribution/active-queue-duty-roster";
 import { canManuallyAssignLeadToBroker } from "@/features/lead-distribution/duty-roster-matching";
+import { offerLeadToBrokerManually } from "@/features/lead-distribution/service";
+import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
-const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable() });
+const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable(), assignmentMode: z.enum(["direct", "offer"]).optional() });
 
 export type ManagementActionState = {
   success?: boolean;
   error?: string;
   warning?: string;
+  message?: string;
   mutationId?: string;
   entity?: {
     leadId: string;
@@ -223,10 +227,13 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
   return withServerActionTiming("/leads", "leads.reassign", async () => {
     const mutationId = randomUUID();
     try {
-      const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null });
+      const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null, assignmentMode: formData.get("assignmentMode") || undefined });
       const { context, db, lead } = await getManagedLead(input.leadId);
       if (["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) throw new Error("Este lead já está em atendimento. Finalize ou libere o atendimento atual antes de reatribuir.");
       if (!input.brokerId) throw new Error("Selecione um corretor para reatribuir o lead.");
+      const assignmentChoiceEnabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
+      if (!lead.corretorId && assignmentChoiceEnabled && !input.assignmentMode) throw new Error("Escolha se deseja atribuir direto ou enviar uma oferta para aceite.");
+      if (input.assignmentMode && (!assignmentChoiceEnabled || lead.corretorId)) throw new Error("Esta escolha está disponível somente para leads sem corretor e quando habilitada pelo Super-admin.");
       const brokerId = input.brokerId;
       const assignmentEventId = randomUUID();
       const dutyRoster = await getActiveQueueDutyRoster({
@@ -248,6 +255,17 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
         throw new Error(dutyRoster.hasActiveDuty
           ? "O corretor selecionado não está escalado no plantão ativo desta fila."
           : "O corretor selecionado não pertence à filial deste lead.");
+      }
+      if (input.assignmentMode === "offer") {
+        const offered = await offerLeadToBrokerManually(context, lead.id, brokerId);
+        if (offered.status === "conflict") throw new Error(offered.reason);
+        if (offered.status === "fallback") {
+          await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId: lead.id, source: "manual_offer_delivery_failed" });
+          return { success: true, message: offered.reason, mutationId, entity: { leadId: lead.id, branchId: lead.branchId, corretorId: null, status: lead.status, distributionStatus: "queued" } };
+        }
+        await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id, runAfter: offered.expiresAt });
+        void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId, branchIds: [lead.branchId, broker.branchId].filter((id): id is string => Boolean(id)), brokerIds: [brokerId] }).catch(() => undefined);
+        return { success: true, message: "Oferta enviada ao corretor. Se não houver aceite no prazo configurado, o lead volta à distribuição normal.", mutationId, entity: { leadId: lead.id, branchId: lead.branchId, corretorId: brokerId, status: "distributed", distributionStatus: "assigned" } };
       }
       const now = new Date();
       const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
@@ -309,6 +327,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
             brokerId,
             leadName: lead.nome,
             isRedistribution: lead.corretorId ? "true" : "false",
+            ...(input.assignmentMode === "direct" ? { skipBrokerWhatsapp: "true" } : {}),
           },
         });
       });

@@ -214,6 +214,7 @@ export function LeadsWorkspace({
   slaStagnantDays = 3,
   brokers = [],
   branches = [],
+  manualAssignmentChoiceEnabled = true,
   pageSize = 20,
   pagination,
   unassignedLeads = [],
@@ -231,6 +232,7 @@ export function LeadsWorkspace({
   slaStagnantDays?: number;
   brokers?: Array<{ id: string; name: string; branchId: string | null }>;
   branches?: Array<{ id: string; name: string }>;
+  manualAssignmentChoiceEnabled?: boolean;
   pageSize?: number;
   pagination?: {
     currentPage: number;
@@ -974,6 +976,7 @@ export function LeadsWorkspace({
                       leadName={selectedLead.nome}
                       brokers={filteredBrokers}
                       branches={branches}
+                      manualAssignmentChoiceEnabled={manualAssignmentChoiceEnabled}
                       leadQueueId={selectedLead.queueId}
                       contextRole={contextRole}
                       currentStatus={selectedLead.status}

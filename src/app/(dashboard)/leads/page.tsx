@@ -202,6 +202,7 @@ async function LeadsPageContent({
   const systemSettingsPromise = getSystemSettings([
         "feature_central_atencao_stagnant_days",
         "feature_lead_management_actions_enabled",
+        "feature_manual_lead_assignment_offer_choice_enabled",
         ...(eligibleCampaignsOnly ? [`meta_lead_capture_mode_${context.tenantId}`] : []),
       ]);
   const userBranchPromise = context.branchId
@@ -718,6 +719,7 @@ async function LeadsPageContent({
               slaStagnantDays={slaStagnantDays}
               brokers={brokers}
               branches={branches}
+              manualAssignmentChoiceEnabled={systemSettings.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false"}
               pageSize={pageSize}
               unassignedLeads={unassignedRows.map((lead) => ({
                 ...lead,

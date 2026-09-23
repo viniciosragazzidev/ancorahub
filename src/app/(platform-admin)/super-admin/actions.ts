@@ -780,6 +780,22 @@ export async function updateLeadManagementActionsSettingsAction(formData: FormDa
 
 }
 
+export async function updateManualLeadAssignmentOfferChoiceSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("manualLeadAssignmentOfferChoiceEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_manual_lead_assignment_offer_choice_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "manual_lead_assignment_offer_choice.settings_updated",
+    targetType: "system_settings",
+    targetId: "feature_manual_lead_assignment_offer_choice_enabled",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
 export async function updateUnlinkedConversationDeletionSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("unlinkedConversationDeletionEnabled") === "true" ? "true" : "false";

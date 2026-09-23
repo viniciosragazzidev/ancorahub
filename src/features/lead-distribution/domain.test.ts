@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, selectDistributionBranch, shuffle } from "./domain";
+import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shuffle } from "./domain";
 
 describe("shuffle", () => {
   it("returns a permutation of the input — same elements, same length", () => {
@@ -22,41 +22,50 @@ describe("shuffle", () => {
 });
 
 describe("automatic unit routing", () => {
-  it("never picks a more loaded unit over a less loaded one", () => {
+  it("chooses the unit with the fewest leads received rather than the fewest active leads", () => {
     const branches = [
-      { id: "unit-b", createdAt: new Date("2026-01-01"), activeLeads: 4 },
-      { id: "unit-c", createdAt: new Date("2026-01-03"), activeLeads: 1 },
-      { id: "unit-a", createdAt: new Date("2026-01-02"), activeLeads: 1 },
+      { id: "unit-b", createdAt: new Date("2026-01-02"), receivedLeads: 37 },
+      { id: "unit-c", createdAt: new Date("2026-01-03"), receivedLeads: 3 },
+      { id: "unit-a", createdAt: new Date("2026-01-01"), receivedLeads: 9 },
     ];
-    for (let i = 0; i < 50; i++) {
-      expect(selectDistributionBranch(branches)?.activeLeads).toBe(1);
-    }
+    expect(selectDistributionBranch(branches)?.id).toBe("unit-c");
     expect(selectDistributionBranch([])).toBeNull();
   });
 
-  it("spreads leads across every unit tied at the lowest load, instead of always the same one", () => {
-    // Reproduces the reported bug: many units with equal (often zero) load —
-    // a real tenant would have 14, this uses 6 to keep the test fast while
-    // still making a "same unit every time" bug astronomically unlikely to
-    // pass by chance.
-    const branches = Array.from({ length: 6 }, (_, i) => ({
-      id: `unit-${i}`,
-      createdAt: new Date(2026, 0, i + 1),
-      activeLeads: 0,
-    }));
-    const picks = new Set(Array.from({ length: 300 }, () => selectDistributionBranch(branches)?.id));
-    expect(picks.size).toBeGreaterThan(1);
-  });
+  it("serializes concurrent reservations so equal candidates cannot all use one stale load snapshot", async () => {
+    const queues = new Map<string, Array<() => void>>();
+    const held = new Set<string>();
+    const withLock = async <T>(key: string, work: () => Promise<T>) => {
+      if (held.has(key)) {
+        await new Promise<void>((resolve) => {
+          const queue = queues.get(key) ?? [];
+          queue.push(resolve);
+          queues.set(key, queue);
+        });
+      }
+      held.add(key);
+      try {
+        return await work();
+      } finally {
+        const next = queues.get(key)?.shift();
+        if (next) next();
+        else held.delete(key);
+      }
+    };
+    const received = new Map([["unit-a", 0], ["unit-b", 0], ["unit-c", 0]]);
+    const routeOne = () => reserveDistributionBranch({
+      withLock: (work) => withLock("tenant-a:automatic-unit-routing", work),
+      getCandidates: async () => [...received].map(([id, receivedLeads]) => ({ id, receivedLeads, createdAt: new Date(0) })),
+      reserve: async (branch) => {
+        received.set(branch.id, received.get(branch.id)! + 1);
+        return branch.id;
+      },
+    });
 
-  it("is reproducible given an injected random source", () => {
-    const branches = [
-      { id: "unit-b", createdAt: new Date("2026-01-01"), activeLeads: 4 },
-      { id: "unit-c", createdAt: new Date("2026-01-03"), activeLeads: 1 },
-      { id: "unit-a", createdAt: new Date("2026-01-02"), activeLeads: 1 },
-    ];
-    const first = selectDistributionBranch(branches, () => 0.5)?.id;
-    const second = selectDistributionBranch(branches, () => 0.5)?.id;
-    expect(first).toBe(second);
+    const results = await Promise.all(Array.from({ length: 120 }, routeOne));
+
+    expect(results.every((result) => result.status === "reserved")).toBe(true);
+    expect([...received.values()]).toEqual([40, 40, 40]);
   });
 });
 
@@ -119,6 +128,41 @@ describe("lead offer ownership", () => {
       motivoPerda: null,
       updatedAt: now,
     });
+  });
+
+  it("marks a manually selected offer separately so expiry can release only that provisional owner", () => {
+    const now = new Date("2026-09-23T12:00:00Z");
+    const pendingUpdate = buildPendingLeadOfferLeadUpdate({
+      targetBranchId: "unit-a",
+      brokerId: "broker-selected",
+      now,
+      assignmentSource: "manual_offer",
+    });
+
+    expect(pendingUpdate.assignmentSource).toBe("manual_offer");
+    expect(pendingUpdate.corretorId).toBe("broker-selected");
+    expect(buildPendingLeadOfferLeadUpdate({
+      targetBranchId: "unit-a",
+      brokerId: "broker-auto",
+      now,
+    }).assignmentSource).toBe("automatic_offer");
+  });
+
+  it("keeps a declined manual offer in the current distribution cycle so fallback does not immediately re-offer the same broker", () => {
+    const startedAt = new Date("2026-09-23T12:00:00Z");
+    const releasedAt = new Date("2026-09-23T12:05:00Z");
+    const release = buildManualOfferLeadReleaseUpdate(releasedAt, startedAt);
+
+    expect(release.corretorId).toBeNull();
+    expect(release.distributionStatus).toBe("queued");
+    expect(release.distributionUpdatedAt).toBe(startedAt);
+    const cycle = resolveLeadOfferCycle({
+      eligibleBrokerIds: ["broker-selected", "broker-next"],
+      cycleStartedAt: release.distributionUpdatedAt,
+      offers: [{ brokerId: "broker-selected", status: "DECLINED", offeredAt: startedAt, expiresAt: releasedAt }],
+      now: releasedAt,
+    });
+    expect(cycle.remainingBrokerIds).toEqual(["broker-next"]);
   });
 });
 

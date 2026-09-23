@@ -6,6 +6,7 @@ import { Workflow, ArrowUpRight, Inbox as InboxIcon } from "lucide-react";
 import { DistributionMetrics } from "./_components/distribution-dashboard";
 import { DistributionInbox } from "./_components/distribution-inbox";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { AppPageHeader } from "@/components/app-page-header";
 import { DsDashboardCard } from "@/components/ui/ds-dashboard-card";
@@ -832,6 +833,7 @@ export default async function LeadDistributionPage({
                   <DistributionInbox
                     key={queueFilter}
                     role={context.role}
+                    manualAssignmentChoiceEnabled={(await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"}
                     totalUnassigned={totalUnassignedForArchive}
                     initialStatusFilter={queueFilter}
                     branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}

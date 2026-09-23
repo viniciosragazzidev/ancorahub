@@ -1,5 +1,5 @@
 export type LeadDistributionStatus = "unassigned" | "awaiting_unit" | "queued" | "assigning" | "assigned" | "distribution_failed" | "returned_to_queue" | "manual_hold";
-export type AssignmentSource = "manual_director" | "manual_manager" | "automatic" | "automatic_offer" | "duty_schedule" | "redistribution" | "system_recovery";
+export type AssignmentSource = "manual_director" | "manual_manager" | "automatic" | "automatic_offer" | "manual_offer" | "duty_schedule" | "redistribution" | "system_recovery";
 export type AssignmentStrategy = "round_robin" | "capacity" | "manual" | "duty_schedule" | "whatsapp_offer";
 export const dutyFallbackPolicyValues = ["unit_roster", "wait_next_duty", "fallback_queue"] as const;
 export type DutyFallbackPolicy = (typeof dutyFallbackPolicyValues)[number];

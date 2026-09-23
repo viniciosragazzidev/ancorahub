@@ -9,9 +9,10 @@ import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import {
   routeLeadToBranch,
   assignLeadToBroker,
+  offerLeadToBrokerManually,
   routeLeadToBranchAndAssignBroker,
 } from "./service";
-import { enqueueLeadDistributionJob, runLeadDistributionProcessor, wakeLeadDistributionJob } from "./jobs";
+import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob, runLeadDistributionProcessor, wakeLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
@@ -22,6 +23,7 @@ import { revalidatePath } from "next/cache";
 import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution, syncDutySchedulesIntoQueue } from "./control-service";
 import { selectBulkDistributionCandidateIds } from "./bulk-recovery";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -385,22 +387,57 @@ export async function assignLeadToBrokerAction(
 ): Promise<DistributionActionState> {
   const mutationId = randomUUID();
   const parsed = z
-    .object({ leadId, brokerId, reason: z.string().trim().min(3).max(200).optional() })
+    .object({ leadId, brokerId, reason: z.string().trim().min(3).max(200).optional(), assignmentMode: z.enum(["direct", "offer"]).optional() })
     .safeParse({
       leadId: formData.get("leadId"),
       brokerId: formData.get("brokerId"),
       reason: String(formData.get("reason") ?? "") || undefined,
+      assignmentMode: formData.get("assignmentMode") || undefined,
     });
   if (!parsed.success)
     return { mutationId, error: parsed.error.issues[0]?.message ?? "Selecione um corretor válido." };
   try {
     const context = await getRequiredTenantContext();
+    if (parsed.data.assignmentMode) {
+      const enabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
+      if (!enabled) return { mutationId, error: "A escolha de oferta foi desativada pelo Super-admin. Atualize a página e tente novamente." };
+
+      if (parsed.data.assignmentMode === "offer") {
+        const offered = await offerLeadToBrokerManually(context, parsed.data.leadId, parsed.data.brokerId);
+        if (offered.status === "conflict") return { mutationId, error: offered.reason };
+        if (offered.status === "fallback") {
+          const fallback = await enqueueAndProcessLeadDistribution({
+            tenantId: context.tenantId,
+            leadId: parsed.data.leadId,
+            source: "manual_offer_delivery_failed",
+          });
+          continueLeadDistributionAfterResponse({ tenantId: context.tenantId, leadId: parsed.data.leadId, actorId: context.userId });
+          return {
+            success: true,
+            mutationId,
+            message: `${offered.reason}${fallback?.offered ? " A distribuição normal já iniciou outra oferta." : ""}`,
+            entity: { leadId: parsed.data.leadId, corretorId: null, distributionStatus: "queued" },
+          };
+        }
+        await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId, runAfter: offered.expiresAt });
+        void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId, branchIds: undefined }).catch(() => {});
+        return {
+          success: true,
+          mutationId,
+          message: "Oferta enviada ao corretor. O lead volta à distribuição normal se não houver aceite no prazo configurado.",
+          entity: { leadId: parsed.data.leadId, corretorId: parsed.data.brokerId, distributionStatus: "assigned" },
+        };
+      }
+    }
     const result = await assignLeadToBroker(
       context,
       parsed.data.leadId,
       parsed.data.brokerId,
       undefined,
       parsed.data.reason,
+      undefined,
+      undefined,
+      parsed.data.assignmentMode === "direct" ? { skipBrokerWhatsApp: true, requireUnassigned: true } : undefined,
     );
     if (result.status !== "assigned") return { mutationId, error: result.reason };
     continueLeadDistributionAfterResponse({
