@@ -22,6 +22,7 @@ import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-
 import { isMediaKindSupported } from "@/features/conversations/media-kinds";
 import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
+import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -38,12 +39,25 @@ export const maxDuration = 300;
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadId?: string; tab?: string }>;
+  searchParams: Promise<{ leadId?: string; lead?: string; tab?: string }>;
 }) {
-  const { leadId, tab } = await searchParams;
+  const { leadId: leadIdParam, lead: leadAlias, tab } = await searchParams;
+  // WhatsApp offer/assignment messages link here with `?lead=`.
+  const leadId = leadIdParam ?? leadAlias;
   const context = await getRequiredTenantContext();
   if (!hasPermission(context.role, "acessar_conversas")) {
     redirect("/minha-fila");
+  }
+
+  // "Aceitar Lead" in the text-fallback offer message is this very link: opening
+  // it as the offered broker is the acceptance (no-op if there is no active offer).
+  if (leadAlias && context.role === "broker") {
+    await handleLeadOfferWebhookResponse({
+      tenantId: context.tenantId,
+      brokerId: context.userId,
+      leadId: leadAlias,
+      buttonText: "aceitar",
+    }).catch((error) => console.error("[conversas] accept via link failed", error));
   }
 
   // A experiência Lite conectada é exclusiva do corretor. Enquanto o controle

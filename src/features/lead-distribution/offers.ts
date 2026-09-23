@@ -413,14 +413,17 @@ export async function createLeadOffersForBrokers(input: {
 
 export async function handleLeadOfferWebhookResponse(input: {
   tenantId: string;
-  phone: string;
+  phone?: string;
+  /** CRM-link acceptance: the authenticated broker is already known, so phone matching is skipped. */
+  brokerId?: string;
+  leadId?: string;
   buttonText?: string;
   buttonPayload?: string;
   providerMessageId?: string;
 }) {
   const db = getDatabase();
-  const phone = normalizePhone(input.phone);
-  if (!phone) return { processed: false, reason: "invalid_phone" };
+  const phone = input.phone ? normalizePhone(input.phone) : null;
+  if (!phone && !input.brokerId) return { processed: false, reason: "invalid_phone" };
 
   // 1. Find broker user by phone number
   const allUsers = await db
@@ -447,7 +450,9 @@ export async function handleLeadOfferWebhookResponse(input: {
       eq(schema.user.status, "active"),
     ));
 
-  const broker = allUsers.find((u) => u.phone && samePhone(u.phone, phone));
+  const broker = input.brokerId
+    ? allUsers.find((u) => u.id === input.brokerId)
+    : allUsers.find((u) => u.phone && phone && samePhone(u.phone, phone));
   if (!broker) return { processed: false, reason: "broker_not_found" };
 
   // 2. Find matching offer for this broker
@@ -506,6 +511,7 @@ export async function handleLeadOfferWebhookResponse(input: {
         and(
           eq(schema.leadOffers.tenantId, input.tenantId),
           eq(schema.leadOffers.brokerId, broker.id),
+          input.leadId ? eq(schema.leadOffers.leadId, input.leadId) : undefined,
           inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
         ),
       )
@@ -799,6 +805,8 @@ export async function handleLeadOfferWebhookResponse(input: {
     // Send unavailable template to broker who lost the dispute
     const brokerName = broker.name || "Corretor(a)";
     const destPhone = broker.phone || input.phone;
+    // CRM-link acceptance has no WhatsApp thread to answer in; the UI reports the outcome.
+    if (!destPhone || input.brokerId) return { processed: true, action: "accepted", won: false, reason: result.reason };
 
     const unavailableOutbound = await enqueueMetaTemplateMessage({
       tenantId: input.tenantId,
@@ -829,6 +837,10 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
       outboundMessageId: schema.leadOffers.outboundMessageId,
       assignmentSource: schema.leads.assignmentSource,
       offeredAt: schema.leadOffers.offeredAt,
+      leadCorretorId: schema.leads.corretorId,
+      leadStatus: schema.leads.status,
+      leadFirstContactAt: schema.leads.firstContactAt,
+      leadServiceStartedAt: schema.leads.serviceStartedAt,
     })
     .from(schema.leadOffers)
     .leftJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, schema.leadOffers.tenantId)))
@@ -858,6 +870,25 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
       await db
         .update(schema.leadOffers)
         .set({ status: "EXPIRED", updatedAt: now })
+        .where(and(eq(schema.leadOffers.id, offer.id), eq(schema.leadOffers.tenantId, offer.tenantId), inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES)));
+      continue;
+    }
+
+    // The broker may have accepted through another path (e.g. starting the
+    // service from the CRM link) without the offer row flipping to ACCEPTED.
+    // If they still own the lead and already engaged with it, the offer was
+    // honoured in time: close it as ACCEPTED and never send "Tempo Expirado".
+    const acceptedElsewhere = offer.leadCorretorId === offer.brokerId
+      && Boolean(
+        offer.assignmentSource === "whatsapp_offer_accepted"
+        || offer.leadFirstContactAt
+        || offer.leadServiceStartedAt
+        || (offer.leadStatus && offer.leadStatus !== "distributed" && offer.leadStatus !== "new"),
+      );
+    if (acceptedElsewhere) {
+      await db
+        .update(schema.leadOffers)
+        .set({ status: "ACCEPTED", acceptedAt: offer.leadServiceStartedAt ?? offer.leadFirstContactAt ?? now, updatedAt: now })
         .where(and(eq(schema.leadOffers.id, offer.id), eq(schema.leadOffers.tenantId, offer.tenantId), inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES)));
       continue;
     }
