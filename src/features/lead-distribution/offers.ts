@@ -8,10 +8,28 @@ import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features
 import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables } from "@/features/communication-channels/templates";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
+import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { reserveQueueCapacitySlot } from "./queue-capacity";
 
 import { normalizePhone } from "@/shared/utils/phone";
 import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
+
+/**
+ * Tenants without an official (Meta) WhatsApp channel cannot deliver offers by
+ * WhatsApp. Their offers stay PENDING in the CRM (in-app / push only) instead of
+ * failing the send and being cancelled.
+ */
+async function tenantHasActiveMetaChannel(tenantId: string) {
+  const [channel] = await getDatabase().select({ id: schema.communicationChannels.id })
+    .from(schema.communicationChannels)
+    .where(and(
+      eq(schema.communicationChannels.tenantId, tenantId),
+      inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+      eq(schema.communicationChannels.status, "active"),
+    ))
+    .limit(1);
+  return Boolean(channel);
+}
 
 function samePhone(left: string, right: string) {
   const a = normalizePhone(left);
@@ -106,6 +124,7 @@ export async function createLeadOffersForBrokers(input: {
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
   let capacityReached = false;
   let permanentDeliveryFailure = false;
+  const whatsappEnabled = await tenantHasActiveMetaChannel(input.tenantId);
 
   for (const broker of brokers) {
     const destinationPhone = broker.phone;
@@ -272,6 +291,12 @@ export async function createLeadOffersForBrokers(input: {
           acao: "lead_offer_channel_unavailable",
         });
       }
+      continue;
+    }
+
+    if (!whatsappEnabled) {
+      // In-app offer: no outbox row; the provisional ownership set above is what keeps the lead exclusive.
+      createdOffers.push({ offerId, brokerId: broker.id });
       continue;
     }
 
