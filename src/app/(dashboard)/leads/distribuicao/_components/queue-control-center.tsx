@@ -66,6 +66,8 @@ type Queue = {
   assignmentStrategy: string;
   capacityEnabled: boolean;
   capacityPerBroker: number | null;
+  offerIntervalMinutes?: number;
+  maxPendingOffersPerBroker?: number;
   aiQualificationEnabled?: boolean;
   colorHue?: number | null;
   waiting: number;
@@ -126,6 +128,8 @@ const emptyQueue = {
   assignmentStrategy: "capacity",
   capacityEnabled: false,
   capacityPerBroker: "10",
+  offerIntervalMinutes: "5",
+  maxPendingOffersPerBroker: "1",
   aiQualificationEnabled: true,
   status: "active",
   colorHue: null as number | null,
@@ -396,6 +400,8 @@ export function QueueControlCenter({
       assignmentStrategy: queue.assignmentStrategy,
       capacityEnabled: queue.capacityEnabled,
       capacityPerBroker: String(queue.capacityPerBroker ?? 10),
+      offerIntervalMinutes: String(queue.offerIntervalMinutes ?? 5),
+      maxPendingOffersPerBroker: String(queue.maxPendingOffersPerBroker ?? 1),
       aiQualificationEnabled: queue.aiQualificationEnabled ?? true,
       status: queue.status,
       colorHue: queue.colorHue ?? pickDistinctHue(usedHuesExcept(queue.id)),
@@ -486,6 +492,8 @@ export function QueueControlCenter({
       assignmentStrategy: form.assignmentStrategy,
       capacityEnabled: form.capacityEnabled,
       capacityPerBroker: form.capacityEnabled ? Number(form.capacityPerBroker) : null,
+      offerIntervalMinutes: Math.max(0, Math.trunc(Number(form.offerIntervalMinutes) || 0)),
+      maxPendingOffersPerBroker: Math.max(0, Math.trunc(Number(form.maxPendingOffersPerBroker) || 0)),
       aiQualificationEnabled: form.aiQualificationEnabled,
       status: form.status,
       colorHue: form.colorHue,
@@ -1712,6 +1720,43 @@ export function QueueControlCenter({
                   />
                 </label>
               ) : null}
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1.5 text-sm font-medium">
+                  <span className="flex items-center gap-1.5">
+                    Intervalo entre ofertas (min)
+                    <InfoTooltip
+                      title="Intervalo entre ofertas"
+                      description="Tempo mínimo entre dois leads oferecidos ao mesmo corretor. Evita enxurrada quando leads guardados são liberados no início do plantão. Use 0 para desativar."
+                    />
+                  </span>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={120}
+                    value={form.offerIntervalMinutes}
+                    onChange={(event) => setForm({ ...form, offerIntervalMinutes: event.target.value })}
+                    className="w-full"
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-medium">
+                  <span className="flex items-center gap-1.5">
+                    Ofertas pendentes por corretor
+                    <InfoTooltip
+                      title="Ofertas pendentes"
+                      description="Quantas ofertas sem resposta o corretor pode ter ao mesmo tempo. Com 1, o próximo lead só é oferecido depois que o anterior for aceito ou expirar. Use 0 para desativar."
+                    />
+                  </span>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={form.maxPendingOffersPerBroker}
+                    onChange={(event) => setForm({ ...form, maxPendingOffersPerBroker: event.target.value })}
+                    className="w-full"
+                  />
+                </label>
+              </div>
 
               <div className="grid gap-1.5 text-sm font-medium">
                 <span>Estado</span>

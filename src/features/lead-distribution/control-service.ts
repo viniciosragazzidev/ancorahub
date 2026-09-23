@@ -28,6 +28,9 @@ const queueInput = z.object({
   assignmentStrategy: z.enum(["round_robin", "capacity"]),
   capacityEnabled: z.boolean(),
   capacityPerBroker: z.number().int().min(1).max(200).nullable(),
+  // Offer pacing (0 disables each rule). Omitted keeps the queue defaults.
+  offerIntervalMinutes: z.number().int().min(0).max(120).default(5),
+  maxPendingOffersPerBroker: z.number().int().min(0).max(20).default(1),
   aiQualificationEnabled: z.boolean().default(true),
   status: z.enum(["active", "inactive"]),
   // Omitted/null → the server assigns one automatically (create) or keeps the
@@ -323,6 +326,8 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     assignmentStrategy: input.assignmentStrategy,
     capacityEnabled: input.capacityEnabled,
     capacityPerBroker: input.capacityEnabled ? input.capacityPerBroker : null,
+    offerIntervalMinutes: input.offerIntervalMinutes,
+    maxPendingOffersPerBroker: input.maxPendingOffersPerBroker,
     aiQualificationEnabled: input.aiQualificationEnabled,
     status: input.status,
     colorHue,

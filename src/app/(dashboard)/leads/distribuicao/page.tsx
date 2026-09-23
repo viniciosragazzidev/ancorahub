@@ -393,6 +393,8 @@ export default async function LeadDistributionPage({
         assignmentStrategy: schema.leadQueues.assignmentStrategy,
         capacityEnabled: schema.leadQueues.capacityEnabled,
         capacityPerBroker: schema.leadQueues.capacityPerBroker,
+        offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes,
+        maxPendingOffersPerBroker: schema.leadQueues.maxPendingOffersPerBroker,
         aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled,
         colorHue: schema.leadQueues.colorHue,
       })

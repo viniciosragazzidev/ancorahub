@@ -173,6 +173,7 @@ export function isDeferredDistributionReason(reason: string) {
     normalized.includes("atingiram a capacity") ||
     normalized.includes("limite de capacidade da fila") ||
     normalized.includes("modo manual") ||
+    normalized.includes("intervalo entre ofertas") ||
     normalized.includes("desativada") ||
     normalized.includes("pausada") ||
     normalized.includes("fila configurada pertence") ||

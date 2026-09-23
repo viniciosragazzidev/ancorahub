@@ -523,6 +523,7 @@ describe("lead distribution domain", () => {
 
   it("keeps a queue retryable while its configured unit has no eligible broker", () => {
     expect(isDeferredDistributionReason("Nenhum corretor elegível nesta unidade.")).toBe(true);
+    expect(isDeferredDistributionReason("Aguardando intervalo entre ofertas: os corretores elegíveis receberam um lead há pouco.")).toBe(true);
     expect(isDeferredDistributionReason("A fila configurada pertence a outra unidade.")).toBe(true);
   });
 

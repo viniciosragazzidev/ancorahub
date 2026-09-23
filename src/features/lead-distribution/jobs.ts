@@ -471,7 +471,8 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
       }
       const reason = distribution.reason ?? "O lead não está pronto para atribuição automática.";
       const deferred = isDeferredDistributionReason(reason);
-      const failed = await deferOrFailJob(job, effectiveConfig, deferred ? "AWAITING_ELIGIBILITY" : "DISTRIBUTION_CONFLICT", reason, deferred);
+      const retryAt = distribution.status === "queued" ? distribution.retryAt : undefined;
+      const failed = await deferOrFailJob(job, effectiveConfig, deferred ? "AWAITING_ELIGIBILITY" : "DISTRIBUTION_CONFLICT", reason, deferred, retryAt);
       if (failed) result.failed += 1; else result.deferred += 1;
     } catch (error) {
       const failed = await deferOrFailJob(job, effectiveConfig, "PROCESSING_ERROR", sanitizeError(error), false);

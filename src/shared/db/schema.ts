@@ -630,6 +630,9 @@ export const leadQueues = pgTable(
     assignmentStrategy: text("assignment_strategy").notNull().default("capacity"),
     capacityEnabled: boolean("capacity_enabled").notNull().default(false),
     capacityPerBroker: integer("capacity_per_broker"),
+    // Offer pacing (see lead-distribution/offer-pacing.ts): 0 disables each rule.
+    offerIntervalMinutes: integer("offer_interval_minutes").notNull().default(5),
+    maxPendingOffersPerBroker: integer("max_pending_offers_per_broker").notNull().default(1),
     aiQualificationEnabled: boolean("ai_qualification_enabled").notNull().default(true),
     isDefault: boolean("is_default").notNull().default(false),
     // Hue (0-359) on the HSL wheel used to tag this queue's leads in tables/boards.

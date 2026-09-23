@@ -8,12 +8,14 @@ import type { TenantContext } from "@/shared/auth/types";
 import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
-import { createLeadOffersForBrokers } from "./offers";
+import { createLeadOffersForBrokers, loadBrokerPacingOffers } from "./offers";
+import { earliestPacingRetryAt, evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type OfferPacingDecision } from "./offer-pacing";
 import { resolveLeadDestinationRule } from "./routing-engine";
 import { getHoldDisqualifiedLeads, shouldHoldDisqualifiedLead } from "./disqualified-routing-settings";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
+import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -44,7 +46,16 @@ async function getRosterBrokerIds(
   const local = getLocalDutyParts(date);
 
   // 1. Find plantões active right now for this branch
-  const activeSchedules = await db.select({ id: schema.unitDutySchedules.id, webhookCredentialId: schema.unitDutySchedules.webhookCredentialId })
+  const activeSchedules = await db.select({
+    id: schema.unitDutySchedules.id,
+    webhookCredentialId: schema.unitDutySchedules.webhookCredentialId,
+    dayOfWeek: schema.unitDutySchedules.dayOfWeek,
+    startsAt: schema.unitDutySchedules.startsAt,
+    endsAt: schema.unitDutySchedules.endsAt,
+    timezone: schema.unitDutySchedules.timezone,
+    validFrom: schema.unitDutySchedules.validFrom,
+    validUntil: schema.unitDutySchedules.validUntil,
+  })
     .from(schema.unitDutySchedules)
     .where(and(
       eq(schema.unitDutySchedules.tenantId, tenantId),
@@ -79,7 +90,16 @@ async function getRosterBrokerIds(
   if (!matchingScheduleIds.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: true };
 
   // 3. Get brokers assigned to matching plantões right now
-  const assignments = await db.select({ brokerId: schema.dutyRosterAssignments.brokerId })
+  const assignments = await db.select({
+    id: schema.dutyRosterAssignments.id,
+    brokerId: schema.dutyRosterAssignments.brokerId,
+    scheduleId: schema.dutyRosterAssignments.scheduleId,
+    dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+    startsAt: schema.dutyRosterAssignments.startsAt,
+    endsAt: schema.dutyRosterAssignments.endsAt,
+    validFrom: schema.dutyRosterAssignments.validFrom,
+    validUntil: schema.dutyRosterAssignments.validUntil,
+  })
     .from(schema.dutyRosterAssignments)
     .where(and(
       eq(schema.dutyRosterAssignments.tenantId, tenantId),
@@ -95,7 +115,13 @@ async function getRosterBrokerIds(
 
   // A matching plantão without escalated brokers has no eligible broker. It must
   // remain queued instead of silently falling back to the whole unit roster.
-  return { brokerIds: new Set(assignments.map((a) => a.brokerId)), hasActiveSelectedSchedule: true };
+  const confirmedAssignmentIds = await getPresenceConfirmedAssignmentIds({
+    tenantId,
+    assignments,
+    schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
+    now: date,
+  });
+  return { brokerIds: new Set(assignments.filter((assignment) => confirmedAssignmentIds.has(assignment.id)).map((assignment) => assignment.brokerId)), hasActiveSelectedSchedule: true };
 }
 
 async function ensureDefaultQueue(tenantId: string, branchId: string, actorId: string) {
@@ -501,7 +527,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
     return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };
   }
-  const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy, dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
+  const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy, dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
   if (lead.queueId && !queue) {
     const staleQueueId = lead.queueId;
     const repairedAt = new Date();
@@ -930,11 +956,34 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, unstartedLeads, lastAssignedAt: idleSince, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };
   });
-  const decision = resolveDistributionCandidate(candidates, intelligentPolicy.value, queue?.strategy === "round_robin" ? "round_robin" : "capacity");
+  // Offer pacing: a broker that just received an offer (or still has one
+  // awaiting a response) is skipped, so a released backlog is delivered one
+  // lead per broker per interval instead of in a single burst.
+  const pacing = lead.queueId && queue ? normalizeOfferPacing({ intervalMinutes: queue.offerIntervalMinutes, maxPending: queue.maxPendingOffers }) : null;
+  const pacingDecisions = new Map<string, OfferPacingDecision>();
+  if (pacing && lead.queueId && isOfferPacingEnabled(pacing)) {
+    const pacingNow = new Date();
+    const recentOffers = await loadBrokerPacingOffers(db, { tenantId: context.tenantId, queueId: lead.queueId, brokerIds: ids, intervalMinutes: pacing.intervalMinutes, now: pacingNow });
+    for (const brokerId of ids) pacingDecisions.set(brokerId, evaluateBrokerOfferPacing(recentOffers.get(brokerId) ?? [], pacing, pacingNow));
+  }
+  const pacedOut = candidates.filter((candidate) => pacingDecisions.get(candidate.id)?.allowed === false);
+  const paceableCandidates = pacedOut.length ? candidates.filter((candidate) => pacingDecisions.get(candidate.id)?.allowed !== false) : candidates;
+  const decision = resolveDistributionCandidate(paceableCandidates, intelligentPolicy.value, queue?.strategy === "round_robin" ? "round_robin" : "capacity");
   // Capacity is a hard per-queue limit. When every eligible broker is full,
   // keep this lead queued rather than assigning above the configured limit.
   const chosen = decision.selected;
   if (!chosen) {
+    // Only paced-out brokers still have room: wait for the earliest release
+    // instead of reporting a capacity/eligibility problem.
+    const waitingForPacing = pacedOut.filter((candidate) => candidate.capacity === null || candidate.activeLeads < candidate.capacity);
+    if (waitingForPacing.length) {
+      return {
+        status: "queued",
+        leadId,
+        reason: "Aguardando intervalo entre ofertas: os corretores elegíveis receberam um lead há pouco ou ainda têm oferta pendente.",
+        retryAt: earliestPacingRetryAt(waitingForPacing.map((candidate) => pacingDecisions.get(candidate.id)!)) ?? undefined,
+      };
+    }
     return {
       status: "queued",
       leadId,
@@ -956,8 +1005,12 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     cycleStartedAt: lead.distributionUpdatedAt,
     queueId: lead.queueId,
     capacityPerBroker: queue?.capacityEnabled ? queue.capacity ?? null : null,
+    pacing,
   });
   if (!offer.createdOffers.length) {
+    if (offer.pacingBlocked && !offer.capacityReached) {
+      return { status: "queued", leadId, reason: "Aguardando intervalo entre ofertas: outro processo acabou de ofertar um lead ao corretor.", retryAt: new Date(Date.now() + 30_000) };
+    }
     if (offer.capacityReached) {
       return {
         status: "queued",

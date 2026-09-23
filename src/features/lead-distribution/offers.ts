@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, count, eq, gt, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, inArray, isNull, lte, ne, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
@@ -10,6 +10,7 @@ import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-eff
 import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { reserveQueueCapacitySlot } from "./queue-capacity";
+import { evaluateBrokerOfferPacing, isOfferPacingEnabled, type OfferPacingConfig, type PacingOffer } from "./offer-pacing";
 
 import { normalizePhone } from "@/shared/utils/phone";
 import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
@@ -58,6 +59,30 @@ export function selectUnambiguousActiveOffer<T extends { status: string }>(offer
   return active.length === 1 ? active[0] : null;
 }
 
+type DatabaseLike = ReturnType<typeof getDatabase>;
+
+/**
+ * Offers a set of brokers received in a queue that matter for pacing: anything
+ * inside the interval window plus offers still awaiting a response.
+ */
+export async function loadBrokerPacingOffers(database: DatabaseLike, input: { tenantId: string; queueId: string; brokerIds: string[]; intervalMinutes: number; now: Date }) {
+  const byBroker = new Map<string, PacingOffer[]>(input.brokerIds.map((id) => [id, []]));
+  if (!input.brokerIds.length) return byBroker;
+  const since = new Date(input.now.getTime() - Math.max(0, input.intervalMinutes) * 60_000);
+  const rows = await database
+    .select({ brokerId: schema.leadOffers.brokerId, status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt })
+    .from(schema.leadOffers)
+    .innerJoin(schema.leads, eq(schema.leadOffers.leadId, schema.leads.id))
+    .where(and(
+      eq(schema.leadOffers.tenantId, input.tenantId),
+      eq(schema.leads.queueId, input.queueId),
+      inArray(schema.leadOffers.brokerId, input.brokerIds),
+      or(gte(schema.leadOffers.offeredAt, since), and(inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES), gt(schema.leadOffers.expiresAt, input.now))),
+    ));
+  for (const row of rows) byBroker.get(row.brokerId)?.push({ status: row.status, offeredAt: row.offeredAt, expiresAt: row.expiresAt });
+  return byBroker;
+}
+
 export async function createLeadOffersForBrokers(input: {
   tenantId: string;
   leadId: string;
@@ -69,6 +94,8 @@ export async function createLeadOffersForBrokers(input: {
   cycleStartedAt?: Date | null;
   queueId?: string | null;
   capacityPerBroker?: number | null;
+  /** Automatic offers only: interval / max-pending rules per broker (see offer-pacing.ts). */
+  pacing?: OfferPacingConfig | null;
   assignmentSource?: "automatic_offer" | "manual_offer";
 }) {
   const db = getDatabase();
@@ -123,6 +150,7 @@ export async function createLeadOffersForBrokers(input: {
 
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
   let capacityReached = false;
+  let pacingBlocked = false;
   let permanentDeliveryFailure = false;
   const whatsappEnabled = await tenantHasActiveMetaChannel(input.tenantId);
 
@@ -167,6 +195,17 @@ export async function createLeadOffersForBrokers(input: {
       // claim guard and the rotation never disagree about what blocks a
       // second offer (duplicate-offer bug).
       if (activeOffers.some((offer) => isBlockingActiveOffer(offer, now))) return null;
+
+      // Pacing is re-checked under the same per-broker lock as capacity so that
+      // concurrent workers cannot each slip one offer past the interval.
+      if (input.pacing && input.queueId && input.assignmentSource !== "manual_offer" && isOfferPacingEnabled(input.pacing)) {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}), hashtext(${`${input.queueId}:${broker.id}`}))`);
+        const recent = await loadBrokerPacingOffers(tx as unknown as DatabaseLike, { tenantId: input.tenantId, queueId: input.queueId, brokerIds: [broker.id], intervalMinutes: input.pacing.intervalMinutes, now });
+        if (!evaluateBrokerOfferPacing(recent.get(broker.id) ?? [], input.pacing, now).allowed) {
+          pacingBlocked = true;
+          return null;
+        }
+      }
 
       const [alreadyAttempted] = await tx
         .select({ id: schema.leadOffers.id })
@@ -433,7 +472,7 @@ export async function createLeadOffersForBrokers(input: {
   // Delivery stays in the durable outbound queue. The scheduler owns retry and
   // provider I/O so offer creation never holds the operational interface open.
 
-  return { created: createdOffers.length, expiresAt, createdOffers, capacityReached, permanentDeliveryFailure };
+  return { created: createdOffers.length, expiresAt, createdOffers, capacityReached, pacingBlocked, permanentDeliveryFailure };
 }
 
 export async function handleLeadOfferWebhookResponse(input: {

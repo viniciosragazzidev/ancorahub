@@ -15,5 +15,5 @@ export type LeadAssignmentResult =
   | { status: "assigned"; leadId: string; brokerId: string; strategy: AssignmentStrategy; notificationWarnings?: string[] }
   | { status: "offered"; leadId: string; brokerId: string; expiresAt: Date; reason: string; outboundMessageId?: string }
   | { status: "manual_required"; leadId: string; reason: string }
-  | { status: "queued"; leadId: string; reason: string }
+  | { status: "queued"; leadId: string; reason: string; /** When the lead should be re-evaluated (offer pacing). */ retryAt?: Date }
   | { status: "conflict"; leadId: string; reason: string };
