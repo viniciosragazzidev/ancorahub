@@ -20,6 +20,20 @@
 - Fila manual, qualificação ativa ou ausência real de corretor elegível permanecem
   com motivo auditável; nunca se burlam tenant, unidade, plantão ou disponibilidade.
 
+## Capacidade rígida e retenção manual da atribuição — DEC-113 — 23/09/2026
+
+- O teto de leads ativos é contado por tenant, fila e corretor; filas diferentes
+  mantêm capacidades independentes.
+- A reserva de vaga ocorre dentro da transação e usa lock por tenant/fila/corretor,
+  para que processadores concorrentes não ultrapassem o teto.
+- Sem vaga, a oferta não é criada e o lead permanece aguardando para reavaliação.
+- Diretor/Gestor podem remover a atribuição de um lead ativo antes ou depois do
+  início do atendimento. Etapa comercial, horários de contato e histórico são
+  preservados; a ação cancela ofertas/trabalhos pendentes, audita e cria `manual_hold`.
+- `manual_hold` não participa de re-seed automático; uma ação manual explícita é
+  necessária para voltar à operação. Leads encerrados, arquivados ou excluídos são
+  inelegíveis para remoção.
+
 ## Motor resiliente — 20/07/2026
 
 - A tabela `lead_distribution_jobs` persiste trabalhos de atribuição e impede jobs ativos duplicados por lead.

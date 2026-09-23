@@ -30,7 +30,8 @@ Introduzir **titularidade provisória** e centralizar toda decisão automática 
 `src/features/lead-distribution`:
 
 1. `processQueuedLead` aplica unidade, fila, plantão, disponibilidade, canal,
-   política, cooldown, fila sem contato, carga, capacidade-alvo e ranking.
+   política, cooldown, fila sem contato, carga, limite rígido de capacidade por fila
+   e ranking. Capacidade esgotada mantém o lead na fila para reavaliação.
 2. A oferta e o owner provisório são registrados sob row lock. A recusa, expiração
    ou SLA troca diretamente o owner para o próximo elegível.
 3. Leads sem unidade são roteados para a unidade automática de menor carga, com
@@ -46,8 +47,11 @@ Introduzir **titularidade provisória** e centralizar toda decisão automática 
 
 - **Positivas:** não existe estado intermediário visível sem corretor; todas as
   entradas e redistribuições compartilham a mesma regra; backlog é autorrecuperável.
-- **Trade-offs:** capacidade é alvo de balanceamento, não bloqueio absoluto. Pausa,
-  plantão e política continuam sendo critérios rígidos.
+- **Trade-offs:** um limite rígido pode aumentar o tempo de espera quando todos os
+  corretores alcançam a capacidade configurada; isso é preferível a exceder o teto.
+  Remoção manual de atribuição de lead ainda ativo preserva a etapa e os horários,
+  cancela ofertas pendentes e deixa o lead em `manual_hold` até uma nova ação manual.
+  Leads perdidos/convertidos, arquivados ou excluídos são bloqueados.
 - **Governança:** toda troca provisória gera evento e auditoria; kill switch
   operacional permanece a fila em modo manual. Super-admin mantém
   `feature_lead_distribution_jobs_enabled` para pausar o motor inteiro.

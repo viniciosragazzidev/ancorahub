@@ -12,13 +12,14 @@ import {
 describe("distribution status map", () => {
   it("translates every lead distribution status and keeps the existing labels", () => {
     const all: LeadDistributionStatus[] = [
-      "unassigned", "awaiting_unit", "queued", "assigning", "assigned", "distribution_failed", "returned_to_queue",
+      "unassigned", "awaiting_unit", "queued", "assigning", "assigned", "distribution_failed", "returned_to_queue", "manual_hold",
     ];
     for (const status of all) expect(leadDistributionStatusUi(status).label).not.toBe("Desconhecido");
     // Vocabulário já usado nos filtros do inbox.
     expect(leadDistributionStatusUi("unassigned").label).toBe("Aguardando unidade");
     expect(leadDistributionStatusUi("queued").label).toBe("Aguardando corretor");
     expect(leadDistributionStatusUi("returned_to_queue").label).toBe("Devolvido à fila");
+    expect(leadDistributionStatusUi("manual_hold").label).toBe("Aguardando ação manual");
   });
 
   it("uses the destructive tone only for a real failure and success only when assigned", () => {

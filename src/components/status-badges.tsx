@@ -1,3 +1,5 @@
+"use client";
+
 import { AnimatedBadge, type AnimatedBadgeStatus } from "@/components/motion/animated-badge";
 import { normalizeTeamMemberStatus } from "@/features/team/status";
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";

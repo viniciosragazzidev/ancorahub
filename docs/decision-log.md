@@ -1237,3 +1237,47 @@ fora da lista. O disparo em massa usa exatamente essa população, mas o servido
 revalida os IDs, o tenant, a filial e o papel antes de enfileirar cada mensagem.
 O envio continua na outbox oficial Meta, com auditoria do lote e sem depender de
 um contato recebido anteriormente.
+
+## DEC-113 — Capacidade rígida por fila e remoção manual de atribuição
+
+**Decisão aprovada em 2026-09-23.** O limite configurado em uma fila é rígido e
+independente por fila: contam-se os leads operacionais ativos do corretor naquela
+fila, e a oferta deve reservar a vaga de forma serializada para impedir estouro
+sob concorrência. Se todos os corretores elegíveis estiverem no limite, o lead
+permanece aguardando na fila, sem atribuição acima da capacidade. Diretor e Gestor
+podem remover a atribuição de um lead ainda operacional mesmo após o início do
+atendimento; etapa, horários e histórico são preservados, ofertas/jobs pendentes
+são cancelados e a operação fica em `manual_hold`, sem reentrada automática. Só
+uma ação manual retoma a distribuição. Leads perdidos, convertidos, arquivados ou
+excluídos não podem ter a atribuição removida. A ação grava evento e auditoria;
+o controle operacional existente do Super-admin continua podendo pausar o motor.
+
+## DEC-114 — Comprimento mínimo da senha no primeiro acesso
+
+**Decisão aprovada em 2026-09-23.** No fluxo `/primeiro-acesso`, a senha definida
+pelo novo membro deve ter ao menos 3 e no máximo 128 caracteres. A regra é
+idêntica no formulário e na validação do servidor. Esta decisão não muda os
+limites de recuperação de senha, aceite de convites em fluxos distintos ou
+acessos administrativos. O mínimo menor facilita a ativação, mas reduz a
+resistência de senhas curtas; recomenda-se que o membro escolha uma senha mais
+longa e exclusiva.
+
+## DEC-115 — Destino de links de convite indisponíveis
+
+**Decisão aprovada em 2026-09-23.** Links de convite expirados, inclusive os
+marcados como `EXPIRED` pelo job de limpeza ou cujo registro já tenha sido
+removido, redirecionam para `/login`. Convites ainda pendentes e dentro da
+validade continuam no fluxo de primeiro acesso. Convites aceitos, revogados ou
+substituídos permanecem com a mensagem de link indisponível; token ausente ou
+inválido mantém a mensagem de acesso inválido.
+
+## DEC-116 — Reatribuição manual pelo plantão ativo da fila
+
+**Decisão aprovada em 2026-09-23.** Quando o lead pertence a uma fila com um ou
+mais plantões vinculados ativos no horário atual e correspondentes à origem do
+lead, o drawer não permite trocar a unidade e oferece todos os corretores com
+vínculo ativo no tenant e escala ativa nesses plantões, mesmo que sejam de outras
+unidades. A unidade e a fila do lead permanecem inalteradas; somente o corretor
+responsável muda. O servidor revalida tenant, acesso ao lead, fila, horário,
+origem e escala no momento da atribuição. Sem plantão correspondente ativo, a
+reatribuição permanece limitada à unidade atual do lead.

@@ -1,13 +1,14 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, count, eq, gt, gte, inArray, isNull, lte, ne, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables } from "@/features/communication-channels/templates";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
+import { reserveQueueCapacitySlot } from "./queue-capacity";
 
 import { normalizePhone } from "@/shared/utils/phone";
 import { buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
@@ -48,6 +49,8 @@ export async function createLeadOffersForBrokers(input: {
   expectedCurrentBrokerId?: string | null;
   targetBranchId: string;
   cycleStartedAt?: Date | null;
+  queueId?: string | null;
+  capacityPerBroker?: number | null;
 }) {
   const db = getDatabase();
   const timeoutMinutes = Math.max(1, Math.min(input.responseTimeoutMinutes ?? 3, 60));
@@ -100,6 +103,7 @@ export async function createLeadOffersForBrokers(input: {
     );
 
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
+  let capacityReached = false;
 
   for (const broker of brokers) {
     const destinationPhone = broker.phone;
@@ -116,6 +120,7 @@ export async function createLeadOffersForBrokers(input: {
 
       if (!lockedLead || lockedLead.corretorId !== (input.expectedCurrentBrokerId ?? null)) return null;
 
+      const commitOffer = async () => {
       const activeOffers = await tx
         .select({
           id: schema.leadOffers.id,
@@ -211,6 +216,41 @@ export async function createLeadOffersForBrokers(input: {
         }
       }
       return destinationPhone ? "pending" as const : "unavailable" as const;
+      };
+
+      if (input.queueId && input.capacityPerBroker !== undefined && input.capacityPerBroker !== null) {
+        const reservation = await reserveQueueCapacitySlot({
+          capacity: input.capacityPerBroker,
+          withLock: async (work) => {
+            // Transaction-level lock serializes reservations across concurrent
+            // workers, even when they are processing different leads.
+            await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${input.tenantId}), hashtext(${`${input.queueId}:${broker.id}`}))`);
+            return work();
+          },
+          countActive: async () => {
+            const [active] = await tx.select({ total: count(schema.leads.id) })
+              .from(schema.leads)
+              .where(and(
+                eq(schema.leads.tenantId, input.tenantId),
+                eq(schema.leads.queueId, input.queueId!),
+                eq(schema.leads.corretorId, broker.id),
+                inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]),
+                isNull(schema.leads.deletedAt),
+                isNull(schema.leads.archivedAt),
+                ne(schema.leads.id, input.leadId),
+              ));
+            return Number(active?.total ?? 0);
+          },
+          reserve: commitOffer,
+        });
+        if (reservation.status === "full") {
+          capacityReached = true;
+          return null;
+        }
+        return reservation.value;
+      }
+
+      return commitOffer();
     });
 
     if (!claimStatus) continue;
@@ -334,7 +374,7 @@ export async function createLeadOffersForBrokers(input: {
   // Delivery stays in the durable outbound queue. The scheduler owns retry and
   // provider I/O so offer creation never holds the operational interface open.
 
-  return { created: createdOffers.length, expiresAt, createdOffers };
+  return { created: createdOffers.length, expiresAt, createdOffers, capacityReached };
 }
 
 export async function handleLeadOfferWebhookResponse(input: {

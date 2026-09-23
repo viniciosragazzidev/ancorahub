@@ -21,9 +21,18 @@ deixá-la visível nas informações do lead sem alterar a classificação PF/PM
 
 ## Validação
 
-- Pendente: teste focado de normalização, persistência e mesclagem de metadados.
-- Pendente: type-check, lint dos arquivos alterados, harness `agent:verify --level
-  full` e build de produção.
+- Testes focados `meta-lead-ads.test.ts` e `webhook-intake-sync.test.ts`: 22 passaram.
+- Type-check e lint dos arquivos alterados: passaram (lint com avisos preexistentes,
+  sem erros).
+- `agent:docs`: 17 referências verificadas.
+- `agent:verify --level full`: documentação, lint, type-check e diagnósticos
+  executados; a suíte global teve 877/878 testes aprovados e foi interrompida por
+  falha preexistente em `broker-lite-experience.test.tsx:30` (contrato de rota do
+  Dashboard Lite, fora do escopo). Segurança: 0 achados; arquitetura e desempenho
+  registraram apenas os tamanhos já existentes das páginas grandes.
+- Build final de produção: aprovado (`npm run build`, Next.js 16.2.10), incluindo
+  compilação, TypeScript e geração de páginas. Os avisos de `headers` durante
+  prerender são os sinais esperados de rotas dinâmicas.
 
 ## Riscos e reversão
 

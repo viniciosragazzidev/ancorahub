@@ -451,7 +451,7 @@ export function LeadsWorkspace({
         corretorId: entity.corretorId === undefined ? lead.corretorId : entity.corretorId,
         corretorNome: entity.corretorId === undefined ? lead.corretorNome : broker?.name ?? null,
         status: entity.status ?? lead.status,
-        assignedAt: new Date().toISOString(),
+        assignedAt: entity.corretorId ? new Date().toISOString() : lead.assignedAt,
         distributionStatus: entity.distributionStatus ?? (entity.corretorId ? "assigned" : lead.distributionStatus),
       }));
     }
@@ -974,9 +974,10 @@ export function LeadsWorkspace({
                       leadName={selectedLead.nome}
                       brokers={filteredBrokers}
                       branches={branches}
-                      leadBranchId={selectedLead.branchId}
+                      leadQueueId={selectedLead.queueId}
                       contextRole={contextRole}
                       currentStatus={selectedLead.status}
+                      currentDistributionStatus={selectedLead.distributionStatus}
                       qualificationStatus={selectedLead.qualificationStatus}
                       qualificationState={selectedLead.qualificationState}
                       currentOwner={selectedLead.corretorNome}

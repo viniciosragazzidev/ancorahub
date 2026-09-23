@@ -47,7 +47,7 @@ import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-
 
 export const dynamic = "force-dynamic";
 
-type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue";
+type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue" | "manual_hold";
 
 const activeStatuses = [
   "new",
@@ -119,7 +119,8 @@ export default async function LeadDistributionPage({
   const queueFilter: QueueFilter =
     params.status === "unassigned" ||
     params.status === "queued" ||
-    params.status === "returned_to_queue"
+    params.status === "returned_to_queue" ||
+    params.status === "manual_hold"
       ? params.status
       : "all";
 
@@ -278,7 +279,7 @@ export default async function LeadDistributionPage({
           isNull(schema.leads.deletedAt),
           isNull(schema.leads.archivedAt),
           isNull(schema.leads.corretorId),
-          inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
+          inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue", "manual_hold"]),
           ne(schema.leads.status, "lost"),
           or(
             isNull(schema.leads.qualificationStatus),
@@ -633,6 +634,11 @@ export default async function LeadDistributionPage({
       status: "returned_to_queue" as const,
       title: "Devolvidos à fila",
       description: "Precisam de revisão antes de uma nova atribuição.",
+    },
+    {
+      status: "manual_hold" as const,
+      title: "Aguardando ação manual",
+      description: "Atribuição removida; não volta à distribuição automática.",
     },
   ].map((queue) => {
     const aggregate = queueCounts.get(queue.status);

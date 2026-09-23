@@ -1,21 +1,30 @@
 "use client";
 
-import { useActionState, useCallback, useState } from "react";
+import { useActionState, useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
-import { ArrowRight, Buildings, ChatCircleText, RotateCcw, Sparkle } from "@/components/huge-icons";
+import { ArrowRight, Buildings, ChatCircleText, RotateCcw, Sparkle, UserSwitch } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
+import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
+import { getLeadDutyReassignmentOptions, reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
 import { routeLeadToBranchAction } from "@/features/lead-distribution/actions";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
 
-type Broker = { id: string; name: string; branchId: string | null };
+type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null };
+type DutyRosterState = {
+  leadId: string;
+  queueId: string;
+  status: "ready" | "error";
+  hasActiveDuty: boolean;
+  brokers: Broker[];
+  error?: string;
+};
 type Branch = { id: string; name: string };
 type ManagementMode = "reassign" | "investigate";
 type ManagementCommit = {
@@ -33,9 +42,10 @@ export function LeadDrawerManagementActions({
   leadName,
   brokers,
   branches,
-  leadBranchId,
+  leadQueueId,
   contextRole,
   currentStatus,
+  currentDistributionStatus,
   qualificationStatus,
   qualificationState,
   currentOwner,
@@ -47,9 +57,10 @@ export function LeadDrawerManagementActions({
   leadName?: string;
   brokers: Broker[];
   branches?: Branch[];
-  leadBranchId?: string | null;
+  leadQueueId?: string | null;
   contextRole?: string;
   currentStatus: string;
+  currentDistributionStatus?: string;
   qualificationStatus?: string | null;
   qualificationState?: string | null;
   currentOwner: string | null;
@@ -59,13 +70,19 @@ export function LeadDrawerManagementActions({
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<ManagementMode>("reassign");
-  const [brokerId, setBrokerId] = useState("");
+  const [brokerSelection, setBrokerSelection] = useState({ leadId, brokerId: "" });
+  const brokerId = brokerSelection.leadId === leadId ? brokerSelection.brokerId : "";
+  const setBrokerId = useCallback((nextBrokerId: string) => {
+    setBrokerSelection({ leadId, brokerId: nextBrokerId });
+  }, [leadId]);
   const [reason, setReason] = useState("");
   const [isAssuming, setIsAssuming] = useState(false);
   const [assignBranchId, setAssignBranchId] = useState("");
+  const [dutyRosterState, setDutyRosterState] = useState<DutyRosterState | null>(null);
 
   const [openQualifyDialog, setOpenQualifyDialog] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
+  const [removeAssignmentDialogOpen, setRemoveAssignmentDialogOpen] = useState(false);
 
   const isQualifiedOrDistributed =
     currentStatus === "distributed" ||
@@ -96,12 +113,30 @@ export function LeadDrawerManagementActions({
     routeLeadToBranchAction,
     {},
   );
+  const [removeAssignmentState, removeAssignment, removeAssignmentPending] = useActionState(removeLeadAssignmentAction, {});
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!leadQueueId) return () => { cancelled = true; };
+    void getLeadDutyReassignmentOptions(leadId).then((result) => {
+      if (cancelled) return;
+      if (!result.success) {
+        setDutyRosterState({ leadId, queueId: leadQueueId, status: "error", hasActiveDuty: false, brokers: [], error: result.error });
+        return;
+      }
+      setDutyRosterState({ leadId, queueId: leadQueueId, status: "ready", hasActiveDuty: result.hasActiveDuty, brokers: result.brokers });
+    }).catch(() => {
+      if (!cancelled) setDutyRosterState({ leadId, queueId: leadQueueId, status: "error", hasActiveDuty: false, brokers: [], error: "Não foi possível confirmar a escala ativa desta fila." });
+    });
+
+    return () => { cancelled = true; };
+  }, [leadId, leadQueueId]);
 
   const handleReassignSuccess = useCallback((result: typeof reassignState) => {
     toast.success("Lead reatribuído e SLA reiniciado.");
     setBrokerId("");
     onSuccess?.(result);
-  }, [onSuccess]);
+  }, [onSuccess, setBrokerId]);
   const handleReassignError = useCallback((result: typeof reassignState) => {
     onReassignRollback?.();
     if (result.error) toast.error(result.error);
@@ -141,10 +176,41 @@ export function LeadDrawerManagementActions({
     onSuccess: handleRouteSuccess,
     onError: handleRouteError,
   });
+  const handleRemoveAssignmentSuccess = useCallback((result: typeof removeAssignmentState) => {
+    setRemoveAssignmentDialogOpen(false);
+    toast.success("Atribuição removida. O lead aguardará uma nova ação manual.");
+    onSuccess?.(result);
+  }, [onSuccess]);
+  const handleRemoveAssignmentError = useCallback((result: typeof removeAssignmentState) => {
+    if (result.error) toast.error(result.error);
+    // The rejection usually means the lead's real state has already moved on
+    // (e.g. someone else already removed it) — refresh so the drawer stops
+    // showing the stale owner/status that made the action look available.
+    router.refresh();
+  }, [router]);
+  useActionDialogLifecycle({
+    state: removeAssignmentState,
+    pending: removeAssignmentPending,
+    onSuccess: handleRemoveAssignmentSuccess,
+    onError: handleRemoveAssignmentError,
+  });
 
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";
-  const canReassignUnit = !activeStatus && branches && branches.length > 0 && isDirectorOrManager;
+  const currentDutyState = dutyRosterState?.leadId === leadId && dutyRosterState.queueId === leadQueueId ? dutyRosterState : null;
+  const dutyRosterLoading = Boolean(leadQueueId) && !currentDutyState;
+  const activeQueueDuty = currentDutyState?.status === "ready" && currentDutyState.hasActiveDuty;
+  const dutyRosterError = currentDutyState?.status === "error" ? currentDutyState.error : null;
+  const assignmentBrokers = activeQueueDuty ? currentDutyState?.brokers ?? [] : brokers;
+  const canReassignUnit = !activeStatus && !activeQueueDuty && !dutyRosterLoading && !dutyRosterError && branches && branches.length > 0 && isDirectorOrManager;
+  const canRemoveAssignment = isDirectorOrManager && Boolean(currentOwner) && currentDistributionStatus === "assigned" &&
+    currentStatus !== "lost" && currentStatus !== "converted";
+
+  function confirmRemoveAssignment() {
+    const data = new FormData();
+    data.set("leadId", leadId);
+    removeAssignment(data);
+  }
 
   const handleAssumeMessaging = async () => {
     try {
@@ -156,7 +222,7 @@ export function LeadDrawerManagementActions({
       } else if (res.error) {
         toast.error(res.error);
       }
-    } catch (err) {
+    } catch {
       toast.error("Ocorreu um erro ao assumir o atendimento.");
     } finally {
       setIsAssuming(false);
@@ -169,6 +235,37 @@ export function LeadDrawerManagementActions({
 
   return (
     <div className="space-y-4 pt-2">
+      {canRemoveAssignment ? (
+        <div className="rounded-lg border border-warning/25 bg-warning/[0.04] p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <UserSwitch className="size-4 text-warning" />
+            <p className="text-xs font-semibold text-foreground">Atribuição atual</p>
+          </div>
+          <p className="text-xs leading-normal text-muted-foreground">
+            Retira o responsável atual sem apagar a etapa nem os horários do atendimento. O lead aguardará uma nova ação manual.
+          </p>
+          <Button
+            className="w-full justify-center gap-2 text-xs"
+            disabled={removeAssignmentPending}
+            onClick={() => setRemoveAssignmentDialogOpen(true)}
+            type="button"
+            variant="outline"
+          >
+            Remover atribuição
+          </Button>
+          <ConfirmDialog
+            open={removeAssignmentDialogOpen}
+            onOpenChange={setRemoveAssignmentDialogOpen}
+            title="Remover atribuição deste lead?"
+            description={`O lead deixará a carteira de ${currentOwner}. A etapa e o histórico serão preservados, e ele aguardará uma nova ação manual sem voltar à distribuição automática.`}
+            confirmLabel="Remover atribuição"
+            destructive
+            loading={removeAssignmentPending}
+            onConfirm={confirmRemoveAssignment}
+          />
+        </div>
+      ) : null}
+
       {/* Atribuir unidade */}
       {canReassignUnit && (
         <div className="rounded-lg border border-primary/20 bg-primary/[0.02] p-3 space-y-3">
@@ -273,24 +370,49 @@ export function LeadDrawerManagementActions({
 
       <p className="text-xs leading-normal text-muted-foreground">{selectedModeDescription}</p>
 
-      {mode === "reassign" ? (
-        <form action={reassign} className="space-y-3" onSubmit={() => onReassignOptimistic?.(brokerId)}>
+      {mode === "reassign" && dutyRosterLoading ? (
+        <p className="rounded-md border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground" role="status">
+          Verificando o plantão vinculado à fila do lead…
+        </p>
+      ) : mode === "reassign" && dutyRosterError ? (
+        <p className="rounded-md border border-destructive/25 bg-destructive/[0.04] p-3 text-xs text-destructive" role="alert">
+          {dutyRosterError} Atualize o drawer para tentar novamente.
+        </p>
+      ) : mode === "reassign" ? (
+        <form action={reassign} className="space-y-3" onSubmit={() => {
+          const canResolveOptimistically = !activeQueueDuty || brokers.some((broker) => broker.id === brokerId);
+          if (canResolveOptimistically) onReassignOptimistic?.(brokerId);
+        }}>
           <input name="leadId" type="hidden" value={leadId} />
           <input name="brokerId" type="hidden" value={brokerId} />
           <div className="space-y-1.5">
-            <Label htmlFor="lead-reassign-broker-drawer" className="text-xs">Novo responsável</Label>
+            <Label htmlFor="lead-reassign-broker-drawer" className="text-xs">
+              {activeQueueDuty ? "Corretores escalados no plantão ativo" : "Novo responsável"}
+            </Label>
+            {activeQueueDuty && assignmentBrokers.length === 0 ? (
+              <p className="rounded-md border border-warning/25 bg-warning/[0.04] p-3 text-xs text-muted-foreground" role="status">
+                Não há corretores ativos escalados neste plantão agora.
+              </p>
+            ) : (
             <Select name="brokerId" onValueChange={(value) => setBrokerId(value ?? "")} value={brokerId}>
-              <SelectTrigger id="lead-reassign-broker-drawer" className="h-9 text-xs"><SelectValue placeholder="Selecione um corretor" /></SelectTrigger>
+              <SelectTrigger id="lead-reassign-broker-drawer" className="h-9 text-xs">
+                <SelectValue placeholder={activeQueueDuty ? "Selecione um corretor escalado" : "Selecione um corretor"} />
+              </SelectTrigger>
               <SelectContent>
-                {brokers.length === 0 ? (
+                {assignmentBrokers.length === 0 ? (
                   <SelectItem value="_none" disabled>Nenhum corretor disponível nesta filial</SelectItem>
                 ) : (
-                  brokers.map((broker) => <SelectItem key={broker.id} value={broker.id} className="text-xs">{broker.name}</SelectItem>)
+                  assignmentBrokers.map((broker) => (
+                    <SelectItem key={broker.id} value={broker.id} className="text-xs">
+                      {broker.name}{activeQueueDuty && broker.branchName ? ` · ${broker.branchName}` : ""}
+                    </SelectItem>
+                  ))
                 )}
               </SelectContent>
             </Select>
+            )}
           </div>
-          <Button className="w-full justify-between h-9 text-xs" disabled={!brokerId || brokerId === "_none" || reassignPending} type="submit" variant="outline">
+          <Button className="w-full justify-between h-9 text-xs" disabled={!brokerId || brokerId === "_none" || (activeQueueDuty && assignmentBrokers.length === 0) || reassignPending} type="submit" variant="outline">
             {reassignPending ? "Reatribuindo..." : "Confirmar reatribuição"}<ArrowRight className="size-4" />
           </Button>
         </form>

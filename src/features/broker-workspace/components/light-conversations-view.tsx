@@ -12,6 +12,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
 import { cn } from "@/lib/utils";
 import { REALTIME_SYNC_BROWSER_EVENT, type RealtimeSyncBrowserDetail } from "@/components/providers/realtime-events";
 
@@ -187,7 +188,7 @@ function InsightDetail({ item, onBack }: { item: BrokerConversationInsight; onBa
     <footer className="border-t border-border bg-card p-3 sm:px-5">
       <div className="mx-auto flex max-w-4xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="flex items-center gap-2 text-xs text-muted-foreground"><Smartphone className="size-4 text-primary" />Para responder, use o WhatsApp no seu aparelho.</p>
-        {whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noreferrer" className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}><MessageSquareText className="size-4" />Abrir WhatsApp<ArrowUpRight className="size-3.5" /></a> : <Button size="sm" disabled>Telefone indisponível</Button>}
+        {whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noreferrer" onClick={() => { if (item.kind === "lead") void recordWhatsAppOpenedAction(item.id); }} className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}><MessageSquareText className="size-4" />Abrir WhatsApp<ArrowUpRight className="size-3.5" /></a> : <Button size="sm" disabled>Telefone indisponível</Button>}
       </div>
     </footer>
   </article>;

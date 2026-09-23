@@ -25,6 +25,8 @@ function formatActionLabel(event: AssignmentHistoryItem) {
       return "Atribuição recuperada pelo sistema";
     case "queued":
       return "Adicionado à fila de distribuição";
+    case "whatsapp_opened":
+      return event.newOwnerName ? `${event.newOwnerName} abriu o WhatsApp do lead` : "Corretor abriu o WhatsApp do lead";
     default:
       return event.action;
   }
@@ -58,6 +60,11 @@ export function LeadAssignmentHistory({
     };
   }, [leadId]);
 
+  const lastWhatsappOpen = history.find((event) => event.action === "whatsapp_opened");
+  const hasOpenedWhatsappSinceAssignment = Boolean(
+    lastWhatsappOpen && assignedAt && new Date(lastWhatsappOpen.createdAt) > new Date(assignedAt),
+  );
+
   return (
     <div className="space-y-4">
       {/* ─── 1. Data e Horário da Última Atribuição ─── */}
@@ -86,6 +93,20 @@ export function LeadAssignmentHistory({
           <div className="mt-2.5 flex items-center justify-between border-t border-border/40 pt-2 text-xs">
             <span className="text-muted-foreground">Corretor responsável:</span>
             <span className="font-semibold text-foreground">{corretorNome}</span>
+          </div>
+        ) : null}
+        {assignedAt && corretorNome && !loading && !isPending ? (
+          <div className="mt-2 flex items-center justify-between border-t border-border/40 pt-2 text-xs">
+            <span className="text-muted-foreground">WhatsApp:</span>
+            {hasOpenedWhatsappSinceAssignment ? (
+              <Badge variant="success" className="text-[10px]">
+                Abriu o WhatsApp{lastWhatsappOpen ? ` às ${formatDate(lastWhatsappOpen.createdAt, { hour: "2-digit", minute: "2-digit" })}` : ""}
+              </Badge>
+            ) : (
+              <Badge variant="warning" className="text-[10px]">
+                Ainda não abriu o WhatsApp
+              </Badge>
+            )}
           </div>
         ) : null}
       </div>

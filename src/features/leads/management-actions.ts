@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -14,6 +14,9 @@ import { enqueueLeadEffectTx, runLeadEffectOutboxProcessor } from "@/features/le
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { checkBrokerScheduleAvailability } from "@/features/leads/assignment";
 import { withServerActionTiming } from "@/shared/observability/request-timing";
+import { canRemoveLeadAssignment, getLeadAssignmentBlockedReason } from "./assignment-domain";
+import { getActiveQueueDutyRoster } from "@/features/lead-distribution/active-queue-duty-roster";
+import { canManuallyAssignLeadToBroker } from "@/features/lead-distribution/duty-roster-matching";
 
 const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable() });
 
@@ -27,6 +30,7 @@ export type ManagementActionState = {
     branchId: string | null;
     corretorId: string | null;
     status: string;
+    distributionStatus?: string;
   };
 };
 
@@ -37,7 +41,7 @@ import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 async function getManagedLead(leadId: string) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, status: schema.leads.status, corretorId: schema.leads.corretorId })
+  const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, status: schema.leads.status, corretorId: schema.leads.corretorId, distributionStatus: schema.leads.distributionStatus, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, archivedAt: schema.leads.archivedAt, deletedAt: schema.leads.deletedAt, queueId: schema.leads.queueId, webhookCredentialId: schema.leads.webhookCredentialId })
     .from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) throw new Error("Lead não encontrado.");
 
@@ -64,6 +68,157 @@ async function getManagedLead(leadId: string) {
   return { context, db, lead };
 }
 
+export async function getLeadDutyReassignmentOptions(leadId: string) {
+  try {
+    const parsedLeadId = z.string().uuid().parse(leadId);
+    const { context, lead } = await getManagedLead(parsedLeadId);
+    const roster = await getActiveQueueDutyRoster({
+      tenantId: context.tenantId,
+      queueId: lead.queueId,
+      webhookCredentialId: lead.webhookCredentialId,
+    });
+    return { success: true as const, leadId: parsedLeadId, ...roster };
+  } catch (error) {
+    return {
+      success: false as const,
+      leadId,
+      error: error instanceof AuthorizationError
+        ? error.message
+        : "Não foi possível consultar o plantão desta fila.",
+    };
+  }
+}
+
+export async function removeLeadAssignmentAction(_prev: ManagementActionState, formData: FormData): Promise<ManagementActionState> {
+  return withServerActionTiming("/leads", "leads.remove_assignment", async () => {
+    const mutationId = randomUUID();
+    try {
+      const leadId = z.string().uuid().parse(formData.get("leadId"));
+      const { context, db, lead } = await getManagedLead(leadId);
+      if (!canRemoveLeadAssignment(lead)) {
+        throw new Error(getLeadAssignmentBlockedReason(lead) ?? "A atribuição deste lead não pode ser removida neste estado.");
+      }
+
+      const now = new Date();
+      const currentBrokerId = lead.corretorId!;
+      const changed = await db.transaction(async (tx) => {
+        // Recheck ownership and service-start markers atomically. If the broker
+        // starts a conversation at the same time, only one of the two writes wins.
+        const updated = await tx.update(schema.leads).set({
+          corretorId: null,
+          distributionStatus: "manual_hold",
+          assignmentSource: "manual_unassignment",
+          distributionUpdatedAt: now,
+          updatedAt: now,
+        }).where(and(
+          eq(schema.leads.id, lead.id),
+          eq(schema.leads.tenantId, context.tenantId),
+          eq(schema.leads.corretorId, currentBrokerId),
+          eq(schema.leads.distributionStatus, "assigned"),
+          inArray(schema.leads.status, ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]),
+          isNull(schema.leads.archivedAt),
+          isNull(schema.leads.deletedAt),
+        )).returning({ id: schema.leads.id });
+        if (!updated.length) return false;
+
+        const activeOffers = await tx.select({ outboundMessageId: schema.leadOffers.outboundMessageId })
+          .from(schema.leadOffers)
+          .where(and(
+            eq(schema.leadOffers.tenantId, context.tenantId),
+            eq(schema.leadOffers.leadId, lead.id),
+            eq(schema.leadOffers.brokerId, currentBrokerId),
+            inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+          ));
+        const outboundIds = activeOffers.map((offer) => offer.outboundMessageId).filter((id): id is string => Boolean(id));
+        await tx.update(schema.leadOffers).set({ status: "CANCELLED", updatedAt: now }).where(and(
+          eq(schema.leadOffers.tenantId, context.tenantId),
+          eq(schema.leadOffers.leadId, lead.id),
+          eq(schema.leadOffers.brokerId, currentBrokerId),
+          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+        ));
+        if (outboundIds.length) {
+          await tx.update(schema.whatsappOutboundMessages).set({
+            status: "cancelled",
+            providerErrorCode: "LEAD_ASSIGNMENT_REMOVED",
+            providerErrorMessage: "Oferta cancelada porque a atribuição do lead foi removida.",
+            failedAt: now,
+            updatedAt: now,
+          }).where(and(
+            eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+            inArray(schema.whatsappOutboundMessages.id, outboundIds),
+            inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
+          ));
+        }
+        await tx.update(schema.leadAssignmentAttempts).set({
+          status: "released",
+          releasedAt: now,
+          releaseReason: "Atribuição removida manualmente; o histórico do atendimento foi preservado.",
+        }).where(and(
+          eq(schema.leadAssignmentAttempts.tenantId, context.tenantId),
+          eq(schema.leadAssignmentAttempts.leadId, lead.id),
+          eq(schema.leadAssignmentAttempts.brokerId, currentBrokerId),
+          eq(schema.leadAssignmentAttempts.status, "open"),
+        ));
+        await tx.update(schema.leadDistributionJobs).set({
+          status: "superseded",
+          completedAt: now,
+          lockedAt: null,
+          lockedBy: null,
+          leaseExpiresAt: null,
+          lastErrorCode: "MANUAL_ASSIGNMENT_REMOVAL",
+          lastErrorMessage: "Lead aguarda uma nova ação manual de distribuição.",
+          updatedAt: now,
+        }).where(and(
+          eq(schema.leadDistributionJobs.tenantId, context.tenantId),
+          eq(schema.leadDistributionJobs.leadId, lead.id),
+          inArray(schema.leadDistributionJobs.status, ["pending", "retrying"]),
+        ));
+        await tx.insert(schema.leadDistributionEvents).values({
+          id: randomUUID(),
+          tenantId: context.tenantId,
+          leadId: lead.id,
+          fromBranchId: lead.branchId,
+          toBranchId: lead.branchId,
+          fromQueueId: lead.queueId,
+          toQueueId: lead.queueId,
+          previousOwnerId: currentBrokerId,
+          newOwnerId: null,
+          action: "assignment_removed",
+          source: context.role === "director" ? "manual_director" : "manual_manager",
+          strategy: "manual",
+          reason: "Atribuição removida por gestor; etapa e histórico preservados, aguardará ação manual.",
+          actorId: context.userId,
+          createdAt: now,
+        });
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "lead_distribution",
+          entidadeId: lead.id,
+          acao: "lead.assignment_removed",
+          createdAt: now,
+        });
+        return true;
+      });
+
+      if (!changed) throw new Error("O estado do lead mudou. Atualize a página antes de tentar novamente.");
+      void publishLeadInvalidation({
+        tenantId: context.tenantId,
+        actorId: context.userId,
+        branchIds: [lead.branchId],
+        brokerIds: [currentBrokerId],
+      }).catch(() => undefined);
+      return {
+        success: true,
+        mutationId,
+        entity: { leadId: lead.id, branchId: lead.branchId, corretorId: null, status: lead.status, distributionStatus: "manual_hold" },
+      };
+    } catch (error) {
+      return { mutationId, error: error instanceof Error ? error.message : "Não foi possível remover a atribuição." };
+    }
+  });
+}
+
 export async function reassignLeadAction(_prev: ManagementActionState, formData: FormData): Promise<ManagementActionState> {
   return withServerActionTiming("/leads", "leads.reassign", async () => {
     const mutationId = randomUUID();
@@ -74,14 +229,32 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       if (!input.brokerId) throw new Error("Selecione um corretor para reatribuir o lead.");
       const brokerId = input.brokerId;
       const assignmentEventId = randomUUID();
+      const dutyRoster = await getActiveQueueDutyRoster({
+        tenantId: context.tenantId,
+        queueId: lead.queueId,
+        webhookCredentialId: lead.webhookCredentialId,
+      });
       const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true))).limit(1);
-      if (!broker || broker.branchId !== lead.branchId) throw new Error("O corretor selecionado não pertence à filial deste lead.");
+        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
+      if (!broker) throw new Error("O corretor selecionado não está ativo neste tenant.");
+      if (!canManuallyAssignLeadToBroker({
+        hasActiveQueueDuty: dutyRoster.hasActiveDuty,
+        brokerId: broker.id,
+        brokerBranchId: broker.branchId,
+        leadBranchId: lead.branchId,
+        activeDutyBrokerIds: dutyRoster.brokers.map((candidate) => candidate.id),
+      })) {
+        throw new Error(dutyRoster.hasActiveDuty
+          ? "O corretor selecionado não está escalado no plantão ativo desta fila."
+          : "O corretor selecionado não pertence à filial deste lead.");
+      }
       const now = new Date();
       const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
 
-      const availabilityCheck = await checkBrokerScheduleAvailability(context.tenantId, brokerId);
+      const availabilityCheck = dutyRoster.hasActiveDuty
+        ? { isConfigured: false, isWithinSchedule: true }
+        : await checkBrokerScheduleAvailability(context.tenantId, brokerId);
       let warning: string | undefined = undefined;
       if (availabilityCheck.isConfigured && !availabilityCheck.isWithinSchedule) {
         warning = "Aviso: O corretor está fora da agenda de atendimento configurada, mas a atribuição manual foi realizada com sucesso.";
@@ -116,7 +289,13 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           action: "assigned",
           source: context.role === "director" ? "manual_director" : "manual_manager",
           strategy: "manual",
-          reason: "Reatribuição manual",
+          reason: dutyRoster.hasActiveDuty
+            ? "Reatribuição manual para corretor escalado no plantão ativo da fila."
+            : "Reatribuição manual",
+          metadata: {
+            assignmentScope: dutyRoster.hasActiveDuty ? "active_queue_duty" : "lead_branch",
+            assignedBrokerBranchId: broker.branchId,
+          },
           actorId: context.userId,
           createdAt: now,
         });
@@ -139,7 +318,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       void publishLeadInvalidation({
         tenantId: context.tenantId,
         actorId: context.userId,
-        branchIds: [lead.branchId],
+        branchIds: Array.from(new Set([lead.branchId, broker.branchId].filter((branchId): branchId is string => Boolean(branchId)))),
         brokerIds: [lead.corretorId, input.brokerId],
       }).catch(() => undefined);
       scheduleAfterResponse("lead-assignment-effects", async () => {

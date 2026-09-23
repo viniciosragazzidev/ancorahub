@@ -4,15 +4,16 @@ import Link from "next/link";
 import { startTransition, useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
-import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText } from "@/components/huge-icons";
+import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText, UserSwitch } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
 import { LeadAssignedNotificationButton } from "@/components/plugins/lead-assigned-notification-button";
-import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction } from "@/features/leads/management-actions";
+import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 
 type Broker = { id: string; name: string };
@@ -125,6 +126,33 @@ export function SupervisionPanel({
     onSuccess: handleAssumeSuccess,
     onError: handleAssumeError,
   });
+
+  const [removeAssignmentDialogOpen, setRemoveAssignmentDialogOpen] = useState(false);
+  const [removeAssignmentState, removeAssignment, removeAssignmentPending] = useActionState(removeLeadAssignmentAction, {});
+  const handleRemoveAssignmentSuccess = useCallback(() => {
+    setRemoveAssignmentDialogOpen(false);
+    setDisplayedAssignment({ status: currentStatus, ownerId: null, ownerName: null, assignedAt: null });
+    toast.success("Atribuição removida. O lead aguardará uma nova ação manual.");
+    startTransition(() => router.refresh());
+  }, [currentStatus, router]);
+  const handleRemoveAssignmentError = useCallback((result: typeof removeAssignmentState) => {
+    if (result.error) toast.error(result.error);
+    // The rejection usually means the lead's real state has already moved on
+    // (e.g. someone else already removed it) — refresh so the panel stops
+    // showing the stale owner/status that made the action look available.
+    startTransition(() => router.refresh());
+  }, [router]);
+  useActionDialogLifecycle({
+    state: removeAssignmentState,
+    pending: removeAssignmentPending,
+    onSuccess: handleRemoveAssignmentSuccess,
+    onError: handleRemoveAssignmentError,
+  });
+  const confirmRemoveAssignment = () => {
+    const formData = new FormData();
+    formData.set("leadId", leadId);
+    removeAssignment(formData);
+  };
 
   // SLA calculations
   const elapsedMinutes = Math.max(0, Math.round((Date.now() - stageEnteredAt.getTime()) / 60000));
@@ -259,7 +287,7 @@ export function SupervisionPanel({
         </div>
 
         {/* Row 2: Takeover banner if active under someone else */}
-        {activeStatus && displayedAssignment.ownerId !== currentUserId && (
+        {activeStatus && displayedAssignment.ownerId && displayedAssignment.ownerId !== currentUserId && (
           <div className="flex flex-col gap-4 rounded-xl border border-primary/20 bg-primary/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">Intervir no Atendimento</p>
@@ -276,6 +304,38 @@ export function SupervisionPanel({
               <ChatCircleText className="size-4 mr-1.5" />
               {isAssuming ? "Assumindo..." : "Assumir conversa"}
             </Button>
+          </div>
+        )}
+
+        {/* Row 2.5: Remove current assignment, even mid-service */}
+        {displayedAssignment.ownerId && (
+          <div className="rounded-lg border border-warning/25 bg-warning/[0.04] p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <UserSwitch className="size-4 text-warning" />
+              <p className="text-xs font-semibold text-foreground">Atribuição atual</p>
+            </div>
+            <p className="text-xs leading-normal text-muted-foreground">
+              Retira o responsável atual sem apagar a etapa nem os horários do atendimento. O lead aguardará uma nova ação manual.
+            </p>
+            <Button
+              className="w-full justify-center gap-2 text-xs"
+              disabled={removeAssignmentPending}
+              onClick={() => setRemoveAssignmentDialogOpen(true)}
+              type="button"
+              variant="outline"
+            >
+              Remover atribuição
+            </Button>
+            <ConfirmDialog
+              open={removeAssignmentDialogOpen}
+              onOpenChange={setRemoveAssignmentDialogOpen}
+              title="Remover atribuição deste lead?"
+              description={`O lead deixará a carteira de ${displayedAssignment.ownerName}. A etapa e o histórico serão preservados, e ele aguardará uma nova ação manual sem voltar à distribuição automática.`}
+              confirmLabel="Remover atribuição"
+              destructive
+              loading={removeAssignmentPending}
+              onConfirm={confirmRemoveAssignment}
+            />
           </div>
         )}
 

@@ -32,7 +32,7 @@ export type DistributionActionState = {
     leadId: string;
     branchId?: string;
     corretorId: string | null;
-    distributionStatus: "queued" | "unassigned" | "assigned";
+    distributionStatus: "queued" | "unassigned" | "assigned" | "manual_hold";
   };
   processed?: number;
   processedLeadIds?: string[];

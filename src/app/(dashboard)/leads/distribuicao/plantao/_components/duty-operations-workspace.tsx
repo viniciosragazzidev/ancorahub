@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import {
   ArrowLeft,
+  ArrowSquareOut,
   CalendarCheck,
   CheckCircle,
   Clock,
@@ -705,6 +707,15 @@ function DutyInspector({
                   {schedule.queueName} · {DAYS_FULL[schedule.dayOfWeek]} ·{" "}
                   {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}
                 </SheetDescription>
+                <Button
+                  className="mt-1 w-fit gap-2 text-xs"
+                  render={<Link href={`/leads/distribuicao/plantao/${schedule.id}`} />}
+                  size="sm"
+                  variant="outline"
+                >
+                  <ArrowSquareOut className="size-4" />
+                  Abrir página do plantão
+                </Button>
               </>
             )}
           </SheetHeader>

@@ -427,6 +427,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     sourceChannel: schema.leads.sourceChannel,
     formData: schema.leads.formData,
     distributionUpdatedAt: schema.leads.distributionUpdatedAt,
+    distributionStatus: schema.leads.distributionStatus,
     corretorId: schema.leads.corretorId,
     assignmentSource: schema.leads.assignmentSource,
     status: schema.leads.status,
@@ -434,6 +435,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     archivedAt: schema.leads.archivedAt,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  if (lead.distributionStatus === "manual_hold") {
+    return { status: "manual_required", leadId, reason: "A atribuição foi removida manualmente; o lead aguarda uma nova ação manual." };
+  }
   if (lead.deletedAt || lead.archivedAt || !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
     return { status: "manual_required", leadId, reason: "Lead inativo; distribuição bloqueada." };
   }
@@ -799,7 +803,14 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
 
   const ids = remainingBrokers.map((broker) => broker.id);
   const [loads, brokerLeadHistory, slaAttempts] = await Promise.all([
-    db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), inArray(schema.leads.status, activeCommercialStatuses))).groupBy(schema.leads.corretorId),
+    db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads).where(and(
+      eq(schema.leads.tenantId, context.tenantId),
+      inArray(schema.leads.corretorId, ids),
+      inArray(schema.leads.status, activeCommercialStatuses),
+      lead.queueId ? eq(schema.leads.queueId, lead.queueId) : isNull(schema.leads.queueId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+    )).groupBy(schema.leads.corretorId),
     db.select({ brokerId: schema.leads.corretorId, status: schema.leads.status, assignedAt: schema.leads.assignedAt, serviceStartedAt: schema.leads.serviceStartedAt, firstContactAt: schema.leads.firstContactAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))),
     db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, assignedAt: schema.leadAssignmentAttempts.assignedAt, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
   ]);
@@ -815,12 +826,17 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };
   });
   const decision = resolveDistributionCandidate(candidates, intelligentPolicy.value, queue?.strategy === "round_robin" ? "round_robin" : "capacity");
-  // Capacity is a preference, not a reason to strand the lead. When every
-  // eligible broker reached the configured target, keep the same fair ranking
-  // and select its least-loaded first candidate.
-  const chosen = decision.selected ?? decision.overflowSelected;
+  // Capacity is a hard per-queue limit. When every eligible broker is full,
+  // keep this lead queued rather than assigning above the configured limit.
+  const chosen = decision.selected;
   if (!chosen) {
-    return { status: "queued", leadId, reason: "Nenhum corretor elegível nesta unidade." };
+    return {
+      status: "queued",
+      leadId,
+      reason: queue?.capacityEnabled
+        ? "Todos os corretores elegíveis atingiram o limite desta fila; o lead continuará aguardando sem exceder a capacidade."
+        : "Nenhum corretor elegível nesta unidade.",
+    };
   }
   const chosenBranchId = remainingBrokers.find((broker) => broker.id === chosen.id)?.branchId ?? lead.branchId;
   if (!chosenBranchId) return { status: "queued", leadId, reason: "A unidade do corretor selecionado não foi encontrada." };
@@ -828,13 +844,22 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const offer = await createLeadOffersForBrokers({
     tenantId: context.tenantId,
     leadId,
-    brokerIds: [chosen.id],
+    brokerIds: [chosen.id, ...decision.eligible.filter((candidate) => candidate.id !== chosen.id).map((candidate) => candidate.id)],
     requestedBy: context.userId,
     expectedCurrentBrokerId: lead.corretorId,
     targetBranchId: chosenBranchId,
     cycleStartedAt: lead.distributionUpdatedAt,
+    queueId: lead.queueId,
+    capacityPerBroker: queue?.capacityEnabled ? queue.capacity ?? null : null,
   });
   if (!offer.createdOffers.length) {
+    if (offer.capacityReached) {
+      return {
+        status: "queued",
+        leadId,
+        reason: "Todos os corretores elegíveis atingiram o limite desta fila; o lead continuará aguardando sem exceder a capacidade.",
+      };
+    }
     const [activeOffer] = await db
       .select({
         brokerId: schema.leadOffers.brokerId,

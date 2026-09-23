@@ -12,6 +12,7 @@ import { Fingerprint } from "@/components/huge-icons";
 import { authClient } from "@/shared/auth/client";
 import { recordSecurityAuditAction } from "@/app/(dashboard)/settings/security-actions";
 import { completeOnboardingAction } from "./onboarding-actions";
+import { isOnboardingPasswordLongEnough, ONBOARDING_PASSWORD_MIN_LENGTH } from "@/features/team/onboarding-password-policy";
 
 type Props = {
   invitation: {
@@ -76,8 +77,8 @@ export function OnboardingWizard({ invitation, profile }: Props) {
       }
       setStep(3);
     } else if (step === 3) {
-      if (password.length < 10) {
-        toast.error("A senha deve ter no mínimo 10 caracteres.");
+      if (!isOnboardingPasswordLongEnough(password)) {
+        toast.error(`A senha deve ter no mínimo ${ONBOARDING_PASSWORD_MIN_LENGTH} caracteres.`);
         return;
       }
       if (password !== confirmPassword) {
@@ -243,11 +244,11 @@ export function OnboardingWizard({ invitation, profile }: Props) {
             <div className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="user-pass">Senha de Acesso</Label>
-                <Input id="user-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Mínimo 10 caracteres" required autoComplete="new-password" />
+                <Input id="user-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={`Mínimo ${ONBOARDING_PASSWORD_MIN_LENGTH} caracteres`} minLength={ONBOARDING_PASSWORD_MIN_LENGTH} maxLength={128} required autoComplete="new-password" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="user-pass-confirm">Confirme sua Senha</Label>
-                <Input id="user-pass-confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repita a senha" required autoComplete="new-password" />
+                <Input id="user-pass-confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repita a senha" minLength={ONBOARDING_PASSWORD_MIN_LENGTH} maxLength={128} required autoComplete="new-password" />
               </div>
               <div className="flex gap-2 pt-2">
                 <Button variant="outline" type="button" className="flex-1" onClick={prevStep}>

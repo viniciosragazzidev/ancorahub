@@ -237,7 +237,7 @@ export function DistributionInbox({
   leads: Lead[];
   branches: Branch[];
   brokers: Broker[];
-  initialStatusFilter?: "all" | "unassigned" | "queued" | "returned_to_queue";
+  initialStatusFilter?: "all" | "unassigned" | "queued" | "returned_to_queue" | "manual_hold";
 }) {
   const router = useRouter();
   const [inboxLeads, setInboxLeads] = useState(leads);
@@ -270,7 +270,8 @@ export function DistributionInbox({
         (lead) =>
           (lead.distributionStatus === "unassigned" ||
             lead.distributionStatus === "queued" ||
-            lead.distributionStatus === "returned_to_queue") &&
+            lead.distributionStatus === "returned_to_queue" ||
+            lead.distributionStatus === "manual_hold") &&
           lead.status !== "lost" &&
           lead.qualificationStatus !== "disqualified",
       ),
@@ -346,7 +347,7 @@ export function DistributionInbox({
   }
 
   function changeStatusFilter(value: string) {
-    setStatusFilter(value as "all" | "unassigned" | "queued" | "returned_to_queue");
+    setStatusFilter(value as "all" | "unassigned" | "queued" | "returned_to_queue" | "manual_hold");
     setPage(1);
     setSelected([]);
   }
@@ -582,6 +583,7 @@ export function DistributionInbox({
                   { value: "unassigned", label: "Aguardando unidade" },
                   { value: "queued", label: "Aguardando corretor" },
                   { value: "returned_to_queue", label: "Devolvido à fila" },
+                  { value: "manual_hold", label: "Aguardando ação manual" },
                 ]}
               />
             </div>
@@ -692,14 +694,16 @@ export function DistributionInbox({
                                 lead.distributionStatus === "queued" ||
                                 lead.distributionStatus === "returned_to_queue"
                                   ? "warning"
-                                  : "outline"
+                                  : lead.distributionStatus === "manual_hold" ? "secondary" : "outline"
                               }
                             >
                               {lead.distributionStatus === "queued"
                                 ? "Aguardando corretor"
                                 : lead.distributionStatus === "returned_to_queue"
                                   ? "Devolvido à fila"
-                                  : "Aguardando unidade"}
+                                  : lead.distributionStatus === "manual_hold"
+                                    ? "Aguardando ação manual"
+                                    : "Aguardando unidade"}
                             </Badge>
                           </TableCell>
                           <TableCell className="pr-5" data-onboarding="manager-redistribute-lead">
@@ -730,14 +734,16 @@ export function DistributionInbox({
                                       <UserList /> Atribuir
                                     </ActionForm>
                                   ) : null}
-                                  <ActionForm
-                                    action={distributeLeadAutomaticallyAction}
-                                    fields={{ leadId: lead.id }}
-                                    label={`distribuir lead ${lead.name}`}
-                                    onCommitted={applySingleCommit}
-                                  >
-                                    <MagicWand /> Auto
-                                  </ActionForm>
+                                  {lead.distributionStatus !== "manual_hold" ? (
+                                    <ActionForm
+                                      action={distributeLeadAutomaticallyAction}
+                                      fields={{ leadId: lead.id }}
+                                      label={`distribuir lead ${lead.name}`}
+                                      onCommitted={applySingleCommit}
+                                    >
+                                      <MagicWand /> Auto
+                                    </ActionForm>
+                                  ) : null}
                                 </>
                               ) : role === "director" ? (
                                 <>

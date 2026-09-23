@@ -123,13 +123,7 @@ export function resolveDistributionCandidate(
   const selected = policy.ranking.enabled
     ? eligible[0] ?? null
     : chooseBroker(eligible, strategy === "round_robin" ? "round_robin" : "capacity", random);
-  const overflowSelected = selected ?? rankBrokers(
-    brokers.map((broker) => ({ ...broker, capacity: null })),
-    policy,
-    new Date(),
-    random,
-  )[0] ?? null;
-  return { eligible, selected, overflowSelected };
+  return { eligible, selected };
 }
 
 export function isValidDutyWindow(dayOfWeek: number, startsAt: string, endsAt: string) {
@@ -161,6 +155,7 @@ export function isDeferredDistributionReason(reason: string) {
   return (
     normalized.includes("nenhum corretor") ||
     normalized.includes("atingiram a capacity") ||
+    normalized.includes("limite de capacidade da fila") ||
     normalized.includes("modo manual") ||
     normalized.includes("desativada") ||
     normalized.includes("pausada") ||

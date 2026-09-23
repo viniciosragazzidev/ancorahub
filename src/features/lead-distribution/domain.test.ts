@@ -136,14 +136,14 @@ describe("lead distribution domain", () => {
     expect(result).toBeNull();
   });
 
-  it("keeps the fairest overflow candidate when every eligible broker reached capacity", () => {
+  it("keeps a lead queued when every eligible broker reached the hard capacity limit", () => {
     const policy = defaultIntelligentDistributionPolicy;
     const decision = resolveDistributionCandidate([
       { id: "busy", createdAt: new Date("2026-01-01"), activeLeads: 8, capacity: 5, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0, unstartedLeads: 4 },
       { id: "less-busy", createdAt: new Date("2026-01-02"), activeLeads: 6, capacity: 5, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0, unstartedLeads: 2 },
     ], policy, "capacity");
     expect(decision.selected).toBeNull();
-    expect(decision.overflowSelected?.id).toBe("less-busy");
+    expect(decision.eligible).toEqual([]);
   });
 
   it("uses the oldest eligible broker for the current round-robin policy", () => {

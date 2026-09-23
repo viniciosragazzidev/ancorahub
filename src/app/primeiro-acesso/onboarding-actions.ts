@@ -9,6 +9,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { buildCredentialAccount } from "@/shared/auth/credential-account";
 import { classifyExistingTeamIdentity } from "@/features/team/identity-reuse-policy";
 import { enqueueBrokerAccountActivationNotice, type BrokerAccountActivationNoticeStatus } from "@/features/team/broker-account-activation-delivery";
+import { isOnboardingPasswordLongEnough } from "@/features/team/onboarding-password-policy";
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
@@ -17,7 +18,7 @@ const completeOnboardingSchema = z.object({
   phone: z.string().trim().min(8).max(30),
   cpf: z.string().trim().max(20).optional().or(z.literal("")),
   birthDate: z.string().trim().min(10).max(10), // YYYY-MM-DD
-  password: z.string().min(10).max(128),
+  password: z.string().refine(isOnboardingPasswordLongEnough, "A senha deve ter no mínimo 3 caracteres.").max(128),
   termsAccepted: z.literal("on"),
 });
 
