@@ -632,3 +632,11 @@ de métricas entre tenants.
   preservam a estrutura do conteúdo para reduzir deslocamento visual.
 - A fonte dos dados permaneceu no resolvedor existente; nenhuma métrica, permissão,
   autorização, escopo ou integração foi alterada.
+
+## 2026-09-23 — agrupamento mensal dos plantões
+
+- A grade semanal existente agora fica dentro de seções recolhíveis organizadas pelo
+  mês de início da vigência do plantão; cards, escalas e ações foram preservados.
+- O mês atual abre inicialmente e uma nova vigência é aberta após criação ou edição.
+- O grupo mensal usa controles e tokens compartilhados, com regiões acessíveis; não
+  foram introduzidos tokens, primitivas nem animações novas.

@@ -8,9 +8,11 @@ import {
   ArrowLeft,
   ArrowSquareOut,
   CalendarCheck,
+  ChevronDownIcon,
   CheckCircle,
   Clock,
   Copy,
+  FolderSimple,
   Loader2Icon,
   PencilSimple,
   Plus,
@@ -61,6 +63,12 @@ import {
 } from "@/features/lead-distribution/roster-actions";
 import { syncDutySchedulesIntoQueueAction } from "@/features/lead-distribution/actions";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
+import {
+  getDefaultDutyScheduleMonthKey,
+  getDutyScheduleMonthKey,
+  getOperationalMonthKey,
+  groupDutySchedulesByMonth,
+} from "./duty-schedule-month-groups";
 
 type Snapshot = DutyRosterSnapshot;
 type Schedule = Snapshot["schedules"][number];
@@ -1034,6 +1042,29 @@ export function DutyOperationsWorkspace({ snapshot, queues = [] }: { snapshot: S
       ),
     [showArchived, snapshot.schedules],
   );
+  const currentMonthKey = getOperationalMonthKey();
+  const monthGroups = useMemo(
+    () => groupDutySchedulesByMonth(scopedSchedules, currentMonthKey),
+    [currentMonthKey, scopedSchedules],
+  );
+  const [expandedMonthKeys, setExpandedMonthKeys] = useState<Set<string>>(
+    () => new Set([getDefaultDutyScheduleMonthKey(monthGroups, currentMonthKey)]),
+  );
+  const knownScheduleMonths = useRef(new Map(
+    snapshot.schedules.map((schedule) => [schedule.id, getDutyScheduleMonthKey(schedule.validFrom)]),
+  ));
+  useEffect(() => {
+    const currentScheduleMonths = new Map(
+      snapshot.schedules.map((schedule) => [schedule.id, getDutyScheduleMonthKey(schedule.validFrom)]),
+    );
+    const changedMonths = [...currentScheduleMonths.entries()]
+      .filter(([scheduleId, monthKey]) => knownScheduleMonths.current.get(scheduleId) !== monthKey)
+      .map(([, monthKey]) => monthKey);
+    if (changedMonths.length) {
+      setExpandedMonthKeys((previous) => new Set([...previous, ...changedMonths]));
+    }
+    knownScheduleMonths.current = currentScheduleMonths;
+  }, [snapshot.schedules]);
   const scopedAssignments = snapshot.assignments;
   const activeCount = scopedSchedules.filter((schedule) => schedule.status === "active").length;
   const inactiveCount = scopedSchedules.filter((schedule) => schedule.status === "inactive").length;
@@ -1121,20 +1152,71 @@ export function DutyOperationsWorkspace({ snapshot, queues = [] }: { snapshot: S
         <CardHeader className="border-b border-border/70 bg-card/70 p-4">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle className="text-base">Grade semanal</CardTitle>
+              <CardTitle className="text-base">Plantões por mês</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
-                Clique em um plantão para editar a regra ou a escala de corretores.
+                Agrupados pelo início da vigência. Abra um mês para editar os plantões e as escalas.
               </p>
             </div>
             <Badge variant="outline">America/Sao_Paulo</Badge>
           </div>
         </CardHeader>{" "}
         <CardContent className="max-h-[80vh] overflow-y-auto p-3 sm:p-4">
-          <DutyTimeline
-            schedules={scopedSchedules}
-            assignments={scopedAssignments}
-            onOpen={setSelectedSchedule}
-          />
+          <div className="space-y-3">
+            {monthGroups.map((group) => {
+              const expanded = expandedMonthKeys.has(group.key);
+              const regionId = `duty-month-${group.key}`;
+              return (
+                <section key={group.key} className="overflow-hidden rounded-xl border border-border/70 bg-card">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full justify-between gap-3 rounded-none px-3 py-3 text-left sm:px-4"
+                    id={`${regionId}-trigger`}
+                    aria-expanded={expanded}
+                    aria-controls={regionId}
+                    onClick={() => setExpandedMonthKeys((previous) => {
+                      const next = new Set(previous);
+                      if (next.has(group.key)) next.delete(group.key);
+                      else next.add(group.key);
+                      return next;
+                    })}
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
+                        <FolderSimple aria-hidden="true" className="size-4" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-foreground">{group.label}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {group.schedules.length} {group.schedules.length === 1 ? "plantão" : "plantões"}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {group.key === currentMonthKey ? <Badge variant="secondary">Mês atual</Badge> : null}
+                      <Badge variant="outline">{group.schedules.length}</Badge>
+                      <ChevronDownIcon aria-hidden="true" className="size-4 text-muted-foreground" />
+                    </span>
+                  </Button>
+                  <div
+                    id={regionId}
+                    role="region"
+                    aria-labelledby={`${regionId}-trigger`}
+                    hidden={!expanded}
+                    className="border-t border-border/70 p-3 sm:p-4"
+                  >
+                    {expanded ? (
+                      <DutyTimeline
+                        schedules={group.schedules}
+                        assignments={scopedAssignments}
+                        onOpen={setSelectedSchedule}
+                      />
+                    ) : null}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
       {!scopedSchedules.length && (
