@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDutyScheduleProfile } from "@/features/lead-distribution/duty-schedule-profile-queries";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
+import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +23,11 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant="secondary">Inativo</Badge>;
 }
 
-export default async function DutyScheduleProfilePage({ params }: { params: Promise<{ scheduleId: string }> }) {
+export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { scheduleId } = await params;
+  const { situacao } = await searchParams;
 
   let profile: Awaited<ReturnType<typeof getDutyScheduleProfile>>;
   try {
@@ -36,6 +38,17 @@ export default async function DutyScheduleProfilePage({ params }: { params: Prom
 
   const { schedule, roster, linkedQueues, leads, windowDays } = profile;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
+
+  const isDistributed = (lead: (typeof leads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
+  const distributedCount = leads.filter(isDistributed).length;
+  const waitingCount = leads.length - distributedCount;
+  const filter = situacao === "aguardando" || situacao === "distribuidos" ? situacao : "todos";
+  const visibleLeads = filter === "aguardando" ? leads.filter((lead) => !isDistributed(lead)) : filter === "distribuidos" ? leads.filter(isDistributed) : leads;
+  const filters = [
+    { key: "todos", label: "Todos", count: leads.length },
+    { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
+    { key: "distribuidos", label: "Distribuídos", count: distributedCount },
+  ] as const;
 
   return <>
     <DashboardHeader
@@ -93,7 +106,7 @@ export default async function DutyScheduleProfilePage({ params }: { params: Prom
             <UserList className="size-4 text-muted-foreground" />
           </div>
           <p className="mt-2 font-mono text-2xl font-semibold tracking-tight">{leads.length}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Distribuídos para corretores deste plantão</p>
+          <p className="mt-1 text-xs text-muted-foreground">{distributedCount} distribuídos · {waitingCount} aguardando</p>
         </div>
       </section>
 
@@ -101,32 +114,53 @@ export default async function DutyScheduleProfilePage({ params }: { params: Prom
         <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader className="border-b border-border/60 p-4">
             <CardTitle className="text-base">Leads do plantão</CardTitle>
-            <CardDescription>Leads distribuídos para um corretor escalado neste plantão nos últimos {windowDays} dias.</CardDescription>
+            <CardDescription>Todos os leads das filas deste plantão nos últimos {windowDays} dias — aguardando distribuição, ofertados, distribuídos e em atendimento.</CardDescription>
+            <nav aria-label="Filtrar leads por situação" className="mt-3 flex flex-wrap gap-2">
+              {filters.map((item) => (
+                <Button
+                  key={item.key}
+                  render={<Link href={item.key === "todos" ? `/leads/distribuicao/plantao/${schedule.id}` : `/leads/distribuicao/plantao/${schedule.id}?situacao=${item.key}`} />}
+                  size="sm"
+                  variant={filter === item.key ? "secondary" : "outline"}
+                >
+                  {item.label} <span className="ml-1 font-mono text-xs text-muted-foreground">{item.count}</span>
+                </Button>
+              ))}
+            </nav>
           </CardHeader>
           <CardContent className="p-0">
-            {leads.length ? (
+            {visibleLeads.length ? (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Lead</TableHead>
+                    <TableHead>Fila</TableHead>
                     <TableHead>Corretor</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead>Distribuição</TableHead>
+                    <TableHead>Etapa</TableHead>
+                    <TableHead>Recebido em</TableHead>
                     <TableHead>Distribuído em</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {leads.map((lead) => (
-                    <TableRow key={lead.id}>
-                      <TableCell className="font-medium">{lead.nome}</TableCell>
-                      <TableCell className="text-muted-foreground">{lead.brokerName ?? "—"}</TableCell>
-                      <TableCell><LeadStatusBadge status={lead.status} /></TableCell>
-                      <TableCell className="text-muted-foreground">{lead.assignedAt ? dateTime.format(lead.assignedAt) : "—"}</TableCell>
-                    </TableRow>
-                  ))}
+                  {visibleLeads.map((lead) => {
+                    const distribution = leadDistributionStatusUi(lead.distributionStatus);
+                    return (
+                      <TableRow key={lead.id}>
+                        <TableCell className="font-medium">{lead.nome}</TableCell>
+                        <TableCell className="text-muted-foreground">{lead.queueName ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{lead.brokerName ?? "Sem corretor"}</TableCell>
+                        <TableCell><Badge variant={distribution.tone}>{distribution.label}</Badge></TableCell>
+                        <TableCell><LeadStatusBadge status={lead.status} /></TableCell>
+                        <TableCell className="text-muted-foreground">{dateTime.format(lead.createdAt)}</TableCell>
+                        <TableCell className="text-muted-foreground">{lead.assignedAt && lead.corretorId ? dateTime.format(lead.assignedAt) : "—"}</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             ) : (
-              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead caiu para este plantão nos últimos {windowDays} dias.</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead nesta situação para este plantão nos últimos {windowDays} dias.</div>
             )}
           </CardContent>
         </Card>

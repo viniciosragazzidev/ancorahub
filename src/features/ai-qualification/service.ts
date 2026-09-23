@@ -61,6 +61,17 @@ async function getOrCreateConfig(tenantId: string) {
 }
 
 export async function startAiQualificationForLead(input: { tenantId: string; leadId: string; actorUserId: string; force?: boolean }) {
+  // Automatic starts (intake, imports) must respect the queue's own switch; only
+  // an explicit operator action (force) may qualify a lead of a disabled queue.
+  if (!input.force) {
+    const [queue] = await getDatabase()
+      .select({ aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled })
+      .from(schema.leads)
+      .innerJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
+      .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
+      .limit(1);
+    if (queue && queue.aiQualificationEnabled === false) return { started: false as const, reason: "queue_disabled" as const };
+  }
   if ((await getSystemSetting("feature_qualification_engine_enabled")) !== "false") {
     return await startQualificationConversationForLead(input, input.force).catch(() => ({ started: false as const, reason: "failed" as const }));
   }

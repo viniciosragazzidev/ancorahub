@@ -79,11 +79,12 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       ),
     ));
 
-  const brokerIds = roster.map((entry) => entry.brokerId);
   const queueIds = linkedQueues.map((queue) => queue.id);
   const since = new Date(Date.now() - LEADS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  const leads = brokerIds.length && queueIds.length
+  // Every lead routed through this plantão's queues — waiting, offered,
+  // distributed or in service — not only the ones already with a rostered broker.
+  const leads = queueIds.length
     ? await db
       .select({
         id: schema.leads.id,
@@ -96,19 +97,19 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         queueId: schema.leads.queueId,
         queueName: schema.leadQueues.name,
         assignedAt: schema.leads.assignedAt,
+        createdAt: schema.leads.createdAt,
       })
       .from(schema.leads)
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
       .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
-        inArray(schema.leads.corretorId, brokerIds),
         inArray(schema.leads.queueId, queueIds),
-        gte(schema.leads.assignedAt, since),
+        or(gte(schema.leads.createdAt, since), gte(schema.leads.assignedAt, since)),
         isNull(schema.leads.deletedAt),
         isNull(schema.leads.archivedAt),
       ))
-      .orderBy(desc(schema.leads.assignedAt))
+      .orderBy(desc(schema.leads.createdAt))
       .limit(LEADS_LIMIT)
     : [];
 
