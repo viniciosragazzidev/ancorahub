@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { CheckCircle2, Clock3 } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ArrowLeft, CalendarCheck, UserList, Users } from "@/components/huge-icons";
 import { LeadStatusBadge } from "@/components/status-badges";
@@ -10,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getDutyScheduleProfile } from "@/features/lead-distribution/duty-schedule-profile-queries";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui";
+import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -36,8 +38,10 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     redirect("/leads/distribuicao?view=plantao");
   }
 
-  const { schedule, roster, linkedQueues, leads, windowDays } = profile;
+  const { schedule, roster, linkedQueues, leads, windowDays, presenceEnabled } = profile;
+  const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
+  const returnedUnaccepted = await getReturnedUnacceptedLeadIds(context.tenantId, leads.map((lead) => lead.id));
 
   const isDistributed = (lead: (typeof leads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
   const distributedCount = leads.filter(isDistributed).length;
@@ -146,10 +150,10 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   {visibleLeads.map((lead) => {
                     const distribution = leadDistributionStatusUi(lead.distributionStatus);
                     return (
-                      <TableRow key={lead.id}>
+                      <TableRow key={lead.id} className={returnedUnaccepted.has(lead.id) ? "bg-warning/10 hover:bg-warning/15" : undefined}>
                         <TableCell className="font-medium">{lead.nome}</TableCell>
                         <TableCell className="text-muted-foreground">{lead.queueName ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground">{lead.brokerName ?? "Sem corretor"}</TableCell>
+                        <TableCell className="text-muted-foreground">{returnedUnaccepted.has(lead.id) ? <span className="flex items-center gap-1.5 font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor"><span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />Devolvido — não aceito</span> : (lead.brokerName ?? "Sem corretor")}</TableCell>
                         <TableCell><Badge variant={distribution.tone}>{distribution.label}</Badge></TableCell>
                         <TableCell><LeadStatusBadge status={lead.status} /></TableCell>
                         <TableCell className="text-muted-foreground">{dateTime.format(lead.createdAt)}</TableCell>
@@ -167,15 +171,25 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
 
         <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Corretores escalados</CardTitle>
-            <CardDescription>Quem está na escala ativa deste plantão agora.</CardDescription>
+            <CardTitle className="text-base">{presenceEnabled ? "Checklist de confirmação" : "Corretores escalados"}</CardTitle>
+            <CardDescription>{presenceEnabled ? `${confirmedCount} de ${roster.length} corretores confirmaram a ocorrência atual.` : "Quem está na escala ativa deste plantão agora."}</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-3" role={presenceEnabled ? "group" : undefined} aria-label={presenceEnabled ? "Status de confirmação dos corretores escalados" : undefined}>
+            {roster.length && roster.every((entry) => entry.blockedReason) ? (
+              <div role="alert" className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
+                <strong className="font-semibold">Nenhum escalado está elegível para receber leads.</strong> Há pendências de cadastro ou confirmação — os leads permanecem aguardando.
+              </div>
+            ) : null}
             {roster.length ? roster.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{entry.brokerName}</p>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <p className="truncate text-sm font-medium">{entry.brokerName}</p>
+                    {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`Presença confirmada${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={entry.confirmedAt ? `Confirmado em ${dateTime.format(entry.confirmedAt)}` : "Presença confirmada"}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
+                    {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
+                  </div>
                   <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}</p>
+                  {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}
                 </div>
                 <Badge variant="secondary">{entry.leadsInWindow} lead{entry.leadsInWindow === 1 ? "" : "s"}</Badge>
               </div>

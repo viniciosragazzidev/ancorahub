@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   customType,
   date,
   foreignKey,
@@ -1363,6 +1364,33 @@ export const dutyRosterAssignments = pgTable(
     index("duty_roster_assignments_tenant_branch_idx").on(table.tenantId, table.branchId, table.dayOfWeek, table.startsAt),
     index("duty_roster_assignments_broker_idx").on(table.tenantId, table.brokerId, table.dayOfWeek),
     index("duty_roster_assignments_schedule_idx").on(table.scheduleId, table.status),
+  ],
+);
+
+export const dutyPresenceConfirmations = pgTable(
+  "duty_presence_confirmations",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    scheduleId: text("schedule_id").notNull().references(() => unitDutySchedules.id, { onDelete: "cascade" }),
+    assignmentId: text("assignment_id").notNull().references(() => dutyRosterAssignments.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    dutyDate: date("duty_date").notNull(),
+    shiftStartsAt: timestamp("shift_starts_at", { withTimezone: true }).notNull(),
+    shiftEndsAt: timestamp("shift_ends_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("pending"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    notificationStatus: text("notification_status").notNull().default("pending"),
+    notificationErrorCode: text("notification_error_code"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("duty_presence_occurrence_assignment_unique").on(table.tenantId, table.assignmentId, table.dutyDate, table.shiftStartsAt, table.shiftEndsAt),
+    index("duty_presence_schedule_date_idx").on(table.tenantId, table.scheduleId, table.dutyDate),
+    index("duty_presence_broker_date_idx").on(table.tenantId, table.brokerId, table.dutyDate, table.status),
+    check("duty_presence_status_check", sql`${table.status} in ('pending', 'confirmed', 'expired')`),
+    check("duty_presence_notification_status_check", sql`${table.notificationStatus} in ('pending', 'dispatching', 'queued', 'sent', 'error')`),
   ],
 );
 

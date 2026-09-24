@@ -5,6 +5,7 @@ import { and, asc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { getLocalDutyParts } from "@/features/leads/assignment";
 import { getDatabase, schema } from "@/shared/db";
 import { selectMatchingDutyScheduleIds, selectQueueLinkedDutySchedules } from "./duty-roster-matching";
+import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
 
 export type ActiveQueueDutyBroker = {
   id: string;
@@ -66,6 +67,12 @@ export async function getActiveQueueDutyRoster(input: {
       id: schema.unitDutySchedules.id,
       queueId: schema.unitDutySchedules.queueId,
       webhookCredentialId: schema.unitDutySchedules.webhookCredentialId,
+      dayOfWeek: schema.unitDutySchedules.dayOfWeek,
+      startsAt: schema.unitDutySchedules.startsAt,
+      endsAt: schema.unitDutySchedules.endsAt,
+      timezone: schema.unitDutySchedules.timezone,
+      validFrom: schema.unitDutySchedules.validFrom,
+      validUntil: schema.unitDutySchedules.validUntil,
     })
     .from(schema.unitDutySchedules)
     .where(and(
@@ -86,6 +93,13 @@ export async function getActiveQueueDutyRoster(input: {
   const brokers = await db
     .selectDistinct({
       id: schema.user.id,
+      assignmentId: schema.dutyRosterAssignments.id,
+      scheduleId: schema.dutyRosterAssignments.scheduleId,
+      dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+      startsAt: schema.dutyRosterAssignments.startsAt,
+      endsAt: schema.dutyRosterAssignments.endsAt,
+      validFrom: schema.dutyRosterAssignments.validFrom,
+      validUntil: schema.dutyRosterAssignments.validUntil,
       name: schema.user.name,
       branchId: schema.dutyRosterAssignments.branchId,
       branchName: schema.branches.name,
@@ -117,5 +131,23 @@ export async function getActiveQueueDutyRoster(input: {
     ))
     .orderBy(asc(schema.user.name));
 
-  return { hasActiveDuty: true, brokers };
+  const confirmedAssignmentIds = await getPresenceConfirmedAssignmentIds({
+    tenantId: input.tenantId,
+    assignments: brokers.map((broker) => ({
+      id: broker.assignmentId,
+      scheduleId: broker.scheduleId,
+      brokerId: broker.id,
+      dayOfWeek: broker.dayOfWeek,
+      startsAt: broker.startsAt,
+      endsAt: broker.endsAt,
+      validFrom: broker.validFrom,
+      validUntil: broker.validUntil,
+    })),
+    schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
+    now,
+  });
+  return {
+    hasActiveDuty: true,
+    brokers: brokers.filter((broker) => confirmedAssignmentIds.has(broker.assignmentId)).map(({ assignmentId, scheduleId, dayOfWeek, startsAt, endsAt, validFrom, validUntil, ...broker }) => broker),
+  };
 }

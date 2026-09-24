@@ -729,6 +729,13 @@
                         "when":  1790190000000,
                         "tag":  "0157_lead_queue_offer_pacing",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  104,
+                        "version":  "7",
+                        "when":  1790180000000,
+                        "tag":  "0156_duty_presence_confirmation",
+                        "breakpoints":  true
                     }
                 ]
 }

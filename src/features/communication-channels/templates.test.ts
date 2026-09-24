@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables, getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
+import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables, getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, isMetaOnlyOutboundPurpose, splitMetaWhatsAppTemplateVariables } from "./templates";
 import {
   CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE,
   CANONICAL_BROKER_INVITATION_TEMPLATE_NAME,
@@ -39,6 +39,16 @@ describe("approved Meta WhatsApp templates", () => {
   it("defines the activation template fallback contract", () => {
     expect(getMetaWhatsAppTemplate("brokerAccountActivated")).toEqual({ name: "broker_account_activated", language: "pt_BR" });
     expect(getMetaWhatsAppTemplateVariableNames("brokerAccountActivated")).toEqual(["nome", "empresa", "login_url"]);
+  });
+
+  it("uses the presence template body contract and reserves its third variable for the URL button", () => {
+    expect(getMetaWhatsAppTemplate("dutyPresenceConfirmation")).toEqual({ name: "plantao_confirm_presence", language: "pt_BR" });
+    expect(getMetaWhatsAppTemplateVariableNames("dutyPresenceConfirmation")).toEqual(["nome", "hora"]);
+    expect(splitMetaWhatsAppTemplateVariables("dutyPresenceConfirmation", ["Ana", "09:00", "97bcf3e2-59a9-4de8-94d4-d6c5e251d4cf"])).toEqual({
+      bodyVariables: ["Ana", "09:00"],
+      urlButtonParameter: "97bcf3e2-59a9-4de8-94d4-d6c5e251d4cf",
+    });
+    expect(isMetaOnlyOutboundPurpose("dutyPresenceConfirmation")).toBe(true);
   });
 
   it("uses the approved notification template and names its body variables", () => {

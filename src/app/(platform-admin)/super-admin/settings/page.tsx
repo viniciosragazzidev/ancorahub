@@ -31,6 +31,7 @@ import {
   updateWahaConnectionSettingsAction,
   updateLeadManagementActionsSettingsAction,
   updateManualLeadAssignmentOfferChoiceSettingsAction,
+  updateDutyPresenceConfirmationSettingsAction,
   updateCustomRolesGlobalSettingsAction,
   updatePerformanceRankingSettingsAction,
   updateTeamMemberProfileSettingsAction,
@@ -98,6 +99,7 @@ export default async function SuperAdminSettingsPage() {
     META_OUTBOUND_STALE_AFTER_HOURS_SETTING,
     "feature_lead_management_actions_enabled",
     "feature_manual_lead_assignment_offer_choice_enabled",
+    FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key,
     FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
@@ -152,6 +154,7 @@ export default async function SuperAdminSettingsPage() {
   const leadManagementActionsEnabled =
     settingMap.get("feature_lead_management_actions_enabled") !== "false";
   const manualLeadAssignmentOfferChoiceEnabled = settingMap.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false";
+  const dutyPresenceConfirmationEnabled = settingMap.get(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key) === "true";
   const unlinkedConversationDeletionEnabled =
     settingMap.get(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key) !== "false";
   const distributionBatchSize = settingMap.get("lead_distribution_jobs_batch_size") ?? "25";
@@ -1129,6 +1132,27 @@ export default async function SuperAdminSettingsPage() {
                       <span className="block text-xs text-muted-foreground">
                         Ativada por padrão. Desative para restaurar a atribuição direta sem exibir o diálogo.
                       </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Confirmação de presença em plantões</CardTitle>
+                <CardDescription>
+                  Exige confirmação por ocorrência antes de um corretor escalado entrar na distribuição. O lembrete usa o template Meta aprovado plantao_confirm_presence.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateDutyPresenceConfirmationSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="dutyPresenceConfirmationEnabled" value="true" defaultChecked={dutyPresenceConfirmationEnabled} className="size-4 accent-primary" />
+                    <span>
+                      <span className="font-medium">Confirmação obrigatória habilitada</span>
+                      <span className="block text-xs text-muted-foreground">Desligada por padrão. Antes de ativar, aplique a migration 0156, aprove/sincronize o template e confirme a agenda de distribuição.</span>
                     </span>
                   </label>
                   <Button type="submit" variant="outline">Salvar configuração</Button>

@@ -234,7 +234,7 @@ export async function enqueueMetaTemplateMessage(input: {
     leadId: input.recipientType === "lead" ? input.recipientId : null,
   }) ?? requestedDestinationPhone;
   const variables = variablesSchema.parse(input.variables ?? []);
-  const messagePlan = await resolveEventMessagePlan({
+  const messagePlan = input.purpose === "dutyPresenceConfirmation" ? null : await resolveEventMessagePlan({
     tenantId: input.tenantId,
     recipientType: input.recipientType,
     recipientId: input.recipientId,
@@ -248,7 +248,7 @@ export async function enqueueMetaTemplateMessage(input: {
   const resolvedTemplate = messagePlan || input.purpose === "brokerAccountActivated"
     ? null
     : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose);
-  const template = resolvedTemplate ?? (input.purpose === "brokerAccountActivated" ? null : getMetaWhatsAppTemplate(input.purpose));
+  const template = resolvedTemplate ?? (input.purpose === "brokerAccountActivated" || input.purpose === "dutyPresenceConfirmation" ? null : getMetaWhatsAppTemplate(input.purpose));
   const primary = messagePlan?.primary ?? (template ? {
     type: "template" as const,
     templateName: template.name,
@@ -577,6 +577,9 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         if (variables[7]) {
           urlButtonParameter = variables[7];
         }
+      } else if (row.purpose === "dutyPresenceConfirmation") {
+        const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
+        if (variables[2]) urlButtonParameter = variables[2];
       }
 
       // Preserve the channel selected when the outbox row was created. This
@@ -701,6 +704,12 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
 
       const providerMessageId = metaResponse.messages?.[0]?.id || "wamid_sent";
       await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId, providerErrorCode: null, providerErrorMessage: null, sentAt: new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      if (row.purpose === "dutyPresenceConfirmation" && Array.isArray(row.variables) && typeof row.variables[2] === "string") {
+        await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "sent", notificationErrorCode: null, updatedAt: new Date() }).where(and(
+          eq(schema.dutyPresenceConfirmations.id, row.variables[2]),
+          eq(schema.dutyPresenceConfirmations.tenantId, row.tenantId),
+        ));
+      }
       // DEC-049: bind the provider wamid to the offer so a broker's button
       // reply can be resolved even when Meta omits `context.id`.
       if (row.purpose === "newLeadAssignment") {
@@ -731,6 +740,12 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         : null;
       const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";
       await db.update(schema.whatsappOutboundMessages).set({ status: finalStatus, deliveryRoute: "meta_only", wahaNumberId: null, providerErrorCode: code, providerErrorMessage: message, nextAttemptAt, failedAt: nextAttemptAt ? null : new Date(), updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      if (!nextAttemptAt && row.purpose === "dutyPresenceConfirmation" && Array.isArray(row.variables) && typeof row.variables[2] === "string") {
+        await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "error", notificationErrorCode: "TEMPLATE_DELIVERY_FAILED", updatedAt: new Date() }).where(and(
+          eq(schema.dutyPresenceConfirmations.id, row.variables[2]),
+          eq(schema.dutyPresenceConfirmations.tenantId, row.tenantId),
+        ));
+      }
       if (row.purpose === "brokerInvitation" && row.recipientId) {
         const failureUpdate = getInvitationDeliveryFailureUpdate({ shouldRetry: Boolean(nextAttemptAt), attempts: row.attempts + 1 });
         await db.update(schema.brokerInvitations).set({

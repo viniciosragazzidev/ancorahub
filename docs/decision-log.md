@@ -1311,3 +1311,19 @@ outbox até recuperação/expiração. O escopo é somente atribuição individu
 sem owner; alterações de owner, lote e distribuição automática preservam seu
 comportamento. Um kill switch global do Super-admin controla a nova escolha e sua
 alteração é auditada.
+
+## DEC-119 — Confirmação de presença para elegibilidade no plantão
+
+**Decisão aprovada em 2026-09-23.** Quando o Super-admin habilita a feature
+global, cada corretor escalado recebe pelo template Meta aprovado
+`plantao_confirm_presence` um lembrete 30 minutos antes da ocorrência. O link
+abre uma tela pública de confirmação com token aleatório, e a confirmação fica
+presa ao tenant, ao vínculo individual da escala e à data local daquela
+ocorrência. Só corretores que confirmaram uma ocorrência ainda vigente entram
+na elegibilidade automática ou na lista de reatribuição manual desse plantão.
+Uma confirmação tardia vale imediatamente até o fim da mesma ocorrência; ela
+nunca libera semanas futuras. Sem elegíveis, o lead continua aguardando ou usa
+somente a contingência que a fila já configurou. A tela de detalhes do plantão
+exibe status individual e horário confirmado. A alteração do kill switch pelo
+Super-admin é auditada. A flag nasce desligada para preservar filas existentes
+até que a aprovação do template, a migration e a agenda sejam validadas.

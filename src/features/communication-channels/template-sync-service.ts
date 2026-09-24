@@ -25,6 +25,7 @@ import { META_WHATSAPP_TEMPLATE_PURPOSES, type MetaWhatsAppTemplatePurpose } fro
 export type EventKey =
   | "FIRST_CONTACT"
   | "BROKER_WELCOME"
+  | "DUTY_PRESENCE_CONFIRMATION"
   | "LEAD_ASSIGNMENT"
   | "LEAD_OFFER"
   | "LEAD_ASSIGNMENT_CONFIRMED"
@@ -38,6 +39,7 @@ export type EventKey =
 export const CRM_EVENT_LABEL_MAP: Record<EventKey, string> = {
   FIRST_CONTACT: "Primeiro contato da qualificação",
   BROKER_WELCOME: "Cadastro de Corretor / Primeiro Acesso",
+  DUTY_PRESENCE_CONFIRMATION: "Confirmação de presença no plantão",
   LEAD_ASSIGNMENT: "Novo Lead Atribuído",
   LEAD_OFFER: "Oferta de Lead para Aceite",
   LEAD_ASSIGNMENT_CONFIRMED: "Confirmação de Aceite pelo Corretor",
@@ -383,7 +385,7 @@ export class WhatsAppTemplateResolver {
   static async resolveTemplateForEvent(
     tenantId: string,
     purpose: MetaWhatsAppTemplatePurpose | string,
-  ): Promise<{ name: string; language: string; isCustom: boolean }> {
+  ): Promise<{ name: string; language: string; isCustom: boolean } | null> {
     // Map purpose string to eventKey
     let eventKey: EventKey | null = null;
     if (purpose === "leadQualification" || purpose === "lead_qualification") eventKey = "FIRST_CONTACT";
@@ -438,6 +440,7 @@ export class WhatsAppTemplateResolver {
             and(
               eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
               eq(schema.metaWhatsAppTemplates.name, fallback.name),
+              ...(purpose === "dutyPresenceConfirmation" ? [eq(schema.metaWhatsAppTemplates.status, "APPROVED")] : []),
               isNull(schema.metaWhatsAppTemplates.deletedAt),
             ),
           )
@@ -450,6 +453,10 @@ export class WhatsAppTemplateResolver {
     } catch {
       // Ignora erro se tabelas meta_whatsapp_templates ou meta_whatsapp_template_usages nao existirem no DB
     }
+
+    // This lifecycle reminder is not eligible for a legacy/static fallback:
+    // the tenant must have the approved Meta resource synchronized locally.
+    if (purpose === "dutyPresenceConfirmation") return null;
 
     // Built-in legacy fallback guarantee with dynamic language detection from synced WABA templates
     const fallback = META_WHATSAPP_TEMPLATE_PURPOSES[purpose as MetaWhatsAppTemplatePurpose];

@@ -30,6 +30,7 @@
 - **Lote de leads**: conjunto importado por CSV que preserva a unidade e a fila escolhidas. Cada lead é persistido sem owner e entra individualmente no motor durável de ofertas; a importação não constitui uma atribuição paralela.
 - **Agenda pessoal do corretor**: janelas semanais declaradas pelo próprio corretor, no fuso operacional. Elas determinam quando ele entra na distribuição automática e não revogam a possibilidade de atribuição manual assistida.
 - **Roster ativo do plantão da fila**: corretores com vínculo ativo no tenant e escala vigente em um plantão ativo explicitamente ligado à fila do lead e compatível com sua origem. A seleção pode atravessar unidades; a unidade do lead não é alterada pela atribuição manual.
+- **Ocorrência do plantão**: instância de uma escala recorrente em uma data local específica, delimitada por horário de início e fim no fuso configurado. Confirmações se aplicam apenas a essa ocorrência, nunca ao plantão recorrente em geral.
 
 ## Canais de comunicação
 

@@ -4,6 +4,8 @@ import { and, asc, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
+import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
+import { getRelevantDutyWindow } from "./duty-presence-domain";
 
 const LEADS_WINDOW_DAYS = 7;
 const LEADS_LIMIT = 200;
@@ -55,8 +57,16 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       brokerId: schema.dutyRosterAssignments.brokerId,
       brokerName: schema.user.name,
       internalCode: schema.brokerProfiles.internalCode,
+      phone: schema.brokerProfiles.phone,
+      userActive: schema.user.active,
+      membershipStatus: schema.tenantMemberships.status,
       availabilityStatus: schema.tenantMemberships.availabilityStatus,
       status: schema.dutyRosterAssignments.status,
+      dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+      startsAt: schema.dutyRosterAssignments.startsAt,
+      endsAt: schema.dutyRosterAssignments.endsAt,
+      validFrom: schema.dutyRosterAssignments.validFrom,
+      validUntil: schema.dutyRosterAssignments.validUntil,
     })
     .from(schema.dutyRosterAssignments)
     .innerJoin(schema.user, eq(schema.dutyRosterAssignments.brokerId, schema.user.id))
@@ -119,12 +129,58 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     leadsPerBroker.set(lead.corretorId, (leadsPerBroker.get(lead.corretorId) ?? 0) + 1);
   }
 
+  const presenceEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION)) === "true";
+  const now = new Date();
+  const occurrenceByAssignment = new Map(roster.flatMap((entry) => {
+    const occurrence = getRelevantDutyWindow({
+      dayOfWeek: entry.dayOfWeek,
+      startsAt: entry.startsAt,
+      endsAt: entry.endsAt,
+      timezone: schedule.timezone,
+    }, now, 24 * 60);
+    return occurrence && occurrence.startsAt >= entry.validFrom && (!entry.validUntil || occurrence.startsAt < entry.validUntil)
+      ? [[entry.id, occurrence] as const]
+      : [];
+  }));
+  const dutyDates = [...new Set([...occurrenceByAssignment.values()].map((occurrence) => occurrence.dutyDate))];
+  const presenceRows = presenceEnabled && dutyDates.length
+    ? await db.select({
+      assignmentId: schema.dutyPresenceConfirmations.assignmentId,
+      dutyDate: schema.dutyPresenceConfirmations.dutyDate,
+      status: schema.dutyPresenceConfirmations.status,
+      confirmedAt: schema.dutyPresenceConfirmations.confirmedAt,
+      notificationStatus: schema.dutyPresenceConfirmations.notificationStatus,
+      notificationErrorCode: schema.dutyPresenceConfirmations.notificationErrorCode,
+    }).from(schema.dutyPresenceConfirmations).where(and(
+      eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId),
+      eq(schema.dutyPresenceConfirmations.scheduleId, scheduleId),
+      inArray(schema.dutyPresenceConfirmations.assignmentId, [...occurrenceByAssignment.keys()]),
+      inArray(schema.dutyPresenceConfirmations.dutyDate, dutyDates),
+    ))
+    : [];
+  const presenceByAssignment = new Map(presenceRows.map((row) => [`${row.assignmentId}:${row.dutyDate}`, row]));
+
   return {
     schedule: {
       ...schedule,
       queueName: schedule.legacyQueueName ?? (linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"),
     },
-    roster: roster.map((entry) => ({ ...entry, leadsInWindow: leadsPerBroker.get(entry.brokerId) ?? 0 })),
+    presenceEnabled,
+    roster: roster.map(({ phone, userActive, membershipStatus, dayOfWeek, startsAt, endsAt, validFrom, validUntil, ...entry }) => {
+      const occurrence = occurrenceByAssignment.get(entry.id);
+      const presence = occurrence ? presenceByAssignment.get(`${entry.id}:${occurrence.dutyDate}`) : null;
+      return {
+      ...entry,
+      leadsInWindow: leadsPerBroker.get(entry.brokerId) ?? 0,
+      // Same prerequisites the distribution engine applies before offering a lead.
+      blockedReason: !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null,
+      presenceStatus: !presenceEnabled || !occurrence ? "not_requested" as const : presence?.status === "confirmed" ? "confirmed" as const : "pending" as const,
+      confirmedAt: presence?.confirmedAt ?? null,
+      notificationStatus: presence?.notificationStatus ?? null,
+      notificationErrorCode: presence?.notificationErrorCode ?? null,
+      dutyDate: occurrence?.dutyDate ?? null,
+      };
+    }),
     linkedQueues,
     leads,
     windowDays: LEADS_WINDOW_DAYS,

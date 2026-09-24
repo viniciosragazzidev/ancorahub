@@ -110,4 +110,12 @@ describe("message event catalog", () => {
     )).toContain("https://crm.ancorasaude.cloud/login");
     expect(getFreeMessageUnknownVariables(event!, ["nome", "empresa", "login_url"])).toEqual([]);
   });
+
+  it("locks duty presence reminders to the approved Meta template and URL token", () => {
+    const event = getMessageEventByPurpose("dutyPresenceConfirmation");
+    expect(event?.key).toBe("DUTY_PRESENCE_CONFIRMATION");
+    expect(event?.templateOnly).toBe(true);
+    expect(event?.variables.filter((variable) => variable.urlOnly).map((variable) => variable.key)).toEqual(["id"]);
+    expect(getFreeMessageUnknownVariables(event!, ["nome", "hora", "id"])).toEqual([]);
+  });
 });

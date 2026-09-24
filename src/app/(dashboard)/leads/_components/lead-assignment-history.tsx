@@ -8,29 +8,53 @@ import { getLeadAssignmentHistoryAction, type AssignmentHistoryItem } from "@/fe
 import { formatDate } from "@/features/quotes/utils";
 
 function formatActionLabel(event: AssignmentHistoryItem) {
+  const to = event.newOwnerName;
+  const from = event.previousOwnerName;
   switch (event.action) {
     case "assigned":
-      return event.newOwnerName ? `Atribuído a ${event.newOwnerName}` : "Atribuído a corretor";
+    case "routed_and_assigned":
+      return to ? `Atribuído a ${to}` : "Atribuído a corretor";
+    case "offer_sent":
+      return to ? `Lead ofertado a ${to} (aguardando aceite)` : "Lead ofertado a um corretor (aguardando aceite)";
+    case "accepted":
+      return to ? `${to} aceitou o lead` : "Corretor aceitou o lead";
+    case "declined":
+      return from ?? to ? `${from ?? to} recusou o lead` : "Corretor recusou o lead";
     case "reassigned":
-      return event.previousOwnerName && event.newOwnerName
-        ? `Reatribuído de ${event.previousOwnerName} para ${event.newOwnerName}`
-        : event.newOwnerName
-        ? `Reatribuído para ${event.newOwnerName}`
-        : "Lead reatribuído";
+      return from && to ? `Reatribuído de ${from} para ${to}` : to ? `Reatribuído para ${to}` : "Lead reatribuído";
+    case "assignment_removed":
+      return from ? `Atribuição removida de ${from}` : "Atribuição removida";
     case "routed_to_unit":
+    case "auto_routed_to_unit":
       return event.toBranchName ? `Encaminhado para ${event.toBranchName}` : "Encaminhado para unidade";
     case "returned_to_queue":
-      return "Devolvido à fila da unidade";
+      return from ? `Devolvido à fila por ${from}` : "Devolvido à fila da unidade";
     case "assignment_recovered":
-      return "Atribuição recuperada pelo sistema";
+      return from ? `Atribuição de ${from} recuperada pelo sistema (sem atendimento a tempo)` : "Atribuição recuperada pelo sistema";
+    case "offer_cycle_restarted":
+      return "Novo ciclo de ofertas iniciado";
+    case "qualification_timeout_queued":
+      return "Qualificação expirou — enviado à fila de distribuição";
+    case "queue_duty_fallback":
+      return "Fila de contingência do plantão acionada";
     case "queued":
       return "Adicionado à fila de distribuição";
     case "whatsapp_opened":
-      return event.newOwnerName ? `${event.newOwnerName} abriu o WhatsApp do lead` : "Corretor abriu o WhatsApp do lead";
+      return to ? `${to} abriu o WhatsApp do lead` : "Corretor abriu o WhatsApp do lead";
     default:
       return event.action;
   }
 }
+
+const SOURCE_LABELS: Record<string, string> = {
+  manual_manager: "Gestor (manual)",
+  manual_director: "Diretor (manual)",
+  automatic: "Distribuição automática",
+  redistribution: "Redistribuição",
+  webhook: "Entrada do lead",
+  broker: "Corretor",
+  qualification_timeout: "Tempo de qualificação",
+};
 
 export function LeadAssignmentHistory({
   leadId,
@@ -157,13 +181,28 @@ export function LeadAssignmentHistory({
                     {formatDate(item.createdAt, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
+                {item.newOwnerName || item.previousOwnerName ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+                    {item.previousOwnerName && item.newOwnerName && item.previousOwnerName !== item.newOwnerName ? (
+                      <>
+                        <Badge variant="outline" className="text-[10px]">De: {item.previousOwnerName}</Badge>
+                        <span className="text-muted-foreground">→</span>
+                      </>
+                    ) : null}
+                    {item.newOwnerName ? (
+                      <Badge variant="info" className="text-[10px]">Corretor: {item.newOwnerName}</Badge>
+                    ) : item.previousOwnerName ? (
+                      <Badge variant="secondary" className="text-[10px]">Corretor anterior: {item.previousOwnerName}</Badge>
+                    ) : null}
+                  </div>
+                ) : null}
                 {item.reason ? (
                   <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
                     {item.reason}
                   </p>
                 ) : null}
                 <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground/80">
-                  <span className="capitalize">Origem: {item.source}</span>
+                  <span>Origem: {SOURCE_LABELS[item.source] ?? item.source}</span>
                   {item.actorName ? (
                     <>
                       <span>•</span>

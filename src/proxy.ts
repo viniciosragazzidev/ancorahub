@@ -17,7 +17,7 @@ const protectedPathPrefixes = [
   "/vendas", "/cotacao", "/empresas", "/tarefas", "/agentes-ia", "/assistente",
   "/noc", "/guia", "/propostas", "/ferramentas-vendas"
 ] as const;
-const publicPaths = ["/compartilhado", "/api/public", "/health"] as const;
+const publicPaths = ["/compartilhado", "/api/public", "/confirm_presence", "/health"] as const;
 const authPaths = ["/login", "/verify", "/admin/login"] as const;
 
 type SessionLookup = { userId: string; role: string | null; onboardingStatus: string | null } | null;

@@ -226,6 +226,14 @@ export const FEATURE_FLAGS = {
     description:
       "Exige que corretores declarem sua agenda semanal e aplica essa agenda à distribuição automática de leads.",
   },
+
+  DUTY_PRESENCE_CONFIRMATION: {
+    key: "feature_duty_presence_confirmation_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 
 // ─── Tipo utilitário ──────────────────────────────────────────────────────────

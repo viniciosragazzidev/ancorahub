@@ -48,6 +48,7 @@ export function LeadsDataTable({
       state: null,
       assignedBrokerName: item.corretorNome ?? null,
       isPlantaoAtivo: item.isPlantaoAtivo ?? false,
+      returnedUnaccepted: item.returnedUnaccepted ?? false,
       branchName: item.branchName ?? null,
       qualificationStatus: item.qualificationStatus ?? null,
       queueName: item.queueName ?? null,
@@ -95,6 +96,7 @@ export function LeadsDataTable({
   return (
     <DataTable
       table={table}
+      getRowClassName={(row) => (row.returnedUnaccepted ? "bg-warning/10 hover:bg-warning/15" : undefined)}
       isPending={isPending}
       actionBar={
         selectedRows.length > 0 ? (
@@ -194,6 +196,7 @@ export function QualifyingLeadsDataTable({
   return (
     <DataTable
       table={table}
+      getRowClassName={(row) => (row.returnedUnaccepted ? "bg-warning/10 hover:bg-warning/15" : undefined)}
       isPending={isPending}
     />
   );

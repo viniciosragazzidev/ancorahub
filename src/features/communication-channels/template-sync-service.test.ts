@@ -24,4 +24,10 @@ describe("WhatsAppTemplateResolver", () => {
       name: "broker_first_access", language: "pt_BR", isCustom: false,
     });
   });
+
+  it("does not fall back to an unapproved presence template when Meta sync is unavailable", async () => {
+    const { getDatabase } = await import("@/shared/db");
+    vi.mocked(getDatabase).mockImplementation(() => { throw new Error("database unavailable"); });
+    await expect(WhatsAppTemplateResolver.resolveTemplateForEvent("tenant-id", "dutyPresenceConfirmation")).resolves.toBeNull();
+  });
 });

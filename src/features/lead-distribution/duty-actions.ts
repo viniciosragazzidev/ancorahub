@@ -37,13 +37,29 @@ async function assertNoScheduleConflict(
   // one applies would be ambiguous). Without a chosen queue yet, fall back
   // to the old broad "any overlapping global plantão" check — we can't tell
   // which queue(s) an unlinked plantão might end up serving.
-  if (isGlobal && input.responsibleQueueId) {
-    const [queue] = await db
+  // The responsible queue is not stored on the schedule — it lives in the
+  // queues' exclusivity lists. When editing an existing schedule the form does
+  // not resend it, so recover it from the queues that already link this
+  // schedule; otherwise an edit would fall into the broad check below and
+  // collide with the other queues' plantões.
+  let queueIdsToCheck: string[] = input.responsibleQueueId ? [input.responsibleQueueId] : [];
+  if (isGlobal && !queueIdsToCheck.length && excludedScheduleId) {
+    const linked = await db
+      .select({ id: schema.leadQueues.id })
+      .from(schema.leadQueues)
+      .where(and(
+        eq(schema.leadQueues.tenantId, tenantId),
+        sql`(${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([excludedScheduleId])}::jsonb OR ${schema.leadQueues.exclusiveDutyScheduleId} = ${excludedScheduleId})`,
+      ));
+    queueIdsToCheck = linked.map((queue) => queue.id);
+  }
+
+  if (isGlobal && queueIdsToCheck.length) {
+    const queues = await db
       .select({ exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds })
       .from(schema.leadQueues)
-      .where(and(eq(schema.leadQueues.id, input.responsibleQueueId), eq(schema.leadQueues.tenantId, tenantId)))
-      .limit(1);
-    const scopedIds = (queue?.exclusiveDutyScheduleIds ?? []).filter((id) => id !== excludedScheduleId);
+      .where(and(inArray(schema.leadQueues.id, queueIdsToCheck), eq(schema.leadQueues.tenantId, tenantId)));
+    const scopedIds = Array.from(new Set(queues.flatMap((queue) => queue.exclusiveDutyScheduleIds ?? []))).filter((id) => id !== excludedScheduleId);
     if (!scopedIds.length) return;
     const [conflict] = await db
       .select({ id: schema.unitDutySchedules.id })
@@ -57,7 +73,7 @@ async function assertNoScheduleConflict(
         inArray(schema.unitDutySchedules.id, scopedIds),
       ))
       .limit(1);
-    if (conflict) throw new Error("A fila escolhida já tem um plantão ativo no mesmo horário.");
+    if (conflict) throw new Error("A fila responsável já tem um plantão ativo no mesmo horário.");
     return;
   }
 

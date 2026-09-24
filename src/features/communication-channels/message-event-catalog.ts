@@ -21,6 +21,7 @@ export type MessageEventDefinition = {
   windowRule: MessageWindowRule;
   variables: readonly MessageEventVariable[];
   defaultFreeMessage?: string;
+  templateOnly?: boolean;
 };
 
 const brokerName = {
@@ -165,6 +166,20 @@ export const MESSAGE_EVENT_CATALOG = [
       { key: "login_url", label: "Link de login", aliases: ["crm_login_url"], fallback: "https://crm.ancorasaude.cloud/login", urlOnly: true },
     ],
     defaultFreeMessage: "Olá *{{nome}}*!\n\nSua conta no *{{empresa}}* foi ativada com sucesso.\n\nAcesse o CRM pelo link:\n{{login_url}}",
+  },
+  {
+    key: "DUTY_PRESENCE_CONFIRMATION",
+    purpose: "dutyPresenceConfirmation",
+    label: "Confirmação de presença no plantão",
+    description: "Envia o link para confirmar a presença antes do início da escala.",
+    audience: "user",
+    windowRule: "corporate_internal",
+    templateOnly: true,
+    variables: [
+      { key: "nome", label: "Nome do corretor", fallback: "Corretor(a)" },
+      { key: "hora", label: "Hora de início", fallback: "—" },
+      { key: "id", label: "Código de confirmação", fallback: "", urlOnly: true },
+    ],
   },
   {
     key: "TASK_REMINDER",

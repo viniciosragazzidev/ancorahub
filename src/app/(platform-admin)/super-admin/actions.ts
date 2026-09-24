@@ -26,12 +26,12 @@ import { provisionDefaultMarketingRole } from "@/features/custom-roles/service";
 import { notificationCapabilities, notificationCapabilitySettingKey } from "@/features/notifications/catalog";
 import { resetPlatformUserRouteOnboarding } from "@/features/onboarding/route-onboarding-service";
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/clean-ui/feature";
 import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
 import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
-import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 
 async function requirePlatformTenantTarget(tenantId: string) {
@@ -793,6 +793,20 @@ export async function updateManualLeadAssignmentOfferChoiceSettingsAction(formDa
     targetId: "feature_manual_lead_assignment_offer_choice_enabled",
     metadata: { enabled },
     createdAt: now,
+  });
+}
+
+export async function updateDutyPresenceConfirmationSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("dutyPresenceConfirmationEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_presence_confirmation.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
   });
 }
 

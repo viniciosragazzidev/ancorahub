@@ -1,3 +1,4 @@
+import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 
@@ -579,6 +580,7 @@ async function LeadsPageContent({
   const isLeadOnActiveDuty = (lead: { branchId: string | null; corretorId: string | null }) => Boolean(
     lead.branchId && lead.corretorId && activeDutyBrokerKeys.has(`${lead.branchId}:${lead.corretorId}`),
   );
+  const returnedUnacceptedIds = await getReturnedUnacceptedLeadIds(context.tenantId, [...leads, ...unassignedRows].filter((lead) => !lead.corretorId).map((lead) => lead.id));
 
   // Merge legacy carrier plans with global + private catalog plans
   const seen = new Set<string>();
@@ -701,6 +703,7 @@ async function LeadsPageContent({
               leads={leads.map((lead) => ({
                 ...lead,
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
+                returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
                 createdAt: lead.createdAt.toISOString(),
                 assignedAt: lead.assignedAt?.toISOString() ?? null,
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
@@ -724,6 +727,7 @@ async function LeadsPageContent({
               unassignedLeads={unassignedRows.map((lead) => ({
                 ...lead,
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
+                returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
                 createdAt: lead.createdAt.toISOString(),
                 assignedAt: lead.assignedAt?.toISOString() ?? null,
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,

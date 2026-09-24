@@ -26,6 +26,7 @@ interface DataTableProps<TData> extends React.HTMLAttributes<HTMLDivElement> {
   containerClassName?: string;
   headerClassName?: string;
   isPending?: boolean;
+  getRowClassName?: (row: TData) => string | undefined;
 }
 
 export function DataTable<TData>({
@@ -36,6 +37,7 @@ export function DataTable<TData>({
   containerClassName,
   headerClassName,
   isPending = false,
+  getRowClassName,
   ...props
 }: DataTableProps<TData>) {
   return (
@@ -80,7 +82,7 @@ export function DataTable<TData>({
                   <TableRow
                     key={row.id}
                     data-state={row.getIsSelected() && "selected"}
-                    className={cn(dataTableStyles.row, "cursor-pointer")}
+                    className={cn(dataTableStyles.row, "cursor-pointer", getRowClassName?.(row.original))}
                     onClick={() => {
                       table.options.meta?.onRowClick?.(row.original);
                     }}

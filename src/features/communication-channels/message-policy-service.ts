@@ -248,6 +248,9 @@ export async function saveMessageEventPolicy(tenantId: string, userId: string, i
       throw new Error("O primeiro acesso usa exclusivamente o template padrão broker_first_access.");
     }
   }
+  if (event.templateOnly && (!parsed.active || parsed.primaryKind !== "meta_template" || parsed.fallbackKind !== null || metaTemplate?.name !== "plantao_confirm_presence")) {
+    throw new Error("A confirmação de presença usa exclusivamente o template Meta aprovado plantao_confirm_presence, sem mensagem livre ou contingência.");
+  }
   if ((parsed.primaryKind === "meta_template" || parsed.fallbackKind === "meta_template") && !metaTemplate) {
     throw new Error("O template Meta precisa estar aprovado e pertencer à WABA ativa desta empresa.");
   }
