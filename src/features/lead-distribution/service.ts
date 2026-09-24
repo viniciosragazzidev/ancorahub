@@ -737,7 +737,14 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     return { status: "queued", leadId, reason: "Nenhum corretor elegível nesta unidade." };
   }
 
-  if (balanceAcrossBranches && context.role === "director") {
+  // Duty-exclusive queues route by roster, not by unit: an escalado is
+  // eligible regardless of which branch their own membership belongs to
+  // (a plantão is commonly staffed across several units at once). Locking
+  // the lead to whichever single branch has "menos leads recebidos" would
+  // silently strip out every escalado from the other branches on every
+  // retry — exactly the bug reported (an available, confirmed broker in a
+  // different branch never receiving a lead while their branch-mates do).
+  if (balanceAcrossBranches && context.role === "director" && !exclusiveScheduleIds?.length) {
     const eligibleBranchIds = Array.from(new Set(brokers.map((broker) => broker.branchId).filter((branchId): branchId is string => Boolean(branchId))));
     let selectedBranchId: string | null = null;
     let routingError: string | null = null;

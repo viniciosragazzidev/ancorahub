@@ -6,6 +6,7 @@ import { toast } from "@/components/ui/sonner";
 
 import { Button } from "@/components/ui/button";
 import { startLeadServiceAction } from "./service-action";
+import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
 
 export function StartServiceButton({ leadId }: { leadId: string }) {
   const [pending, startTransition] = useTransition();
@@ -30,6 +31,10 @@ export function StartServiceButton({ leadId }: { leadId: string }) {
       }
       setCompleted(true);
       toast.success("Atendimento iniciado com sucesso.", { description: "Dados liberados. Abrindo seu WhatsApp pessoal..." });
+      // This redirect *is* "opening WhatsApp" — record it here too, not just
+      // the standalone WhatsApp button, or the "abriu o WhatsApp" status the
+      // director sees never fires for the button most brokers actually use.
+      void recordWhatsAppOpenedAction(leadId);
       window.setTimeout(() => window.location.assign(result.whatsappUrl!), 650);
     });
   }
