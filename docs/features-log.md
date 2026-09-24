@@ -2,6 +2,19 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 24/09/2026 - Sincronização em tempo real da carteira e "Marcar em atendimento" do diretor
+
+- Oferta criada, aceite (WhatsApp ou CRM), recusa, expiração, atribuição direta e início
+  de atendimento agora sinalizam, após o commit, os corretores afetados (novo e anterior)
+  e a gestão da unidade; as telas (Lite e `/leads`) se atualizam sem F5.
+- Redes de segurança no cliente: refresh ao reconectar o canal, ao voltar à aba após 15 s
+  oculta e ao voltar a ficar online; com canal indisponível ou realtime desligado, a tela
+  visível se reconcilia a cada 20 s.
+- O drawer de `/leads` passa a refletir o lead atualizado do servidor em vez de uma cópia.
+- Diretor pode marcar um lead atribuído e ainda "Distribuído" como "Em atendimento" na
+  página e no drawer do lead. Usa a mesma transação do "Iniciar atendimento" (confirma a
+  oferta e bloqueia redistribuição); auditoria registra o diretor e o corretor é avisado.
+
 ## 24/09/2026 - "Aceitar lead" no CRM Lite registra o aceite
 
 - O botão "ACEITAR LEAD" da lista e do dashboard Lite era apenas um link para o lead e

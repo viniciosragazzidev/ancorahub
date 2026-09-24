@@ -9,6 +9,7 @@ import { calculateBrokerRankingScore, canRotateProvisionalLeadOwner, defaultInte
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { createLeadOffersForBrokers, loadBrokerPacingOffers } from "./offers";
+import { signalLeadOwnershipChange } from "./ownership-signal";
 import { earliestPacingRetryAt, evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type OfferPacingDecision } from "./offer-pacing";
 import { resolveLeadDestinationRule } from "./routing-engine";
 import { getHoldDisqualifiedLeads, shouldHoldDisqualifiedLead } from "./disqualified-routing-settings";
@@ -383,6 +384,7 @@ export async function routeLeadToBranchAndAssignBroker(
     return true;
   });
 
+  if (assigned) await signalLeadOwnershipChange({ tenantId: context.tenantId, leadId, brokerIds: [brokerId, lead.corretorId] });
   return assigned
     ? { status: "assigned", leadId, brokerId, strategy: "manual" }
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
@@ -437,6 +439,7 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     });
     return true;
   });
+  if (assigned) await signalLeadOwnershipChange({ tenantId: context.tenantId, leadId, brokerIds: [brokerId, lead.corretorId] });
   return assigned
     ? { status: "assigned", leadId, brokerId, strategy: "manual" }
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
@@ -1042,10 +1045,15 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const chosenBranchId = remainingBrokers.find((broker) => broker.id === chosen.id)?.branchId ?? lead.branchId;
   if (!chosenBranchId) return { status: "queued", leadId, reason: "A unidade do corretor selecionado não foi encontrada." };
 
+  // The acceptance window is the tenant's "SLA de Aceite" setting, the same
+  // one manual offers use — not a hard-coded default.
+  const [tenantSla] = await db.select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes })
+    .from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
   const offer = await createLeadOffersForBrokers({
     tenantId: context.tenantId,
     leadId,
     brokerIds: [chosen.id, ...decision.eligible.filter((candidate) => candidate.id !== chosen.id).map((candidate) => candidate.id)],
+    responseTimeoutMinutes: Number.parseInt(tenantSla?.slaFirstContactMinutes ?? "15", 10) || 15,
     requestedBy: context.userId,
     expectedCurrentBrokerId: lead.corretorId,
     targetBranchId: chosenBranchId,

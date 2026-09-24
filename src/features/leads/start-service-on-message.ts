@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, ne, or } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { signalLeadOwnershipChange } from "@/features/lead-distribution/ownership-signal";
 
 /**
  * Transitions a distributed lead to in_contact when its owning broker sends
@@ -158,6 +159,9 @@ export async function startServiceOnFirstMessage(input: {
     return true;
   });
 
+  if (updated) {
+    await signalLeadOwnershipChange({ tenantId: input.tenantId, leadId: input.leadId, brokerIds: [input.brokerId, input.actorId] });
+  }
   return updated;
 }
 

@@ -7,6 +7,7 @@ import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables } from "@/features/communication-channels/templates";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { signalLeadOwnershipChange } from "./ownership-signal";
 import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { reserveQueueCapacitySlot } from "./queue-capacity";
@@ -99,7 +100,8 @@ export async function createLeadOffersForBrokers(input: {
   assignmentSource?: "automatic_offer" | "manual_offer";
 }) {
   const db = getDatabase();
-  const timeoutMinutes = Math.max(1, Math.min(input.responseTimeoutMinutes ?? 3, input.assignmentSource === "manual_offer" ? 1440 : 60));
+  // Same bounds as the "SLA de Aceite" setting (1–1440 min).
+  const timeoutMinutes = Math.max(1, Math.min(input.responseTimeoutMinutes ?? 3, 1440));
   const now = new Date();
   const expiresAt = new Date(now.getTime() + timeoutMinutes * 60_000);
 
@@ -149,6 +151,7 @@ export async function createLeadOffersForBrokers(input: {
     );
 
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
+  const claimedBrokerIds: string[] = [];
   let capacityReached = false;
   let pacingBlocked = false;
   let permanentDeliveryFailure = false;
@@ -320,6 +323,7 @@ export async function createLeadOffersForBrokers(input: {
     });
 
     if (!claimStatus) continue;
+    claimedBrokerIds.push(broker.id);
     if (claimStatus === "unavailable" || !destinationPhone) {
       console.warn(`[createLeadOffersForBrokers] Corretor ${broker.id} (${broker.name}) não possui telefone cadastrado.`);
       if (input.requestedBy) {
@@ -472,6 +476,14 @@ export async function createLeadOffersForBrokers(input: {
 
   // Delivery stays in the durable outbound queue. The scheduler owns retry and
   // provider I/O so offer creation never holds the operational interface open.
+
+  if (claimedBrokerIds.length) {
+    await signalLeadOwnershipChange({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      brokerIds: [...claimedBrokerIds, input.expectedCurrentBrokerId],
+    });
+  }
 
   return { created: createdOffers.length, expiresAt, createdOffers, capacityReached, pacingBlocked, permanentDeliveryFailure };
 }
@@ -642,6 +654,7 @@ export async function handleLeadOfferWebhookResponse(input: {
     });
 
     if (!declined) return { processed: true, action: "declined", leadId: offer.leadId };
+    await signalLeadOwnershipChange({ tenantId: input.tenantId, leadId: offer.leadId, brokerIds: [broker.id] });
 
     await db.insert(schema.auditLogs).values({
       id: randomUUID(),
@@ -798,6 +811,11 @@ export async function handleLeadOfferWebhookResponse(input: {
   });
 
   if (result.won && result.lead && result.broker) {
+    await signalLeadOwnershipChange({
+      tenantId: input.tenantId,
+      leadId: result.lead.id,
+      brokerIds: [result.broker.id, result.lead.corretorId],
+    });
     const brokerName = result.broker.name || "Corretor(a)";
     const leadTypeLabel = result.lead.tipo === "pme" ? "PME" : result.lead.tipo === "pj" ? "Empresarial" : "Pessoa Física";
     const interest = readLeadFormValue(result.lead.formData, ["produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse"])
@@ -977,6 +995,7 @@ export async function expireOutdatedLeadOffers(tenantId?: string) {
 
     if (updated) {
       expiredCount += 1;
+      await signalLeadOwnershipChange({ tenantId: offer.tenantId, leadId: offer.leadId, brokerIds: [offer.brokerId] });
 
       const releasedManualOffer = offer.assignmentSource === "manual_offer"
         ? await db.update(schema.leads)

@@ -17,7 +17,7 @@ import { CommandPalette } from "@/components/command-palette";
 import { SystemFeedbackDrawer } from "@/components/system-feedback-drawer";
 import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-provider";
 import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
-import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
+import { getRealtimeSyncTopic, isRealtimeSyncEnabled } from "@/features/notifications/realtime-sync";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { hasPermission } from "@/shared/auth/permissions";
@@ -131,7 +131,11 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const [tenant] = tenantRows;
   const [currentUser] = userRows;
   const [membership] = membershipRows;
-  const syncTopic = getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId });
+  // With realtime switched off the server sends no signals; a null topic makes
+  // the client fall back to periodic reconciliation instead of trusting a silent channel.
+  const syncTopic = (await isRealtimeSyncEnabled())
+    ? getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId })
+    : null;
 
   return (
     <AgentDrawerProvider>

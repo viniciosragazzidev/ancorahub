@@ -69,6 +69,22 @@ export function shouldScheduleShellRefresh(detail: RealtimeSyncBrowserDetail, pa
   );
 }
 
+/**
+ * Returning to a tab that stayed hidden this long re-reads the server view:
+ * signals may have been missed while the browser throttled the socket.
+ */
+export const RESUME_REFRESH_AFTER_MS = 15_000;
+
+/**
+ * While the realtime channel is down (or disabled), visible pages reconcile on
+ * this interval so no one needs F5 to see offers, acceptances or rotations.
+ */
+export const FALLBACK_REFRESH_MS = 20_000;
+
+export function shouldRefreshOnResume(hiddenAt: number | null, now: number): boolean {
+  return hiddenAt !== null && now - hiddenAt >= RESUME_REFRESH_AFTER_MS;
+}
+
 export function shouldDelayRealtimeUnavailable(status: string): boolean {
   return status === "CHANNEL_ERROR" || status === "TIMED_OUT";
 }
@@ -81,6 +97,9 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   const refreshPendingRef = useRef(false);
   const pendingEventsRef = useRef(0);
   const shellStartedAtRef = useRef<number | null>(null);
+  const hiddenAtRef = useRef<number | null>(null);
+  const hasSubscribedRef = useRef(false);
+  const [isRealtimeLive, setIsRealtimeLive] = useState(false);
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [incomingLeads, setIncomingLeads] = useState(createIncomingLeadQueueState);
@@ -171,14 +190,24 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     const resumePendingRefresh = () => {
       if (refreshPendingRef.current) scheduleServerRefresh();
     };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+      const staleAfterHidden = shouldRefreshOnResume(hiddenAtRef.current, Date.now());
+      hiddenAtRef.current = null;
+      if (staleAfterHidden) scheduleServerRefresh();
+      else resumePendingRefresh();
+    };
     const onFocusOut = () => window.setTimeout(resumePendingRefresh, 0);
     window.addEventListener("focus", resumePendingRefresh);
     window.addEventListener("focusout", onFocusOut);
-    document.addEventListener("visibilitychange", resumePendingRefresh);
+    document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       window.removeEventListener("focus", resumePendingRefresh);
       window.removeEventListener("focusout", onFocusOut);
-      document.removeEventListener("visibilitychange", resumePendingRefresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       if (refreshTimerRef.current !== null) window.clearTimeout(refreshTimerRef.current);
     };
   }, [scheduleServerRefresh]);
@@ -187,6 +216,8 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     const onOnline = () => {
       logSupabaseRealtimeDiagnostic({ event: "network_status", status: "ONLINE" });
       setIsOnline(true);
+      // Anything that changed while offline was never signalled to this tab.
+      scheduleServerRefresh();
     };
     const onOffline = () => {
       logSupabaseRealtimeDiagnostic({ event: "network_status", status: "OFFLINE" });
@@ -198,7 +229,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
     };
-  }, []);
+  }, [scheduleServerRefresh]);
 
   useEffect(() => {
     if (typeof BroadcastChannel === "undefined") return;
@@ -251,18 +282,32 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
           errorPresent: Boolean(error),
         });
         if (shouldDelayRealtimeUnavailable(status)) scheduleRealtimeUnavailable();
+        if (status !== "SUBSCRIBED") setIsRealtimeLive(false);
         if (status === "SUBSCRIBED") {
           clearRealtimeFailureTimer();
           setIsOnline(true);
+          setIsRealtimeLive(true);
           setLastSyncedAt(Date.now());
+          // A re-subscription means signals may have been lost while the channel was down.
+          if (hasSubscribedRef.current) scheduleServerRefresh();
+          hasSubscribedRef.current = true;
         }
       });
     logSupabaseRealtimeDiagnostic({ event: "subscribe_requested" });
     return () => {
       clearRealtimeFailureTimer();
+      setIsRealtimeLive(false);
       void supabase.removeChannel(channel);
     };
-  }, [handleRemoteSignal, syncTopic]);
+  }, [handleRemoteSignal, scheduleServerRefresh, syncTopic]);
+
+  useEffect(() => {
+    if (isRealtimeLive) return;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") scheduleServerRefresh();
+    }, FALLBACK_REFRESH_MS);
+    return () => window.clearInterval(interval);
+  }, [isRealtimeLive, scheduleServerRefresh]);
 
   useEffect(() => {
     if (!isEligibleForLeadNotifications) return;
