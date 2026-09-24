@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDutyStartHour, getPreviousDutyOccurrenceCutoff, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive } from "./duty-presence-domain";
+import { formatDutyStartHour, getDutyOccurrenceLeadWindow, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive } from "./duty-presence-domain";
 
 describe("duty presence occurrence windows", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
@@ -42,31 +42,33 @@ describe("duty presence occurrence windows", () => {
   });
 });
 
-describe("getPreviousDutyOccurrenceCutoff", () => {
+describe("getDutyOccurrenceLeadWindow", () => {
   // Wednesday 10:00–12:00 America/Sao_Paulo (UTC-3) — 13:00–15:00 UTC.
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
 
-  it("uses the occurrence's own start while it is currently in progress, so today's arrivals so far still show", () => {
+  it("is open-ended from the occurrence's own start while it is currently in progress", () => {
     const now = new Date("2026-09-23T14:00:00.000Z"); // Wed 11:00 in São Paulo, mid-shift
-    expect(getPreviousDutyOccurrenceCutoff(shift, now).toISOString()).toBe("2026-09-23T13:00:00.000Z");
+    expect(getDutyOccurrenceLeadWindow(shift, now)).toEqual({ since: new Date("2026-09-23T13:00:00.000Z"), until: null });
   });
 
-  it("uses today's own end right after the shift closes", () => {
+  it("closes the window at today's own end right after the shift closes, not open-ended", () => {
     const now = new Date("2026-09-23T15:30:00.000Z"); // Wed 12:30 SP, just after close
-    expect(getPreviousDutyOccurrenceCutoff(shift, now).toISOString()).toBe("2026-09-23T15:00:00.000Z");
+    expect(getDutyOccurrenceLeadWindow(shift, now)).toEqual({ since: new Date("2026-09-23T13:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
   });
 
-  it("uses yesterday's end the next day, not a week-old cutoff — the reported bug", () => {
+  it("scopes a past occurrence's page to only its own window the next day — the reported bug", () => {
+    // Viewing Wednesday's page on Thursday must not keep absorbing Thursday's
+    // own leads: bounded to Wednesday's own start/end, not open past its close.
     const now = new Date("2026-09-24T14:00:00.000Z"); // Thursday, well after Wednesday's shift
-    expect(getPreviousDutyOccurrenceCutoff(shift, now).toISOString()).toBe("2026-09-23T15:00:00.000Z");
+    expect(getDutyOccurrenceLeadWindow(shift, now)).toEqual({ since: new Date("2026-09-23T13:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
   });
 
   it("reaches back a full week when today is shift day but the shift has not started yet", () => {
     const now = new Date("2026-09-30T12:00:00.000Z"); // Wed 09:00 SP — today's own shift starts at 10:00
-    expect(getPreviousDutyOccurrenceCutoff(shift, now).toISOString()).toBe("2026-09-23T15:00:00.000Z");
+    expect(getDutyOccurrenceLeadWindow(shift, now)).toEqual({ since: new Date("2026-09-23T13:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
   });
 
-  it("falls back to epoch (show everything) for an invalid weekday rather than throwing", () => {
-    expect(getPreviousDutyOccurrenceCutoff({ ...shift, dayOfWeek: 9 }, new Date("2026-09-23T12:00:00.000Z")).getTime()).toBe(0);
+  it("falls back to show-everything (epoch, no upper bound) for an invalid weekday rather than throwing", () => {
+    expect(getDutyOccurrenceLeadWindow({ ...shift, dayOfWeek: 9 }, new Date("2026-09-23T12:00:00.000Z"))).toEqual({ since: new Date(0), until: null });
   });
 });

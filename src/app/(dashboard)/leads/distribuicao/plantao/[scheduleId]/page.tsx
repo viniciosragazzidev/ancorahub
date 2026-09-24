@@ -14,6 +14,7 @@ import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
+import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +40,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     redirect("/leads/distribuicao?view=plantao");
   }
 
-  const { schedule, roster, linkedQueues, leads, leadsSince, presenceEnabled, liveStatusEnabled } = profile;
+  const { schedule, roster, linkedQueues, leads, leadsSince, leadsUntil, presenceEnabled, liveStatusEnabled } = profile;
   const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
   const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
@@ -56,7 +57,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
     { key: "distribuidos", label: "Distribuídos", count: distributedCount },
   ] as const;
-  const sinceLabel = leadsSince.getTime() > 0 ? `desde o fim do último plantão (${dateTime.format(leadsSince)})` : "desde a criação deste plantão";
+  const sinceLabel = leadsSince.getTime() === 0
+    ? "desde a criação deste plantão"
+    : leadsUntil
+      ? `nesta ocorrência (${dateTime.format(leadsSince)} – ${dateTime.format(leadsUntil)})`
+      : `desde o início desta ocorrência (${dateTime.format(leadsSince)})`;
 
   return <>
     <DashboardHeader
@@ -196,6 +201,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                     <p className="truncate text-sm font-medium">{entry.brokerName}</p>
                     {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`Presença confirmada${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={entry.confirmedAt ? `Confirmado em ${dateTime.format(entry.confirmedAt)}` : "Presença confirmada"}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
+                    {presenceEnabled ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
                   </div>
                   <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}</p>
                   {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}

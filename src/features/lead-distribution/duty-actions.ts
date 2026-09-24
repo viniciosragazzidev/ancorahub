@@ -7,6 +7,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
 import { dutyScheduleInput, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
+import { sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 
 export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
 
@@ -369,5 +370,19 @@ export async function restoreDutyScheduleAction(_previous: DutyActionState, form
     return { success: true, scheduleId: schedule.id };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível restaurar o plantão." };
+  }
+}
+
+/**
+ * Manual "send/resend now" for one roster row's presence-confirmation
+ * invite — the roster page's per-broker button, not a form. Reuses the same
+ * director/manager + branch-scope check as every other roster mutation.
+ */
+export async function sendDutyPresenceInviteManuallyAction(scheduleId: string, assignmentId: string): Promise<ManualDutyPresenceInviteResult> {
+  try {
+    const { context } = await findScheduleForMutation(scheduleId);
+    return await sendDutyPresenceInviteManually({ tenantId: context.tenantId, assignmentId, requestedBy: context.userId });
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível enviar o convite." };
   }
 }

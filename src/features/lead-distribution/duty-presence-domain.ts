@@ -86,37 +86,45 @@ export function getRelevantDutyWindow(input: WeeklyWindowInput, now: Date, leadM
   return null;
 }
 
-/**
- * When "this plantão" last had leads flowing: the start of the occurrence
- * currently in progress (if we're inside one right now — today's arrivals so
- * far should still show), otherwise the end of the most recently completed
- * occurrence (so leads from a prior, already-closed shift don't linger on
- * the page). Falls back to epoch (show everything) if the schedule never
- * had a completed occurrence in the lookback window — a schedule brand new
- * today, for example.
- */
-export function getPreviousDutyOccurrenceCutoff(input: WeeklyWindowInput, now: Date): Date {
-  const current = getRelevantDutyWindow(input, now, 0);
-  if (isDutyWindowActive(current, now)) return current!.startsAt;
-
-  if (!Number.isInteger(input.dayOfWeek) || input.dayOfWeek < 0 || input.dayOfWeek > 6) return new Date(0);
-  const localNow = zonedParts(now, input.timezone);
-  const today = dateKey(localNow.year, localNow.month, localNow.day);
-  // 0 through -6 covers 7 consecutive days, so exactly one of them is the
+/** The most recent occurrence of this schedule whose end is at or before `referenceTime`, searching back up to a week. */
+function findMostRecentCompletedOccurrence(input: WeeklyWindowInput, referenceTime: Date): DutyWindow | null {
+  if (!Number.isInteger(input.dayOfWeek) || input.dayOfWeek < 0 || input.dayOfWeek > 6) return null;
+  const localRef = zonedParts(referenceTime, input.timezone);
+  const refDay = dateKey(localRef.year, localRef.month, localRef.day);
+  // 0 through -6 is 7 consecutive days, so exactly one of them is the
   // schedule's weekday — except when that's today and today's occurrence
-  // hasn't ended yet (already handled above as "active", but also reachable
-  // here if today hasn't started yet), in which case the one before it is a
-  // full week back at offset -7.
+  // hasn't ended by `referenceTime` yet, in which case the one before it is
+  // a full week back at offset -7.
   for (const offset of [0, -1, -2, -3, -4, -5, -6, -7]) {
-    const dutyDate = addCalendarDays(today, offset);
+    const dutyDate = addCalendarDays(refDay, offset);
     const [year, month, day] = dutyDate.split("-").map(Number);
     if (new Date(Date.UTC(year, month - 1, day)).getUTCDay() !== input.dayOfWeek) continue;
     const startsAt = localTimeToUtc(dutyDate, input.startsAt, input.timezone);
     let endsAt = localTimeToUtc(dutyDate, input.endsAt, input.timezone);
     if (endsAt <= startsAt) endsAt = localTimeToUtc(addCalendarDays(dutyDate, 1), input.endsAt, input.timezone);
-    if (endsAt <= now) return endsAt;
+    if (endsAt <= referenceTime) return { dutyDate, startsAt, endsAt };
   }
-  return new Date(0);
+  return null;
+}
+
+/**
+ * The exact window of leads that belong to "this plantão" right now: the
+ * occurrence currently in progress (open-ended — still collecting, so
+ * `until` is null) if we're inside one, otherwise the most recently
+ * completed occurrence, bounded on both ends so a closed shift's page
+ * doesn't keep absorbing leads that arrived after it ended (those belong to
+ * whichever occurrence — same schedule next week, or a different weekday's
+ * schedule — is actually running then). Falls back to "show everything"
+ * (epoch, no upper bound) if the schedule never had a completed occurrence
+ * yet — brand new today, for example.
+ */
+export function getDutyOccurrenceLeadWindow(input: WeeklyWindowInput, now: Date): { since: Date; until: Date | null } {
+  const current = getRelevantDutyWindow(input, now, 0);
+  if (isDutyWindowActive(current, now)) return { since: current!.startsAt, until: null };
+
+  const completed = findMostRecentCompletedOccurrence(input, now);
+  if (!completed) return { since: new Date(0), until: null };
+  return { since: completed.startsAt, until: completed.endsAt };
 }
 
 export function isDutyWindowActive(window: DutyWindow | null, now: Date) {

@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, gt, inArray, isNull, lte, lt, or } from "drizzle-orm";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
-import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
+import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 
@@ -188,4 +188,106 @@ export async function processDutyPresenceReminders(now = new Date()) {
     }
   }
   return { enabled: true, considered, queued, failed, expired: expiredRows.length };
+}
+
+export type ManualDutyPresenceInviteResult =
+  | { ok: true; delivered: boolean }
+  | { ok: false; reason: string };
+
+/**
+ * Directors/managers can trigger this from the roster row — for a broker
+ * added mid-shift (who missed the sweep's window) or to resend after a
+ * delivery error, without waiting for the next cron pass. Unlike the sweep,
+ * this always (re)sends: it does not skip an already-"sent" row.
+ */
+export async function sendDutyPresenceInviteManually(input: { tenantId: string; assignmentId: string; requestedBy: string }, now = new Date()): Promise<ManualDutyPresenceInviteResult> {
+  if (!(await isDutyPresenceConfirmationEnabled())) return { ok: false, reason: "A confirmação de presença está desligada globalmente." };
+  const db = getDatabase();
+
+  const [assignment] = await db.select({
+    id: schema.dutyRosterAssignments.id,
+    tenantId: schema.dutyRosterAssignments.tenantId,
+    scheduleId: schema.dutyRosterAssignments.scheduleId,
+    brokerId: schema.dutyRosterAssignments.brokerId,
+    brokerName: schema.user.name,
+    phone: schema.brokerProfiles.phone,
+    dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+    startsAt: schema.dutyRosterAssignments.startsAt,
+    endsAt: schema.dutyRosterAssignments.endsAt,
+    validFrom: schema.dutyRosterAssignments.validFrom,
+    validUntil: schema.dutyRosterAssignments.validUntil,
+    scheduleTimezone: schema.unitDutySchedules.timezone,
+  }).from(schema.dutyRosterAssignments)
+    .innerJoin(schema.user, eq(schema.user.id, schema.dutyRosterAssignments.brokerId))
+    .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
+    .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.dutyRosterAssignments.brokerId), eq(schema.brokerProfiles.tenantId, schema.dutyRosterAssignments.tenantId)))
+    .where(and(
+      eq(schema.dutyRosterAssignments.id, input.assignmentId),
+      eq(schema.dutyRosterAssignments.tenantId, input.tenantId),
+      eq(schema.dutyRosterAssignments.status, "active"),
+    ))
+    .limit(1);
+  if (!assignment) return { ok: false, reason: "Escalação não encontrada." };
+  if (!assignment.phone) return { ok: false, reason: "Corretor sem telefone cadastrado." };
+
+  const window = getWindow({ id: assignment.scheduleId, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt, endsAt: assignment.endsAt, timezone: assignment.scheduleTimezone, validFrom: assignment.validFrom, validUntil: assignment.validUntil }, now);
+  if (!window) return { ok: false, reason: "Não há ocorrência de plantão ativa ou próxima para este corretor agora." };
+
+  const confirmationId = randomUUID();
+  const [inserted] = await db.insert(schema.dutyPresenceConfirmations).values({
+    id: confirmationId,
+    tenantId: input.tenantId,
+    scheduleId: assignment.scheduleId,
+    assignmentId: assignment.id,
+    brokerId: assignment.brokerId,
+    dutyDate: window.dutyDate,
+    shiftStartsAt: window.startsAt,
+    shiftEndsAt: window.endsAt,
+    status: "pending",
+    notificationStatus: "pending",
+    createdAt: now,
+    updatedAt: now,
+  }).onConflictDoNothing().returning({ id: schema.dutyPresenceConfirmations.id });
+  const record = inserted ?? (await db.select({ id: schema.dutyPresenceConfirmations.id, status: schema.dutyPresenceConfirmations.status }).from(schema.dutyPresenceConfirmations).where(and(
+    eq(schema.dutyPresenceConfirmations.tenantId, input.tenantId),
+    eq(schema.dutyPresenceConfirmations.assignmentId, assignment.id),
+    eq(schema.dutyPresenceConfirmations.dutyDate, window.dutyDate),
+    eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt),
+    eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
+  )).limit(1))[0];
+  if (!record) return { ok: false, reason: "Não foi possível preparar a confirmação." };
+
+  await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "dispatching", updatedAt: now }).where(eq(schema.dutyPresenceConfirmations.id, record.id));
+  try {
+    const outbound = await enqueueMetaTemplateMessage({
+      tenantId: input.tenantId,
+      recipientType: "user",
+      recipientId: assignment.brokerId,
+      destinationPhone: assignment.phone,
+      purpose: "dutyPresenceConfirmation",
+      variables: [assignment.brokerName, formatDutyStartHour(window.startsAt, assignment.scheduleTimezone), record.id],
+      requestedBy: input.requestedBy,
+      // A fresh key per manual click — the idempotency key from the sweep
+      // (`duty-presence:${record.id}`) may already have been consumed for
+      // this same confirmation row, and a resend is a deliberate new attempt.
+      idempotencyKey: `duty-presence-manual:${record.id}:${now.getTime()}`,
+    });
+    const delivery = await processMetaOutboundBatch(1, input.tenantId, outbound.id);
+    const failedNow = delivery.failed > 0 && delivery.sent === 0;
+    await db.update(schema.dutyPresenceConfirmations).set({
+      notificationStatus: failedNow ? "error" : "sent",
+      notificationErrorCode: failedNow ? "OUTBOX_DELIVERY_FAILED" : null,
+      updatedAt: new Date(),
+    }).where(eq(schema.dutyPresenceConfirmations.id, record.id));
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(), userId: input.requestedBy, entidade: "duty_presence_confirmation", entidadeId: record.id,
+      acao: failedNow ? "duty_presence.manual_invite_failed" : "duty_presence.manual_invite_sent",
+    });
+    if (failedNow) return { ok: false, reason: "O envio falhou no provedor. Tente novamente em instantes." };
+    return { ok: true, delivered: delivery.sent > 0 };
+  } catch (error) {
+    const safeCode = error instanceof Error && error.message === "BROKER_PHONE_UNAVAILABLE" ? "BROKER_PHONE_UNAVAILABLE" : "TEMPLATE_DELIVERY_UNAVAILABLE";
+    await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "error", notificationErrorCode: safeCode, updatedAt: new Date() }).where(eq(schema.dutyPresenceConfirmations.id, record.id));
+    return { ok: false, reason: "Não foi possível enviar o convite agora. Confira o canal de WhatsApp da empresa." };
+  }
 }

@@ -1,11 +1,11 @@
 import "server-only";
 
-import { and, asc, desc, eq, gt, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
-import { getPreviousDutyOccurrenceCutoff, getRelevantDutyWindow } from "./duty-presence-domain";
+import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow } from "./duty-presence-domain";
 import { normalizeOfferPacing } from "./offer-pacing";
 import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 
@@ -115,13 +115,15 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
 
   const queueIds = linkedQueues.map((queue) => queue.id);
   const now = new Date();
-  // Only leads that arrived after the last time this plantão was actually
-  // running — the previous occurrence's own end (or its start, if we're
-  // inside it right now) — not a flat lookback window that mixes in an
-  // already-closed prior shift's leftovers and confuses whoever's on duty.
+  // Only leads that actually belong to this specific occurrence: the one
+  // currently running (open-ended — still collecting) or, once it's closed,
+  // bounded to exactly its own start/end. Without the upper bound, an
+  // already-closed occurrence's page kept absorbing whatever arrived after
+  // it ended — including a different day's own leads.
   const safetyFloor = new Date(now.getTime() - LEADS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  const occurrenceCutoff = getPreviousDutyOccurrenceCutoff({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, now);
-  const since = occurrenceCutoff > safetyFloor ? occurrenceCutoff : safetyFloor;
+  const occurrenceWindow = getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, now);
+  const since = occurrenceWindow.since > safetyFloor ? occurrenceWindow.since : safetyFloor;
+  const until = occurrenceWindow.until;
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.
@@ -146,7 +148,10 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
         inArray(schema.leads.queueId, queueIds),
-        or(gte(schema.leads.createdAt, since), gte(schema.leads.assignedAt, since)),
+        or(
+          and(gte(schema.leads.createdAt, since), until ? lte(schema.leads.createdAt, until) : undefined),
+          and(gte(schema.leads.assignedAt, since), until ? lte(schema.leads.assignedAt, until) : undefined),
+        ),
         isNull(schema.leads.deletedAt),
         isNull(schema.leads.archivedAt),
       ))
@@ -265,6 +270,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     linkedQueues,
     leads,
     leadsSince: since,
+    leadsUntil: until,
     liveStatusEnabled: Boolean(operatingQueue),
   };
 }
