@@ -107,24 +107,43 @@ function findMostRecentCompletedOccurrence(input: WeeklyWindowInput, referenceTi
   return null;
 }
 
+/** The most recently completed occurrence across a family of schedules (e.g. every weekday of the same rotating plantão), whichever of them ended latest at or before `referenceTime`. */
+function mostRecentCompletedAcrossFamily(schedules: WeeklyWindowInput[], referenceTime: Date): DutyWindow | null {
+  let best: DutyWindow | null = null;
+  for (const schedule of schedules) {
+    const occurrence = findMostRecentCompletedOccurrence(schedule, referenceTime);
+    if (occurrence && (!best || occurrence.endsAt > best.endsAt)) best = occurrence;
+  }
+  return best;
+}
+
 /**
  * The exact window of leads that belong to "this plantão" right now: the
  * occurrence currently in progress (open-ended — still collecting, so
  * `until` is null) if we're inside one, otherwise the most recently
- * completed occurrence, bounded on both ends so a closed shift's page
- * doesn't keep absorbing leads that arrived after it ended (those belong to
- * whichever occurrence — same schedule next week, or a different weekday's
- * schedule — is actually running then). Falls back to "show everything"
- * (epoch, no upper bound) if the schedule never had a completed occurrence
- * yet — brand new today, for example.
+ * completed occurrence, bounded on the end so a closed shift's page doesn't
+ * keep absorbing leads that arrived after it ended.
+ *
+ * The lower bound reaches into `family` — every schedule sharing the same
+ * queue(s) as `schedule`, itself included — because a plantão is commonly
+ * one row per weekday (Mon..Fri as five separate schedules): "the previous
+ * occurrence" a lead should be counted from is usually a *different*
+ * weekday's schedule (yesterday's), not this same schedule a week back.
+ * Pass `[schedule]` when there is no rotation to widen into.
+ *
+ * Falls back to "show everything" (epoch, no upper bound) if the schedule
+ * never had a completed occurrence yet — brand new today, for example.
  */
-export function getDutyOccurrenceLeadWindow(input: WeeklyWindowInput, now: Date): { since: Date; until: Date | null } {
-  const current = getRelevantDutyWindow(input, now, 0);
-  if (isDutyWindowActive(current, now)) return { since: current!.startsAt, until: null };
+export function getDutyOccurrenceLeadWindow(schedule: WeeklyWindowInput, family: WeeklyWindowInput[], now: Date): { since: Date; until: Date | null } {
+  const current = getRelevantDutyWindow(schedule, now, 0);
+  const active = isDutyWindowActive(current, now);
+  const relevant = active ? current! : findMostRecentCompletedOccurrence(schedule, now);
+  if (!relevant) return { since: new Date(0), until: null };
 
-  const completed = findMostRecentCompletedOccurrence(input, now);
-  if (!completed) return { since: new Date(0), until: null };
-  return { since: completed.startsAt, until: completed.endsAt };
+  const until = active ? null : relevant.endsAt;
+  const previous = mostRecentCompletedAcrossFamily(family, relevant.startsAt);
+  const since = previous ? previous.endsAt : relevant.startsAt;
+  return { since, until };
 }
 
 export function isDutyWindowActive(window: DutyWindow | null, now: Date) {

@@ -93,6 +93,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       capacityPerBroker: schema.leadQueues.capacityPerBroker,
       offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes,
       maxPendingOffersPerBroker: schema.leadQueues.maxPendingOffersPerBroker,
+      exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId,
+      exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds,
     })
     .from(schema.leadQueues)
     .leftJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
@@ -115,13 +117,30 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
 
   const queueIds = linkedQueues.map((queue) => queue.id);
   const now = new Date();
+
+  // A plantão is commonly one row per weekday sharing the same queue(s)
+  // (Mon..Fri as five separate schedules). The lower bound of "leads that
+  // belong to this occurrence" needs every sibling in that rotation to find
+  // the *actual* previous occurrence — usually a different weekday's
+  // schedule (yesterday's close), not this same schedule a week back.
+  const familyScheduleIds = new Set<string>([scheduleId]);
+  for (const queue of linkedQueues) {
+    if (queue.exclusiveDutyScheduleId) familyScheduleIds.add(queue.exclusiveDutyScheduleId);
+    for (const id of queue.exclusiveDutyScheduleIds ?? []) familyScheduleIds.add(id);
+  }
+  const familySchedules = familyScheduleIds.size > 1
+    ? await db.select({ dayOfWeek: schema.unitDutySchedules.dayOfWeek, startsAt: schema.unitDutySchedules.startsAt, endsAt: schema.unitDutySchedules.endsAt, timezone: schema.unitDutySchedules.timezone })
+      .from(schema.unitDutySchedules)
+      .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), inArray(schema.unitDutySchedules.id, [...familyScheduleIds])))
+    : [{ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }];
+
   // Only leads that actually belong to this specific occurrence: the one
   // currently running (open-ended — still collecting) or, once it's closed,
   // bounded to exactly its own start/end. Without the upper bound, an
   // already-closed occurrence's page kept absorbing whatever arrived after
   // it ended — including a different day's own leads.
   const safetyFloor = new Date(now.getTime() - LEADS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
-  const occurrenceWindow = getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, now);
+  const occurrenceWindow = getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, now);
   const since = occurrenceWindow.since > safetyFloor ? occurrenceWindow.since : safetyFloor;
   const until = occurrenceWindow.until;
 
