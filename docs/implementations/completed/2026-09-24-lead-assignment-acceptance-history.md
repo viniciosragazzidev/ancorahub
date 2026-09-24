@@ -45,7 +45,7 @@ oferta e impede que um job atrasado retire o lead da carteira do corretor.
   passaram; a suíte completa tem uma falha pré-existente e fora do escopo em
   `src/features/broker-workspace/broker-lite-experience.test.tsx` (contrato de ordem das
   rotas Lite/relatórios). Relatório: `reports/agent/verification/2026-09-24T15-34-29.211Z.md`.
-- Build final pendente.
+- `npm run build`: aprovado (24/09/2026).
 
 ## Risco e reversão
 
