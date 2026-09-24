@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircle2, Clock3 } from "lucide-react";
@@ -16,6 +17,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
+import { groupDutyLeadsByShift } from "../_components/duty-leads-shift-groups";
+import { DragScrollTable } from "../_components/drag-scroll-table";
 
 export const dynamic = "force-dynamic";
 
@@ -144,35 +147,49 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           </CardHeader>
           <CardContent className="p-0">
             {visibleLeads.length ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Fila</TableHead>
-                    <TableHead>Corretor</TableHead>
-                    <TableHead>Distribuição</TableHead>
-                    <TableHead>Etapa</TableHead>
-                    <TableHead>Recebido em</TableHead>
-                    <TableHead>Distribuído em</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleLeads.map((lead) => {
-                    const distribution = leadDistributionStatusUi(lead.distributionStatus);
-                    return (
-                      <TableRow key={lead.id} className={returnedUnaccepted.has(lead.id) ? "bg-warning/10 hover:bg-warning/15" : undefined}>
-                        <TableCell className="font-medium">{lead.nome}</TableCell>
-                        <TableCell className="text-muted-foreground">{lead.queueName ?? "—"}</TableCell>
-                        <TableCell className="text-muted-foreground">{returnedUnaccepted.has(lead.id) ? <span className="flex items-center gap-1.5 font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor"><span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />Devolvido — não aceito</span> : (lead.brokerName ?? "Sem corretor")}</TableCell>
-                        <TableCell><Badge variant={distribution.tone}>{distribution.label}</Badge></TableCell>
-                        <TableCell><LeadStatusBadge status={lead.status} /></TableCell>
-                        <TableCell className="text-muted-foreground">{dateTime.format(lead.createdAt)}</TableCell>
-                        <TableCell className="text-muted-foreground">{lead.assignedAt && lead.corretorId ? dateTime.format(lead.assignedAt) : "—"}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
+              <DragScrollTable>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Lead</TableHead>
+                      <TableHead>Fila</TableHead>
+                      <TableHead>Corretor</TableHead>
+                      <TableHead>Distribuição</TableHead>
+                      <TableHead>Etapa</TableHead>
+                      <TableHead>Recebido em</TableHead>
+                      <TableHead>Distribuído em</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {groupDutyLeadsByShift(visibleLeads).map((group) => (
+                      <Fragment key={group.key}>
+                        <TableRow className="bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)]">
+                          <TableCell colSpan={7} className="py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            <span className="flex items-center justify-between gap-2">
+                              {group.label}
+                              <span className="font-mono">{group.leads.length}</span>
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                        {group.leads.map((lead) => {
+                          const distribution = leadDistributionStatusUi(lead.distributionStatus);
+                          return (
+                            <TableRow key={lead.id} className={returnedUnaccepted.has(lead.id) ? "bg-warning/10 hover:bg-warning/15" : undefined}>
+                              <TableCell className="font-medium">{lead.nome}</TableCell>
+                              <TableCell className="text-muted-foreground">{lead.queueName ?? "—"}</TableCell>
+                              <TableCell className="text-muted-foreground">{returnedUnaccepted.has(lead.id) ? <span className="flex items-center gap-1.5 font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor"><span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />Devolvido — não aceito</span> : (lead.brokerName ?? "Sem corretor")}</TableCell>
+                              <TableCell><Badge variant={distribution.tone}>{distribution.label}</Badge></TableCell>
+                              <TableCell><LeadStatusBadge status={lead.status} /></TableCell>
+                              <TableCell className="text-muted-foreground">{dateTime.format(lead.createdAt)}</TableCell>
+                              <TableCell className="text-muted-foreground">{lead.assignedAt && lead.corretorId ? dateTime.format(lead.assignedAt) : "—"}</TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </Fragment>
+                    ))}
+                  </TableBody>
+                </Table>
+              </DragScrollTable>
             ) : (
               <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead nesta situação para este plantão {sinceLabel}.</div>
             )}
