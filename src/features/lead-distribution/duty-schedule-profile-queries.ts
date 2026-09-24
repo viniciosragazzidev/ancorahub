@@ -1,14 +1,20 @@
 import "server-only";
 
-import { and, asc, desc, eq, gte, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getRelevantDutyWindow } from "./duty-presence-domain";
+import { normalizeOfferPacing } from "./offer-pacing";
+import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 
 const LEADS_WINDOW_DAYS = 7;
 const LEADS_LIMIT = 200;
+// Same set the distribution engine uses to count a broker's active load against
+// queue capacity (service.ts's local `activeCommercialStatuses`) — kept in sync
+// by hand since neither file exports a shared constant.
+const ACTIVE_COMMERCIAL_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
 export type DutyScheduleProfile = Awaited<ReturnType<typeof getDutyScheduleProfile>>;
 
@@ -76,7 +82,16 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     .orderBy(asc(schema.user.name));
 
   const linkedQueues = await db
-    .select({ id: schema.leadQueues.id, name: schema.leadQueues.name, branchName: schema.branches.name })
+    .select({
+      id: schema.leadQueues.id,
+      name: schema.leadQueues.name,
+      branchName: schema.branches.name,
+      assignmentMode: schema.leadQueues.assignmentMode,
+      capacityEnabled: schema.leadQueues.capacityEnabled,
+      capacityPerBroker: schema.leadQueues.capacityPerBroker,
+      offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes,
+      maxPendingOffersPerBroker: schema.leadQueues.maxPendingOffersPerBroker,
+    })
     .from(schema.leadQueues)
     .leftJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
     .where(and(
@@ -88,6 +103,13 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         schedule.legacyQueueId ? eq(schema.leadQueues.id, schedule.legacyQueueId) : sql`false`,
       ),
     ));
+  // The queue the live offer status is computed against: the first automatic
+  // one if there is any (matches what the distribution engine actually runs),
+  // otherwise the first linked queue so a manual-only plantão still shows
+  // capacity, just with no pacing countdown to expect.
+  const operatingQueue = linkedQueues.find((queue) => queue.assignmentMode === "automatic") ?? linkedQueues[0] ?? null;
+  const pacing = normalizeOfferPacing(operatingQueue ? { intervalMinutes: operatingQueue.offerIntervalMinutes, maxPending: operatingQueue.maxPendingOffersPerBroker } : null);
+  const operatingCapacity = operatingQueue?.capacityEnabled ? operatingQueue.capacityPerBroker ?? null : null;
 
   const queueIds = linkedQueues.map((queue) => queue.id);
   const since = new Date(Date.now() - LEADS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
@@ -160,6 +182,44 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     : [];
   const presenceByAssignment = new Map(presenceRows.map((row) => [`${row.assignmentId}:${row.dutyDate}`, row]));
 
+  // Live offer status: how many leads the broker is actively carrying for the
+  // operating queue right now (the exact rule the distribution engine checks
+  // against capacity), plus their offers in the pacing lookback window.
+  const brokerIds = roster.map((entry) => entry.brokerId);
+  const [activeLoadRows, recentOfferRows] = operatingQueue && brokerIds.length
+    ? await Promise.all([
+      db.select({ brokerId: schema.leads.corretorId, total: sql<number>`count(*)::int` })
+        .from(schema.leads)
+        .where(and(
+          eq(schema.leads.tenantId, context.tenantId),
+          eq(schema.leads.queueId, operatingQueue.id),
+          inArray(schema.leads.corretorId, brokerIds),
+          inArray(schema.leads.status, ACTIVE_COMMERCIAL_STATUSES),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
+        ))
+        .groupBy(schema.leads.corretorId),
+      db.select({ brokerId: schema.leadOffers.brokerId, status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt })
+        .from(schema.leadOffers)
+        .innerJoin(schema.leads, eq(schema.leadOffers.leadId, schema.leads.id))
+        .where(and(
+          eq(schema.leadOffers.tenantId, context.tenantId),
+          eq(schema.leads.queueId, operatingQueue.id),
+          inArray(schema.leadOffers.brokerId, brokerIds),
+          or(
+            gte(schema.leadOffers.offeredAt, new Date(now.getTime() - Math.max(pacing.intervalMinutes, 1) * 60_000)),
+            gt(schema.leadOffers.expiresAt, now),
+          ),
+        )),
+    ])
+    : [[], []];
+  const activeLoadByBroker = new Map(activeLoadRows.map((row) => [row.brokerId, Number(row.total)]));
+  const offersByBroker = new Map<string, typeof recentOfferRows>();
+  for (const offer of recentOfferRows) {
+    const list = offersByBroker.get(offer.brokerId);
+    if (list) list.push(offer); else offersByBroker.set(offer.brokerId, [offer]);
+  }
+
   return {
     schedule: {
       ...schedule,
@@ -169,20 +229,34 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     roster: roster.map(({ phone, userActive, membershipStatus, dayOfWeek, startsAt, endsAt, validFrom, validUntil, ...entry }) => {
       const occurrence = occurrenceByAssignment.get(entry.id);
       const presence = occurrence ? presenceByAssignment.get(`${entry.id}:${occurrence.dutyDate}`) : null;
+      // Same prerequisites the distribution engine applies before offering a lead.
+      const blockedReason = !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
+      const liveStatus = classifyBrokerLiveOfferStatus({
+        blockedReason,
+        capacity: operatingCapacity,
+        activeLeads: activeLoadByBroker.get(entry.brokerId) ?? 0,
+        pacing,
+        offers: offersByBroker.get(entry.brokerId) ?? [],
+        now,
+      });
       return {
       ...entry,
       leadsInWindow: leadsPerBroker.get(entry.brokerId) ?? 0,
-      // Same prerequisites the distribution engine applies before offering a lead.
-      blockedReason: !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null,
+      blockedReason,
       presenceStatus: !presenceEnabled || !occurrence ? "not_requested" as const : presence?.status === "confirmed" ? "confirmed" as const : "pending" as const,
       confirmedAt: presence?.confirmedAt ?? null,
       notificationStatus: presence?.notificationStatus ?? null,
       notificationErrorCode: presence?.notificationErrorCode ?? null,
       dutyDate: occurrence?.dutyDate ?? null,
+      liveStatus: liveStatus.status,
+      nextEventAt: liveStatus.nextEventAt,
+      activeLeads: activeLoadByBroker.get(entry.brokerId) ?? 0,
+      capacity: operatingCapacity,
       };
     }),
     linkedQueues,
     leads,
     windowDays: LEADS_WINDOW_DAYS,
+    liveStatusEnabled: Boolean(operatingQueue),
   };
 }

@@ -13,6 +13,7 @@ import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui";
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
 
 export const dynamic = "force-dynamic";
 
@@ -38,8 +39,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     redirect("/leads/distribuicao?view=plantao");
   }
 
-  const { schedule, roster, linkedQueues, leads, windowDays, presenceEnabled } = profile;
+  const { schedule, roster, linkedQueues, leads, windowDays, presenceEnabled, liveStatusEnabled } = profile;
   const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
+  const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
   const returnedUnaccepted = await getReturnedUnacceptedLeadIds(context.tenantId, leads.map((lead) => lead.id));
 
@@ -173,6 +175,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           <CardHeader className="pb-3">
             <CardTitle className="text-base">{presenceEnabled ? "Checklist de confirmação" : "Corretores escalados"}</CardTitle>
             <CardDescription>{presenceEnabled ? `${confirmedCount} de ${roster.length} corretores confirmaram a ocorrência atual.` : "Quem está na escala ativa deste plantão agora."}</CardDescription>
+            {liveStatusEnabled && roster.length ? (
+              <p className="mt-1 text-xs font-medium text-muted-foreground">
+                <span className="text-foreground">{readyNowCount}</span> de {roster.length} prontos para receber o próximo lead agora
+              </p>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-3" role={presenceEnabled ? "group" : undefined} aria-label={presenceEnabled ? "Status de confirmação dos corretores escalados" : undefined}>
             {roster.length && roster.every((entry) => entry.blockedReason) ? (
@@ -190,6 +197,10 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   </div>
                   <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}</p>
                   {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}
+                  <div className="mt-1.5">
+                    <BrokerLiveStatus status={entry.liveStatus} nextEventAt={entry.nextEventAt ? entry.nextEventAt.toISOString() : null} />
+                  </div>
+                  <BrokerCapacityBar activeLeads={entry.activeLeads} capacity={entry.capacity} />
                 </div>
                 <Badge variant="secondary">{entry.leadsInWindow} lead{entry.leadsInWindow === 1 ? "" : "s"}</Badge>
               </div>
