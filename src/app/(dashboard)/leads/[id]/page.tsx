@@ -20,6 +20,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { StartServiceButton } from "./start-service-button";
+import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-in-service-button";
+import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
 import { SupervisionPanel } from "./supervision-panel";
 import { DeleteLeadControl } from "./delete-lead-control";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
@@ -345,6 +347,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {context.role === "broker" && context.userId === lead.corretorId && lead.status === "distributed" && (
                 <StartServiceButton leadId={lead.id} />
               )}
+              {canDirectorMarkLeadInService({ role: context.role, corretorId: lead.corretorId, status: lead.status }) ? (
+                <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} />
+              ) : null}
               <Badge className={slaUrgent ? "border-warning/30 bg-warning/[0.08] text-warning" : "border-border/80"} variant="outline">
                 {lead.status === "distributed" ? `SLA: ${remainingMinutes > 0 ? `expira em ${remainingMinutes}min` : "expirado"}` : "SLA em acompanhamento"}
               </Badge>

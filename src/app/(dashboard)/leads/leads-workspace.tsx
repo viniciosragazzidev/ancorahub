@@ -74,6 +74,8 @@ import { LeadQuickNote } from "@/features/leads/components/lead-quick-note";
 import { LeadReminder } from "@/features/leads/components/lead-reminder";
 import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { leadsViewRequiresServerData } from "./leads-view-navigation";
+import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-in-service-button";
+import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
 
 export type QualifyingLeadItem = {
   id: string;
@@ -283,6 +285,8 @@ export function LeadsWorkspace({
   // while the next navigation or realtime reconciliation is pending.
   useEffect(() => {
     setWorkspaceLeads(leads);
+    // The open drawer holds its own copy; keep it in step with the fresh payload.
+    setSelectedLead((current) => current ? leads.find((lead) => lead.id === current.id) ?? current : current);
   }, [leads]);
 
   const visibleStatuses = useMemo(
@@ -894,6 +898,13 @@ export function LeadsWorkspace({
             <div className="flex flex-wrap items-center gap-1.5 pt-1">
               <LeadStatusBadge status={selectedLead.status} />
               <LeadQualificationBadge status={selectedLead.qualificationStatus} />
+              {canDirectorMarkLeadInService({ role: contextRole, corretorId: selectedLead.corretorId, status: selectedLead.status }) ? (
+                <MarkLeadInServiceButton
+                  leadId={selectedLead.id}
+                  brokerName={selectedLead.corretorNome}
+                  onDone={() => applyLeadPatch([selectedLead.id], (lead) => ({ ...lead, status: "in_contact" }))}
+                />
+              ) : null}
               <LeadHealthBadge
                 health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
               />

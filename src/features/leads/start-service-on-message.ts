@@ -17,7 +17,9 @@ export async function startServiceOnFirstMessage(input: {
   leadId: string;
   brokerId: string;
   branchId: string | null;
-  trigger?: "button" | "first_message";
+  trigger?: "button" | "first_message" | "director";
+  /** Who performed the start when it is not the broker (director override). */
+  actorId?: string;
 }): Promise<boolean> {
   const db = getDatabase();
   const now = new Date();
@@ -104,7 +106,7 @@ export async function startServiceOnFirstMessage(input: {
     if (acceptedOffer) {
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(),
-        userId: input.brokerId,
+        userId: input.actorId ?? input.brokerId,
         entidade: "lead_offer",
         entidadeId: acceptedOffer.id,
         acao: "lead_offer_accepted_by_starting_service",
@@ -134,19 +136,23 @@ export async function startServiceOnFirstMessage(input: {
     await tx.insert(schema.leadInteractions).values({
       id: randomUUID(),
       leadId: input.leadId,
-      userId: input.brokerId,
+      userId: input.actorId ?? input.brokerId,
       tipo: "service_started",
-      conteudo: input.trigger === "button"
-        ? "Corretor iniciou o atendimento e os dados pessoais foram liberados."
-        : "Atendimento iniciado automaticamente pela primeira mensagem enviada no chat.",
+      conteudo: input.trigger === "director"
+        ? "Diretor marcou o lead como em atendimento em nome do corretor."
+        : input.trigger === "button"
+          ? "Corretor iniciou o atendimento e os dados pessoais foram liberados."
+          : "Atendimento iniciado automaticamente pela primeira mensagem enviada no chat.",
     });
 
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(),
-      userId: input.brokerId,
+      userId: input.actorId ?? input.brokerId,
       entidade: "lead",
       entidadeId: input.leadId,
-      acao: input.trigger === "button" ? "iniciou_atendimento_whatsapp" : "iniciou_atendimento_primeira_mensagem",
+      acao: input.trigger === "director"
+        ? "diretor_marcou_em_atendimento"
+        : input.trigger === "button" ? "iniciou_atendimento_whatsapp" : "iniciou_atendimento_primeira_mensagem",
     });
 
     return true;
