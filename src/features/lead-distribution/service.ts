@@ -16,6 +16,7 @@ import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
+import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -465,6 +466,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     status: schema.leads.status,
     deletedAt: schema.leads.deletedAt,
     archivedAt: schema.leads.archivedAt,
+    createdAt: schema.leads.createdAt,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
   if (lead.distributionStatus === "manual_hold") {
@@ -619,6 +621,32 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     : queue?.exclusiveDutyScheduleId
       ? [queue.exclusiveDutyScheduleId]
       : null;
+
+  // Duty-exclusive queues only distribute what belongs to the occurrence
+  // currently running: a lead that arrived before it started (still queued
+  // from an earlier, already-closed occurrence that never got to it) is not
+  // swept into today's roster just because capacity freed up later — it sits
+  // out of automatic distribution entirely until someone assigns it by hand.
+  if (exclusiveScheduleIds?.length) {
+    const dutySchedules = await db.select({
+      dayOfWeek: schema.unitDutySchedules.dayOfWeek,
+      startsAt: schema.unitDutySchedules.startsAt,
+      endsAt: schema.unitDutySchedules.endsAt,
+      timezone: schema.unitDutySchedules.timezone,
+    }).from(schema.unitDutySchedules).where(and(
+      eq(schema.unitDutySchedules.tenantId, context.tenantId),
+      inArray(schema.unitDutySchedules.id, exclusiveScheduleIds),
+    ));
+    const activeNow = new Date();
+    const activeSchedule = dutySchedules.find((candidate) => isDutyWindowActive(getRelevantDutyWindow(candidate, activeNow, 0), activeNow));
+    if (activeSchedule) {
+      const occurrenceWindow = getDutyOccurrenceLeadWindow(activeSchedule, dutySchedules, activeNow);
+      if (lead.createdAt < occurrenceWindow.since) {
+        return { status: "queued", leadId, reason: "Lead chegou antes do início deste plantão; aguarda atribuição manual e não entra na distribuição automática." };
+      }
+    }
+  }
+
   const loadEligibleBrokers = async (branchIds: string[]) => {
     const allBrokers = await db
       .select({
