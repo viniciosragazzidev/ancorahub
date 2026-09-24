@@ -2,6 +2,14 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 24/09/2026 - "Aceitar lead" no CRM Lite registra o aceite
+
+- O botão "ACEITAR LEAD" da lista e do dashboard Lite era apenas um link para o lead e
+  não registrava aceite; agora usa o mesmo aceite atômico do botão do WhatsApp antes de
+  abrir o lead, confirmando a titularidade e bloqueando qualquer redistribuição automática.
+- Oferta expirada ou assumida por outro corretor mostra erro e atualiza a lista; clique
+  repetido em lead já aceito apenas abre o lead.
+
 ## 24/09/2026 - Oferta aceita não é mais redistribuída pelo SLA
 
 - A varredura de SLA de primeiro contato redistribuía leads com oferta aceita pelo

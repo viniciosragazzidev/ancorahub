@@ -31,6 +31,7 @@ import { cn } from "@/lib/utils";
 import { signOut } from "@/shared/auth/client";
 import { toast } from "@/components/ui/sonner";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
+import { AcceptLeadButton } from "@/features/broker-workspace/components/accept-lead-button";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -292,17 +293,31 @@ export function LightDashboard({
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 pt-1">
-                <Link
-                  href={priorityInfo.btnHref}
-                  className={cn(
-                    buttonVariants({ size: "lg" }),
-                    "flex-1 font-bold gap-2 text-xs shadow-sm bg-primary text-primary-foreground hover:bg-primary/90 h-11",
-                  )}
-                >
-                  <Lightning className="size-4" />
-                  {priorityInfo.btnLabel}
-                  <ArrowRight className="size-4" />
-                </Link>
+                {data.nextAction?.kind === "new_lead" && data.nextAction.leadId ? (
+                  <AcceptLeadButton
+                    leadId={data.nextAction.leadId}
+                    className={cn(
+                      buttonVariants({ size: "lg" }),
+                      "flex-1 font-bold gap-2 text-xs shadow-sm bg-primary text-primary-foreground hover:bg-primary/90 h-11",
+                    )}
+                  >
+                    <Lightning className="size-4" />
+                    {priorityInfo.btnLabel}
+                    <ArrowRight className="size-4" />
+                  </AcceptLeadButton>
+                ) : (
+                  <Link
+                    href={priorityInfo.btnHref}
+                    className={cn(
+                      buttonVariants({ size: "lg" }),
+                      "flex-1 font-bold gap-2 text-xs shadow-sm bg-primary text-primary-foreground hover:bg-primary/90 h-11",
+                    )}
+                  >
+                    <Lightning className="size-4" />
+                    {priorityInfo.btnLabel}
+                    <ArrowRight className="size-4" />
+                  </Link>
+                )}
                 <Link
                   href="/minha-fila"
                   className={cn(

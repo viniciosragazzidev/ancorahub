@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 
 import { cn } from "@/lib/utils";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
+import { AcceptLeadButton } from "@/features/broker-workspace/components/accept-lead-button";
 
 export type LightLeadItem = {
   id: string;
@@ -390,19 +391,29 @@ export function LightLeadsList({
                         >
                           Insights
                         </Link>
-                        <Link
-                          href={`/leads/${lead.id}`}
-                          className={cn(
-                            buttonVariants({
-                              variant: isDistributed ? "default" : "outline",
-                              size: "sm",
-                            }),
-                            "h-9 flex-1 gap-1.5 px-4 text-xs font-semibold sm:w-auto",
-                          )}
-                        >
-                          {isDistributed ? "ACEITAR LEAD" : isConverted ? "VER" : "ABRIR"}
-                          <ArrowRight className="size-3.5" />
-                        </Link>
+                        {isDistributed ? (
+                          <AcceptLeadButton
+                            leadId={lead.id}
+                            className={cn(
+                              buttonVariants({ variant: "default", size: "sm" }),
+                              "h-9 flex-1 gap-1.5 px-4 text-xs font-semibold sm:w-auto",
+                            )}
+                          >
+                            ACEITAR LEAD
+                            <ArrowRight className="size-3.5" />
+                          </AcceptLeadButton>
+                        ) : (
+                          <Link
+                            href={`/leads/${lead.id}`}
+                            className={cn(
+                              buttonVariants({ variant: "outline", size: "sm" }),
+                              "h-9 flex-1 gap-1.5 px-4 text-xs font-semibold sm:w-auto",
+                            )}
+                          >
+                            {isConverted ? "VER" : "ABRIR"}
+                            <ArrowRight className="size-3.5" />
+                          </Link>
+                        )}
                       </div>
                     </div>
                   </div>
