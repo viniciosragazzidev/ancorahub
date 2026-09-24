@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shuffle } from "./domain";
+import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shuffle } from "./domain";
 
 describe("provisional assignment rotation guard", () => {
   it("does not rotate a lead after the broker has started or contacted the customer", () => {
@@ -22,6 +22,19 @@ describe("provisional assignment rotation guard", () => {
       firstContactAt: null,
       serviceStartedAt: null,
     })).toBe(true);
+  });
+
+  it("does not rotate an accepted offer even when the SLA sweep excludes its owner", () => {
+    expect(canRotateProvisionalLeadOwner({
+      corretorId: "broker-1",
+      assignmentSource: "whatsapp_offer_accepted",
+      excludeBrokerId: "broker-1",
+      status: "distributed",
+      firstContactAt: null,
+      serviceStartedAt: null,
+    })).toBe(false);
+    expect(isAcceptedOfferAssignment("whatsapp_offer_accepted")).toBe(true);
+    expect(isAcceptedOfferAssignment("automatic_offer")).toBe(false);
   });
 
   it("does not rotate a provisional owner after a commercial stage advanced", () => {

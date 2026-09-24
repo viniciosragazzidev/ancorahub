@@ -2,6 +2,15 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 24/09/2026 - Oferta aceita não é mais redistribuída pelo SLA
+
+- A varredura de SLA de primeiro contato redistribuía leads com oferta aceita pelo
+  WhatsApp quando o corretor ainda não havia iniciado o atendimento, pois o aceite deixa
+  o lead em `distributed` sem `firstContactAt`. Isso gerava ciclos aceite → redistribuição.
+- Oferta aceita (`whatsapp_offer_accepted`) agora é titularidade confirmada: o guard de
+  rotação bloqueia a troca mesmo com exclusão do owner, e o SLA só alerta corretor e gestão.
+- O aviso ao corretor que já aceitou não ameaça mais redistribuição.
+
 ## 24/09/2026 - Aceite e recusa no histórico de atribuição do lead
 
 - O histórico do drawer mostra o aceite com o nome do corretor e o horário persistido.

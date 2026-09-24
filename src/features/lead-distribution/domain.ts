@@ -2,6 +2,14 @@ import type { AssignmentStrategy, DutyFallbackPolicy } from "./types";
 
 export type EligibleBroker = { id: string; createdAt: Date; activeLeads: number; capacity: number | null };
 
+/**
+ * An offer accepted by the broker confirms ownership (BR-023). No automatic
+ * flow — worker, SLA sweep or exclusion — may move the lead away from them.
+ */
+export function isAcceptedOfferAssignment(assignmentSource: string | null) {
+  return assignmentSource === "whatsapp_offer_accepted";
+}
+
 export function canRotateProvisionalLeadOwner(input: {
   corretorId: string | null;
   assignmentSource: string | null;
@@ -16,6 +24,7 @@ export function canRotateProvisionalLeadOwner(input: {
   return Boolean(
     input.corretorId
       && !serviceAlreadyStarted
+      && !isAcceptedOfferAssignment(input.assignmentSource)
       && (input.assignmentSource === "automatic_offer" || input.assignmentSource === "manual_offer" || input.corretorId === input.excludeBrokerId),
   );
 }

@@ -9,6 +9,7 @@ import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sy
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { processQueuedLead } from "@/features/lead-distribution/service";
+import { isAcceptedOfferAssignment } from "@/features/lead-distribution/domain";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
@@ -45,6 +46,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       branchId: schema.leads.branchId,
       status: schema.leads.status,
       corretorId: schema.leads.corretorId,
+      assignmentSource: schema.leads.assignmentSource,
       assignedAt: schema.leads.assignedAt,
       firstContactAt: schema.leads.firstContactAt,
       serviceStartedAt: schema.leads.serviceStartedAt,
@@ -76,8 +78,11 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     
     for (const lead of leads) {
       let kind: SlaKind = "lead_stalled";
-      const isAcceptedOrStarted = Boolean(lead.firstContactAt || lead.serviceStartedAt || lead.status !== "distributed");
-      if (lead.status === "distributed" && lead.assignedAt && !isAcceptedOrStarted) {
+      const isStarted = Boolean(lead.firstContactAt || lead.serviceStartedAt || lead.status !== "distributed");
+      // An accepted offer is confirmed ownership: the sweep still alerts about the
+      // missing first contact, but never moves the lead to another broker.
+      const isAccepted = isAcceptedOfferAssignment(lead.assignmentSource);
+      if (lead.status === "distributed" && lead.assignedAt && !isStarted) {
         if (lead.assignedAt < unworkedCutoff) {
           kind = "lead_unworked";
         } else if (lead.assignedAt <= warningCutoff) {
@@ -93,7 +98,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
         // notification fails during the SLA handoff.
         const previousOwnerId = lead.corretorId;
         const automationActor = recipients.find((recipient) => recipient.role === "director");
-        if (previousOwnerId && automationActor) {
+        if (previousOwnerId && automationActor && !isAccepted) {
           const reassigned = await processQueuedLead(
             {
               tenantId: tenant.id,
@@ -139,13 +144,17 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
               leadId: lead.id,
               type: "lead_warning_10m",
               title: "Atenção: Atendimento Pendente ⚠️",
-              message: `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos e ainda não iniciou o atendimento. Inicie o contato imediatamente para evitar a redistribuição automática do lead!`,
+              message: isAccepted
+                ? `Você aceitou o lead "${lead.nome}" há ${warningMinutes} minutos e ainda não iniciou o atendimento. Inicie o contato imediatamente!`
+                : `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos e ainda não iniciou o atendimento. Inicie o contato imediatamente para evitar a redistribuição automática do lead!`,
               createdAt: new Date(),
             });
 
             void sendNotificationToUser(lead.corretorId, {
               title: "Atenção: Atendimento Pendente ⚠️",
-              body: `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos. Inicie o contato agora para evitar que ele seja redistribuído!`,
+              body: isAccepted
+                ? `Você aceitou o lead "${lead.nome}" há ${warningMinutes} minutos. Inicie o contato agora!`
+                : `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos. Inicie o contato agora para evitar que ele seja redistribuído!`,
               url: `/leads/${lead.id}`,
               tag: `corretop-warning-${lead.id}`,
             }).catch(console.error);
