@@ -6,6 +6,7 @@ import { AnimatedBadge, type AnimatedBadgeStatus } from "@/components/motion/ani
 import type { BrokerLiveOfferStatus } from "@/features/lead-distribution/duty-roster-live-status";
 
 const STATUS_UI: Record<BrokerLiveOfferStatus, { label: string; status: AnimatedBadgeStatus; pulse: boolean }> = {
+  paused: { label: "Pausado", status: "neutral", pulse: false },
   ready: { label: "Pronto para receber", status: "success", pulse: true },
   offer_pending: { label: "Oferta enviada", status: "info", pulse: true },
   cooldown: { label: "Próximo lead em", status: "warning", pulse: false },

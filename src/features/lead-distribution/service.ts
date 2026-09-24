@@ -106,6 +106,9 @@ async function getRosterBrokerIds(
       eq(schema.dutyRosterAssignments.branchId, branchId),
       eq(schema.dutyRosterAssignments.dayOfWeek, local.weekday),
       eq(schema.dutyRosterAssignments.status, "active"),
+      // Deliberately paused by a director/manager — stays visible on the
+      // roster but is excluded from automatic offers until resumed.
+      isNull(schema.dutyRosterAssignments.pausedAt),
       lte(schema.dutyRosterAssignments.startsAt, local.time),
       gt(schema.dutyRosterAssignments.endsAt, local.time),
       lte(schema.dutyRosterAssignments.validFrom, date),

@@ -5,9 +5,15 @@ import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 const now = new Date("2026-09-24T12:00:00Z");
 const minutes = (value: number) => new Date(now.getTime() + value * 60_000);
 const pacing = { intervalMinutes: 5, maxPending: 1 };
-const base = { blockedReason: null, capacity: 7, activeLeads: 2, pacing, offers: [], now };
+const base = { paused: false, blockedReason: null, capacity: 7, activeLeads: 2, pacing, offers: [], now };
 
 describe("classifyBrokerLiveOfferStatus", () => {
+  it("is paused above everything else, even a technical block or a live offer", () => {
+    const offers = [{ status: "SENT", offeredAt: minutes(-1), expiresAt: minutes(2) }];
+    expect(classifyBrokerLiveOfferStatus({ ...base, paused: true, blockedReason: "Conta inativa", offers }))
+      .toEqual({ status: "paused", nextEventAt: null });
+  });
+
   it("is blocked when the roster prerequisites fail, regardless of everything else", () => {
     expect(classifyBrokerLiveOfferStatus({ ...base, blockedReason: "Sem telefone cadastrado" }))
       .toEqual({ status: "blocked", nextEventAt: null });

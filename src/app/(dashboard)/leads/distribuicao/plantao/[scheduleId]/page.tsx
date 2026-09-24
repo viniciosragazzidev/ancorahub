@@ -15,6 +15,7 @@ import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/retur
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
+import { BrokerPauseButton } from "../_components/broker-pause-button";
 
 export const dynamic = "force-dynamic";
 
@@ -202,6 +203,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                     {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`Presença confirmada${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={entry.confirmedAt ? `Confirmado em ${dateTime.format(entry.confirmedAt)}` : "Presença confirmada"}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
+                    <BrokerPauseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} paused={Boolean(entry.pausedAt)} />
                   </div>
                   <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}</p>
                   {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}

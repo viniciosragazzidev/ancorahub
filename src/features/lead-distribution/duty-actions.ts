@@ -386,3 +386,34 @@ export async function sendDutyPresenceInviteManuallyAction(scheduleId: string, a
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível enviar o convite." };
   }
 }
+
+/**
+ * Pause/resume one escalado's live "próximo lead" countdown — stops
+ * automatic distribution from offering them anything while paused, without
+ * pulling them off the roster (they stay visible, badge shows "Pausado").
+ * Scoped to this one plantão: pausing here does not touch any other
+ * schedule the same broker may be escalado on.
+ */
+export async function toggleDutyRosterPauseAction(scheduleId: string, assignmentId: string, paused: boolean): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const { context, db } = await findScheduleForMutation(scheduleId);
+    const now = new Date();
+    const updated = await db.update(schema.dutyRosterAssignments)
+      .set({ pausedAt: paused ? now : null, pausedBy: paused ? context.userId : null, updatedBy: context.userId, updatedAt: now })
+      .where(and(
+        eq(schema.dutyRosterAssignments.id, assignmentId),
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+        eq(schema.dutyRosterAssignments.scheduleId, scheduleId),
+        eq(schema.dutyRosterAssignments.status, "active"),
+      ))
+      .returning({ id: schema.dutyRosterAssignments.id });
+    if (!updated.length) return { success: false, error: "Escalação não encontrada." };
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignmentId,
+      acao: paused ? "duty_roster.paused" : "duty_roster.resumed",
+    });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar a pausa." };
+  }
+}

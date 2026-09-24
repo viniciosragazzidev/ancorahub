@@ -6,7 +6,7 @@ import { evaluateBrokerOfferPacing, type OfferPacingConfig, type PacingOffer } f
  * feeds it offers/capacity and gets back a status plus the one timestamp
  * (`nextEventAt`) the client needs to run its own countdown.
  */
-export type BrokerLiveOfferStatus = "blocked" | "capacity_full" | "offer_pending" | "cooldown" | "ready";
+export type BrokerLiveOfferStatus = "paused" | "blocked" | "capacity_full" | "offer_pending" | "cooldown" | "ready";
 
 export type BrokerLiveOfferState = {
   status: BrokerLiveOfferStatus;
@@ -15,6 +15,8 @@ export type BrokerLiveOfferState = {
 };
 
 export function classifyBrokerLiveOfferStatus(input: {
+  /** A director/manager deliberately paused this escalado — outranks every other state, including a technical block. */
+  paused: boolean;
   blockedReason: string | null;
   capacity: number | null;
   activeLeads: number;
@@ -22,6 +24,7 @@ export function classifyBrokerLiveOfferStatus(input: {
   offers: PacingOffer[];
   now: Date;
 }): BrokerLiveOfferState {
+  if (input.paused) return { status: "paused", nextEventAt: null };
   if (input.blockedReason) return { status: "blocked", nextEventAt: null };
   if (input.capacity !== null && input.activeLeads >= input.capacity) return { status: "capacity_full", nextEventAt: null };
 

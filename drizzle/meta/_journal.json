@@ -736,6 +736,13 @@
                         "when":  1790180000000,
                         "tag":  "0156_duty_presence_confirmation",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  105,
+                        "version":  "7",
+                        "when":  1790200000000,
+                        "tag":  "0158_duty_roster_pause",
+                        "breakpoints":  true
                     }
                 ]
 }

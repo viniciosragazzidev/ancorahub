@@ -1355,6 +1355,11 @@ export const dutyRosterAssignments = pgTable(
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
     validUntil: timestamp("valid_until", { withTimezone: true }),
     status: text("status").notNull().default("active"),
+    // Distinct from `status`: a paused escalado stays visible on the roster
+    // (still "active") but is excluded from automatic distribution until
+    // resumed — a temporary "skip this shift" toggle, not a removal.
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    pausedBy: text("paused_by").references(() => user.id),
     createdBy: text("created_by").notNull().references(() => user.id),
     updatedBy: text("updated_by").notNull().references(() => user.id),
     createdAt,

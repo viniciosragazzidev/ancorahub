@@ -70,6 +70,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       membershipStatus: schema.tenantMemberships.status,
       availabilityStatus: schema.tenantMemberships.availabilityStatus,
       status: schema.dutyRosterAssignments.status,
+      pausedAt: schema.dutyRosterAssignments.pausedAt,
       dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
       startsAt: schema.dutyRosterAssignments.startsAt,
       endsAt: schema.dutyRosterAssignments.endsAt,
@@ -264,6 +265,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       // Same prerequisites the distribution engine applies before offering a lead.
       const blockedReason = !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
       const liveStatus = classifyBrokerLiveOfferStatus({
+        paused: Boolean(entry.pausedAt),
         blockedReason,
         capacity: operatingCapacity,
         activeLeads: activeLoadByBroker.get(entry.brokerId) ?? 0,
