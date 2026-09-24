@@ -4,7 +4,7 @@ import { aliasedTable, and, desc, eq, gte, inArray, isNull, ne, or } from "drizz
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { resolveAccessContext } from "@/shared/auth/access-context";
-import { toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
 import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import {
   routeLeadToBranch,
@@ -24,6 +24,8 @@ import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution, syncDutySchedulesIntoQueue } from "./control-service";
 import { selectBulkDistributionCandidateIds } from "./bulk-recovery";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { AuthorizationService } from "@/shared/auth/authorization-service";
+import { buildOfferOutcomeHistory } from "./assignment-history";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -988,6 +990,35 @@ export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promi
     const context = await getRequiredTenantContext();
     const db = getDatabase();
 
+    const [lead] = await db
+      .select({
+        id: schema.leads.id,
+        tenantId: schema.leads.tenantId,
+        branchId: schema.leads.branchId,
+        corretorId: schema.leads.corretorId,
+        status: schema.leads.status,
+        firstContactAt: schema.leads.firstContactAt,
+        serviceStartedAt: schema.leads.serviceStartedAt,
+      })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, parsed.data), eq(schema.leads.tenantId, context.tenantId)))
+      .limit(1);
+    if (!lead) return [];
+
+    const accessContext = await resolveAccessContext(context);
+    const resource = buildLeadResourceScope(lead);
+    const legacyAllowed = context.role === "director"
+      || (context.role === "broker" && lead.corretorId === context.userId)
+      || (context.role === "manager" && Boolean(context.branchId) && lead.branchId === context.branchId);
+    await evaluateShadowAuthorization({
+      operationKey: "lead.assignment_history.read",
+      legacyAllowed,
+      context: accessContext,
+      capability: "acessar_leads",
+      resource,
+    });
+    if (!AuthorizationService.can(accessContext, "acessar_leads", resource)) return [];
+
     const previousOwner = aliasedTable(schema.user, "previous_owner");
     const newOwner = aliasedTable(schema.user, "new_owner");
     const actor = aliasedTable(schema.user, "actor");
@@ -999,6 +1030,7 @@ export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promi
         id: schema.leadDistributionEvents.id,
         createdAt: schema.leadDistributionEvents.createdAt,
         action: schema.leadDistributionEvents.action,
+        newOwnerId: schema.leadDistributionEvents.newOwnerId,
         source: schema.leadDistributionEvents.source,
         strategy: schema.leadDistributionEvents.strategy,
         reason: schema.leadDistributionEvents.reason,
@@ -1023,19 +1055,57 @@ export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promi
       .orderBy(desc(schema.leadDistributionEvents.createdAt))
       .limit(30);
 
-    return events.map((e) => ({
-      id: e.id,
-      createdAt: e.createdAt.toISOString(),
-      action: e.action,
-      source: e.source,
-      strategy: e.strategy ?? null,
-      reason: e.reason ?? null,
-      previousOwnerName: e.previousOwnerName ?? null,
-      newOwnerName: e.newOwnerName ?? null,
-      fromBranchName: e.fromBranchName ?? null,
-      toBranchName: e.toBranchName ?? null,
-      actorName: e.actorName ?? null,
-    }));
+    const offers = await db
+      .select({
+        id: schema.leadOffers.id,
+        brokerId: schema.leadOffers.brokerId,
+        brokerName: schema.user.name,
+        status: schema.leadOffers.status,
+        offeredAt: schema.leadOffers.offeredAt,
+        expiresAt: schema.leadOffers.expiresAt,
+        acceptedAt: schema.leadOffers.acceptedAt,
+        declinedAt: schema.leadOffers.declinedAt,
+      })
+      .from(schema.leadOffers)
+      .leftJoin(schema.user, eq(schema.leadOffers.brokerId, schema.user.id))
+      .where(and(
+        eq(schema.leadOffers.tenantId, context.tenantId),
+        eq(schema.leadOffers.leadId, parsed.data),
+      ))
+      .orderBy(desc(schema.leadOffers.offeredAt))
+      .limit(30);
+
+    const offerHistory = buildOfferOutcomeHistory(offers, {
+      corretorId: lead.corretorId,
+      status: lead.status,
+      firstContactAt: lead.firstContactAt,
+      serviceStartedAt: lead.serviceStartedAt,
+    });
+    const existingEventKeys = new Set(events.map((event) =>
+      `${event.action}:${event.newOwnerId ?? ""}:${event.createdAt.getTime()}`,
+    ));
+    const combined = [
+      ...events.map((event) => ({
+        id: event.id,
+        createdAt: event.createdAt.toISOString(),
+        action: event.action,
+        source: event.source,
+        strategy: event.strategy ?? null,
+        reason: event.reason ?? null,
+        previousOwnerName: event.previousOwnerName ?? null,
+        newOwnerName: event.newOwnerName ?? null,
+        fromBranchName: event.fromBranchName ?? null,
+        toBranchName: event.toBranchName ?? null,
+        actorName: event.actorName ?? null,
+      })),
+      ...offerHistory
+        .filter((item) => !existingEventKeys.has(`${item.action}:${item.brokerId}:${Date.parse(item.createdAt)}`))
+        .map(({ brokerId: _brokerId, ...item }) => item),
+    ];
+
+    return combined
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .slice(0, 30);
   } catch (error) {
     console.error("[getLeadAssignmentHistoryAction] Error:", error);
     return [];

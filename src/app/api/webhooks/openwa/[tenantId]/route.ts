@@ -7,6 +7,7 @@ import { publishDomainInvalidation } from "@/features/notifications/realtime-syn
 import { getOpenWaContact, normalizeOpenWaStatus } from "@/lib/integrations/openwa";
 import { processInboundAiResponse } from "@/features/ai-agent/conversation-state-machine";
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
 
 type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; type?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string; type?: string } };
 
@@ -86,6 +87,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   // are represented by the outbox and must not be duplicated by WAHA echoes.
   if (isInternal && isOutgoing) return NextResponse.json({ accepted: true, discarded: true });
   await db.insert(schema.whatsappMessages).values({ id: randomUUID(), tenantId, leadId: lead?.id ?? null, clientId: client?.id ?? null, messageId: providerMessageId, phone, direction: isOutgoing ? "outgoing" : "incoming", body: body || `[${messageKind}]`, sentAt: event.timestamp ? new Date(event.timestamp * 1000) : new Date() }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
+  if (isOutgoing && lead?.id && connection.userId) {
+    try {
+      await startServiceOnFirstMessage({ tenantId, leadId: lead.id, brokerId: connection.userId, branchId: null, trigger: "first_message" });
+    } catch {
+      console.warn("[openwa] outgoing_lead_service_start_failed");
+    }
+  }
   if (!isOutgoing && lead?.id && connection.userId) {
     const aiPromise = processInboundAiResponse({
       tenantId,

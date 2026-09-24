@@ -15,6 +15,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence";
+import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
 import {
   phoneHash,
   normalizePhone,
@@ -27,6 +28,15 @@ import { phoneSubscriberSuffix, samePhoneSubscriber } from "./phone-matching";
 type SessionSource =
   | { kind: "number"; number: typeof schema.wahaNumbers.$inferSelect }
   | { kind: "connection"; connection: typeof schema.whatsappConnections.$inferSelect };
+
+export function shouldStartServiceFromOutgoingLeadMessage(input: {
+  isOutgoing: boolean;
+  sourceKind: SessionSource["kind"];
+  hasLead: boolean;
+  brokerId: string | null | undefined;
+}) {
+  return input.isOutgoing && input.sourceKind === "connection" && input.hasLead && Boolean(input.brokerId);
+}
 
 export function shouldCreateSyntheticLead(input: {
   sourceKind: SessionSource["kind"];
@@ -298,6 +308,25 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
         .where(eq(schema.leads.id, leadId));
     }
   });
+
+  if (shouldStartServiceFromOutgoingLeadMessage({
+    isOutgoing,
+    sourceKind: source.kind,
+    hasLead: Boolean(leadId),
+    brokerId: source.kind === "connection" ? source.connection.userId : null,
+  }) && source.kind === "connection" && source.connection.userId && leadId) {
+    try {
+      await startServiceOnFirstMessage({
+        tenantId,
+        leadId,
+        brokerId: source.connection.userId,
+        branchId: null,
+        trigger: "first_message",
+      });
+    } catch {
+      console.warn("[waha-cadence] outgoing_lead_service_start_failed");
+    }
+  }
   metrics.persistMs = Date.now() - persistStart;
 
   // Invalidate cache and push realtime sync

@@ -161,13 +161,14 @@ export async function createLeadOffersForBrokers(input: {
       // Serialize offer creation per lead. This is the final guard against two
       // workers creating simultaneous active offers for different brokers.
       const [lockedLead] = await tx
-        .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, archivedAt: schema.leads.archivedAt, deletedAt: schema.leads.deletedAt, status: schema.leads.status })
+        .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, archivedAt: schema.leads.archivedAt, deletedAt: schema.leads.deletedAt, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt })
         .from(schema.leads)
         .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
         .for("update")
         .limit(1);
 
       if (!lockedLead || lockedLead.corretorId !== (input.expectedCurrentBrokerId ?? null)) return null;
+      if (lockedLead.firstContactAt || lockedLead.serviceStartedAt || !["new", "distributed"].includes(lockedLead.status)) return null;
       if (input.assignmentSource === "manual_offer" && (
         lockedLead.archivedAt || lockedLead.deletedAt ||
         !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lockedLead.status)

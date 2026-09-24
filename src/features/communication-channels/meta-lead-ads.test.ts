@@ -99,6 +99,37 @@ describe("Meta Lead Ads normalization", () => {
     expect(normalizeMetaLead({ id: "leadgen_without_cnpj_type", field_data: [] })).not.toHaveProperty("tipoCnpj");
   });
 
+  it("normalizes product, CNPJ type and carrier answers while keeping them separate", () => {
+    expect(normalizeMetaLead({
+      id: "leadgen_pme_product",
+      field_data: [
+        { name: "Tipo de Plano", values: ["PME"] },
+        { name: "Tipo de CNPJ", values: ["MEI"] },
+        { name: "Operadora de preferência", values: ["SulAmérica"] },
+        { name: "medical_history", values: ["not persisted here"] },
+      ],
+    })).toMatchObject({ tipoPlano: "PME", leadType: "PME", tipoCnpj: "MEI", operadora: "SulAmérica" });
+  });
+
+  it("supports accented question labels and leaves unknown product answers unclassified", () => {
+    expect(normalizeMetaLead({
+      id: "leadgen_individual_product",
+      field_data: [
+        { name: "Modalidade do plano", values: ["Pessoa física"] },
+        { name: "Operadora", values: ["Amil"] },
+      ],
+    })).toMatchObject({ tipoPlano: "Pessoa física", leadType: "PF", operadora: "Amil" });
+
+    expect(normalizeMetaLead({
+      id: "leadgen_unknown_product",
+      field_data: [{ name: "Tipo de plano", values: ["Coletivo por adesão"] }],
+    })).toMatchObject({ tipoPlano: "Coletivo por adesão" });
+    expect(normalizeMetaLead({
+      id: "leadgen_unknown_product",
+      field_data: [{ name: "Tipo de plano", values: ["Coletivo por adesão"] }],
+    })).not.toHaveProperty("leadType");
+  });
+
   it("preserves the complete Meta attribution chain when provided", () => {
     expect(normalizeMetaLead({
       id: "leadgen-chain",

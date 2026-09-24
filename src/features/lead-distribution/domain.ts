@@ -2,6 +2,24 @@ import type { AssignmentStrategy, DutyFallbackPolicy } from "./types";
 
 export type EligibleBroker = { id: string; createdAt: Date; activeLeads: number; capacity: number | null };
 
+export function canRotateProvisionalLeadOwner(input: {
+  corretorId: string | null;
+  assignmentSource: string | null;
+  excludeBrokerId?: string | null;
+  status: string;
+  firstContactAt: Date | string | null;
+  serviceStartedAt: Date | string | null;
+}) {
+  const serviceAlreadyStarted = Boolean(input.firstContactAt || input.serviceStartedAt)
+    || !["new", "distributed"].includes(input.status);
+
+  return Boolean(
+    input.corretorId
+      && !serviceAlreadyStarted
+      && (input.assignmentSource === "automatic_offer" || input.assignmentSource === "manual_offer" || input.corretorId === input.excludeBrokerId),
+  );
+}
+
 export type IntelligentDistributionPolicy = {
   excludedBrokerIds: string[];
   excludedBranchIds: string[];

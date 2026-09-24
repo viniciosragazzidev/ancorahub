@@ -5,7 +5,7 @@ import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, not
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, type IntelligentDistributionPolicy } from "./domain";
+import { calculateBrokerRankingScore, canRotateProvisionalLeadOwner, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { createLeadOffersForBrokers, loadBrokerPacingOffers } from "./offers";
@@ -16,7 +16,7 @@ import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
-import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
+import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, isDutyWindowActive, isLeadInDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -464,6 +464,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     corretorId: schema.leads.corretorId,
     assignmentSource: schema.leads.assignmentSource,
     status: schema.leads.status,
+    firstContactAt: schema.leads.firstContactAt,
+    serviceStartedAt: schema.leads.serviceStartedAt,
     deletedAt: schema.leads.deletedAt,
     archivedAt: schema.leads.archivedAt,
     createdAt: schema.leads.createdAt,
@@ -474,6 +476,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   }
   if (lead.deletedAt || lead.archivedAt || !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
     return { status: "manual_required", leadId, reason: "Lead inativo; distribuição bloqueada." };
+  }
+  if (lead.corretorId && (lead.firstContactAt || lead.serviceStartedAt || !["new", "distributed"].includes(lead.status))) {
+    return { status: "manual_required", leadId, reason: "Atendimento já iniciado; a atribuição atual está protegida contra redistribuição automática." };
   }
   if (lead.assignmentSource === "manual_offer" && lead.corretorId) {
     const [manualOffer] = await db.select({ brokerId: schema.leadOffers.brokerId, expiresAt: schema.leadOffers.expiresAt })
@@ -521,10 +526,14 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       return { status: "queued", leadId, reason: "Lead desqualificado mantido em espera pela regra global de segurança." };
     }
   }
-  const canRotateCurrentOwner = Boolean(
-    lead.corretorId
-      && (lead.assignmentSource === "automatic_offer" || lead.assignmentSource === "manual_offer" || lead.corretorId === excludeBrokerId),
-  );
+  const canRotateCurrentOwner = canRotateProvisionalLeadOwner({
+    corretorId: lead.corretorId,
+    assignmentSource: lead.assignmentSource,
+    excludeBrokerId,
+    status: lead.status,
+    firstContactAt: lead.firstContactAt,
+    serviceStartedAt: lead.serviceStartedAt,
+  });
   if (lead.corretorId && !canRotateCurrentOwner) {
     return { status: "conflict", leadId, reason: "Lead já possui corretor confirmado." };
   }
@@ -640,8 +649,8 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const activeNow = new Date();
     const activeSchedule = dutySchedules.find((candidate) => isDutyWindowActive(getRelevantDutyWindow(candidate, activeNow, 0), activeNow));
     if (activeSchedule) {
-      const occurrenceWindow = getDutyOccurrenceLeadWindow(activeSchedule, dutySchedules, activeNow);
-      if (lead.createdAt < occurrenceWindow.since) {
+      const bounds = resolveDutyLeadWindowBounds(getDutyOccurrenceLeadWindow(activeSchedule, dutySchedules, activeNow), activeNow);
+      if (!isLeadInDutyWindow(lead, bounds)) {
         return { status: "queued", leadId, reason: "Lead chegou antes do início deste plantão; aguarda atribuição manual e não entra na distribuição automática." };
       }
     }

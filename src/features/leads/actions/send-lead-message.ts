@@ -9,7 +9,6 @@ import {
   sendMetaCloudChannelText,
 } from "@/features/communication-channels/service";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
-import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
 import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { getSystemSetting } from "@/features/system-settings/queries";

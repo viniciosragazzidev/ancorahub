@@ -3,7 +3,40 @@ import { describe, expect, it } from "vitest";
 import {
   shouldCreateSyntheticLead,
   shouldPersistBrokerConnectionMessage,
+  shouldStartServiceFromOutgoingLeadMessage,
 } from "./inbound";
+
+describe("outgoing lead message service start", () => {
+  it("starts service for an outgoing message from the owning broker connection", () => {
+    expect(shouldStartServiceFromOutgoingLeadMessage({
+      isOutgoing: true,
+      sourceKind: "connection",
+      hasLead: true,
+      brokerId: "broker-1",
+    })).toBe(true);
+  });
+
+  it("does not start service for inbound messages, official number sends, or unlinked contacts", () => {
+    expect(shouldStartServiceFromOutgoingLeadMessage({
+      isOutgoing: false,
+      sourceKind: "connection",
+      hasLead: true,
+      brokerId: "broker-1",
+    })).toBe(false);
+    expect(shouldStartServiceFromOutgoingLeadMessage({
+      isOutgoing: true,
+      sourceKind: "number",
+      hasLead: true,
+      brokerId: null,
+    })).toBe(false);
+    expect(shouldStartServiceFromOutgoingLeadMessage({
+      isOutgoing: true,
+      sourceKind: "connection",
+      hasLead: false,
+      brokerId: "broker-1",
+    })).toBe(false);
+  });
+});
 
 describe("shouldCreateSyntheticLead", () => {
   it("never creates a tenant lead from an unknown inbound to a broker connection", () => {

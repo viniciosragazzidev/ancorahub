@@ -5,13 +5,12 @@ import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
-import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow } from "./duty-presence-domain";
+import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
 import { normalizeOfferPacing } from "./offer-pacing";
 import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 
 // Upper bound on how far back a lead can show even when the schedule has no
 // completed occurrence yet (brand-new schedule) — keeps the query sane.
-const LEADS_WINDOW_DAYS = 7;
 const LEADS_LIMIT = 200;
 // Same set the distribution engine uses to count a broker's active load against
 // queue capacity (service.ts's local `activeCommercialStatuses`) — kept in sync
@@ -140,10 +139,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // bounded to exactly its own start/end. Without the upper bound, an
   // already-closed occurrence's page kept absorbing whatever arrived after
   // it ended — including a different day's own leads.
-  const safetyFloor = new Date(now.getTime() - LEADS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const occurrenceWindow = getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, now);
-  const since = occurrenceWindow.since > safetyFloor ? occurrenceWindow.since : safetyFloor;
-  const until = occurrenceWindow.until;
+  const { since, until } = resolveDutyLeadWindowBounds(occurrenceWindow, now);
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.

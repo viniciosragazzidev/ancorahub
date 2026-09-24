@@ -72,6 +72,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LeadQuickNote } from "@/features/leads/components/lead-quick-note";
 import { LeadReminder } from "@/features/leads/components/lead-reminder";
+import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { leadsViewRequiresServerData } from "./leads-view-navigation";
 
 export type QualifyingLeadItem = {
@@ -87,6 +88,7 @@ export type QualifyingLeadItem = {
   origem: string;
   sourceChannel?: string | null;
   sourceCampaign?: string | null;
+  sourceMetadata?: unknown;
   tipo: string;
   queueId?: string | null;
   queueName?: string | null;
@@ -105,7 +107,10 @@ export type LeadWorkspaceItem = {
   qualificationState?: string | null;
   distributionStatus?: string;
   origem: string;
+  email?: string | null;
+  sourceChannel?: string | null;
   sourceCampaign: string | null;
+  sourceMetadata?: unknown;
   tipo: string;
   createdAt: string;
   assignedAt: string | null;
@@ -253,6 +258,9 @@ export function LeadsWorkspace({
   const searchParams = useSearchParams();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
+  const selectedMetaDetails = selectedLead
+    ? readMetaLeadDisplayDetails(selectedLead.sourceChannel, selectedLead.sourceMetadata)
+    : null;
   const drawerOptimisticSnapshots = useRef(new Map<string, LeadWorkspaceItem>());
   const [activeTab, setActiveTab] = useState<string>(() => initialView ?? (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
@@ -1022,11 +1030,10 @@ export function LeadsWorkspace({
                         }
                       />
                       <DetailRow label="Responsável" value={[selectedLead.corretorNome ?? "Aguardando distribuição", selectedLead.branchName ?? "Sem unidade"].join(" · ")} />
-                      <DetailRow label="Tipo" value={
-                        <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${selectedLead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
-                          {selectedLead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
-                        </span>
-                      } />
+                      <DetailRow label="Plano / Produto" value={getLeadProductLabel({ tipo: selectedLead.tipo, sourceChannel: selectedLead.sourceChannel, sourceMetadata: selectedLead.sourceMetadata })} />
+                      {!shouldMask(selectedLead) ? <DetailRow label="E-mail" value={selectedLead.email || "Não informado"} /> : null}
+                      {!shouldMask(selectedLead) && selectedMetaDetails?.tipoCnpj ? <DetailRow label="Tipo de CNPJ" value={selectedMetaDetails.tipoCnpj} /> : null}
+                      {!shouldMask(selectedLead) && selectedMetaDetails?.operadora ? <DetailRow label="Operadora" value={selectedMetaDetails.operadora} /> : null}
                       <DetailRow label="Origem" value={selectedLead.sourceCampaign || (selectedLead.origem === "manual" ? "Manual" : "Webhook")} />
                       <DetailRow label="Entrada" value={formatDate(selectedLead.createdAt, { day: "2-digit", month: "short" })} />
                     </dl>

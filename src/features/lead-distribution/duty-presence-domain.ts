@@ -170,3 +170,23 @@ export function isConfirmationForActiveOccurrence(input: {
 export function formatDutyStartHour(date: Date, timezone: string) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
 }
+
+/** Hard lookback cap on the plantão lead window, so a schedule with no completed occurrence yet can't reach back forever. */
+export const DUTY_LEAD_WINDOW_SAFETY_DAYS = 7;
+
+/**
+ * The single rule for "does this lead belong to the plantão's waiting list":
+ * created or (re)assigned inside [since, until]. The plantão page filters with
+ * the SQL equivalent of this; the distribution engine calls it directly, so
+ * what the page lists under "Aguardando distribuição" and what gets offered
+ * automatically can never drift apart.
+ */
+export function resolveDutyLeadWindowBounds(window: { since: Date; until: Date | null }, now: Date): { since: Date; until: Date | null } {
+  const floor = new Date(now.getTime() - DUTY_LEAD_WINDOW_SAFETY_DAYS * 24 * 60 * 60 * 1000);
+  return { since: window.since > floor ? window.since : floor, until: window.until };
+}
+
+export function isLeadInDutyWindow(lead: { createdAt: Date; assignedAt?: Date | null }, bounds: { since: Date; until: Date | null }) {
+  const inside = (value: Date | null | undefined) => Boolean(value && value >= bounds.since && (!bounds.until || value <= bounds.until));
+  return inside(lead.createdAt) || inside(lead.assignedAt);
+}

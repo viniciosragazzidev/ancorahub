@@ -28,6 +28,7 @@ export type MetaLeadAdsWebhookPayload = {
 
 type MetaLeadField = { name?: string; values?: string[] };
 type MetaLeadAdRecord = { id?: string; created_time?: string; ad_id?: string; adset_id?: string; form_id?: string; campaign_id?: string; campaign_name?: string; page_id?: string; field_data?: MetaLeadField[] };
+type LeadType = "PF" | "PJ" | "PME";
 
 export const META_LEAD_ADS_SOURCE = "meta_lead_ads";
 
@@ -74,12 +75,20 @@ export function verifyMetaWebhookSignature(rawBody: string, signatureHeader: str
 }
 
 function normalizeFieldName(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  return value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 }
 
 function firstField(fields: MetaLeadField[], names: string[]) {
   const match = fields.find((field) => field.name && names.includes(normalizeFieldName(field.name)));
   return match?.values?.find((value) => typeof value === "string" && value.trim())?.trim() ?? "";
+}
+
+function normalizeLeadType(value: string): LeadType | undefined {
+  const normalized = normalizeFieldName(value);
+  if (["pf", "pessoa_fisica", "individual", "familiar", "plano_individual", "plano_familiar"].includes(normalized)) return "PF";
+  if (["pj", "pessoa_juridica", "plano_pj"].includes(normalized)) return "PJ";
+  if (["pme", "empresarial", "plano_pme", "plano_empresarial"].includes(normalized)) return "PME";
+  return undefined;
 }
 
 /** Deterministic field mapping; unknown form answers are never sent to logs. */
@@ -89,6 +98,13 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   let telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
   let email = firstField(fields, ["email", "email_address", "e_mail"]);
   const tipoCnpj = firstField(fields, ["tipo_de_cnpj", "tipo_cnpj", "cnpj_type"]).slice(0, 120);
+  const tipoPlano = firstField(fields, [
+    "tipo_de_plano", "tipo_plano", "plan_type", "tipo_de_produto", "tipo_produto",
+    "categoria_do_plano", "modalidade_do_plano", "modalidade", "plano_produto",
+    "plano_de_interesse", "plano_interesse", "produto_de_interesse", "plano", "produto",
+  ]).slice(0, 120);
+  const operadora = firstField(fields, ["operadora", "operadora_de_preferencia", "operadora_preferida", "nome_da_operadora", "carrier", "health_insurance_company"]).slice(0, 120);
+  const leadType = tipoPlano ? normalizeLeadType(tipoPlano) : undefined;
 
   // Fallbacks amigáveis para ferramentas de testes da Meta (Lead Gen Testing Tool)
   if (nome.includes("<test lead:") || nome.includes("dummy data")) {
@@ -114,6 +130,9 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   return {
     ...normalized,
     ...(tipoCnpj ? { tipoCnpj } : {}),
+    ...(tipoPlano ? { tipoPlano } : {}),
+    ...(operadora ? { operadora } : {}),
+    ...(leadType ? { leadType } : {}),
     ...(record.adset_id ? { adSetId: record.adset_id } : {}),
     ...(record.page_id ? { pageId: record.page_id } : {}),
   };
@@ -335,7 +354,25 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
           requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
           bypassPlantao,
-          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, campaign: lead.campaignId, ad: lead.adId, form: lead.formId, adSet: lead.adSetId, page: lead.pageId ?? entry.id, capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt, metadata: { pageId: lead.pageId ?? entry.id, campaignName: lead.campaignName ?? null, ...(lead.tipoCnpj ? { tipoCnpj: lead.tipoCnpj } : {}) } },
+          leadSource: {
+            channel: META_LEAD_ADS_SOURCE,
+            externalId: lead.externalId,
+            campaign: lead.campaignId,
+            ad: lead.adId,
+            form: lead.formId,
+            adSet: lead.adSetId,
+            page: lead.pageId ?? entry.id,
+            capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt,
+            ...(lead.leadType ? { leadType: lead.leadType } : {}),
+            metadata: {
+              pageId: lead.pageId ?? entry.id,
+              campaignName: lead.campaignName ?? null,
+              tipoPlano: lead.tipoPlano ?? null,
+              tipoPlanoStatus: lead.tipoPlano ? "provided" : "not_provided",
+              tipoCnpj: lead.tipoCnpj ?? null,
+              operadora: lead.operadora ?? null,
+            },
+          },
         });
         console.log("[ingestMetaLeadAdsWebhook] createLeadFromWebhookSync result:", result);
         if (!result.success) throw new Error(result.code);

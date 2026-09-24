@@ -60,6 +60,35 @@ describe("createLeadFromWebhookSync", () => {
     });
   });
 
+  it("persists an explicitly classified Meta product and its display metadata", async () => {
+    await createLeadFromWebhookSync({
+      ...input,
+      payload,
+      leadSource: {
+        channel: "meta_lead_ads", externalId: "meta-pme", leadType: "PME",
+        metadata: { tipoPlano: "Plano PME", tipoPlanoStatus: "provided", operadora: "SulAmérica" },
+      },
+    });
+
+    expect(inserted(state.schema.leads)[0]).toMatchObject({
+      tipo: "PME",
+      sourceMetadata: { tipoPlano: "Plano PME", tipoPlanoStatus: "provided", operadora: "SulAmérica" },
+    });
+  });
+
+  it("marks an unanswered Meta product as unknown without changing other intake defaults", async () => {
+    await createLeadFromWebhookSync({
+      ...input,
+      payload,
+      leadSource: { channel: "meta_lead_ads", externalId: "meta-no-product", metadata: { tipoPlanoStatus: "not_provided" } },
+    });
+    await createLeadFromWebhookSync({ ...input, idempotencyKey: "delivery-b", payload });
+
+    expect(inserted(state.schema.leads)[0]).toMatchObject({ sourceMetadata: { tipoPlanoStatus: "not_provided" } });
+    expect(inserted(state.schema.leads)[0]).not.toHaveProperty("tipo");
+    expect(inserted(state.schema.leads)[1]).not.toHaveProperty("tipo");
+  });
+
   it("merges Meta source details into an existing lead without erasing prior metadata", async () => {
     state.setExistingLeadRows([{
       id: "lead-existing",
@@ -80,6 +109,50 @@ describe("createLeadFromWebhookSync", () => {
       campaignName: "Campaign old",
       pageId: "page-1",
       tipoCnpj: "MEI",
+    });
+  });
+
+  it("does not overwrite an existing product classification when a duplicate Meta lead omits that answer", async () => {
+    state.setExistingLeadRows([{
+      id: "lead-existing",
+      status: "new",
+      telefone: "+5511999999999",
+      tipo: "PME",
+      sourceMetadata: { tipoPlano: "PME", tipoPlanoStatus: "provided", operadora: "Amil" },
+    }]);
+
+    await createLeadFromWebhookSync({
+      ...input,
+      payload,
+      leadSource: { channel: "meta_lead_ads", externalId: "meta-duplicate", metadata: { tipoPlano: null, tipoPlanoStatus: "not_provided", operadora: null } },
+    });
+
+    const update = state.updates.find((entry) => entry.table === state.schema.leads)?.values;
+    expect(update).not.toHaveProperty("tipo");
+    expect(update?.sourceMetadata).toEqual({ tipoPlano: "PME", tipoPlanoStatus: "provided", operadora: "Amil" });
+  });
+
+  it("updates an existing lead's classification only when Meta supplies a recognized product answer", async () => {
+    state.setExistingLeadRows([{
+      id: "lead-existing",
+      status: "new",
+      telefone: "+5511999999999",
+      tipo: "PF",
+      sourceMetadata: { tipoPlanoStatus: "not_provided" },
+    }]);
+
+    await createLeadFromWebhookSync({
+      ...input,
+      payload,
+      leadSource: {
+        channel: "meta_lead_ads", externalId: "meta-product-update", leadType: "PME",
+        metadata: { tipoPlano: "PME", tipoPlanoStatus: "provided" },
+      },
+    });
+
+    expect(state.updates.find((entry) => entry.table === state.schema.leads)?.values).toMatchObject({
+      tipo: "PME",
+      sourceMetadata: { tipoPlano: "PME", tipoPlanoStatus: "provided" },
     });
   });
 

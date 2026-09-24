@@ -29,6 +29,7 @@ export type CreateLeadFromWebhookSyncInput = {
   leadSource?: {
     channel: string;
     externalId: string;
+    leadType?: "PF" | "PJ" | "PME";
     campaign?: string | null;
     ad?: string | null;
     adSet?: string | null;
@@ -57,6 +58,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   }
 
   const data = parsed.data;
+  const metaLeadType = input.leadSource?.channel === "meta_lead_ads" ? input.leadSource.leadType : undefined;
   if (data.website && data.website.trim().length > 0) return { success: true, leadId: "honeypot-discarded", duplicate: false };
 
   let branchId: string | null = input.branchId;
@@ -126,6 +128,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         .set({
           nome: normalizedName || undefined,
           email: normalizedEmail || undefined,
+          ...(metaLeadType ? { tipo: metaLeadType } : {}),
           ...(input.leadSource ? {
             sourceChannel: input.leadSource.channel,
             sourceCampaign: input.leadSource.campaign ?? null,
@@ -140,7 +143,9 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
             ...(input.leadSource.metadata ? {
               sourceMetadata: {
                 ...(existingLead.sourceMetadata && typeof existingLead.sourceMetadata === "object" && !Array.isArray(existingLead.sourceMetadata) ? existingLead.sourceMetadata as Record<string, unknown> : {}),
-                ...Object.fromEntries(Object.entries(input.leadSource.metadata).filter(([, value]) => value !== null)),
+                ...Object.fromEntries(Object.entries(input.leadSource.metadata).filter(([key, value]) =>
+                  value !== null && !(key === "tipoPlanoStatus" && typeof input.leadSource?.metadata?.tipoPlano !== "string"),
+                )),
               },
             } : {}),
           } : {}),
@@ -154,6 +159,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
 
     await tx.insert(schema.leads).values({
       id: leadId, tenantId, branchId, queueId, corretorId: null, nome: normalizedName, telefone: normalizedPhone, email: normalizedEmail,
+      ...(metaLeadType ? { tipo: metaLeadType } : {}),
       origem: "webhook", distributionOrigin: "landing-page", status: "new", distributionStatus: distStatus,
       consentimentoLgpd: false, webhookCredentialId: credentialId, createdAt: now,
       ...(input.leadSource ? {
@@ -167,7 +173,12 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         metaAdSetId: input.leadSource.adSet ?? null,
         metaFormId: input.leadSource.form ?? null,
         metaPageId: input.leadSource.page ?? null,
-        sourceMetadata: input.leadSource.metadata ?? null,
+        sourceMetadata: input.leadSource.channel === "meta_lead_ads"
+          ? {
+            ...(input.leadSource.metadata ?? {}),
+            tipoPlanoStatus: typeof input.leadSource.metadata?.tipoPlano === "string" ? "provided" : "not_provided",
+          }
+          : input.leadSource.metadata ?? null,
         capturedAt: input.leadSource.capturedAt ?? receivedAt,
       } : {}),
     });

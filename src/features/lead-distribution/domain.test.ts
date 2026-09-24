@@ -1,5 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shuffle } from "./domain";
+import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shuffle } from "./domain";
+
+describe("provisional assignment rotation guard", () => {
+  it("does not rotate a lead after the broker has started or contacted the customer", () => {
+    const startedAt = new Date("2026-09-24T11:00:00.000Z");
+
+    expect(canRotateProvisionalLeadOwner({
+      corretorId: "broker-1",
+      assignmentSource: "automatic_offer",
+      status: "in_contact",
+      firstContactAt: startedAt,
+      serviceStartedAt: startedAt,
+    })).toBe(false);
+  });
+
+  it("still rotates an untouched provisional offer on timeout", () => {
+    expect(canRotateProvisionalLeadOwner({
+      corretorId: "broker-1",
+      assignmentSource: "automatic_offer",
+      status: "distributed",
+      firstContactAt: null,
+      serviceStartedAt: null,
+    })).toBe(true);
+  });
+
+  it("does not rotate a provisional owner after a commercial stage advanced", () => {
+    expect(canRotateProvisionalLeadOwner({
+      corretorId: "broker-1",
+      assignmentSource: "manual_offer",
+      status: "negotiation",
+      firstContactAt: null,
+      serviceStartedAt: null,
+    })).toBe(false);
+  });
+});
 
 describe("shuffle", () => {
   it("returns a permutation of the input — same elements, same length", () => {

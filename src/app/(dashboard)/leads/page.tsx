@@ -27,6 +27,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-eligibility";
+import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { buildLeadScopeWhere, buildUnassignedLeadWhere } from "@/features/leads/lead-authorization";
 import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
 import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
@@ -448,12 +449,15 @@ async function LeadsPageContent({
         id: schema.leads.id,
         nome: schema.leads.nome,
         telefone: schema.leads.telefone,
+        email: schema.leads.email,
         status: schema.leads.status,
         qualificationStatus: schema.leads.qualificationStatus,
         qualificationState: schema.leads.qualificationState,
         distributionStatus: schema.leads.distributionStatus,
         origem: schema.leads.origem,
+        sourceChannel: schema.leads.sourceChannel,
         sourceCampaign: schema.leads.sourceCampaign,
+        sourceMetadata: schema.leads.sourceMetadata,
         tipo: schema.leads.tipo,
         createdAt: schema.leads.createdAt,
         assignedAt: schema.leads.assignedAt,
@@ -498,6 +502,7 @@ async function LeadsPageContent({
         origem: schema.leads.origem,
         sourceChannel: schema.leads.sourceChannel,
         sourceCampaign: schema.leads.sourceCampaign,
+        sourceMetadata: schema.leads.sourceMetadata,
         tipo: schema.leads.tipo,
         queueId: schema.leads.queueId,
         queueName: schema.leadQueues.name,
@@ -539,12 +544,15 @@ async function LeadsPageContent({
           id: schema.leads.id,
           nome: schema.leads.nome,
           telefone: schema.leads.telefone,
+          email: schema.leads.email,
           status: schema.leads.status,
           qualificationStatus: schema.leads.qualificationStatus,
           qualificationState: schema.leads.qualificationState,
           distributionStatus: schema.leads.distributionStatus,
           origem: schema.leads.origem,
+          sourceChannel: schema.leads.sourceChannel,
           sourceCampaign: schema.leads.sourceCampaign,
+          sourceMetadata: schema.leads.sourceMetadata,
           tipo: schema.leads.tipo,
           createdAt: schema.leads.createdAt,
           assignedAt: schema.leads.assignedAt,
@@ -702,6 +710,7 @@ async function LeadsPageContent({
             <LeadsWorkspace
               leads={leads.map((lead) => ({
                 ...lead,
+                sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
                 createdAt: lead.createdAt.toISOString(),
@@ -711,7 +720,10 @@ async function LeadsPageContent({
                 firstContactAt: lead.firstContactAt?.toISOString() ?? null,
                 qualificationDetails: (lead.qualificationDetails as Record<string, unknown>) ?? null,
               }))}
-              qualifyingLeads={qualifyingLeads}
+              qualifyingLeads={qualifyingLeads.map((lead) => ({
+                ...lead,
+                sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
+              }))}
               queues={activeQueues}
               contextRole={leadManagementActionsEnabled ? context.role : "broker"}
               showUnassignedFilter={canViewUnassigned}
@@ -726,6 +738,7 @@ async function LeadsPageContent({
               pageSize={pageSize}
               unassignedLeads={unassignedRows.map((lead) => ({
                 ...lead,
+                sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
                 createdAt: lead.createdAt.toISOString(),

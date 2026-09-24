@@ -168,6 +168,9 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
           eq(schema.leads.distributionStatus, "assigned"),
           eq(schema.leads.assignmentSource, "automatic_offer"),
           isNotNull(schema.leads.corretorId),
+          eq(schema.leads.status, "distributed"),
+          isNull(schema.leads.firstContactAt),
+          isNull(schema.leads.serviceStartedAt),
         ),
       ),
       // Lost, disqualified, archived or soft-deleted leads are terminal and must never
@@ -390,7 +393,11 @@ async function deferOrFailJob(
     lastErrorMessage: message,
     completedAt: exhausted ? now : null,
     updatedAt: now,
-  }).where(eq(schema.leadDistributionJobs.id, job.id));
+  }).where(and(
+    eq(schema.leadDistributionJobs.id, job.id),
+    eq(schema.leadDistributionJobs.status, "processing"),
+    job.lockedBy ? eq(schema.leadDistributionJobs.lockedBy, job.lockedBy) : undefined,
+  ));
   return exhausted;
 }
 

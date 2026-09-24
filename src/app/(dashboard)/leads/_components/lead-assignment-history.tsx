@@ -17,9 +17,11 @@ function formatActionLabel(event: AssignmentHistoryItem) {
     case "offer_sent":
       return to ? `Lead ofertado a ${to} (aguardando aceite)` : "Lead ofertado a um corretor (aguardando aceite)";
     case "accepted":
-      return to ? `${to} aceitou o lead` : "Corretor aceitou o lead";
+      return to ? `${to} aceitou o atendimento` : "Corretor aceitou o atendimento";
     case "declined":
-      return from ?? to ? `${from ?? to} recusou o lead` : "Corretor recusou o lead";
+      return from ?? to ? `${from ?? to} recusou o atendimento` : "Corretor recusou o atendimento";
+    case "not_accepted":
+      return to ? `${to} não aceitou até o prazo` : "Corretor não aceitou até o prazo";
     case "reassigned":
       return from && to ? `Reatribuído de ${from} para ${to}` : to ? `Reatribuído para ${to}` : "Lead reatribuído";
     case "assignment_removed":
@@ -54,6 +56,7 @@ const SOURCE_LABELS: Record<string, string> = {
   webhook: "Entrada do lead",
   broker: "Corretor",
   qualification_timeout: "Tempo de qualificação",
+  offer: "Oferta de atendimento",
 };
 
 export function LeadAssignmentHistory({

@@ -15,6 +15,7 @@ import { LeadTasks } from "@/features/leads/components/lead-tasks";
 import { LeadChat } from "@/features/leads/components/lead-chat";
 import { LEAD_STATUS_LABELS, LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
 import { getLeadTimeline } from "@/features/leads/queries";
+import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
@@ -124,7 +125,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const metaCampaignName = metaCampaign[0]?.name ?? null;
   const metaAdName = metaAd[0]?.name ?? null;
   const metaFormName = metaForm[0]?.name ?? null;
-  const metaLeadDetails = readMetaLeadSourceMetadata(lead.sourceChannel, lead.sourceMetadata);
+  const metaLeadDetails = readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
   const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
 
   const [redistributionNotice] = context.role === "broker"
@@ -520,7 +521,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                       ) : (
                         <div><p className="text-xs text-muted-foreground">Idades informadas</p><p className="mt-1 font-medium">{qualificationDetails.individualAges ?? "Não informadas"}</p></div>
                       )}
-                      <div><p className="text-xs text-muted-foreground">Tipo de atendimento</p><p className="mt-1 font-medium">{lead.tipo === "PME" ? "Empresa / PME" : "Pessoa física"}</p></div>
+                      <div><p className="text-xs text-muted-foreground">Tipo de atendimento</p><p className="mt-1 font-medium">{metaLeadDetails.tipoPlanoStatus === "not_provided" ? "Não informado" : lead.tipo === "PME" ? "Empresa / PME" : lead.tipo === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</p></div>
                     </CardContent>
                   </Card>
                 )}
@@ -578,6 +579,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                       <div><p className="text-muted-foreground">Anúncio</p><p className="font-semibold text-foreground mt-0.5">{metaAdName || lead.sourceAd || lead.metaAdId || "Anúncio Padrão"}</p>{lead.metaAdId && metaAdName ? <p className="font-mono text-[10px] text-muted-foreground">ID: {lead.metaAdId}</p> : null}</div>
                       <div><p className="text-muted-foreground">Formulário</p><p className="font-semibold text-foreground mt-0.5">{metaFormName || lead.sourceForm || lead.metaFormId || "Formulário Direct"}</p>{lead.metaFormId && metaFormName ? <p className="font-mono text-[10px] text-muted-foreground">ID: {lead.metaFormId}</p> : null}</div>
                       {metaLeadDetails.tipoCnpj ? <div><p className="text-muted-foreground">Tipo de CNPJ</p><p className="font-semibold text-foreground mt-0.5">{metaLeadDetails.tipoCnpj}</p></div> : null}
+                      {metaLeadDetails.tipoPlano ? <div><p className="text-muted-foreground">Plano / Produto</p><p className="font-semibold text-foreground mt-0.5">{metaLeadDetails.tipoPlano}</p></div> : metaLeadDetails.tipoPlanoStatus === "not_provided" ? <div><p className="text-muted-foreground">Plano / Produto</p><p className="font-semibold text-foreground mt-0.5">{getLeadProductLabel({ tipo: lead.tipo, sourceChannel: lead.sourceChannel, sourceMetadata: lead.sourceMetadata })}</p></div> : null}
+                      {metaLeadDetails.operadora ? <div><p className="text-muted-foreground">Operadora</p><p className="font-semibold text-foreground mt-0.5">{metaLeadDetails.operadora}</p></div> : null}
                       <div><p className="text-muted-foreground font-medium">Data de Captura</p><p className="font-mono text-foreground mt-0.5">{lead.capturedAt ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(lead.capturedAt) : new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}</p></div>
                     </CardContent>
                   </Card>
@@ -738,12 +741,4 @@ function readFormData(value: unknown) {
     cnpj: typeof data.cnpj === "string" ? data.cnpj : null,
     funcionarios: typeof data.funcionarios === "string" ? data.funcionarios : null,
   };
-}
-
-function readMetaLeadSourceMetadata(sourceChannel: string, value: unknown) {
-  if (sourceChannel !== "meta_lead_ads" || !value || typeof value !== "object" || Array.isArray(value)) {
-    return { tipoCnpj: null as string | null };
-  }
-  const tipoCnpj = (value as Record<string, unknown>).tipoCnpj;
-  return { tipoCnpj: typeof tipoCnpj === "string" && tipoCnpj.trim() ? tipoCnpj.trim().slice(0, 120) : null };
 }
