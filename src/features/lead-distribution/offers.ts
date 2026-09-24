@@ -700,12 +700,17 @@ export async function handleLeadOfferWebhookResponse(input: {
       { offerStatus: currentOffer.status, expiresAt: currentOffer.expiresAt, leadCorretorId: lead.corretorId, brokerId: broker.id },
       now,
     );
+    // A late "Aceitar" after the broker already started service (which accepts
+    // the offer) is idempotent: keep ACCEPTED and don't tell them it was lost.
+    if (currentOffer.status === "ACCEPTED" && lead.corretorId === broker.id) {
+      return { won: false, reason: "already_accepted", lead };
+    }
     const winningStatuses = ["PENDING", "SENT", "DELIVERED", "READ"] as const;
     if (decision.isExpired || decision.isAlreadyAssigned || !(winningStatuses as readonly string[]).includes(currentOffer.status)) {
       await tx
         .update(schema.leadOffers)
         .set({ status: decision.isExpired ? "EXPIRED" : "LOST", updatedAt: now })
-        .where(eq(schema.leadOffers.id, offer.id));
+        .where(and(eq(schema.leadOffers.id, offer.id), inArray(schema.leadOffers.status, ACTIVE_OFFER_STATUSES)));
 
       return { won: false, reason: decision.isExpired ? "expired" : "already_assigned", lead };
     }
@@ -871,7 +876,7 @@ export async function handleLeadOfferWebhookResponse(input: {
     const brokerName = broker.name || "Corretor(a)";
     const destPhone = broker.phone || input.phone;
     // CRM-link acceptance has no WhatsApp thread to answer in; the UI reports the outcome.
-    if (!destPhone || input.brokerId) return { processed: true, action: "accepted", won: false, reason: result.reason };
+    if (result.reason === "already_accepted" || !destPhone || input.brokerId) return { processed: true, action: "accepted", won: false, reason: result.reason };
 
     const unavailableOutbound = await enqueueMetaTemplateMessage({
       tenantId: input.tenantId,
