@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 /** Movement (px) before a press becomes a drag, so plain clicks and text selection keep working. */
 const DRAG_THRESHOLD = 4;
@@ -11,7 +12,7 @@ const INTERACTIVE = "a, button, input, select, textarea, [role=button]";
  * own `[data-slot=table-container]`, which is the element that overflows.
  * Touch and trackpads keep their native scrolling.
  */
-export function DragScrollTable({ children }: { children: ReactNode }) {
+export function DragScrollTable({ children, className }: { children: ReactNode; className?: string }) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -87,7 +88,7 @@ export function DragScrollTable({ children }: { children: ReactNode }) {
   return (
     <div
       ref={rootRef}
-      className="[&_[data-drag-scroll=idle]]:cursor-grab [&_[data-drag-scroll=dragging]]:cursor-grabbing [&_[data-drag-scroll=dragging]]:select-none"
+      className={cn("[&_[data-drag-scroll=idle]]:cursor-grab [&_[data-drag-scroll=dragging]]:cursor-grabbing [&_[data-drag-scroll=dragging]]:select-none", className)}
     >
       {children}
     </div>

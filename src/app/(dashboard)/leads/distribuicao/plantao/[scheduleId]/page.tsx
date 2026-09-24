@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, Clock3 } from "lucide-react";
+import { CheckCircle2, Clock3, Download } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ArrowLeft, CalendarCheck, UserList, Users } from "@/components/huge-icons";
 import { LeadStatusBadge } from "@/components/status-badges";
@@ -14,10 +14,11 @@ import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui";
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { hasCapability } from "@/shared/auth/permissions";
 import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
-import { groupDutyLeadsByShift } from "../_components/duty-leads-shift-groups";
+import { groupDutyLeadsByShift } from "@/features/lead-distribution/duty-leads-shift-groups";
 import { DragScrollTable } from "../_components/drag-scroll-table";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
   const returnedUnaccepted = await getReturnedUnacceptedLeadIds(context.tenantId, leads.map((lead) => lead.id));
+  const canExportReport = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
 
   const isDistributed = (lead: (typeof leads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
   const distributedCount = leads.filter(isDistributed).length;
@@ -71,7 +73,14 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     <DashboardHeader
       breadcrumb="Distribuição · Plantões"
       title={schedule.name}
-      rightSlot={<Button render={<Link href="/leads/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>}
+      rightSlot={<div className="flex flex-wrap items-center gap-2">
+        {canExportReport ? (
+          <Button render={<a href={`/api/reports/duty-schedule/${schedule.id}`} download />} size="sm" variant="outline" className="gap-1.5">
+            <Download className="size-3.5" aria-hidden="true" /> Exportar PDF
+          </Button>
+        ) : null}
+        <Button render={<Link href="/leads/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>
+      </div>}
     />
     <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
       <Card className="border-transparent bg-transparent shadow-none">
@@ -127,7 +136,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.85fr)]">
+      <div className="flex flex-col gap-5">
         <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader className="border-b border-border/60 p-4">
             <CardTitle className="text-base">Leads do plantão</CardTitle>
@@ -147,7 +156,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           </CardHeader>
           <CardContent className="p-0">
             {visibleLeads.length ? (
-              <DragScrollTable>
+              <DragScrollTable className="[&_[data-slot=table-container]]:max-h-[60vh] [&_[data-slot=table-container]]:overflow-y-auto [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -212,7 +221,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 <strong className="font-semibold">Nenhum escalado está elegível para receber leads.</strong> Há pendências de cadastro ou confirmação — os leads permanecem aguardando.
               </div>
             ) : null}
-            {roster.length ? roster.map((entry) => (
+            {roster.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{roster.map((entry) => (
               <div key={entry.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
@@ -231,7 +240,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 </div>
                 <Badge variant="secondary">{entry.leadsInWindow} lead{entry.leadsInWindow === 1 ? "" : "s"}</Badge>
               </div>
-            )) : <p className="text-sm text-muted-foreground">Nenhum corretor escalado neste plantão.</p>}
+            ))}</div> : <p className="text-sm text-muted-foreground">Nenhum corretor escalado neste plantão.</p>}
           </CardContent>
         </Card>
       </div>

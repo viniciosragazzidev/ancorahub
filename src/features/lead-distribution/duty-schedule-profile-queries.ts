@@ -11,7 +11,7 @@ import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 
 // Upper bound on how far back a lead can show even when the schedule has no
 // completed occurrence yet (brand-new schedule) — keeps the query sane.
-const LEADS_LIMIT = 200;
+export const DUTY_PROFILE_LEADS_LIMIT = 200;
 // Same set the distribution engine uses to count a broker's active load against
 // queue capacity (service.ts's local `activeCommercialStatuses`) — kept in sync
 // by hand since neither file exports a shared constant.
@@ -173,7 +173,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         isNull(schema.leads.archivedAt),
       ))
       .orderBy(desc(schema.leads.createdAt))
-      .limit(LEADS_LIMIT)
+      .limit(DUTY_PROFILE_LEADS_LIMIT)
     : [];
 
   const leadsPerBroker = new Map<string, number>();
