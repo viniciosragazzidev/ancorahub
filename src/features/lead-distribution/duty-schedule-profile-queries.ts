@@ -5,10 +5,12 @@ import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
-import { getRelevantDutyWindow } from "./duty-presence-domain";
+import { getPreviousDutyOccurrenceCutoff, getRelevantDutyWindow } from "./duty-presence-domain";
 import { normalizeOfferPacing } from "./offer-pacing";
 import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 
+// Upper bound on how far back a lead can show even when the schedule has no
+// completed occurrence yet (brand-new schedule) — keeps the query sane.
 const LEADS_WINDOW_DAYS = 7;
 const LEADS_LIMIT = 200;
 // Same set the distribution engine uses to count a broker's active load against
@@ -112,7 +114,14 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   const operatingCapacity = operatingQueue?.capacityEnabled ? operatingQueue.capacityPerBroker ?? null : null;
 
   const queueIds = linkedQueues.map((queue) => queue.id);
-  const since = new Date(Date.now() - LEADS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  // Only leads that arrived after the last time this plantão was actually
+  // running — the previous occurrence's own end (or its start, if we're
+  // inside it right now) — not a flat lookback window that mixes in an
+  // already-closed prior shift's leftovers and confuses whoever's on duty.
+  const safetyFloor = new Date(now.getTime() - LEADS_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const occurrenceCutoff = getPreviousDutyOccurrenceCutoff({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, now);
+  const since = occurrenceCutoff > safetyFloor ? occurrenceCutoff : safetyFloor;
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.
@@ -152,7 +161,6 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   }
 
   const presenceEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION)) === "true";
-  const now = new Date();
   const occurrenceByAssignment = new Map(roster.flatMap((entry) => {
     const occurrence = getRelevantDutyWindow({
       dayOfWeek: entry.dayOfWeek,
@@ -256,7 +264,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     }),
     linkedQueues,
     leads,
-    windowDays: LEADS_WINDOW_DAYS,
+    leadsSince: since,
     liveStatusEnabled: Boolean(operatingQueue),
   };
 }

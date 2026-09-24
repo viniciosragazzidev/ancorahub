@@ -86,6 +86,39 @@ export function getRelevantDutyWindow(input: WeeklyWindowInput, now: Date, leadM
   return null;
 }
 
+/**
+ * When "this plantão" last had leads flowing: the start of the occurrence
+ * currently in progress (if we're inside one right now — today's arrivals so
+ * far should still show), otherwise the end of the most recently completed
+ * occurrence (so leads from a prior, already-closed shift don't linger on
+ * the page). Falls back to epoch (show everything) if the schedule never
+ * had a completed occurrence in the lookback window — a schedule brand new
+ * today, for example.
+ */
+export function getPreviousDutyOccurrenceCutoff(input: WeeklyWindowInput, now: Date): Date {
+  const current = getRelevantDutyWindow(input, now, 0);
+  if (isDutyWindowActive(current, now)) return current!.startsAt;
+
+  if (!Number.isInteger(input.dayOfWeek) || input.dayOfWeek < 0 || input.dayOfWeek > 6) return new Date(0);
+  const localNow = zonedParts(now, input.timezone);
+  const today = dateKey(localNow.year, localNow.month, localNow.day);
+  // 0 through -6 covers 7 consecutive days, so exactly one of them is the
+  // schedule's weekday — except when that's today and today's occurrence
+  // hasn't ended yet (already handled above as "active", but also reachable
+  // here if today hasn't started yet), in which case the one before it is a
+  // full week back at offset -7.
+  for (const offset of [0, -1, -2, -3, -4, -5, -6, -7]) {
+    const dutyDate = addCalendarDays(today, offset);
+    const [year, month, day] = dutyDate.split("-").map(Number);
+    if (new Date(Date.UTC(year, month - 1, day)).getUTCDay() !== input.dayOfWeek) continue;
+    const startsAt = localTimeToUtc(dutyDate, input.startsAt, input.timezone);
+    let endsAt = localTimeToUtc(dutyDate, input.endsAt, input.timezone);
+    if (endsAt <= startsAt) endsAt = localTimeToUtc(addCalendarDays(dutyDate, 1), input.endsAt, input.timezone);
+    if (endsAt <= now) return endsAt;
+  }
+  return new Date(0);
+}
+
 export function isDutyWindowActive(window: DutyWindow | null, now: Date) {
   return Boolean(window && window.startsAt <= now && window.endsAt > now);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive } from "./duty-presence-domain";
+import { formatDutyStartHour, getPreviousDutyOccurrenceCutoff, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive } from "./duty-presence-domain";
 
 describe("duty presence occurrence windows", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
@@ -39,5 +39,34 @@ describe("duty presence occurrence windows", () => {
     const window = getRelevantDutyWindow({ ...shift, timezone: "America/New_York", startsAt: "09:00", endsAt: "11:00" }, now);
     expect(window?.startsAt.toISOString()).toBe("2026-09-23T13:00:00.000Z");
     expect(formatDutyStartHour(window!.startsAt, "America/New_York")).toBe("09:00");
+  });
+});
+
+describe("getPreviousDutyOccurrenceCutoff", () => {
+  // Wednesday 10:00–12:00 America/Sao_Paulo (UTC-3) — 13:00–15:00 UTC.
+  const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
+
+  it("uses the occurrence's own start while it is currently in progress, so today's arrivals so far still show", () => {
+    const now = new Date("2026-09-23T14:00:00.000Z"); // Wed 11:00 in São Paulo, mid-shift
+    expect(getPreviousDutyOccurrenceCutoff(shift, now).toISOString()).toBe("2026-09-23T13:00:00.000Z");
+  });
+
+  it("uses today's own end right after the shift closes", () => {
+    const now = new Date("2026-09-23T15:30:00.000Z"); // Wed 12:30 SP, just after close
+    expect(getPreviousDutyOccurrenceCutoff(shift, now).toISOString()).toBe("2026-09-23T15:00:00.000Z");
+  });
+
+  it("uses yesterday's end the next day, not a week-old cutoff — the reported bug", () => {
+    const now = new Date("2026-09-24T14:00:00.000Z"); // Thursday, well after Wednesday's shift
+    expect(getPreviousDutyOccurrenceCutoff(shift, now).toISOString()).toBe("2026-09-23T15:00:00.000Z");
+  });
+
+  it("reaches back a full week when today is shift day but the shift has not started yet", () => {
+    const now = new Date("2026-09-30T12:00:00.000Z"); // Wed 09:00 SP — today's own shift starts at 10:00
+    expect(getPreviousDutyOccurrenceCutoff(shift, now).toISOString()).toBe("2026-09-23T15:00:00.000Z");
+  });
+
+  it("falls back to epoch (show everything) for an invalid weekday rather than throwing", () => {
+    expect(getPreviousDutyOccurrenceCutoff({ ...shift, dayOfWeek: 9 }, new Date("2026-09-23T12:00:00.000Z")).getTime()).toBe(0);
   });
 });

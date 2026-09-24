@@ -39,7 +39,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     redirect("/leads/distribuicao?view=plantao");
   }
 
-  const { schedule, roster, linkedQueues, leads, windowDays, presenceEnabled, liveStatusEnabled } = profile;
+  const { schedule, roster, linkedQueues, leads, leadsSince, presenceEnabled, liveStatusEnabled } = profile;
   const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
   const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
@@ -48,13 +48,15 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const isDistributed = (lead: (typeof leads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
   const distributedCount = leads.filter(isDistributed).length;
   const waitingCount = leads.length - distributedCount;
-  const filter = situacao === "aguardando" || situacao === "distribuidos" ? situacao : "todos";
-  const visibleLeads = filter === "aguardando" ? leads.filter((lead) => !isDistributed(lead)) : filter === "distribuidos" ? leads.filter(isDistributed) : leads;
+  // Only two situations matter operationally here; "todos" mixed them back
+  // together and hid which bucket someone was actually looking at.
+  const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
+  const visibleLeads = filter === "distribuidos" ? leads.filter(isDistributed) : leads.filter((lead) => !isDistributed(lead));
   const filters = [
-    { key: "todos", label: "Todos", count: leads.length },
     { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
     { key: "distribuidos", label: "Distribuídos", count: distributedCount },
   ] as const;
+  const sinceLabel = leadsSince.getTime() > 0 ? `desde o fim do último plantão (${dateTime.format(leadsSince)})` : "desde a criação deste plantão";
 
   return <>
     <DashboardHeader
@@ -108,7 +110,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
         </div>
         <div className="min-w-0 px-4 py-4">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">Leads nos últimos {windowDays} dias</p>
+            <p className="text-xs text-muted-foreground">Leads {sinceLabel}</p>
             <UserList className="size-4 text-muted-foreground" />
           </div>
           <p className="mt-2 font-mono text-2xl font-semibold tracking-tight">{leads.length}</p>
@@ -120,12 +122,12 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
         <Card className="border-transparent bg-transparent shadow-none">
           <CardHeader className="border-b border-border/60 p-4">
             <CardTitle className="text-base">Leads do plantão</CardTitle>
-            <CardDescription>Todos os leads das filas deste plantão nos últimos {windowDays} dias — aguardando distribuição, ofertados, distribuídos e em atendimento.</CardDescription>
+            <CardDescription>Leads das filas deste plantão {sinceLabel} — aguardando distribuição, ofertados, distribuídos e em atendimento.</CardDescription>
             <nav aria-label="Filtrar leads por situação" className="mt-3 flex flex-wrap gap-2">
               {filters.map((item) => (
                 <Button
                   key={item.key}
-                  render={<Link href={item.key === "todos" ? `/leads/distribuicao/plantao/${schedule.id}` : `/leads/distribuicao/plantao/${schedule.id}?situacao=${item.key}`} />}
+                  render={<Link href={`/leads/distribuicao/plantao/${schedule.id}?situacao=${item.key}`} />}
                   size="sm"
                   variant={filter === item.key ? "secondary" : "outline"}
                 >
@@ -166,7 +168,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 </TableBody>
               </Table>
             ) : (
-              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead nesta situação para este plantão nos últimos {windowDays} dias.</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead nesta situação para este plantão {sinceLabel}.</div>
             )}
           </CardContent>
         </Card>
