@@ -30,6 +30,20 @@ export function getDutyLeadShift(lead: { assignedAt: Date | null; corretorId: st
   return saoPauloHour(reference) >= AFTERNOON_CUTOFF_HOUR ? "tarde" : "manha";
 }
 
+/**
+ * Distributed leads in the order they were handed to brokers: earliest
+ * assignment first, arrival time as the tie-break (and for any row that
+ * somehow lacks an assignment time, which then sorts last).
+ */
+export function sortByAssignmentTime<T extends { assignedAt: Date | null; createdAt: Date }>(leads: T[]): T[] {
+  return [...leads].sort((a, b) => {
+    const aAssigned = a.assignedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+    const bAssigned = b.assignedAt?.getTime() ?? Number.POSITIVE_INFINITY;
+    if (aAssigned !== bAssigned) return aAssigned - bAssigned;
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  });
+}
+
 /** Splits leads into morning/afternoon blocks, keeping their order and omitting empty blocks. */
 export function groupDutyLeadsByShift<T extends { assignedAt: Date | null; corretorId: string | null; createdAt: Date }>(
   leads: T[],

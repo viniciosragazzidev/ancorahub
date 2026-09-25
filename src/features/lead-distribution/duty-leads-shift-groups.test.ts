@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDutyLeadShift, groupDutyLeadsByShift } from "./duty-leads-shift-groups";
+import { getDutyLeadShift, groupDutyLeadsByShift, sortByAssignmentTime } from "./duty-leads-shift-groups";
 
 // São Paulo is UTC-3: 15:59Z = 12:59 local, 16:00Z = 13:00 local.
 const lead = (id: string, assignedAt: string | null, createdAt = "2026-09-24T11:00:00.000Z", corretorId: string | null = "broker-1") => ({
@@ -24,6 +24,20 @@ describe("duty leads shift groups", () => {
   it("ignores a stale assignedAt once the lead has no broker", () => {
     const released = { id: "r", corretorId: null, assignedAt: new Date("2026-09-24T18:00:00.000Z"), createdAt: new Date("2026-09-24T12:00:00.000Z") };
     expect(getDutyLeadShift(released)).toBe("manha");
+  });
+
+  it("orders distributed leads by assignment time, earliest first, across both blocks", () => {
+    const sorted = sortByAssignmentTime([
+      lead("late", "2026-09-25T16:30:00.000Z"),
+      lead("first", "2026-09-25T12:01:09.000Z"),
+      { id: "no-time", corretorId: "broker", assignedAt: null, createdAt: new Date("2026-09-25T11:00:00.000Z") },
+      lead("second", "2026-09-25T12:33:06.000Z"),
+    ]);
+    expect(sorted.map((item) => item.id)).toEqual(["first", "second", "late", "no-time"]);
+    expect(groupDutyLeadsByShift(sorted).map((group) => [group.key, group.leads.map((item) => item.id)])).toEqual([
+      ["manha", ["first", "second", "no-time"]],
+      ["tarde", ["late"]],
+    ]);
   });
 
   it("keeps order inside each block and omits empty blocks", () => {

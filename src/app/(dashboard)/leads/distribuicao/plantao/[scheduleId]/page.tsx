@@ -18,7 +18,7 @@ import { hasCapability } from "@/shared/auth/permissions";
 import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
-import { groupDutyLeadsByShift } from "@/features/lead-distribution/duty-leads-shift-groups";
+import { groupDutyLeadsByShift, sortByAssignmentTime } from "@/features/lead-distribution/duty-leads-shift-groups";
 import { DragScrollTable } from "../_components/drag-scroll-table";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +59,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // Only two situations matter operationally here; "todos" mixed them back
   // together and hid which bucket someone was actually looking at.
   const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
-  const visibleLeads = filter === "distribuidos" ? leads.filter(isDistributed) : leads.filter((lead) => !isDistributed(lead));
+  // Distributed rows read as the order leads were handed out (earliest
+  // assignment first); the waiting list keeps its newest-arrival order.
+  const visibleLeads = filter === "distribuidos"
+    ? sortByAssignmentTime(leads.filter(isDistributed))
+    : leads.filter((lead) => !isDistributed(lead));
   const filters = [
     { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
     { key: "distribuidos", label: "Distribuídos", count: distributedCount },
