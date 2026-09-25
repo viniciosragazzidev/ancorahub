@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shuffle } from "./domain";
+import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shouldReleaseUnacceptedProvisionalOwner, shuffle } from "./domain";
 
 describe("provisional assignment rotation guard", () => {
   it("does not rotate a lead after the broker has started or contacted the customer", () => {
@@ -617,5 +617,45 @@ describe("lead distribution domain", () => {
       queueId: "queue-a",
       profileKey: null,
     });
+  });
+});
+
+describe("shouldReleaseUnacceptedProvisionalOwner", () => {
+  // 25/09: Rodrigo Waldhelm / "iv" — offer expired after the duty closed, no
+  // broker eligible, and the lead sat with the broker who never accepted.
+  const stuck = {
+    handoffStatus: "queued",
+    corretorId: "marcio",
+    assignmentSource: "automatic_offer",
+    status: "distributed",
+    firstContactAt: null,
+    serviceStartedAt: null,
+    latestOfferStatus: "EXPIRED",
+  };
+
+  it("releases a provisional lead only when the acceptance time ran out and nobody could take it", () => {
+    expect(shouldReleaseUnacceptedProvisionalOwner(stuck)).toBe(true);
+  });
+
+  it("never releases when the handoff to another broker succeeded", () => {
+    expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, handoffStatus: "offered" })).toBe(false);
+    expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, handoffStatus: "assigned" })).toBe(false);
+  });
+
+  it("only for an expired offer — not pending, accepted, declined or with no offer at all", () => {
+    for (const latestOfferStatus of ["PENDING", "SENT", "ACCEPTED", "DECLINED", null]) {
+      expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, latestOfferStatus })).toBe(false);
+    }
+  });
+
+  it("keeps the lead with a broker who accepted or already started service", () => {
+    expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, assignmentSource: "whatsapp_offer_accepted" })).toBe(false);
+    expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, firstContactAt: new Date() })).toBe(false);
+    expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, serviceStartedAt: new Date() })).toBe(false);
+    expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, status: "in_contact" })).toBe(false);
+  });
+
+  it("leaves manual offers to their own expiry release", () => {
+    expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, assignmentSource: "manual_offer" })).toBe(false);
   });
 });

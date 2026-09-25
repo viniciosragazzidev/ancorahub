@@ -10,6 +10,33 @@ export function isAcceptedOfferAssignment(assignmentSource: string | null) {
   return assignmentSource === "whatsapp_offer_accepted";
 }
 
+/**
+ * The SLA sweep could not hand an unaccepted lead to another broker (duty
+ * closed, lead from an earlier occurrence, nobody eligible). Only when the
+ * broker's acceptance window ran out — their latest offer for this lead
+ * EXPIRED, never accepted, never contacted — does the provisional lead go
+ * back to "Aguardando distribuição" for manual assignment instead of sitting
+ * in their wallet indefinitely. Any other unworked lead is left as is.
+ */
+export function shouldReleaseUnacceptedProvisionalOwner(input: {
+  handoffStatus: string;
+  corretorId: string | null;
+  assignmentSource: string | null;
+  status: string;
+  firstContactAt: Date | null;
+  serviceStartedAt: Date | null;
+  /** Status of the broker's most recent offer for this lead, if any. */
+  latestOfferStatus: string | null;
+}) {
+  if (input.handoffStatus === "assigned" || input.handoffStatus === "offered") return false;
+  return Boolean(input.corretorId)
+    && input.assignmentSource === "automatic_offer"
+    && input.status === "distributed"
+    && !input.firstContactAt
+    && !input.serviceStartedAt
+    && input.latestOfferStatus === "EXPIRED";
+}
+
 export function canRotateProvisionalLeadOwner(input: {
   corretorId: string | null;
   assignmentSource: string | null;

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -9,7 +9,8 @@ import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sy
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { processQueuedLead } from "@/features/lead-distribution/service";
-import { isAcceptedOfferAssignment } from "@/features/lead-distribution/domain";
+import { isAcceptedOfferAssignment, shouldReleaseUnacceptedProvisionalOwner } from "@/features/lead-distribution/domain";
+import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
@@ -128,6 +129,57 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
             void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
             void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
             void publishLeadInvalidation({ tenantId: tenant.id, actorId: nextBrokerId }).catch(() => {});
+          } else {
+            // Only an offer whose acceptance time ran out releases the lead.
+            const [latestOffer] = await db.select({ status: schema.leadOffers.status }).from(schema.leadOffers).where(and(
+              eq(schema.leadOffers.tenantId, tenant.id),
+              eq(schema.leadOffers.leadId, lead.id),
+              eq(schema.leadOffers.brokerId, previousOwnerId),
+            )).orderBy(desc(schema.leadOffers.offeredAt)).limit(1);
+            if (shouldReleaseUnacceptedProvisionalOwner({
+              handoffStatus: reassigned.status,
+              corretorId: previousOwnerId,
+              assignmentSource: lead.assignmentSource,
+              status: lead.status,
+              firstContactAt: lead.firstContactAt,
+              serviceStartedAt: lead.serviceStartedAt,
+              latestOfferStatus: latestOffer?.status ?? null,
+            })) {
+              // Guarded on the same unaccepted state, so a broker who accepts or
+              // starts service concurrently keeps the lead.
+              const now = new Date();
+              const [released] = await db.update(schema.leads)
+                .set(buildDeclinedLeadReleaseUpdate(now))
+                .where(and(
+                  eq(schema.leads.id, lead.id),
+                  eq(schema.leads.tenantId, tenant.id),
+                  eq(schema.leads.corretorId, previousOwnerId),
+                  eq(schema.leads.assignmentSource, "automatic_offer"),
+                  eq(schema.leads.status, "distributed"),
+                  isNull(schema.leads.firstContactAt),
+                  isNull(schema.leads.serviceStartedAt),
+                  isNull(schema.leads.deletedAt),
+                ))
+                .returning({ id: schema.leads.id });
+              if (released) {
+                const reason = "Tempo para aceite esgotado e sem corretor elegível para repasse automático: lead devolvido para atribuição manual.";
+                await db.insert(schema.leadDistributionEvents).values({
+                  id: randomUUID(), tenantId: tenant.id, leadId: lead.id, fromBranchId: lead.branchId, toBranchId: lead.branchId,
+                  previousOwnerId, action: "released_for_manual_assignment", source: "sla", strategy: "manual",
+                  reason, actorId: automationActor.userId, createdAt: now,
+                });
+                for (const recipient of recipients) {
+                  if (recipient.role === "manager" && recipient.branchId !== lead.branchId) continue;
+                  pending.push({
+                    id: randomUUID(), tenantId: tenant.id, recipientUserId: recipient.userId, leadId: lead.id,
+                    type: "lead_manual_assignment_needed", title: "Lead aguardando atribuição manual",
+                    message: `O tempo para aceitar o lead ${lead.nome} acabou e não havia corretor elegível para o repasse automático. Atribua manualmente.`,
+                    createdAt: now,
+                  });
+                }
+                void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
+              }
+            }
           }
         }
 
