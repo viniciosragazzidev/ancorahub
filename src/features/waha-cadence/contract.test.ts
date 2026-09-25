@@ -164,3 +164,37 @@ describe("WAHA cadence contract", () => {
     expect(event.sessionStatus).toBe(expected);
   });
 });
+
+describe("WAHA @lid contacts", () => {
+  const native = (payload: Record<string, unknown>) => wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+    event: "message",
+    session: "ancora-broker-1",
+    id: "evt-lid-1",
+    payload: { id: "msg-1", body: "Oi, tenho interesse", timestamp: 1_790_000_000, ...payload },
+  }));
+
+  it("uses the phone the relay attached for an @lid sender", () => {
+    const event = native({ from: "123456789012345@lid", to: "5521900000000@c.us", fromMe: false, _ancora: { fromPn: "5521999428504@c.us" } });
+    expect(event.message?.from).toBe("5521999428504");
+    expect(event.message?.contactLidUnresolved).toBeUndefined();
+  });
+
+  it("flags an @lid sender with no phone instead of passing the LID digits off as a phone", () => {
+    const event = native({ from: "123456789012345@lid", to: "5521900000000@c.us", fromMe: false });
+    expect(event.message?.contactLidUnresolved).toBe(true);
+  });
+
+  it("checks the recipient side for the broker's own messages", () => {
+    const resolved = native({ from: "5521900000000@c.us", to: "123456789012345@lid", fromMe: true, _ancora: { toPn: "5521999428504@c.us" } });
+    expect(resolved.message?.to).toBe("5521999428504");
+    expect(resolved.message?.contactLidUnresolved).toBeUndefined();
+    const unresolved = native({ from: "5521900000000@c.us", to: "123456789012345@lid", fromMe: true });
+    expect(unresolved.message?.contactLidUnresolved).toBe(true);
+  });
+
+  it("leaves phone-addressed messages exactly as before", () => {
+    const event = native({ from: "5521999428504@c.us", to: "5521900000000@c.us", fromMe: false });
+    expect(event.message?.from).toBe("5521999428504");
+    expect(event.message?.contactLidUnresolved).toBeUndefined();
+  });
+});

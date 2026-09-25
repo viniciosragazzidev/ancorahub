@@ -519,6 +519,20 @@ export class WahaClient {
         return [];
     }
     /**
+     * Telefone (`<número>@c.us`) por trás de um identificador `@lid`, ou null
+     * quando o WAHA não conhece o mapeamento. Nunca lança: um webhook não deve
+     * falhar por causa dessa consulta.
+     */
+    async getPhoneForLid(sessionName, lid) {
+        try {
+            const result = await this.request(`/api/${encodeURIComponent(sessionName)}/lids/${encodeURIComponent(lid)}`, { timeoutMs: 5_000 });
+            return typeof result?.pn === "string" && result.pn.trim() ? result.pn.trim() : null;
+        }
+        catch {
+            return null;
+        }
+    }
+    /**
      * Resolve um telefone para o identificador de conversa que o WAHA/WebJS
      * reconhece. Em algumas contas o WhatsApp usa @lid, não <telefone>@c.us;
      * enviar diretamente para o telefone causa "No LID for user".

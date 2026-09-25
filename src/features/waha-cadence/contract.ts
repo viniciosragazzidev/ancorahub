@@ -69,6 +69,12 @@ export const wahaWebhookSchema = z.object({
     type: z.enum(["text", "image", "audio", "video", "document", "sticker", "location", "contact"]).default("text"),
     /** Whether this message was sent by the session owner (broker's own messages) */
     fromMe: z.boolean().default(false),
+    /**
+     * The contact side (sender, or recipient when fromMe) arrived as a
+     * WhatsApp `@lid` the relay could not map to a phone: `from`/`to` then
+     * hold LID digits, not a phone, and must not be matched to a lead.
+     */
+    contactLidUnresolved: z.boolean().optional(),
     /** Provider-origin metadata used only for observability and outgoing reconciliation. */
     source: z.string().trim().min(1).max(64).optional(),
     /** Caption for media messages */
@@ -103,6 +109,14 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
 
   const normalizeJid = (value: unknown) =>
     typeof value === "string" ? value.replace(/@[^\s]+$/, "").replace(/\D/g, "") : value;
+  // An `@lid` is a privacy id, not a phone: prefer the phone the relay
+  // attached (`payload._ancora.{from,to}Pn`, see whatsapp-api lid.ts).
+  const contactJid = (value: unknown, phone: unknown) =>
+    typeof value === "string" && value.endsWith("@lid") && typeof phone === "string" && phone.trim()
+      ? normalizeJid(phone)
+      : normalizeJid(value);
+  const isUnresolvedLid = (value: unknown, phone: unknown) =>
+    typeof value === "string" && value.endsWith("@lid") && !(typeof phone === "string" && phone.trim());
 
   const rawEventType = String(raw.event || raw.type || "");
   const isNativeWahaMessage =
@@ -181,6 +195,13 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
                 (rawMessageId as Record<string, unknown>).fromMe === true,
             );
 
+      const attached = innerPayload._ancora && typeof innerPayload._ancora === "object"
+        ? innerPayload._ancora as Record<string, unknown>
+        : {};
+      const contactLidUnresolved = fromMe
+        ? isUnresolvedLid(innerPayload.to, attached.toPn)
+        : isUnresolvedLid(innerPayload.from, attached.fromPn);
+
       return {
         eventId,
         type: "message.inbound",
@@ -188,8 +209,9 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
         occurredAt,
         message: {
           id: messageId,
-          from: normalizeJid(innerPayload.from),
-          to: normalizeJid(innerPayload.to) || undefined,
+          from: contactJid(innerPayload.from, attached.fromPn),
+          to: contactJid(innerPayload.to, attached.toPn) || undefined,
+          ...(contactLidUnresolved ? { contactLidUnresolved: true } : {}),
           body: bodyText,
           type: mappedType,
           fromMe,

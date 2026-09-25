@@ -239,6 +239,14 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     return { processed: 0, ignored: "unknown_session" as const };
   }
 
+  // A contact WhatsApp only exposed as `@lid` (no phone mapping from the
+  // relay) cannot be matched to a lead; flag it distinctly instead of letting
+  // the LID digits pass for an unknown phone.
+  if (event.message.contactLidUnresolved) {
+    await markIgnored(db, registered.id, "unresolved_lid");
+    return { processed: 0, ignored: "unresolved_lid" as const };
+  }
+
   // Determine direction based on fromMe flag
   const isOutgoing = event.message.fromMe === true;
   const contactPhoneRaw = isOutgoing && event.message.to ? event.message.to : event.message.from;

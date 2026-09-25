@@ -6,6 +6,7 @@ import { MetaGraphError, MetaGraphTimeoutError } from "./integrations/whatsapp/c
 import { sendTestMessage } from "./integrations/whatsapp/service.js";
 import { WahaClient, resolveWebhookUrl, type WahaRecoveryCleanup } from "./integrations/waha/client.js";
 import { WahaClientError } from "./integrations/waha/types.js";
+import { attachLidPhoneNumbers } from "./integrations/waha/lid.js";
 
 type SendBody = { to: string; message: string };
 type HistorySyncBody = { sessionName: string; chatIds: string[]; limit?: number };
@@ -1011,6 +1012,18 @@ export function buildApp() {
           session: typeof envelope.session === "string" ? envelope.session : undefined,
           status: typeof envelope.payload?.status === "string" ? envelope.payload.status : undefined,
         });
+      }
+
+      // Contacts addressed by @lid carry no phone: attach the real one so the
+      // CRM can match the message to the broker's lead (see lid.ts).
+      try {
+        const lidClient = new WahaClient(getWahaConfig());
+        const resolved = await attachLidPhoneNumbers(request.body, (session, lid) => lidClient.getPhoneForLid(session, lid));
+        if (resolved.from || resolved.to) {
+          request.log.info({ operation: "waha.webhook.lid_resolved", from: resolved.from, to: resolved.to });
+        }
+      } catch {
+        // WAHA config missing: forward unchanged; the CRM flags unresolved LIDs.
       }
 
       const rawBody = JSON.stringify(request.body);
