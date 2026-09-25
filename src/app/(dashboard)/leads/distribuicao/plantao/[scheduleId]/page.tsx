@@ -19,7 +19,7 @@ import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
 import { groupDutyLeadsByShift, sortByAssignmentTime } from "@/features/lead-distribution/duty-leads-shift-groups";
-import { DragScrollTable } from "../_components/drag-scroll-table";
+import { DragScrollTable } from "@/components/ui/drag-scroll-table";
 
 export const dynamic = "force-dynamic";
 

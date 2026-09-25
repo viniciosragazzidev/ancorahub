@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/data-table/data-table-pagination";
+import { DragScrollTable } from "@/components/ui/drag-scroll-table";
 import { getCommonPinningStyles } from "@/lib/data-table";
 import { cn } from "@/lib/utils";
 import {
@@ -49,7 +50,7 @@ export function DataTable<TData>({
             <div className="h-full w-full animate-pulse bg-primary" />
           </div>
         )}
-        <div className="overflow-x-auto">
+        <DragScrollTable className="overflow-x-auto">
           <Table className="w-full text-xs">
             <TableHeader className={cn(dataTableStyles.header, headerClassName)}>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -121,7 +122,7 @@ export function DataTable<TData>({
               )}
             </TableBody>
           </Table>
-        </div>
+        </DragScrollTable>
         <DataTablePagination table={table} isPending={isPending} />
       </DataTableFrame>
       {actionBar}
