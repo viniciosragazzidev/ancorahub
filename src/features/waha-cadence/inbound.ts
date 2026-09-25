@@ -266,7 +266,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
 
   // ── 6. Resolve lead/client (race-safe) ─────────────────────────────────
   const leadResolveStart = Date.now();
-  const { leadId, clientId, runId } = await resolveContact(
+  const { leadId, clientId, runId, formerOwnerLead } = await resolveContact(
     db,
     source,
     tenantId,
@@ -354,7 +354,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     sourceKind: source.kind,
     hasLead: Boolean(leadId),
     brokerId: source.kind === "connection" ? source.connection.userId : null,
-  }) && source.kind === "connection" && source.connection.userId && leadId) {
+  }) && !formerOwnerLead && source.kind === "connection" && source.connection.userId && leadId) {
     try {
       await startServiceOnFirstMessage({
         tenantId,
@@ -501,7 +501,8 @@ async function resolveContact(
   tenantId: string,
   normalizedPhone: string,
   isOutgoing: boolean,
-): Promise<{ leadId: string | null; clientId: string | null; runId: string | null }> {
+): Promise<{ leadId: string | null; clientId: string | null; runId: string | null; formerOwnerLead: boolean }> {
+  let formerOwnerLead = false;
   let leadId: string | null = null;
   let clientId: string | null = null;
   let runId: string | null = null;
@@ -512,7 +513,7 @@ async function resolveContact(
   const isTenantOfficial = await isTenantOfficialNumberPhone(db, tenantId, normalizedPhone);
 
   if (isBrokerOrTeam || isTenantOfficial) {
-    return { leadId: null, clientId: null, runId: null };
+    return { leadId: null, clientId: null, runId: null, formerOwnerLead: false };
   }
 
   // For number-based flow, check cadence runs first
@@ -561,6 +562,22 @@ async function resolveContact(
         (source.kind !== "connection" || candidate.corretorId === source.connection.userId),
     );
     if (lead) leadId = lead.id;
+
+    // The lead moved on (reassigned, or its assignment removed) while the
+    // conversation continues on this broker's WhatsApp: keep the messages on
+    // the lead, but only for a lead this broker actually handled — never a
+    // personal contact that happens to share the number.
+    if (!leadId && source.kind === "connection" && source.connection.userId) {
+      const previouslyHandled = candidates.filter((candidate) =>
+        samePhoneSubscriber(candidate.telefone, normalizedPhone) && candidate.corretorId !== source.connection.userId);
+      for (const candidate of previouslyHandled) {
+        if (await wasLeadHandledByBroker(db, tenantId, candidate.id, source.connection.userId)) {
+          leadId = candidate.id;
+          formerOwnerLead = true;
+          break;
+        }
+      }
+    }
   }
 
   // Fallback: find client by phone (scoped to tenant, same tolerant match)
@@ -615,7 +632,7 @@ async function resolveContact(
     console.info("[waha/inbound] new_lead_created", { tenantId, leadId: newLeadId });
   }
 
-  return { leadId, clientId, runId };
+  return { leadId, clientId, runId, formerOwnerLead };
 }
 
 async function markProcessed(db: ReturnType<typeof getDatabase>, eventId: string) {
@@ -623,6 +640,22 @@ async function markProcessed(db: ReturnType<typeof getDatabase>, eventId: string
     .update(schema.wahaWebhookEvents)
     .set({ status: "processed", processedAt: new Date() })
     .where(eq(schema.wahaWebhookEvents.id, eventId));
+}
+
+/** The broker once owned or accepted this lead (distribution history or an accepted offer). */
+async function wasLeadHandledByBroker(db: ReturnType<typeof getDatabase>, tenantId: string, leadId: string, brokerId: string) {
+  const [event] = await db.select({ id: schema.leadDistributionEvents.id }).from(schema.leadDistributionEvents)
+    .where(and(
+      eq(schema.leadDistributionEvents.tenantId, tenantId),
+      eq(schema.leadDistributionEvents.leadId, leadId),
+      or(eq(schema.leadDistributionEvents.previousOwnerId, brokerId), eq(schema.leadDistributionEvents.newOwnerId, brokerId)),
+    ))
+    .limit(1);
+  if (event) return true;
+  const [offer] = await db.select({ id: schema.leadOffers.id }).from(schema.leadOffers)
+    .where(and(eq(schema.leadOffers.tenantId, tenantId), eq(schema.leadOffers.leadId, leadId), eq(schema.leadOffers.brokerId, brokerId), eq(schema.leadOffers.status, "ACCEPTED")))
+    .limit(1);
+  return Boolean(offer);
 }
 
 export type IgnoredBrokerContact = "proprio_corretor" | "lead_sem_corretor" | "lead_de_outro_corretor" | "nao_e_lead";

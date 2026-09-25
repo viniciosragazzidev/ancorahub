@@ -23,6 +23,7 @@ import { isMediaKindSupported } from "@/features/conversations/media-kinds";
 import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { renderTemplatePreview } from "@/features/communication-channels/template-preview";
+import { describeOwnerTransition } from "@/features/conversations/owner-transitions";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
@@ -336,6 +337,42 @@ export default async function ConversationsPage({
       messagesByLead.set(lead.id, deduplicated);
     }
 
+    // Changes of broker become dividers in the conversation, so messages that
+    // kept arriving on a former broker's WhatsApp read in context.
+    const leadsWithMessages = [...messagesByLead.entries()].filter(([, list]) => list.length).map(([leadId]) => leadId);
+    if (leadsWithMessages.length) {
+      const ownerEvents = await db
+        .select({
+          id: schema.leadDistributionEvents.id,
+          leadId: schema.leadDistributionEvents.leadId,
+          previousOwnerId: schema.leadDistributionEvents.previousOwnerId,
+          newOwnerId: schema.leadDistributionEvents.newOwnerId,
+          createdAt: schema.leadDistributionEvents.createdAt,
+        })
+        .from(schema.leadDistributionEvents)
+        .where(and(
+          eq(schema.leadDistributionEvents.tenantId, context.tenantId),
+          inArray(schema.leadDistributionEvents.leadId, leadsWithMessages),
+          or(isNotNull(schema.leadDistributionEvents.previousOwnerId), isNotNull(schema.leadDistributionEvents.newOwnerId)),
+        ))
+        .orderBy(asc(schema.leadDistributionEvents.createdAt))
+        .catch(() => []);
+      const ownerIds = [...new Set(ownerEvents.flatMap((event) => [event.previousOwnerId, event.newOwnerId]).filter((id): id is string => Boolean(id)))];
+      const ownerNames = new Map(ownerIds.length
+        ? (await db.select({ id: schema.user.id, name: schema.user.name }).from(schema.user).where(inArray(schema.user.id, ownerIds))).map((row) => [row.id, row.name])
+        : []);
+      for (const event of ownerEvents) {
+        const label = describeOwnerTransition(
+          event.previousOwnerId ? ownerNames.get(event.previousOwnerId) ?? "corretor" : null,
+          event.newOwnerId ? ownerNames.get(event.newOwnerId) ?? "corretor" : null,
+        );
+        const list = messagesByLead.get(event.leadId);
+        if (!label || !list) continue;
+        list.push({ id: `transition:${event.id}`, leadId: event.leadId, body: "", direction: "transition", transition: label, sentAt: event.createdAt.toISOString() });
+      }
+      for (const list of messagesByLead.values()) list.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+    }
+
     const documentsByLead = new Map<
       string,
       {
@@ -469,7 +506,7 @@ export default async function ConversationsPage({
       const messages = messagesByLead.get(lead.id) || [];
       const documents = documentsByLead.get(lead.id) || [];
       const aiConversation = aiConversationByLead.get(lead.id) || null;
-      const latestMessage = messages[messages.length - 1];
+      const latestMessage = messages.filter((message) => !message.transition).at(-1);
 
       return {
         id: lead.id,

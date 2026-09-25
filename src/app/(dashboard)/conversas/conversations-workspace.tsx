@@ -109,6 +109,8 @@ export type ConversationMessage = {
   direction: string;
   sentAt: string;
   senderRole?: string | null;
+  /** Divider for a change of broker (direction "transition"), not a message. */
+  transition?: string | null;
   providerStatus?: string | null;
   providerFailure?: {
     code: string;
@@ -836,23 +838,24 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
     if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [sortedMessages.length, client.id]);
 
-  if (!sortedMessages.length) {
+  if (!sortedMessages.some((message) => !message.transition)) {
     return <HistoryEmptyState client={client} />;
   }
 
-  const getGroupKey = (dir: string) => {
-    return dir === "outgoing" || dir === "outbound" ? "system" : "client";
+  const getGroupKey = (message: ConversationMessage) => {
+    if (message.transition) return "transition";
+    return message.direction === "outgoing" || message.direction === "outbound" ? "system" : "client";
   };
 
   return (
     <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
         {messagesByDate.map(([dateLabel, msgs], dateIdx) => {
-          const grouped = msgs.reduce<{ type: "system" | "client"; messages: ConversationMessage[] }[]>(
+          const grouped = msgs.reduce<{ type: "system" | "client" | "transition"; messages: ConversationMessage[] }[]>(
             (acc, msg) => {
-              const type = getGroupKey(msg.direction);
+              const type = getGroupKey(msg);
               const last = acc[acc.length - 1];
-              if (last && last.type === type) {
+              if (last && last.type === type && type !== "transition") {
                 last.messages.push(msg);
               } else {
                 acc.push({ type, messages: [msg] });
@@ -873,7 +876,15 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
                 <div className="h-[1px] flex-1 bg-border/50" />
               </div>
 
-              {grouped.map((group, gi) => (
+              {grouped.map((group, gi) => group.type === "transition" ? (
+                <div key={gi} className="flex items-center justify-center gap-3" role="note">
+                  <div className="h-px flex-1 bg-border/50" />
+                  <span className="rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                    {group.messages[0].transition} · {formatTime(group.messages[0].sentAt)}
+                  </span>
+                  <div className="h-px flex-1 bg-border/50" />
+                </div>
+              ) : (
                 <MessageGroup key={gi}>
                   {group.messages.map((message, mi) => (
                     <MessageRow
@@ -1425,7 +1436,7 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
           {renderRowQualificationBadge(conversation)}
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <Clock aria-hidden="true" className="size-3" />
-            {hasHistory ? `${conversation.messages.length} mensagens` : "Aguardando histórico"}
+            {hasHistory ? `${conversation.messages.filter((message) => !message.transition).length} mensagens` : "Aguardando histórico"}
           </span>
         </span>
       </span>
