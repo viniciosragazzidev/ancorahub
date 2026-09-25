@@ -8,6 +8,7 @@ import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/querie
 import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
 import { normalizeOfferPacing } from "./offer-pacing";
 import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
+import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
 
 // Upper bound on how far back a lead can show even when the schedule has no
 // completed occurrence yet (brand-new schedule) — keeps the query sane.
@@ -145,7 +146,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.
-  const leads = queueIds.length
+  const queriedLeads = queueIds.length
     ? await db
       .select({
         id: schema.leads.id,
@@ -176,6 +177,18 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       .orderBy(desc(schema.leads.createdAt))
       .limit(DUTY_PROFILE_LEADS_LIMIT)
     : [];
+
+  // Leads taken "para investigação" by a director/manager leave the plantão list.
+  const investigationOwnerIds = [...new Set(queriedLeads.filter((lead) => lead.status === "under_analysis" && lead.corretorId).map((lead) => lead.corretorId!))];
+  const managementUserIds = new Set(investigationOwnerIds.length
+    ? (await db.select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships).where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      inArray(schema.tenantMemberships.userId, investigationOwnerIds),
+      inArray(schema.tenantMemberships.role, ["director", "manager"]),
+    ))).map((row) => row.userId)
+    : []);
+  const leads = queriedLeads.filter((lead) => !isManagementInvestigation(lead, managementUserIds));
+  const leadsByShift = countBrokerLeadsByShift(leads);
 
   const leadsPerBroker = new Map<string, number>();
   for (const lead of leads) {
@@ -274,6 +287,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       return {
       ...entry,
       leadsInWindow: leadsPerBroker.get(entry.brokerId) ?? 0,
+      leadsMorning: leadsByShift.get(entry.brokerId)?.manha ?? 0,
+      leadsAfternoon: leadsByShift.get(entry.brokerId)?.tarde ?? 0,
       blockedReason,
       presenceStatus: !presenceEnabled || !occurrence ? "not_requested" as const : presence?.status === "confirmed" ? "confirmed" as const : "pending" as const,
       confirmedAt: presence?.confirmedAt ?? null,

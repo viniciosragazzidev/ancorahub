@@ -52,3 +52,24 @@ export function groupDutyLeadsByShift<T extends { assignedAt: Date | null; corre
   for (const lead of leads) groups[getDutyLeadShift(lead) === "manha" ? 0 : 1].leads.push(lead);
   return groups.filter((group) => group.leads.length > 0);
 }
+
+/** Leads each broker received in the occurrence, split by the same morning/afternoon cut as the list. */
+export function countBrokerLeadsByShift<T extends { assignedAt: Date | null; corretorId: string | null; createdAt: Date }>(leads: T[]) {
+  const counts = new Map<string, Record<DutyLeadShift, number>>();
+  for (const lead of leads) {
+    if (!lead.corretorId) continue;
+    const current = counts.get(lead.corretorId) ?? { manha: 0, tarde: 0 };
+    current[getDutyLeadShift(lead)] += 1;
+    counts.set(lead.corretorId, current);
+  }
+  return counts;
+}
+
+/**
+ * A lead a director/manager took "para investigação" (status under_analysis,
+ * owned by management) is out of the plantão flow and must not be listed.
+ * under_analysis owned by a broker is a normal funnel stage and stays.
+ */
+export function isManagementInvestigation(lead: { status: string; corretorId: string | null }, managementUserIds: ReadonlySet<string>) {
+  return lead.status === "under_analysis" && Boolean(lead.corretorId) && managementUserIds.has(lead.corretorId!);
+}

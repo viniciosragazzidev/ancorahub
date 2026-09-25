@@ -245,7 +245,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   </div>
                   <BrokerCapacityBar activeLeads={entry.activeLeads} capacity={entry.capacity} />
                 </div>
-                <Badge variant="secondary">{entry.leadsInWindow} lead{entry.leadsInWindow === 1 ? "" : "s"}</Badge>
+                {/* Leads received in this occurrence: morning (até 12:59) in blue, afternoon (13:00+) in red. */}
+                <div className="flex shrink-0 items-center gap-1.5" aria-label={`${entry.leadsMorning} leads de manhã e ${entry.leadsAfternoon} à tarde`}>
+                  <Badge variant="info" title="Leads recebidos de manhã (até 12:59)">Manhã {entry.leadsMorning}</Badge>
+                  <Badge variant="destructive" title="Leads recebidos à tarde (a partir de 13:00)">Tarde {entry.leadsAfternoon}</Badge>
+                </div>
               </div>
             ))}</div> : <p className="text-sm text-muted-foreground">Nenhum corretor escalado neste plantão.</p>}
           </CardContent>

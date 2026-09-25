@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getDutyLeadShift, groupDutyLeadsByShift, sortByAssignmentTime } from "./duty-leads-shift-groups";
+import { countBrokerLeadsByShift, getDutyLeadShift, groupDutyLeadsByShift, isManagementInvestigation, sortByAssignmentTime } from "./duty-leads-shift-groups";
 
 // São Paulo is UTC-3: 15:59Z = 12:59 local, 16:00Z = 13:00 local.
 const lead = (id: string, assignedAt: string | null, createdAt = "2026-09-24T11:00:00.000Z", corretorId: string | null = "broker-1") => ({
@@ -51,5 +51,29 @@ describe("duty leads shift groups", () => {
       ["tarde", ["t1", "t2"]],
     ]);
     expect(groupDutyLeadsByShift([lead("m", "2026-09-24T12:00:00.000Z")]).map((group) => group.key)).toEqual(["manha"]);
+  });
+});
+
+describe("countBrokerLeadsByShift", () => {
+  it("counts each broker's leads in the morning (até 12:59) and afternoon (13:00+) blocks", () => {
+    const counts = countBrokerLeadsByShift([
+      { corretorId: "kaio", assignedAt: new Date("2026-09-25T12:01:00.000Z"), createdAt: new Date("2026-09-25T11:00:00.000Z") }, // 09:01
+      { corretorId: "kaio", assignedAt: new Date("2026-09-25T15:59:00.000Z"), createdAt: new Date("2026-09-25T11:00:00.000Z") }, // 12:59
+      { corretorId: "kaio", assignedAt: new Date("2026-09-25T16:00:00.000Z"), createdAt: new Date("2026-09-25T11:00:00.000Z") }, // 13:00
+      { corretorId: null, assignedAt: null, createdAt: new Date("2026-09-25T17:00:00.000Z") },
+    ]);
+    expect(counts.get("kaio")).toEqual({ manha: 2, tarde: 1 });
+    expect(counts.size).toBe(1);
+  });
+});
+
+describe("isManagementInvestigation", () => {
+  const management = new Set(["director-1"]);
+  it("hides a lead a director took para investigação", () => {
+    expect(isManagementInvestigation({ status: "under_analysis", corretorId: "director-1" }, management)).toBe(true);
+  });
+  it("keeps 'Em análise' as a normal stage for a broker, and other statuses", () => {
+    expect(isManagementInvestigation({ status: "under_analysis", corretorId: "kaio" }, management)).toBe(false);
+    expect(isManagementInvestigation({ status: "in_contact", corretorId: "director-1" }, management)).toBe(false);
   });
 });

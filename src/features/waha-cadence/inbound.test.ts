@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  classifyIgnoredBrokerContact,
   shouldCreateSyntheticLead,
   shouldKeepTenantChannelMessage,
   shouldPersistBrokerConnectionMessage,
@@ -98,5 +99,20 @@ describe("company number (WhatsApp da diretoria)", () => {
 
   it("ignores anyone else — the internal channel never turns a contact into a lead", () => {
     expect(shouldKeepTenantChannelMessage({ isBrokerOrTeam: false })).toBe(false);
+  });
+});
+
+describe("classifyIgnoredBrokerContact", () => {
+  it("flags the broker's own number — the relay attributing an @lid reply to the broker", () => {
+    expect(classifyIgnoredBrokerContact({ isOwner: true, matchingLeadOwners: [] })).toBe("proprio_corretor");
+  });
+
+  it("flags a lead whose assignment was removed mid-conversation (Neusa Galvao, 25/09)", () => {
+    expect(classifyIgnoredBrokerContact({ isOwner: false, matchingLeadOwners: [null] })).toBe("lead_sem_corretor");
+  });
+
+  it("tells a lead of another broker from a contact that is not a lead", () => {
+    expect(classifyIgnoredBrokerContact({ isOwner: false, matchingLeadOwners: ["other-broker"] })).toBe("lead_de_outro_corretor");
+    expect(classifyIgnoredBrokerContact({ isOwner: false, matchingLeadOwners: [] })).toBe("nao_e_lead");
   });
 });

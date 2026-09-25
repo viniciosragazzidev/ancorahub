@@ -282,9 +282,10 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       hasClient: Boolean(clientId),
     })
   ) {
-    // The number's shape (not the number) tells a personal contact from a
-    // lead whose reply arrived under a format we failed to match.
-    await markIgnored(db, registered.id, `connection_contact_not_authorized:${contactNumberShape(normalizedPhone)}`);
+    // The number's shape and who it belongs to (never the number itself)
+    // tell a personal contact from a lead reply lost to a matching gap.
+    const detail = await describeIgnoredBrokerContact(db, tenantId, source.connection.userId, normalizedPhone).catch(() => "desconhecido");
+    await markIgnored(db, registered.id, `connection_contact_not_authorized:${contactNumberShape(normalizedPhone)}:${detail}`);
     return { processed: 0, ignored: "connection_contact_not_authorized" as const };
   }
 
@@ -622,6 +623,34 @@ async function markProcessed(db: ReturnType<typeof getDatabase>, eventId: string
     .update(schema.wahaWebhookEvents)
     .set({ status: "processed", processedAt: new Date() })
     .where(eq(schema.wahaWebhookEvents.id, eventId));
+}
+
+export type IgnoredBrokerContact = "proprio_corretor" | "lead_sem_corretor" | "lead_de_outro_corretor" | "nao_e_lead";
+
+/**
+ * Why a message on a broker's own WhatsApp was not kept. "proprio_corretor"
+ * is the signature of the relay attributing an @lid reply to the broker;
+ * "lead_sem_corretor" is a lead whose assignment was removed mid-conversation.
+ */
+export function classifyIgnoredBrokerContact(input: { isOwner: boolean; matchingLeadOwners: ReadonlyArray<string | null> }): IgnoredBrokerContact {
+  if (input.isOwner) return "proprio_corretor";
+  if (input.matchingLeadOwners.some((owner) => owner === null)) return "lead_sem_corretor";
+  if (input.matchingLeadOwners.length) return "lead_de_outro_corretor";
+  return "nao_e_lead";
+}
+
+async function describeIgnoredBrokerContact(db: ReturnType<typeof getDatabase>, tenantId: string, brokerUserId: string | null, normalizedPhone: string) {
+  const [owner] = brokerUserId
+    ? await db.select({ phone: schema.brokerProfiles.phone }).from(schema.brokerProfiles)
+      .where(and(eq(schema.brokerProfiles.tenantId, tenantId), eq(schema.brokerProfiles.userId, brokerUserId))).limit(1)
+    : [];
+  const leads = await db.select({ telefone: schema.leads.telefone, corretorId: schema.leads.corretorId }).from(schema.leads)
+    .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), phoneSuffixConditions(schema.leads.telefone, normalizedPhone)))
+    .limit(10);
+  return classifyIgnoredBrokerContact({
+    isOwner: Boolean(owner?.phone && samePhoneSubscriber(owner.phone, normalizedPhone)),
+    matchingLeadOwners: leads.filter((lead) => samePhoneSubscriber(lead.telefone, normalizedPhone)).map((lead) => lead.corretorId),
+  });
 }
 
 /** Company number (WhatsApp da diretoria): only conversations with brokers/team are kept. */
