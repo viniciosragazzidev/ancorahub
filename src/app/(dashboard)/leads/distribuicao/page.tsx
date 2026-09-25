@@ -35,6 +35,7 @@ import { DistributionTabsContainer } from "./_components/distribution-tabs-conta
 import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { RoutingMatrixPanel } from "./_components/routing-matrix-panel";
+import { DddRoutingPanel } from "./_components/ddd-routing-panel";
 import { RoutingSimulatorPanel } from "./_components/routing-simulator-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
@@ -44,6 +45,7 @@ import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queri
 import { BrokerAcceptanceSlaPanel } from "./_components/broker-acceptance-sla-panel";
 import { resolveDistributionView } from "@/features/lead-distribution/distribution-view-access";
 import { getHoldDisqualifiedLeads } from "@/features/lead-distribution/disqualified-routing-settings";
+import { getDddRoutingSettings } from "@/features/lead-distribution/ddd-routing-settings";
 import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-routing-panel";
 
 export const dynamic = "force-dynamic";
@@ -216,6 +218,7 @@ export default async function LeadDistributionPage({
     dutyRoster,
     tenantSlaSettings,
     holdDisqualifiedLeads,
+    dddRoutingSettings,
   ] = await Promise.all([
     db
       .select({
@@ -569,6 +572,7 @@ export default async function LeadDistributionPage({
         (r) => r[0] ?? { slaFirstContactMinutes: "15", autoRedistributeOnFeedbackTimeout: true },
       ),
     getHoldDisqualifiedLeads(context.tenantId),
+    getDddRoutingSettings(context.tenantId),
   ]);
 
   const activeBrokerLeadsMap = new Map(
@@ -711,6 +715,11 @@ export default async function LeadDistributionPage({
               <div className="space-y-5">
                 <DisqualifiedLeadsRoutingPanel
                   initialHoldDisqualifiedLeads={holdDisqualifiedLeads}
+                  canEdit={context.role === "director"}
+                />
+                <DddRoutingPanel
+                  initialSettings={dddRoutingSettings}
+                  queues={queues.map((q) => ({ id: q.id, name: q.name }))}
                   canEdit={context.role === "director"}
                 />
                 <RoutingMatrixPanel

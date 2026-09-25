@@ -13,6 +13,8 @@ import { signalLeadOwnershipChange } from "./ownership-signal";
 import { earliestPacingRetryAt, evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type OfferPacingDecision } from "./offer-pacing";
 import { resolveLeadDestinationRule } from "./routing-engine";
 import { getHoldDisqualifiedLeads, shouldHoldDisqualifiedLead } from "./disqualified-routing-settings";
+import { DDD_OUTCOME_LABELS, decideDddRouting } from "./ddd-routing";
+import { getDddRoutingSettings } from "./ddd-routing-settings";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
@@ -452,6 +454,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const [lead] = await db.select({
     id: schema.leads.id,
     nome: schema.leads.nome,
+    telefone: schema.leads.telefone,
     branchId: schema.leads.branchId,
     queueId: schema.leads.queueId,
     webhookCredentialId: schema.leads.webhookCredentialId,
@@ -543,6 +546,32 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   const brokerToExclude = excludeBrokerId ?? (lead.assignmentSource === "automatic_offer" || lead.assignmentSource === "manual_offer" ? lead.corretorId : null);
   if (lead.qualificationState === "IN_PROGRESS" || lead.qualificationStatus === "qualifying") {
     return { status: "queued", leadId, reason: "O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído." };
+  }
+  // Regra de DDD (Matriz de Roteamento): each situation — valid DDD, invalid
+  // DDD, no identifiable DDD — may send the lead to a configured queue before
+  // any offer. Idempotent: once in that queue the lead is not moved again.
+  const dddDecision = decideDddRouting(await getDddRoutingSettings(context.tenantId), lead.telefone);
+  if (dddDecision?.queueId && dddDecision.queueId !== lead.queueId) {
+    const [dddQueue] = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.id, dddDecision.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active")))
+      .limit(1);
+    if (dddQueue) {
+      const previousQueueId = lead.queueId;
+      const routedAt = new Date();
+      const moved = await db.transaction(async (tx) => {
+        const [updated] = await tx.update(schema.leads).set({ queueId: dddQueue.id, distributionUpdatedAt: routedAt, updatedAt: routedAt })
+          .where(and(
+            eq(schema.leads.id, leadId),
+            eq(schema.leads.tenantId, context.tenantId),
+            previousQueueId ? eq(schema.leads.queueId, previousQueueId) : isNull(schema.leads.queueId),
+          ))
+          .returning({ id: schema.leads.id });
+        if (!updated) return false;
+        await tx.insert(schema.leadDistributionEvents).values({ id: randomUUID(), tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: lead.branchId, fromQueueId: previousQueueId, toQueueId: dddQueue.id, action: "ddd_routed", source: "ddd_rule", strategy: "automatic", reason: `${DDD_OUTCOME_LABELS[dddDecision.outcome]}: ${dddDecision.reason}.`, actorId: context.userId, createdAt: routedAt });
+        return true;
+      });
+      if (moved) lead.queueId = dddQueue.id;
+    }
   }
   const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy, dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
   if (lead.queueId && !queue) {
