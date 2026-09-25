@@ -133,7 +133,10 @@ export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: s
   }
 
   if (purpose === "leadAssignmentConfirmed") {
-    const [brokerName, leadNome, leadTelefone, interesse, leadTypeLabel, dependentes, cidade, leadId] = variables;
+    // The stored row keeps the city at index 6 for older readers, but the
+    // approved template has no {{cidade}}: sending it as a 7th parameter makes
+    // Meta reject the whole message.
+    const [brokerName, leadNome, leadTelefone, interesse, leadTypeLabel, dependentes, , leadId] = variables;
     return {
       bodyVariables: [
         brokerName?.trim() || "Corretor(a)",
@@ -142,7 +145,6 @@ export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: s
         interesse?.trim() || "Plano de saúde",
         leadTypeLabel?.trim() || "Individual",
         dependentes?.trim() || "0",
-        cidade?.trim() || "Não informada",
       ],
       urlButtonParameter: leadId || undefined,
     };

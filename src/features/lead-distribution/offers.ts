@@ -15,6 +15,7 @@ import { evaluateBrokerOfferPacing, isOfferPacingEnabled, type OfferPacingConfig
 
 import { normalizePhone } from "@/shared/utils/phone";
 import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
+import { formatLeadTypeLabel, readSourcePlanType } from "./lead-type-label";
 
 /**
  * Tenants without an official (Meta) WhatsApp channel cannot deliver offers by
@@ -113,6 +114,7 @@ export async function createLeadOffersForBrokers(input: {
       branchId: schema.leads.branchId,
       tipo: schema.leads.tipo,
       formData: schema.leads.formData,
+      sourceMetadata: schema.leads.sourceMetadata,
     })
     .from(schema.leads)
     .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
@@ -120,10 +122,10 @@ export async function createLeadOffersForBrokers(input: {
 
   if (!lead) throw new Error("Lead não encontrado.");
 
-  const leadTypeLabel = lead.tipo === "pme" ? "PME" : lead.tipo === "pj" ? "Empresarial" : "Pessoa Física";
+  const leadTypeLabel = formatLeadTypeLabel(lead.tipo, lead.sourceMetadata);
   const produtoInteresse = readLeadFormValue(lead.formData, [
     "produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse", "interesse",
-  ]) ?? leadTypeLabel;
+  ]) ?? readSourcePlanType(lead.sourceMetadata) ?? leadTypeLabel;
 
   // 2. Fetch brokers info
   const brokers = await db
@@ -686,6 +688,7 @@ export async function handleLeadOfferWebhookResponse(input: {
         telefone: schema.leads.telefone,
         tipo: schema.leads.tipo,
         formData: schema.leads.formData,
+        sourceMetadata: schema.leads.sourceMetadata,
         corretorId: schema.leads.corretorId,
         branchId: schema.leads.branchId,
         queueId: schema.leads.queueId,
@@ -817,8 +820,9 @@ export async function handleLeadOfferWebhookResponse(input: {
       brokerIds: [result.broker.id, result.lead.corretorId],
     });
     const brokerName = result.broker.name || "Corretor(a)";
-    const leadTypeLabel = result.lead.tipo === "pme" ? "PME" : result.lead.tipo === "pj" ? "Empresarial" : "Pessoa Física";
+    const leadTypeLabel = formatLeadTypeLabel(result.lead.tipo, result.lead.sourceMetadata);
     const interest = readLeadFormValue(result.lead.formData, ["produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse"])
+      ?? readSourcePlanType(result.lead.sourceMetadata)
       ?? "Plano de saúde";
     const dependents = readLeadFormValue(result.lead.formData, ["dependentes", "n_dependentes", "numeroDependentes", "qtdDependentes"])
       ?? "Não informado";

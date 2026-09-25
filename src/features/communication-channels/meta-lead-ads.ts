@@ -91,20 +91,42 @@ function normalizeLeadType(value: string): LeadType | undefined {
   return undefined;
 }
 
+const CONTACT_FIELD_NAMES = ["full_name", "nome", "name", "first_name", "primeiro_nome", "last_name", "sobrenome", "phone_number", "telefone", "phone", "celular", "whatsapp", "email", "email_address", "e_mail"];
+const CNPJ_TYPE_FIELD_NAMES = ["tipo_de_cnpj", "tipo_cnpj", "cnpj_type"];
+const PLAN_TYPE_FIELD_NAMES = [
+  "tipo_de_plano", "tipo_plano", "plan_type", "tipo_de_produto", "tipo_produto",
+  "categoria_do_plano", "modalidade_do_plano", "modalidade", "plano_produto",
+  "plano_de_interesse", "plano_interesse", "produto_de_interesse", "plano", "produto",
+];
+const CARRIER_FIELD_NAMES = ["operadora", "operadora_de_preferencia", "operadora_preferida", "nome_da_operadora", "carrier", "health_insurance_company"];
+const MAPPED_FIELD_NAMES = new Set([...CONTACT_FIELD_NAMES, ...CNPJ_TYPE_FIELD_NAMES, ...PLAN_TYPE_FIELD_NAMES, ...CARRIER_FIELD_NAMES]);
+
+/**
+ * Names (never answers — a form can ask health questions) of the questions
+ * the mapping below doesn't recognize, so a renamed or new question shows up
+ * on the lead instead of being dropped without a trace.
+ */
+function collectUnmappedQuestionNames(fields: MetaLeadField[]) {
+  const names = fields
+    .map((field) => field.name?.trim())
+    .filter((name): name is string => Boolean(name) && !MAPPED_FIELD_NAMES.has(normalizeFieldName(name!)))
+    .map((name) => name.slice(0, 120));
+  return [...new Set(names)].slice(0, 40);
+}
+
 /** Deterministic field mapping; unknown form answers are never sent to logs. */
 export function normalizeMetaLead(record: MetaLeadAdRecord) {
   const fields = record.field_data ?? [];
   let nome = firstField(fields, ["full_name", "nome", "name"]) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
   let telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
   let email = firstField(fields, ["email", "email_address", "e_mail"]);
-  const tipoCnpj = firstField(fields, ["tipo_de_cnpj", "tipo_cnpj", "cnpj_type"]).slice(0, 120);
-  const tipoPlano = firstField(fields, [
-    "tipo_de_plano", "tipo_plano", "plan_type", "tipo_de_produto", "tipo_produto",
-    "categoria_do_plano", "modalidade_do_plano", "modalidade", "plano_produto",
-    "plano_de_interesse", "plano_interesse", "produto_de_interesse", "plano", "produto",
-  ]).slice(0, 120);
-  const operadora = firstField(fields, ["operadora", "operadora_de_preferencia", "operadora_preferida", "nome_da_operadora", "carrier", "health_insurance_company"]).slice(0, 120);
-  const leadType = tipoPlano ? normalizeLeadType(tipoPlano) : undefined;
+  const tipoCnpj = firstField(fields, CNPJ_TYPE_FIELD_NAMES).slice(0, 120);
+  const tipoPlano = firstField(fields, PLAN_TYPE_FIELD_NAMES).slice(0, 120);
+  const operadora = firstField(fields, CARRIER_FIELD_NAMES).slice(0, 120);
+  // A CNPJ type (MEI, ME, LTDA…) means a company plan even when the form has
+  // no explicit plan-type question.
+  const leadType = (tipoPlano ? normalizeLeadType(tipoPlano) : undefined) ?? (tipoCnpj ? "PME" : undefined);
+  const unmappedFormFields = collectUnmappedQuestionNames(fields);
 
   // Fallbacks amigáveis para ferramentas de testes da Meta (Lead Gen Testing Tool)
   if (nome.includes("<test lead:") || nome.includes("dummy data")) {
@@ -133,6 +155,7 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
     ...(tipoPlano ? { tipoPlano } : {}),
     ...(operadora ? { operadora } : {}),
     ...(leadType ? { leadType } : {}),
+    ...(unmappedFormFields.length ? { unmappedFormFields } : {}),
     ...(record.adset_id ? { adSetId: record.adset_id } : {}),
     ...(record.page_id ? { pageId: record.page_id } : {}),
   };
@@ -371,6 +394,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
               tipoPlanoStatus: lead.tipoPlano ? "provided" : "not_provided",
               tipoCnpj: lead.tipoCnpj ?? null,
               operadora: lead.operadora ?? null,
+              unmappedFormFields: lead.unmappedFormFields ?? null,
             },
           },
         });

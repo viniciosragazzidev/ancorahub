@@ -37,7 +37,8 @@ export type CreateLeadFromWebhookSyncInput = {
     page?: string | null;
     /** Hora real de captura no anúncio (ex.: created_time da Meta). Fallback: receivedAt. */
     capturedAt?: Date;
-    metadata?: Record<string, string | number | boolean | null>;
+    /** `unmappedFormFields` lists Meta form question names the mapping did not recognize. */
+    metadata?: Record<string, string | number | boolean | null | string[]>;
   };
 };
 
