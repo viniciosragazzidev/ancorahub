@@ -11,6 +11,14 @@ export const DEFAULT_OFFER_INTERVAL_MINUTES = 5;
 export const DEFAULT_MAX_PENDING_OFFERS = 1;
 
 const PENDING_STATUSES = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
+/**
+ * A pending offer can be answered at any moment (accepted in the CRM, on
+ * WhatsApp, by starting service…), and none of those paths re-wakes the
+ * leads that were waiting on it. So a pending slot is re-checked at this
+ * cadence rather than parked until the offer's expiry, which with a long
+ * acceptance SLA kept leads queued for up to an hour next to free brokers.
+ */
+export const PENDING_OFFER_RECHECK_MS = 60_000;
 
 export type OfferPacingConfig = { intervalMinutes: number; maxPending: number };
 export type PacingOffer = { status: string; offeredAt: Date; expiresAt: Date };
@@ -61,7 +69,9 @@ export function evaluateBrokerOfferPacing(offers: PacingOffer[], config: OfferPa
     if (pending.length >= config.maxPending) {
       // A slot frees up when enough of the pending offers expire (or are answered).
       const byExpiry = pending.map((offer) => offer.expiresAt).sort((a, b) => a.getTime() - b.getTime());
-      keepLater(byExpiry[pending.length - config.maxPending], "pending");
+      const freesAt = byExpiry[pending.length - config.maxPending];
+      const recheckAt = new Date(now.getTime() + PENDING_OFFER_RECHECK_MS);
+      keepLater(freesAt < recheckAt ? freesAt : recheckAt, "pending");
     }
   }
 

@@ -66,6 +66,18 @@ describe("evaluateBrokerOfferPacing", () => {
     expect(evaluateBrokerOfferPacing(two, { intervalMinutes: 0, maxPending: 2 }, now)).toMatchObject({ allowed: false, retryAt: minutes(1) });
   });
 
+  it("re-checks a pending slot within a minute instead of parking until a long SLA expires", () => {
+    // 25/09: offers with a 60-min acceptance SLA were accepted a minute later,
+    // but the waiting leads had been scheduled for the expiry and sat idle.
+    const offers = [{ status: "SENT", offeredAt: minutes(0), expiresAt: minutes(60) }];
+    expect(evaluateBrokerOfferPacing(offers, { intervalMinutes: 0, maxPending: 1 }, now)).toEqual({ allowed: false, retryAt: minutes(1), rule: "pending" });
+  });
+
+  it("still waits for the interval when it ends after the pending re-check", () => {
+    const offers = [{ status: "SENT", offeredAt: minutes(0), expiresAt: minutes(60) }];
+    expect(evaluateBrokerOfferPacing(offers, { intervalMinutes: 30, maxPending: 1 }, now)).toEqual({ allowed: false, retryAt: minutes(30), rule: "interval" });
+  });
+
   it("picks the later of the two rules for the retry time", () => {
     const offers = [{ status: "READ", offeredAt: minutes(-1), expiresAt: minutes(2) }];
     expect(evaluateBrokerOfferPacing(offers, config, now)).toEqual({ allowed: false, retryAt: minutes(4), rule: "interval" });
