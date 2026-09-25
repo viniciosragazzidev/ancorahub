@@ -1,4 +1,5 @@
 import { getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
+import { buildNamedTemplateValues } from "./template-parameters";
 
 /** What the recipient actually sees for a sent Meta template: text only, button URLs deliberately left out (they can carry secret tokens). */
 export type TemplateMessagePreview = {
@@ -39,6 +40,9 @@ export function renderTemplatePreview(input: {
   if (!bodyComponent?.text) return null;
 
   const configured = stringArray(input.providerVariables);
+  // Without a message-plan override the sender fills named parameters by
+  // name (see template-parameters.ts), so the preview reads the same map.
+  const named = configured.length > 0 ? {} : buildNamedTemplateValues(input.purpose, stringArray(input.variables));
   const values = configured.length > 0
     ? configured
     : splitMetaWhatsAppTemplateVariables(input.purpose, stringArray(input.variables)).bodyVariables;
@@ -52,6 +56,7 @@ export function renderTemplatePreview(input: {
     if (!/^\d+$/.test(match[1]) && !order.includes(match[1])) order.push(match[1]);
   }
   const fill = (text: string) => text.replace(PLACEHOLDER, (placeholder, key: string) => {
+    if (key in named) return named[key];
     const index = /^\d+$/.test(key) ? Number(key) - 1 : names.includes(key) ? names.indexOf(key) : order.indexOf(key);
     return values[index] ?? placeholder;
   });

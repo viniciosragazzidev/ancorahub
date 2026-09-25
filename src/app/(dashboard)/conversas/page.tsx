@@ -728,11 +728,10 @@ export default async function ConversationsPage({
           .orderBy(desc(schema.metaWhatsAppTemplates.lastSyncedAt))
         : [];
       const findSyncedTemplate = (message: (typeof outboundMessages)[number]) => {
-        const candidates = syncedTemplates.filter((t) => t.name === message.templateName);
-        return candidates.find((t) => t.wabaId === message.wabaId && t.language === message.templateLanguage)
-          ?? candidates.find((t) => t.wabaId === message.wabaId)
-          ?? candidates.find((t) => t.language === message.templateLanguage)
-          ?? candidates[0];
+        // Only the sending number's account: a same-named template approved on
+        // another WABA is not what the broker received (Meta rejects it).
+        const candidates = syncedTemplates.filter((t) => t.name === message.templateName && (!message.wabaId || t.wabaId === message.wabaId));
+        return candidates.find((t) => t.language === message.templateLanguage) ?? candidates[0];
       };
 
       const brokerByProfileId = new Map(brokers.map((b) => [b.id, b]));

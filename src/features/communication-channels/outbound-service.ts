@@ -16,6 +16,7 @@ import { isCustomerServiceWindowOpen, resolveEventMessagePlan } from "./message-
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
+import { resolveNamedTemplateBodyParameters } from "./template-parameters";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
@@ -113,6 +114,9 @@ export function getInvitationDeliveryFailureUpdate(input: { shouldRetry: boolean
   };
 }
 
+/** Configuration problems a retry cannot fix: the template must be approved/linked on the sending number first. */
+const terminalTemplateErrorCodes = new Set(["TEMPLATE_NOT_IN_WABA", "TEMPLATE_PARAMETERS_UNAVAILABLE"]);
+
 const terminalBrokerInvitationErrorCodes = new Set([
   "BROKER_INVITATION_NOT_FOUND",
   "BROKER_INVITATION_NOT_PENDING",
@@ -125,6 +129,10 @@ function brokerInvitationError(code: string, message: string) {
   const error = new Error(message) as Error & { code: string };
   error.code = code;
   return error;
+}
+
+function stringList(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
 function outboundChannelError(code: string, message: string) {
@@ -234,6 +242,19 @@ export async function enqueueMetaTemplateMessage(input: {
     leadId: input.recipientType === "lead" ? input.recipientId : null,
   }) ?? requestedDestinationPhone;
   const variables = variablesSchema.parse(input.variables ?? []);
+  // Resolved up front: a template only exists inside the sending number's
+  // WhatsApp Business Account, so the lookup below is scoped to its WABA.
+  const channelQuery = and(
+    input.channelId ? eq(schema.communicationChannels.id, input.channelId) : undefined,
+    eq(schema.communicationChannels.tenantId, input.tenantId),
+    inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
+    eq(schema.communicationChannels.status, "active"),
+  );
+  const [channel] = await getDatabase().select({ id: schema.communicationChannels.id, wabaId: schema.communicationChannels.wabaId })
+    .from(schema.communicationChannels)
+    .where(channelQuery)
+    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
+    .limit(1);
   const messagePlan = input.purpose === "dutyPresenceConfirmation" ? null : await resolveEventMessagePlan({
     tenantId: input.tenantId,
     recipientType: input.recipientType,
@@ -247,7 +268,7 @@ export async function enqueueMetaTemplateMessage(input: {
   // invent a template name when an active policy is incomplete.
   const resolvedTemplate = messagePlan || input.purpose === "brokerAccountActivated"
     ? null
-    : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose);
+    : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose, channel?.wabaId ?? null);
   const template = resolvedTemplate ?? (input.purpose === "brokerAccountActivated" || input.purpose === "dutyPresenceConfirmation" ? null : getMetaWhatsAppTemplate(input.purpose));
   const primary = messagePlan?.primary ?? (template ? {
     type: "template" as const,
@@ -259,17 +280,6 @@ export async function enqueueMetaTemplateMessage(input: {
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
   const delivery = resolveInternalBrokerDeliveryRoute(input);
-  const channelQuery = and(
-    input.channelId ? eq(schema.communicationChannels.id, input.channelId) : undefined,
-    eq(schema.communicationChannels.tenantId, input.tenantId),
-    inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-    eq(schema.communicationChannels.status, "active"),
-  );
-  const [channel] = await db.select({ id: schema.communicationChannels.id })
-    .from(schema.communicationChannels)
-    .where(channelQuery)
-    .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
-    .limit(1);
   if (!channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const id = randomUUID();
   const now = new Date();
@@ -602,6 +612,35 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       const phoneNumberId = channel.phoneNumberId;
       const accessToken = decryptChannelSecret(channel.accessTokenCiphertext, getMetaCloudServerConfig().tokenEncryptionKey);
 
+      // A template exists per WhatsApp Business Account. Check the primary
+      // one against the sending number's WABA before calling Meta, and fill
+      // exactly the named parameters that approved version declares.
+      let primaryParameters: { variables: string[]; variableNames: string[] } | undefined;
+      const hasConfiguredParameters = Array.isArray(row.providerVariables) && row.providerVariables.length > 0;
+      if (row.messageType === "template" && channel.wabaId) {
+        const wabaTemplates = await db.select({ name: schema.metaWhatsAppTemplates.name, language: schema.metaWhatsAppTemplates.language, componentsJson: schema.metaWhatsAppTemplates.componentsJson })
+          .from(schema.metaWhatsAppTemplates)
+          .where(and(
+            eq(schema.metaWhatsAppTemplates.tenantId, row.tenantId),
+            eq(schema.metaWhatsAppTemplates.wabaId, channel.wabaId),
+            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+            isNull(schema.metaWhatsAppTemplates.deletedAt),
+          ));
+        const approved = wabaTemplates.filter((template) => template.name === row.templateName);
+        const synced = approved.find((template) => template.language === row.templateLanguage) ?? approved[0];
+        // Only trust the local catalog once this WABA was synchronized at all.
+        if (!synced && wabaTemplates.length && !row.fallbackMessageType) {
+          throw outboundChannelError("TEMPLATE_NOT_IN_WABA", `O modelo "${row.templateName}" não está aprovado no número que envia. Vincule um modelo aprovado desse número em Qualificação → Políticas de mensagem.`);
+        }
+        if (synced && !hasConfiguredParameters) {
+          const resolved = resolveNamedTemplateBodyParameters({ purpose: row.purpose, rawVariables: stringList(row.variables), componentsJson: synced.componentsJson });
+          if (resolved && !resolved.ok) {
+            throw outboundChannelError("TEMPLATE_PARAMETERS_UNAVAILABLE", `O modelo "${row.templateName}" pede ${resolved.missing.map((name) => `{{${name}}}`).join(", ")}, que o CRM não preenche para este aviso.`);
+          }
+          if (resolved?.ok) primaryParameters = { variables: resolved.variables, variableNames: resolved.variableNames };
+        }
+      }
+
       const rawVariables = Array.isArray(row.variables)
         ? row.variables.filter((value): value is string => typeof value === "string")
         : [];
@@ -615,11 +654,12 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         language: string;
         providerVariables?: unknown;
         variableNames?: unknown;
+        declared?: { variables: string[]; variableNames: string[] };
       }) => {
         const configuredVariables = stringArray(resource.providerVariables);
-        const variables = configuredVariables.length > 0 ? configuredVariables : defaultTemplateVariables.bodyVariables;
+        const variables = resource.declared?.variables ?? (configuredVariables.length > 0 ? configuredVariables : defaultTemplateVariables.bodyVariables);
         const configuredNames = stringArray(resource.variableNames);
-        const variableNames = configuredNames.length > 0 ? configuredNames : getMetaWhatsAppTemplateVariableNames(row.purpose);
+        const variableNames = resource.declared?.variableNames ?? (configuredNames.length > 0 ? configuredNames : getMetaWhatsAppTemplateVariableNames(row.purpose));
         try {
           return await sendMetaCloudTemplate({
             phoneNumberId, accessToken, to: row.destinationPhone,
@@ -670,6 +710,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
             language: row.templateLanguage,
             providerVariables: row.providerVariables,
             variableNames: row.templateVariableNames,
+            declared: primaryParameters,
           });
         }
       } catch (primaryError) {
@@ -734,8 +775,9 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           ? String((error as { code?: unknown }).code ?? "META_OUTBOUND_FAILED")
           : "META_OUTBOUND_FAILED";
       const terminalInvitationFailure = row.purpose === "brokerInvitation" && terminalBrokerInvitationErrorCodes.has(code);
+      const terminalTemplateFailure = terminalTemplateErrorCodes.has(code);
 
-      const nextAttemptAt = !terminalInvitationFailure && row.attempts < 3
+      const nextAttemptAt = !terminalInvitationFailure && !terminalTemplateFailure && row.attempts < 3
         ? new Date(Date.now() + Math.pow(2, row.attempts) * 60 * 1000)
         : null;
       const finalStatus: WhatsAppOutboundStatus = nextAttemptAt ? "pending" : "failed";

@@ -46,6 +46,18 @@ describe("renderTemplatePreview", () => {
     expect(preview).toMatchObject({ body: "Oi Ana, tarefa: Ligar", footer: "Âncora" });
   });
 
+  it("previews the lead_informations replacement with the same values the sender fills by name", () => {
+    const preview = renderTemplatePreview({
+      purpose: "leadAssignmentConfirmed",
+      componentsJson: [
+        { type: "HEADER", format: "TEXT", text: "Lead aceito com sucesso!" },
+        { type: "BODY", text: "*Nome*: {{nome}}; *Contato*: {{telefone}}; *Cidade*: {{cidade}}" },
+      ],
+      variables: ["Kaio", "Creuza", "+5521999428504", "Plano de saúde", "PME · MEI", "0", "Niterói", "lead-id"],
+    });
+    expect(preview?.body).toBe("*Nome*: Creuza; *Contato*: +5521999428504; *Cidade*: Niterói");
+  });
+
   it("returns null when the template has no body to render", () => {
     expect(renderTemplatePreview({ purpose: "x", componentsJson: [], variables: [] })).toBeNull();
   });

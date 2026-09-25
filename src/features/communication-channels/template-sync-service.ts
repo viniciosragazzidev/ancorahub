@@ -385,6 +385,8 @@ export class WhatsAppTemplateResolver {
   static async resolveTemplateForEvent(
     tenantId: string,
     purpose: MetaWhatsAppTemplatePurpose | string,
+    /** The sending number's WABA: templates approved on another account cannot be sent from it. */
+    wabaId: string | null = null,
   ): Promise<{ name: string; language: string; isCustom: boolean } | null> {
     // Map purpose string to eventKey
     let eventKey: EventKey | null = null;
@@ -420,6 +422,7 @@ export class WhatsAppTemplateResolver {
               eq(schema.metaWhatsAppTemplateUsages.active, true),
               eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
               isNull(schema.metaWhatsAppTemplates.deletedAt),
+              wabaId ? eq(schema.metaWhatsAppTemplates.wabaId, wabaId) : undefined,
             ),
           )
           .limit(1);
@@ -442,6 +445,7 @@ export class WhatsAppTemplateResolver {
               eq(schema.metaWhatsAppTemplates.name, fallback.name),
               ...(purpose === "dutyPresenceConfirmation" ? [eq(schema.metaWhatsAppTemplates.status, "APPROVED")] : []),
               isNull(schema.metaWhatsAppTemplates.deletedAt),
+              wabaId ? eq(schema.metaWhatsAppTemplates.wabaId, wabaId) : undefined,
             ),
           )
           .limit(1);
