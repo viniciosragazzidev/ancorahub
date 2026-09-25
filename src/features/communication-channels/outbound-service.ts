@@ -17,6 +17,8 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
+import { resolveTenantChannelDelivery } from "@/features/waha-cadence/tenant-channel-routing";
+import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
@@ -270,21 +272,32 @@ export async function enqueueMetaTemplateMessage(input: {
     ? null
     : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose, channel?.wabaId ?? null);
   const template = resolvedTemplate ?? (input.purpose === "brokerAccountActivated" || input.purpose === "dutyPresenceConfirmation" ? null : getMetaWhatsAppTemplate(input.purpose));
+  // A broker notice routed to the company number (WhatsApp da diretoria)
+  // leaves through WAHA with the chosen free message; the Meta resource
+  // resolved above stays on the row as the automatic fallback.
+  const tenantChannel = input.recipientType === "user"
+    ? await resolveTenantChannelDelivery({ tenantId: input.tenantId, purpose: input.purpose, variables }).catch(() => null)
+    : null;
   const primary = messagePlan?.primary ?? (template ? {
     type: "template" as const,
     templateName: template.name,
     templateLanguage: template.language,
+  } : tenantChannel ? {
+    type: "text" as const,
+    templateName: "__text__",
+    templateLanguage: "pt_BR",
+    renderedBody: tenantChannel.text,
   } : null);
   if (!primary) throw new Error("Modelo de WhatsApp não permitido para esta operação.");
   const db = getDatabase();
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
   const delivery = resolveInternalBrokerDeliveryRoute(input);
-  if (!channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
+  if (!channel && !tenantChannel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const id = randomUUID();
   const now = new Date();
   await db.insert(schema.whatsappOutboundMessages).values({
-    id, tenantId: input.tenantId, channelId: channel?.id ?? null, deliveryRoute: delivery.route, wahaNumberId: delivery.wahaNumberId, recipientType: input.recipientType, recipientId: input.recipientId ?? null,
+    id, tenantId: input.tenantId, channelId: channel?.id ?? null, deliveryRoute: tenantChannel ? "waha_direct" : delivery.route, wahaNumberId: tenantChannel?.wahaNumberId ?? delivery.wahaNumberId, recipientType: input.recipientType, recipientId: input.recipientId ?? null,
     destinationPhone,
     purpose: input.purpose,
     messageType: primary.type,
@@ -295,7 +308,7 @@ export async function enqueueMetaTemplateMessage(input: {
     templateVariableNames: primary.templateVariableNames ?? null,
     messagePolicyId: messagePlan?.policyId ?? null,
     messagePolicyVersion: messagePlan?.policyVersion ?? null,
-    renderedBody: primary.renderedBody ?? null,
+    renderedBody: tenantChannel?.text ?? primary.renderedBody ?? null,
     fallbackMessageType: messagePlan?.fallback?.type ?? null,
     fallbackTemplateName: messagePlan?.fallback?.templateName ?? null,
     fallbackTemplateLanguage: messagePlan?.fallback?.templateLanguage ?? null,
@@ -503,7 +516,10 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
     const [claimed] = await db.update(schema.whatsappOutboundMessages).set({ status: "processing", attempts: row.attempts + 1, updatedAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), or(eq(schema.whatsappOutboundMessages.status, "queued"), eq(schema.whatsappOutboundMessages.status, "pending")))).returning({ id: schema.whatsappOutboundMessages.id });
     if (!claimed) return;
     try {
-      if (row.deliveryRoute !== "meta_only" || row.wahaNumberId) {
+      // A notice routed to the company number (WhatsApp da diretoria) keeps
+      // its WAHA route; every other non-Meta row is legacy and migrates.
+      const viaTenantChannel = row.deliveryRoute === "waha_direct" && Boolean(row.wahaNumberId) && Boolean(row.renderedBody);
+      if (!viaTenantChannel && (row.deliveryRoute !== "meta_only" || row.wahaNumberId)) {
         await db.update(schema.whatsappOutboundMessages).set({
           deliveryRoute: "meta_only",
           wahaNumberId: null,
@@ -553,6 +569,42 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           purpose: row.purpose,
         });
         return;
+      }
+
+      if (viaTenantChannel) {
+        const [tenantNumber] = await db.select({ relaySessionId: schema.wahaNumbers.relaySessionId }).from(schema.wahaNumbers)
+          .where(and(
+            eq(schema.wahaNumbers.id, row.wahaNumberId!),
+            eq(schema.wahaNumbers.tenantId, row.tenantId),
+            eq(schema.wahaNumbers.status, "active"),
+          ))
+          .limit(1);
+        try {
+          if (!tenantNumber) throw new Error("Número da empresa desconectado.");
+          const sentByWaha = await sendWahaRelayMessage({
+            idempotencyKey: row.idempotencyKey,
+            sessionId: tenantNumber.relaySessionId,
+            destination: row.destinationPhone.replace(/\D/g, ""),
+            body: row.renderedBody!,
+          });
+          await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId: sentByWaha.messageId, providerErrorCode: null, providerErrorMessage: null, sentAt: new Date(), updatedAt: new Date() })
+            .where(eq(schema.whatsappOutboundMessages.id, row.id));
+          sent += 1;
+          return;
+        } catch (wahaError) {
+          // Never lose the notice: fall back to the Meta resource on the row.
+          console.warn("[tenant-channel] waha_send_failed_falling_back_to_meta", {
+            outboundMessageId: row.id,
+            purpose: row.purpose,
+            error: wahaError instanceof Error ? wahaError.message.slice(0, 160) : "unknown",
+          });
+          await db.update(schema.whatsappOutboundMessages).set({
+            deliveryRoute: "meta_only",
+            wahaNumberId: null,
+            providerErrorMessage: "Número da empresa indisponível; enviado pela API oficial Meta.",
+            updatedAt: new Date(),
+          }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+        }
       }
 
       if (row.purpose === "brokerInvitation" && row.recipientId) {

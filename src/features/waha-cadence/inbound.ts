@@ -256,6 +256,13 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   const contactPhoneRaw = isOutgoing && event.message.to ? event.message.to : event.message.from;
   const normalizedPhone = normalizePhone(contactPhoneRaw);
 
+  // The company number (WhatsApp da diretoria) is an internal channel with the
+  // brokers: messages with anyone else are ignored and never become leads
+  // (decided 25/09). Broker messages are kept, linked to no lead.
+  if (source.kind === "number" && !shouldKeepTenantChannelMessage({ isBrokerOrTeam: await isBrokerOrTeamPhone(db, tenantId, normalizedPhone) })) {
+    await markIgnored(db, registered.id, `tenant_channel_non_broker:${contactNumberShape(normalizedPhone)}`);
+    return { processed: 0, ignored: "tenant_channel_non_broker" as const };
+  }
 
   // ── 6. Resolve lead/client (race-safe) ─────────────────────────────────
   const leadResolveStart = Date.now();
@@ -615,6 +622,11 @@ async function markProcessed(db: ReturnType<typeof getDatabase>, eventId: string
     .update(schema.wahaWebhookEvents)
     .set({ status: "processed", processedAt: new Date() })
     .where(eq(schema.wahaWebhookEvents.id, eventId));
+}
+
+/** Company number (WhatsApp da diretoria): only conversations with brokers/team are kept. */
+export function shouldKeepTenantChannelMessage(input: { isBrokerOrTeam: boolean }) {
+  return input.isBrokerOrTeam;
 }
 
 async function markIgnored(db: ReturnType<typeof getDatabase>, eventId: string, code: string) {

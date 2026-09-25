@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   shouldCreateSyntheticLead,
+  shouldKeepTenantChannelMessage,
   shouldPersistBrokerConnectionMessage,
   shouldStartServiceFromOutgoingLeadMessage,
 } from "./inbound";
@@ -87,5 +88,15 @@ describe("broker WAHA workspace boundary", () => {
         hasClient: true,
       }),
     ).toBe(true);
+  });
+});
+
+describe("company number (WhatsApp da diretoria)", () => {
+  it("keeps conversations with brokers and team", () => {
+    expect(shouldKeepTenantChannelMessage({ isBrokerOrTeam: true })).toBe(true);
+  });
+
+  it("ignores anyone else — the internal channel never turns a contact into a lead", () => {
+    expect(shouldKeepTenantChannelMessage({ isBrokerOrTeam: false })).toBe(false);
   });
 });

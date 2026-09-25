@@ -27,6 +27,13 @@ export const integrationCatalogEntries: IntegrationCard[] = [
     status: "available",
   },
   {
+    name: "WhatsApp da diretoria",
+    description: "Conecte por QR um número da empresa para a diretoria falar com os corretores.",
+    href: "/integrations/whats_alt",
+    icon: WhatsappLogo,
+    status: "available",
+  },
+  {
     name: "Formulários e site",
     description: "Crie fontes de captura para landing pages, formulários próprios e pixels.",
     href: "/settings?tab=integracoes",

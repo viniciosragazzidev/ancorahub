@@ -774,7 +774,8 @@ export default async function ConversationsPage({
       for (const message of outboundMessages) {
         const broker = findBroker(message.recipientId, message.destinationPhone);
         if (!broker) continue;
-        const synced = message.messageType === "template" ? findSyncedTemplate(message) : undefined;
+        // Sent through the company number (WAHA): the free-message text is what the broker got.
+        const synced = message.messageType === "template" && message.deliveryRoute !== "waha_direct" ? findSyncedTemplate(message) : undefined;
         const template = synced
           ? renderTemplatePreview({
             purpose: message.purpose,

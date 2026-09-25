@@ -1327,3 +1327,28 @@ somente a contingência que a fila já configurou. A tela de detalhes do plantã
 exibe status individual e horário confirmado. A alteração do kill switch pelo
 Super-admin é auditada. A flag nasce desligada para preservar filas existentes
 até que a aprovação do template, a migration e a agenda sejam validadas.
+
+## DEC-120 — WAHA da empresa como canal da diretoria com os corretores
+
+**Decisão aprovada em 2026-09-25.** A DEC de 2026-09-15 (Meta como único canal
+oficial do tenant) continua valendo para toda notificação oficial — templates,
+ofertas, atribuições, convites e automações. Além dela, cada tenant pode ter
+**um** número próprio conectado por QR via WAHA, gerenciado só pelo Diretor em
+`/integrations/whats_alt`, com um único propósito: a conversa da diretoria com
+os corretores. A conexão usa as mesmas rotas do relay que a conexão pessoal do
+corretor (`/internal/waha/connections…`), sem compartilhar código ou registro
+com ela (`waha_numbers` com `scope = tenant`, sessão `tenant_<hash>`).
+Desconectar para e apaga a sessão no WAHA. Mensagens recebidas nesse número de
+quem não é corretor/equipe são ignoradas e nunca viram lead. A sessão
+`ancora-d47a4d41-38df8c71`, criada em 11/09 e nunca pareada, foi encerrada no
+WAHA e removida (~100 eventos de status por hora sem uso).
+
+Início da transição (mesma data): o Diretor pode escolher, por aviso ao
+corretor, que ele saia pelo número da empresa com uma mensagem livre de
+Qualificação (`tenant_channel_routing_<tenant>`). Avisos elegíveis: novo lead
+atribuído, lead atribuído (aceite), lead indisponível, oferta expirada,
+lembrete de feedback, lembrete de tarefa e conta ativada. Ficam na Meta a
+oferta de lead (aceite pelo botão do template), a confirmação de presença e o
+convite de primeiro acesso (links com token). A linha da outbox guarda também
+o recurso Meta: se o número da empresa estiver desconectado ou o WAHA falhar,
+o aviso segue pela Meta automaticamente.
