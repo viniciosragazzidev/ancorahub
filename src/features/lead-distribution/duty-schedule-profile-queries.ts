@@ -141,6 +141,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // it ended — including a different day's own leads.
   const occurrenceWindow = getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, now);
   const { since, until } = resolveDutyLeadWindowBounds(occurrenceWindow, now);
+  const upcomingStartsAt = occurrenceWindow.upcomingStartsAt ?? null;
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.
@@ -289,6 +290,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     leads,
     leadsSince: since,
     leadsUntil: until,
+    leadsUpcomingStartsAt: upcomingStartsAt,
     liveStatusEnabled: Boolean(operatingQueue),
   };
 }

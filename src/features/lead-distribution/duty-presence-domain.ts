@@ -107,6 +107,19 @@ function findMostRecentCompletedOccurrence(input: WeeklyWindowInput, referenceTi
   return null;
 }
 
+/** Today's occurrence of this schedule if it hasn't started yet as of `now` (local calendar day in the schedule's timezone). */
+function findTodaysUpcomingOccurrence(input: WeeklyWindowInput, now: Date): DutyWindow | null {
+  if (!Number.isInteger(input.dayOfWeek) || input.dayOfWeek < 0 || input.dayOfWeek > 6) return null;
+  const localNow = zonedParts(now, input.timezone);
+  if (localNow.weekday !== input.dayOfWeek) return null;
+  const dutyDate = dateKey(localNow.year, localNow.month, localNow.day);
+  const startsAt = localTimeToUtc(dutyDate, input.startsAt, input.timezone);
+  if (startsAt <= now) return null;
+  let endsAt = localTimeToUtc(dutyDate, input.endsAt, input.timezone);
+  if (endsAt <= startsAt) endsAt = localTimeToUtc(addCalendarDays(dutyDate, 1), input.endsAt, input.timezone);
+  return { dutyDate, startsAt, endsAt };
+}
+
 /** The most recently completed occurrence across a family of schedules (e.g. every weekday of the same rotating plantão), whichever of them ended latest at or before `referenceTime`. */
 function mostRecentCompletedAcrossFamily(schedules: WeeklyWindowInput[], referenceTime: Date): DutyWindow | null {
   let best: DutyWindow | null = null;
@@ -120,9 +133,11 @@ function mostRecentCompletedAcrossFamily(schedules: WeeklyWindowInput[], referen
 /**
  * The exact window of leads that belong to "this plantão" right now: the
  * occurrence currently in progress (open-ended — still collecting, so
- * `until` is null) if we're inside one, otherwise the most recently
- * completed occurrence, bounded on the end so a closed shift's page doesn't
- * keep absorbing leads that arrived after it ended.
+ * `until` is null) if we're inside one; otherwise today's occurrence that
+ * hasn't started yet (also open-ended, flagged with `upcomingStartsAt`, so
+ * the page lists what is piling up for it instead of last week's shift);
+ * otherwise the most recently completed occurrence, bounded on the end so a
+ * closed shift's page doesn't keep absorbing leads that arrived after it ended.
  *
  * The lower bound reaches into `family` — every schedule sharing the same
  * queue(s) as `schedule`, itself included — because a plantão is commonly
@@ -134,9 +149,16 @@ function mostRecentCompletedAcrossFamily(schedules: WeeklyWindowInput[], referen
  * Falls back to "show everything" (epoch, no upper bound) if the schedule
  * never had a completed occurrence yet — brand new today, for example.
  */
-export function getDutyOccurrenceLeadWindow(schedule: WeeklyWindowInput, family: WeeklyWindowInput[], now: Date): { since: Date; until: Date | null } {
+export function getDutyOccurrenceLeadWindow(schedule: WeeklyWindowInput, family: WeeklyWindowInput[], now: Date): { since: Date; until: Date | null; upcomingStartsAt?: Date } {
   const current = getRelevantDutyWindow(schedule, now, 0);
   const active = isDutyWindowActive(current, now);
+  if (!active) {
+    const upcoming = findTodaysUpcomingOccurrence(schedule, now);
+    if (upcoming) {
+      const previous = mostRecentCompletedAcrossFamily(family, upcoming.startsAt);
+      return { since: previous ? previous.endsAt : upcoming.startsAt, until: null, upcomingStartsAt: upcoming.startsAt };
+    }
+  }
   const relevant = active ? current! : findMostRecentCompletedOccurrence(schedule, now);
   if (!relevant) return { since: new Date(0), until: null };
 

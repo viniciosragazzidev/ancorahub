@@ -25,6 +25,7 @@ export const dynamic = "force-dynamic";
 
 const DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+const timeOnly = new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone: "America/Sao_Paulo" });
 
 function StatusBadge({ status }: { status: string }) {
   if (status === "active") return <Badge variant="success">Ativo</Badge>;
@@ -45,7 +46,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     redirect("/leads/distribuicao?view=plantao");
   }
 
-  const { schedule, roster, linkedQueues, leads, leadsSince, leadsUntil, presenceEnabled, liveStatusEnabled } = profile;
+  const { schedule, roster, linkedQueues, leads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled } = profile;
   const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
   const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
@@ -65,7 +66,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   ] as const;
   const sinceLabel = leadsSince.getTime() === 0
     ? "desde a criação deste plantão"
-    : leadsUntil
+    : leadsUpcomingStartsAt
+      ? `aguardando o início de hoje às ${timeOnly.format(leadsUpcomingStartsAt)} (desde ${dateTime.format(leadsSince)})`
+      : leadsUntil
       ? `nesta ocorrência (${dateTime.format(leadsSince)} – ${dateTime.format(leadsUntil)})`
       : `desde o início desta ocorrência (${dateTime.format(leadsSince)})`;
 

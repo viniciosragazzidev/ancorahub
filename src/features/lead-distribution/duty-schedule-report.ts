@@ -23,8 +23,9 @@ const LIVE_STATUS_LABELS: Record<BrokerLiveOfferStatus, string> = {
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
 const timeOnly = new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone: "America/Sao_Paulo" });
 
-export function dutyReportPeriodLabel(since: Date, until: Date | null) {
+export function dutyReportPeriodLabel(since: Date, until: Date | null, upcomingStartsAt: Date | null = null) {
   if (since.getTime() === 0) return "Desde a criação do plantão";
+  if (upcomingStartsAt) return `Ocorrência desde ${dateTime.format(since)} (inicia às ${timeOnly.format(upcomingStartsAt)})`;
   return until ? `Ocorrência de ${dateTime.format(since)} a ${dateTime.format(until)}` : `Ocorrência desde ${dateTime.format(since)} (em andamento)`;
 }
 
@@ -34,7 +35,7 @@ export function buildDutyScheduleReport(
   returnedUnaccepted: ReadonlySet<string>,
   leadsLimit: number,
 ): Omit<DutyScheduleReportInput, "tenantName" | "tenantLogoUrl" | "generatedAt"> {
-  const { schedule, roster, linkedQueues, leads, leadsSince, leadsUntil, presenceEnabled, liveStatusEnabled } = profile;
+  const { schedule, roster, linkedQueues, leads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled } = profile;
   const isDistributed = (lead: (typeof leads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
   const distributedCount = leads.filter(isDistributed).length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
@@ -64,7 +65,7 @@ export function buildDutyScheduleReport(
   return {
     scheduleName: schedule.name,
     scheduleDetails,
-    periodLabel: dutyReportPeriodLabel(leadsSince, leadsUntil),
+    periodLabel: dutyReportPeriodLabel(leadsSince, leadsUntil, leadsUpcomingStartsAt),
     summary,
     brokers: roster.map((entry) => ({
       code: entry.internalCode ?? "-",

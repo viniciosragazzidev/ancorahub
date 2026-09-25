@@ -63,9 +63,13 @@ describe("getDutyOccurrenceLeadWindow", () => {
     expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({ since: new Date("2026-09-16T15:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
   });
 
-  it("reaches back to find last week's occurrence when today is shift day but the shift has not started yet", () => {
+  it("shows today's not-yet-started occurrence (open-ended, since the last close) instead of last week's", () => {
     const now = new Date("2026-09-30T12:00:00.000Z"); // Wed 09:00 SP — today's own shift starts at 10:00
-    expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({ since: new Date("2026-09-16T15:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
+    expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({
+      since: new Date("2026-09-23T15:00:00.000Z"),
+      until: null,
+      upcomingStartsAt: new Date("2026-09-30T13:00:00.000Z"),
+    });
   });
 
   it("falls back to show-everything (epoch, no upper bound) for an invalid weekday rather than throwing", () => {
@@ -94,6 +98,19 @@ describe("getDutyOccurrenceLeadWindow", () => {
       expect(getDutyOccurrenceLeadWindow(wed, rotation, now)).toEqual({
         since: new Date("2026-09-22T21:00:00.000Z"),
         until: new Date("2026-09-23T21:00:00.000Z"),
+      });
+    });
+
+    it("before today's shift starts, counts leads since yesterday's close — not last week's same weekday", () => {
+      // Friday 2026-09-25 08:29 SP, Friday's row starts at 09:00. The page
+      // used to show last Friday (18/09); it must show today's occurrence,
+      // collecting since Thursday's 18:00 close.
+      const fri = { dayOfWeek: 5, startsAt: "09:00", endsAt: "18:00", timezone: "America/Sao_Paulo" };
+      const now = new Date("2026-09-25T11:29:00.000Z");
+      expect(getDutyOccurrenceLeadWindow(fri, [...rotation, fri], now)).toEqual({
+        since: new Date("2026-09-24T21:00:00.000Z"),
+        until: null,
+        upcomingStartsAt: new Date("2026-09-25T12:00:00.000Z"),
       });
     });
   });
