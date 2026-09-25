@@ -1352,3 +1352,8 @@ oferta de lead (aceite pelo botão do template), a confirmação de presença e 
 convite de primeiro acesso (links com token). A linha da outbox guarda também
 o recurso Meta: se o número da empresa estiver desconectado ou o WAHA falhar,
 o aviso segue pela Meta automaticamente.
+
+
+## DEC-121 - Reatribuição manual de atendimento iniciado
+
+Aprovada pelo usuário em 2026-09-25: permitir transferir manualmente um lead em atendimento para outro corretor elegível, reiniciando atendimento e SLA e preservando todo o histórico. A redistribuição automática continua protegida enquanto o atendimento está iniciado. Reutilizar o controle global feature_lead_management_actions_enabled, validado no servidor, e os parâmetros de SLA do tenant. Registrar os responsáveis anterior/novo e os marcadores anteriores de atendimento; encerrar tentativas abertas antigas na mesma transação.

@@ -234,7 +234,7 @@ export function LeadDrawerManagementActions({
   };
 
   const selectedModeDescription = mode === "reassign"
-    ? "Transfira a responsabilidade para outro corretor elegível. O SLA de primeiro contato será reiniciado."
+    ? "Transfira a responsabilidade para outro corretor elegível. O atendimento e o SLA de primeiro contato serão reiniciados, mantendo o histórico."
     : "Assuma este caso para apurar uma exceção. Registre o motivo para manter a operação auditável.";
 
   const shouldAskAssignmentMode = manualAssignmentChoiceEnabled && !currentOwner;

@@ -229,7 +229,9 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
     try {
       const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null, assignmentMode: formData.get("assignmentMode") || undefined });
       const { context, db, lead } = await getManagedLead(input.leadId);
-      if (["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) throw new Error("Este lead já está em atendimento. Finalize ou libere o atendimento atual antes de reatribuir.");
+      if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
+      if (lead.archivedAt || lead.deletedAt) throw new Error("Não é possível reatribuir um lead arquivado ou excluído.");
+      if (input.brokerId && input.brokerId === lead.corretorId) throw new Error("Selecione outro corretor para reiniciar o atendimento.");
       if (!input.brokerId) throw new Error("Selecione um corretor para reatribuir o lead.");
       const assignmentChoiceEnabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
       if (!lead.corretorId && assignmentChoiceEnabled && !input.assignmentMode) throw new Error("Escolha se deseja atribuir direto ou enviar uma oferta para aceite.");
@@ -279,7 +281,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       }
 
       await db.transaction(async (tx) => {
-        await tx.update(schema.leads).set({
+        const updated = await tx.update(schema.leads).set({
           corretorId: input.brokerId,
           status: "distributed",
           distributionStatus: "assigned",
@@ -292,9 +294,28 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           serviceStartedBy: null,
           stageEnteredAt: now,
           motivoPerda: null,
-        }).where(eq(schema.leads.id, lead.id));
+        }).where(and(
+          eq(schema.leads.id, lead.id),
+          eq(schema.leads.tenantId, context.tenantId),
+          lead.corretorId ? eq(schema.leads.corretorId, lead.corretorId) : isNull(schema.leads.corretorId),
+          eq(schema.leads.status, lead.status),
+          lead.firstContactAt ? eq(schema.leads.firstContactAt, lead.firstContactAt) : isNull(schema.leads.firstContactAt),
+          lead.serviceStartedAt ? eq(schema.leads.serviceStartedAt, lead.serviceStartedAt) : isNull(schema.leads.serviceStartedAt),
+          isNull(schema.leads.archivedAt),
+          isNull(schema.leads.deletedAt),
+        )).returning({ id: schema.leads.id });
+        if (!updated.length) throw new Error("O estado do lead mudou. Atualize a página antes de tentar novamente.");
+        await tx.update(schema.leadAssignmentAttempts).set({
+          status: "released",
+          releasedAt: now,
+          releaseReason: "Reatribuição manual; atendimento reiniciado para outro corretor, com histórico preservado.",
+        }).where(and(
+          eq(schema.leadAssignmentAttempts.tenantId, context.tenantId),
+          eq(schema.leadAssignmentAttempts.leadId, lead.id),
+          eq(schema.leadAssignmentAttempts.status, "open"),
+        ));
         if (tenantPolicy?.feedbackRequiredEnabled !== false) await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: lead.tenantId, leadId: lead.id, brokerId, sequence: 1, assignedAt: now, feedbackDueAt: new Date(now.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000), status: "open", createdAt: now });
-        await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead reatribuído por ${context.role === "director" ? "Diretor" : "Gestor"}; SLA reiniciado.` });
+        await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead reatribuído por ${context.role === "director" ? "Diretor" : "Gestor"}; atendimento e SLA reiniciados, com histórico preservado.` });
         await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "reatribuiu_lead" });
         await tx.insert(schema.leadDistributionEvents).values({
           id: assignmentEventId,
@@ -313,6 +334,10 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           metadata: {
             assignmentScope: dutyRoster.hasActiveDuty ? "active_queue_duty" : "lead_branch",
             assignedBrokerBranchId: broker.branchId,
+            previousStatus: lead.status,
+            previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null,
+            previousServiceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
+            serviceRestarted: true,
           },
           actorId: context.userId,
           createdAt: now,
@@ -351,7 +376,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
         success: true,
         warning,
         mutationId,
-        entity: { leadId: lead.id, branchId: lead.branchId, corretorId: input.brokerId, status: "distributed" },
+        entity: { leadId: lead.id, branchId: lead.branchId, corretorId: input.brokerId, status: "distributed", distributionStatus: "assigned" },
       };
     } catch (error) {
       return { mutationId, error: error instanceof Error ? error.message : "Não foi possível reatribuir o lead." };

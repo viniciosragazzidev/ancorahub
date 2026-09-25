@@ -9,6 +9,10 @@ const state = vi.hoisted(() => {
     leadDistributionEvents: "leadDistributionEvents",
     leadDistributionJobs: { tenantId: "jobs.tenantId", leadId: "jobs.leadId", status: "jobs.status" },
     auditLogs: "auditLogs",
+    leadInteractions: "leadInteractions",
+    user: { id: "user.id", active: "user.active", status: "user.status" },
+    tenantMemberships: { tenantId: "members.tenantId", userId: "members.userId", role: "members.role", status: "members.status", branchId: "members.branchId" },
+    tenants: { id: "tenants.id", feedbackRequiredEnabled: "tenants.feedbackRequiredEnabled", feedbackGraceMinutes: "tenants.feedbackGraceMinutes", slaFirstContactMinutes: "tenants.slaFirstContactMinutes" },
   };
   const updates: Array<{ table: unknown; values: Record<string, unknown> }> = [];
   const inserts: Array<{ table: unknown; values: Record<string, unknown> }> = [];
@@ -26,12 +30,14 @@ const state = vi.hoisted(() => {
     archivedAt: null as Date | null,
     deletedAt: null as Date | null,
   };
+  const controls = { enabled: true, conflict: false };
   const db = {
     select: vi.fn(() => ({
       from: vi.fn((table: unknown) => ({
+        innerJoin: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000003", branchId: "branch-test" }]) })) })),
         where: vi.fn(() => table === schema.leads
           ? { limit: vi.fn(async () => [{ ...lead }]) }
-          : Promise.resolve([{ outboundMessageId: "outbound-test" }]),
+          : table === schema.tenants ? { limit: vi.fn(async () => [{ feedbackRequiredEnabled: true, slaFirstContactMinutes: "15", feedbackGraceMinutes: "5" }]) } : Promise.resolve([{ outboundMessageId: "outbound-test" }]),
         ),
       })),
     })),
@@ -41,7 +47,7 @@ const state = vi.hoisted(() => {
         return {
           where: vi.fn(() => {
             const result = Promise.resolve(undefined) as Promise<unknown> & { returning?: () => Promise<Array<{ id: string }>> };
-            result.returning = async () => table === schema.leads ? [{ id: lead.id }] : [];
+            result.returning = async () => table === schema.leads && !controls.conflict ? [{ id: lead.id }] : [];
             return result;
           }),
         };
@@ -54,6 +60,7 @@ const state = vi.hoisted(() => {
   };
   return {
     db,
+    controls,
     inserts,
     lead,
     mockTenantContext: { tenantId: "tenant-test", userId: "director-test", role: "director" as const },
@@ -68,11 +75,11 @@ vi.mock("@/shared/auth/errors", () => ({ AuthorizationError: class Authorization
 vi.mock("@/shared/auth/authorization-service", () => ({ AuthorizationService: { can: () => true } }));
 vi.mock("@/features/leads/lead-authorization", () => ({ buildLeadResourceScope: (lead: unknown) => lead, toEffectiveLeadAccessContext: (context: unknown) => context }));
 vi.mock("@/shared/auth/shadow-mode", () => ({ evaluateShadowAuthorization: vi.fn(async () => undefined) }));
-vi.mock("@/features/notifications/send-push-helper", () => ({ notifyLeadReassigned: vi.fn() }));
+vi.mock("@/features/notifications/send-push-helper", () => ({ notifyLeadReassigned: vi.fn(async () => undefined) }));
 vi.mock("@/features/leads/publish-lead-invalidation", () => ({ publishLeadInvalidation: vi.fn(async () => undefined) }));
 vi.mock("@/features/leads/webhooks/services/lead-effect-outbox", () => ({ enqueueLeadEffectTx: vi.fn(), runLeadEffectOutboxProcessor: vi.fn() }));
 vi.mock("@/shared/async/after-response", () => ({ scheduleAfterResponse: vi.fn() }));
-vi.mock("@/features/leads/assignment", () => ({ checkBrokerScheduleAvailability: vi.fn() }));
+vi.mock("@/features/leads/assignment", () => ({ checkBrokerScheduleAvailability: vi.fn(async () => ({ isConfigured: false, isWithinSchedule: true })) }));
 vi.mock("@/shared/observability/request-timing", () => ({ withServerActionTiming: (_path: string, _name: string, action: () => Promise<unknown>) => action() }));
 vi.mock("drizzle-orm", () => ({
   and: (...values: unknown[]) => values,
@@ -81,7 +88,12 @@ vi.mock("drizzle-orm", () => ({
   isNull: (field: unknown) => ({ field, null: true }),
 }));
 
-import { removeLeadAssignmentAction } from "./management-actions";
+vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: vi.fn(async () => state.controls.enabled ? "true" : "false") }));
+vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ getActiveQueueDutyRoster: vi.fn(async () => ({ hasActiveDuty: false, brokers: [] })) }));
+vi.mock("@/features/lead-distribution/service", () => ({ offerLeadToBrokerManually: vi.fn() }));
+vi.mock("@/features/lead-distribution/jobs", () => ({ enqueueAndProcessLeadDistribution: vi.fn(), enqueueLeadDistributionJob: vi.fn() }));
+
+import { removeLeadAssignmentAction, reassignLeadAction } from "./management-actions";
 
 function formData() {
   const data = new FormData();
@@ -132,6 +144,46 @@ describe("removeLeadAssignmentAction", () => {
 
     expect(result).toMatchObject({ error: expect.any(String) });
     expect(state.db.transaction).not.toHaveBeenCalled();
+    expect(state.inserts).toHaveLength(0);
+  });
+});
+
+
+describe("manual service reassignment", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.updates.length = 0;
+    state.inserts.length = 0;
+    Object.assign(state.controls, { enabled: true, conflict: false });
+    Object.assign(state.lead, { corretorId: "00000000-0000-4000-8000-000000000002", status: "in_contact", distributionStatus: "assigned", firstContactAt: new Date("2026-09-25T10:00:00Z"), serviceStartedAt: new Date("2026-09-25T10:00:00Z"), archivedAt: null, deletedAt: null });
+  });
+  function reassignmentForm() {
+    const data = formData();
+    data.set("brokerId", "00000000-0000-4000-8000-000000000003");
+    return data;
+  }
+  it.each(["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"])("restarts %s and preserves the previous service in history", async (status) => {
+    state.lead.status = status;
+    const result = await reassignLeadAction({}, reassignmentForm());
+    expect(result).toMatchObject({ success: true, entity: { status: "distributed", distributionStatus: "assigned", corretorId: "00000000-0000-4000-8000-000000000003" } });
+    expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null, assignedAt: expect.any(Date), stageEnteredAt: expect.any(Date) });
+    expect(state.updates.find(u => u.table === state.schema.leadAssignmentAttempts)?.values).toMatchObject({ status: "released" });
+    const attempt = state.inserts.find(i => i.table === state.schema.leadAssignmentAttempts)?.values;
+    expect(attempt).toMatchObject({ status: "open", brokerId: "00000000-0000-4000-8000-000000000003" });
+    expect((attempt!.feedbackDueAt as Date).getTime() - (attempt!.assignedAt as Date).getTime()).toBe(20 * 60_000);
+    expect(state.inserts.find(i => i.table === state.schema.leadDistributionEvents)?.values).toMatchObject({ previousOwnerId: state.lead.corretorId, newOwnerId: "00000000-0000-4000-8000-000000000003", metadata: { previousStatus: status, previousFirstContactAt: "2026-09-25T10:00:00.000Z", previousServiceStartedAt: "2026-09-25T10:00:00.000Z", serviceRestarted: true } });
+    expect(state.inserts.some(i => i.table === state.schema.leadInteractions)).toBe(true);
+    expect(state.inserts.some(i => i.table === state.schema.auditLogs)).toBe(true);
+    expect(state.updates.every(u => u.table === state.schema.leads || u.table === state.schema.leadAssignmentAttempts)).toBe(true);
+  });
+  it.each(["disabled", "same owner", "archived", "deleted", "conflict"])("rejects %s without appending history or a new SLA", async (reason) => {
+    const data = reassignmentForm();
+    if (reason === "disabled") state.controls.enabled = false;
+    if (reason === "same owner") data.set("brokerId", state.lead.corretorId);
+    if (reason === "archived") state.lead.archivedAt = new Date();
+    if (reason === "deleted") state.lead.deletedAt = new Date();
+    if (reason === "conflict") state.controls.conflict = true;
+    expect(await reassignLeadAction({}, data)).toMatchObject({ error: expect.any(String) });
     expect(state.inserts).toHaveLength(0);
   });
 });
