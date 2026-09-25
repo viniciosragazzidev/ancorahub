@@ -1,9 +1,24 @@
 import type { ConversationAssessment, PolicyExecutionResult } from "./types";
+import { LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
+
+/** Funnel stages the IA may advance through by itself ("forward" rule). */
+const FORWARD_STAGES = new Set(["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+
+function isForwardMove(from: string, to: string) {
+  return FORWARD_STAGES.has(from) && FORWARD_STAGES.has(to)
+    && (LEAD_STATUS_ORDER[to] ?? -1) > (LEAD_STATUS_ORDER[from] ?? Number.POSITIVE_INFINITY);
+}
 import type { ConversationIntelligenceConfig } from "@/shared/domain-root/conversation-intelligence-root";
 
 export interface PolicyEvaluationInput {
   assessment: ConversationAssessment;
   currentLeadStatus: string;
+  /**
+   * Customer messages in the analyzed window. An automatic "lost" must rest
+   * on what the customer said: silence alone (or a transcript missing the
+   * customer's side) only ever produces a suggestion.
+   */
+  customerMessageCount?: number;
   config: Pick<
     ConversationIntelligenceConfig,
     | "confidenceThresholdAuto"
@@ -80,8 +95,46 @@ export function evaluateAssessmentPolicy(
   const isAutoEligible =
     confidence >= config.confidenceThresholdAuto &&
     (config.autoAllowedTransitions.includes(transitionPair) ||
-      config.autoAllowedTransitions.includes(genericWildcardPair)) &&
+      config.autoAllowedTransitions.includes(genericWildcardPair) ||
+      (config.autoAllowedTransitions.includes("forward") && isForwardMove(currentLeadStatus, suggestedStatus))) &&
     !isExplicitSuggestOnly;
+
+  // Every automatic change is recorded with its reason: without one written
+  // by the IA, it is only a suggestion.
+  if (isAutoEligible && !assessment.statusReason?.trim()) {
+    return {
+      action: "SUGGEST",
+      transitionAllowed: false,
+      fromStatus: currentLeadStatus,
+      targetStatus: suggestedStatus,
+      confidence,
+      reason: "Mudança sugerida sem motivo por escrito; requer confirmação do corretor.",
+      aiFeedbackPayload: buildAIFeedbackPayload(assessment),
+    };
+  }
+
+  // "lost" closes the attendance: auto only with a catalog loss code, a
+  // written reason and at least one customer message backing it.
+  if (isAutoEligible && suggestedStatus === "lost") {
+    const missing = !assessment.lossReasonCode
+      ? "código do motivo de perda"
+      : !assessment.statusReason?.trim()
+        ? "motivo por escrito"
+        : !(input.customerMessageCount && input.customerMessageCount > 0)
+          ? "mensagem do cliente que comprove a desistência"
+          : null;
+    if (missing) {
+      return {
+        action: "SUGGEST",
+        transitionAllowed: false,
+        fromStatus: currentLeadStatus,
+        targetStatus: suggestedStatus,
+        confidence,
+        reason: `Perda sugerida sem ${missing}; requer confirmação do corretor.`,
+        aiFeedbackPayload: buildAIFeedbackPayload(assessment),
+      };
+    }
+  }
 
   if (isAutoEligible) {
     return {
@@ -122,4 +175,20 @@ export function buildAIFeedbackPayload(assessment: ConversationAssessment) {
     source: "AI" as const,
     confidence: assessment.statusConfidence,
   };
+}
+
+const PLACEHOLDER_VALUES = new Set(["NONE", "UNKNOWN", "NEUTRAL", "POSITIVE", "NEGATIVE", "N/A", "NULL"]);
+
+/**
+ * Rejects degenerate model output — on 25/09 a fallback model answered
+ * summary "NEUTRAL" / nextBestAction "NONE" / confidence 0 and overwrote a
+ * good analysis. A real diagnosis has a written summary and next action.
+ */
+export function isUsableAssessment(assessment: ConversationAssessment): boolean {
+  const summary = assessment.summary.trim();
+  const nextAction = assessment.nextBestAction.trim();
+  return summary.length >= 20
+    && !PLACEHOLDER_VALUES.has(summary.toUpperCase())
+    && nextAction.length >= 4
+    && !PLACEHOLDER_VALUES.has(nextAction.toUpperCase());
 }

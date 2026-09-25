@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MOTIVOS_PERDA } from "@/features/leads/lead-status-constants";
+
 export const ConversationStageEnum = z.enum([
   "INITIAL_CONTACT",
   "DISCOVERY",
@@ -54,6 +56,12 @@ export const ConversationAssessmentSchema = z.object({
   nextBestAction: z.string().trim().min(1),
   suggestedLeadStatus: z.string().nullable().optional(),
   statusConfidence: z.number().min(0).max(1),
+  /** Why the status should change, in plain Portuguese — recorded as the observation. */
+  statusReason: z.string().trim().max(600).nullable().optional(),
+  /** Loss catalog code, required for an automatic move to "lost". */
+  lossReasonCode: z.enum(MOTIVOS_PERDA).nullable().optional(),
+  /** Short customer quotes that justify the status change. */
+  evidence: z.array(z.string().trim().max(300)).max(5).default([]),
   summary: z.string().trim().min(1),
   risk: z.string().nullable().optional(),
   opportunity: z.string().nullable().optional(),

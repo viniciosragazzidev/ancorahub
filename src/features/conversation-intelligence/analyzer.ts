@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { generateObject } from "ai";
 
 import { getAiEngineSettings } from "@/features/ai/engine";
@@ -17,7 +17,9 @@ import {
   buildConversationIntelligenceContext,
   type ContextBuilderMessage,
 } from "./context-builder";
-import { evaluateAssessmentPolicy } from "./policy-executor";
+import { evaluateAssessmentPolicy, isUsableAssessment } from "./policy-executor";
+import { getTenantPlaybooks } from "@/features/ai-qualification/playbooks-storage";
+import { MOTIVOS_PERDA, MOTIVO_PERDA_LABELS, LEAD_STATUS_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
 import {
   ConversationAssessmentSchema,
   type ConversationAssessment,
@@ -170,7 +172,10 @@ Orientações:
 5. Declare com clareza quem está com a pendência no momento (BROKER, CUSTOMER, INTERNAL, NONE).
 6. Sugira a próxima melhor ação comercial específica para o corretor avançar e fechar a venda.
 7. Se houver clareza de transição de status no funil, informe em suggestedLeadStatus (valores possíveis: distributed, in_contact, quote_sent, negotiation, documentation_pending, under_analysis, lost) e statusConfidence (0.0 a 1.0).
-8. Produza um resumo executivo objetivo em português do Brasil sem jargões desnecessários.`;
+8. Produza um resumo executivo objetivo em português do Brasil sem jargões desnecessários.
+9. Sempre que sugerir um status, explique em statusReason o motivo em uma ou duas frases, e cite em evidence trechos literais das mensagens do cliente que justificam a mudança.
+10. Sugira "lost" somente quando o CLIENTE deixar claro que desistiu, já contratou com outra empresa, não tem interesse ou pediu para não ser mais contatado. Nesse caso preencha lossReasonCode com um destes códigos: ${MOTIVOS_PERDA.join(", ")}. Silêncio do cliente ou mensagens só do corretor NÃO bastam para "lost".
+11. Nunca invente falas do cliente; se a transcrição não trouxer mensagens do cliente, declare isso no resumo.${await buildPlaybookRules(lead.tenantId)}`;
 
   const userPrompt = `Contexto do Lead:\n${compactContext.leadSummary}\n\nMemória Anterior:\n${compactContext.historicalMemory}\n\nTranscrição Recente:\n${compactContext.recentTranscript}`;
 
@@ -188,6 +193,12 @@ Orientações:
         prompt: userPrompt,
         temperature: 0.2,
       });
+      // A model that echoes enum values instead of analysing ("NEUTRAL" as the
+      // summary, "NONE" as the next action) must not overwrite the memory.
+      if (!isUsableAssessment(aiResult.object)) {
+        lastError = new Error(`Resposta vazia ou inválida de ${candidate.provider}/${candidate.model}`);
+        continue;
+      }
       assessment = aiResult.object;
       modelUsed = `${candidate.provider}/${candidate.model}`;
       break;
@@ -209,6 +220,7 @@ Orientações:
   const policyResult = evaluateAssessmentPolicy({
     assessment,
     currentLeadStatus: lead.status,
+    customerMessageCount: messages.filter((m) => m.direction === "incoming").length,
     config: conversationIntelligenceDomainRoot.defaults,
   });
 
@@ -229,29 +241,43 @@ Orientações:
   await db.transaction(async (tx) => {
     // 7.1 Se autorizado auto-transição segura, atualizar status do lead
     if (policyResult.action === "AUTO_TRANSITION" && policyResult.transitionAllowed && policyResult.targetStatus) {
-      await tx
+      const isLost = policyResult.targetStatus === "lost";
+      // Guarded on the status the analysis saw, so a change made by the
+      // broker meanwhile wins over the IA.
+      const moved = await tx
         .update(schema.leads)
         .set({
           status: policyResult.targetStatus as any,
           stageEnteredAt: now,
+          ...(isLost ? { motivoPerda: assessment.lossReasonCode ?? "outro" } : {}),
+          version: sql`${schema.leads.version} + 1`,
           updatedAt: now,
         })
-        .where(eq(schema.leads.id, lead.id));
+        .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.status, lead.status as any)))
+        .returning({ id: schema.leads.id });
 
-      await tx.insert(schema.leadInteractions).values({
-        id: randomUUID(),
-        leadId: lead.id,
-        userId: actorUserId,
-        tipo: "status_change",
-        conteudo: `Status atualizado automaticamente para '${policyResult.targetStatus}' pela IA com ${(assessment.statusConfidence * 100).toFixed(0)}% de confiança. Motivo: ${policyResult.reason}`,
-        metadata: {
-          source: "AI",
-          fromStatus: policyResult.fromStatus,
-          toStatus: policyResult.targetStatus,
-          confidence: assessment.statusConfidence,
-        },
-        createdAt: now,
-      });
+      if (moved.length) {
+        const statusLabel = LEAD_STATUS_LABELS[policyResult.targetStatus] ?? policyResult.targetStatus;
+        const lossLabel = isLost && assessment.lossReasonCode ? MOTIVO_PERDA_LABELS[assessment.lossReasonCode as MotivoPerda] : null;
+        const evidence = assessment.evidence.length ? `\nTrechos do cliente: ${assessment.evidence.map((quote) => `"${quote}"`).join(" · ")}` : "";
+        await tx.insert(schema.leadInteractions).values({
+          id: randomUUID(),
+          leadId: lead.id,
+          userId: actorUserId,
+          tipo: "status_change",
+          conteudo: `Status alterado automaticamente pela IA: ${LEAD_STATUS_LABELS[lead.status] ?? lead.status} → ${statusLabel} (${(assessment.statusConfidence * 100).toFixed(0)}% de confiança).${lossLabel ? `\nMotivo da perda: ${lossLabel}.` : ""}\nObservação: ${assessment.statusReason?.trim() || policyResult.reason}${evidence}`,
+          metadata: {
+            source: "AI",
+            fromStatus: policyResult.fromStatus,
+            toStatus: policyResult.targetStatus,
+            confidence: assessment.statusConfidence,
+            statusReason: assessment.statusReason ?? null,
+            lossReasonCode: assessment.lossReasonCode ?? null,
+            evidence: assessment.evidence,
+          },
+          createdAt: now,
+        });
+      }
     }
 
     // 7.2 Atualizar qualificationDetails com o estado mais recente de IA
@@ -336,4 +362,18 @@ Orientações:
     policyResult,
     state,
   };
+}
+
+/**
+ * The tenant's /qualificação triggers that carry a suggested status, as rules
+ * the analyst must apply — so the situations the brokerage already mapped
+ * (e.g. "cliente fechou com outra corretora → lost") drive the funnel.
+ */
+async function buildPlaybookRules(tenantId: string): Promise<string> {
+  const playbooks = await getTenantPlaybooks(tenantId).catch(() => []);
+  const rules = playbooks
+    .filter((playbook) => playbook.enabled && playbook.suggestedLeadStatus?.trim())
+    .slice(0, 20)
+    .map((playbook) => `- Quando: ${playbook.triggerCondition} (${playbook.title}) → status sugerido: ${playbook.suggestedLeadStatus}`);
+  return rules.length ? `\n\nGatilhos definidos pela corretora (aplique quando a conversa se encaixar):\n${rules.join("\n")}` : "";
 }

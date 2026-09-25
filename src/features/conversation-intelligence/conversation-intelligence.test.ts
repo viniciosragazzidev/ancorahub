@@ -5,6 +5,7 @@ import {
   evaluateAssessmentPolicy,
   type ConversationAssessment,
 } from "./index";
+import { isUsableAssessment } from "./policy-executor";
 import { conversationIntelligenceDomainRoot } from "@/shared/domain-root/conversation-intelligence-root";
 
 describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
@@ -19,11 +20,13 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
     nextBestAction: "SEND_REVISED_QUOTE",
     suggestedLeadStatus: "negotiation",
     statusConfidence: 0.94,
+    statusReason: "Cliente pediu nova condição de preço sobre a cotação enviada.",
     summary: "Cliente demonstrou interesse e pediu nova condição de preço.",
     risk: null,
     opportunity: "Cliente tem 4 vidas e fechamento previsto para este mês",
     facts: ["Cliente solicitou desconto na SulAmérica"],
     inferences: ["Alta propensão a fechar se houver flexibilidade de preço"],
+    evidence: [],
   };
 
   describe("Schema & Type Contract", () => {
@@ -162,20 +165,65 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
       expect(result.reason).toContain("SYSTEM_ONLY");
     });
 
-    it("keeps transition to 'lost' as SUGGEST_ONLY even with 0.95 confidence", () => {
-      const result = evaluateAssessmentPolicy({
-        assessment: {
-          ...sampleAssessment,
-          suggestedLeadStatus: "lost",
-          statusConfidence: 0.95,
-        },
-        currentLeadStatus: "in_contact",
-        config,
+    describe("automatic stage moves (decided 25/09)", () => {
+      it("advances along the funnel by itself — cotação enviada, negociação, documentação, análise", () => {
+        for (const [from, to] of [["in_contact", "quote_sent"], ["quote_sent", "negotiation"], ["negotiation", "documentation_pending"], ["documentation_pending", "under_analysis"], ["in_contact", "negotiation"]]) {
+          const result = evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: to }, currentLeadStatus: from, config });
+          expect(result.action, `${from}->${to}`).toBe("AUTO_TRANSITION");
+        }
       });
 
-      expect(result.action).toBe("SUGGEST");
-      expect(result.transitionAllowed).toBe(false);
-      expect(result.reason).toContain("SUGGEST_ONLY");
+      it("only suggests going back a stage", () => {
+        const result = evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "in_contact" }, currentLeadStatus: "negotiation", config });
+        expect(result.action).toBe("SUGGEST");
+      });
+
+      it("only suggests when the IA gives no written reason", () => {
+        const result = evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "negotiation", statusReason: null }, currentLeadStatus: "quote_sent", config });
+        expect(result.action).toBe("SUGGEST");
+      });
+    });
+
+    describe("automatic 'lost' (decided 25/09)", () => {
+      const gaveUp: ConversationAssessment = {
+        ...sampleAssessment,
+        suggestedLeadStatus: "lost",
+        statusConfidence: 0.95,
+        statusReason: "A cliente informou que já fechou o plano com outra corretora.",
+        lossReasonCode: "ja_contratou",
+        evidence: ["Obrigada, mas já fechei com outra corretora"],
+      };
+
+      it("closes as lost when the customer said so, with code, reason and a customer message", () => {
+        const result = evaluateAssessmentPolicy({ assessment: gaveUp, currentLeadStatus: "in_contact", customerMessageCount: 2, config });
+        expect(result.action).toBe("AUTO_TRANSITION");
+        expect(result.targetStatus).toBe("lost");
+      });
+
+      it("only suggests when the transcript has no customer message (silence or missing side)", () => {
+        const result = evaluateAssessmentPolicy({ assessment: gaveUp, currentLeadStatus: "in_contact", customerMessageCount: 0, config });
+        expect(result.action).toBe("SUGGEST");
+        expect(result.reason).toContain("mensagem do cliente");
+      });
+
+      it("only suggests without a loss code or a written reason", () => {
+        expect(evaluateAssessmentPolicy({ assessment: { ...gaveUp, lossReasonCode: null }, currentLeadStatus: "in_contact", customerMessageCount: 2, config }).action).toBe("SUGGEST");
+        expect(evaluateAssessmentPolicy({ assessment: { ...gaveUp, statusReason: "  " }, currentLeadStatus: "in_contact", customerMessageCount: 2, config }).action).toBe("SUGGEST");
+      });
+
+      it("only suggests below the automation confidence", () => {
+        expect(evaluateAssessmentPolicy({ assessment: { ...gaveUp, statusConfidence: 0.8 }, currentLeadStatus: "in_contact", customerMessageCount: 2, config }).action).toBe("SUGGEST");
+      });
+    });
+  });
+
+  describe("isUsableAssessment", () => {
+    it("rejects the degenerate output seen on Neusa Galvao (summary NEUTRAL, next action NONE)", () => {
+      expect(isUsableAssessment({ ...sampleAssessment, summary: "NEUTRAL", nextBestAction: "NONE" })).toBe(false);
+    });
+
+    it("accepts a written diagnosis", () => {
+      expect(isUsableAssessment(sampleAssessment)).toBe(true);
     });
   });
 });
