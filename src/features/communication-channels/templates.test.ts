@@ -86,7 +86,7 @@ describe("approved Meta WhatsApp templates", () => {
     });
   });
 
-  it("uses the approved accepted-offer contract, including the seventh URL value", () => {
+  it("uses the approved accepted-offer contract: six body parameters, the lead id only for the URL button", () => {
     const variables = buildLeadAssignmentConfirmedVariables({
       corretorNome: "André",
       clienteNome: "Maria",
@@ -102,8 +102,24 @@ describe("approved Meta WhatsApp templates", () => {
       "nome_corretor", "nome_cliente", "telefone_cliente", "interesse", "tipo", "n_dependentes",
     ]);
     expect(splitMetaWhatsAppTemplateVariables("leadAssignmentConfirmed", variables)).toEqual({
-      bodyVariables: ["André", "Maria", "5511999999999", "Plano familiar", "Pessoa Física", "2", "Nova Iguaçu"],
+      bodyVariables: ["André", "Maria", "5511999999999", "Plano familiar", "Pessoa Física", "2"],
       urlButtonParameter: "lead-id",
     });
+  });
+
+  it("always sends as many body values as the template has named parameters", () => {
+    const samples: Record<string, string[]> = {
+      brokerInvitation: ["Ana", "Âncora", "Corretor(a)", "Matriz"],
+      brokerAccountActivated: ["Ana", "Âncora", "https://crm/login"],
+      dutyPresenceConfirmation: ["Ana", "09:00", "confirmation-id"],
+      newLeadAssignment: ["Corretor(a)", "Ana", "Maria", "PME", "lead-id"],
+      brokerLeadNotification: ["Corretor(a)", "Ana", "Maria", "PME", "lead-id"],
+      leadAssignmentConfirmed: ["Ana", "Maria", "5511999999999", "Plano", "PME · MEI", "0", "Rio", "lead-id"],
+    };
+    for (const [purpose, variables] of Object.entries(samples)) {
+      const names = getMetaWhatsAppTemplateVariableNames(purpose);
+      expect(names, purpose).toBeDefined();
+      expect(splitMetaWhatsAppTemplateVariables(purpose, variables).bodyVariables, purpose).toHaveLength(names!.length);
+    }
   });
 });
