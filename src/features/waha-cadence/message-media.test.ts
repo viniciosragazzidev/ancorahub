@@ -13,7 +13,7 @@ vi.mock("@/features/communication-channels/conversation-media", () => ({
 const download = vi.fn();
 vi.mock("./relay-client", () => ({ downloadWahaMedia: (url: string) => download(url) }));
 
-import { storeWahaMessageMedia, wahaMessageMediaKind } from "./message-media";
+import { storeWahaMessageMedia, wahaFilePath, wahaMessageMediaKind } from "./message-media";
 
 describe("wahaMessageMediaKind", () => {
   it("maps file-bearing types and ignores text-like ones", () => {
@@ -27,9 +27,16 @@ describe("wahaMessageMediaKind", () => {
 describe("storeWahaMessageMedia", () => {
   it("downloads a voice note through the relay and stores it for the conversation", async () => {
     download.mockResolvedValueOnce({ body: Buffer.from([1, 2, 3]), contentType: "audio/ogg" });
-    const stored = await storeWahaMessageMedia({ tenantId: "t", messageRowId: "row-1", type: "audio", media: { url: "/api/files/s/a.oga", mimeType: "audio/ogg; codecs=opus" } });
+    const stored = await storeWahaMessageMedia({ tenantId: "t", messageRowId: "row-1", type: "audio", media: { providerPath: "/api/files/s/a.oga", mimeType: "audio/ogg; codecs=opus" } });
     expect(download).toHaveBeenCalledWith("/api/files/s/a.oga");
     expect(stored).toMatchObject({ kind: "audio", mimeType: "audio/ogg", sizeBytes: 3, storageKey: "whatsapp-media/t/row-1" });
+  });
+
+  it("derives the relay path from a raw WAHA link, ignoring its host", async () => {
+    download.mockResolvedValueOnce({ body: Buffer.from([9]), contentType: "image/jpeg" });
+    await storeWahaMessageMedia({ tenantId: "t", messageRowId: "row-2", type: "image", media: { url: "http://localhost:3000/api/files/s/x.jpeg" } });
+    expect(download).toHaveBeenLastCalledWith("/api/files/s/x.jpeg");
+    expect(wahaFilePath("http://evil.example/api/sessions")).toBeNull();
   });
 
   it("returns null (message still recorded) when there is no file or the download fails", async () => {

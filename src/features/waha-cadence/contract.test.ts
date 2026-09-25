@@ -227,3 +227,20 @@ describe("WAHA media messages", () => {
     expect(event.message?.type).toBe("image");
   });
 });
+
+describe("WAHA events already normalized by the infra relay", () => {
+  it("accepts the media providerPath the relay forwards", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      eventId: "evt-relay-audio", type: "message.inbound", sessionId: "waha_broker_1", occurredAt: "2026-09-25T14:00:00.000Z",
+      message: { id: "msg-a", from: "5521999998888", to: "5521988887777", body: "[audio]", fromMe: false, type: "audio", media: { mimeType: "audio/ogg; codecs=opus", providerPath: "/api/files/waha_broker_1/msg-a.oga" } },
+    }));
+    expect(event.message?.media?.providerPath).toBe("/api/files/waha_broker_1/msg-a.oga");
+  });
+
+  it("rejects a providerPath outside WAHA's files", () => {
+    expect(() => wahaWebhookSchema.parse({
+      eventId: "evt-bad", type: "message.inbound", sessionId: "s", occurredAt: "2026-09-25T14:00:00.000Z",
+      message: { id: "m", from: "5521999998888", body: "[audio]", type: "audio", media: { providerPath: "/api/sessions" } },
+    })).toThrow();
+  });
+});

@@ -161,14 +161,20 @@ export async function getWahaMessageHistory(input: {
   return data.chats;
 }
 
-/** Baixa, pelo relay, o arquivo que o WAHA guardou para uma mensagem (`media.url` do webhook). */
-export async function downloadWahaMedia(mediaUrl: string): Promise<{ body: Buffer; contentType: string }> {
+/**
+ * Baixa, pelo relay da infra (`POST /internal/waha/media/download`), o
+ * arquivo que o WAHA guardou para uma mensagem — `providerPath` é o caminho
+ * `/api/files/…` que o próprio relay encaminha no webhook.
+ */
+export async function downloadWahaMedia(providerPath: string): Promise<{ body: Buffer; contentType: string }> {
   const config = relayConfig();
   if (config.transport !== "fastify") throw new Error("WAHA_MEDIA_REQUIRES_FASTIFY");
-  const response = await fetch(`${config.url}/internal/waha/media?${new URLSearchParams({ url: mediaUrl }).toString()}`, {
-    headers: getFastifyHeaders(config.secret, false),
+  const response = await fetch(`${config.url}/internal/waha/media/download`, {
+    method: "POST",
+    headers: getFastifyHeaders(config.secret, true),
+    body: JSON.stringify({ providerPath }),
     cache: "no-store",
-    signal: AbortSignal.timeout(25_000),
+    signal: AbortSignal.timeout(35_000),
   });
   if (!response.ok) {
     const data = await response.json().catch(() => null) as { error?: string } | null;

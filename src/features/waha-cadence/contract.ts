@@ -88,6 +88,8 @@ export const wahaWebhookSchema = z.object({
       sizeBytes: z.number().int().optional(),
       /** WAHA's link to the stored file; only its /api/files path is ever fetched, through the relay. */
       url: z.string().max(2000).optional(),
+      /** What the infra relay forwards instead of the link: `/api/files/<session>/<file>`. */
+      providerPath: z.string().regex(/^\/api\/files\//).max(1024).optional(),
     }).strict().optional(),
   }).strict().optional(),
   delivery: z.object({
