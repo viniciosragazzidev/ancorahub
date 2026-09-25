@@ -1357,3 +1357,8 @@ o aviso segue pela Meta automaticamente.
 ## DEC-121 - Reatribuição manual de atendimento iniciado
 
 Aprovada pelo usuário em 2026-09-25: permitir transferir manualmente um lead em atendimento para outro corretor elegível, reiniciando atendimento e SLA e preservando todo o histórico. A redistribuição automática continua protegida enquanto o atendimento está iniciado. Reutilizar o controle global feature_lead_management_actions_enabled, validado no servidor, e os parâmetros de SLA do tenant. Registrar os responsáveis anterior/novo e os marcadores anteriores de atendimento; encerrar tentativas abertas antigas na mesma transação.
+
+Complemento de 2026-09-25 (DEC-120): com o número da empresa conectado, todo
+texto livre para um corretor — digitado no chat da diretoria ou disparo de
+mensagem livre — sai por ele por padrão, com a Meta como fallback. Templates
+Meta só saem pelo número quando o aviso foi roteado explicitamente.

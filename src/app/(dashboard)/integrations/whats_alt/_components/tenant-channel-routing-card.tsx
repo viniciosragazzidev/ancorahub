@@ -70,9 +70,9 @@ export function TenantChannelRoutingCard({
             <div className="min-w-0">
               <CardTitle>Avisos aos corretores por este número</CardTitle>
               <CardDescription className="mt-1 max-w-2xl leading-5">
-                Escolha quais avisos saem pelo número da empresa, com qual mensagem livre. Os demais
-                seguem pela API oficial da Meta. Se o número estiver fora do ar, o aviso vai pela Meta
-                automaticamente.
+                Mensagens digitadas no chat e mensagens livres enviadas aos corretores saem sempre por
+                este número enquanto ele estiver conectado. Aqui você escolhe, além disso, quais avisos
+                automáticos também saem por ele. Se o número estiver fora do ar, tudo segue pela Meta.
               </CardDescription>
             </div>
             <Badge variant={routedCount ? "info" : "secondary"}>

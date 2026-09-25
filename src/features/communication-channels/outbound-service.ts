@@ -17,7 +17,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
-import { resolveTenantChannelDelivery } from "@/features/waha-cadence/tenant-channel-routing";
+import { findConnectedTenantChannelId, resolveTenantChannelDelivery, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
@@ -391,13 +391,19 @@ export async function enqueueMetaTextMessage(input: {
     .where(channelQuery)
     .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
     .limit(1);
-  if (!channel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
+  // Free text to a broker - typed in the chat or a free message - always
+  // leaves through the company number when it is connected (Meta fallback).
+  const tenantChannelId = input.recipientType === "user" ? await findConnectedTenantChannelId(input.tenantId).catch(() => null) : null;
+  if (!channel && !tenantChannelId) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
   const id = randomUUID();
   const now = new Date();
   await db.insert(schema.whatsappOutboundMessages).values({
-    id, tenantId: input.tenantId, channelId: channel?.id ?? null, deliveryRoute: delivery.route, wahaNumberId: delivery.wahaNumberId, recipientType: input.recipientType, recipientId: input.recipientId ?? null,
+    id, tenantId: input.tenantId, channelId: channel?.id ?? null,
+    deliveryRoute: tenantChannelId ? "waha_direct" : delivery.route, wahaNumberId: tenantChannelId ?? delivery.wahaNumberId,
+    ...(tenantChannelId ? { renderedBody: body } : {}),
+    recipientType: input.recipientType, recipientId: input.recipientId ?? null,
     destinationPhone, purpose: input.purpose ?? "directText", messageType: "text", templateName: "__text__", templateLanguage: "pt_BR", variables: [body],
     status: input.scheduledAt && input.scheduledAt > now ? "pending" : "queued", idempotencyKey: input.idempotencyKey,
     scheduledAt: input.scheduledAt ?? null, queuedAt: now, requestedBy: input.requestedBy ?? null, createdAt: now, updatedAt: now,
@@ -576,7 +582,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           .where(and(
             eq(schema.wahaNumbers.id, row.wahaNumberId!),
             eq(schema.wahaNumbers.tenantId, row.tenantId),
-            eq(schema.wahaNumbers.status, "active"),
+            inArray(schema.wahaNumbers.status, TENANT_CHANNEL_CONNECTED_STATUSES),
           ))
           .limit(1);
         try {

@@ -99,7 +99,8 @@ async function findChannel(tenantId: string) {
 }
 
 function uiStatusFromRow(status: string): WahaUiStatus {
-  if (status === "active") return "ready";
+  // "ready" was written by the status webhook before it used the relay vocabulary.
+  if (status === "active" || status === "ready") return "ready";
   if (status === "error") return "error";
   if (status === "connecting" || status === "pending") return "initializing";
   return "disconnected";
@@ -111,8 +112,19 @@ function formatPhone(value: string | null | undefined) {
 }
 
 export async function getTenantChannel(context: TenantContext): Promise<TenantChannelView | null> {
-  const row = await findChannel(context.tenantId);
+  let row = await findChannel(context.tenantId);
   if (!row) return null;
+  // WAHA only reports the paired phone a moment after WORKING, when the QR
+  // screen has already stopped polling: fill it in (and the status) on load.
+  if (uiStatusFromRow(row.status) === "ready" && !formatPhone(row.displayPhoneNumber)) {
+    const live = await relay(`/internal/waha/connections/${encodeURIComponent(row.relaySessionId)}/status`, { timeoutMs: 5_000 }).catch(() => null);
+    const phone = normalizeWahaUiStatus(live?.status) === "ready" ? formatPhone(live?.phoneNumber) : null;
+    if (phone) {
+      const now = new Date();
+      await getDatabase().update(schema.wahaNumbers).set({ displayPhoneNumber: phone, status: "active", lastHealthAt: now, updatedAt: now }).where(eq(schema.wahaNumbers.id, row.id)).catch(() => null);
+      row = { ...row, displayPhoneNumber: phone, status: "active" };
+    }
+  }
   return {
     id: row.id,
     status: uiStatusFromRow(row.status),

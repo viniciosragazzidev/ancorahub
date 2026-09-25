@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getMessageEventByPurpose } from "@/features/communication-channels/message-event-catalog";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -12,6 +12,18 @@ import {
   renderTenantChannelMessage,
   type TenantChannelRouting,
 } from "./tenant-channel-routing-rules";
+
+/** Connected company-number statuses: relay vocabulary ("active") and rows written as "ready". */
+export const TENANT_CHANNEL_CONNECTED_STATUSES = ["active", "ready"];
+
+/** The tenant's company number (WhatsApp da diretoria) when it is connected, else null. */
+export async function findConnectedTenantChannelId(tenantId: string): Promise<string | null> {
+  const [channel] = await getDatabase().select({ id: schema.wahaNumbers.id }).from(schema.wahaNumbers)
+    .where(and(eq(schema.wahaNumbers.tenantId, tenantId), eq(schema.wahaNumbers.scope, "tenant"), inArray(schema.wahaNumbers.status, TENANT_CHANNEL_CONNECTED_STATUSES)))
+    .orderBy(desc(schema.wahaNumbers.createdAt))
+    .limit(1);
+  return channel?.id ?? null;
+}
 
 export function tenantChannelRoutingKey(tenantId: string) {
   return `tenant_channel_routing_${tenantId}`;
@@ -43,16 +55,13 @@ export async function resolveTenantChannelDelivery(input: {
   if (!messageId) return null;
 
   const db = getDatabase();
-  const [channel] = await db.select({ id: schema.wahaNumbers.id }).from(schema.wahaNumbers)
-    .where(and(eq(schema.wahaNumbers.tenantId, input.tenantId), eq(schema.wahaNumbers.scope, "tenant"), eq(schema.wahaNumbers.status, "active")))
-    .orderBy(desc(schema.wahaNumbers.createdAt))
-    .limit(1);
-  if (!channel) return null;
+  const channelId = await findConnectedTenantChannelId(input.tenantId);
+  if (!channelId) return null;
   const [message] = await db.select({ content: schema.messageTemplates.content }).from(schema.messageTemplates)
     .where(and(eq(schema.messageTemplates.id, messageId), eq(schema.messageTemplates.tenantId, input.tenantId), eq(schema.messageTemplates.active, true)))
     .limit(1);
   if (!message) return null;
 
   const text = renderTenantChannelMessage(event, message.content, input.variables);
-  return text ? { wahaNumberId: channel.id, text } : null;
+  return text ? { wahaNumberId: channelId, text } : null;
 }

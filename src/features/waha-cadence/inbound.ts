@@ -159,7 +159,9 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   // ── 3. Handle session.status ───────────────────────────────────────────
   if (event.type === "session.status") {
     const statusMap: Record<string, string> = {
-      active: "ready",
+      // Broker connections use the UI vocabulary ("ready"); company numbers
+      // (waha_numbers) keep the relay's ("active"), which their readers expect.
+      active: source.kind === "connection" ? "ready" : "active",
       paused: "paused",
       offline: "disconnected",
       error: "error",
