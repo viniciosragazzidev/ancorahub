@@ -8,6 +8,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
 import { dutyScheduleInput, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
 import { sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
+import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 
 export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
 
@@ -412,6 +413,9 @@ export async function toggleDutyRosterPauseAction(scheduleId: string, assignment
       id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignmentId,
       acao: paused ? "duty_roster.paused" : "duty_roster.resumed",
     });
+    // Resuming frees this broker right now: leads already waiting must not
+    // keep the retry time computed while they were paused.
+    if (!paused) await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar a pausa." };

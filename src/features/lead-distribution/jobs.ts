@@ -104,6 +104,34 @@ export async function wakeLeadDistributionJob(tenantId: string, leadId: string) 
 }
 
 /**
+ * A broker just became able to receive leads (resumed from a pause,
+ * confirmed presence, added to the roster). Leads parked because no broker
+ * was eligible keep a run_after computed while that broker was unavailable —
+ * on 25/09 Carla Martins sat until 13:51 although three brokers were resumed
+ * at 13:23. Bring those jobs forward so the next processor pass (immediate
+ * below, else the 1-minute cron) re-evaluates them; the engine still decides
+ * who gets what, so waking a lead that cannot be offered yet is harmless.
+ */
+export async function wakeLeadsAwaitingEligibleBroker(tenantId: string) {
+  const now = new Date();
+  const woken = await getDatabase().update(schema.leadDistributionJobs)
+    .set({ runAfter: now, updatedAt: now })
+    .where(and(
+      eq(schema.leadDistributionJobs.tenantId, tenantId),
+      inArray(schema.leadDistributionJobs.status, ["pending", "retrying"]),
+      eq(schema.leadDistributionJobs.lastErrorCode, "AWAITING_ELIGIBILITY"),
+      gt(schema.leadDistributionJobs.runAfter, now),
+    ))
+    .returning({ leadId: schema.leadDistributionJobs.leadId });
+  if (woken.length) {
+    await runLeadDistributionProcessor({ tenantId, limit: Math.min(woken.length, 10) }).catch((error) => {
+      console.warn("[lead-distribution] wake_after_broker_available_failed", error instanceof Error ? error.message : "unknown");
+    });
+  }
+  return woken.length;
+}
+
+/**
  * Persists the distribution intent before attempting the immediate path.
  *
  * A handoff must never depend exclusively on the scheduler: during business

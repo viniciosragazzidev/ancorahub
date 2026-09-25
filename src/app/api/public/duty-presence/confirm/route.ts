@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, exists, gt, lte, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
+import { wakeLeadsAwaitingEligibleBroker } from "@/features/lead-distribution/jobs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
         id: randomUUID(), userId: confirmed.brokerId, entidade: "duty_presence_confirmation",
         entidadeId: confirmed.id, acao: "duty_presence_confirmed", createdAt: now,
       });
-      return { state: "confirmed" as const };
+      return { state: "confirmed" as const, tenantId: confirmed.tenantId };
     }
 
     const [existing] = await tx.select({ status: schema.dutyPresenceConfirmations.status, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt })
@@ -58,5 +59,7 @@ export async function POST(request: NextRequest) {
   });
 
   if (result.state === "unavailable") return NextResponse.json({ success: false, error: "Este link expirou ou não está mais disponível." }, { status: 410 });
+  // A confirmed broker can receive leads from now on: retry those waiting.
+  if (result.state === "confirmed") await wakeLeadsAwaitingEligibleBroker(result.tenantId).catch(() => 0);
   return NextResponse.json({ success: true, alreadyConfirmed: result.state === "already_confirmed" });
 }

@@ -6,6 +6,7 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
+import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 
 export type RosterActionState = { success?: boolean; error?: string };
 
@@ -82,6 +83,7 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
     if (!broker.branchId) throw new Error("O corretor não está vinculado a uma unidade ativa.");
     await db.insert(schema.dutyRosterAssignments).values({ id: randomUUID(), tenantId: context.tenantId, branchId: broker.branchId, scheduleId: schedule.id, brokerId: input.brokerId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, validFrom: schedule.validFrom, validUntil: schedule.validUntil, status: "active", createdBy: context.userId, updatedBy: context.userId, createdAt: now, updatedAt: now });
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: input.brokerId, acao: "duty_roster_assignment.created" });
+    await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível adicionar o corretor à escala." };
