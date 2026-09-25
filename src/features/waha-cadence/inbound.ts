@@ -23,7 +23,7 @@ import {
   WAHA_AI_FEATURE,
   WAHA_CADENCE_FEATURE,
 } from "./contract";
-import { phoneSubscriberSuffix, samePhoneSubscriber } from "./phone-matching";
+import { brazilNinthDigitVariant, contactNumberShape, phoneSubscriberSuffix, samePhoneSubscriber } from "./phone-matching";
 import { storeWahaMessageMedia } from "./message-media";
 
 type SessionSource =
@@ -79,9 +79,12 @@ function phoneSuffixConditions(
 ) {
   const last9 = phoneSubscriberSuffix(normalizedPhone);
   if (!last9) return eq(column, normalizedPhone);
+  // Also the same Brazilian mobile with/without the 9th digit (DDD included).
+  const variant = brazilNinthDigitVariant(normalizedPhone);
   return or(
     eq(column, normalizedPhone),
     like(column, `%${last9}`),
+    variant ? like(column, `%${variant}`) : undefined,
   );
 }
 
@@ -272,7 +275,9 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       hasClient: Boolean(clientId),
     })
   ) {
-    await markIgnored(db, registered.id, "connection_contact_not_authorized");
+    // The number's shape (not the number) tells a personal contact from a
+    // lead whose reply arrived under a format we failed to match.
+    await markIgnored(db, registered.id, `connection_contact_not_authorized:${contactNumberShape(normalizedPhone)}`);
     return { processed: 0, ignored: "connection_contact_not_authorized" as const };
   }
 
