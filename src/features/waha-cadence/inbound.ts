@@ -24,6 +24,7 @@ import {
   WAHA_CADENCE_FEATURE,
 } from "./contract";
 import { phoneSubscriberSuffix, samePhoneSubscriber } from "./phone-matching";
+import { storeWahaMessageMedia } from "./message-media";
 
 type SessionSource =
   | { kind: "number"; number: typeof schema.wahaNumbers.$inferSelect }
@@ -279,12 +280,22 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   const persistStart = Date.now();
   const providerMessageId = event.message.id;
 
+  // Audio/image/video/document: keep the actual file (fetched through the
+  // relay) so the conversation plays it instead of showing "[audio]".
+  const messageRowId = randomUUID();
+  const storedMedia = await storeWahaMessageMedia({
+    tenantId,
+    messageRowId,
+    type: event.message.type,
+    media: event.message.media,
+  });
+
   await db.transaction(async (tx) => {
     // Insert message with dedup
     await tx
       .insert(schema.whatsappMessages)
       .values({
-        id: randomUUID(),
+        id: messageRowId,
         tenantId,
         leadId,
         clientId,
@@ -295,6 +306,14 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
         direction: isOutgoing ? "outgoing" : "incoming",
         body: event.message!.body,
         sentAt: new Date(event.occurredAt),
+        ...(storedMedia ? {
+          mediaKind: storedMedia.kind,
+          mediaMimeType: storedMedia.mimeType,
+          mediaFilename: storedMedia.filename,
+          mediaSizeBytes: storedMedia.sizeBytes,
+          mediaStorageKey: storedMedia.storageKey,
+          mediaSha256: storedMedia.sha256,
+        } : {}),
       })
       .onConflictDoNothing({
         target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId],

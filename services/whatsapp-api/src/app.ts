@@ -858,6 +858,42 @@ export function buildApp() {
     },
   );
 
+  // ── WAHA Media: file download for the CRM (webhook `media.url`) ──────
+  app.get<{ Querystring: { url?: string } }>(
+    "/internal/waha/media",
+    {
+      schema: {
+        querystring: {
+          type: "object",
+          additionalProperties: false,
+          required: ["url"],
+          properties: { url: { type: "string", minLength: 1, maxLength: 2000 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!requireInternalAuth(request, reply, getInternalApiToken())) return;
+
+      let wahaConfig;
+      try {
+        wahaConfig = getWahaConfig();
+      } catch {
+        return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+      }
+
+      try {
+        const file = await new WahaClient(wahaConfig).downloadMediaFile(request.query.url ?? "");
+        request.log.info({ operation: "waha.media.download", bytes: file.body.byteLength, contentType: file.contentType });
+        return reply.code(200).header("content-type", file.contentType).header("cache-control", "no-store").send(file.body);
+      } catch (error) {
+        const code = error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE";
+        const status = error instanceof WahaClientError ? error.statusCode : 502;
+        request.log.warn({ operation: "waha.media.download", errorCode: code });
+        return reply.code(status).send({ ok: false, error: code });
+      }
+    },
+  );
+
   // ── WAHA Connection: QR Code ─────────────────────────────────────────
   app.get<{ Params: { id: string } }>(
     "/internal/waha/connections/:id/qr",

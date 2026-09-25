@@ -12,7 +12,10 @@ export type WahaErrorCode =
   | "SESSION_NOT_FOUND"
   | "SESSION_EXISTS"
   | "QR_NOT_READY"
-  | "QR_EXPIRED";
+  | "QR_EXPIRED"
+  | "WAHA_MEDIA_INVALID_PATH"
+  | "WAHA_MEDIA_NOT_FOUND"
+  | "WAHA_MEDIA_TOO_LARGE";
 
 /**
  * Status normalizados internamente.

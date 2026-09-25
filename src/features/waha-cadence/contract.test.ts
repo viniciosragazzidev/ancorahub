@@ -198,3 +198,32 @@ describe("WAHA @lid contacts", () => {
     expect(event.message?.contactLidUnresolved).toBeUndefined();
   });
 });
+
+describe("WAHA media messages", () => {
+  it("keeps WAHA's media link so the file can be fetched through the relay", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: "message.any",
+      session: "ancora-broker-1",
+      id: "evt-audio-1",
+      payload: {
+        id: "msg-audio", from: "5521900000000@c.us", to: "5521999428504@c.us", fromMe: true, type: "ptt", hasMedia: true,
+        timestamp: 1_790_000_000,
+        media: { url: "http://localhost:3000/api/files/ancora-broker-1/msg-audio.oga", mimetype: "audio/ogg; codecs=opus" },
+      },
+    }));
+    expect(event.message?.media?.url).toBe("http://localhost:3000/api/files/ancora-broker-1/msg-audio.oga");
+    expect(event.message?.media?.mimeType).toBe("audio/ogg; codecs=opus");
+    expect(event.message?.type).toBe("audio");
+    expect(event.message?.body).toBe("[audio]");
+  });
+
+  it("derives the kind from the file when the engine sends no usable type", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: "message",
+      session: "ancora-broker-1",
+      id: "evt-img-1",
+      payload: { id: "msg-img", from: "5521999428504@c.us", fromMe: false, hasMedia: true, timestamp: 1_790_000_000, media: { url: "/api/files/s/x.jpeg", mimetype: "image/jpeg" } },
+    }));
+    expect(event.message?.type).toBe("image");
+  });
+});

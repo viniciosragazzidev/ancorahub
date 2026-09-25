@@ -100,6 +100,7 @@ import {
   type MediaBubbleData,
 } from "@/features/conversations/components/media-bubble";
 import { MediaAttachButton } from "@/features/conversations/components/media-attach-button";
+import { mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
 
 export type ConversationMessage = {
   id: string;
@@ -1125,6 +1126,8 @@ function MessageRow({
               />
             ) : mediaData && !mediaData.url ? (
               <MediaUnavailable isOutbound={isOutbound} />
+            ) : mediaPlaceholderLabel(message.body) ? (
+              <p className="whitespace-pre-wrap leading-5 italic opacity-80">{mediaPlaceholderLabel(message.body)}</p>
             ) : (
               <p className="whitespace-pre-wrap leading-5">{message.body}</p>
             )}

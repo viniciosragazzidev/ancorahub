@@ -626,6 +626,33 @@ export class WahaClient {
   }
 
   /**
+   * Baixa um arquivo de mídia que o WAHA guardou (link `media.url` do
+   * webhook). Só aceita caminhos `/api/files/…` deste WAHA — o host do link é
+   * ignorado, para o relay nunca buscar URLs arbitrárias vindas do payload.
+   */
+  async downloadMediaFile(mediaUrl: string, maxBytes = WAHA_MEDIA_MAX_BYTES): Promise<{ body: Buffer; contentType: string }> {
+    const path = wahaMediaFilePath(mediaUrl);
+    if (!path) throw new WahaClientError("WAHA_MEDIA_INVALID_PATH", 400, "Caminho de mídia WAHA inválido.");
+    let response: Response;
+    try {
+      response = await this.fetchFn(`${this.baseUrl}${path}`, {
+        headers: { "x-api-key": this.apiKey },
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch (error) {
+      if (isTimeoutError(error)) throw new WahaClientError("WAHA_TIMEOUT", 504, "WAHA não respondeu dentro do timeout.");
+      throw new WahaClientError("WAHA_UNAVAILABLE", 502, "WAHA indisponível.");
+    }
+    if (response.status === 404) throw new WahaClientError("WAHA_MEDIA_NOT_FOUND", 404, "Mídia não encontrada no WAHA.", 404);
+    if (!response.ok) throw new WahaClientError("WAHA_INTERNAL_ERROR", 502, `WAHA retornou status ${response.status}.`, response.status);
+    const declared = Number(response.headers.get("content-length") ?? "0");
+    if (declared > maxBytes) throw new WahaClientError("WAHA_MEDIA_TOO_LARGE", 413, "Mídia acima do limite.");
+    const body = Buffer.from(await response.arrayBuffer());
+    if (body.byteLength > maxBytes) throw new WahaClientError("WAHA_MEDIA_TOO_LARGE", 413, "Mídia acima do limite.");
+    return { body, contentType: response.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream" };
+  }
+
+  /**
    * Telefone (`<número>@c.us`) por trás de um identificador `@lid`, ou null
    * quando o WAHA não conhece o mapeamento. Nunca lança: um webhook não deve
    * falhar por causa dessa consulta.
@@ -677,6 +704,21 @@ export class WahaClient {
 
     return resolvedChatId;
   }
+}
+
+/** WhatsApp's own ceiling for documents; audio/image/video are far smaller. */
+export const WAHA_MEDIA_MAX_BYTES = 100 * 1024 * 1024;
+
+/** `/api/files/<session>/<file>` from a WAHA media link, or null for anything else. */
+export function wahaMediaFilePath(mediaUrl: string): string | null {
+  let pathname: string;
+  try {
+    pathname = new URL(mediaUrl, "http://waha.local").pathname;
+  } catch {
+    return null;
+  }
+  if (!pathname.startsWith("/api/files/") || pathname.includes("..") || pathname.includes("//")) return null;
+  return pathname;
 }
 
 const DEFAULT_WEBHOOK_URL = "http://api:3000/internal/webhooks/waha";

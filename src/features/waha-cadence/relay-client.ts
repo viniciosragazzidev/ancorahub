@@ -161,6 +161,25 @@ export async function getWahaMessageHistory(input: {
   return data.chats;
 }
 
+/** Baixa, pelo relay, o arquivo que o WAHA guardou para uma mensagem (`media.url` do webhook). */
+export async function downloadWahaMedia(mediaUrl: string): Promise<{ body: Buffer; contentType: string }> {
+  const config = relayConfig();
+  if (config.transport !== "fastify") throw new Error("WAHA_MEDIA_REQUIRES_FASTIFY");
+  const response = await fetch(`${config.url}/internal/waha/media?${new URLSearchParams({ url: mediaUrl }).toString()}`, {
+    headers: getFastifyHeaders(config.secret, false),
+    cache: "no-store",
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(`WAHA_MEDIA_FAILED:${data?.error ?? response.status}`);
+  }
+  return {
+    body: Buffer.from(await response.arrayBuffer()),
+    contentType: response.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream",
+  };
+}
+
 /** Lista conversas WAHA para reconciliar o chat real pelo sufixo do telefone. */
 export async function getWahaChats(input: { sessionName: string; limit?: number }) {
   const config = relayConfig();

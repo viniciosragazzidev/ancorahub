@@ -86,6 +86,8 @@ export const wahaWebhookSchema = z.object({
       mimeType: z.string().max(100).optional(),
       fileName: z.string().max(255).optional(),
       sizeBytes: z.number().int().optional(),
+      /** WAHA's link to the stored file; only its /api/files path is ever fetched, through the relay. */
+      url: z.string().max(2000).optional(),
     }).strict().optional(),
   }).strict().optional(),
   delivery: z.object({
@@ -150,9 +152,18 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
 
     if (isNativeWahaMessage) {
       const rawType = String(innerPayload.type || "chat");
+      // Voice notes arrive as "ptt"; some engines omit the type on media and
+      // only send the file's mimetype, so the kind is derived from it.
+      const rawMedia = innerPayload.media && typeof innerPayload.media === "object" ? innerPayload.media as Record<string, unknown> : null;
+      const rawMime = String(rawMedia?.mimetype ?? rawMedia?.mimeType ?? "").toLowerCase();
+      const kindFromMime = !rawMime ? null
+        : rawMime.startsWith("audio/") ? "audio"
+          : rawMime.startsWith("image/") ? "image"
+            : rawMime.startsWith("video/") ? "video"
+              : "document";
       const mappedType =
-        rawType === "chat"
-          ? "text"
+        rawType === "ptt" || rawType === "voice"
+          ? "audio"
           : [
               "image",
               "audio",
@@ -163,7 +174,9 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
               "contact",
             ].includes(rawType)
             ? rawType
-            : "text";
+            : innerPayload.hasMedia === true && kindFromMime
+              ? kindFromMime
+              : "text";
 
       const mediaObj =
         innerPayload.media && typeof innerPayload.media === "object"
@@ -225,6 +238,7 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
                 mimeType: String(mediaObj.mimetype || mediaObj.mimeType || "application/octet-stream"),
                 fileName: mediaObj.filename ? String(mediaObj.filename) : undefined,
                 sizeBytes: typeof mediaObj.sizeBytes === "number" ? mediaObj.sizeBytes : undefined,
+                url: typeof mediaObj.url === "string" && mediaObj.url.trim() ? mediaObj.url.trim().slice(0, 2000) : undefined,
               }
             : undefined,
         },
