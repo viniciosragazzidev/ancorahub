@@ -33,7 +33,8 @@ import {
   ShieldCheck,
   WhatsappLogo,
 } from "@/components/huge-icons";
-import { FileText, Send, Sparkles, Users, Check, Zap } from "lucide-react";
+import { ExternalLink, FileText, Send, Sparkles, Users, Check, Zap } from "lucide-react";
+import type { TemplateMessagePreview } from "@/features/communication-channels/template-preview";
 import { cn } from "@/lib/utils";
 import {
   MediaBubble,
@@ -59,6 +60,8 @@ export type OfficialBrokerMessage = {
   status: "pending" | "queued" | "sent" | "delivered" | "read" | "failed" | "received";
   purpose?: string;
   templateName?: string;
+  /** The approved Meta template as the broker received it (header/body/footer/buttons), when it could be resolved. */
+  template?: TemplateMessagePreview | null;
   attempts?: number;
   error?: string | null;
   /** DEC-098: inbound broker media streamed through the authenticated route. */
@@ -887,6 +890,8 @@ function MessageBubble({
               />
             ) : hasMedia ? (
               <MediaUnavailable isOutbound={isOutgoing} />
+            ) : message.template ? (
+              <TemplateMessageContent template={message.template} />
             ) : (
               <span className="whitespace-pre-wrap">{message.body}</span>
             )}
@@ -909,6 +914,42 @@ function MessageBubble({
           <p className="px-1 text-[10px] text-rose-500 font-medium">{message.error}</p>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+/** WhatsApp inline formatting: *bold*, _italic_, ~strike~. */
+function WhatsAppFormattedText({ text }: { text: string }) {
+  const parts = text.split(/(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~)/g);
+  return (
+    <span className="whitespace-pre-wrap">
+      {parts.map((part, index) => {
+        if (part.length > 2 && part.startsWith("*") && part.endsWith("*")) return <strong key={index} className="font-semibold">{part.slice(1, -1)}</strong>;
+        if (part.length > 2 && part.startsWith("_") && part.endsWith("_")) return <em key={index}>{part.slice(1, -1)}</em>;
+        if (part.length > 2 && part.startsWith("~") && part.endsWith("~")) return <s key={index}>{part.slice(1, -1)}</s>;
+        return part;
+      })}
+    </span>
+  );
+}
+
+/** Renders a sent template the way WhatsApp shows it to the broker; buttons are a preview only, never links. */
+function TemplateMessageContent({ template }: { template: TemplateMessagePreview }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {template.header ? <p className="font-semibold"><WhatsAppFormattedText text={template.header} /></p> : null}
+      <WhatsAppFormattedText text={template.body} />
+      {template.footer ? <p className="opacity-70">{template.footer}</p> : null}
+      {template.buttons.length ? (
+        <div className="-mx-3 mt-1 flex flex-col">
+          {template.buttons.map((label, index) => (
+            <span key={index} className="flex items-center justify-center gap-1.5 border-t border-current/20 px-3 pt-2 font-medium">
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

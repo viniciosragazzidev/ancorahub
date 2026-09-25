@@ -22,6 +22,7 @@ import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-
 import { isMediaKindSupported } from "@/features/conversations/media-kinds";
 import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
+import { renderTemplatePreview } from "@/features/communication-channels/template-preview";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
@@ -640,7 +641,12 @@ export default async function ConversationsPage({
                 purpose: schema.whatsappOutboundMessages.purpose,
                 messageType: schema.whatsappOutboundMessages.messageType,
                 templateName: schema.whatsappOutboundMessages.templateName,
+                templateLanguage: schema.whatsappOutboundMessages.templateLanguage,
                 variables: schema.whatsappOutboundMessages.variables,
+                providerVariables: schema.whatsappOutboundMessages.providerVariables,
+                templateVariableNames: schema.whatsappOutboundMessages.templateVariableNames,
+                renderedBody: schema.whatsappOutboundMessages.renderedBody,
+                wabaId: schema.communicationChannels.wabaId,
                 status: schema.whatsappOutboundMessages.status,
                 createdAt: schema.whatsappOutboundMessages.createdAt,
                 sentAt: schema.whatsappOutboundMessages.sentAt,
@@ -701,6 +707,34 @@ export default async function ConversationsPage({
           ])
         : [[], [], []] as const;
 
+      // The approved templates as synchronized from Meta, so each sent
+      // template renders with its real header/body/buttons instead of a
+      // hand-written approximation.
+      const templateNames = [...new Set(outboundMessages.filter((m) => m.messageType === "template" && m.templateName).map((m) => m.templateName))];
+      const syncedTemplates = templateNames.length
+        ? await db
+          .select({
+            name: schema.metaWhatsAppTemplates.name,
+            language: schema.metaWhatsAppTemplates.language,
+            wabaId: schema.metaWhatsAppTemplates.wabaId,
+            componentsJson: schema.metaWhatsAppTemplates.componentsJson,
+          })
+          .from(schema.metaWhatsAppTemplates)
+          .where(and(
+            eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
+            inArray(schema.metaWhatsAppTemplates.name, templateNames),
+            isNull(schema.metaWhatsAppTemplates.deletedAt),
+          ))
+          .orderBy(desc(schema.metaWhatsAppTemplates.lastSyncedAt))
+        : [];
+      const findSyncedTemplate = (message: (typeof outboundMessages)[number]) => {
+        const candidates = syncedTemplates.filter((t) => t.name === message.templateName);
+        return candidates.find((t) => t.wabaId === message.wabaId && t.language === message.templateLanguage)
+          ?? candidates.find((t) => t.wabaId === message.wabaId)
+          ?? candidates.find((t) => t.language === message.templateLanguage)
+          ?? candidates[0];
+      };
+
       const brokerByProfileId = new Map(brokers.map((b) => [b.id, b]));
       const brokerByUserId = new Map(brokers.filter((b) => b.userId).map((b) => [b.userId!, b]));
       const invitationToBrokerId = new Map(invitations.map((inv) => [inv.id, inv.brokerProfileId]));
@@ -741,15 +775,26 @@ export default async function ConversationsPage({
       for (const message of outboundMessages) {
         const broker = findBroker(message.recipientId, message.destinationPhone);
         if (!broker) continue;
+        const synced = message.messageType === "template" ? findSyncedTemplate(message) : undefined;
+        const template = synced
+          ? renderTemplatePreview({
+            purpose: message.purpose,
+            componentsJson: synced.componentsJson,
+            variables: message.variables,
+            providerVariables: message.providerVariables,
+            templateVariableNames: message.templateVariableNames,
+          })
+          : null;
         addMessage(broker.id, {
           id: `out:${message.id}`,
           direction: "outgoing",
-          body: formatOfficialOutboundBody(
+          body: template?.body ?? message.renderedBody ?? formatOfficialOutboundBody(
             message.purpose,
             message.messageType,
             message.templateName,
             message.variables,
           ),
+          template,
           sentAt: (message.sentAt ?? message.createdAt).toISOString(),
           status: normalizeOutboundStatus(message.status),
           purpose: message.purpose,
