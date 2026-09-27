@@ -119,3 +119,18 @@ describe("message event catalog", () => {
     expect(getFreeMessageUnknownVariables(event!, ["nome", "hora", "id"])).toEqual([]);
   });
 });
+
+describe("Meta template parameters", () => {
+  it("never sends a blank parameter for a name the event does not know", () => {
+    // Approved lead_assignment_expired declares {{nome}}; the event only has the broker name.
+    const event = getMessageEventByPurpose("leadAssignmentExpired")!;
+    expect(buildMetaProviderVariables(event, ["Vinicios Ragazzi A."], ["nome"], {})).toEqual(["Vinicios Ragazzi A."]);
+    expect(buildMetaProviderVariables(event, [], ["nome"], {})).toEqual(["Corretor(a)"]);
+  });
+
+  it("keeps explicit mappings and known names", () => {
+    const event = getMessageEventByPurpose("leadAssignmentExpired")!;
+    expect(buildMetaProviderVariables(event, ["Ana"], ["corretor"], {})).toEqual(["Ana"]);
+    expect(buildMetaProviderVariables(event, ["Ana"], ["x"], { x: "corretor_nome" })).toEqual(["Ana"]);
+  });
+});

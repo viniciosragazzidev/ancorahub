@@ -11,7 +11,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -189,6 +189,27 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
 
     await inRollback(async (tx, tenantId, brokerId) => {
       await companyNumber(tx, tenantId, "active");
+      const switchCompanyNumber = (on: boolean) => tx.insert(realSchema.systemSettings).values({ key: `company_number_notices_enabled_${tenantId}`, value: on ? "true" : "false" })
+        .onConflictDoUpdate({ target: realSchema.systemSettings.key, set: { value: on ? "true" : "false" } });
+      // Queued for the company number, then the director switches it off: it leaves through Meta.
+      const queuedBefore = await scenario(tx, { tenantId, brokerId, purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"], process: false });
+      await switchCompanyNumber(false);
+      // Switched off: every notice goes through the official Meta only, even with the number connected.
+      report.switchedOff = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"] });
+      report.switchedOffConfirmed = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadAssignmentConfirmed", variables: ["Corretor Teste", "Lead Teste", "(21) 90000-0003", "Plano", "Individual", "0", "Rio", randomUUID()], process: false });
+      const outbound = await import("./outbound-service");
+      const [queuedRow] = await tx.select({ id: realSchema.whatsappOutboundMessages.id }).from(realSchema.whatsappOutboundMessages)
+        .where(and(eq(realSchema.whatsappOutboundMessages.tenantId, tenantId), eq(realSchema.whatsappOutboundMessages.deliveryRoute, "waha_direct"), eq(realSchema.whatsappOutboundMessages.purpose, "brokerAccountActivated")))
+        .orderBy(desc(realSchema.whatsappOutboundMessages.createdAt)).limit(1);
+      calls.length = 0;
+      await outbound.processMetaOutboundBatch(1, tenantId, queuedRow.id);
+      const [queuedAfter] = await tx.select().from(realSchema.whatsappOutboundMessages).where(eq(realSchema.whatsappOutboundMessages.id, queuedRow.id));
+      report.queuedThenSwitchedOff = { enqueue: queuedBefore.enqueue, process: { status: queuedAfter.status, route: queuedAfter.deliveryRoute, hold: queuedAfter.holdReason, error: null, calls: [...calls] } };
+      await switchCompanyNumber(true);
+    });
+
+    await inRollback(async (tx, tenantId, brokerId) => {
+      await companyNumber(tx, tenantId, "active");
       await notice(tx, tenantId, "LEAD_FEEDBACK_REMINDER", true, "company_number");
       // At most 2 feedback reminders per person per day, spaced apart.
       report.reminder1 = await scenario(tx, { tenantId, brokerId, purpose: "leadFeedbackReminder", variables: ["Corretor Teste", "Lead B"] });
@@ -234,6 +255,13 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
     expect(report.reminderSaturday.process).toMatchObject({ status: "queued", hold: "outside_business_hours" });
     expect(sentBy("reminderSaturday")).toEqual([]);
     expect(report.confirmedSaturday.process).toMatchObject({ status: "sent" });
+
+    // Master switch off: Meta only, never the company number (not even as a fallback).
+    expect(report.switchedOff).toMatchObject({ enqueue: { route: "meta_only", hold: "company_number_off" }, process: { status: "sent", route: "meta_only" } });
+    expect(sentBy("switchedOff")).toEqual(["meta_template"]);
+    expect(report.switchedOffConfirmed.enqueue).toMatchObject({ route: "meta_only", hold: "company_number_off" });
+    expect(report.queuedThenSwitchedOff).toMatchObject({ enqueue: { route: "waha_direct" }, process: { status: "sent", route: "meta_only" } });
+    expect(sentBy("queuedThenSwitchedOff")).toEqual(["meta_template"]);
 
     expect(report.reminder1.process).toMatchObject({ status: "sent" });
     expect(report.reminder2.process).toMatchObject({ status: "sent" });

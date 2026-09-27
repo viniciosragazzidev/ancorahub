@@ -25,6 +25,8 @@ const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().u
 
 export type ManagementActionState = {
   success?: boolean;
+  /** The lead has no broker: the screen must ask "direct or offer" and submit again. */
+  needsAssignmentMode?: boolean;
   error?: string;
   warning?: string;
   message?: string;
@@ -234,7 +236,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       if (input.brokerId && input.brokerId === lead.corretorId) throw new Error("Selecione outro corretor para reiniciar o atendimento.");
       if (!input.brokerId) throw new Error("Selecione um corretor para reatribuir o lead.");
       const assignmentChoiceEnabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
-      if (!lead.corretorId && assignmentChoiceEnabled && !input.assignmentMode) throw new Error("Escolha se deseja atribuir direto ou enviar uma oferta para aceite.");
+      if (!lead.corretorId && assignmentChoiceEnabled && !input.assignmentMode) return { mutationId, needsAssignmentMode: true, error: "Escolha se deseja atribuir direto ou enviar uma oferta para aceite." };
       if (input.assignmentMode && (!assignmentChoiceEnabled || lead.corretorId)) throw new Error("Esta escolha está disponível somente para leads sem corretor e quando habilitada pelo Super-admin.");
       const brokerId = input.brokerId;
       const assignmentEventId = randomUUID();

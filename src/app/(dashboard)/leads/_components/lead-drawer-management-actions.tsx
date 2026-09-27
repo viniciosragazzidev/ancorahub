@@ -143,6 +143,11 @@ export function LeadDrawerManagementActions({
   }, [onSuccess, setBrokerId]);
   const handleReassignError = useCallback((result: typeof reassignState) => {
     onReassignRollback?.();
+    // The screen still showed an owner the lead no longer has: ask the mode now.
+    if (result.needsAssignmentMode) {
+      setManualAssignmentDialogOpen(true);
+      return;
+    }
     if (result.error) toast.error(result.error);
   }, [onReassignRollback]);
   useActionDialogLifecycle({

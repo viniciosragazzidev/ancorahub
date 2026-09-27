@@ -16,8 +16,26 @@ import {
 /** Connected company-number statuses: relay vocabulary ("active") and rows written as "ready". */
 export const TENANT_CHANNEL_CONNECTED_STATUSES = ["active", "ready"];
 
-/** The tenant's company number (WhatsApp da diretoria) when it is connected, else null. */
+export function companyNumberNoticesKey(tenantId: string) {
+  return `company_number_notices_enabled_${tenantId}`;
+}
+
+/**
+ * Director's master switch for the company number in team messages. Off means
+ * every team message leaves through the official Meta API only: the company
+ * number is not used first nor as a fallback. Unset = on.
+ */
+export async function companyNumberNoticesEnabled(tenantId: string): Promise<boolean> {
+  try {
+    return (await getSystemSetting(companyNumberNoticesKey(tenantId))) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+/** The tenant's company number (WhatsApp da diretoria) when it is connected and switched on, else null. */
 export async function findConnectedTenantChannelId(tenantId: string): Promise<string | null> {
+  if (!(await companyNumberNoticesEnabled(tenantId))) return null;
   const [channel] = await getDatabase().select({ id: schema.wahaNumbers.id }).from(schema.wahaNumbers)
     .where(and(eq(schema.wahaNumbers.tenantId, tenantId), eq(schema.wahaNumbers.scope, "tenant"), inArray(schema.wahaNumbers.status, TENANT_CHANNEL_CONNECTED_STATUSES)))
     .orderBy(desc(schema.wahaNumbers.createdAt))

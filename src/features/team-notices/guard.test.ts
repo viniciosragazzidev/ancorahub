@@ -92,6 +92,16 @@ describe("team notice decision", () => {
     expect(decideTeamNotice(notice, { enabled: false, channel: "meta", freeMessageId: null }, null, now)).toEqual({ action: "skip", reason: "disabled" });
   });
 
+  it("sends everything through Meta only when the company number is switched off", () => {
+    const off = { enabled: true, channel: "company_number" as const, freeMessageId: null };
+    for (const key of ["LEAD_OFFER", "LEAD_ASSIGNMENT_CONFIRMED", "LEAD_ASSIGNMENT_EXPIRED"]) {
+      expect(decideTeamNotice(teamNoticeByKey(key)!, off, number, now, false)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: "company_number_off" });
+      expect(decideTeamNotice(teamNoticeByKey(key)!, { ...off, channel: "meta" }, number, now, false)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: "company_number_off" });
+    }
+    // Switched off still does not send a disabled notice.
+    expect(decideTeamNotice(teamNoticeByKey("TASK_REMINDER")!, { ...off, enabled: false }, number, now, false)).toEqual({ action: "skip", reason: "disabled" });
+  });
+
   it("goes by the company number and falls back to Meta when it is down, paused or banned", () => {
     const notice = teamNoticeByKey("LEAD_ASSIGNMENT_CONFIRMED")!;
     const setting = { enabled: true, channel: "company_number" as const, freeMessageId: null };

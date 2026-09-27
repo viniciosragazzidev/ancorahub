@@ -281,5 +281,16 @@ export function buildMetaProviderVariables(
   mappings: Record<string, string>,
 ) {
   const values = buildEventVariableValues(event, rawVariables);
-  return templateVariables.map((placeholder) => values[mappings[placeholder] ?? ""] ?? "");
+  const bodyVariables = event.variables.filter((variable) => !variable.urlOnly);
+  // Meta rejects a blank parameter (#131008). An unmapped name (e.g. {{nome}}
+  // on a broker-only notice) takes the variable in the same position, then the
+  // variable's fallback text.
+  return templateVariables.map((placeholder, index) => {
+    const key = mappings[placeholder]
+      ?? resolveEventVariableKey(event, placeholder)
+      ?? bodyVariables[index]?.key
+      ?? (bodyVariables.length === 1 ? bodyVariables[0].key : null);
+    const value = key ? values[key]?.trim() : "";
+    return value || bodyVariables[index]?.fallback || bodyVariables[0]?.fallback || "-";
+  });
 }

@@ -1,6 +1,6 @@
 ﻿import "server-only";
 
-import { and, desc, eq, isNotNull, isNull, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
@@ -68,6 +68,8 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           eq(schema.leads.tenantId, tenant.id),
           isNull(schema.leads.deletedAt),
           isNull(schema.leads.corretorId),
+          // A lead a manager put on hold waits for a manual action: never back to automatic distribution.
+          ne(schema.leads.distributionStatus, "manual_hold"),
           or(
             eq(schema.leads.qualificationState, "IN_PROGRESS"),
             eq(schema.leads.qualificationStatus, "qualifying"),

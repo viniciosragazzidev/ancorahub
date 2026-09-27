@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 
 import { setSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
-import { tenantChannelRoutingKey } from "@/features/waha-cadence/tenant-channel-routing";
+import { companyNumberNoticesKey, tenantChannelRoutingKey } from "@/features/waha-cadence/tenant-channel-routing";
 import { normalizeTenantChannelRouting, type TenantChannelRouting } from "@/features/waha-cadence/tenant-channel-routing-rules";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -85,6 +85,23 @@ export async function saveTenantChannelRoutingAction(input: TenantChannelRouting
 export type TeamNoticeInput = { key: string; enabled: boolean; channel: NoticeChannel; freeMessageId: string | null };
 
 /** Team notices (DEC-125): on/off, primary channel and the company-number text of each notice. */
+/** Master switch: off sends every team message through the official Meta API only. */
+export async function saveCompanyNumberNoticesAction(enabled: boolean): Promise<Result<object>> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") return { success: false, error: "Apenas o Diretor pode alterar o canal dos avisos." };
+    await setSystemSetting(companyNumberNoticesKey(context.tenantId), enabled ? "true" : "false");
+    await getDatabase().insert(schema.auditLogs).values({
+      id: randomUUID(), userId: context.userId, entidade: "tenant", entidadeId: context.tenantId,
+      acao: `team_notices.company_number:${enabled ? "on" : "off"}`,
+    });
+    revalidatePath("/integrations/whatsapp");
+    return { success: true };
+  } catch (error) {
+    return failure(error, "Não foi possível alterar o canal dos avisos.");
+  }
+}
+
 export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<Result<object>> {
   try {
     const context = await getRequiredTenantContext();
