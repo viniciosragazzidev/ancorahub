@@ -625,6 +625,8 @@ export const leadQueues = pgTable(
     exclusiveDutyScheduleIds: jsonb("exclusive_duty_schedule_ids").$type<string[]>().notNull().default([]),
     dutyFallbackPolicy: text("duty_fallback_policy").notNull().default("unit_roster"),
     dutyFallbackQueueId: text("duty_fallback_queue_id"),
+    /** Attendance flow of this queue (DEC-127); null keeps today's intake. */
+    attendanceFlowId: text("attendance_flow_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     status: text("status").notNull().default("active"),
@@ -4415,3 +4417,58 @@ export type PasswordResetRequestStatus = "requested" | "approved" | "rejected" |
 export type ProposalStatus = (typeof proposalStatusValues)[number];
 export type AutomationStatus = (typeof automationStatusValues)[number];
 export type AutomationLogStatus = (typeof automationLogStatusValues)[number];
+
+/** Attendance flows per queue (DEC-127). */
+export const attendanceFlows = pgTable("attendance_flows", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  builtinKey: text("builtin_key"),
+  status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
+  publishedVersionId: text("published_version_id"),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const attendanceFlowVersions = pgTable("attendance_flow_versions", {
+  id: text("id").primaryKey(),
+  flowId: text("flow_id").notNull().references(() => attendanceFlows.id, { onDelete: "cascade" }),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  status: text("status", { enum: ["draft", "published", "superseded"] }).notNull().default("draft"),
+  definition: jsonb("definition").notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const attendanceRuns = pgTable("attendance_runs", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  flowVersionId: text("flow_version_id").notNull().references(() => attendanceFlowVersions.id),
+  queueId: text("queue_id"),
+  status: text("status", { enum: ["running", "waiting", "completed", "failed", "cancelled"] }).notNull(),
+  currentNodeId: text("current_node_id"),
+  waitingFor: text("waiting_for"),
+  wakeAt: timestamp("wake_at", { withTimezone: true }),
+  lastReply: text("last_reply"),
+  error: text("error"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const attendanceRunSteps = pgTable("attendance_run_steps", {
+  id: text("id").primaryKey(),
+  runId: text("run_id").notNull().references(() => attendanceRuns.id, { onDelete: "cascade" }),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  nodeId: text("node_id").notNull(),
+  kind: text("kind").notNull(),
+  status: text("status", { enum: ["done", "failed"] }).notNull(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  detail: jsonb("detail"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

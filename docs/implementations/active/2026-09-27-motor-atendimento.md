@@ -56,6 +56,18 @@ Resultado da caracterização:
 - Sem migration e sem mudança de envio.
 - Verificação: testes do catálogo; teste com banco real e transação desfeita (uso, recusa ao remover, remoção liberada) que também gera todos os avisos da equipe com os dados do corretor de teste Vinicios Ragazzi A. (nome e links conferidos, nada enviado).
 
+## Fase 3 — motor de fluxos (base entregue em `feat/motor-atendimento-fase3`)
+
+- Núcleo puro `src/features/attendance-flows`: blocos (início, enviar, enviar e aguardar, condição com "senão", agente de IA, aguardar, transferir, atualizar lead, atendimento atual, encerrar), validação para publicar (saídas, blocos soltos, voltas sem espera) e executor determinístico.
+- Fluxos prontos por empresa, versão 1 publicada: "Atendimento atual" (roda exatamente a entrada de hoje), "Direto para a distribuição" e "IA qualifica e distribui (motor novo)".
+- Execução: um lead passa pelo fluxo da fila uma vez (reinício só explícito), cada bloco roda uma vez (chave por passo) e fica registrado; espera do agente confere a cada 2 min se o lead foi distribuído (concluiu → encerra sem distribuir de novo; 90 min sem distribuir → saída "não concluiu" → distribuição). O job de 1 min `qualification-timeout` acorda as execuções.
+- Motor novo de qualificação só para leads cujo telefone é número de teste de Qualificação (DEC-126), sem depender de `feature_qualification_engine_enabled`; os demais seguem a saída "não concluiu".
+- Entrada por webhook: fila com fluxo e chave ligada → fluxo; senão, entrada de hoje (inalterada). Se o fluxo não iniciar, a entrada de hoje roda.
+- Chave global `feature_attendance_flows_enabled` (padrão desligada) no super-admin; campo "Fluxo de atendimento" no editor da fila só aparece com ela ligada.
+- Migration `0165_attendance_flows` (aditiva, aplicada em 2026-09-27).
+- Verificação: 8 testes do núcleo; teste com banco real e transação desfeita cobrindo fila sem fluxo, "Atendimento atual" uma vez, reinício bloqueado, distribuição direta com uma única distribuição, agente que não inicia, agente que conclui, agente travado e chave desligada; 520 testes das áreas afetadas.
+- Pendente: envio de mensagens pelo fluxo e editor visual (fase 4); outras entradas de lead (manual, importação, WhatsApp) ainda usam só a entrada de hoje.
+
 ## Fases
 
 1. **Avisos da equipe.** Tabela única por evento (ligado, canal: WAHA com reserva Meta / Meta / WAHA / Meta com reserva WAHA, template Meta, texto livre). Função única de decisão; desligado = pulado; validação ao salvar (template precisa existir no número); oferta por WAHA com aceite por link seguro. Migra `tenant_channel_routing_*` e as políticas internas; atualiza a caracterização para o comportamento novo.

@@ -826,6 +826,20 @@ export async function updateDutyPresenceConfirmationSettingsAction(formData: For
   });
 }
 
+export async function updateAttendanceFlowsSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("attendanceFlowsEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.ATTENDANCE_FLOWS.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "attendance_flows.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+}
+
 export async function updateDutyMonthlySchedulingSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("dutyMonthlySchedulingEnabled") === "true" ? "true" : "false";

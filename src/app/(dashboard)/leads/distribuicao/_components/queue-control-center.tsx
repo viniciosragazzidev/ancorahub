@@ -96,6 +96,7 @@ const emptyQueue = {
   offerIntervalMinutes: "5",
   maxPendingOffersPerBroker: "1",
   aiQualificationEnabled: true,
+  attendanceFlowId: null as string | null,
   status: "active",
   colorHue: null as number | null,
 };
@@ -113,6 +114,7 @@ export function QueueControlCenter({
   adRoutes,
   canEdit,
   settingsPanels = [],
+  attendanceFlows = null,
 }: {
   queues: Queue[];
   branches: Branch[];
@@ -123,6 +125,8 @@ export function QueueControlCenter({
   campaignRoutes: MetaCampaignRoute[];
   adRoutes: MetaAdRoute[];
   canEdit: boolean;
+  /** Attendance flows (DEC-127); null while the switch is off, so the field stays hidden. */
+  attendanceFlows?: Array<{ id: string; name: string; description: string | null }> | null;
   /** Secondary settings reached from the page "⋯" menu, each in a drawer. */
   settingsPanels?: Array<{ id: string; label: string; description?: string; content: ReactNode }>;
 }) {
@@ -325,6 +329,7 @@ export function QueueControlCenter({
       offerIntervalMinutes: String(queue.offerIntervalMinutes ?? 5),
       maxPendingOffersPerBroker: String(queue.maxPendingOffersPerBroker ?? 1),
       aiQualificationEnabled: queue.aiQualificationEnabled ?? true,
+      attendanceFlowId: queue.attendanceFlowId ?? null,
       status: queue.status,
       colorHue: queue.colorHue ?? pickDistinctHue(usedHuesExcept(queue.id)),
     });
@@ -417,6 +422,7 @@ export function QueueControlCenter({
       offerIntervalMinutes: Math.max(0, Math.trunc(Number(form.offerIntervalMinutes) || 0)),
       maxPendingOffersPerBroker: Math.max(0, Math.trunc(Number(form.maxPendingOffersPerBroker) || 0)),
       aiQualificationEnabled: form.aiQualificationEnabled,
+      ...(attendanceFlows ? { attendanceFlowId: form.attendanceFlowId } : {}),
       status: form.status,
       colorHue: form.colorHue,
     });
@@ -939,6 +945,24 @@ export function QueueControlCenter({
                   direcionados a esta fila.
                 </p>
               </div>
+
+              {attendanceFlows ? (
+                <div className="rounded-xl border border-border/70 p-4 space-y-1.5">
+                  <label htmlFor="queue-attendance-flow" className="text-sm font-semibold text-foreground">Fluxo de atendimento</label>
+                  <select
+                    id="queue-attendance-flow"
+                    value={form.attendanceFlowId ?? ""}
+                    onChange={(event) => setForm({ ...form, attendanceFlowId: event.target.value || null })}
+                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                  >
+                    <option value="">Sem fluxo (atendimento atual)</option>
+                    {attendanceFlows.map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}
+                  </select>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {attendanceFlows.find((flow) => flow.id === form.attendanceFlowId)?.description ?? "Os leads desta fila seguem o atendimento de hoje."}
+                  </p>
+                </div>
+              ) : null}
 
               <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
                 <p className="text-xs font-semibold text-foreground">Entradas da fila</p>

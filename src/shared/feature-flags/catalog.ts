@@ -234,6 +234,14 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
   },
+  ATTENDANCE_FLOWS: {
+    key: "feature_attendance_flows_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Liga os fluxos de atendimento por fila (DEC-127). Desligado, toda fila segue o atendimento atual.",
+  },
+
   DUTY_MONTHLY_SCHEDULING: {
     key: "feature_duty_monthly_scheduling_enabled",
     scope: "global",

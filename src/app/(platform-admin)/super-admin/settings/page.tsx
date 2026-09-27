@@ -32,6 +32,7 @@ import {
   updateLeadManagementActionsSettingsAction,
   updateManualLeadAssignmentOfferChoiceSettingsAction,
   updateDutyPresenceConfirmationSettingsAction,
+  updateAttendanceFlowsSettingsAction,
   updateDutyMonthlySchedulingSettingsAction,
   updateDutyOccurrenceHistorySettingsAction,
   updateCustomRolesGlobalSettingsAction,
@@ -104,6 +105,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_manual_lead_assignment_offer_choice_enabled",
     FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key,
     FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key,
+    FEATURE_FLAGS.ATTENDANCE_FLOWS.key,
     FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key,
     FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
     "ai_enabled",
@@ -162,6 +164,7 @@ export default async function SuperAdminSettingsPage() {
   const manualLeadAssignmentOfferChoiceEnabled = settingMap.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false";
   const dutyPresenceConfirmationEnabled = settingMap.get(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key) === "true";
   const dutyMonthlySchedulingEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key) ?? FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue) === "true";
+  const attendanceFlowsEnabled = (settingMap.get(FEATURE_FLAGS.ATTENDANCE_FLOWS.key) ?? FEATURE_FLAGS.ATTENDANCE_FLOWS.defaultValue) === "true";
   const dutyOccurrenceHistoryEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key) ?? FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.defaultValue) === "true";
   const unlinkedConversationDeletionEnabled =
     settingMap.get(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key) !== "false";
@@ -1167,6 +1170,26 @@ export default async function SuperAdminSettingsPage() {
                     <span>
                       <span className="font-medium">Geração de escala mensal habilitada</span>
                       <span className="block text-xs text-muted-foreground">Desativar impede novas gerações e publicações; escalas já publicadas permanecem registradas.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Fluxos de atendimento por fila</CardTitle>
+                <CardDescription>
+                  Permite escolher, em cada fila, o fluxo que atende os leads que chegam (DEC-127). Desligado, toda fila segue o atendimento atual, mesmo com um fluxo escolhido.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateAttendanceFlowsSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="attendanceFlowsEnabled" value="true" defaultChecked={attendanceFlowsEnabled} className="size-4 accent-primary" />
+                    <span>
+                      <span className="font-medium">Fluxos de atendimento habilitados</span>
+                      <span className="block text-xs text-muted-foreground">O motor novo de IA só atende números de teste de Qualificação até a troca definitiva.</span>
                     </span>
                   </label>
                   <Button type="submit" variant="outline">Salvar configuração</Button>

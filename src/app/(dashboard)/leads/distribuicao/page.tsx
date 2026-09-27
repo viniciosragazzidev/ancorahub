@@ -346,6 +346,7 @@ export default async function LeadDistributionPage({
         offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes,
         maxPendingOffersPerBroker: schema.leadQueues.maxPendingOffersPerBroker,
         aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled,
+        attendanceFlowId: schema.leadQueues.attendanceFlowId,
         colorHue: schema.leadQueues.colorHue,
       })
       .from(schema.leadQueues)
@@ -575,6 +576,15 @@ export default async function LeadDistributionPage({
       .map((p) => [p.queueId!, readDistributionPolicy(p.policy)]),
   );
 
+  // DEC-127: the queue's attendance flow, offered only while the switch is on.
+  const attendanceFlowOptions = await (async () => {
+    const { attendanceFlowsEnabled, ensureBuiltinFlows } = await import("@/features/attendance-flows/runtime");
+    if (!(await attendanceFlowsEnabled().catch(() => false))) return null;
+    await ensureBuiltinFlows(context.tenantId);
+    return getDatabase().select({ id: schema.attendanceFlows.id, name: schema.attendanceFlows.name, description: schema.attendanceFlows.description })
+      .from(schema.attendanceFlows)
+      .where(and(eq(schema.attendanceFlows.tenantId, context.tenantId), eq(schema.attendanceFlows.status, "active")));
+  })();
   const queuesForControl = queues.map((queue) => {
     const queuePolicy = queuePoliciesMap.get(queue.id);
     return {
@@ -659,6 +669,7 @@ export default async function LeadDistributionPage({
                       queueId: r.queueId ?? "",
                     }))}
                     adRoutes={metaAdRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
+                    attendanceFlows={attendanceFlowOptions}
                     canEdit
                     settingsPanels={[
                       {

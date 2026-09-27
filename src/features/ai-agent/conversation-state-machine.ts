@@ -443,9 +443,11 @@ export async function getOrCreateAiConversation({
 
 export async function startQualificationConversationForLead(
   input: { tenantId: string; leadId: string; actorUserId: string },
-  force: boolean = false
+  force: boolean = false,
+  /** Attendance flow test (DEC-126): the caller already checked the lead is a qualification test number. */
+  options: { flowTestLead?: boolean } = {},
 ) {
-  if ((await getSystemSetting("feature_qualification_engine_enabled")) === "false") return { started: false as const, reason: "disabled" as const };
+  if (!options.flowTestLead && (await getSystemSetting("feature_qualification_engine_enabled")) === "false") return { started: false as const, reason: "disabled" as const };
   const db = getDatabase();
   const [lead] = await db.select({
     id: schema.leads.id,

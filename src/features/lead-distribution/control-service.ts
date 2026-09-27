@@ -32,6 +32,8 @@ const queueInput = z.object({
   offerIntervalMinutes: z.number().int().min(0).max(120).default(5),
   maxPendingOffersPerBroker: z.number().int().min(0).max(20).default(1),
   aiQualificationEnabled: z.boolean().default(true),
+  /** Attendance flow (DEC-127). Omitted keeps the current one; null = today's intake. */
+  attendanceFlowId: z.string().uuid().nullable().optional(),
   status: z.enum(["active", "inactive"]),
   // Omitted/null → the server assigns one automatically (create) or keeps the
   // queue's current color untouched (update). See saveDistributionQueue.
@@ -246,6 +248,11 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     assertManager(context, input.branchId);
   }
   const db = getDatabase();
+  if (input.attendanceFlowId) {
+    const [flow] = await db.select({ id: schema.attendanceFlows.id }).from(schema.attendanceFlows)
+      .where(and(eq(schema.attendanceFlows.id, input.attendanceFlowId), eq(schema.attendanceFlows.tenantId, context.tenantId), eq(schema.attendanceFlows.status, "active"))).limit(1);
+    if (!flow) throw new AuthorizationError("Fluxo de atendimento não encontrado.");
+  }
   if (input.branchId) {
     const [branch] = await db.select({ id: schema.branches.id }).from(schema.branches)
       .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
@@ -329,6 +336,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     offerIntervalMinutes: input.offerIntervalMinutes,
     maxPendingOffersPerBroker: input.maxPendingOffersPerBroker,
     aiQualificationEnabled: input.aiQualificationEnabled,
+    ...(input.attendanceFlowId !== undefined ? { attendanceFlowId: input.attendanceFlowId } : {}),
     status: input.status,
     colorHue,
     updatedAt: now,

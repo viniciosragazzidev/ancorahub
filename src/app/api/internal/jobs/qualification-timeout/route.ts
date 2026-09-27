@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { runQualificationTimeoutSweep } from "@/features/ai-agent/qualification-timeout-sweep";
 import { runSlaSweep } from "@/features/leads/sla";
+import { flowEffectHandlers } from "@/features/attendance-flows/handlers";
+import { attendanceFlowsEnabled, wakeDueRuns } from "@/features/attendance-flows/runtime";
+
+/**
+ * DEC-127: wakes attendance flow runs whose wait is over (only with the switch
+ * on). Waking only follows exits (timeouts, agent result, distribution); an
+ * agent is never started here.
+ */
+async function wakeAttendanceRuns() {
+  if (!(await attendanceFlowsEnabled())) return 0;
+  return wakeDueRuns((run) => ({
+    ...flowEffectHandlers({ tenantId: run.tenantId, leadId: run.leadId, actorUserId: "", legacyIntake: async () => undefined }),
+    async startAgent() {
+      return { started: false };
+    },
+  }));
+}
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,11 +31,15 @@ async function handle(request: NextRequest) {
   }
 
   try {
-    const [result, slaResult] = await Promise.all([
+    const [result, slaResult, attendanceRuns] = await Promise.all([
       runQualificationTimeoutSweep(),
       runSlaSweep(),
+      wakeAttendanceRuns().catch((error) => {
+        console.error("[attendance-flows] wake failed", { message: error instanceof Error ? error.message.slice(0, 180) : "unknown" });
+        return -1;
+      }),
     ]);
-    return NextResponse.json({ success: true, result, slaResult });
+    return NextResponse.json({ success: true, result, slaResult, attendanceRuns });
   } catch (error) {
     const message = error instanceof Error ? error.message.replace(/[\r\n]+/g, " ").slice(0, 180) : "unknown_error";
     console.error("[qualification-timeout-job] failed", { message });

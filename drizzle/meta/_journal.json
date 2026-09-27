@@ -785,6 +785,13 @@
                         "when":  1790221600000,
                         "tag":  "0164_team_notices_delivery_guard",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  112,
+                        "version":  "7",
+                        "when":  1790225200000,
+                        "tag":  "0165_attendance_flows",
+                        "breakpoints":  true
                     }
                 ]
 }
