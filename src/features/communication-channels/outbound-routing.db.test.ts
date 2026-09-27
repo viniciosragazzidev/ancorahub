@@ -164,6 +164,7 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
       vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 20_000));
       report.confirmedMetaThenCompany = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadAssignmentConfirmed", variables: ["Outro", "Lead", "(21) 90000-0001", "Plano", "Individual", "1", "Rio", randomUUID()] });
       // Default off: an expired offer is not sent at all (and never through another channel).
+      await tx.delete(realSchema.teamNoticeSettings).where(and(eq(realSchema.teamNoticeSettings.tenantId, tenantId), eq(realSchema.teamNoticeSettings.noticeKey, "LEAD_ASSIGNMENT_EXPIRED")));
       report.expiredDefaultOff = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentExpired" });
       // Reminder switched on: sent by the company number within business hours.
       await notice(tx, tenantId, "TASK_REMINDER", true, "company_number");
@@ -222,6 +223,10 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
       report.reminderSaturday = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadFeedbackReminder", variables: ["Corretor Teste", "Lead A"] });
       // Lead information is never held, even on a Saturday.
       report.confirmedSaturday = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentConfirmed", variables: ["Corretor Teste", "Lead S", "(21) 90000-0002", "Plano", "Individual", "0", "Rio", randomUUID()] });
+      // Offer expired, switched on: goes out at once even on a Saturday.
+      await notice(tx, tenantId, "LEAD_ASSIGNMENT_EXPIRED", true, "company_number");
+      vi.setSystemTime(new Date(SATURDAY_10AM.getTime() + 60_000));
+      report.expiredSaturday = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadAssignmentExpired", variables: ["Corretor Teste"] });
     });
 
     if (process.env.OUTBOUND_REPORT_FILE) writeFileSync(process.env.OUTBOUND_REPORT_FILE, JSON.stringify(report, null, 2));
@@ -255,6 +260,7 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
     expect(report.reminderSaturday.process).toMatchObject({ status: "queued", hold: "outside_business_hours" });
     expect(sentBy("reminderSaturday")).toEqual([]);
     expect(report.confirmedSaturday.process).toMatchObject({ status: "sent" });
+    expect(report.expiredSaturday.process).toMatchObject({ status: "sent", route: "waha_direct" });
 
     // Master switch off: Meta only, never the company number (not even as a fallback).
     expect(report.switchedOff).toMatchObject({ enqueue: { route: "meta_only", hold: "company_number_off" }, process: { status: "sent", route: "meta_only" } });
