@@ -580,12 +580,26 @@ export async function saveFreeMessageTemplateAction(input: {
   }
 }
 
-export async function deleteFreeMessageTemplateAction(templateId: string) {
+/** Every message with its kind, where it is valid and where it is used (message library). */
+export async function fetchMessageLibraryAction() {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { getMessageLibrary } = await import("@/features/message-library/service");
+  return getMessageLibrary(context.tenantId);
+}
+
+export async function deleteFreeMessageTemplateAction(templateId: string): Promise<{ success: true } | { success: false; error: string }> {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { getDatabase, schema } = await import("@/shared/db");
   const { and, eq } = await import("drizzle-orm");
   const { randomUUID } = await import("node:crypto");
+  const { getMessageUsages } = await import("@/features/message-library/service");
+  const { describeUsages } = await import("@/features/message-library/catalog");
+
+  // A message in use is never removed silently: the place using it would change what it sends.
+  const inUse = (await getMessageUsages(context.tenantId)).get(templateId) ?? [];
+  if (inUse.length) return { success: false, error: `Esta mensagem está em uso (${describeUsages(inUse)}). Troque a mensagem nesses lugares antes de removê-la.` };
 
   const db = getDatabase();
   await db

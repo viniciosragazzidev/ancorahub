@@ -48,6 +48,14 @@ Resultado da caracterização:
 - Fase 1b: o botão do template de oferta é só um link para `/leads/<id>` (aceite no CRM), então a oferta sai pelo WhatsApp da empresa com o mesmo link e passa a ter esse canal como padrão. A confirmação de presença ganhou a opção do WhatsApp da empresa (link `/confirm_presence?id=`), fica sempre ligada (desligar tiraria o corretor da distribuição) e continua Meta por padrão. Só o convite de primeiro acesso segue travado na Meta.
 - Fica para depois: agrupar vários lembretes numa mensagem só.
 
+## Fase 2 — biblioteca de mensagens (entregue em `feat/motor-atendimento-fase2`)
+
+- `src/features/message-library`: tipos explícitos (template Meta, mensagem livre, resposta rápida da IA), validade por canal (Meta: template a qualquer hora, texto livre só na janela de 24h; WhatsApp da empresa: texto a qualquer hora) e "onde é usada" (avisos da equipe, rota antiga do número da empresa, situações, templates por situação, follow-ups, respostas da IA).
+- Card "Biblioteca de mensagens" (tabela no padrão `/equipe`, painel lateral por mensagem) no topo de Qualificação → Mensagens; a edição continua nos painéis existentes.
+- Remover mensagem livre em uso é recusado com a lista de lugares (antes desativava em silêncio e o aviso caía no texto padrão).
+- Sem migration e sem mudança de envio.
+- Verificação: testes do catálogo; teste com banco real e transação desfeita (uso, recusa ao remover, remoção liberada) que também gera todos os avisos da equipe com os dados do corretor de teste Vinicios Ragazzi A. (nome e links conferidos, nada enviado).
+
 ## Fases
 
 1. **Avisos da equipe.** Tabela única por evento (ligado, canal: WAHA com reserva Meta / Meta / WAHA / Meta com reserva WAHA, template Meta, texto livre). Função única de decisão; desligado = pulado; validação ao salvar (template precisa existir no número); oferta por WAHA com aceite por link seguro. Migra `tenant_channel_routing_*` e as políticas internas; atualiza a caracterização para o comportamento novo.

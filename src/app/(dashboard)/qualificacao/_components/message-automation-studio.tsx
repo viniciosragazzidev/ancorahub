@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { TemplateListView } from "../../integrations/whatsapp/_components/template-list-view";
+import { MessageLibraryCard } from "./message-library-card";
 import { MessagePoliciesPanel } from "./message-policies-panel";
 
 export function MessageAutomationStudio({ canManage }: { canManage: boolean }) {
@@ -11,6 +12,7 @@ export function MessageAutomationStudio({ canManage }: { canManage: boolean }) {
 
   return (
     <section className="grid gap-6" aria-label="Estúdio de mensagens automáticas">
+      <MessageLibraryCard />
       <TemplateListView
         canManage={canManage}
         onUseTemplate={canManage ? (templateId, eventKey) => {

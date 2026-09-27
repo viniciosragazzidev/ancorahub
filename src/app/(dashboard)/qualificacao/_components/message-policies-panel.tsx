@@ -266,7 +266,11 @@ export function MessagePoliciesPanel({
   async function removeFreeMessage(message: FreeMessage) {
     if (!window.confirm(`Remover a mensagem livre “${message.name}”?`)) return;
     try {
-      await deleteFreeMessageTemplateAction(message.id);
+      const result = await deleteFreeMessageTemplateAction(message.id);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Mensagem livre removida.");
       await load();
     } catch (error) {
