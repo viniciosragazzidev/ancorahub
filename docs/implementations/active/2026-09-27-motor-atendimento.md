@@ -45,7 +45,8 @@ Resultado da caracterização:
 - Migration `0164_team_notices_delivery_guard` (aditiva, aplicada em 2026-09-27): `team_notice_settings`, `whatsapp_outbound_messages.hold_reason/notice_key`, `waha_numbers.last_sent_at/consecutive_failures/paused_until`.
 - Tela: card "Avisos da equipe" em Integrações → WhatsApp (visão diretoria), substituindo a rota por evento.
 - Verificação: 14 testes das regras; caracterização com banco real (transação desfeita, provedores simulados) cobrindo WAHA, Meta primeiro sem template, desligado, número caído/pausado, falha do WAHA, sábado, limite de lembretes; 688 testes das áreas afetadas.
-- Fica para depois: oferta pelo WhatsApp da empresa com aceite por link (1b) e agrupar vários lembretes numa mensagem só.
+- Fase 1b: o botão do template de oferta é só um link para `/leads/<id>` (aceite no CRM), então a oferta sai pelo WhatsApp da empresa com o mesmo link e passa a ter esse canal como padrão. A confirmação de presença ganhou a opção do WhatsApp da empresa (link `/confirm_presence?id=`), fica sempre ligada (desligar tiraria o corretor da distribuição) e continua Meta por padrão. Só o convite de primeiro acesso segue travado na Meta.
+- Fica para depois: agrupar vários lembretes numa mensagem só.
 
 ## Fases
 

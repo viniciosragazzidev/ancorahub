@@ -27,6 +27,7 @@ export async function DirectorWhatsAppView({ context }: { context: TenantContext
       label: notice.label,
       description: notice.description,
       metaOnly: Boolean(notice.metaOnly),
+      alwaysOn: Boolean(notice.alwaysOn),
       immediate: notice.class === "critical",
       enabled: setting.enabled,
       channel: setting.channel,

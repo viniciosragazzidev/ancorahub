@@ -19,6 +19,7 @@ export type TeamNoticeRow = {
   label: string;
   description: string;
   metaOnly: boolean;
+  alwaysOn: boolean;
   immediate: boolean;
   enabled: boolean;
   channel: NoticeChannel;
@@ -87,12 +88,13 @@ export function TeamNoticesCard({
               {row.metaOnly ? (
                 <span className="mt-0.5 grid size-5 shrink-0 place-items-center text-muted-foreground" aria-label="Sempre ligado pela Meta"><LockKey className="size-4" /></span>
               ) : (
-                <Switch checked={row.enabled} onCheckedChange={(checked) => update(row.key, { enabled: checked === true })} aria-label={`${row.enabled ? "Desligar" : "Ligar"} ${row.label}`} className="mt-0.5" />
+                <Switch checked={row.enabled} disabled={row.alwaysOn} onCheckedChange={(checked) => update(row.key, { enabled: checked === true })} aria-label={row.alwaysOn ? `${row.label}: sempre ligado` : `${row.enabled ? "Desligar" : "Ligar"} ${row.label}`} className="mt-0.5" />
               )}
               <div className="min-w-0">
                 <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-foreground">
                   {row.label}
                   {row.immediate ? <span className="text-[11px] font-normal text-muted-foreground">sai na hora</span> : null}
+                  {row.alwaysOn ? <span className="text-[11px] font-normal text-muted-foreground">sempre ligado</span> : null}
                 </p>
                 <p className="text-xs leading-5 text-muted-foreground">{row.description}</p>
               </div>

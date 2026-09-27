@@ -18,8 +18,12 @@ export type TeamNotice = {
   description: string;
   class: NoticeClass;
   defaultEnabled: boolean;
-  /** Only the Meta template works (button or secret link); channel and switch are locked. */
+  /** Only the Meta template works (secret link); channel and switch are locked. */
   metaOnly?: boolean;
+  /** Cannot be switched off (turning it off would break the operation); the channel is still chosen. */
+  alwaysOn?: boolean;
+  /** Channel before anything is saved. Company number unless stated. */
+  defaultChannel?: NoticeChannel;
 };
 
 export const TEAM_NOTICES: readonly TeamNotice[] = [
@@ -27,10 +31,9 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     key: "LEAD_OFFER",
     purpose: "newLeadAssignment",
     label: "Novo lead disponível",
-    description: "Oferta de lead para o corretor aceitar. O aceite usa o botão do template Meta.",
+    description: "Oferta de lead para o corretor aceitar. O link abre o lead no CRM, onde ele aceita.",
     class: "critical",
     defaultEnabled: true,
-    metaOnly: true,
   },
   {
     key: "LEAD_ASSIGNMENT",
@@ -101,10 +104,11 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     key: "DUTY_PRESENCE_CONFIRMATION",
     purpose: "dutyPresenceConfirmation",
     label: "Confirmação de presença no plantão",
-    description: "Link seguro para confirmar o plantão. Sai sempre pela Meta.",
+    description: "Link para o corretor confirmar o plantão. Sempre ligado: sem ele o corretor não entra na distribuição.",
     class: "critical",
     defaultEnabled: true,
-    metaOnly: true,
+    alwaysOn: true,
+    defaultChannel: "meta",
   },
 ];
 
@@ -125,8 +129,8 @@ export type TeamNoticeSetting = { enabled: boolean; channel: NoticeChannel; free
 export function effectiveNoticeSetting(notice: TeamNotice, stored: Partial<TeamNoticeSetting> | null | undefined): TeamNoticeSetting {
   if (notice.metaOnly) return { enabled: true, channel: "meta", freeMessageId: null };
   return {
-    enabled: stored?.enabled ?? notice.defaultEnabled,
-    channel: stored?.channel ?? "company_number",
+    enabled: notice.alwaysOn ? true : stored?.enabled ?? notice.defaultEnabled,
+    channel: stored?.channel ?? notice.defaultChannel ?? "company_number",
     freeMessageId: stored?.freeMessageId ?? null,
   };
 }

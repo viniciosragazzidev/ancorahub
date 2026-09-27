@@ -341,7 +341,7 @@ export function MessagePoliciesPanel({
                     {isBrokerWelcome
                       ? "O primeiro acesso é enviado exclusivamente pelo template Meta aprovado broker_first_access. Esse contrato evita que um convite seja substituído por uma mensagem livre ou por outro modelo."
                       : isTemplateOnly
-                      ? "O lembrete de presença é sempre enviado pelo template Meta aprovado plantao_confirm_presence; texto livre e templates alternativos não são usados."
+                      ? "Pela Meta, o lembrete de presença usa o template aprovado plantao_confirm_presence. Ele também pode sair pelo WhatsApp da empresa, em Integrações → WhatsApp → Avisos da equipe."
                       : selectedEvent.windowRule === "meta_required_without_window"
                       ? "Sem inbound nas últimas 24 horas, o sistema força um template Meta aprovado. Texto livre nunca abre uma conversa fora da janela."
                       : "Mensagem livre só será enviada dentro da janela de 24 horas do WhatsApp. Fora dela, o sistema não envia texto livre; use um template Meta aprovado. O WhatsApp pessoal do corretor nunca envia pelo CRM."}

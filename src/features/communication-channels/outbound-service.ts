@@ -500,7 +500,7 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     const leadNome = split.bodyVariables[2] || rawVariables[2] || "Cliente";
     const produto = split.bodyVariables[3] || rawVariables[3] || "Plano de saúde";
     const leadId = urlButtonParameter || split.urlButtonParameter;
-    const link = leadId ? `\n\n👉 *Acesse no CRM:* ${baseUrl}/conversas?lead=${leadId}` : "";
+    const link = leadId ? `\n\n👉 *Acesse no CRM:* ${baseUrl}/leads/${leadId}` : "";
     return `⚡ *Novo Lead Atribuído!*\n\nOlá *${corretorNome}*, um novo lead foi atribuído a você:\n\n👤 *Cliente:* ${leadNome}\n🏥 *Interesse:* ${produto}${link}`;
   }
 
@@ -524,7 +524,7 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     const leadNome = split.bodyVariables[2] || rawVariables[2] || "Cliente";
     const produto = split.bodyVariables[3] || rawVariables[3] || "Plano de saúde";
     const leadId = urlButtonParameter || split.urlButtonParameter;
-    const link = leadId ? `\n\n👉 *Aceitar Lead:* ${baseUrl}/conversas?lead=${leadId}` : "";
+    const link = leadId ? `\n\n👉 *Aceitar o lead:* ${baseUrl}/leads/${leadId}` : "";
     return `🚨 *Novo Lead Disponível!*\n\nOlá *${brokerName}*, o lead *${leadNome}* está disponível para atendimento.\n\n🏥 *Interesse:* ${produto}${link}`;
   }
 
@@ -549,6 +549,14 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
   if (purpose === "leadAssignmentUnavailable") {
     const brokerName = rawVariables[0] || "Corretor(a)";
     return `ℹ️ *Aviso de Atribuição*\n\nOlá *${brokerName}*, este lead já foi atribuído a outro corretor ou expirou.`;
+  }
+
+  if (purpose === "dutyPresenceConfirmation") {
+    const brokerName = rawVariables[0]?.trim() || "Corretor(a)";
+    const hour = rawVariables[1]?.trim() || "";
+    const confirmationId = urlButtonParameter || rawVariables[2]?.trim() || "";
+    const link = confirmationId ? `\n\n👉 *Confirmar presença:* ${baseUrl}/confirm_presence?id=${confirmationId}` : "";
+    return `📅 *Confirme seu plantão*\n\nOlá *${brokerName}*, seu plantão começa${hour ? ` às *${hour}*` : " em breve"}. Confirme que está disponível para receber leads.${link}`;
   }
 
   if (purpose === "leadFeedbackReminder") {
@@ -594,6 +602,15 @@ async function guardNoticeRow(row: OutboundRow, channel: "company_number" | "met
   return "go";
 }
 
+/** A presence confirmation sent by the company number counts as notified, as on the Meta path. */
+async function markPresenceNotified(row: OutboundRow) {
+  if (row.purpose !== "dutyPresenceConfirmation" || !Array.isArray(row.variables) || typeof row.variables[2] !== "string") return;
+  await getDatabase().update(schema.dutyPresenceConfirmations).set({ notificationStatus: "sent", notificationErrorCode: null, updatedAt: new Date() }).where(and(
+    eq(schema.dutyPresenceConfirmations.id, row.variables[2]),
+    eq(schema.dutyPresenceConfirmations.tenantId, row.tenantId),
+  ));
+}
+
 /** Takes the company number's spacing slot; an exact dispatch retries once after the gap. */
 async function takeCompanySlot(wahaNumberId: string, noticeKey: string, exact: boolean) {
   const critical = teamNoticeByKey(noticeKey)?.class === "critical";
@@ -626,6 +643,7 @@ async function sendNoticeByCompanyNumber(row: OutboundRow, metaError: unknown, e
       holdReason: null, sentAt: now, updatedAt: now,
     }).where(eq(schema.whatsappOutboundMessages.id, row.id));
     await recordCompanyNumberSuccess(number.id).catch(() => undefined);
+    await markPresenceNotified(row);
     return true;
   } catch {
     await recordCompanyNumberFailure(number.id).catch(() => undefined);
@@ -746,6 +764,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId: sentByWaha.messageId, providerErrorCode: null, providerErrorMessage: null, holdReason: null, sentAt: new Date(), updatedAt: new Date() })
             .where(eq(schema.whatsappOutboundMessages.id, row.id));
           await recordCompanyNumberSuccess(row.wahaNumberId!).catch(() => undefined);
+          await markPresenceNotified(row);
           sent += 1;
           return;
         } catch (wahaError) {

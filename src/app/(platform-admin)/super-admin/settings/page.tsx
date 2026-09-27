@@ -1222,7 +1222,7 @@ export default async function SuperAdminSettingsPage() {
               <CardHeader>
                 <CardTitle>Confirmação de presença em plantões</CardTitle>
                 <CardDescription>
-                  Exige confirmação por ocorrência antes de um corretor escalado entrar na distribuição. O lembrete usa o template Meta aprovado plantao_confirm_presence.
+                  Exige confirmação por ocorrência antes de um corretor escalado entrar na distribuição. O lembrete usa o template Meta aprovado plantao_confirm_presence ou o WhatsApp da empresa, conforme Avisos da equipe.
                 </CardDescription>
               </CardHeader>
               <CardContent>

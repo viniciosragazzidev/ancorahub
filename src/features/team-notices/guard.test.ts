@@ -105,12 +105,21 @@ describe("team notice decision", () => {
     expect(decideTeamNotice(notice, { enabled: true, channel: "meta", freeMessageId: null }, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: "waha-1", note: null });
   });
 
-  it("locks the offer, the invitation and the presence confirmation to Meta, always on", () => {
-    for (const key of ["LEAD_OFFER", "BROKER_WELCOME", "DUTY_PRESENCE_CONFIRMATION"]) {
-      const notice = teamNoticeByKey(key)!;
-      const setting = effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" });
-      expect(setting).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
-      expect(decideTeamNotice(notice, setting, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: null });
-    }
+  it("locks only the first-access invitation to Meta", () => {
+    const notice = teamNoticeByKey("BROKER_WELCOME")!;
+    const setting = effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" });
+    expect(setting).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
+    expect(decideTeamNotice(notice, setting, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: null });
+  });
+
+  it("sends the lead offer by the company number by default (the link opens the lead in the CRM)", () => {
+    const notice = teamNoticeByKey("LEAD_OFFER")!;
+    expect(decideTeamNotice(notice, effectiveNoticeSetting(notice, null), number, now)).toEqual({ action: "send", primary: "company_number", wahaNumberId: "waha-1", note: null });
+  });
+
+  it("keeps the presence confirmation always on, Meta by default, with the company number as an option", () => {
+    const notice = teamNoticeByKey("DUTY_PRESENCE_CONFIRMATION")!;
+    expect(effectiveNoticeSetting(notice, null)).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
+    expect(effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" })).toEqual({ enabled: true, channel: "company_number", freeMessageId: null });
   });
 });

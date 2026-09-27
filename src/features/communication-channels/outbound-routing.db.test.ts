@@ -148,18 +148,26 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
   it("routes each team notice by its setting, with the company number first and Meta as the fallback", async () => {
     await inRollback(async (tx, tenantId, brokerId) => {
       await companyNumber(tx, tenantId, "active");
-      // Offer: locked to Meta (acceptance uses the template button).
-      report.offer = await scenario(tx, { tenantId, brokerId, purpose: "newLeadAssignment" });
-      // Lead information: company number first, built-in wording.
+      // Offer: company number by default; the link opens the lead in the CRM (same as the Meta button).
+      const offerLeadId = randomUUID();
+      report.offer = await scenario(tx, { tenantId, brokerId, purpose: "newLeadAssignment", variables: ["Corretor(a)", "Corretor Teste", "Lead Teste", "Plano de saúde", offerLeadId] });
+      report.offerLink = { enqueue: { status: "", route: offerLeadId, type: null, template: null, hold: null } };
+      // Presence confirmation: always on; Meta by default, company number when chosen.
+      report.presenceDefault = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "dutyPresenceConfirmation", variables: ["Corretor Teste", "09:00", randomUUID()], process: false });
+      await notice(tx, tenantId, "DUTY_PRESENCE_CONFIRMATION", false, "company_number");
+      report.presenceByCompany = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "dutyPresenceConfirmation", variables: ["Corretor Teste", "09:00", randomUUID()], process: false });
+      // Lead information: company number first, built-in wording (a few seconds after the offer).
+      vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 10_000));
       report.confirmedByCompany = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentConfirmed", variables: ["Corretor Teste", "Lead Teste", "(21) 90000-0000", "Plano de saúde", "Individual", "0", "Niterói", randomUUID()] });
       // Meta first: the template is missing on the sending number, so the company number carries it.
       await notice(tx, tenantId, "LEAD_ASSIGNMENT_CONFIRMED", true, "meta");
+      vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 20_000));
       report.confirmedMetaThenCompany = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadAssignmentConfirmed", variables: ["Outro", "Lead", "(21) 90000-0001", "Plano", "Individual", "1", "Rio", randomUUID()] });
       // Default off: an expired offer is not sent at all (and never through another channel).
       report.expiredDefaultOff = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentExpired" });
       // Reminder switched on: sent by the company number within business hours.
       await notice(tx, tenantId, "TASK_REMINDER", true, "company_number");
-      vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 20_000)); // past the company number spacing
+      vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 40_000)); // past the company number spacing
       report.taskReminderOn = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "taskReminder", variables: ["Corretor Teste", "Ligar para o lead", "30/09 14:00"] });
     });
 
@@ -197,8 +205,11 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
 
     if (process.env.OUTBOUND_REPORT_FILE) writeFileSync(process.env.OUTBOUND_REPORT_FILE, JSON.stringify(report, null, 2));
 
-    expect(report.offer).toMatchObject({ enqueue: { route: "meta_only", template: "new_lead_broker" }, process: { status: "sent" } });
-    expect(sentBy("offer")).toEqual(["meta_template"]);
+    expect(report.offer).toMatchObject({ enqueue: { route: "waha_direct" }, process: { status: "sent", route: "waha_direct" } });
+    expect(sentBy("offer")).toEqual(["waha"]);
+    expect(report.offer.process?.calls[0].body).toContain(`/leads/${(report.offerLink.enqueue as { route: string }).route}`);
+    expect(report.presenceDefault.enqueue).toMatchObject({ status: "queued", route: "meta_then_waha" });
+    expect(report.presenceByCompany.enqueue).toMatchObject({ status: "queued", route: "waha_direct" });
 
     expect(report.confirmedByCompany).toMatchObject({ enqueue: { route: "waha_direct" }, process: { status: "sent", route: "waha_direct" } });
     expect(sentBy("confirmedByCompany")).toEqual(["waha"]);

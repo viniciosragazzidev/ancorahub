@@ -72,7 +72,8 @@ describe("outboundService", () => {
     expect(leadNotifText).toContain("⚡ *Novo Lead Atribuído!*");
     expect(leadNotifText).toContain("Maria Souza");
     expect(leadNotifText).toContain("Plano de Saúde PME");
-    expect(leadNotifText).toContain("https://crm.ancorasaude.cloud/conversas?lead=lead-999");
+    // Same destination as the Meta template button: the lead in the CRM.
+    expect(leadNotifText).toContain("https://crm.ancorasaude.cloud/leads/lead-999");
 
     const confirmedText = resolveTemplateTextBody("leadAssignmentConfirmed", ["João Silva", "Ana Lima", "(11) 98888-7777", "Individual", "Saúde Bradesco", "2", "Nova Iguaçu", "lead-999"]);
     expect(confirmedText).toContain("✅ *Atribuição Confirmada*");

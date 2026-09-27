@@ -92,7 +92,7 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
     const rows = input.filter((item) => {
       const notice = teamNoticeByKey(item.key);
       return notice && !notice.metaOnly && (item.channel === "company_number" || item.channel === "meta");
-    });
+    }).map((item) => (teamNoticeByKey(item.key)?.alwaysOn ? { ...item, enabled: true } : item));
     const messageIds = [...new Set(rows.map((item) => item.freeMessageId).filter((id): id is string => Boolean(id)))];
     if (messageIds.length) {
       const found = await getDatabase().select({ id: schema.messageTemplates.id }).from(schema.messageTemplates).where(and(
