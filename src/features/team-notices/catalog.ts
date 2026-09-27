@@ -56,7 +56,8 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     purpose: "leadAssignmentUnavailable",
     label: "Lead indisponível",
     description: "Resposta quando o corretor tenta aceitar um lead que já foi para outra pessoa.",
-    class: "informative",
+    // Outcome of an offer: goes out at once, any day, like the offer itself.
+    class: "critical",
     defaultEnabled: true,
   },
   {
@@ -64,7 +65,8 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     purpose: "leadAssignmentExpired",
     label: "Oferta expirada",
     description: "Avisa que o prazo de aceite de uma oferta acabou.",
-    class: "informative",
+    // Outcome of an offer: goes out at once, any day, like the offer itself.
+    class: "critical",
     defaultEnabled: false,
   },
   {
