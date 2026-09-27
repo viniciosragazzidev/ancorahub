@@ -3,9 +3,11 @@
 import { useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { ShieldX } from "@/components/huge-icons";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { saveDisqualifiedRoutingSettingAction } from "@/features/lead-distribution/disqualified-routing-actions";
 
 export function DisqualifiedLeadsRoutingPanel({
@@ -39,22 +41,18 @@ export function DisqualifiedLeadsRoutingPanel({
   }
 
   return (
-    <Card variant="overview" className="shadow-sm">
-      <CardHeader className="gap-2 border-b border-border/70 px-5 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle>Leads desqualificados</CardTitle>
-            <CardDescription className="mt-1 max-w-3xl leading-5">
-              Controle global para manter leads desqualificados em espera, sem enviá-los a um
-              corretor automaticamente.
-            </CardDescription>
-          </div>
+    <Card variant="overview">
+      <SectionCardHeader
+        icon={<ShieldX />}
+        title="Leads desqualificados"
+        description="Controle global para manter leads desqualificados em espera, sem enviá-los a um corretor automaticamente."
+        actions={
           <Badge variant={enabled ? "warning" : "secondary"}>
             {enabled ? "Em espera" : "Distribuição normal"}
           </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-4 px-5 py-4">
+        }
+      />
+      <CardContent className="grid gap-4 p-4">
         <div className="flex items-start justify-between gap-4 rounded-lg border border-border/70 bg-muted/20 p-3">
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium text-foreground">

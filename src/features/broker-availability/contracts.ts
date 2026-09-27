@@ -14,6 +14,13 @@ export type BrokerAvailabilityWindowInput = {
   endsAt: string;
 };
 
+/** Default day for every broker (2026-09-26): 08:00–19:00. The database seeds it
+ *  on every new broker membership (migration 0162); the editor starts from it. */
+export const DEFAULT_AVAILABILITY_HOURS = { startsAt: "08:00", endsAt: "19:00" } as const;
+
+/** Every day of the week, 08:00–19:00. */
+export const DEFAULT_BROKER_AVAILABILITY: BrokerAvailabilityWindowInput[] = WEEKDAY_LABELS.map((_, dayOfWeek) => ({ dayOfWeek, ...DEFAULT_AVAILABILITY_HOURS }));
+
 type DatabaseErrorShape = {
   code?: string;
   message?: string;

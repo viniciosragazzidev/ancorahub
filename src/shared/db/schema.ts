@@ -723,6 +723,23 @@ export const leadDistributionSettings = pgTable(
   (table) => [index("lead_distribution_settings_tenant_idx").on(table.tenantId, table.branchId, table.queueId)],
 );
 
+export const dutyScheduleTypes = pgTable(
+  "duty_schedule_types",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("active"),
+    createdBy: text("created_by").notNull().references(() => user.id),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("duty_schedule_types_tenant_name_unique").on(table.tenantId, sql`lower(${table.name})`),
+    index("duty_schedule_types_tenant_status_idx").on(table.tenantId, table.status, table.name),
+  ],
+);
+
 export const unitDutySchedules = pgTable(
   "unit_duty_schedules",
   {
@@ -733,11 +750,13 @@ export const unitDutySchedules = pgTable(
     branchId: text("branch_id").references(() => branches.id, { onDelete: "cascade" }),
     queueId: text("queue_id").references(() => leadQueues.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    typeId: text("type_id").references(() => dutyScheduleTypes.id, { onDelete: "set null" }),
     dayOfWeek: integer("day_of_week").notNull(),
     startsAt: text("starts_at").notNull(),
     endsAt: text("ends_at").notNull(),
     priority: integer("priority").notNull().default(100),
     minimumBrokers: integer("minimum_brokers").notNull().default(1),
+    maximumBrokers: integer("maximum_brokers"),
     status: text("status").notNull().default("active"),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
@@ -748,6 +767,30 @@ export const unitDutySchedules = pgTable(
     updatedAt,
   },
   (table) => [index("unit_duty_schedules_tenant_status_idx").on(table.tenantId, table.status, table.dayOfWeek, table.startsAt)],
+);
+
+export const dutyScheduleMonthlyPlans = pgTable(
+  "duty_schedule_monthly_plans",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    monthKey: text("month_key").notNull(),
+    revision: integer("revision").notNull().default(1),
+    status: text("status").notNull().default("draft"),
+    quotas: jsonb("quotas").notNull().default([]),
+    occurrences: jsonb("occurrences").notNull().default([]),
+    assignments: jsonb("assignments").notNull().default([]),
+    generatedBy: text("generated_by").notNull().references(() => user.id),
+    publishedBy: text("published_by").references(() => user.id),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("duty_schedule_monthly_plans_tenant_month_revision_unique").on(table.tenantId, table.monthKey, table.revision),
+    uniqueIndex("duty_schedule_monthly_plans_one_published").on(table.tenantId, table.monthKey).where(sql`${table.status} = 'published'`),
+    index("duty_schedule_monthly_plans_tenant_month_status_idx").on(table.tenantId, table.monthKey, table.status),
+  ],
 );
 
 export const clients = pgTable(
@@ -1360,12 +1403,18 @@ export const dutyRosterAssignments = pgTable(
     // resumed — a temporary "skip this shift" toggle, not a removal.
     pausedAt: timestamp("paused_at", { withTimezone: true }),
     pausedBy: text("paused_by").references(() => user.id),
+    // Published monthly occurrence (DEC-123): the one date it covers and the
+    // plan that published it. Both NULL on the weekly roster.
+    dutyDate: date("duty_date"),
+    monthlyPlanId: text("monthly_plan_id").references(() => dutyScheduleMonthlyPlans.id, { onDelete: "cascade" }),
     createdBy: text("created_by").notNull().references(() => user.id),
     updatedBy: text("updated_by").notNull().references(() => user.id),
     createdAt,
     updatedAt,
   },
   (table) => [
+    index("duty_roster_assignments_dated_idx").on(table.tenantId, table.dutyDate, table.scheduleId).where(sql`${table.dutyDate} is not null`),
+    uniqueIndex("duty_roster_assignments_dated_unique").on(table.tenantId, table.dutyDate, table.scheduleId, table.brokerId).where(sql`${table.dutyDate} is not null and ${table.status} = 'active'`),
     index("duty_roster_assignments_tenant_branch_idx").on(table.tenantId, table.branchId, table.dayOfWeek, table.startsAt),
     index("duty_roster_assignments_broker_idx").on(table.tenantId, table.brokerId, table.dayOfWeek),
     index("duty_roster_assignments_schedule_idx").on(table.scheduleId, table.status),

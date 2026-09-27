@@ -1,6 +1,6 @@
 export const distributionViewValues = [
-  "roteamento",
   "resumo_dia",
+  "roteamento",
   "filas",
   "operar",
   "plantao",
@@ -21,7 +21,7 @@ export function resolveDistributionView(role: string, requestedView?: string): D
     saude: "saude_historico",
     historico: "saude_historico",
   };
-  const normalized = requestedView ? aliases[requestedView] ?? requestedView : "roteamento";
+  const normalized = requestedView ? aliases[requestedView] ?? requestedView : "resumo_dia";
   const allowed = visibleDistributionViews(role);
-  return allowed.includes(normalized as DistributionView) ? (normalized as DistributionView) : "roteamento";
+  return allowed.includes(normalized as DistributionView) ? (normalized as DistributionView) : "resumo_dia";
 }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { saveOwnBrokerAvailabilityAction } from "../actions";
-import { WEEKDAY_LABELS, type BrokerAvailabilityWindowInput } from "../contracts";
+import { DEFAULT_AVAILABILITY_HOURS, DEFAULT_BROKER_AVAILABILITY, WEEKDAY_LABELS, type BrokerAvailabilityWindowInput } from "../contracts";
 
 type Props = {
   initialWindows: BrokerAvailabilityWindowInput[];
@@ -17,14 +17,14 @@ type Props = {
   compact?: boolean;
 };
 
-const DEFAULT_WINDOW: BrokerAvailabilityWindowInput = { dayOfWeek: 1, startsAt: "08:00", endsAt: "18:00" };
+const DEFAULT_WINDOW: BrokerAvailabilityWindowInput = { dayOfWeek: 1, ...DEFAULT_AVAILABILITY_HOURS };
 
 function ordered(windows: BrokerAvailabilityWindowInput[]) {
   return [...windows].sort((a, b) => a.dayOfWeek - b.dayOfWeek || a.startsAt.localeCompare(b.startsAt));
 }
 
 export function BrokerAvailabilityScheduleEditor({ initialWindows, onSaved, submitLabel = "Salvar disponibilidade", compact = false }: Props) {
-  const [windows, setWindows] = useState<BrokerAvailabilityWindowInput[]>(ordered(initialWindows));
+  const [windows, setWindows] = useState<BrokerAvailabilityWindowInput[]>(ordered(initialWindows.length ? initialWindows : DEFAULT_BROKER_AVAILABILITY));
   const [pending, startTransition] = useTransition();
   const grouped = useMemo(() => WEEKDAY_LABELS.map((label, dayOfWeek) => ({ label, dayOfWeek, windows: windows.filter((window) => window.dayOfWeek === dayOfWeek) })), [windows]);
 

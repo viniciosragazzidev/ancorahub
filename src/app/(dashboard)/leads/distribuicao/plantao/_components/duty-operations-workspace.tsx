@@ -1,29 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import {
-  ArrowLeft,
   ArrowSquareOut,
   CalendarCheck,
   ChevronDownIcon,
-  CheckCircle,
-  Clock,
   Copy,
-  FolderSimple,
   Loader2Icon,
   PencilSimple,
   Plus,
   Trash,
-  Users,
-  WarningCircle,
 } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { AppSelect } from "@/components/ui/select";
 import {
   Dialog,
@@ -63,24 +58,73 @@ import {
 } from "@/features/lead-distribution/roster-actions";
 import { syncDutySchedulesIntoQueueAction } from "@/features/lead-distribution/actions";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
-import {
-  getDefaultDutyScheduleMonthKey,
-  getDutyScheduleMonthKey,
-  getOperationalMonthKey,
-  groupDutySchedulesByMonth,
-} from "./duty-schedule-month-groups";
+import { buildMonthOccurrences, monthCoverage, monthShiftProgress, summarizeDutyDays } from "@/features/lead-distribution/monthly-duty-plan";
+import { DutyMonthCalendar } from "./duty-month-calendar";
+import { MonthlyDutyPlanner, monthLabel, useMonthlyDutyPlans, type MonthSchedule } from "./monthly-duty-planner";
+import { getOperationalMonthKey } from "./duty-schedule-month-groups";
 
 type Snapshot = DutyRosterSnapshot;
 type Schedule = Snapshot["schedules"][number];
-type Assignment = Snapshot["assignments"][number];
 type DutyAction = (previous: DutyActionState, formData: FormData) => Promise<DutyActionState>;
 
 const DAYS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
 const DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
+const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
 
 function dateInputValue(value: Date | null) {
   if (!value) return "";
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(value);
+}
+
+/**
+ * The one date a plantão happens on, when it has a single one (the default
+ * kind: "PME 25/09"). A rule whose period holds no date of its weekday (a
+ * broken edit) resolves to its first possible date so it can be fixed with one
+ * field. Weekly rules (two or more dates, or no end) return null.
+ */
+function singleDutyDate(schedule: Pick<Schedule, "validFrom" | "validUntil" | "dayOfWeek">) {
+  if (!schedule.validUntil) return null;
+  const from = dateInputValue(schedule.validFrom);
+  const last = dateInputValue(lastIncludedDay(schedule.validUntil));
+  const dates: string[] = [];
+  for (let key = from; key <= last && dates.length < 2; key = addDaysKey(key, 1)) {
+    if (new Date(`${key}T12:00:00Z`).getUTCDay() === schedule.dayOfWeek) dates.push(key);
+  }
+  if (dates.length === 1) return dates[0];
+  if (dates.length === 0) {
+    let key = from;
+    while (new Date(`${key}T12:00:00Z`).getUTCDay() !== schedule.dayOfWeek) key = addDaysKey(key, 1);
+    return key;
+  }
+  return null;
+}
+
+function isSingleDaySchedule(schedule: Pick<Schedule, "validFrom" | "validUntil" | "dayOfWeek">) {
+  return singleDutyDate(schedule) !== null;
+}
+
+function addDaysKey(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+/** Every date in [from, until] whose weekday is selected (capped to keep a batch sane). */
+function datesInRange(from: string, until: string, weekdays: number[], limit = 93) {
+  const dates: string[] = [];
+  if (!from || !until || until < from) return dates;
+  for (let key = from; key <= until && dates.length <= limit; key = addDaysKey(key, 1)) {
+    if (weekdays.includes(new Date(`${key}T12:00:00Z`).getUTCDay())) dates.push(key);
+  }
+  return dates;
+}
+
+function dateTag(dateKey: string) {
+  return `${DAYS[new Date(`${dateKey}T12:00:00Z`).getUTCDay()]} ${dateKey.slice(8, 10)}/${dateKey.slice(5, 7)}`;
+}
+
+/** `validUntil` is the exclusive instant after the last day: show that last day. */
+function lastIncludedDay(value: Date | null) {
+  return value ? new Date(value.getTime() - 1) : null;
 }
 
 function dateLabel(value: Date | null) {
@@ -91,9 +135,24 @@ function dateLabel(value: Date | null) {
   }).format(value);
 }
 
-function coverageLabel(schedule: Schedule, assignments: Assignment[]) {
-  const assigned = assignments.filter((assignment) => assignment.scheduleId === schedule.id).length;
-  return getDutyCoverage(assigned, schedule.minimumBrokers);
+type RosterEntry = { id: string; brokerId: string; brokerName: string };
+
+/**
+ * Everyone on the plantão, as one list: the brokers added here plus the ones
+ * the month's escala placed on it (from today on). A broker appears once.
+ */
+function plantaoRoster(snapshot: Snapshot, scheduleId: string): RosterEntry[] {
+  const today = dateInputValue(new Date());
+  const entries: RosterEntry[] = [
+    ...snapshot.assignments.filter((row) => row.scheduleId === scheduleId),
+    ...snapshot.publishedAssignments.filter((row) => row.scheduleId === scheduleId && row.dutyDate >= today),
+  ].map((row) => ({ id: row.id, brokerId: row.brokerId, brokerName: row.brokerName }));
+  const seen = new Set<string>();
+  return entries.filter((entry) => !seen.has(entry.brokerId) && seen.add(entry.brokerId));
+}
+
+function coverageLabel(schedule: Schedule, snapshot: Snapshot) {
+  return getDutyCoverage(plantaoRoster(snapshot, schedule.id).length, schedule.minimumBrokers);
 }
 
 function actionLabel(action: string) {
@@ -115,255 +174,37 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant="secondary">Inativo</Badge>;
 }
 
-function SummaryCard({
-  icon: Icon,
-  label,
-  value,
-  description,
-  tone = "neutral",
-}: {
-  icon: typeof CalendarCheck;
-  label: string;
-  value: number;
-  description: string;
-  tone?: "neutral" | "warning" | "success";
-}) {
-  const toneClass =
-    tone === "warning"
-      ? "border-warning/30 bg-warning/5"
-      : tone === "success"
-        ? "border-success/25 bg-success/5"
-        : "border-border/80 bg-card";
-  const iconTone =
-    tone === "warning"
-      ? "bg-warning/10 text-warning"
-      : tone === "success"
-        ? "bg-success/10 text-success"
-        : "bg-muted text-muted-foreground";
-  return (
-    <Card className={`gap-0 p-0 ${toneClass}`}>
-      <CardContent className="flex min-h-20 items-center gap-3 p-3">
-        <span className={`grid size-8 shrink-0 place-items-center rounded-lg ${iconTone}`}>
-          <Icon className="size-4" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-muted-foreground">{label}</p>
-          <div className="mt-0.5 flex items-baseline gap-2">
-            <p className="text-lg font-semibold tabular-nums text-foreground">{value}</p>
-            <p className="truncate text-xs text-muted-foreground">{description}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function DutyCard({
-  schedule,
-  assignments,
-  onOpen,
-}: {
-  schedule: Schedule;
-  assignments: Assignment[];
-  onOpen: () => void;
-}) {
-  const coverage = coverageLabel(schedule, assignments);
-  const coverageClass =
-    schedule.status !== "active"
-      ? "border-border/70 bg-muted/20 text-muted-foreground"
-      : coverage.covered
-        ? "border-border bg-card hover:border-primary/35"
-        : "border-warning/40 bg-warning/5 hover:border-warning/60";
-  return (
-    <Button
-      type="button"
-      onClick={onOpen}
-      className={`group h-auto min-w-0 max-w-full flex-col items-stretch overflow-hidden px-3 py-2.5 text-left ${coverageClass}`}
-      variant="outline"
-    >
-      <div className="flex min-w-0 items-center justify-between gap-2">
-        <p className="min-w-0 truncate text-sm font-semibold text-foreground">{schedule.name}</p>
-        <StatusBadge status={schedule.status} />
-      </div>
-      <p className="mt-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">
-        <Clock className="size-3 shrink-0" />
-        {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}
-      </p>
-      <p className="mt-2 truncate text-xs text-muted-foreground">
-        {schedule.queueName} · {schedule.credentialName ?? "Todas as origens"}
-      </p>
-      <div className="mt-2 flex items-center justify-between gap-2 border-t border-border/60 pt-2">
-        <Badge variant={coverage.covered || schedule.status !== "active" ? "outline" : "warning"}>
-          {coverage.assigned}/{coverage.minimum} escalados
-        </Badge>
-      </div>
-    </Button>
-  );
-}
-
-function DutyTimeline({
-  schedules,
-  assignments,
-  onOpen,
-}: {
-  schedules: Schedule[];
-  assignments: Assignment[];
-  onOpen: (schedule: Schedule) => void;
-}) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [showScrollButton, setShowScrollButton] = useState(false);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const check = () => setShowScrollButton(el.scrollLeft > 20);
-    check();
-    el.addEventListener("scroll", check, { passive: true });
-    return () => el.removeEventListener("scroll", check);
-  }, []);
-
-  const scrollToStart = useCallback(() => {
-    scrollRef.current?.scrollTo({ left: 0, behavior: "smooth" });
-  }, []);
-
-  return (
-    <div className="relative">
-      <div ref={scrollRef} className="overflow-x-auto pb-1">
-        <div className="grid min-w-[1540px] grid-cols-7 overflow-hidden rounded-xl border border-border/70 bg-border/70">
-          {DAYS.map((day, dayIndex) => {
-            const daySchedules = schedules.filter((schedule) => schedule.dayOfWeek === dayIndex);
-            return (
-              <section key={day} className="min-w-0 bg-card">
-                <header className="flex items-center justify-between border-b border-border/70 px-3 py-2.5">
-                  <h3 className="text-xs font-semibold text-foreground">{day}</h3>
-                  <span className="text-xs tabular-nums text-muted-foreground">
-                    {daySchedules.length}
-                  </span>
-                </header>
-                <div className="min-h-60 space-y-2 bg-muted/10 p-3">
-                  {daySchedules.map((schedule) => (
-                    <DutyCard
-                      key={schedule.id}
-                      schedule={schedule}
-                      assignments={assignments}
-                      onOpen={() => onOpen(schedule)}
-                    />
-                  ))}
-                  {daySchedules.length === 0 && (
-                    <p className="rounded-lg border border-dashed border-border/70 px-3 py-5 text-center text-xs text-muted-foreground">
-                      Sem plantão
-                    </p>
-                  )}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-      </div>{" "}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={scrollToStart}
-        className={`absolute bottom-3 left-3 z-10 rounded-full bg-background/90 text-muted-foreground shadow-sm backdrop-blur-sm transition-all duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-background hover:text-foreground hover:shadow-md active:scale-95 ${showScrollButton ? "opacity-100" : "pointer-events-none opacity-0"}`}
-      >
-        <ArrowLeft className="size-3.5" />
-        Início
-      </Button>
-    </div>
-  );
-}
-
-function CoverageAlerts({
-  schedules,
-  assignments,
-  onOpen,
-}: {
-  schedules: Schedule[];
-  assignments: Assignment[];
-  onOpen: (schedule: Schedule) => void;
-}) {
-  const gaps = schedules.filter(
-    (schedule) => schedule.status === "active" && !coverageLabel(schedule, assignments).covered,
-  );
-  if (!gaps.length)
-    return (
-      <Card className="gap-0 border-success/25 bg-success/5 p-0">
-        <CardContent className="flex items-center gap-3 p-4">
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-success/10 text-success">
-            <CheckCircle className="size-4" />
-          </span>
-          <div>
-            <p className="text-sm font-semibold">Cobertura em dia</p>
-            <p className="text-xs text-muted-foreground">
-              Todos os plantões ativos atendem ao mínimo definido.
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  return (
-    <Card className="gap-0 overflow-hidden border-warning/35 bg-warning/5 p-0">
-      <CardHeader className="flex flex-row items-center gap-3 space-y-0 p-4">
-        <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-warning/10 text-warning">
-          <WarningCircle className="size-4" />
-        </span>
-        <div className="min-w-0">
-          <CardTitle className="text-sm">Lacunas de cobertura</CardTitle>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            A distribuição segue ativa para quem já está escalado.
-          </p>
-        </div>
-      </CardHeader>
-      <CardContent className="grid gap-2 px-4 pb-4">
-        {gaps.map((schedule) => {
-          const coverage = coverageLabel(schedule, assignments);
-          return (
-            <Button
-              key={schedule.id}
-              type="button"
-              onClick={() => onOpen(schedule)}
-              className="h-auto min-w-0 justify-between gap-3 border-warning/25 bg-card/70 px-3 py-2 text-left hover:bg-card"
-              variant="outline"
-            >
-              <span className="min-w-0">
-                <span className="block truncate text-xs font-semibold">{schedule.name}</span>
-                <span className="block truncate text-[11px] text-muted-foreground">
-                  {DAYS_FULL[schedule.dayOfWeek]} · {schedule.startsAt.slice(0, 5)}–
-                  {schedule.endsAt.slice(0, 5)} · {schedule.queueName}
-                </span>
-              </span>
-              <Badge variant="warning" className="shrink-0">
-                Faltam {coverage.minimum - coverage.assigned}
-              </Badge>
-            </Button>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
-}
-
 function DutyFormSheet({
   open,
   onOpenChange,
   schedule,
   snapshot,
   queues,
+  defaultStartDate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   schedule: Schedule | null;
   snapshot: Snapshot;
   queues: QueueOption[];
+  /** YYYY-MM-DD used as "a partir de" when creating from a month view. */
+  defaultStartDate?: string;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [selectedDays, setSelectedDays] = useState<number[]>(() => [schedule?.dayOfWeek ?? 1]);
+  // New plantões are one-day plantões by default: a range becomes one per date.
+  const [mode, setMode] = useState<"dates" | "weekly">(() => (schedule && !isSingleDaySchedule(schedule) ? "weekly" : "dates"));
+  const [selectedDays, setSelectedDays] = useState<number[]>(() => (schedule ? [schedule.dayOfWeek] : [0, 1, 2, 3, 4, 5, 6]));
+  const initialDate = schedule ? singleDutyDate(schedule) ?? dateInputValue(schedule.validFrom) : defaultStartDate ?? dateInputValue(new Date());
+  const [rangeFrom, setRangeFrom] = useState(initialDate);
+  const [rangeUntil, setRangeUntil] = useState(initialDate);
+  const plannedDates = useMemo(() => (mode === "dates" && !schedule ? datesInRange(rangeFrom, rangeUntil, selectedDays) : []), [mode, rangeFrom, rangeUntil, schedule, selectedDays]);
   // Only offered at creation: picking a queue here is a shortcut for the same
   // "Exclusividade de Plantão" checklist the queue editor already has.
-  const [queueId, setQueueId] = useState<string>("");
-  const canSubmit = selectedDays.length > 0;
+  // The queue that receives this plantão (kept in sync with Filas → Exclusividade de Plantão).
+  const [queueId, setQueueId] = useState<string>(() => schedule?.linkedQueueId ?? "");
+  const tooManyDates = plannedDates.length > 93;
+  const canSubmit = mode === "dates" && !schedule ? plannedDates.length > 0 && !tooManyDates : selectedDays.length > 0;
   const title = schedule ? "Editar plantão" : "Novo plantão";
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
@@ -371,9 +212,22 @@ function DutyFormSheet({
     const formData = new FormData(event.currentTarget);
     if (schedule) {
       formData.set("scheduleId", schedule.id);
-      formData.set("dayOfWeek", String(selectedDays[0] ?? schedule.dayOfWeek));
+      formData.set("receivingQueueId", queueId);
+      if (mode === "dates") {
+        // A one-day plantão moved to another date: its weekday follows the date.
+        formData.set("validFrom", rangeFrom);
+        formData.set("validUntil", rangeFrom);
+        formData.set("dayOfWeek", String(new Date(`${rangeFrom}T12:00:00Z`).getUTCDay()));
+      } else {
+        formData.set("dayOfWeek", String(selectedDays[0] ?? schedule.dayOfWeek));
+      }
     } else {
-      formData.set("daysOfWeek", JSON.stringify(selectedDays));
+      if (mode === "dates") {
+        formData.set("dates", JSON.stringify(plannedDates));
+        formData.set("validFrom", rangeFrom);
+        formData.delete("validUntil");
+      }
+      formData.set("daysOfWeek", JSON.stringify(mode === "dates" ? [...new Set(plannedDates.map((date) => new Date(`${date}T12:00:00Z`).getUTCDay()))] : selectedDays));
       // Lets the same-time conflict check scope by queue: a different queue
       // at the same day/time is fine, only the same queue collides.
       if (queueId) formData.set("responsibleQueueId", queueId);
@@ -413,8 +267,8 @@ function DutyFormSheet({
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>
             {schedule
-              ? "Edite o horário e a cobertura deste plantão global. O dia desta regra permanece fixo."
-              : "Este plantão será compartilhado por todas as unidades e corretores da corretora."}
+              ? "Edite a data, o horário, a fila que recebe e a cobertura deste plantão."
+              : "Escolha o período e os dias da semana: cada dia vira um plantão de um dia, para todas as unidades."}
           </SheetDescription>
         </SheetHeader>
         <SheetBody>
@@ -429,37 +283,77 @@ function DutyFormSheet({
                 required
               />
             </div>
-            <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-3 text-sm text-foreground">
-              <p className="font-medium">Escopo global da corretora</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                O mesmo horário e a mesma regra serão aplicados aos corretores escalados em todas as unidades. A fila de entrada continua definindo quais leads podem usar este plantão.
-              </p>
-            </div>
-            {!schedule ? (
-              <div className="grid gap-2">
-                <Label htmlFor="duty-queue">Fila responsável (opcional)</Label>
-                <AppSelect
-                  aria-label="Fila responsável pelo plantão"
-                  value={queueId}
-                  onValueChange={setQueueId}
-                  options={[
-                    { value: "", label: "Nenhuma agora — vincular depois pela fila" },
-                    ...queues.map((queue) => ({ value: queue.id, label: queue.name })),
-                  ]}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Marca este plantão como exclusividade dessa fila assim que ele for criado — o mesmo que fazer depois em Filas → Editar → Exclusividade de Plantão. Escolher a fila também libera criar outro plantão no mesmo horário, desde que seja para uma fila diferente.
-                </p>
+            {/* Type stays in the data (kept on save) but is not part of the form. */}
+            <input type="hidden" name="typeName" value={schedule?.typeName ?? ""} />
+            <div className="grid gap-3 rounded-lg border border-border p-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-medium">Quando</p>
+                {!schedule || !isSingleDaySchedule(schedule) ? (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox checked={mode === "weekly"} disabled={Boolean(schedule)} onCheckedChange={(checked) => setMode(checked === true ? "weekly" : "dates")} />
+                    Repetir toda semana
+                  </label>
+                ) : null}
               </div>
-            ) : null}
-            <div className="grid gap-3">
+              {mode === "dates" ? (
+                schedule ? (
+                  <div className="grid gap-1.5">
+                    <Label htmlFor="duty-date">Data</Label>
+                    <Input id="duty-date" type="date" value={rangeFrom} onChange={(event) => setRangeFrom(event.target.value)} required />
+                    <p className="text-[11px] text-muted-foreground">Este plantão vale só neste dia.</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="duty-range-from">De</Label>
+                        <Input id="duty-range-from" type="date" value={rangeFrom} onChange={(event) => { setRangeFrom(event.target.value); if (event.target.value > rangeUntil) setRangeUntil(event.target.value); }} required />
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="duty-range-until">Até</Label>
+                        <Input id="duty-range-until" type="date" value={rangeUntil} min={rangeFrom} onChange={(event) => setRangeUntil(event.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5" role="group" aria-label="Dias da semana">
+                      {WEEKDAY_ORDER.map((index) => {
+                        const selected = selectedDays.includes(index);
+                        const count = datesInRange(rangeFrom, rangeUntil, [index]).length;
+                        return (
+                          <button
+                            key={index}
+                            type="button"
+                            aria-pressed={selected}
+                            disabled={count === 0}
+                            onClick={() => setSelectedDays((current) => (selected ? current.filter((day) => day !== index) : [...current, index].sort((a, b) => a - b)))}
+                            className={`rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-40 ${selected && count ? "border-foreground bg-foreground text-background" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}
+                          >
+                            {DAYS[index]}{count ? ` · ${count === 1 ? datesInRange(rangeFrom, rangeUntil, [index])[0].slice(8, 10) + "/" + datesInRange(rangeFrom, rangeUntil, [index])[0].slice(5, 7) : `${count}×`}` : ""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="grid gap-1.5">
+                      <p className="text-xs text-muted-foreground">
+                        {tooManyDates ? "Escolha no máximo 93 dias (cerca de 3 meses) por vez." : plannedDates.length ? `Serão criados ${plannedDates.length} ${plannedDates.length === 1 ? "plantão de um dia" : "plantões de um dia cada"}:` : "Nenhum dia selecionado no período."}
+                      </p>
+                      {plannedDates.length && !tooManyDates ? (
+                        <div className="flex max-h-24 flex-wrap gap-1 overflow-y-auto">
+                          {plannedDates.map((date) => <Badge key={date} variant="outline" className="font-normal tabular-nums">{dateTag(date)}</Badge>)}
+                        </div>
+                      ) : null}
+                    </div>
+                  </>
+                )
+              ) : null}
+              {mode === "weekly" ? (
               <fieldset className="grid gap-2">
                 <legend className="text-sm font-medium">Dias da semana</legend>
                 <p className="text-xs text-muted-foreground">
                   {schedule ? "Esta regra vale para um único dia." : "Selecione um ou mais dias."}
                 </p>
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                  {DAYS_FULL.map((day, index) => {
+                  {WEEKDAY_ORDER.map((index) => {
+                    const day = DAYS_FULL[index];
                     const selected = selectedDays.includes(index);
                     return (
                       <label
@@ -484,6 +378,31 @@ function DutyFormSheet({
                   })}
                 </div>
               </fieldset>
+              ) : null}
+              {mode === "weekly" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="duty-valid-from">Repete toda semana a partir de</Label>
+                    <Input
+                      id="duty-valid-from"
+                      name="validFrom"
+                      type="date"
+                      defaultValue={schedule ? dateInputValue(schedule.validFrom) : defaultStartDate ?? dateInputValue(new Date())}
+                      required
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="duty-valid-until">Até (opcional)</Label>
+                    <Input
+                      id="duty-valid-until"
+                      name="validUntil"
+                      type="date"
+                      defaultValue={dateInputValue(lastIncludedDay(schedule?.validUntil ?? null))}
+                    />
+                    <p className="text-[11px] text-muted-foreground">Em branco: repete sem data para acabar. O dia informado entra.</p>
+                  </div>
+                </div>
+              ) : null}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="grid gap-2">
@@ -522,26 +441,35 @@ function DutyFormSheet({
                 Abaixo deste mínimo, o plantão vira uma pendência; a distribuição não é bloqueada.
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="grid gap-2">
-                <Label htmlFor="duty-valid-from">Início da vigência</Label>
-                <Input
-                  id="duty-valid-from"
-                  name="validFrom"
-                  type="date"
-                  defaultValue={dateInputValue(schedule?.validFrom ?? new Date())}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="duty-valid-until">Fim da vigência</Label>
-                <Input
-                  id="duty-valid-until"
-                  name="validUntil"
-                  type="date"
-                  defaultValue={dateInputValue(schedule?.validUntil ?? null)}
-                />
-              </div>
+            <div className="grid gap-2">
+              <Label htmlFor="duty-maximum">Máximo de corretores (opcional)</Label>
+              <Input
+                id="duty-maximum"
+                name="maximumBrokers"
+                type="number"
+                min={1}
+                max={99}
+                defaultValue={schedule?.maximumBrokers ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">Deixe em branco para não limitar a capacidade. Quando definido, não pode ser menor que o mínimo.</p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="duty-queue">Fila que recebe este plantão</Label>
+              <AppSelect
+                id="duty-queue"
+                aria-label="Fila que recebe este plantão"
+                value={queueId}
+                onValueChange={setQueueId}
+                options={[
+                  { value: "", label: schedule ? "Nenhuma fila" : "Nenhuma agora — vincular depois" },
+                  ...queues.map((queue) => ({ value: queue.id, label: queue.name })),
+                  // A linked queue that is no longer active still shows by name.
+                  ...(schedule?.linkedQueueId && !queues.some((queue) => queue.id === schedule.linkedQueueId) ? [{ value: schedule.linkedQueueId, label: schedule.queueName }] : []),
+                ]}
+              />
+              <p className="text-xs text-muted-foreground">
+                Os leads dessa fila vão para os corretores deste plantão. Fica sincronizado com Filas → Exclusividade de Plantão.
+              </p>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="duty-credential">Origem de entrada</Label>
@@ -584,7 +512,9 @@ function DutyFormSheet({
                 ? "Salvando…"
                 : schedule
                   ? "Salvar alterações"
-                  : "Criar plantão global"}
+                  : mode === "dates"
+                    ? `Criar ${plannedDates.length || ""} ${plannedDates.length === 1 ? "plantão" : "plantões"}`.replace("  ", " ")
+                    : "Criar plantão semanal"}
             </Button>
           </form>
         </SheetBody>
@@ -617,9 +547,7 @@ function DutyInspector({
   // results snapping in on every character.
   const [searchingBrokers, setSearchingBrokers] = useState(false);
   const [addingBrokerId, setAddingBrokerId] = useState<string | null>(null);
-  const assignments = schedule
-    ? snapshot.assignments.filter((assignment) => assignment.scheduleId === schedule.id)
-    : [];
+  const assignments = schedule ? plantaoRoster(snapshot, schedule.id) : [];
   const eligibleBrokers = schedule
     ? snapshot.brokers.filter(
         (broker) =>
@@ -684,7 +612,7 @@ function DutyInspector({
     });
   }
 
-  function removeAssignment(assignment: Assignment) {
+  function removeAssignment(assignment: RosterEntry) {
     const formData = new FormData();
     formData.set("assignmentId", assignment.id);
     startTransition(async () => {
@@ -698,7 +626,7 @@ function DutyInspector({
     });
   }
 
-  const coverage = schedule ? coverageLabel(schedule, snapshot.assignments) : null;
+  const coverage = schedule ? coverageLabel(schedule, snapshot) : null;
   return (
     <>
       <Sheet open={open} onOpenChange={onOpenChange}>
@@ -710,7 +638,12 @@ function DutyInspector({
                   <StatusBadge status={schedule.status} />
                   <span className="text-xs text-muted-foreground">{schedule.branchName ?? "Todas as unidades"}</span>
                 </div>
-                <SheetTitle>{schedule.name}</SheetTitle>
+                <SheetTitle className="flex flex-wrap items-center gap-2">
+                  {schedule.name}
+                  <Badge variant="outline" className="font-normal tabular-nums">
+                    {isSingleDaySchedule(schedule) ? dateTag(singleDutyDate(schedule)!) : `↻ ${DAYS[schedule.dayOfWeek]}`}
+                  </Badge>
+                </SheetTitle>
                 <SheetDescription>
                   {schedule.queueName} · {DAYS_FULL[schedule.dayOfWeek]} ·{" "}
                   {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}
@@ -722,7 +655,7 @@ function DutyInspector({
                   variant="outline"
                 >
                   <ArrowSquareOut className="size-4" />
-                  Abrir página do plantão
+                  Ver plantão e histórico
                 </Button>
               </>
             )}
@@ -770,9 +703,11 @@ function DutyInspector({
                       </dd>
                     </div>
                     <div className="flex justify-between gap-4">
-                      <dt className="text-muted-foreground">Vigência</dt>
+                      <dt className="text-muted-foreground">{isSingleDaySchedule(schedule) ? "Data" : "Repete toda semana"}</dt>
                       <dd className="text-right">
-                        {dateLabel(schedule.validFrom)} · {dateLabel(schedule.validUntil)}
+                        {isSingleDaySchedule(schedule)
+                          ? dateTag(singleDutyDate(schedule)!)
+                          : `${dateLabel(schedule.validFrom)} · ${dateLabel(lastIncludedDay(schedule.validUntil))}`}
                       </dd>
                     </div>
                     <div className="flex justify-between gap-4">
@@ -1029,52 +964,118 @@ function DutyInspector({
 
 type QueueOption = { id: string; name: string };
 
-export function DutyOperationsWorkspace({ snapshot, queues = [] }: { snapshot: Snapshot; queues?: QueueOption[] }) {
+function shiftMonth(key: string, offset: number) {
+  const [year, month] = key.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1 + offset, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function lastDayOfMonth(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+}
+
+function outsideLabel(schedule: Schedule, reason: "ends_before" | "starts_after" | "no_weekday" | "empty_range") {
+  if (reason === "empty_range") return "Não tem nenhuma data válida: abra e escolha a data";
+  if (reason === "ends_before") return `Terminou em ${dateLabel(lastIncludedDay(schedule.validUntil))}`;
+  if (reason === "starts_after") return `Começa em ${dateLabel(schedule.validFrom)}`;
+  return "Não cai neste mês";
+}
+
+export function DutyOperationsWorkspace({ snapshot, queues = [], monthlySchedulingEnabled = false, canPlanMonthlySchedule = false, initialMonthlyScheduleMonth = null }: { snapshot: Snapshot; queues?: QueueOption[]; monthlySchedulingEnabled?: boolean; canPlanMonthlySchedule?: boolean; initialMonthlyScheduleMonth?: string | null }) {
+  const router = useRouter();
+  const currentMonthKey = getOperationalMonthKey();
+  // One month drives the whole tab: the plantões shown, the scale and "Novo plantão".
+  const [month, setMonth] = useState(() => initialMonthlyScheduleMonth ?? currentMonthKey);
+  const [plannerOpen, setPlannerOpen] = useState(Boolean(initialMonthlyScheduleMonth));
   const [showArchived, setShowArchived] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [formSchedule, setFormSchedule] = useState<Schedule | null>(null);
   const [formOpen, setFormOpen] = useState(false);
-  const scopedSchedules = useMemo(
-    () =>
-      snapshot.schedules.filter(
-        (schedule) =>
-          (showArchived || schedule.status !== "archived"),
-      ),
+  // "Novo plantão" from inside the scale: swap drawers, then come back to it.
+  const [returnToPlanner, setReturnToPlanner] = useState(false);
+  // Day clicked in the calendar: "Novo plantão" opens on that date.
+  const [createDate, setCreateDate] = useState<string | null>(null);
+  const plansState = useMonthlyDutyPlans(monthlySchedulingEnabled);
+  const { load: loadPlan } = plansState;
+
+  useEffect(() => {
+    if (monthlySchedulingEnabled) queueMicrotask(() => { void loadPlan(month); });
+  }, [loadPlan, month, monthlySchedulingEnabled]);
+
+  // Month arrows stop at the first and last month that have a plantão
+  // (open-ended weekly rules: at most 12 months ahead).
+  const { firstMonth, lastMonth } = useMemo(() => {
+    const cap = shiftMonth(currentMonthKey, 12);
+    let first = currentMonthKey;
+    let last = currentMonthKey;
+    for (const schedule of snapshot.schedules) {
+      if (schedule.status === "archived") continue;
+      const from = dateInputValue(schedule.validFrom).slice(0, 7);
+      const until = schedule.validUntil ? dateInputValue(lastIncludedDay(schedule.validUntil)).slice(0, 7) : cap;
+      if (until < from) continue;
+      if (from < first) first = from;
+      if (until > last) last = until;
+    }
+    return { firstMonth: first, lastMonth: last > cap ? cap : last };
+  }, [currentMonthKey, snapshot.schedules]);
+  const visibleSchedules = useMemo(
+    () => snapshot.schedules.filter((schedule) => showArchived || schedule.status !== "archived"),
     [showArchived, snapshot.schedules],
   );
-  const currentMonthKey = getOperationalMonthKey();
-  const monthGroups = useMemo(
-    () => groupDutySchedulesByMonth(scopedSchedules, currentMonthKey),
-    [currentMonthKey, scopedSchedules],
+  const coverageById = useMemo(
+    () => new Map(visibleSchedules.map((schedule) => [schedule.id, monthCoverage(schedule, month)])),
+    [month, visibleSchedules],
   );
-  const [expandedMonthKeys, setExpandedMonthKeys] = useState<Set<string>>(
-    () => new Set([getDefaultDutyScheduleMonthKey(monthGroups, currentMonthKey)]),
+  const monthSchedules = visibleSchedules.filter((schedule) => coverageById.get(schedule.id)?.covered);
+  const progressById = useMemo(() => {
+    const now = new Date();
+    return new Map(monthSchedules.map((schedule) => [schedule.id, monthShiftProgress(schedule, month, now)]));
+  }, [month, monthSchedules]);
+  const outsideSchedules = visibleSchedules.filter((schedule) => !coverageById.get(schedule.id)?.covered && schedule.status !== "archived");
+  const plannerSchedules = useMemo<MonthSchedule[]>(() => {
+    const now = new Date();
+    return snapshot.schedules
+    .filter((schedule) => schedule.status === "active")
+    .map((schedule) => {
+      const coverage = monthCoverage(schedule, month);
+      // Only dates that have not ended can still be staffed.
+      const upcoming = coverage.covered ? buildMonthOccurrences(month, [schedule], [], { from: now }).length : 0;
+      return {
+        id: schedule.id,
+        name: schedule.name,
+        dayOfWeek: schedule.dayOfWeek,
+        startsAt: schedule.startsAt,
+        endsAt: schedule.endsAt,
+        minimumBrokers: schedule.minimumBrokers,
+        maximumBrokers: schedule.maximumBrokers,
+        dates: upcoming,
+        finished: coverage.covered && upcoming === 0,
+        queueId: schedule.linkedQueueId ?? null,
+        queueName: schedule.linkedQueueId ? schedule.queueName : null,
+        outside: coverage.covered ? null : { reason: coverage.reason, label: outsideLabel(schedule, coverage.reason) },
+      };
+    });
+  }, [month, snapshot.schedules]);
+  const plan = plansState.plans[month];
+  const publishedScheduleIds = useMemo(
+    () => new Set(plan?.status === "published" ? plan.occurrences.filter((occurrence) => occurrence.assignedCount > 0).map((occurrence) => occurrence.scheduleId) : []),
+    [plan],
   );
-  const knownScheduleMonths = useRef(new Map(
-    snapshot.schedules.map((schedule) => [schedule.id, getDutyScheduleMonthKey(schedule.validFrom)]),
-  ));
-  useEffect(() => {
-    const currentScheduleMonths = new Map(
-      snapshot.schedules.map((schedule) => [schedule.id, getDutyScheduleMonthKey(schedule.validFrom)]),
-    );
-    const changedMonths = [...currentScheduleMonths.entries()]
-      .filter(([scheduleId, monthKey]) => knownScheduleMonths.current.get(scheduleId) !== monthKey)
-      .map(([, monthKey]) => monthKey);
-    if (changedMonths.length) {
-      setExpandedMonthKeys((previous) => new Set([...previous, ...changedMonths]));
-    }
-    knownScheduleMonths.current = currentScheduleMonths;
-  }, [snapshot.schedules]);
-  const scopedAssignments = snapshot.assignments;
-  const activeCount = scopedSchedules.filter((schedule) => schedule.status === "active").length;
-  const inactiveCount = scopedSchedules.filter((schedule) => schedule.status === "inactive").length;
-  const archivedCount = snapshot.schedules.filter((schedule) => schedule.status === "archived").length;
-  const gapCount = scopedSchedules.filter(
-    (schedule) =>
-      schedule.status === "active" && !coverageLabel(schedule, scopedAssignments).covered,
-  ).length;
 
-  function openCreate() {
+  const repeatingScheduleIds = useMemo(
+    () => new Set(monthSchedules.filter((schedule) => !isSingleDaySchedule(schedule)).map((schedule) => schedule.id)),
+    [monthSchedules],
+  );
+  const gapScheduleIds = useMemo(
+    () => new Set(monthSchedules.filter((schedule) => schedule.status === "active" && !coverageLabel(schedule, snapshot).covered).map((schedule) => schedule.id)),
+    [monthSchedules, snapshot],
+  );
+  const monthDays = summarizeDutyDays(monthSchedules.filter((schedule) => schedule.status === "active").map((schedule) => progressById.get(schedule.id)));
+  const gapCount = summarizeDutyDays(monthSchedules.filter((schedule) => schedule.status === "active" && gapScheduleIds.has(schedule.id) && !publishedScheduleIds.has(schedule.id)).map((schedule) => progressById.get(schedule.id))).upcoming;
+
+  function openCreate(date: string | null = null) {
+    setCreateDate(date);
     setFormSchedule(null);
     setFormOpen(true);
   }
@@ -1083,161 +1084,174 @@ export function DutyOperationsWorkspace({ snapshot, queues = [] }: { snapshot: S
     setFormSchedule(schedule);
     setFormOpen(true);
   }
+  function chooseMonth(key: string) {
+    setMonth(key);
+    if (plannerOpen) updateMonthParam(key);
+  }
+  function updateMonthParam(value: string | null) {
+    const url = new URL(window.location.href);
+    if (value) url.searchParams.set("escalaMes", value);
+    else url.searchParams.delete("escalaMes");
+    window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+  }
+  function setPlanner(open: boolean) {
+    setPlannerOpen(open);
+    updateMonthParam(open ? month : null);
+  }
+
+  /** One click: keep the plantão going until the last day of the viewed month. */
+  async function extendSchedule(scheduleId: string) {
+    const schedule = snapshot.schedules.find((item) => item.id === scheduleId);
+    if (!schedule) return false;
+    const formData = new FormData();
+    formData.set("scheduleId", schedule.id);
+    formData.set("name", schedule.name);
+    formData.set("typeName", schedule.typeName ?? "");
+    formData.set("dayOfWeek", String(schedule.dayOfWeek));
+    formData.set("startsAt", schedule.startsAt);
+    formData.set("endsAt", schedule.endsAt);
+    formData.set("minimumBrokers", String(schedule.minimumBrokers));
+    formData.set("maximumBrokers", schedule.maximumBrokers === null ? "" : String(schedule.maximumBrokers));
+    formData.set("validFrom", dateInputValue(schedule.validFrom));
+    formData.set("validUntil", lastDayOfMonth(month));
+    if (schedule.webhookCredentialId) formData.set("webhookCredentialId", schedule.webhookCredentialId);
+    const result = await updateDutyScheduleAction({}, formData);
+    if (!result.success) {
+      toast.error(result.error ?? "Não foi possível estender o plantão.");
+      return false;
+    }
+    toast.success(`${schedule.name} agora vai até ${dateLabel(new Date(`${lastDayOfMonth(month)}T12:00:00Z`))}.`);
+    router.refresh();
+    return true;
+  }
+
+  const monthStart = `${month}-01`;
+  const todayKey = dateInputValue(new Date());
+  const defaultStartDate = monthStart > todayKey ? monthStart : todayKey;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5">
-      <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-4">
+      <section className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-foreground">Plantões</h2>
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Organize escalas, horários e cobertura sem perder o vínculo com a fila de destino.
+          <h2 className="text-base font-semibold tracking-tight text-foreground">Plantões</h2>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
+            Cada plantão vale no dia escolhido, para todas as unidades. ↻ marca os que repetem toda semana.
           </p>
         </div>
-        <Button
-          onClick={openCreate}
-        >
-          <Plus />
-          Novo plantão
-        </Button>
-      </section>
-      <section className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium">Escopo: todas as unidades</p>
-          <p className="mt-1 text-xs text-muted-foreground">Os plantões são globais; as filas apenas escolhem quando uma origem usa a regra.</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {monthlySchedulingEnabled ? (
+            <Button variant="outline" onClick={() => setPlanner(true)}>
+              <CalendarCheck className="size-4" />
+              Escala de {monthLabel(month).replace(/ de \d{4}$/, "")}
+            </Button>
+          ) : null}
+          <Button onClick={() => openCreate()}>
+            <Plus />
+            Novo plantão
+          </Button>
         </div>
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Checkbox
-            checked={showArchived}
-            onCheckedChange={(checked) => setShowArchived(checked === true)}
-          />
-          Mostrar arquivados
-        </label>
       </section>
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard
-          icon={CalendarCheck}
-          label="Plantões ativos"
-          value={activeCount}
-          description="Regras elegíveis agora"
-          tone="success"
-        />
-        <SummaryCard
-          icon={Users}
-          label="Sem cobertura"
+
+      <section className="grid grid-cols-2 gap-2 sm:gap-3">
+        <StatCard label={`Dias com plantão em ${monthLabel(month).replace(/ de \d{4}$/, "").toLocaleLowerCase("pt-BR")}`} value={monthDays.total} sublabel={`${monthDays.upcoming} por acontecer · ${monthDays.finished} encerrados`} />
+        <StatCard
+          label="Dias sem cobertura"
           value={gapCount}
-          description="Abaixo do mínimo configurado"
-          tone={gapCount ? "warning" : "neutral"}
-        />
-        <SummaryCard
-          icon={Clock}
-          label="Inativos"
-          value={inactiveCount}
-          description="Regras pausadas"
-        />
-        <SummaryCard
-          icon={Trash}
-          label="Arquivados"
-          value={archivedCount}
-          description="Histórico reversível"
+          sublabel="abaixo do mínimo na escala semanal"
+          valueClassName={gapCount ? "text-warning" : undefined}
         />
       </section>
-      {gapCount > 0 && (
-        <CoverageAlerts
-          schedules={scopedSchedules}
-          assignments={scopedAssignments}
-          onOpen={setSelectedSchedule}
-        />
-      )}
-      <Card className="gap-0 overflow-hidden border-border/80 p-0">
-        <CardHeader className="border-b border-border/70 bg-card/70 p-4">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="text-base">Plantões por mês</CardTitle>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Agrupados pelo início da vigência. Abra um mês para editar os plantões e as escalas.
-              </p>
+
+      <Card variant="overview">
+        <CardHeader className="gap-0 border-b border-border/50 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <CalendarCheck className="size-4" />
+              {monthLabel(month)}
+            </CardTitle>
+            <div className="flex items-center gap-1">
+              <Button type="button" size="icon-sm" variant="ghost" aria-label="Mês anterior" disabled={month <= firstMonth} onClick={() => chooseMonth(shiftMonth(month, -1))}>
+                <ChevronDownIcon className="size-4 rotate-90" />
+              </Button>
+              <Button type="button" size="icon-sm" variant="ghost" aria-label="Próximo mês" disabled={month >= lastMonth} onClick={() => chooseMonth(shiftMonth(month, 1))}>
+                <ChevronDownIcon className="size-4 -rotate-90" />
+              </Button>
             </div>
-            <Badge variant="outline">America/Sao_Paulo</Badge>
           </div>
-        </CardHeader>{" "}
-        <CardContent className="max-h-[80vh] overflow-y-auto p-3 sm:p-4">
-          <div className="space-y-3">
-            {monthGroups.map((group) => {
-              const expanded = expandedMonthKeys.has(group.key);
-              const regionId = `duty-month-${group.key}`;
-              return (
-                <section key={group.key} className="overflow-hidden rounded-xl border border-border/70 bg-card">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-auto w-full justify-between gap-3 rounded-none px-3 py-3 text-left sm:px-4"
-                    id={`${regionId}-trigger`}
-                    aria-expanded={expanded}
-                    aria-controls={regionId}
-                    onClick={() => setExpandedMonthKeys((previous) => {
-                      const next = new Set(previous);
-                      if (next.has(group.key)) next.delete(group.key);
-                      else next.add(group.key);
-                      return next;
-                    })}
-                  >
-                    <span className="flex min-w-0 items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground">
-                        <FolderSimple aria-hidden="true" className="size-4" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-foreground">{group.label}</span>
-                        <span className="block text-xs text-muted-foreground">
-                          {group.schedules.length} {group.schedules.length === 1 ? "plantão" : "plantões"}
-                        </span>
-                      </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      {group.key === currentMonthKey ? <Badge variant="secondary">Mês atual</Badge> : null}
-                      <Badge variant="outline">{group.schedules.length}</Badge>
-                      <ChevronDownIcon aria-hidden="true" className="size-4 text-muted-foreground" />
-                    </span>
-                  </Button>
-                  <div
-                    id={regionId}
-                    role="region"
-                    aria-labelledby={`${regionId}-trigger`}
-                    hidden={!expanded}
-                    className="border-t border-border/70 p-3 sm:p-4"
-                  >
-                    {expanded ? (
-                      <DutyTimeline
-                        schedules={group.schedules}
-                        assignments={scopedAssignments}
-                        onOpen={setSelectedSchedule}
-                      />
-                    ) : null}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
+        </CardHeader>
+        <CardContent className="grid gap-3 p-4">
+          {monthSchedules.length ? (
+            <DutyMonthCalendar
+              month={month}
+              schedules={monthSchedules}
+              progressById={progressById}
+              publishedScheduleIds={publishedScheduleIds}
+              gapScheduleIds={gapScheduleIds}
+              repeatingScheduleIds={repeatingScheduleIds}
+              canCreate
+              onOpen={setSelectedSchedule}
+              onCreateOnDate={(date) => openCreate(date)}
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-8 text-center">
+              <p className="text-sm font-medium">Nenhum plantão acontece em {monthLabel(month)}</p>
+              <Button onClick={() => openCreate()}>
+                <Plus />
+                Novo plantão
+              </Button>
+            </div>
+          )}
+          <label className="flex items-center gap-2 justify-self-end text-xs text-muted-foreground">
+            <Checkbox checked={showArchived} onCheckedChange={(checked) => setShowArchived(checked === true)} />
+            Mostrar arquivados
+          </label>
+          {outsideSchedules.length ? (
+            <details className="rounded-lg border border-border bg-card px-3 py-2 text-xs">
+              <summary className="cursor-pointer font-medium">
+                {outsideSchedules.length} {outsideSchedules.length === 1 ? "plantão não acontece" : "plantões não acontecem"} em {monthLabel(month)}
+              </summary>
+              <ul className="mt-2 grid gap-1.5">
+                {outsideSchedules.map((schedule) => {
+                  const coverage = coverageById.get(schedule.id);
+                  const reason = coverage && !coverage.covered ? coverage.reason : "no_weekday";
+                  return (
+                    <li key={schedule.id} className="flex items-center justify-between gap-2">
+                      <button type="button" className="min-w-0 text-left hover:underline" onClick={() => setSelectedSchedule(schedule)}>
+                        <span className="block truncate text-foreground">{schedule.name} · {DAYS[schedule.dayOfWeek]} {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}</span>
+                        <span className="block text-muted-foreground">{outsideLabel(schedule, reason)}</span>
+                      </button>
+                      {reason === "ends_before" && schedule.status === "active" ? (
+                        <Button type="button" size="sm" variant="outline" className="shrink-0" onClick={() => { void extendSchedule(schedule.id); }}>
+                          Estender até o fim do mês
+                        </Button>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </details>
+          ) : null}
         </CardContent>
       </Card>
-      {!scopedSchedules.length && (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
-            <span className="grid size-9 place-items-center rounded-lg bg-muted/60 text-muted-foreground">
-              <CalendarCheck aria-hidden="true" className="size-5" />
-            </span>
-            <div>
-              <p className="text-sm font-semibold">Nenhum plantão neste escopo</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-                Crie uma regra para organizar a cobertura de todas as unidades.
-              </p>
-            </div>
-            <Button onClick={openCreate}>
-              <Plus />
-              Criar plantão
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+
+      {monthlySchedulingEnabled ? (
+        <MonthlyDutyPlanner
+          brokers={snapshot.brokers}
+          enabled={monthlySchedulingEnabled}
+          canEdit={canPlanMonthlySchedule}
+          month={month}
+          open={plannerOpen}
+          onOpenChange={setPlanner}
+          schedules={plannerSchedules}
+          plansState={plansState}
+          onCreateSchedule={() => {
+            setReturnToPlanner(true);
+            setPlannerOpen(false);
+            openCreate(null);
+          }}
+          onExtendSchedule={extendSchedule}
+        />
+      ) : null}
       <DutyInspector
         key={`${selectedSchedule?.id ?? "closed"}-${selectedSchedule ? "open" : "closed"}`}
         schedule={selectedSchedule}
@@ -1249,12 +1263,19 @@ export function DutyOperationsWorkspace({ snapshot, queues = [] }: { snapshot: S
         onEdit={openEdit}
       />
       <DutyFormSheet
-        key={formSchedule?.id ?? (formOpen ? "new" : "closed")}
+        key={formSchedule?.id ?? (formOpen ? `new-${createDate ?? month}` : "closed")}
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open && returnToPlanner) {
+            setReturnToPlanner(false);
+            setPlannerOpen(true);
+          }
+        }}
         schedule={formSchedule}
         snapshot={snapshot}
         queues={queues}
+        defaultStartDate={createDate ?? defaultStartDate}
       />
     </div>
   );

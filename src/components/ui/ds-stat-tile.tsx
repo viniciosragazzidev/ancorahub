@@ -56,7 +56,7 @@ export const DsStatTile = React.forwardRef<HTMLDivElement, DsStatTileProps>(
           <p className="font-ds-inter text-ds-caption text-ds-steel">{label}</p>
         </div>
         {value !== undefined ? (
-          <p className={cn("font-ds-mono text-ds-heading-sm font-semibold tabular-nums", TONE_TEXT[tone])}>
+          <p className={cn("font-ds-mono text-ds-body-lg font-semibold tabular-nums", TONE_TEXT[tone])}>
             {value}
           </p>
         ) : (

@@ -288,74 +288,71 @@
 
 .dark {
   color-scheme: dark;
-  /* ── Camada 1: Fundação Neutra Dark (Contraste Dobrado) ───────────────── */
-  --surface-base: oklch(0.150 0.008 260);
-  /* Lvl 0: Base Canvas (#0d0f12) */
-  --surface-card: oklch(0.190 0.009 260);
-  /* Lvl 1: Card Surface (#16191d) */
-  --surface-secondary: oklch(0.230 0.011 260);
-  /* Lvl 2: Recessed / Active (#20242a) */
-  --surface-elevated: oklch(0.255 0.012 260);
-  /* Lvl 3: Elevated Popover (#292e36) */
-  --surface-overlay: oklch(0.280 0.010 260);
+  /* Dark palette taken from the reference admin panel (jubayer910/Admin-panel,
+     MIT): a neutral #151515 ground, #1C1C1C cards, #1E1E1E controls and an
+     indigo primary. Recorded in docs/design-system.md § Dark Mode. */
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  --surface-base: #151515;
+  --surface-card: #1c1c1c;
+  --surface-secondary: #1a1a1a;
+  --surface-elevated: #1e1e1e;
+  --surface-overlay: #232323;
 
-  --background: oklch(0.150 0.008 260);
-  --foreground: oklch(100% 0.00011 271.152);
+  --background: #151515;
+  --foreground: #f3f3f3;
 
-  --card: oklch(0.190 0.009 260);
-  --card-foreground: oklch(0.940 0.006 260);
+  --card: #1c1c1c;
+  --card-foreground: #e6e6e6;
 
-  --popover: oklch(0.220 0.011 260);
-  --popover-foreground: oklch(0.940 0.006 260);
+  --popover: #1e1e1e;
+  --popover-foreground: #e6e6e6;
 
-  /* ── Camada 2: Acentos Funcionais & Ações da Marca Dark ───────────────── */
-  --primary: #f2f5f7;
-  --primary-foreground: #0d111b;
+  /* ── Action ───────────────────────────────────────────────────────────── */
+  --primary: #3b1fe5;
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.240 0.008 260);
-  --secondary-foreground: oklch(0.960 0.003 260);
+  --secondary: #1e1e1e;
+  --secondary-foreground: #e6e6e6;
 
-  --accent: oklch(0.280 0.055 255);
-  /* Ramp Esmeralda da Marca Dark (#47D18C) */
-  --accent-foreground: oklch(0.760 0.130 255);
+  --accent: #262626;
+  --accent-foreground: #f3f3f3;
 
-  --muted: oklch(0.240 0.008 260);
-  --muted-foreground: oklch(0.720 0.008 260);
-  --muted-text: oklch(0.580 0.010 260);
+  --muted: #252525;
+  --muted-foreground: #8a8a8a;
+  --muted-text: #6b6b6b;
 
-  /* ── Camada 3: Comunicação Semântica Dark (Uniformidade OKLCH L ≈ 0.70-0.76) */
-  --warning: oklch(0.760 0.160 75);
-  --warning-foreground: oklch(0.120 0.005 260);
-  --success: oklch(0.740 0.175 145);
-  --success-foreground: oklch(0.120 0.005 260);
-  --destructive: oklch(0.700 0.210 25);
+  /* ── Status (ink over a deep wash, same pairs as the Ds tokens) ─────────── */
+  --warning: #e8b98f;
+  --warning-foreground: #151515;
+  --success: #7fd1a0;
+  --success-foreground: #151515;
+  --destructive: #f4a3a9;
 
-  --border: oklch(0.290 0.008 260);
-  /* Bordas nítidas sem empastamento */
-  --border-strong: oklch(0.380 0.010 260);
-  --input: oklch(0.290 0.008 260);
-  --ring: #0098f2;
+  --border: #2a2a2a;
+  --border-strong: #353535;
+  --input: #2a2a2a;
+  --ring: #6350ff;
 
-  --sidebar: var(--card);
-  --sidebar-foreground: oklch(0.910 0.006 260);
-  --sidebar-primary: #f2f5f7;
-  --sidebar-primary-foreground: #0d111b;
-  --sidebar-accent: oklch(0.280 0.018 260);
-  --sidebar-accent-foreground: oklch(0.940 0.006 260);
-  --sidebar-warning: oklch(0.230 0.011 260);
-  --sidebar-warning-foreground: oklch(0.910 0.006 260);
-  --sidebar-border: oklch(0.290 0.010 260);
-  --sidebar-ring: #0098f2;
+  --sidebar: #111111;
+  --sidebar-foreground: #c7c7c7;
+  --sidebar-primary: #3b1fe5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #262626;
+  --sidebar-accent-foreground: #f3f3f3;
+  --sidebar-warning: #1a1a1a;
+  --sidebar-warning-foreground: #c7c7c7;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #6350ff;
 
-  --ct-blue: oklch(0.960 0.003 260);
-  --ct-blue-strong: oklch(0.960 0.003 260);
+  --ct-blue: #c0d4f2;
+  --ct-blue-strong: #c0d4f2;
 
-  /* ── Camada 4: Paleta de Gráficos Dark em OKLCH (L = 0.74, C = 0.15) ───── */
-  --chart-1: oklch(0.740 0.150 260);
-  --chart-2: oklch(0.740 0.150 150);
-  --chart-3: oklch(0.740 0.150 230);
-  --chart-4: oklch(0.740 0.150 300);
-  --chart-5: oklch(0.740 0.150 65);
+  /* ── Charts: the reference's tag inks, one hue each ───────────────────── */
+  --chart-1: #c0d4f2;
+  --chart-2: #7fd1a0;
+  --chart-3: #b5e4ec;
+  --chart-4: #b6aede;
+  --chart-5: #dfb099;
   --radius: var(--radius-card);
 }
 
@@ -1187,18 +1184,12 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   transition: outline-offset var(--duration-quick) var(--ease-smooth-out);
 }
 
-/* ── 3. Card hover lift ─────────────────────────────────────────────────── */
+/* ── 3. Cards: no hover lift ───────────────────────────────────────────────
+   Borders define containers (design system): cards do not gain a shadow or
+   move on hover in any route or tab. Only border color may transition. */
 
 [data-slot="card"] {
-  transition:
-    box-shadow var(--duration-fast) var(--ease-smooth-out),
-    border-color var(--duration-fast) var(--ease-smooth-out),
-    transform var(--duration-fast) var(--ease-smooth-out);
-}
-
-[data-slot="card"]:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  transition: border-color var(--duration-fast) var(--ease-smooth-out);
 }
 
 /* ── 4. Skeleton shimmer animation ─────────────────────────────────────── */
@@ -1511,7 +1502,6 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 @media (prefers-reduced-motion: reduce) {
 
   [data-slot="button"]:active,
-  [data-slot="card"]:hover,
   [data-slot="button"],
   [data-slot="input"],
   [data-slot="textarea"],

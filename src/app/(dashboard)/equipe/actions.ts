@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { resendTeamInvitation } from "@/features/team/resend-invitation";
 import { createTeamUser } from "@/features/team/create-user";
 import { generatePasswordResetLinkForMember } from "@/features/team/password-recovery";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
@@ -15,8 +16,7 @@ import {
 } from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "@/features/team/onboarding-helpers";
-import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
-import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { enqueueBrokerInvitation } from "@/features/team/broker-invitation-delivery";
 import { parseCsv } from "@/shared/utils/csv";
@@ -766,81 +766,10 @@ export async function getPendingInvitesAction() {
 
 export async function resendInviteAction(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
-    const invitationId = String(formData.get("invitationId") ?? "").trim();
-    const context = await getRequiredTenantContext();
-    const db = getDatabase();
-
-    const [invitation] = await db
-      .select()
-      .from(schema.brokerInvitations)
-      .where(and(or(eq(schema.brokerInvitations.id, invitationId), eq(schema.brokerInvitations.brokerProfileId, invitationId)), eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.status, "PENDING")))
-      .limit(1);
-
-    if (!invitation) throw new Error("Convite não encontrado.");
-    if (invitation.status !== "PENDING") throw new Error("Este convite não está mais pendente.");
-    if (invitation.expiresAt < new Date()) throw new Error("Convite expirado. Crie um novo acesso.");
-
-    // Criar novo convite (substitui o anterior)
-    const newInvite = await db.transaction(async (tx) => {
-      const result = await createBrokerInvitation(
-        tx,
-        context.tenantId,
-        invitation.branchId,
-        invitation.brokerProfileId,
-        invitation.email,
-        invitation.role as "director" | "manager" | "supervisor" | "broker",
-        invitation.jobTitle,
-        invitation.customRoleId,
-      );
-      // Re-enfileirar envio WhatsApp
-      const [profile] = await tx
-        .select({ phone: schema.brokerProfiles.phone, name: schema.brokerProfiles.professionalName })
-        .from(schema.brokerProfiles)
-        .where(eq(schema.brokerProfiles.id, invitation.brokerProfileId))
-        .limit(1);
-      return { ...result, phone: profile?.phone ?? null, name: profile?.name ?? null };
-    });
-
-    // Tentar enfileirar WhatsApp
-    let whatsappStatus: TeamActionState["whatsappStatus"] = "not_available";
-    if (newInvite.phone) {
-      try {
-        const [[company], [branch]] = await Promise.all([
-          db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
-          db.select({ name: schema.branches.name }).from(schema.branches).where(and(
-            eq(schema.branches.id, invitation.branchId),
-            eq(schema.branches.tenantId, context.tenantId),
-          )).limit(1),
-        ]);
-        const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
-          eq(schema.communicationChannels.tenantId, context.tenantId),
-          inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-          eq(schema.communicationChannels.status, "active"),
-        )).orderBy(sql`CASE WHEN ${schema.communicationChannels.isDefault} = true THEN 0 ELSE 1 END`).limit(1);
-        const queued = await enqueueMetaTemplateMessage({
-          tenantId: context.tenantId,
-          channelId: channel?.id,
-          recipientType: "user",
-          recipientId: newInvite.id,
-          destinationPhone: newInvite.phone,
-          purpose: "brokerInvitation",
-          variables: [newInvite.name ?? newInvite.id, company?.name ?? "sua corretora", invitation.role === "director" ? "Diretor" : invitation.role === "manager" ? "Gestor" : "Corretor", branch?.name ?? "Unidade"],
-          requestedBy: context.userId,
-          idempotencyKey: `team-invitation:${newInvite.id}`,
-        });
-        whatsappStatus = queued.duplicate || queued.status === "queued" ? "queued" : "failed";
-        // The message was stored in the transactional outbox. Do not wait for
-        // provider delivery before releasing the dialog state to the user.
-        scheduleAfterResponse("team-invitation-resend-outbound", () => processMetaOutboundBatch(3, context.tenantId));
-      } catch {
-        whatsappStatus = "failed";
-      }
-    }
-
-    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_invitation", entidadeId: newInvite.id, acao: "reenviou_convite" });
-    return { success: true, token: newInvite.token, invitationId: newInvite.id, whatsappStatus };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erro ao reenviar convite." };
+    const result = await resendTeamInvitation(formData.get("memberId") ?? formData.get("invitationId"));
+    return { success: true, ...result };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao reenviar convite." };
   }
 }
 

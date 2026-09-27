@@ -6,12 +6,21 @@ import { getDatabase, schema } from "@/shared/db";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { WhatsAppPage } from "../../settings/whatsapp-page";
+import { DirectorWhatsAppView } from "./director-whatsapp-view";
 
 export const dynamic = "force-dynamic";
 
-export default async function WhatsAppIntegrationPage() {
+export default async function WhatsAppIntegrationPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role === "broker") redirect("/integrations");
+  const { visao } = await searchParams;
+  if (visao === "diretoria") {
+    if (context.role !== "director") redirect("/access-denied");
+    return <>
+      <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
+      <DirectorWhatsAppView context={context} />
+    </>;
+  }
 
   const db = getDatabase();
   const [metaEnabled, channels, branches] = await Promise.all([

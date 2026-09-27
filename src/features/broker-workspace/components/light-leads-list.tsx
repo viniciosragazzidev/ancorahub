@@ -8,6 +8,7 @@ import {
   MagnifyingGlass,
   SlidersHorizontal,
   X,
+  CalendarCheck,
 } from "@/components/huge-icons";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -50,10 +51,14 @@ export function LightLeadsList({
   leads,
   initialFilter = "all",
   availabilityStatus = "available",
+  dutyAssignments = [],
+  showDutySchedule = false,
 }: {
   leads: LightLeadItem[];
   initialFilter?: FilterTab;
   availabilityStatus?: "available" | "paused" | "offline";
+  dutyAssignments?: Array<{ dutyDate: string; startsAt: string; endsAt: string; scheduleName: string }>;
+  showDutySchedule?: boolean;
 }) {
   const [filter, setFilter] = useState<FilterTab>(initialFilter);
   const [searchQuery, setSearchQuery] = useState("");
@@ -151,6 +156,20 @@ export function LightLeadsList({
             </button>
           </div>
         </div>
+
+        {showDutySchedule && <section aria-label="Minha escala de plantões" className="rounded-xl border border-border/70 bg-card p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <CalendarCheck className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold">Minha escala</h2>
+            <span className="ml-auto text-xs text-muted-foreground">Próximos 3 meses</span>
+          </div>
+          {dutyAssignments.length ? <ul className="space-y-2">
+            {dutyAssignments.map((assignment, index) => <li key={`${assignment.dutyDate}-${assignment.startsAt}-${index}`} className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm">
+              <span className="min-w-0 truncate font-medium">{assignment.scheduleName}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "short" }).format(new Date(`${assignment.dutyDate}T12:00:00Z`))} · {assignment.startsAt.slice(0, 5)}–{assignment.endsAt.slice(0, 5)}</span>
+            </li>)}
+          </ul> : <p className="text-sm text-muted-foreground">Ainda não há plantões publicados para você neste período.</p>}
+        </section>}
 
         {/* Filter Pills */}
         <div role="tablist" aria-label="Filtros de leads" className="flex snap-x snap-mandatory flex-nowrap items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">

@@ -35,7 +35,7 @@ export function DistributionTabsContainer({
   useEffect(() => {
     const handlePopState = () => {
       const nextView = new URL(window.location.href).searchParams.get("view");
-      if (nextView) setActiveTab(nextView);
+      setActiveTab(nextView ?? "resumo_dia");
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -51,8 +51,8 @@ export function DistributionTabsContainer({
   };
 
   const tabs = [
-    { id: "roteamento", label: "Entradas e regras", icon: ArrowsDownUp },
     { id: "resumo_dia", label: "Resumo", icon: ChartLineUp },
+    { id: "roteamento", label: "Entradas e regras", icon: ArrowsDownUp },
     { id: "operar", label: "Operação", icon: FileArrowDown },
     ...(showQueueDefinition ? [{ id: "filas", label: "Filas", icon: Buildings }] : []),
     { id: "plantao", label: "Plantões", icon: CalendarBlank },
@@ -65,14 +65,11 @@ export function DistributionTabsContainer({
       variant="underline"
       className="w-full gap-6"
     >
-      {/* Was `top-[var(--header-height)]`, offset to sit right below the old
-          sticky DashboardHeader. That header is gone (replaced by DsPageHeader,
-          which isn't sticky), so this nav is now the only sticky element and
-          sticks to the real top of the scroll container instead of floating
-          with a gap above it. */}
+      {/* Sits right below the sticky DashboardHeader (the page is back on the
+          compact header shared by the other routes), so the two never overlap. */}
       <nav
         aria-label="Áreas da distribuição"
-        className="sticky top-0 z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 max-[559px]:top-[var(--mobile-safe-top)]"
+        className="sticky top-[var(--header-height)] z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]"
       >
         <TabsList
           aria-label="Áreas da distribuição"
@@ -84,10 +81,10 @@ export function DistributionTabsContainer({
               <TabsTrigger
                 key={tab.id}
                 value={tab.id}
-                className="min-h-12 shrink-0 gap-2 px-3.5 py-0 text-[13px] font-medium transition-colors duration-150"
-                indicatorClassName="left-3.5 right-3.5 rounded-full"
+                className="min-h-10 shrink-0 gap-1.5 px-3 py-0 text-xs font-medium transition-colors duration-150"
+                indicatorClassName="left-3 right-3 rounded-full"
               >
-                <Icon aria-hidden="true" className="size-4" />
+                <Icon aria-hidden="true" className="size-3.5" />
                 {tab.label}
               </TabsTrigger>
             );

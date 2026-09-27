@@ -4,21 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
-  Users,
   Download,
   Search,
-  TrendingUp,
-  Clock,
-  UserCheck,
-  UserX,
-  Flame,
-  CheckCircle2,
   Filter,
   ArrowUpRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,8 +23,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
+import { StatCard } from "@/components/dashboard/metric-card";
 import { AvailabilityToggle } from "@/components/availability-toggle";
-import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { DataTableFrame, dataTableStyles } from "@/components/ui/data-table/data-table-frame";
 import {
   Table,
   TableBody,
@@ -240,13 +234,15 @@ export function BrokerDailySummaryPanel({
   return (
     <div className="space-y-5">
       {/* FILTER BAR & PERIOD SELECTOR */}
-      <Card variant="overview" className="space-y-4 p-5 shadow-sm">
+      <Card variant="overview" className="space-y-4 p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
+          <div className="min-w-0">
             <div>
-              <h3 className="font-semibold text-base">Resumo de Desempenho dos Corretores</h3>
-              <p className="text-xs text-muted-foreground">
+              <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+                <Calendar className="size-4 shrink-0" />
+                Resumo de desempenho dos corretores
+              </h3>
+              <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
                 Acompanhe o volume de leads recebidos, perdas, atendimento ativo e conversão por
                 período.
               </p>
@@ -338,12 +334,12 @@ export function BrokerDailySummaryPanel({
         {/* BRANCH & SEARCH BAR */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
           <div className="relative max-w-sm w-full">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar corretor por nome ou e-mail..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 text-xs h-9"
+              className="pl-8"
             />
           </div>
 
@@ -351,7 +347,7 @@ export function BrokerDailySummaryPanel({
             <div className="flex items-center gap-2">
               <Filter className="h-3.5 w-3.5 text-muted-foreground" />
               <Select value={selectedBranchId} onValueChange={handleBranchChange}>
-                <SelectTrigger className="w-[200px] h-9 text-xs">
+                <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Todas as Unidades" />
                 </SelectTrigger>
                 <SelectContent>
@@ -368,71 +364,28 @@ export function BrokerDailySummaryPanel({
         </div>
       </Card>
 
-      {/* KPI METRIC CARDS */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5 text-primary" /> Corretores Ativos
-          </p>
-          <p className="text-xl font-bold tabular-nums">{data.totalBrokers}</p>
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Flame className="h-3.5 w-3.5 text-blue-500" /> Leads Recebidos
-          </p>
-          <p className="text-xl font-bold tabular-nums">{data.totalReceived}</p>
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <UserCheck className="h-3.5 w-3.5 text-emerald-500" /> Em Atendimento
-          </p>
-          <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-            {data.totalActive}
-          </p>
-          {data.totalUnstarted > 0 && (
-            <p className="text-[10px] text-amber-500 font-semibold">
-              {data.totalUnstarted} sem 1º contato
-            </p>
-          )}
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <UserX className="h-3.5 w-3.5 text-rose-500" /> Leads Perdidos
-          </p>
-          <p className="text-xl font-bold tabular-nums text-rose-600 dark:text-rose-400">
-            {data.totalLost}
-          </p>
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Vendas Concluídas
-          </p>
-          <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">
-            {data.totalConverted}
-          </p>
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5 text-amber-500" /> Taxa de Conversão
-          </p>
-          <p className="text-xl font-bold tabular-nums">{data.teamConversionRate}%</p>
-          {data.avgTeamResponseMinutes !== null && (
-            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" /> ~{data.avgTeamResponseMinutes} min resposta
-            </p>
-          )}
-        </Card>
+      {/* KPI METRIC CARDS — same StatCard as /equipe */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <StatCard label="Corretores ativos" value={data.totalBrokers} sublabel="no período" />
+        <StatCard label="Leads recebidos" value={data.totalReceived} sublabel="no período" />
+        <StatCard
+          label="Em atendimento"
+          value={data.totalActive}
+          sublabel={data.totalUnstarted > 0 ? `${data.totalUnstarted} sem 1º contato` : "todos com 1º contato"}
+        />
+        <StatCard label="Leads perdidos" value={data.totalLost} sublabel="no período" />
+        <StatCard label="Vendas concluídas" value={data.totalConverted} sublabel="no período" />
+        <StatCard
+          label="Taxa de conversão"
+          value={`${data.teamConversionRate}%`}
+          sublabel={data.avgTeamResponseMinutes !== null ? `~${data.avgTeamResponseMinutes} min de resposta` : "sem tempo de resposta"}
+        />
       </div>
 
       {/* BROKER SUMMARY TABLE */}
       <Card variant="overview" className="border-0 p-0">
         <DataTableFrame>
-          <Table>
+          <Table className={dataTableStyles.native}>
             <TableHeader>
               <TableRow>
                 <TableHead>Corretor</TableHead>

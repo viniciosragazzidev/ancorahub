@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BRAZIL_DDDS_BY_STATE, decideDddRouting, extractBrazilianDdd, normalizeDddRoutingSettings } from "./ddd-routing";
+import { BRAZIL_DDDS_BY_STATE, decideDddRouting, extractBrazilianDdd, normalizeDddRoutingSettings, parseDddList } from "./ddd-routing";
 
 describe("BRAZIL_DDDS_BY_STATE", () => {
   it("lists the 67 Brazilian DDDs once each, across the 27 states", () => {
@@ -56,5 +56,13 @@ describe("normalizeDddRoutingSettings", () => {
       queues: { valid: null, invalid: "q1", unknown: null },
     });
     expect(normalizeDddRoutingSettings("garbage").enabled).toBe(false);
+  });
+});
+
+describe("parseDddList", () => {
+  it("reads typed DDDs in any separator and reports the ones that do not exist", () => {
+    expect(parseDddList("21, 22 24;21\n11")).toEqual({ valid: ["11", "21", "22", "24"], unknown: [] });
+    expect(parseDddList("21, 20, 123")).toEqual({ valid: ["21"], unknown: ["20", "123"] });
+    expect(parseDddList("")).toEqual({ valid: [], unknown: [] });
   });
 });

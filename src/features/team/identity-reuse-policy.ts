@@ -16,8 +16,12 @@ export type ExistingTeamMembership = { id: string } | null;
 export function classifyExistingTeamIdentity(
   identity: ExistingTeamIdentity | null,
   tenantMembership: ExistingTeamMembership,
+  invitedPendingUserId: string | null = null,
 ) {
   if (!identity) return { kind: "new" as const };
+  if (tenantMembership && identity.status === "pending" && identity.id === invitedPendingUserId) {
+    return { kind: "reactivate" as const, userId: identity.id };
+  }
   if (tenantMembership) return { kind: "tenant-conflict" as const };
   if (!identity.active || identity.status !== "active") return { kind: "reactivate" as const, userId: identity.id };
   return { kind: "reuse" as const, userId: identity.id };

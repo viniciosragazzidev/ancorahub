@@ -103,7 +103,10 @@ function SheetBody({
   return (
     <ScrollArea
       data-slot="sheet-body"
-      className={cn("min-h-0 flex-1 overscroll-contain", className)}
+      // Radix wraps content in `display: table`, which grows to the widest
+      // child (long names) and scrolls the drawer sideways; block keeps it
+      // at the drawer width so `truncate` works.
+      className={cn("min-h-0 flex-1 overscroll-contain [&_[data-radix-scroll-area-viewport]>div]:block!", className)}
       {...props}
     >
       <div

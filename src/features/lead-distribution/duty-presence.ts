@@ -6,6 +6,7 @@ import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/querie
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
+import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 
 type PresenceAssignment = { id: string; scheduleId: string; brokerId: string; dayOfWeek: number; startsAt: string; endsAt: string; validFrom: Date; validUntil: Date | null };
 type PresenceSchedule = { id: string; dayOfWeek: number; startsAt: string; endsAt: string; timezone: string; validFrom: Date; validUntil: Date | null };
@@ -100,6 +101,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
     endsAt: schema.dutyRosterAssignments.endsAt,
     validFrom: schema.dutyRosterAssignments.validFrom,
     validUntil: schema.dutyRosterAssignments.validUntil,
+    dutyDate: schema.dutyRosterAssignments.dutyDate,
   }).from(schema.dutyRosterAssignments)
     .innerJoin(schema.user, eq(schema.user.id, schema.dutyRosterAssignments.brokerId))
     .innerJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.dutyRosterAssignments.brokerId), eq(schema.tenantMemberships.tenantId, schema.dutyRosterAssignments.tenantId)))
@@ -112,6 +114,14 @@ export async function processDutyPresenceReminders(now = new Date()) {
     ));
 
   const scheduleById = new Map(schedules.map((schedule) => [schedule.id, schedule]));
+  // A published monthly occurrence replaces the weekly roster of its plantão on
+  // that date: only whoever is actually in force gets a reminder.
+  const publishedByTenantDate = new Map<string, Promise<Set<string> | null>>();
+  const publishedFor = (tenantId: string, day: string) => {
+    const key = `${tenantId}:${day}`;
+    if (!publishedByTenantDate.has(key)) publishedByTenantDate.set(key, getPublishedDutyScheduleIds(tenantId, day));
+    return publishedByTenantDate.get(key)!;
+  };
   let considered = 0;
   let queued = 0;
   let failed = 0;
@@ -127,6 +137,8 @@ export async function processDutyPresenceReminders(now = new Date()) {
     if (!window) continue;
     const reminderOpensAt = new Date(window.startsAt.getTime() - 30 * 60_000);
     if (now < reminderOpensAt || now >= window.endsAt) continue;
+    const shiftDay = getSaoPauloDateKey(window.startsAt);
+    if (!selectEffectiveDutyAssignments([assignment], shiftDay, await publishedFor(assignment.tenantId, shiftDay)).length) continue;
     considered += 1;
     const confirmationId = randomUUID();
     const [inserted] = await db.insert(schema.dutyPresenceConfirmations).values({

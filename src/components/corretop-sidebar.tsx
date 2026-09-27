@@ -19,7 +19,6 @@ import {
   SlidersHorizontal,
   UserCircle,
   ShieldCheck,
-  Buildings,
   Megaphone,
 } from "@phosphor-icons/react";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
@@ -117,7 +116,7 @@ const navigationItems: NavItemConfig[] = [
   },
   {
     label: "Equipe",
-    fullLabel: "Equipe & Colaboradores",
+    fullLabel: "Equipe & Unidades",
     icon: UsersThree,
     url: "/equipe",
     permission: "convidar_corretor",
@@ -153,15 +152,6 @@ const navigationItems: NavItemConfig[] = [
     permission: "acessar_campanhas_meta",
     section: "Marketing",
     iconTone: "text-blue-600 dark:text-blue-300",
-  },
-  {
-    label: "Unidades",
-    fullLabel: "Filiais & Unidades",
-    icon: Buildings,
-    url: "/filiais",
-    permission: "acessar_configuracoes_unidade",
-    section: "Administração",
-    iconTone: "text-indigo-600 dark:text-indigo-300",
   },
   {
     label: "Ajustes",
@@ -218,6 +208,15 @@ function canShowItem(item: NavItemConfig, user: UserDisplayInfo | null, roleKey:
   const permissions = user?.permissions ?? [];
   const routePermission = routePermissionForPath(item.url);
   const explicitRoutes = permissions.filter((permission) => permission.startsWith("route:"));
+  if (item.url === "/equipe") {
+    if (explicitRoutes.length > 0) {
+      return Boolean(routePermission && permissions.includes(routePermission))
+        || permissions.includes("route:/filiais")
+        || permissions.includes("route:/unidades")
+        || permissions.includes("acessar_configuracoes_unidade");
+    }
+    return permissions.includes("convidar_corretor") || permissions.includes("acessar_configuracoes_unidade");
+  }
   if (routePermission && explicitRoutes.length > 0) return permissions.includes(routePermission);
   return permissions.includes(item.permission);
 }
@@ -337,10 +336,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 (item.url !== "/dashboard" && pathname.startsWith(item.url + "/")) ||
                 (item.url.startsWith("/marketing") && pathname.startsWith("/marketing"));
 
-              const itemTargetUrl =
-                item.url === "/filiais" && user?.roleKey === "manager" && user?.branchId
-                  ? `/unidades/${user.branchId}`
-                  : item.url;
+              const itemTargetUrl = item.url;
 
               const previousItem = visibleItems[index - 1];
               const showSection = !previousItem || previousItem.section !== item.section;

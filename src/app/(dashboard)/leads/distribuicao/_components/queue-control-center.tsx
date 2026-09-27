@@ -1,25 +1,32 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowsClockwise,
-  ChartBar,
   CheckCircle,
-  Clock,
   MagicWand,
   Plus,
-  SlidersHorizontal,
-  Trash,
   UserList,
   Buildings,
   Lightning,
   MagnifyingGlass,
+  ChevronDownIcon,
+  ShieldX,
+  Gear,
 } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import {
   Dialog,
   DialogDescription,
@@ -31,17 +38,12 @@ import {
 } from "@/components/ui/dialog";
 import { InfoTooltip } from "@/components/ui/info-tooltip";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
 import {
   deleteDistributionQueueAction,
-  deleteMetaAdQueueRouteAction,
-  deleteMetaCampaignQueueRouteAction,
   forceDeleteQueueAction,
   getQueueDependenciesAction,
   saveDistributionQueueAction,
-  saveMetaAdQueueRouteAction,
-  saveMetaCampaignQueueRouteAction,
   simulateDistributionAction,
   type QueueDependencyInfo,
 } from "@/features/lead-distribution/actions";
@@ -51,53 +53,16 @@ import { cn } from "@/utils/core/cn";
 import { QUEUE_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
 import { circularHueDistance, pickDistinctHue, QUEUE_COLOR_SWATCHES } from "@/features/lead-distribution/queue-color";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
+import { MetaEntries, countQueueEntries, type MetaAd, type MetaAdRoute, type MetaCampaign, type MetaCampaignRoute, type MetaEntriesData } from "./queues/meta-entries";
+import { PanelSheet, QueueDetailSheet } from "./queues/queue-detail-sheet";
+import { QueuesTable } from "./queues/queues-table";
+import type { DutySchedule, Queue } from "./queues/types";
 
-type Queue = {
-  id: string;
-  name: string;
-  branchId: string | null;
-  exclusiveDutyScheduleId?: string | null;
-  exclusiveDutyScheduleIds?: string[] | null;
-  dutyFallbackPolicy?: string | null;
-  dutyFallbackQueueId?: string | null;
-  branchName?: string | null;
-  status: string;
-  assignmentMode: string;
-  assignmentStrategy: string;
-  capacityEnabled: boolean;
-  capacityPerBroker: number | null;
-  offerIntervalMinutes?: number;
-  maxPendingOffersPerBroker?: number;
-  aiQualificationEnabled?: boolean;
-  colorHue?: number | null;
-  waiting: number;
-  members: number;
-  activeLeads: number;
-  allowedBranchIds?: string[];
-  allowedBrokerIds?: string[];
-  allowedSourceIds?: string[];
-};
+const IGNORED_PANEL_ID = "__ignored_campaigns__";
 
 type Branch = { id: string; name: string };
 type Broker = { id: string; name: string; branchId?: string | null; branchName?: string | null };
-type DutySchedule = {
-  id: string;
-  name: string;
-  startsAt: string;
-  endsAt: string;
-  dayOfWeek?: number;
-  branchName?: string | null;
-};
 const DUTY_DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"] as const;
-type Campaign = { campaignId: string; name: string; status: string };
-type CampaignRoute = {
-  campaignId: string;
-  queueId: string | null;
-  queueName: string | null;
-  enabled: boolean;
-};
-type Ad = { adId: string; name: string; status: string };
-type AdRoute = { adId: string; queueId: string | null; queueName: string | null; enabled: boolean };
 type Simulation = {
   success: boolean;
   error?: string;
@@ -147,16 +112,19 @@ export function QueueControlCenter({
   campaignRoutes,
   adRoutes,
   canEdit,
+  settingsPanels = [],
 }: {
   queues: Queue[];
   branches: Branch[];
   brokers?: Broker[];
   dutySchedules?: DutySchedule[];
-  campaigns: Campaign[];
-  ads: Ad[];
-  campaignRoutes: CampaignRoute[];
-  adRoutes: AdRoute[];
+  campaigns: MetaCampaign[];
+  ads: MetaAd[];
+  campaignRoutes: MetaCampaignRoute[];
+  adRoutes: MetaAdRoute[];
   canEdit: boolean;
+  /** Secondary settings reached from the page "⋯" menu, each in a drawer. */
+  settingsPanels?: Array<{ id: string; label: string; description?: string; content: ReactNode }>;
 }) {
   const [editorOpen, setEditorOpen] = useState(false);
   const [simulatorOpen, setSimulatorOpen] = useState(false);
@@ -171,21 +139,9 @@ export function QueueControlCenter({
     temperature: "warm",
     score: "50",
   });
-  const [campaignRoute, setCampaignRoute] = useState({
-    campaignId: campaigns[0]?.campaignId ?? "",
-    queueId: queues[0]?.id ?? "",
-  });
-  const [adRoute, setAdRoute] = useState({
-    adId: ads[0]?.adId ?? "",
-    queueId: queues[0]?.id ?? "",
-  });
-  const [savingCampaignRoute, setSavingCampaignRoute] = useState(false);
-  const [savingAdRoute, setSavingAdRoute] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [showOnlyActiveCampaigns, setShowOnlyActiveCampaigns] = useState(true);
-  const [showOnlyActiveAds, setShowOnlyActiveAds] = useState(true);
-  const [campaignSearch, setCampaignSearch] = useState("");
-  const [adSearch, setAdSearch] = useState("");
+  // Queue drawer (row click) and the "⋯" menu drawers.
+  const [detailQueueId, setDetailQueueId] = useState<string | null>(null);
+  const [panelId, setPanelId] = useState<string | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Queue | null>(null);
   const [deleteDependencies, setDeleteDependencies] = useState<QueueDependencyInfo | null>(null);
@@ -228,49 +184,17 @@ export function QueueControlCenter({
     if (editorOpen && !editingId) persistQueueDraft();
   }, [editorOpen, editingId, persistQueueDraft]);
 
-  const activeCampaigns = useMemo(
-    () => campaigns.filter((c) => (c.status ?? "").toUpperCase() === "ACTIVE"),
-    [campaigns],
+  const meta = useMemo<MetaEntriesData>(
+    () => ({ campaigns, ads, campaignRoutes, adRoutes }),
+    [campaigns, ads, campaignRoutes, adRoutes],
   );
-  const displayedCampaigns = useMemo(
-    () => (showOnlyActiveCampaigns && activeCampaigns.length > 0 ? activeCampaigns : campaigns),
-    [showOnlyActiveCampaigns, activeCampaigns, campaigns],
+  const entriesByQueue = useMemo(
+    () => new Map(queues.map((queue) => [queue.id, countQueueEntries(meta, queue.id)])),
+    [queues, meta],
   );
-  const filteredCampaigns = useMemo(() => {
-    const query = campaignSearch.trim().toLocaleLowerCase("pt-BR");
-    return query
-      ? displayedCampaigns.filter((campaign) =>
-          campaign.name.toLocaleLowerCase("pt-BR").includes(query),
-        )
-      : displayedCampaigns;
-  }, [campaignSearch, displayedCampaigns]);
-
-  const activeAds = useMemo(
-    () => ads.filter((a) => (a.status ?? "").toUpperCase() === "ACTIVE"),
-    [ads],
-  );
-  const displayedAds = useMemo(
-    () => (showOnlyActiveAds && activeAds.length > 0 ? activeAds : ads),
-    [showOnlyActiveAds, activeAds, ads],
-  );
-  const filteredAds = useMemo(() => {
-    const query = adSearch.trim().toLocaleLowerCase("pt-BR");
-    return query
-      ? displayedAds.filter((ad) => ad.name.toLocaleLowerCase("pt-BR").includes(query))
-      : displayedAds;
-  }, [adSearch, displayedAds]);
-  const activeCampaignRoutes = useMemo(
-    () => campaignRoutes.filter((route) => campaigns.some((campaign) => campaign.campaignId === route.campaignId && (campaign.status ?? "").toUpperCase() === "ACTIVE")),
-    [campaignRoutes, campaigns],
-  );
-  const activeAdRoutes = useMemo(
-    () => adRoutes.filter((route) => ads.some((ad) => ad.adId === route.adId && (ad.status ?? "").toUpperCase() === "ACTIVE")),
-    [adRoutes, ads],
-  );
-  const queueIdsWithAdExceptions = useMemo(
-    () => new Set(adRoutes.filter((route) => route.queueId && route.enabled).map((route) => route.queueId)),
-    [adRoutes],
-  );
+  const brokerNames = useMemo(() => new Map(brokers.map((broker) => [broker.id, broker.name])), [brokers]);
+  const detailQueue = queues.find((queue) => queue.id === detailQueueId) ?? null;
+  const activePanel = settingsPanels.find((panel) => panel.id === panelId) ?? null;
 
   async function handleDeleteQueue(queue: Queue) {
     setDeleteTarget(queue);
@@ -284,10 +208,8 @@ export function QueueControlCenter({
 
   async function confirmDeleteQueue() {
     if (!deleteTarget) return;
-    setDeletingId(deleteTarget.id);
     setDeleteConfirmOpen(false);
     const result = await deleteDistributionQueueAction(deleteTarget.id);
-    setDeletingId(null);
     if (!result.success) return toast.error(result.error ?? "Não foi possível excluir a fila.");
     toast.success(result.message, { description: `A fila "${deleteTarget.name}" foi removida.` });
     router.refresh();
@@ -532,758 +454,113 @@ export function QueueControlCenter({
     if (!result.success) toast.error(result.error ?? "Não foi possível simular.");
   }
 
-  async function saveCampaignRoute(enabled: boolean) {
-    setSavingCampaignRoute(true);
-    const result = await saveMetaCampaignQueueRouteAction({
-      campaignId: campaignRoute.campaignId,
-      queueId: enabled ? campaignRoute.queueId : null,
-      enabled,
-    });
-    setSavingCampaignRoute(false);
-    if (!result.success)
-      return toast.error(result.error ?? "Não foi possível atualizar a campanha.", {
-        description: "Verifique se a fila está ativa.",
-      });
-    toast.success(
-      result.message ?? (enabled ? "Campanha vinculada à fila." : "Campanha ignorada pelo CRM."),
-      {
-        description: enabled
-          ? "Leads serão direcionados automaticamente."
-          : "A campanha não será registrada no CRM.",
-      },
-    );
-    router.refresh();
-  }
-
-  async function saveAdRoute(enabled: boolean) {
-    setSavingAdRoute(true);
-    const result = await saveMetaAdQueueRouteAction({
-      adId: adRoute.adId,
-      queueId: enabled ? adRoute.queueId : null,
-      enabled,
-    });
-    setSavingAdRoute(false);
-    if (!result.success)
-      return toast.error(result.error ?? "Não foi possível atualizar o anúncio.", {
-        description: "Verifique se a fila está ativa.",
-      });
-    toast.success(
-      result.message ?? (enabled ? "Anúncio vinculado à fila." : "Anúncio ignorado pelo CRM."),
-      {
-        description: enabled
-          ? "Leads deste anúncio serão direcionados automaticamente."
-          : "O anúncio não será registrado no CRM.",
-      },
-    );
-    router.refresh();
-  }
-
-  async function deleteMetaCampaignRoute(campaignId: string) {
-    if (!confirm("Remover esta regra de campanha? A campanha voltará a usar a fila geral.")) return;
-    const result = await deleteMetaCampaignQueueRouteAction(campaignId);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível remover a regra.");
-    toast.success(result.message);
-    router.refresh();
-  }
-
-  async function deleteMetaAdRoute(adId: string) {
-    if (!confirm("Remover esta regra de anúncio? O anúncio voltará a usar a fila geral.")) return;
-    const result = await deleteMetaAdQueueRouteAction(adId);
-    if (!result.success) return toast.error(result.error ?? "Não foi possível remover a regra.");
-    toast.success(result.message);
-    router.refresh();
-  }
-
   return (
     <>
-      <section aria-labelledby="queues-title" className="space-y-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 id="queues-title" className="text-base font-semibold">
-              Filas de distribuição
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Cada fila decide como a corretora ou unidade recebe, prioriza e distribui novos leads.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setSimulation(null);
-                setSimulatorOpen(true);
-              }}
-              className="active:scale-[0.97] transition-transform"
-            >
-              <MagicWand />
-              Simular distribuição
-            </Button>
-            {canEdit ? (
-              <Button
-                size="sm"
-                onClick={openCreate}
-                className="active:scale-[0.97] transition-transform"
-              >
-                <Plus />
-                Criar fila
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        {!queues.length ? (
-          <Card variant="overview">
-            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
-              <span className="grid size-10 place-items-center rounded-lg bg-muted text-muted-foreground">
-                <UserList className="size-5" />
-              </span>
+      <Card variant="overview">
+        <SectionCardHeader
+          icon={<UserList />}
+          title="Filas de distribuição"
+          description="Cada fila decide quem recebe, em que ordem e por quais campanhas. Clique numa fila para ver e ajustar."
+          actions={
+            <>
+              {canEdit ? (
+                <Button size="sm" onClick={openCreate}>
+                  <Plus />
+                  Nova fila
+                </Button>
+              ) : null}
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button size="sm" variant="outline" />}>
+                  <Gear className="size-3.5" />
+                  Configurações
+                  <ChevronDownIcon className="size-3 opacity-60" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSimulation(null);
+                      setSimulatorOpen(true);
+                    }}
+                  >
+                    <MagicWand className="size-3.5" /> Simular distribuição
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setPanelId(IGNORED_PANEL_ID)}>
+                    <ShieldX className="size-3.5" /> Campanhas não registradas
+                  </DropdownMenuItem>
+                  {settingsPanels.length ? <DropdownMenuSeparator /> : null}
+                  {settingsPanels.map((panel) => (
+                    <DropdownMenuItem key={panel.id} onClick={() => setPanelId(panel.id)}>
+                      <Gear className="size-3.5" /> {panel.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          }
+        />
+        <div className="p-4">
+          {queues.length ? (
+            <QueuesTable
+              queues={queues}
+              dutySchedules={dutySchedules}
+              entriesByQueue={entriesByQueue}
+              canEdit={canEdit}
+              onOpen={(queue) => setDetailQueueId(queue.id)}
+              onEdit={openEdit}
+              onDelete={(queue) => void handleDeleteQueue(queue)}
+            />
+          ) : (
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
               <p className="text-sm font-medium">Nenhuma fila configurada</p>
               <p className="max-w-sm text-xs text-muted-foreground">
                 Crie a primeira fila para tornar a distribuição previsível na operação.
               </p>
-              {canEdit ? (
-                <Button size="sm" onClick={openCreate}>
-                  <Plus />
-                  Criar fila
-                </Button>
-              ) : null}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {queues.map((queue) => {
-              const multiBranchCount =
-                (queue.allowedBranchIds?.length ?? 0) + (queue.branchId ? 1 : 0);
-              const hasSpecificBrokers = (queue.allowedBrokerIds?.length ?? 0) > 0;
-              const dutyScheduleIds = Array.from(new Set([
-                ...(queue.exclusiveDutyScheduleIds ?? []),
-                ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : []),
-              ]));
-              const dutyScheduleNames = dutyScheduleIds
-                .map((id) => dutySchedules.find((ds) => ds.id === id)?.name)
-                .filter((name): name is string => Boolean(name));
-              const queueCampaignRoutes = campaignRoutes.filter(
-                (r) => r.queueId === queue.id && r.enabled,
-              );
-              const queueCampaigns = campaigns.filter((c) =>
-                queueCampaignRoutes.some((r) => r.campaignId === c.campaignId),
-              );
-              const queueSourceIds = queue.allowedSourceIds ?? [];
-              const queueSourceNames = queueSourceIds.flatMap((sourceId) => {
-                const label = QUEUE_SOURCE_OPTIONS.find((source) => source.id === sourceId)?.label;
-                return label ? [label] : [];
-              });
-
-              return (
-                <Card
-                  key={queue.id}
-                  variant="compact"
-                  className="group transition-[border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-primary/30 motion-reduce:transition-none"
-                >
-                  <CardHeader className="gap-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <CardTitle className="flex min-w-0 items-center gap-2 truncate">
-                          <QueueColorDot hue={queue.colorHue} />
-                          <span className="truncate">{queue.name}</span>
-                        </CardTitle>
-                        <CardDescription className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <span>{queue.branchName || "Todas as Unidades (Geral)"}</span>
-                          {multiBranchCount > 1 && (
-                            <Badge variant="outline" className="text-[10px] font-normal">
-                              +{multiBranchCount - 1} unidade(s)
-                            </Badge>
-                          )}
-                          {dutyScheduleIds.length > 0 && (
-                            <Badge
-                              variant="secondary"
-                              className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 text-[10px]"
-                            >
-                              <Lightning className="size-3.5" aria-hidden="true" /> Plantão{dutyScheduleIds.length > 1 ? "ões" : ""}:{" "}
-                              {dutyScheduleNames.slice(0, 2).join(", ") || "Exclusivo"}
-                              {dutyScheduleNames.length > 2 ? ` +${dutyScheduleNames.length - 2}` : ""}
-                            </Badge>
-                          )}
-                          {queue.aiQualificationEnabled !== false ? (
-                            <Badge
-                              variant="secondary"
-                              className="bg-primary/10 text-primary border-primary/20 text-[10px] gap-1"
-                            >
-                              <MagicWand className="size-3" /> Bot IA Ativo
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant="outline"
-                              className="text-[10px] text-muted-foreground gap-1"
-                            >
-                              Bot IA Pausado
-                            </Badge>
-                          )}
-                        </CardDescription>
-                      </div>
-                      <Badge variant={queue.status === "active" ? "success" : "outline"}>
-                        {queue.status === "active" ? "Ativa" : "Pausada"}
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="grid grid-cols-3 divide-x divide-border/70 rounded-lg border border-border/60 bg-muted/20 py-2">
-                      <Metric icon={Clock} label="Aguardando" value={queue.waiting} />
-                      <Metric icon={UserList} label="Elegíveis" value={queue.members} />
-                      <Metric icon={ChartBar} label="Ativos" value={queue.activeLeads} />
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                      <span>
-                        {queue.assignmentMode === "automatic" ? "Automática" : "Manual"} ·{" "}
-                        {queue.assignmentStrategy === "round_robin" ? "Round robin" : "Menor carga"}
-                      </span>
-                      {hasSpecificBrokers ? (
-                        <Badge
-                          variant="secondary"
-                          className="text-[10px] bg-primary/10 text-primary border-primary/20"
-                        >
-                          {queue.allowedBrokerIds!.length} corretor(es) específico(s)
-                        </Badge>
-                      ) : (
-                        <span>
-                          {queue.capacityEnabled
-                            ? `${queue.capacityPerBroker}/corretor`
-                            : "Sem limite"}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold text-foreground">Entradas desta fila</p>
-                          <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
-                            Campanhas vinculadas diretamente a este destino.
-                          </p>
-                        </div>
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant="outline"
-                        className="shrink-0"
-                        onClick={() =>
-                          document.getElementById("entradas-meta")?.scrollIntoView({
-                            behavior: "smooth",
-                            block: "start",
-                          })
-                        }
-                      >
-                        Ver entradas
-                      </Button>
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                        {queueCampaigns.length > 0 ? (
-                          <>
-                            {queueCampaigns.slice(0, 3).map((campaign) => (
-                              <Badge key={campaign.campaignId} variant="outline" className="max-w-full truncate text-[10px] font-medium">
-                                {campaign.name}
-                              </Badge>
-                            ))}
-                            {queueCampaigns.length > 3 ? (
-                              <Badge variant="secondary" className="text-[10px]">+{queueCampaigns.length - 3}</Badge>
-                            ) : null}
-                          </>
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground">Fila geral — sem campanha específica</span>
-                        )}
-                        {queueIdsWithAdExceptions.has(queue.id) ? (
-                          <span className="text-[10px] text-muted-foreground">· exceção por anúncio ativa</span>
-                        ) : null}
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/50 pt-2">
-                        <span className="text-[10px] font-medium text-muted-foreground">Fontes:</span>
-                        {queueSourceNames.length ? queueSourceNames.slice(0, 3).map((label) => (
-                          <Badge key={label} variant="secondary" className="text-[10px] font-normal">
-                            {label}
-                          </Badge>
-                        )) : (
-                          <span className="text-[10px] text-muted-foreground">Todas as fontes válidas</span>
-                        )}
-                        {queueSourceNames.length > 3 ? (
-                          <Badge variant="secondary" className="text-[10px]">+{queueSourceNames.length - 3}</Badge>
-                        ) : null}
-                      </div>
-                    </div>
-
-                    {canEdit ? (
-                      <div className="flex justify-end gap-2 border-t border-border/60 pt-3">
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          onClick={() => handleDeleteQueue(queue)}
-                          disabled={deletingId === queue.id}
-                          className={cn(
-                            "text-destructive hover:bg-destructive/10 hover:text-destructive gap-1 active:scale-[0.96] transition-[transform,background-color,color] duration-150",
-                            deletingId === queue.id && "pointer-events-none",
-                          )}
-                        >
-                          {deletingId === queue.id ? (
-                            <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />
-                          ) : (
-                            <Trash className="size-3.5" />
-                          )}
-                          {deletingId === queue.id ? "Excluindo…" : "Excluir"}
-                        </Button>
-                        <Button
-                          size="xs"
-                          variant="outline"
-                          onClick={() => openEdit(queue)}
-                          className="active:scale-[0.96] transition-transform duration-150"
-                        >
-                          <SlidersHorizontal />
-                          Editar
-                        </Button>
-                      </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <div className="border-t border-border/70 pt-6">
-        <h2 className="text-base font-semibold tracking-tight text-foreground">Entradas e exceções</h2>
-        <p className="mt-1 mb-4 text-sm leading-6 text-muted-foreground">
-          A campanha define o destino padrão. Use uma exceção apenas quando um anúncio precisar de outra fila.
-        </p>
-      </div>
-
-      {/* Meta Campaign Route Card */}
-      <Card id="entradas-meta" variant="compact" className="scroll-mt-28 border-primary/20 bg-card shadow-sm">
-        <CardHeader className="border-b border-border/60 pb-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <span>Campanhas Meta</span>
-                <InfoTooltip
-                  title="Regra de entrada por campanha"
-                  description="Define para qual fila cada campanha envia os leads (Fila Geral, Unidade ou Corretor específico). Opcionalmente é possível ignorar uma campanha."
-                />
-                <Badge
-                  variant="secondary"
-                  className="text-xs font-normal"
-                >
-                  {activeCampaigns.length} ativa(s)
-                </Badge>
-              </CardTitle>
-              <CardDescription className="mt-1 text-xs">
-                Uma campanha sem regra específica usa a Fila Geral.
-              </CardDescription>
             </div>
-            {campaigns.length > activeCampaigns.length && (
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setShowOnlyActiveCampaigns((prev) => !prev)}
-                className="text-xs text-muted-foreground hover:text-foreground shrink-0"
-              >
-                {showOnlyActiveCampaigns
-                  ? `Mostrar todas (${campaigns.length})`
-                  : `Filtrar ativas (${activeCampaigns.length})`}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <label className="relative block">
-            <span className="sr-only">Buscar campanha Meta</span>
-            <MagnifyingGlass
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              value={campaignSearch}
-              onChange={(event) => setCampaignSearch(event.target.value)}
-              placeholder="Buscar campanha por nome..."
-              className="h-9 pl-9 text-sm"
-            />
-          </label>
-          {displayedCampaigns.length && queues.length ? (
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
-              <AppSelect
-                aria-label="Campanha Meta"
-                value={campaignRoute.campaignId}
-                onValueChange={(campaignId) => setCampaignRoute({ ...campaignRoute, campaignId })}
-                contentClassName="max-h-72 overflow-y-auto"
-                options={filteredCampaigns.map((campaign) => {
-                  const isActive = (campaign.status ?? "").toUpperCase() === "ACTIVE";
-                  return {
-                    value: campaign.campaignId,
-                    label: `${campaign.name} ${isActive ? "· Ativa" : "· Pausada"}`,
-                  };
-                })}
-              />
-              <AppSelect
-                aria-label="Fila de destino da campanha"
-                value={campaignRoute.queueId}
-                onValueChange={(queueId) => setCampaignRoute({ ...campaignRoute, queueId })}
-                options={queues
-                  .filter((queue) => queue.status === "active")
-                  .map((queue) => ({
-                    value: queue.id,
-                    label: queue.branchName
-                      ? `${queue.name} · ${queue.branchName}`
-                      : `${queue.name} · Fila geral`,
-                  }))}
-              />
-              <Button
-                size="sm"
-                onClick={() => void saveCampaignRoute(true)}
-                disabled={
-                  !canEdit ||
-                  savingCampaignRoute ||
-                  !campaignRoute.campaignId ||
-                  !campaignRoute.queueId
-                }
-                className={cn(
-                  "gap-1.5 active:scale-[0.97] transition-all duration-150",
-                  savingCampaignRoute && "pointer-events-none",
-                )}
-              >
-                {savingCampaignRoute ? (
-                  <>
-                    <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
-                    Salvando…
-                  </>
-                ) : (
-                  "Receber na fila"
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void saveCampaignRoute(false)}
-                disabled={!canEdit || savingCampaignRoute || !campaignRoute.campaignId}
-                className={cn(
-                  "text-destructive hover:bg-destructive/10 active:scale-[0.97] transition-all duration-150",
-                  savingCampaignRoute && "pointer-events-none",
-                )}
-              >
-                {savingCampaignRoute ? (
-                  <>
-                    <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
-                    Salvando…
-                  </>
-                ) : (
-                  "Não registrar"
-                )}
-              </Button>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {campaigns.length === 0
-                ? "Sincronize ao menos uma campanha Meta para configurar essa regra."
-                : "Nenhuma campanha ativa encontrada. Alterne para 'Mostrar todas' para ver campanhas pausadas."}
-            </p>
           )}
-
-          {activeCampaignRoutes.length ? (
-            <div className="space-y-2 border-t border-border/60 pt-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Regras de Campanhas Ativas ({activeCampaignRoutes.length})
-              </div>
-              <ScrollArea className="h-64 max-h-[50vh] min-h-0 rounded-lg border border-border/60 bg-muted/20">
-                <div className="divide-y divide-border/40">
-                  {activeCampaignRoutes
-                    .filter((route) => {
-                      const campaign = campaigns.find(
-                        (item) => item.campaignId === route.campaignId,
-                      );
-                      return (
-                        !campaignSearch.trim() ||
-                        (campaign?.name ?? route.campaignId)
-                          .toLocaleLowerCase("pt-BR")
-                          .includes(campaignSearch.trim().toLocaleLowerCase("pt-BR"))
-                      );
-                    })
-                    .map((route) => {
-                      const matched = campaigns.find((c) => c.campaignId === route.campaignId);
-                      const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
-                      return (
-                        <div
-                          key={route.campaignId}
-                          className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-sm"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className={`size-2 rounded-full shrink-0 ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
-                            />
-                            <span className="font-medium truncate">
-                              {matched?.name ?? route.campaignId}
-                            </span>
-                            {matched?.status && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] font-normal uppercase"
-                              >
-                                {matched.status}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Badge
-                              variant={route.enabled ? "success" : "outline"}
-                              className="text-xs font-medium"
-                            >
-                              {route.enabled
-                                ? `→ ${route.queueName ?? "Fila geral"}`
-                                : "Não registrar no CRM"}
-                            </Badge>
-                            {canEdit && (
-                              <>
-                                <Button
-                                  size="xs"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    setCampaignRoute({
-                                      campaignId: route.campaignId,
-                                      queueId: route.queueId ?? queues[0]?.id ?? "",
-                                    });
-                                    window.scrollTo({ top: 0, behavior: "smooth" });
-                                  }}
-                                  className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
-                                >
-                                  Editar
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  variant="ghost"
-                                  onClick={() => void deleteMetaCampaignRoute(route.campaignId)}
-                                  className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                >
-                                  Excluir
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </ScrollArea>
-            </div>
-          ) : null}
-        </CardContent>
+        </div>
       </Card>
 
-      {/* Meta Ad Route Card */}
-      <Card id="excecoes-anuncio" variant="compact" className="scroll-mt-28 border-border/60">
-        <CardHeader className="border-b border-border/60 pb-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <span>Exceções por anúncio</span>
-                <InfoTooltip
-                  title="Prioridade da regra"
-                  description="Se um anúncio tiver regra própria, ela prevalece sobre a regra da campanha. Use quando anúncios da mesma campanha precisam de filas diferentes."
-                />
-                <Badge variant="outline" className="text-xs font-normal">
-                  {activeAds.length} ativo(s)
-                </Badge>
-              </CardTitle>
-              <CardDescription className="mt-1 text-xs">
-                Uma exceção por anúncio prevalece sobre a regra da campanha.
-              </CardDescription>
-            </div>
-            {ads.length > activeAds.length && (
-              <Button
-                variant="ghost"
-                size="xs"
-                onClick={() => setShowOnlyActiveAds((prev) => !prev)}
-                className="text-xs text-muted-foreground hover:text-foreground shrink-0"
-              >
-                {showOnlyActiveAds
-                  ? `Mostrar todos (${ads.length})`
-                  : `Filtrar ativos (${activeAds.length})`}
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <label className="relative block">
-            <span className="sr-only">Buscar anúncio Meta</span>
-            <MagnifyingGlass
-              aria-hidden="true"
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            />
-            <Input
-              value={adSearch}
-              onChange={(event) => setAdSearch(event.target.value)}
-              placeholder="Buscar anúncio por nome..."
-              className="h-9 pl-9 text-sm"
-            />
-          </label>
-          {displayedAds.length && queues.length ? (
-            <div className="grid gap-3 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_auto_auto]">
-              <AppSelect
-                aria-label="Anúncio Meta"
-                value={adRoute.adId}
-                onValueChange={(adId) => setAdRoute({ ...adRoute, adId })}
-                contentClassName="max-h-72 overflow-y-auto"
-                options={filteredAds.map((ad) => {
-                  const isActive = (ad.status ?? "").toUpperCase() === "ACTIVE";
-                  return {
-                    value: ad.adId,
-                    label: `${ad.name} ${isActive ? "· Ativo" : "· Pausado"}`,
-                  };
-                })}
-              />
-              <AppSelect
-                aria-label="Fila de destino do anúncio"
-                value={adRoute.queueId}
-                onValueChange={(queueId) => setAdRoute({ ...adRoute, queueId })}
-                options={queues
-                  .filter((queue) => queue.status === "active")
-                  .map((queue) => ({
-                    value: queue.id,
-                    label: queue.branchName
-                      ? `${queue.name} · ${queue.branchName}`
-                      : `${queue.name} · Fila geral`,
-                  }))}
-              />
-              <Button
-                size="sm"
-                onClick={() => void saveAdRoute(true)}
-                disabled={!canEdit || savingAdRoute || !adRoute.adId || !adRoute.queueId}
-                className={cn(
-                  "gap-1.5 active:scale-[0.97] transition-all duration-150",
-                  savingAdRoute && "pointer-events-none",
-                )}
-              >
-                {savingAdRoute ? (
-                  <>
-                    <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
-                    Salvando…
-                  </>
-                ) : (
-                  "Receber na fila"
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => void saveAdRoute(false)}
-                disabled={!canEdit || savingAdRoute || !adRoute.adId}
-                className={cn(
-                  "text-destructive hover:bg-destructive/10 active:scale-[0.97] transition-all duration-150",
-                  savingAdRoute && "pointer-events-none",
-                )}
-              >
-                {savingAdRoute ? (
-                  <>
-                    <Loader2Icon className="size-3.5 animate-spin motion-reduce:animate-none" />{" "}
-                    Salvando…
-                  </>
-                ) : (
-                  "Não registrar"
-                )}
-              </Button>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {ads.length === 0
-                ? "Os anúncios aparecem depois da sincronização completa da conta de anúncios."
-                : "Nenhum anúncio ativo encontrado. Alterne para 'Mostrar todos' para ver anúncios pausados."}
-            </p>
-          )}
+      <QueueDetailSheet
+        queue={detailQueue}
+        onOpenChange={(open) => {
+          if (!open) setDetailQueueId(null);
+        }}
+        dutySchedules={dutySchedules}
+        brokerNames={brokerNames}
+        meta={meta}
+        canEdit={canEdit}
+        onEdit={(queue) => {
+          setDetailQueueId(null);
+          openEdit(queue);
+        }}
+        onDelete={(queue) => {
+          setDetailQueueId(null);
+          void handleDeleteQueue(queue);
+        }}
+      />
 
-          {activeAdRoutes.length ? (
-            <div className="space-y-2 border-t border-border/60 pt-3">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Exceções de Anúncios Ativos ({activeAdRoutes.length})
-              </div>
-              <ScrollArea className="h-64 max-h-[50vh] min-h-0 rounded-lg border border-border/60 bg-muted/20">
-                <div className="divide-y divide-border/40">
-                  {activeAdRoutes
-                    .filter((route) => {
-                      const ad = ads.find((item) => item.adId === route.adId);
-                      return (
-                        !adSearch.trim() ||
-                        (ad?.name ?? route.adId)
-                          .toLocaleLowerCase("pt-BR")
-                          .includes(adSearch.trim().toLocaleLowerCase("pt-BR"))
-                      );
-                    })
-                    .map((route) => {
-                      const matched = ads.find((a) => a.adId === route.adId);
-                      const isActive = (matched?.status ?? "").toUpperCase() === "ACTIVE";
-                      return (
-                        <div
-                          key={route.adId}
-                          className="flex flex-wrap items-center justify-between gap-2 p-2.5 text-sm"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className={`size-2 rounded-full shrink-0 ${isActive ? "bg-emerald-500" : "bg-muted-foreground/40"}`}
-                            />
-                            <span className="font-medium truncate">
-                              {matched?.name ?? route.adId}
-                            </span>
-                            {matched?.status && (
-                              <Badge
-                                variant="outline"
-                                className="text-[10px] font-normal uppercase"
-                              >
-                                {matched.status}
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Badge
-                              variant={route.enabled ? "success" : "outline"}
-                              className="text-xs font-medium"
-                            >
-                              {route.enabled
-                                ? `→ ${route.queueName ?? "Fila geral"}`
-                                : "Não registrar no CRM"}
-                            </Badge>
-                            {canEdit && (
-                              <>
-                                <Button
-                                  size="xs"
-                                  variant="ghost"
-                                  onClick={() => {
-                                    setAdRoute({
-                                      adId: route.adId,
-                                      queueId: route.queueId ?? queues[0]?.id ?? "",
-                                    });
-                                    window.scrollTo({ top: 0, behavior: "smooth" });
-                                  }}
-                                  className="h-6 px-1.5 text-[10px] text-muted-foreground hover:text-foreground"
-                                >
-                                  Editar
-                                </Button>
-                                <Button
-                                  size="xs"
-                                  variant="ghost"
-                                  onClick={() => void deleteMetaAdRoute(route.adId)}
-                                  className="h-6 px-1.5 text-[10px] text-destructive hover:bg-destructive/10 hover:text-destructive"
-                                >
-                                  Excluir
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              </ScrollArea>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+      <PanelSheet
+        open={panelId === IGNORED_PANEL_ID}
+        onOpenChange={(open) => {
+          if (!open) setPanelId(null);
+        }}
+        title="Campanhas não registradas"
+        description="Leads destas campanhas ou anúncios não entram no CRM."
+      >
+        <MetaEntries queueId={null} data={meta} canEdit={canEdit} />
+      </PanelSheet>
 
-      {/* Editor Modal */}
+      <PanelSheet
+        open={Boolean(activePanel)}
+        onOpenChange={(open) => {
+          if (!open) setPanelId(null);
+        }}
+        title={activePanel?.label ?? ""}
+        description={activePanel?.description}
+      >
+        {activePanel?.content}
+      </PanelSheet>
+
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
         <DialogPopup className="sm:max-w-2xl max-h-[88vh] p-0 flex flex-col overflow-hidden">
           <DialogPanel className="flex flex-col h-full min-h-0">
@@ -2049,23 +1326,5 @@ export function QueueControlCenter({
         </DialogPopup>
       </Dialog>
     </>
-  );
-}
-
-function Metric({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  value: number;
-}) {
-  return (
-    <div className="rounded-lg bg-muted/50 px-2 py-2">
-      <Icon className="mx-auto size-3.5 text-muted-foreground" />
-      <p className="mt-1 font-mono text-sm font-semibold tabular-nums">{value}</p>
-      <p className="text-[10px] text-muted-foreground">{label}</p>
-    </div>
   );
 }

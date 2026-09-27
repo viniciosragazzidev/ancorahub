@@ -6,6 +6,69 @@
 
 Este documento registra cronologicamente todas as alterações de UX/UI, estrutura de páginas, componentes e navegação realizadas no CRM Âncora.
 
+## 2026-09-26 — Primeiro acesso de membros
+
+- O campo de nascimento usa o calendário compartilhado com mês e ano selecionáveis, idioma português e datas futuras desabilitadas. A data exibida é brasileira; o envio ao servidor mantém o formato anterior.
+- O campo de e-mail corporativo recebeu borda mais visível nos estados editável e preenchido pelo convite. Registro: `docs/implementations/completed/2026-09-26-primeiro-acesso-calendario.md`.
+
+## 2026-09-26 — Integrações WhatsApp e Meta mais diretas
+
+- O aviso redundante “Proteção de dados” foi removido da aba Oficial do WhatsApp. A aba Diretoria usa toda a largura disponível até o limite de leitura, com o conjunto de cartões centralizado.
+- `/integrations/meta` abre no painel de conexão e ativos, sem a introdução duplicada e sem os blocos explicativos sobre o número corporativo e `leadgen`. Estado da conexão, ações, permissões e regras de integração permanecem no fluxo existente.
+
+---
+
+## 2026-09-26 — Qualificação alinhada à Distribuição
+
+- `/qualificacao` agora usa uma única faixa horizontal de abas compartilhadas em desktop e mobile, com rolagem, indicador e estado preservado em `?tab=`. O menu lateral duplicado foi removido.
+- Os indicadores ficaram na aba inicial; os painéis de configuração, roteiros e permissões adotaram a superfície neutra dos cards. A grade se ajusta à largura disponível e títulos/descrições seguem a hierarquia comum.
+- O texto de SLA fixo de 45 segundos foi removido do card da fila por não corresponder a uma medição. Nenhuma regra de qualificação ou autorização foi alterada.
+
+---
+
+## 2026-09-26 — WhatsApp unificado e distribuição por Resumo
+
+- `/integrations/whatsapp` reúne o número oficial Meta e o canal WAHA da diretoria em abas com estado na URL. A segunda aba mantém acesso exclusivo do Diretor; `/integrations/whats_alt` redireciona para ela e o catálogo tem um único destino WhatsApp.
+- O cabeçalho interno grande foi removido da integração WhatsApp; o título da barra superior e as abas identificam o contexto.
+- `/distribuicao` abre em Resumo, que também é a primeira aba. Links explícitos para Plantões e outras áreas continuam selecionando a aba solicitada.
+- O detalhe do plantão ativo e encerrado usa cabeçalho de contexto comum, estado em badge, metadados em etiquetas e títulos/descrições padronizados nos painéis. Turnos futuros sem histórico não exibem um bloco histórico vazio.
+
+---
+
+## 2026-09-26 — Histórico dos plantões encerrados
+
+- O detalhe de cada plantão oferece datas encerradas e permite consultar outra data da mesma regra semanal. Cada ocorrência passada é rotulada como “Terminado” e reúne os leads distribuídos, o corretor na época e a escala registrada.
+- Vínculos legados sem identificação exata do plantão são indicados como estimados pela fila; a regra semanal permanece operante nos próximos dias. O Super-admin pode ocultar a consulta sem excluir eventos.
+
+## 2026-09-26 — Planejamento mensal em painel lateral
+
+- A lista permanente de corretores saiu da página de Plantão. Um resumo compacto abre o sheet de planejamento, com meses separados e busca de corretores por nome ou unidade.
+- As cotas são ajustadas por corretor em grupos de unidade; a revisão organiza as alocações por data e evidencia cotas sem cobertura antes da confirmação de publicação.
+- A seleção do mês é recuperável pela URL. A interface informa alterações ainda não geradas, indisponibilidade pela flag, carregamento, erro e mês publicado somente para leitura.
+- O sheet reutiliza os componentes compartilhados e suas transições; os estados de seleção usam os tokens de duração e respeitam `prefers-reduced-motion`. QA autenticado permanece pendente.
+
+---
+
+## 2026-09-26 — Cotas e proposta de escala mensal de plantões
+
+- Em `/distribuicao?view=plantao`, a gestão escolhe o mês e define a cota por corretor; a proposta automática mostra cada corretor, plantão, data e horário antes da publicação.
+- Cotas sem cobertura são destacadas e exigem confirmação explícita para publicar escala parcial. Publicações ficam identificadas e protegidas contra sobrescrita.
+- O novo painel usa os componentes e tokens existentes; o Super-admin pode pausar a geração mensal globalmente.
+- Publicar materializa as ocorrências datadas para que o runtime use a escala do dia e preserve as regras semanais nos demais dias. QA autenticado continua pendente.
+- Referência: `docs/implementations/active/2026-09-26-duty-scheduling-quotas.md`.
+
+---
+
+## 2026-09-25 — Gestão unificada de equipe e unidades
+
+- A navegação lateral reúne as duas áreas em **Equipe & Unidades**. `/equipe` abre a lista de membros e `/equipe?visao=unidades` abre unidades; `/filiais` permanece como URL legada e redireciona para a visão equivalente.
+- A lista de unidades agora usa o `DataTable` compartilhado, com busca, paginação e ordenação; as alterações de dados ficam em uma folha lateral e as operações ficam agrupadas por unidade.
+- O escopo do tenant e os limites de perfil continuam determinados no servidor. Gestores consultam somente a própria unidade; Diretores acessam e gerenciam a lista do tenant.
+- `/dev/component-preview` inclui uma amostra da tabela de produção para inspeção visual dos componentes compartilhados.
+- Validação: `npm run type-check`, lint direcionado e `git diff --check` concluídos. O harness `agent:verify --level fast` não iniciou por `uv_os_get_passwd returned ENOMEM`; QA autenticado responsivo M1.10 permanece pendente.
+
+---
+
 ## 2026-09-22 — Tipo de CNPJ nas informações do lead
 
 - Os detalhes do lead exibem a resposta `Tipo de CNPJ` enviada pelo formulário Meta,

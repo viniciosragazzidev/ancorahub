@@ -32,9 +32,12 @@ import {
   updateLeadManagementActionsSettingsAction,
   updateManualLeadAssignmentOfferChoiceSettingsAction,
   updateDutyPresenceConfirmationSettingsAction,
+  updateDutyMonthlySchedulingSettingsAction,
+  updateDutyOccurrenceHistorySettingsAction,
   updateCustomRolesGlobalSettingsAction,
   updatePerformanceRankingSettingsAction,
   updateTeamMemberProfileSettingsAction,
+  updateTeamInvitationResendSettingsAction,
   updateUserProfileSettingsAction,
   updateReportingCenterSettingsAction,
   updateUnlinkedConversationDeletionSettingsAction,
@@ -100,6 +103,8 @@ export default async function SuperAdminSettingsPage() {
     "feature_lead_management_actions_enabled",
     "feature_manual_lead_assignment_offer_choice_enabled",
     FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key,
+    FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key,
+    FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key,
     FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
@@ -110,6 +115,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_custom_roles_enabled",
     "feature_performance_ranking_enabled",
     "feature_team_member_profile_enabled",
+    "feature_team_invitation_resend_enabled",
     "feature_user_profile_enabled",
     "ai_primary_provider",
     "ai_primary_model",
@@ -155,6 +161,8 @@ export default async function SuperAdminSettingsPage() {
     settingMap.get("feature_lead_management_actions_enabled") !== "false";
   const manualLeadAssignmentOfferChoiceEnabled = settingMap.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false";
   const dutyPresenceConfirmationEnabled = settingMap.get(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key) === "true";
+  const dutyMonthlySchedulingEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key) ?? FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue) === "true";
+  const dutyOccurrenceHistoryEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key) ?? FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.defaultValue) === "true";
   const unlinkedConversationDeletionEnabled =
     settingMap.get(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key) !== "false";
   const distributionBatchSize = settingMap.get("lead_distribution_jobs_batch_size") ?? "25";
@@ -190,6 +198,7 @@ export default async function SuperAdminSettingsPage() {
   const customRolesEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
   const performanceRankingEnabled =
     settingMap.get("feature_performance_ranking_enabled") !== "false";
+  const teamInvitationResendEnabled = settingMap.get("feature_team_invitation_resend_enabled") !== "false";
   const teamMemberProfileEnabled =
     settingMap.get("feature_team_member_profile_enabled") !== "false";
   const userProfileEnabled = settingMap.get("feature_user_profile_enabled") !== "false";
@@ -519,6 +528,40 @@ export default async function SuperAdminSettingsPage() {
                   </label>
                   <Button type="submit" variant={teamMemberProfileEnabled ? "outline" : "default"}>
                     {teamMemberProfileEnabled ? "Salvar controle" : "Liberar perfis"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Reenvio de convites de ativação</CardTitle>
+                <CardDescription>
+                  Permite renovar e reenviar convites de ativação para membros pendentes, inclusive quando o convite anterior expirou ou não existe. Cada reenvio é auditado.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  action={updateTeamInvitationResendSettingsAction}
+                  className="flex flex-wrap items-center justify-between gap-4"
+                >
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="teamInvitationResendEnabled"
+                      value="true"
+                      defaultChecked={teamInvitationResendEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">Reenvio de convites habilitado</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Desativar bloqueia novos reenvios sem apagar os convites e o histórico.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={teamInvitationResendEnabled ? "outline" : "default"}>
+                    {teamInvitationResendEnabled ? "Salvar controle" : "Liberar reenvio"}
                   </Button>
                 </form>
               </CardContent>
@@ -1106,6 +1149,42 @@ export default async function SuperAdminSettingsPage() {
                   <Button type="submit" variant="outline">
                     Salvar personalização
                   </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Escala mensal automática de plantões</CardTitle>
+                <CardDescription>
+                  Permite que Diretores e Gestores definam cotas mensais por corretor, gerem uma proposta equilibrada, revisem e publiquem a escala. Cada publicação fica auditada e pode ser desativada globalmente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateDutyMonthlySchedulingSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="dutyMonthlySchedulingEnabled" value="true" defaultChecked={dutyMonthlySchedulingEnabled} className="size-4 accent-primary" />
+                    <span>
+                      <span className="font-medium">Geração de escala mensal habilitada</span>
+                      <span className="block text-xs text-muted-foreground">Desativar impede novas gerações e publicações; escalas já publicadas permanecem registradas.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Histórico de plantões encerrados</CardTitle>
+                <CardDescription>Permite consultar cada ocorrência encerrada e os registros de distribuição associados. Desativar oculta a consulta sem apagar eventos.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateDutyOccurrenceHistorySettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="dutyOccurrenceHistoryEnabled" value="true" defaultChecked={dutyOccurrenceHistoryEnabled} className="size-4 accent-primary" />
+                    <span className="font-medium">Histórico de ocorrências habilitado</span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
                 </form>
               </CardContent>
             </Card>

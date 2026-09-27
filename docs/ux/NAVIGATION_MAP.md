@@ -30,13 +30,12 @@ O sistema consolida 29 rotas em 5 grandes domínios funcionais, com uma única *
   │     └── /marketing/campanhas (Gestão de Campanhas e Origens)
   │
   ├── 4. ESTRUTURA ORGANIZACIONAL
-  │     ├── /equipe (Home Canônica: Colaboradores, Cargos e Permissões)
-  │     └── /filiais (Unidades Físicas e Regionais)
+  │     └── /equipe (Home Canônica: Equipe, unidades, cargos e permissões)
   │
   └── 5. INTEGRAÇÕES & SISTEMA
         ├── /integrations (Home Canônica: Catálogo de Conexões)
         ├── /settings (Preferências do Tenant e Notificações)
-        └── /settings/whatsapp (Conexões Cloud API e WAHA)
+        └── /integrations/whatsapp (Canal oficial Meta e canal WAHA da diretoria em abas)
 ```
 
 ---
@@ -52,6 +51,7 @@ O sistema consolida 29 rotas em 5 grandes domínios funcionais, com uma única *
 | `/distribuicao` | Configuração Total | Gestão de Plantão | Visualização de Status | Não visível |
 | `/qualificacao` | Configuração Total | Visualização de IA | Não visível | Não visível |
 | `/equipe` | Gestão Total | Gestão de Unidade | Não visível | Não visível |
+| `/equipe?visao=unidades` | Gestão e configuração das unidades do tenant | Consulta da própria unidade | Não visível | Não visível |
 | `/relatorios` | Acesso Total (inc. Financeiro) | Comercial e Equipe | Não visível | Não visível |
 | `/settings/*` | Configurações do Tenant | Não visível | Preferências Pessoais | Preferências Pessoais |
 

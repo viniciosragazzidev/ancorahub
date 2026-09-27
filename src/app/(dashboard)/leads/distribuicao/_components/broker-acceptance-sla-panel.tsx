@@ -6,11 +6,12 @@ import { Clock, ShieldCheck, ArrowsClockwise, Warning, Check } from "@phosphor-i
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { saveBrokerAcceptanceSlaAction } from "@/features/lead-distribution/sla-actions";
 
 interface BrokerAcceptanceSlaPanelProps {
@@ -52,27 +53,19 @@ export function BrokerAcceptanceSlaPanel({
   };
 
   return (
-    <Card className="border-border/80 shadow-xs">
-      <CardHeader className="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-xl bg-primary/10 text-primary">
-              <Clock className="size-5" />
-            </span>
-            <div>
-              <CardTitle className="text-base">SLA de Aceite & Início de Atendimento</CardTitle>
-              <CardDescription className="text-xs">
-                Controle quanto tempo o corretor pode demorar para aceitar o lead e iniciar o primeiro contato antes de perder a oportunidade.
-              </CardDescription>
-            </div>
-          </div>
-          <Badge variant={autoRedistribute ? "success" : "secondary"} className="text-xs px-2.5 py-0.5">
-            {autoRedistribute ? "Redistribuição Ativa" : "Apenas Alertas"}
+    <Card variant="overview">
+      <SectionCardHeader
+        icon={<Clock />}
+        title="SLA de aceite e início de atendimento"
+        description="Controle quanto tempo o corretor pode demorar para aceitar o lead e iniciar o primeiro contato antes de perder a oportunidade."
+        actions={
+          <Badge variant={autoRedistribute ? "success" : "secondary"}>
+            {autoRedistribute ? "Redistribuição ativa" : "Apenas alertas"}
           </Badge>
-        </div>
-      </CardHeader>
+        }
+      />
 
-      <CardContent className="p-4 sm:p-5 pt-0 space-y-5">
+      <CardContent className="space-y-5 p-4">
         {/* Toggle de Redistribuição Automática */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/30 p-3.5">
           <div className="space-y-0.5">

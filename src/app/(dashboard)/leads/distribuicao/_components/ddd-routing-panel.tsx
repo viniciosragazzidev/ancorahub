@@ -4,16 +4,18 @@ import { useMemo, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { Phone } from "@/components/huge-icons";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/components/ui/sonner";
-import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { saveDddRoutingSettingsAction } from "@/features/lead-distribution/ddd-routing-actions";
 import {
-  BRAZIL_DDDS_BY_STATE,
   DDD_OUTCOME_LABELS,
+  parseDddList,
   type DddOutcome,
   type DddRoutingSettings,
 } from "@/features/lead-distribution/ddd-routing";
@@ -22,7 +24,7 @@ import {
 const NORMAL_FLOW = "__normal__";
 
 const OUTCOME_HELP: Record<DddOutcome, string> = {
-  valid: "Telefone com um dos DDDs marcados abaixo.",
+  valid: "Telefone com um dos DDDs digitados acima.",
   invalid: "Telefone brasileiro com DDD fora da lista.",
   unknown: "Telefone sem DDD, estrangeiro ou malformado.",
 };
@@ -39,16 +41,14 @@ export function DddRoutingPanel({
   const [settings, setSettings] = useState<DddRoutingSettings>(initialSettings);
   const [saved, setSaved] = useState<DddRoutingSettings>(initialSettings);
   const [isPending, startTransition] = useTransition();
-  const valid = useMemo(() => new Set(settings.validDdds), [settings.validDdds]);
+  const [dddText, setDddText] = useState(initialSettings.validDdds.join(", "));
+  const parsed = useMemo(() => parseDddList(dddText), [dddText]);
   const dirty = JSON.stringify(settings) !== JSON.stringify(saved);
 
-  const setValid = (ddds: string[], selected: boolean) => {
-    const next = new Set(settings.validDdds);
-    for (const ddd of ddds) {
-      if (selected) next.add(ddd);
-      else next.delete(ddd);
-    }
-    setSettings({ ...settings, validDdds: [...next].sort() });
+  // Only the typed DDDs are valid; every other area code falls in "DDD inválido".
+  const onDddText = (text: string) => {
+    setDddText(text);
+    setSettings({ ...settings, validDdds: parseDddList(text).valid });
   };
 
   const setQueue = (outcome: DddOutcome, value: string) => {
@@ -68,23 +68,19 @@ export function DddRoutingPanel({
   }
 
   return (
-    <Card variant="overview" className="shadow-sm">
-      <CardHeader className="gap-2 border-b border-border/70 px-5 py-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <CardTitle>Regra de DDD</CardTitle>
-            <CardDescription className="mt-1 max-w-3xl leading-5">
-              Escolha os DDDs atendidos e para qual fila o lead vai em cada situação. Vale para a
-              empresa inteira e é aplicada antes da oferta ao corretor.
-            </CardDescription>
-          </div>
+    <Card variant="overview">
+      <SectionCardHeader
+        icon={<Phone />}
+        title="Regra de DDD"
+        description="Escolha os DDDs atendidos e para qual fila o lead vai em cada situação. Vale para a empresa inteira e é aplicada antes da oferta ao corretor."
+        actions={
           <Badge variant={settings.enabled ? "success" : "secondary"}>
             {settings.enabled ? "Ativa" : "Desligada"}
           </Badge>
-        </div>
-      </CardHeader>
+        }
+      />
 
-      <CardContent className="grid gap-5 px-5 py-4">
+      <CardContent className="grid gap-5 p-4">
         <div className="flex items-start justify-between gap-4 rounded-lg border border-border/70 bg-muted/20 p-3">
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium text-foreground">Aplicar a regra de DDD</p>
@@ -100,53 +96,21 @@ export function DddRoutingPanel({
           />
         </div>
 
-        <div className="grid gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label className="text-xs font-medium">DDDs válidos</Label>
-            <span className="text-xs text-muted-foreground">
-              {valid.size} de 67 selecionados · os demais são inválidos
-            </span>
-          </div>
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {BRAZIL_DDDS_BY_STATE.map((state) => {
-              const allSelected = state.ddds.every((ddd) => valid.has(ddd));
-              return (
-                <div key={state.uf} className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border/70 p-2">
-                  <button
-                    type="button"
-                    disabled={!canEdit}
-                    aria-pressed={allSelected}
-                    onClick={() => setValid([...state.ddds], !allSelected)}
-                    className="w-8 text-left text-xs font-semibold text-foreground disabled:cursor-default"
-                    title={allSelected ? `Desmarcar ${state.uf}` : `Marcar todo o ${state.uf}`}
-                  >
-                    {state.uf}
-                  </button>
-                  {state.ddds.map((ddd) => {
-                    const selected = valid.has(ddd);
-                    return (
-                      <button
-                        key={ddd}
-                        type="button"
-                        disabled={!canEdit}
-                        aria-pressed={selected}
-                        aria-label={`DDD ${ddd} ${selected ? "válido" : "inválido"}`}
-                        onClick={() => setValid([ddd], !selected)}
-                        className={cn(
-                          "rounded-full border px-2 py-0.5 text-xs tabular-nums transition-colors disabled:cursor-default",
-                          selected
-                            ? "border-primary bg-primary/10 font-medium text-primary"
-                            : "border-border text-muted-foreground hover:text-foreground",
-                        )}
-                      >
-                        {ddd}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+        <div className="grid gap-1.5">
+          <Label htmlFor="ddd-valid-list" className="text-xs font-medium">DDDs válidos</Label>
+          <Input
+            id="ddd-valid-list"
+            value={dddText}
+            disabled={!canEdit}
+            placeholder="Ex.: 21, 22, 24"
+            onChange={(event) => onDddText(event.target.value)}
+          />
+          <p className="text-[11px] leading-4 text-muted-foreground">
+            {parsed.valid.length
+              ? `${parsed.valid.length} válido${parsed.valid.length === 1 ? "" : "s"} (${parsed.valid.join(", ")}). Qualquer outro DDD é tratado como inválido.`
+              : "Digite os DDDs atendidos, separados por vírgula ou espaço. Qualquer outro DDD será tratado como inválido."}
+            {parsed.unknown.length ? ` Ignorados, não existem: ${parsed.unknown.join(", ")}.` : ""}
+          </p>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">

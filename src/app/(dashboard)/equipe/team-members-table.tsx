@@ -11,7 +11,8 @@ import { CheckCircle, MagnifyingGlass, Pause, Play, UsersThree, XCircle } from "
 import { EmptyState } from "@/components/empty-state";
 import { MemberStatusBadge, RoleBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -262,35 +263,29 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
   ];
 
   return (
-    <Card className="border-transparent bg-transparent shadow-none">
-      <CardHeader className="border-b border-border/50 p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UsersThree size={17} />
-              Acessos vinculados
-            </CardTitle>
-            <CardDescription className="text-xs mt-1">
-              {activeCount} acesso(s) ativo(s) · convites pendentes ficam sinalizados até o primeiro login.
-            </CardDescription>
-          </div>
-          {currentRole === "director" ? (
-            <Select value={branchFilter} onValueChange={(value) => setBranchFilter(value ?? "all")}>
-              <SelectTrigger aria-label="Filtrar por unidade" className="w-full sm:w-52 h-9 text-xs">
-                <SelectValue placeholder="Todas as unidades" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as unidades</SelectItem>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-        </div>
-      </CardHeader>
+    <Card variant="overview">
+      <SectionCardHeader
+        icon={<UsersThree />}
+        title="Acessos vinculados"
+        description={`${activeCount} acesso(s) ativo(s) · convites pendentes ficam sinalizados até o primeiro login.`}
+        actions={
+          currentRole === "director" ? (
+                <Select value={branchFilter} onValueChange={(value) => setBranchFilter(value ?? "all")}>
+                  <SelectTrigger aria-label="Filtrar por unidade" className="w-full sm:w-52">
+                    <SelectValue placeholder="Todas as unidades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as unidades</SelectItem>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+          ) : null
+        }
+      />
       <CardContent className="p-0">
         <div className="hidden sm:block">
           <div className="px-4 pt-3 pb-0">
@@ -368,14 +363,14 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
         </div>
 
         <div className="sm:hidden">
-          <div className="relative px-4 pt-3">
-            <Search className="pointer-events-none absolute left-7 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative px-4 pt-4">
+            <Search className="pointer-events-none absolute left-6.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               aria-label="Buscar colaborador"
               placeholder="Buscar por nome, e-mail ou WhatsApp..."
               value={mobileQuery}
               onChange={(event) => setMobileQuery(event.target.value)}
-              className="h-9 rounded-xl border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-foreground"
+              className="bg-card pl-8"
             />
           </div>
           <div className="mt-2 divide-y divide-border">
@@ -438,7 +433,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
           )}
         </div>
 
-        <div className="max-sm:hidden">
+        <div className="p-4 max-sm:hidden">
           <DataTable
             columns={columns}
             data={visibleMembers}

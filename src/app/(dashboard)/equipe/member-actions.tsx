@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { CheckCircle, DotsThreeVertical, LockKey, PencilSimple, Power, Trash, UserSwitch } from "@/components/huge-icons";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
@@ -404,11 +404,24 @@ export function TeamMemberActions({
       const message = resendState.whatsappStatus === "sent"
         ? "A mensagem foi enviada pelo WhatsApp corporativo."
         : resendState.whatsappStatus === "failed"
-          ? "O convite foi recriado, mas a Meta recusou o envio. Use o link gerado no perfil do membro."
+          ? "O convite foi recriado, mas não foi possível enfileirar o envio. Copie o link para compartilhar."
           : resendState.whatsappStatus === "queued"
             ? "O convite foi colocado na fila de envio do WhatsApp."
             : "O convite foi recriado. Envie o link manualmente se necessário.";
-      toast.success("Convite processado.", { description: message });
+      toast.success("Convite processado.", {
+        description: message,
+        action: resendState.token ? {
+          label: "Copiar link",
+          onClick: () => {
+            const url = new URL("/primeiro-acesso", window.location.origin);
+            url.searchParams.set("token", resendState.token!);
+            void navigator.clipboard.writeText(url.toString()).then(
+              () => toast.success("Link de ativação copiado."),
+              () => toast.error("Não foi possível copiar o link."),
+            );
+          },
+        } : undefined,
+      });
       router.refresh();
     }
     if (resendState.error) toast.error(resendState.error);
@@ -418,7 +431,7 @@ export function TeamMemberActions({
   const canDelete = member.canManage;
   const canToggle = member.canManage && member.userId !== null;
   const toggleLabel = displayStatus === "active" ? "Desativar" : "Ativar";
-  const canManageInvite = member.canManage && (member.role === "broker" || member.role === "manager");
+  const canManageInvite = member.canManage;
   const canResetPassword = member.userId !== null && (currentRole === "director" || currentRole === "manager");
 
   return (
@@ -469,8 +482,8 @@ export function TeamMemberActions({
               <>
                 <DropdownMenuItem onClick={() => {
                   const fd = new FormData();
-                  fd.set("invitationId", member.id);
-                  resendAction(fd);
+                  fd.set("memberId", member.id);
+                  startTransition(() => resendAction(fd));
                 }} disabled={resendPending}>
                   <UserSwitch size={15} />
                   Reenviar convite

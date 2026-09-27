@@ -40,49 +40,59 @@ Dub's visual system is a quiet, almost editorial SaaS aesthetic — a near-white
 
 ## Dark Mode
 
-Added in the Fase 2 extension (docs/implementations — /dashboard pilot), after the user asked to support both themes. Applies via the same `.dark` class the rest of the app already uses on `<html>` — no new toggle mechanism.
+Applies via the `.dark` class on `<html>` (no other toggle). **Palette replaced on 2026-09-26** by the dark theme of the reference admin panel [jubayer910/Admin-panel](https://github.com/jubayer910/Admin-panel) (MIT): a neutral grey ground instead of the earlier blue-grey, an indigo primary action and ink-over-wash status pairs. Light mode is unchanged. Two layers carry it: the shadcn variables in `src/app/globals.css` (`.dark`) and the Ds tokens in `src/styles/design-system/tokens.css` (`.dark`).
 
-**Neutral ramp:** the light-mode neutral ramp (Canvas White → Midnight Ink, 12 steps from `#ffffff` to `#0a0a0a`) is mirrored end-to-end for dark mode — same 12 hex values, roles reassigned in reverse. No new neutral color introduced.
+**Surfaces and text (app variables)**
 
-| Token | Light value | Dark value |
+| Variable | Dark value | Role |
 |---|---|---|
-| Canvas White | `#ffffff` | `#0a0a0a` (was Midnight Ink) |
-| Paper Mist | `#f5f5f5` | `#171717` (was Charcoal) |
-| Ash | `#e5e5e5` | `#262626` (was Graphite) |
-| Smoke | `#d4d4d4` | `#404040` (was Slate) |
-| Pebble | `#c8c8c8` | `#525252` (was Steel) |
-| Silver | `#a3a3a3` | `#737373` (was Fog) |
-| Fog | `#737373` | `#a3a3a3` (was Silver) |
-| Steel | `#525252` | `#c8c8c8` (was Pebble) |
-| Slate | `#404040` | `#d4d4d4` (was Smoke) |
-| Graphite | `#262626` | `#e5e5e5` (was Ash) |
-| Charcoal | `#171717` | `#f5f5f5` (was Paper Mist) |
-| Midnight Ink | `#0a0a0a` | `#ffffff` (was Canvas White) |
+| `--background` | `#151515` | Page ground |
+| `--sidebar` | `#111111` | Sidebar, one step darker than the ground |
+| `--card` | `#1c1c1c` | Cards |
+| `--popover`, `--secondary` | `#1e1e1e` | Controls, menus, popovers |
+| `--muted` | `#252525` | Hover and recessed fills |
+| `--accent`, `--sidebar-accent` | `#262626` | Active item |
+| `--foreground` / `--card-foreground` | `#f3f3f3` / `#e6e6e6` | Text |
+| `--sidebar-foreground` | `#c7c7c7` | Secondary text, nav |
+| `--muted-foreground` | `#8a8a8a` | Notes, descriptions (5:1 on cards) |
+| `--muted-text` | `#6b6b6b` | Hints and placeholders only |
+| `--border` / `--border-strong` | `#2a2a2a` / `#353535` | Hairlines |
+| `--primary`, `--sidebar-primary` | `#3b1fe5` (text `#ffffff`) | The primary action |
+| `--ring` | `#6350ff` | Focus ring |
+| `--success` / `--warning` / `--destructive` | `#7fd1a0` / `#e8b98f` / `#f4a3a9` | Status ink |
+| `--chart-1…5` | `#c0d4f2`, `#7fd1a0`, `#b5e4ec`, `#b6aede`, `#dfb099` | One hue per series |
 
-**Chromatic:** Electric Blue brightens to `#3b82f6` for legibility on dark surfaces. Deep Sapphire (the single reserved CTA color) is promoted to light mode's Electric Blue value (`#2563eb`) in dark mode, so it stays the more saturated of the two blues — same relative hierarchy as light mode, not a coincidence. Primary Action Fill flips `#000000` → `#ffffff`; combined with the neutral mirror, this makes the Filled Dark CTA automatically render as a light-fill/dark-text button in dark mode and the Input Field's black-border exception automatically become a white-border exception — through the existing tokens, no component-level dark variant needed.
+**Ds tokens**
 
-| Token | Light value | Dark value |
+| Token | Light | Dark |
 |---|---|---|
-| Electric Blue | `#2563eb` | `#3b82f6` |
-| Deep Sapphire | `#1e40af` | `#2563eb` |
-| Primary Action Fill | `#000000` | `#ffffff` |
-| Vivid Green | `#16a34a` | `#4ade80` |
-| Tangerine | `#ea580c` | `#fb923c` |
-| Lavender | `#7c3aed` | `#a78bfa` |
+| Canvas White | `#ffffff` | `#1c1c1c` |
+| Paper Mist | `#f5f5f5` | `#252525` |
+| Ash | `#e5e5e5` | `#2a2a2a` |
+| Smoke | `#d4d4d4` | `#353535` |
+| Pebble | `#c8c8c8` | `#3a3a3a` |
+| Silver | `#a3a3a3` | `#6b6b6b` |
+| Fog | `#737373` | `#8a8a8a` |
+| Steel | `#525252` | `#c7c7c7` |
+| Slate | `#404040` | `#d4d4d4` |
+| Graphite | `#262626` | `#e6e6e6` |
+| Charcoal | `#171717` | `#f3f3f3` |
+| Midnight Ink | `#0a0a0a` | `#ffffff` |
+| Electric Blue | `#2563eb` | `#c0d4f2` (the reference's blue ink) |
+| Deep Sapphire | `#1e40af` | `#3b1fe5` |
+| Primary Action Fill | `#000000` | `#3b1fe5` |
+| On Primary Action (new) | `#ffffff` | `#ffffff` |
+| Primary Action Hover (new) | `#171717` | `#4b33f0` |
+| Soft Mint / Forest Ink / Vivid Green | `#dcfce7` / `#166534` / `#16a34a` | `#1b3b2a` / `#7fd1a0` / `#7fd1a0` |
+| Powder Blue | `#dbeaff` | `#1e2a3f` |
+| Amber Wash / Amber Ink | `#fef3c7` / `#92400e` | `#41271d` / `#e8b98f` |
+| Rose Wash / Rose Ink | `#fee2e2` / `#991b1b` | `#3e1c1c` / `#f4a3a9` |
+| Tangerine | `#ea580c` | `#dfb099` |
+| Lavender | `#7c3aed` | `#b6aede` |
 
-**Status tint/ink pairs:** a light tint doesn't work as a dark-mode wash (too bright against a dark canvas), so these six are genuinely new values — following the standard dark-mode convention of a near-950 wash paired with a 400-ish ink:
+The Filled Dark CTA reads its text and hover from **On Primary Action** and **Primary Action Hover**, so in dark it is an indigo button with white text. In light both new tokens keep the previous look (white text, Charcoal hover).
 
-| Token | Light value | Dark value |
-|---|---|---|
-| Soft Mint | `#dcfce7` | `#052e1a` |
-| Forest Ink | `#166534` | `#4ade80` (aliases dark Vivid Green) |
-| Powder Blue | `#dbeaff` | `#16243d` |
-| Amber Wash | `#fef3c7` | `#3a2408` |
-| Amber Ink | `#92400e` | `#fbbf24` |
-| Rose Wash | `#fee2e2` | `#3d0e0e` |
-| Rose Ink | `#991b1b` | `#f87171` |
-
-**Shadows:** left as literal `rgba(0,0,0,…)` values in dark mode rather than inverted — a black shadow is naturally quieter against an already-dark canvas, which matches the common dark-UI convention of leaning on border/lightness contrast over shadow for elevation. Not a gap, a deliberate non-change.
+**Shadows:** unchanged; black shadows stay quiet on the dark ground and borders carry the structure.
 
 ## Tokens — Typography
 
@@ -259,6 +269,13 @@ Transparent or light blue (#dbeaff) active background, 8px radius, #171717 text,
 
 White background, #111827 text, 1px #000000 border (distinctive — inputs use near-black border instead of #e5e5e5 for emphasis), 6px radius, 8px vertical / 12px horizontal padding. The black border is a signature: inputs feel important, not optional.
 
+**Product override (2026-09-25, approved by the product owner):** in the CRM the
+dense form controls win over the reference spec. `Input`, `Textarea` and the
+`Select` trigger share one compact size: `h-8` (2rem, ~29px at the app root size; `h-7` for the `sm`
+select), `text-xs`, 6px/10px padding, and keep the current `border-input`
+(neutral) border instead of the black one. Pages must not override control
+height or text size; use the component defaults.
+
 ### Logo Cloud Item
 **Role:** Customer/social proof logo display
 
@@ -400,6 +417,32 @@ Imagery is product-first, not lifestyle. The hero centers a large dashboard scre
 ## Layout
 
 The page follows a centered, max-width contained model at approximately 1200px. The hero is a centered text stack with three floating feature pills (Affiliate Programs, Conversion Analytics, Short Links) arranged horizontally above a large product mockup. Sections stack vertically with consistent 64px gaps, alternating between white canvas and the #f5f5f5 paper mist for tonal separation. The lower section uses a z-pattern: editorial text centered in the middle third, with floating UI cards anchored at the left and right margins, creating an asymmetric, magazine-like rhythm. The logo cloud is a simple 5×2 grid centered on the page. Navigation is a minimal top bar — logo left, nav center, two-button cluster (ghost Log in + filled Sign up) right — with no sticky or mega-menu behavior. The dashboard mockup in the hero shows a classic 2-column app shell: fixed sidebar (240px-ish) + content area, establishing the product's information density for visitors before they scroll.
+
+## Product Density — only the essential stays on screen (2026-09-26)
+
+Rule for every CRM route (adopted on `/leads/distribuicao?view=filas`, to be
+applied route by route). The goal is low cognitive load: a screen shows what is
+needed to act, everything else is one click away.
+
+1. **Lists of entities are one table** in the `/equipe` pattern
+   (`DataTable` + `SectionCardHeader` inside a `Card variant="overview"`).
+   Never a grid of large cards per entity.
+2. **Details open in a right drawer** (`Sheet`) from a click on the row: summary
+   numbers, configuration read-out and the entity's sub-lists live there.
+   Editing complex forms may still open the existing dialog from the drawer.
+3. **Secondary actions and settings go into dropdowns**: row actions in a `⋯`
+   menu (icon-sm ghost), page-level extras (simulators, auxiliary settings,
+   explainers) in a labeled "Configurações ▾" menu that opens drawers.
+4. **One primary CTA per screen** (e.g. "Nova fila"), next to the settings menu
+   in the card header.
+5. **Adding related items = search + "+"** (`SearchAddList`): no permanent
+   selectors or full lists of candidates; results appear only while typing.
+   Prefer filters like "Só ativos" on by default, with a "mostrar todas" link.
+6. **Tables scroll sideways by mouse drag** (`DataTable` wraps `DragScrollTable`);
+   the horizontal scrollbar stays hidden.
+7. Reusable building blocks: `SectionCardHeader`, `StatCard`, `DataTable`,
+   `Sheet`/`SheetSection`, `DropdownMenu`, `SearchAddList`. Do not re-create
+   them per page.
 
 ## Agent Prompt Guide
 

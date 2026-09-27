@@ -702,6 +702,22 @@ export async function updateTeamMemberProfileSettingsAction(formData: FormData) 
   });
 }
 
+export async function updateTeamInvitationResendSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("teamInvitationResendEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_team_invitation_resend_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "team_invitation_resend.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "team_invitation_resend",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
 export async function updateUserProfileSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("userProfileEnabled") === "true" ? "true" : "false";
@@ -805,6 +821,34 @@ export async function updateDutyPresenceConfirmationSettingsAction(formData: For
   await getDatabase().insert(schema.platformAuditLogs).values({
     id: crypto.randomUUID(), actorUserId: admin.userId,
     action: "duty_presence_confirmation.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+}
+
+export async function updateDutyMonthlySchedulingSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("dutyMonthlySchedulingEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_monthly_scheduling.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+}
+
+export async function updateDutyOccurrenceHistorySettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("dutyOccurrenceHistoryEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_occurrence_history.settings_updated",
     targetType: "system_settings", targetId: key,
     metadata: { enabled: enabled === "true" }, createdAt: now,
   });

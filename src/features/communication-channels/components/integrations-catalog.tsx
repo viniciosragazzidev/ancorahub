@@ -20,16 +20,9 @@ export const integrationCatalogEntries: IntegrationCard[] = [
     status: "available",
   },
   {
-    name: "WhatsApp oficial",
-    description: "Conecte o número corporativo para atendimento, templates e notificações.",
+    name: "WhatsApp",
+    description: "Gerencie o número oficial de atendimento e o canal da diretoria em uma só área.",
     href: "/integrations/whatsapp",
-    icon: WhatsappLogo,
-    status: "available",
-  },
-  {
-    name: "WhatsApp da diretoria",
-    description: "Conecte por QR um número da empresa para a diretoria falar com os corretores.",
-    href: "/integrations/whats_alt",
     icon: WhatsappLogo,
     status: "available",
   },

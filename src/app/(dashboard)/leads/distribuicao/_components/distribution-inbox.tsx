@@ -55,6 +55,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/utils/core/cn";
+import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
 
 type Lead = {
   id: string;
@@ -580,13 +581,13 @@ export function DistributionInbox({
   return (
     <>
       <Card variant="overview" data-onboarding="manager-team-performance">
-        <CardHeader className="border-b border-border px-5 pb-4 pt-5">
+        <CardHeader className="gap-0 border-b border-border/50 p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <UserList className="size-4 text-primary" /> Inbox operacional de distribuição
+              <CardTitle className="flex items-center gap-2 text-base">
+                <UserList className="size-4" /> Inbox operacional de distribuição
               </CardTitle>
-              <CardDescription className="mt-1">
+              <CardDescription className="mt-1 max-w-3xl text-xs leading-5">
                 Aqui ficam apenas os leads que ainda podem ser enviados para uma unidade, fila ou corretor.
               </CardDescription>
             </div>
@@ -739,7 +740,7 @@ export function DistributionInbox({
                 <span>{totalPages > 1 ? `Página ${currentPage} de ${totalPages}` : null}</span>
               </div>
               <div className="overflow-x-auto">
-                <Table>
+                <Table className={dataTableStyles.native}>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10 pl-5">
@@ -942,20 +943,20 @@ export function DistributionInbox({
 
       {inboxLeads.length ? (
         <Card variant="overview" className="mt-4">
-          <CardHeader className="border-b border-border px-5 pb-4 pt-5">
+          <CardHeader className="gap-0 border-b border-border/50 p-4">
             <CardTitle className="flex items-center gap-2 text-base">
-              <Archive className="size-4 text-amber-600 dark:text-amber-400" />
+              <Archive className="size-4" />
               Todos os leads sem corretor
               <Badge variant="secondary">{totalUnassigned}</Badge>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="mt-1 max-w-3xl text-xs leading-5">
               Esta é a lista completa do escopo sem corretor. Leads que ainda podem ser distribuídos ficam no Inbox acima;
               os demais também podem ser arquivados e exportados.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
               <div className="max-h-[560px] overflow-auto">
-                <Table>
+                <Table className={dataTableStyles.native}>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="pl-5">Lead</TableHead>

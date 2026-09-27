@@ -102,7 +102,7 @@ export async function completeOnboardingAction(
         eq(schema.tenantMemberships.userId, existingUser.id),
       ))
       .limit(1) : [];
-    const identityDecision = classifyExistingTeamIdentity(identity ?? null, membershipForIdentity ?? null);
+    const identityDecision = classifyExistingTeamIdentity(identity ?? null, membershipForIdentity ?? null, profile.userId);
     if (identityDecision.kind === "tenant-conflict") {
       throw new Error("Este e-mail já pertence a outro membro desta corretora.");
     }

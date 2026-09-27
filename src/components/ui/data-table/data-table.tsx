@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { DataTablePagination } from "./data-table-pagination";
 import { DataTableViewOptions } from "./data-table-view-options";
+import { DragScrollTable } from "@/components/ui/drag-scroll-table";
 import { DataTableFrame, dataTableStyles } from "./data-table-frame";
 
 interface DataTableProps<TData, TValue> {
@@ -97,24 +98,24 @@ export function DataTable<TData, TValue>({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-0.5">
           {searchKey ? (
             <div className="relative w-full max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder={searchPlaceholder}
                 value={(table.getColumn(searchKey)?.getFilterValue() as string) ?? ""}
                 onChange={(event) =>
                   table.getColumn(searchKey)?.setFilterValue(event.target.value)
                 }
-                className="h-9 rounded-[var(--radius-control)] border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-ring"
+                className="bg-card pl-8"
               />
             </div>
           ) : (
             <div className="relative w-full max-w-xs">
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input
                 placeholder={searchPlaceholder}
                 value={globalFilter ?? ""}
                 onChange={(event) => setGlobalFilter(event.target.value)}
-                className="h-9 rounded-[var(--radius-control)] border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-ring"
+                className="bg-card pl-8"
               />
             </div>
           )}
@@ -127,7 +128,9 @@ export function DataTable<TData, TValue>({
       )}
 
       <DataTableFrame>
-        <div className="overflow-x-auto">
+        {/* Mouse drag scrolls sideways (as in the leads table); the horizontal
+            scrollbar stays hidden, trackpads and touch scroll natively. */}
+        <DragScrollTable className="[&_[data-slot=table-container]]:[scrollbar-width:none] [&_[data-slot=table-container]::-webkit-scrollbar]:hidden">
           <Table>
             <TableHeader className={dataTableStyles.header}>
               {table.getHeaderGroups().map((headerGroup) => (
@@ -186,7 +189,7 @@ export function DataTable<TData, TValue>({
               )}
             </TableBody>
           </Table>
-        </div>
+        </DragScrollTable>
 
         {showPagination && <DataTablePagination table={table} />}
       </DataTableFrame>

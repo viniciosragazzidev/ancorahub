@@ -14,7 +14,7 @@ export const dsButtonVariants = cva(
       dsVariant: {
         /** Filled Dark CTA — primary action, once per surface */
         "filled-dark":
-          "rounded-ds-buttons border border-transparent bg-ds-primary-action-fill px-ds-16 py-ds-12 text-ds-canvas-white shadow-ds-subtle hover:bg-ds-charcoal",
+          "rounded-ds-buttons border border-transparent bg-ds-primary-action-fill px-ds-16 py-ds-12 text-ds-on-primary-action shadow-ds-subtle hover:bg-ds-primary-action-hover",
         /** Outlined Action Button — secondary/utility action workhorse */
         "outlined-action":
           "rounded-ds-buttons border border-ds-ash bg-ds-canvas-white px-ds-16 py-ds-12 text-ds-charcoal hover:bg-ds-paper-mist",

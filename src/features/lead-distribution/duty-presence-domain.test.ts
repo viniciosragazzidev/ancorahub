@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { formatDutyStartHour, getDutyOccurrenceLeadWindow, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive } from "./duty-presence-domain";
+import { formatDutyStartHour, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, listCompletedDutyWindows } from "./duty-presence-domain";
+
+describe("completed duty history", () => {
+  const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
+
+  it("accepts only real dates on the configured weekday", () => {
+    expect(getDutyWindowOnDate(shift, "2026-09-23")?.startsAt.toISOString()).toBe("2026-09-23T13:00:00.000Z");
+    expect(getDutyWindowOnDate(shift, "2026-09-24")).toBeNull();
+    expect(getDutyWindowOnDate(shift, "2026-02-30")).toBeNull();
+  });
+
+  it("lists a date only after the shift ends and respects the rule validity", () => {
+    const rule = { ...shift, validFrom: new Date("2026-09-16T00:00:00.000Z"), validUntil: null };
+    expect(listCompletedDutyWindows(rule, new Date("2026-09-23T14:59:00.000Z"), 2).map((entry) => entry.dutyDate)).toEqual(["2026-09-16"]);
+    expect(listCompletedDutyWindows(rule, new Date("2026-09-23T15:01:00.000Z"), 2).map((entry) => entry.dutyDate)).toEqual(["2026-09-23", "2026-09-16"]);
+  });
+
+  it("ends an overnight occurrence on the next local day", () => {
+    const night = { ...shift, startsAt: "22:00", endsAt: "02:00" };
+    expect(getDutyWindowOnDate(night, "2026-09-23")?.endsAt.toISOString()).toBe("2026-09-24T05:00:00.000Z");
+  });
+});
 
 describe("duty presence occurrence windows", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };

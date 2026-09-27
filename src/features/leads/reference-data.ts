@@ -4,6 +4,7 @@ import { and, count, eq, gt, isNull, lte, or } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 
 import { getDatabase, schema } from "@/shared/db";
+import { resolveEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 
 /**
  * Cached wrappers for the /leads page's reference data — branches, brokers,
@@ -137,8 +138,8 @@ export const getCachedActiveDutyAssignments = (
   unstable_cache(
     async () => {
       const db = getDatabase();
-      return db
-        .select({ branchId: schema.dutyRosterAssignments.branchId, brokerId: schema.dutyRosterAssignments.brokerId })
+      const assignments = await db
+        .select({ id: schema.dutyRosterAssignments.id, scheduleId: schema.dutyRosterAssignments.scheduleId, validFrom: schema.dutyRosterAssignments.validFrom, validUntil: schema.dutyRosterAssignments.validUntil, branchId: schema.dutyRosterAssignments.branchId, brokerId: schema.dutyRosterAssignments.brokerId, dutyDate: schema.dutyRosterAssignments.dutyDate })
         .from(schema.dutyRosterAssignments)
         .innerJoin(schema.unitDutySchedules, eq(schema.dutyRosterAssignments.scheduleId, schema.unitDutySchedules.id))
         .where(
@@ -160,6 +161,7 @@ export const getCachedActiveDutyAssignments = (
             or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, dutyNow)),
           ),
         );
+      return (await resolveEffectiveDutyAssignments(tenantId, assignments, dutyNow)).map(({ branchId, brokerId }) => ({ branchId, brokerId }));
     },
     ["leads-ref-active-duty", tenantId],
     { revalidate: 30 },

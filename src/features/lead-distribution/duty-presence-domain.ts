@@ -68,6 +68,31 @@ function localTimeToUtc(day: string, clock: string, timezone: string) {
   return candidate;
 }
 
+/** One immutable calendar occurrence of a weekly rule, including overnight shifts. */
+export function getDutyWindowOnDate(input: WeeklyWindowInput, dutyDate: string): DutyWindow | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dutyDate) || !Number.isInteger(input.dayOfWeek) || input.dayOfWeek < 0 || input.dayOfWeek > 6) return null;
+  const [year, month, day] = dutyDate.split("-").map(Number);
+  const calendarDay = new Date(Date.UTC(year, month - 1, day));
+  if (calendarDay.toISOString().slice(0, 10) !== dutyDate || calendarDay.getUTCDay() !== input.dayOfWeek) return null;
+  const startsAt = localTimeToUtc(dutyDate, input.startsAt, input.timezone);
+  let endsAt = localTimeToUtc(dutyDate, input.endsAt, input.timezone);
+  if (endsAt <= startsAt) endsAt = localTimeToUtc(addCalendarDays(dutyDate, 1), input.endsAt, input.timezone);
+  return { dutyDate, startsAt, endsAt };
+}
+
+export function listCompletedDutyWindows(input: WeeklyWindowInput & { validFrom: Date; validUntil: Date | null }, now: Date, limit = 8): DutyWindow[] {
+  const localNow = zonedParts(now, input.timezone);
+  const today = dateKey(localNow.year, localNow.month, localNow.day);
+  const completed: DutyWindow[] = [];
+  for (let offset = 0; offset > -limit * 7 - 7 && completed.length < limit; offset -= 1) {
+    const window = getDutyWindowOnDate(input, addCalendarDays(today, offset));
+    if (!window || window.endsAt > now) continue;
+    if (window.startsAt < input.validFrom || (input.validUntil && window.startsAt >= input.validUntil)) continue;
+    completed.push(window);
+  }
+  return completed;
+}
+
 /** Returns this week's matching shift if it is within its 30-minute reminder window or active. */
 export function getRelevantDutyWindow(input: WeeklyWindowInput, now: Date, leadMinutes = 30): DutyWindow | null {
   if (!Number.isInteger(input.dayOfWeek) || input.dayOfWeek < 0 || input.dayOfWeek > 6) return null;

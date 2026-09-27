@@ -101,3 +101,18 @@ export function decideDddRouting(settings: DddRoutingSettings, phone: string | n
       : `DDD ${ddd} está fora dos DDDs válidos`;
   return { outcome, ddd, queueId: settings.queues[outcome], reason };
 }
+
+/**
+ * Valid DDDs typed as free text ("21, 22 24"): keeps the real Brazilian
+ * area codes, in order and de-duplicated, and reports tokens that are not one.
+ */
+export function parseDddList(text: string): { valid: string[]; unknown: string[] } {
+  const tokens = text.split(/[^0-9]+/).filter(Boolean);
+  const valid = new Set<string>();
+  const unknown = new Set<string>();
+  for (const token of tokens) {
+    if (token.length === 2 && ALL_DDDS.has(token)) valid.add(token);
+    else unknown.add(token);
+  }
+  return { valid: [...valid].sort(), unknown: [...unknown] };
+}

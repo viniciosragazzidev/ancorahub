@@ -11,6 +11,7 @@ describe("IntegrationsCatalog", () => {
     render(<IntegrationsCatalog />);
 
     expect(screen.getByRole("link", { name: "Abrir integração Meta Business" })).toHaveAttribute("href", "/integrations/meta");
-    expect(screen.getByRole("link", { name: "Abrir integração WhatsApp oficial" })).toHaveAttribute("href", "/integrations/whatsapp");
+    expect(screen.getByRole("link", { name: "Abrir integração WhatsApp" })).toHaveAttribute("href", "/integrations/whatsapp");
+    expect(screen.queryByRole("link", { name: "Abrir integração WhatsApp da diretoria" })).not.toBeInTheDocument();
   });
 });

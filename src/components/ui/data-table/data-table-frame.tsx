@@ -43,6 +43,11 @@ const dataTableStyles = {
   body: "bg-card",
   row: "border-b border-border/70 bg-card transition-colors duration-[var(--duration-quick)] hover:bg-muted/40 focus-within:bg-muted/40 motion-reduce:transition-none",
   cell: "px-4 py-2.5 text-sm font-normal text-foreground",
+  /**
+   * The /equipe table look for plain <Table> markup (tables not built on
+   * DataTable): 40px header row, 12px cells, same paddings.
+   */
+  native: "[&_th]:h-10 [&_th]:px-3.5 [&_td]:px-4 [&_td]:py-2.5 [&_td]:text-xs",
 } as const;
 
 export { DataTableFrame, dataTableFrameVariants, dataTableStyles };

@@ -10,7 +10,13 @@ describe("distribution view access", () => {
   });
 
   it("does not honor a direct queue-definition URL for managers", () => {
-    expect(resolveDistributionView("manager", "filas")).toBe("roteamento");
+    expect(resolveDistributionView("manager", "filas")).toBe("resumo_dia");
     expect(resolveDistributionView("director", "filas")).toBe("filas");
+  });
+
+  it("opens the summary first while retaining deep links", () => {
+    expect(resolveDistributionView("director")).toBe("resumo_dia");
+    expect(resolveDistributionView("manager", "resumo")).toBe("resumo_dia");
+    expect(resolveDistributionView("director", "plantao")).toBe("plantao");
   });
 });

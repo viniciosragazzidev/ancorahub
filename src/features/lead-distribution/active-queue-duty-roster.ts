@@ -6,6 +6,7 @@ import { getLocalDutyParts } from "@/features/leads/assignment";
 import { getDatabase, schema } from "@/shared/db";
 import { selectMatchingDutyScheduleIds, selectQueueLinkedDutySchedules } from "./duty-roster-matching";
 import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
+import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 
 export type ActiveQueueDutyBroker = {
   id: string;
@@ -103,6 +104,7 @@ export async function getActiveQueueDutyRoster(input: {
       name: schema.user.name,
       branchId: schema.dutyRosterAssignments.branchId,
       branchName: schema.branches.name,
+      dutyDate: schema.dutyRosterAssignments.dutyDate,
     })
     .from(schema.dutyRosterAssignments)
     .innerJoin(schema.tenantMemberships, and(
@@ -131,9 +133,11 @@ export async function getActiveQueueDutyRoster(input: {
     ))
     .orderBy(asc(schema.user.name));
 
+  const effectiveBrokers = await resolveEffectiveDutyAssignments(input.tenantId, brokers, now);
+  const effectiveAssignmentIds = new Set(effectiveBrokers.map((assignment) => assignment.assignmentId));
   const confirmedAssignmentIds = await getPresenceConfirmedAssignmentIds({
     tenantId: input.tenantId,
-    assignments: brokers.map((broker) => ({
+    assignments: brokers.filter((broker) => effectiveAssignmentIds.has(broker.assignmentId)).map((broker) => ({
       id: broker.assignmentId,
       scheduleId: broker.scheduleId,
       brokerId: broker.id,
@@ -148,6 +152,6 @@ export async function getActiveQueueDutyRoster(input: {
   });
   return {
     hasActiveDuty: true,
-    brokers: brokers.filter((broker) => confirmedAssignmentIds.has(broker.assignmentId)).map(({ assignmentId, scheduleId, dayOfWeek, startsAt, endsAt, validFrom, validUntil, ...broker }) => broker),
+    brokers: brokers.filter((broker) => effectiveAssignmentIds.has(broker.assignmentId) && confirmedAssignmentIds.has(broker.assignmentId)).map((broker) => ({ id: broker.id, name: broker.name, branchId: broker.branchId, branchName: broker.branchName })),
   };
 }

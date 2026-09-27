@@ -31,6 +31,11 @@
 - **Agenda pessoal do corretor**: janelas semanais declaradas pelo próprio corretor, no fuso operacional. Elas determinam quando ele entra na distribuição automática e não revogam a possibilidade de atribuição manual assistida.
 - **Roster ativo do plantão da fila**: corretores com vínculo ativo no tenant e escala vigente em um plantão ativo explicitamente ligado à fila do lead e compatível com sua origem. A seleção pode atravessar unidades; a unidade do lead não é alterada pela atribuição manual.
 - **Ocorrência do plantão**: instância de uma escala recorrente em uma data local específica, delimitada por horário de início e fim no fuso configurado. Confirmações se aplicam apenas a essa ocorrência, nunca ao plantão recorrente em geral.
+- **Histórico de ocorrência**: registro consultável de um turno já encerrado, com os eventos de distribuição e os corretores ligados à data; não encerra a regra semanal recorrente.
+- **Tipo de plantão**: rótulo configurado por uma corretora para organizar e comunicar uma escala. É classificatório e não decide quais leads ou corretores participam.
+- **Cota mensal de plantões**: quantidade planejada de ocorrências para um corretor dentro de um mês definido; pode ficar parcialmente não atendida quando as restrições não permitem alocação segura.
+- **Rascunho de escala**: proposta revisável de ocorrências datadas, sem efeito para o atendimento até ser publicada pela gestão.
+- **Escala publicada**: versão aprovada pela gestão que comunica as ocorrências aos corretores e conserva o histórico de publicação e mudanças.
 
 ## Canais de comunicação
 

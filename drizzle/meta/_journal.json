@@ -743,6 +743,41 @@
                         "when":  1790200000000,
                         "tag":  "0158_duty_roster_pause",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  106,
+                        "version":  "7",
+                        "when":  1790203600000,
+                        "tag":  "0159_duty_schedule_types_capacity",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  107,
+                        "version":  "7",
+                        "when":  1790207200000,
+                        "tag":  "0160_duty_schedule_monthly_plans",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  108,
+                        "version":  "7",
+                        "when":  1790210800000,
+                        "tag":  "0161_duty_dated_roster_rows",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  109,
+                        "version":  "7",
+                        "when":  1790214400000,
+                        "tag":  "0162_default_broker_availability",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  110,
+                        "version":  "7",
+                        "when":  1790218000000,
+                        "tag":  "0163_duty_monthly_plan_superseded",
+                        "breakpoints":  true
                     }
                 ]
 }

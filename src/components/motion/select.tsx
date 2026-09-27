@@ -255,7 +255,7 @@ export function SelectTrigger({
         "relative z-10 flex w-full items-center justify-between gap-2 rounded-[10px] border border-input bg-card px-3 text-foreground outline-none transition-colors select-none",
         "hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring/20",
         "disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "h-8 py-1 text-xs" : "h-9 py-2 text-sm",
+        size === "sm" ? "h-7 py-1 text-xs" : "h-8 py-1.5 text-xs",
         className,
       )}
     >
@@ -450,7 +450,7 @@ export function SelectItem({
         disabled={disabled}
         onClick={() => ctx.select(value)}
         className={cn(
-          "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-sm outline-none transition-colors cursor-pointer select-none",
+          "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs outline-none transition-colors cursor-pointer select-none",
           selected
             ? "bg-accent text-accent-foreground font-medium"
             : "text-popover-foreground hover:bg-accent/50 focus-visible:bg-accent/50",

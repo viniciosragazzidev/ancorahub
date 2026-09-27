@@ -153,7 +153,7 @@ export function AgentTriggersPanel() {
   return (
     <div className="space-y-6">
       {/* HEADER & POLICY ENGINE SUMMARY */}
-      <Card variant="subtle" className="rounded-xl border-border/80">
+      <Card className="border-border/70">
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>

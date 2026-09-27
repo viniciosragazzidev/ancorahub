@@ -17,7 +17,7 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     .where(branchCondition)
     .orderBy(asc(schema.branches.name));
   const branchIds = branches.map((branch) => branch.id);
-  if (!branchIds.length) return { branches: [], queues: [], credentials: [], schedules: [], brokers: [], assignments: [], history: [] };
+  if (!branchIds.length) return { branches: [], queues: [], credentials: [], schedules: [], brokers: [], assignments: [], publishedAssignments: [], history: [] };
 
   const [queues, credentials, schedules, brokers, assignments, campaignOrigins] = await Promise.all([
     db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, name: schema.leadQueues.name })
@@ -46,11 +46,13 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       queueId: schema.unitDutySchedules.queueId,
       queueName: schema.leadQueues.name,
       name: schema.unitDutySchedules.name,
+      typeName: schema.dutyScheduleTypes.name,
       dayOfWeek: schema.unitDutySchedules.dayOfWeek,
       startsAt: schema.unitDutySchedules.startsAt,
       endsAt: schema.unitDutySchedules.endsAt,
       priority: schema.unitDutySchedules.priority,
       minimumBrokers: schema.unitDutySchedules.minimumBrokers,
+      maximumBrokers: schema.unitDutySchedules.maximumBrokers,
       status: schema.unitDutySchedules.status,
       timezone: schema.unitDutySchedules.timezone,
       validFrom: schema.unitDutySchedules.validFrom,
@@ -61,6 +63,7 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       .from(schema.unitDutySchedules)
       .leftJoin(schema.branches, eq(schema.unitDutySchedules.branchId, schema.branches.id))
       .leftJoin(schema.leadQueues, eq(schema.unitDutySchedules.queueId, schema.leadQueues.id))
+      .leftJoin(schema.dutyScheduleTypes, and(eq(schema.unitDutySchedules.typeId, schema.dutyScheduleTypes.id), eq(schema.unitDutySchedules.tenantId, schema.dutyScheduleTypes.tenantId)))
       .leftJoin(schema.leadWebhookCredentials, eq(schema.unitDutySchedules.webhookCredentialId, schema.leadWebhookCredentials.id))
       .leftJoin(schema.metaLeadAdSources, and(
         eq(schema.metaLeadAdSources.leadWebhookCredentialId, schema.leadWebhookCredentials.id),
@@ -81,10 +84,12 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       email: schema.user.email,
       internalCode: schema.brokerProfiles.internalCode,
       branchId: schema.tenantMemberships.branchId,
+      branchName: schema.branches.name,
       availabilityStatus: schema.tenantMemberships.availabilityStatus,
     })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+      .leftJoin(schema.branches, and(eq(schema.tenantMemberships.branchId, schema.branches.id), eq(schema.branches.tenantId, context.tenantId)))
       .leftJoin(schema.brokerProfiles, and(
         eq(schema.brokerProfiles.userId, schema.user.id),
         eq(schema.brokerProfiles.tenantId, context.tenantId),
@@ -116,6 +121,8 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
         eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
         inArray(schema.dutyRosterAssignments.branchId, branchIds),
         eq(schema.dutyRosterAssignments.status, "active"),
+        // Published monthly rows are one-date occurrences, not part of the weekly roster.
+        isNull(schema.dutyRosterAssignments.dutyDate),
       ))
       .orderBy(asc(schema.dutyRosterAssignments.dayOfWeek), asc(schema.dutyRosterAssignments.startsAt)),
     db.select({
@@ -155,10 +162,25 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     ...credential,
     name: displayCredentialName(credential.id, credential.name) ?? credential.name,
   }));
+  // Which queue receives each plantão: the queue's exclusivity list (what the
+  // Filas page edits), not the legacy per-schedule queue_id.
+  const linkingQueues = schedules.length
+    ? await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId })
+      .from(schema.leadQueues)
+      .where(eq(schema.leadQueues.tenantId, context.tenantId))
+      .orderBy(asc(schema.leadQueues.name))
+    : [];
+  const linkedQueueBySchedule = new Map<string, { id: string; name: string }>();
+  for (const queue of linkingQueues) {
+    for (const id of new Set([...(queue.exclusiveDutyScheduleIds ?? []), ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : [])])) {
+      if (!linkedQueueBySchedule.has(id)) linkedQueueBySchedule.set(id, { id: queue.id, name: queue.name });
+    }
+  }
   const displaySchedules = schedules.map((schedule) => ({
     ...schedule,
     branchName: schedule.branchName ?? "Todas as unidades",
-    queueName: schedule.queueName ?? "Todas as filas",
+    linkedQueueId: linkedQueueBySchedule.get(schedule.id)?.id ?? null,
+    queueName: linkedQueueBySchedule.get(schedule.id)?.name ?? schedule.queueName ?? "Sem fila vinculada",
     credentialName: displayCredentialName(schedule.webhookCredentialId, schedule.credentialName),
   }));
 
@@ -177,5 +199,29 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       .limit(100)
     : [];
 
-  return { branches, queues, credentials: displayCredentials, schedules: displaySchedules, brokers, assignments, history };
+  // Published monthly escala (DEC-123): one row per broker per date. Shown next
+  // to the weekly roster; from the start of the current month on.
+  const monthStart = `${new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date()).slice(0, 7)}-01`;
+  const publishedAssignments = scheduleIds.length
+    ? await db.select({
+      id: schema.dutyRosterAssignments.id,
+      scheduleId: schema.dutyRosterAssignments.scheduleId,
+      brokerId: schema.dutyRosterAssignments.brokerId,
+      brokerName: schema.user.name,
+      dutyDate: sql<string>`${schema.dutyRosterAssignments.dutyDate}::text`,
+    })
+      .from(schema.dutyRosterAssignments)
+      .innerJoin(schema.user, eq(schema.dutyRosterAssignments.brokerId, schema.user.id))
+      .where(and(
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+        inArray(schema.dutyRosterAssignments.branchId, branchIds),
+        inArray(schema.dutyRosterAssignments.scheduleId, scheduleIds),
+        eq(schema.dutyRosterAssignments.status, "active"),
+        isNotNull(schema.dutyRosterAssignments.monthlyPlanId),
+        sql`${schema.dutyRosterAssignments.dutyDate} >= ${monthStart}::date`,
+      ))
+      .orderBy(asc(schema.dutyRosterAssignments.dutyDate), asc(schema.user.name))
+    : [];
+
+  return { branches, queues, credentials: displayCredentials, schedules: displaySchedules, brokers, assignments, publishedAssignments, history };
 }

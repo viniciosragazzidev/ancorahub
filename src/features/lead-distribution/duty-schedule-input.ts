@@ -1,17 +1,42 @@
 import { z } from "zod";
+import { zonedMidnight } from "./monthly-duty-plan";
 
-export const dutyScheduleInput = z.object({
+const DUTY_TIME_ZONE = "America/Sao_Paulo";
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+function nextDateKey(dateKey: string) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + 1)).toISOString().slice(0, 10);
+}
+
+// A date input ("2026-11-21") means a local calendar day, not UTC midnight
+// (which is 21:00 of the day before in São Paulo and shrank every re-save).
+// "A partir de" starts at local midnight; "até" includes the whole day.
+const startOfLocalDay = (value: unknown) => (typeof value === "string" && DATE_ONLY.test(value) ? zonedMidnight(value, DUTY_TIME_ZONE) : value);
+const endOfLocalDay = (value: unknown) => (typeof value === "string" && DATE_ONLY.test(value) ? zonedMidnight(nextDateKey(value), DUTY_TIME_ZONE) : value);
+
+// Plain object (no refinements) so create/update schemas can omit/extend it;
+// Zod 4 refuses `.omit()` on a refined schema at module load.
+const dutyScheduleFields = z.object({
   branchId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
   queueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
   name: z.string().trim().min(2).max(100),
+  typeName: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().trim().min(2).max(60).nullable().optional()),
   dayOfWeek: z.coerce.number().int().min(0).max(6),
   startsAt: z.string(),
   endsAt: z.string(),
   minimumBrokers: z.coerce.number().int().min(1).max(99),
-  validFrom: z.coerce.date(),
-  validUntil: z.coerce.date().optional(),
+  maximumBrokers: z.preprocess((value) => value === "" || value === undefined ? null : value, z.coerce.number().int().min(1).max(99).nullable().optional()),
+  validFrom: z.preprocess(startOfLocalDay, z.coerce.date()),
+  validUntil: z.preprocess(endOfLocalDay, z.coerce.date().optional()),
   webhookCredentialId: z.string().uuid().optional().nullable(),
 });
+
+const maximumAtLeastMinimum = (value: { minimumBrokers: number; maximumBrokers?: number | null }) =>
+  value.maximumBrokers == null || value.maximumBrokers >= value.minimumBrokers;
+const maximumAtLeastMinimumIssue = { path: ["maximumBrokers"], message: "O máximo deve ser igual ou maior que o mínimo." };
+
+export const dutyScheduleInput = dutyScheduleFields.refine(maximumAtLeastMinimum, maximumAtLeastMinimumIssue);
 
 const dayOfWeekInput = z.coerce.number().int().min(0).max(6);
 const legacyUnitAssignmentsInput = z.preprocess((value) => {
@@ -33,7 +58,7 @@ const daysOfWeekInput = z.preprocess((value) => {
   "Cada dia da semana pode ser selecionado apenas uma vez.",
 ));
 
-const createDutyScheduleInput = dutyScheduleInput.omit({ branchId: true, queueId: true, dayOfWeek: true }).extend({
+const createDutyScheduleInput = dutyScheduleFields.omit({ branchId: true, queueId: true, dayOfWeek: true }).extend({
   // Keep accepting the legacy single-day field while old forms are still open.
   dayOfWeek: dayOfWeekInput.optional(),
   daysOfWeek: daysOfWeekInput.optional(),
@@ -45,10 +70,16 @@ const createDutyScheduleInput = dutyScheduleInput.omit({ branchId: true, queueId
   // the same day/time are fine as long as they end up serving different
   // queues, so the check needs to know which queue this one is headed for.
   responsibleQueueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
+  // "Datas" mode: each date becomes a plantão valid only on that day.
+  dates: z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    try { return JSON.parse(value); } catch { return value; }
+  }, z.array(z.string().regex(DATE_ONLY)).max(93, "Escolha no máximo 93 datas (cerca de 3 meses) por vez.").refine((dates) => new Set(dates).size === dates.length, "Cada data pode aparecer apenas uma vez.")).optional(),
 }).superRefine((value, ctx) => {
-  if (!value.daysOfWeek?.length && value.dayOfWeek === undefined) {
+  if (!value.dates?.length && !value.daysOfWeek?.length && value.dayOfWeek === undefined) {
     ctx.addIssue({ code: "custom", path: ["daysOfWeek"], message: "Selecione ao menos um dia da semana." });
   }
+  if (!maximumAtLeastMinimum(value)) ctx.addIssue({ code: "custom", ...maximumAtLeastMinimumIssue });
 }).transform((value) => ({
   ...value,
   daysOfWeek: value.daysOfWeek ?? (value.dayOfWeek === undefined ? [] : [value.dayOfWeek]),

@@ -1,10 +1,11 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
 import Link from "next/link";
-import { ArrowSquareOut, PencilSimple, Plus, Power } from "@/components/huge-icons";
+import type { ColumnDef } from "@tanstack/react-table";
+import { ArrowSquareOut, Buildings, PencilSimple, Plus, Power } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
 
 import { Button } from "@/components/ui/button";
@@ -12,8 +13,10 @@ import { StatCard } from "@/components/dashboard/metric-card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Table, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Section, StatusBadge, EmptyState } from "@/components/foundations";
+import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { StatusBadge, EmptyState } from "@/components/foundations";
+import { Card } from "@/components/ui/card";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { createBranchAction, toggleBranchAction, updateBranchAction, type BranchActionState } from "@/features/branches/actions";
 import {
   BranchAcceptingToggle,
@@ -105,101 +108,96 @@ function CreateBranchSheet() {
   );
 }
 
-function BranchRow({ branch, index }: { branch: Branch; index?: number }) {
-  const [updateState, updateAction, updatePending] = useActionState<BranchActionState, FormData>(updateBranchAction, {});
-  const [toggleState, toggleAction, togglePending] = useActionState<BranchActionState, FormData>(toggleBranchAction, {});
-  const updateFormId = `branch-update-${branch.id}`;
-  const cells = (
-    <>
-      <TableCell className="min-w-56 pl-5"><form id={updateFormId} action={updateAction} className="flex items-center gap-2"><input type="hidden" name="branchId" value={branch.id} /><Input aria-label={`Nome da filial ${branch.name}`} name="name" defaultValue={branch.name} required /><Button aria-label={`Salvar ${branch.name}`} type="submit" variant="ghost" size="icon-sm" disabled={updatePending}><PencilSimple size={15} /></Button></form><ActionFeedback state={updateState} /></TableCell>
-      <TableCell className="min-w-40"><Input form={updateFormId} aria-label={`Identificador de ${branch.name}`} name="externalId" defaultValue={branch.externalId ?? ""} placeholder="Sem ID" /></TableCell>
-      <TableCell><span className="text-sm">{branch.memberCount}</span><span className="ml-1 text-xs text-muted-foreground">membro(s)</span></TableCell>
-      <TableCell>
-        <StatusBadge
-          label={branch.status === "active" ? "Ativa" : "Inativa"}
-          tone={branch.status === "active" ? "success" : "neutral"}
-          dot
-        />
-      </TableCell>
-      <TableCell><BranchAcceptingToggle branchId={branch.id} enabled={branch.acceptingLeads} /></TableCell>
-      <TableCell><BranchAutoDistributeToggle branchId={branch.id} enabled={branch.autoDistribute} /></TableCell>
-      <TableCell><BranchHubToggle branchId={branch.id} enabled={branch.isDistributionHub} /></TableCell>
-      <TableCell>
-        <span className={`font-mono text-sm tabular-nums ${branch.availableBrokers > 0 ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground"}`}>
-          {branch.availableBrokers}
-        </span>
-      </TableCell>
-      <TableCell><span className="font-mono text-sm tabular-nums">{branch.activeLeads}</span></TableCell>
-      <TableCell>
-        <span className={`font-mono text-sm tabular-nums ${branch.newLeads > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground"}`}>
-          {branch.newLeads}
-        </span>
-      </TableCell>
-      <TableCell className="pr-5 text-right">
-        <div className="flex items-center justify-end gap-1">
-          <Button render={<Link href={`/unidades/${branch.id}`} />} size="sm" variant="ghost" className="gap-1.5 text-xs">
-            <ArrowSquareOut size={14} aria-hidden="true" />
-            Ver perfil
-          </Button>
-          <form action={toggleAction}><input type="hidden" name="branchId" value={branch.id} /><Button type="submit" size="sm" variant="ghost" className="text-xs" disabled={togglePending}><Power size={14} />{branch.status === "active" ? "Desativar" : "Ativar"}</Button></form>
-          <ActionFeedback state={toggleState} />
-        </div>
-      </TableCell>
-    </>
-  );
+function EditBranchSheet({ branch }: { branch: Branch }) {
+  const [open, setOpen] = useState(false);
+  const [state, action, pending] = useActionState<BranchActionState, FormData>(updateBranchAction, {});
+  const router = useRouter();
+  useEffect(() => {
+    if (state.error) toast.error(state.error);
+    if (state.message && !state.error) {
+      toast.success(state.message);
+      router.refresh();
+    }
+  }, [state, router]);
+  return <Sheet open={open} onOpenChange={setOpen}>
+    <SheetTrigger render={<Button aria-label={`Editar ${branch.name}`} title={`Editar ${branch.name}`} size="icon-sm" variant="ghost" />}><PencilSimple size={15} /></SheetTrigger>
+    <SheetContent>
+      <SheetHeader><SheetTitle>Editar unidade</SheetTitle><SheetDescription>Atualize o nome e o identificador desta unidade.</SheetDescription></SheetHeader>
+      <SheetBody className="pt-4">
+        <form key={`${branch.name}-${branch.externalId ?? ""}`} action={action} className="space-y-4">
+          <input type="hidden" name="branchId" value={branch.id} />
+          <div className="space-y-2"><Label htmlFor={`branch-name-${branch.id}`}>Nome</Label><Input id={`branch-name-${branch.id}`} name="name" defaultValue={branch.name} required /></div>
+          <div className="space-y-2"><Label htmlFor={`branch-external-${branch.id}`}>Identificador</Label><Input id={`branch-external-${branch.id}`} name="externalId" defaultValue={branch.externalId ?? ""} placeholder="Opcional" /></div>
+          <Button type="submit" className="w-full" disabled={pending}>{pending ? "Salvando..." : "Salvar alterações"}</Button>
+        </form>
+      </SheetBody>
+    </SheetContent>
+  </Sheet>;
+}
 
-  if (index !== undefined) {
-    return (
-      <motion.tr
-        custom={index}
-        variants={{
-          hidden: { opacity: 0, x: -8 },
-          visible: (i: number) => ({
-            opacity: 1,
-            x: 0,
-            transition: { duration: 0.15, ease: [0, 0, 0.2, 1], delay: Math.min(i * 0.03, 0.25) },
-          }),
-        }}
-      >
-        {cells}
-      </motion.tr>
-    );
-  }
-
-  return <TableRow>{cells}</TableRow>;
+function BranchStatusAction({ branch }: { branch: Branch }) {
+  const [state, action, pending] = useActionState<BranchActionState, FormData>(toggleBranchAction, {});
+  return <form action={action} className="inline-flex items-center gap-2">
+    <input type="hidden" name="branchId" value={branch.id} />
+    <Button
+      type="submit"
+      size="icon-sm"
+      variant="ghost"
+      disabled={pending}
+      aria-label={`${branch.status === "active" ? "Desativar" : "Ativar"} ${branch.name}`}
+      title={`${branch.status === "active" ? "Desativar" : "Ativar"} ${branch.name}`}
+    >
+      <Power size={15} />
+    </Button>
+    <ActionFeedback state={state} />
+  </form>;
 }
 
 export function BranchesManager({
   branches,
-  branchesTrend,
-  membersTrend,
+  canManage = true,
 }: {
   branches: Branch[];
-  branchesTrend?: number[];
-  membersTrend?: number[];
+  canManage?: boolean;
 }) {
   const activeCount = branches.filter((branch) => branch.status === "active").length;
   const acceptingCount = branches.filter((branch) => branch.acceptingLeads).length;
   const memberCount = branches.reduce((total, branch) => total + branch.memberCount, 0);
-  const trend = branchesTrend ?? branches.map((_, index) => index + 1);
-  const memberSeries = membersTrend ?? branchesTrend ?? [];
+  const columns = useMemo<ColumnDef<Branch>[]>(() => [
+    { accessorKey: "name", header: ({ column }) => <DataTableColumnHeader column={column} title="Unidade" />, cell: ({ row }) => <span className="font-medium text-foreground">{row.original.name}</span> },
+    { accessorKey: "externalId", header: ({ column }) => <DataTableColumnHeader column={column} title="Identificador" />, cell: ({ row }) => <span className="font-mono text-muted-foreground">{row.original.externalId || "—"}</span> },
+    { accessorKey: "memberCount", header: ({ column }) => <DataTableColumnHeader column={column} title="Equipe" />, cell: ({ row }) => <span className="tabular-nums">{row.original.memberCount}</span> },
+    { accessorKey: "status", header: ({ column }) => <DataTableColumnHeader column={column} title="Status" />, cell: ({ row }) => <StatusBadge label={row.original.status === "active" ? "Ativa" : "Inativa"} tone={row.original.status === "active" ? "success" : "neutral"} dot /> },
+    { id: "accepting", header: "Recebe leads", cell: ({ row }) => canManage
+      ? <BranchAcceptingToggle branchId={row.original.id} enabled={row.original.acceptingLeads} />
+      : <span className="text-muted-foreground">{row.original.acceptingLeads ? "Sim" : "Pausado"}</span> },
+    { id: "autoDistribute", header: "Distribuição automática", cell: ({ row }) => canManage
+      ? <BranchAutoDistributeToggle branchId={row.original.id} enabled={row.original.autoDistribute} />
+      : <span className="text-muted-foreground">{row.original.autoDistribute ? "Sim" : "Não"}</span> },
+    { id: "hub", header: "Central", cell: ({ row }) => canManage
+      ? <BranchHubToggle branchId={row.original.id} enabled={row.original.isDistributionHub} />
+      : <span className="text-muted-foreground">{row.original.isDistributionHub ? "Sim" : "—"}</span> },
+    { accessorKey: "activeLeads", header: ({ column }) => <DataTableColumnHeader column={column} title="Em atendimento" />, cell: ({ row }) => <span className="tabular-nums">{row.original.activeLeads}</span> },
+    { id: "actions", header: () => <span className="sr-only">Ações</span>, enableHiding: false, cell: ({ row }) => <div className="flex items-center justify-end gap-2">
+      {canManage ? <><EditBranchSheet branch={row.original} /><BranchStatusAction branch={row.original} /></> : null}
+      <Button render={<Link href={`/unidades/${row.original.id}`} />} size="icon-sm" variant="ghost" aria-label={`Abrir ${row.original.name}`} title={`Abrir ${row.original.name}`}>
+        <ArrowSquareOut size={15} />
+      </Button>
+    </div> },
+  ], [canManage]);
   return (
     <>
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
         <StatCard
           label="Total de filiais"
           value={branches.length}
-          sublabel="últimos 6 meses"
-          sparklineData={trend}
-          sparklineColor="var(--chart-1)"
+          sublabel="no total"
           animated
         />
         <StatCard
           label="Filiais ativas"
           value={activeCount}
           sublabel="operacionais"
-          sparklineData={trend.map((value) => Math.round((value / Math.max(1, branches.length)) * activeCount))}
-          sparklineColor="var(--chart-3)"
           animated
           animationDelay={0.06}
         />
@@ -207,8 +205,6 @@ export function BranchesManager({
           label="Recebendo leads"
           value={acceptingCount}
           sublabel="com recebimento ativo"
-          sparklineData={trend.map((value) => Math.round((value / Math.max(1, branches.length)) * acceptingCount))}
-          sparklineColor="var(--chart-4)"
           animated
           animationDelay={0.12}
         />
@@ -216,27 +212,26 @@ export function BranchesManager({
           label="Equipe vinculada"
           value={memberCount}
           sublabel="membros nas unidades"
-          sparklineData={memberSeries}
-          sparklineColor="var(--chart-2)"
           animated
           animationDelay={0.18}
         />
       </div>
 
-      <Section
-        title="Filiais da corretora"
-        description="Edite dados, acompanhe a equipe vinculada e controle recebimento, distribuição automática e papel de cada filial."
-        actions={
-          <div className="flex flex-wrap items-center gap-2">
-            <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline">
-              Plantões
-            </Button>
-            <CreateBranchSheet />
-          </div>
-        }
-        variant="card"
-        className="p-0 overflow-hidden"
-      >
+      <Card variant="overview">
+        <SectionCardHeader
+          icon={<Buildings />}
+          title="Unidades"
+          description="Consulte a equipe e a operação de cada unidade. Use a busca para localizar uma filial pelo nome ou identificador."
+          actions={
+            <>
+              <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline">
+                Plantões
+              </Button>
+              {canManage && branches.length === 0 ? <CreateBranchSheet /> : null}
+            </>
+          }
+        />
+        <div className="p-4">
         {branches.length === 0 ? (
           <EmptyState
             type="EMPTY_DATA"
@@ -245,36 +240,13 @@ export function BranchesManager({
             className="border-none bg-transparent"
           />
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-5">Filial</TableHead>
-                  <TableHead>Identificador</TableHead>
-                  <TableHead>Equipe</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="min-w-[120px]">Receber leads</TableHead>
-                  <TableHead className="min-w-[140px]">Distrib. automática</TableHead>
-                  <TableHead className="min-w-[110px]">Papel da unidade</TableHead>
-                  <TableHead>Disponíveis</TableHead>
-                  <TableHead>Leads ativos</TableHead>
-                  <TableHead>Novos</TableHead>
-                  <TableHead className="pr-5 text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <motion.tbody
-                initial="hidden"
-                animate="visible"
-              >
-                {branches.map((branch, i) => (
-                  <BranchRow key={branch.id} branch={branch} index={i} />
-                ))}
-              </motion.tbody>
-            </Table>
-          </div>
+          <DataTable columns={columns} data={branches} searchPlaceholder="Buscar unidade..." showColumnToggle={false} pageSize={10}
+            headerSlot={canManage ? <CreateBranchSheet /> : null}
+            emptyState={<EmptyState type="EMPTY_DATA" title="Nenhuma unidade encontrada" description="Ajuste a busca ou cadastre uma nova unidade." />} />
         )}
+        </div>
         {branches.length > 0 ? <BranchDistributionLegend /> : null}
-      </Section>
+      </Card>
     </>
   );
 }

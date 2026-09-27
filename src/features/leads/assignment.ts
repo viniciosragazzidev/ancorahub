@@ -4,6 +4,7 @@ import { and, asc, count, eq, gt, inArray, isNotNull, isNull, lte, not, or } fro
 
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
+import { resolveEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 
 const activeStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -56,6 +57,7 @@ export async function checkBrokerScheduleAvailability(tenantId: string, brokerId
 export async function chooseAvailableBroker(tenantId: string, branchId: string | null, excludeBrokerId?: string | null, webhookCredentialId?: string | null) {
   if (!branchId) return null;
   const db = getDatabase();
+  const now = new Date();
 
   const [branch, brokers, availabilityOnboardingEnabled] = await Promise.all([
     db
@@ -102,7 +104,7 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
   const limit = tenantSettings?.maxActiveLeadsLimit ?? 10;
 
   // ── Plantão credential filter ──────────────────────────────────────
-  const local = getLocalDutyParts(new Date());
+  const local = getLocalDutyParts(now);
   const scheduleRows = availabilityOnboardingEnabled !== "false"
     ? await db
         .select({ brokerId: schema.brokerAvailabilityWindows.brokerId, dayOfWeek: schema.brokerAvailabilityWindows.dayOfWeek, startsAt: schema.brokerAvailabilityWindows.startsAt, endsAt: schema.brokerAvailabilityWindows.endsAt })
@@ -124,6 +126,8 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
       eq(schema.unitDutySchedules.status, "active"),
       lte(schema.unitDutySchedules.startsAt, local.time),
       gt(schema.unitDutySchedules.endsAt, local.time),
+      lte(schema.unitDutySchedules.validFrom, now),
+      or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
     ));
 
   if (activeSchedules.length) {
@@ -133,19 +137,23 @@ export async function chooseAvailableBroker(tenantId: string, branchId: string |
 
     if (!matchingScheduleIds.length) return null;
 
-    const rosterAssignments = await db.select({ brokerId: schema.dutyRosterAssignments.brokerId })
+    const rosterAssignments = await db.select({ id: schema.dutyRosterAssignments.id, scheduleId: schema.dutyRosterAssignments.scheduleId, validFrom: schema.dutyRosterAssignments.validFrom, validUntil: schema.dutyRosterAssignments.validUntil, brokerId: schema.dutyRosterAssignments.brokerId, branchId: schema.dutyRosterAssignments.branchId, dutyDate: schema.dutyRosterAssignments.dutyDate })
       .from(schema.dutyRosterAssignments)
       .where(and(
         eq(schema.dutyRosterAssignments.tenantId, tenantId),
         eq(schema.dutyRosterAssignments.branchId, branchId),
         eq(schema.dutyRosterAssignments.dayOfWeek, local.weekday),
         eq(schema.dutyRosterAssignments.status, "active"),
+        lte(schema.dutyRosterAssignments.validFrom, now),
+        or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now)),
         lte(schema.dutyRosterAssignments.startsAt, local.time),
         gt(schema.dutyRosterAssignments.endsAt, local.time),
         inArray(schema.dutyRosterAssignments.scheduleId, matchingScheduleIds),
       ));
 
-    const rosterIds = new Set(rosterAssignments.map((a) => a.brokerId));
+    const effectiveRosterAssignments = await resolveEffectiveDutyAssignments(tenantId, rosterAssignments, now);
+
+    const rosterIds = new Set(effectiveRosterAssignments.map((a) => a.brokerId));
     const filtered = eligibleBySchedule.filter((b) => rosterIds.has(b.id));
     if (!filtered.length) return null;
     const ids = filtered.map((b) => b.id);

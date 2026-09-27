@@ -114,7 +114,7 @@ export const guideSections: GuideSection[] = [
     description: "Organize quem atende, onde cada pessoa trabalha e como os leads entram na fila.",
     icon: "Buildings",
     audience: ["director", "manager"],
-    links: [{ label: "Abrir Equipe", href: "/equipe" }, { label: "Abrir Filiais", href: "/filiais" }],
+    links: [{ label: "Abrir Equipe", href: "/equipe" }, { label: "Abrir Unidades", href: "/equipe?visao=unidades" }],
     steps: [
       { title: "Cadastre a estrutura", description: "Crie filiais e convide Gestores ou Corretores com o papel adequado para cada pessoa." },
       { title: "Mantenha a disponibilidade atualizada", description: "O status disponível ou pausado ajuda a distribuir novos leads para quem realmente pode atender." },

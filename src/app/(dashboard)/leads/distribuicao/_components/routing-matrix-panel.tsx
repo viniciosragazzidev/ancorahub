@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -42,6 +42,7 @@ import {
   reorderRoutingRulesAction,
   type RoutingRuleInput,
 } from "@/features/lead-distribution/routing-actions";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import type { RoutingRule } from "@/features/lead-distribution/routing-engine";
 import { ALL_BRANCHES_TARGET_ID, ALL_ROUTING_SOURCES_ID, getRoutingQualificationStatusLabel, getRoutingSourceLabel, ROUTING_QUALIFICATION_STATUS_OPTIONS, ROUTING_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
 
@@ -290,28 +291,22 @@ export function RoutingMatrixPanel({
   };
 
   return (
-    <Card variant="overview" className="shadow-sm">
-      <CardHeader className="gap-1.5 border-b border-border/70 px-5 py-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <Sliders className="h-5 w-5 text-primary" />
-              Matriz Inteligente de Roteamento de Leads
-            </CardTitle>
-            <CardDescription className="mt-1 max-w-3xl leading-5">
-              Defina, em ordem de prioridade, para onde cada tipo de lead deve ser encaminhado.
-            </CardDescription>
-          </div>
-          {canEdit && (
-            <Button onClick={handleOpenCreateModal} size="sm" className="gap-2 shrink-0">
+    <Card variant="overview">
+      <SectionCardHeader
+        icon={<Sliders />}
+        title="Matriz inteligente de roteamento de leads"
+        description="Defina, em ordem de prioridade, para onde cada tipo de lead deve ser encaminhado."
+        actions={
+          canEdit ? (
+            <Button onClick={handleOpenCreateModal} size="sm" className="gap-2">
               <Plus className="h-4 w-4" />
-              Nova Regra de Roteamento
+              Nova regra de roteamento
             </Button>
-          )}
-        </div>
-      </CardHeader>
+          ) : null
+        }
+      />
 
-      <CardContent className="space-y-4 px-5 py-4">
+      <CardContent className="space-y-4 p-4">
         {rules.length === 0 ? (
           <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
             <Zap className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />

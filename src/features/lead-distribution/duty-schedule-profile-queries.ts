@@ -6,6 +6,8 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
+import { getSaoPauloDateKey } from "./dated-duty-roster";
+import { firstValidShift } from "./monthly-duty-plan";
 import { normalizeOfferPacing } from "./offer-pacing";
 import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
@@ -59,9 +61,11 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     throw new AuthorizationError("Este plantão está fora da sua unidade.");
   }
 
-  const roster = await db
+  // Weekly rows plus published monthly rows (duty_date); the occurrence below picks which apply.
+  const rosterRows = await db
     .select({
       id: schema.dutyRosterAssignments.id,
+      dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`,
       brokerId: schema.dutyRosterAssignments.brokerId,
       brokerName: schema.user.name,
       internalCode: schema.brokerProfiles.internalCode,
@@ -140,9 +144,24 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // bounded to exactly its own start/end. Without the upper bound, an
   // already-closed occurrence's page kept absorbing whatever arrived after
   // it ended — including a different day's own leads.
-  const occurrenceWindow = getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, now);
+  // The occurrence must be one the plantão really has: a one-day plantão still
+  // ahead ("PME 28/09" seen on 26/09) shows its own date, and an ended one is
+  // read as of its last valid moment — never last week's same weekday.
+  const firstShift = firstValidShift(schedule);
+  const referenceNow = schedule.validUntil && now >= schedule.validUntil ? new Date(schedule.validUntil.getTime() - 1) : now;
+  const occurrenceWindow: { since: Date; until: Date | null; upcomingStartsAt?: Date } = firstShift && firstShift.start > referenceNow
+    ? { since: firstShift.start, until: firstShift.end, upcomingStartsAt: firstShift.start }
+    : getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, referenceNow);
   const { since, until } = resolveDutyLeadWindowBounds(occurrenceWindow, now);
   const upcomingStartsAt = occurrenceWindow.upcomingStartsAt ?? null;
+
+  // Same rule as the runtime (DEC-123): on a date with a published escala, its
+  // brokers replace the weekly roster; any other date keeps the weekly roster.
+  const monthlyEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true";
+  const occurrenceDate = getSaoPauloDateKey(upcomingStartsAt ?? since);
+  const publishedHere = monthlyEnabled ? rosterRows.filter((row) => row.dutyDate === occurrenceDate) : [];
+  const roster = (publishedHere.length ? publishedHere : rosterRows.filter((row) => row.dutyDate === null))
+    .map(({ dutyDate: _dutyDate, ...row }) => row);
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.

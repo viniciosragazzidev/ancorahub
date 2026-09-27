@@ -36,6 +36,16 @@ describe("createUserInput", () => {
 describe("classifyExistingTeamIdentity", () => {
   const identity = { id: "user-1", active: true, status: "active" as const };
 
+  it("permite ativar somente a identidade pendente vinculada ao perfil convidado", () => {
+    const pending = { ...identity, active: false, status: "pending" as const };
+    expect(classifyExistingTeamIdentity(pending, { id: "membership-1" }, pending.id))
+      .toEqual({ kind: "reactivate", userId: pending.id });
+    expect(classifyExistingTeamIdentity(pending, { id: "membership-1" }, "other-user").kind)
+      .toBe("tenant-conflict");
+    expect(classifyExistingTeamIdentity(identity, { id: "membership-1" }, identity.id).kind)
+      .toBe("tenant-conflict");
+  });
+
   it("permite reutilizar uma identidade ativa sem vínculo no tenant", () => {
     expect(classifyExistingTeamIdentity(identity, null)).toEqual({ kind: "reuse", userId: "user-1" });
   });

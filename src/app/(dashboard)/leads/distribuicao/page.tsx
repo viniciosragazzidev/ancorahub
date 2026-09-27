@@ -1,29 +1,21 @@
-import { count, desc, eq, and, inArray, isNull, ne, or, sql } from "drizzle-orm";
+import { count, desc, eq, and, inArray, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-import { Workflow, ArrowUpRight, Inbox as InboxIcon } from "lucide-react";
+import { Activity, History, Workflow, Inbox as InboxIcon } from "lucide-react";
 import { DistributionMetrics } from "./_components/distribution-dashboard";
 import { DistributionInbox } from "./_components/distribution-inbox";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { getSystemSetting } from "@/features/system-settings/queries";
+import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
-import { AppPageHeader } from "@/components/app-page-header";
-import { DsDashboardCard } from "@/components/ui/ds-dashboard-card";
+import { DashboardHeader } from "@/components/dashboard-header";
 import { DsStatusBadge } from "@/components/ui/ds-status-badge";
-import { DsStatTile } from "@/components/ui/ds-stat-tile";
+import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/dashboard/metric-card";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { DsEmptyState } from "@/components/ui/ds-empty-state";
 import { DsOutlinedActionButton } from "@/components/ui/ds-outlined-action-button";
 import { dsButtonVariants } from "@/components/ui/ds-button-variants";
-import {
-  DsDialog,
-  DsDialogTrigger,
-  DsDialogPopup,
-  DsDialogHeader,
-  DsDialogTitle,
-  DsDialogDescription,
-} from "@/components/ui/ds-dialog";
-import { cn } from "@/lib/utils";
 import {
   getDistributionJobConfig,
   getLeadDistributionJobHealth,
@@ -36,7 +28,6 @@ import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { RoutingMatrixPanel } from "./_components/routing-matrix-panel";
 import { DddRoutingPanel } from "./_components/ddd-routing-panel";
-import { RoutingSimulatorPanel } from "./_components/routing-simulator-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
@@ -62,11 +53,9 @@ const activeStatuses = [
   "under_analysis",
 ] as const;
 
-// Static reference content — was previously a permanently-rendered card at
-// the top of the Filas tab, eating vertical space on every visit even for
-// directors who already know the flow. Moved behind a dialog trigger instead
-// (UX pass): the explainer is one click away rather than always in the way.
-function DistributionRulesDialog() {
+// Static reference content, opened from the Filas "⋯" menu (only the queue
+// table stays on screen).
+function DistributionStages() {
   const stages = [
     { title: "Entrada", text: "Manual, integração ou webhook cria uma intenção rastreável." },
     { title: "Unidade", text: "A regra da fila escolhe a unidade elegível com menor carga." },
@@ -75,48 +64,29 @@ function DistributionRulesDialog() {
     { title: "Oferta + SLA", text: "Recusa, expiração ou atraso avança para o próximo elegível." },
   ];
   return (
-    <DsDialog>
-      <DsDialogTrigger
-        className={cn(
-          dsButtonVariants({ dsVariant: "outlined-action" }),
-          "gap-ds-8 self-start",
-        )}
-      >
-        <Workflow size={14} aria-hidden="true" />
-        Como funciona a distribuição
-      </DsDialogTrigger>
-      <DsDialogPopup className="max-w-xl">
-        <DsDialogHeader>
-          <DsDialogTitle>Como a distribuição acontece</DsDialogTitle>
-          <DsDialogDescription>
-            Um único fluxo para qualquer origem: entrada, unidade, fila, corretor e redistribuição.
-          </DsDialogDescription>
-        </DsDialogHeader>
-        <ol className="grid gap-ds-12 sm:grid-cols-2">
-          {stages.map((stage, index) => (
-            <li key={stage.title} className="flex min-w-0 gap-ds-12 rounded-ds-cards border border-ds-ash bg-ds-paper-mist p-ds-12">
-              <span
-                className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-ds-powder-blue text-[10px] font-semibold text-ds-electric-blue"
-                aria-hidden="true"
-              >
-                {index + 1}
-              </span>
-              <div className="min-w-0">
-                <p className="font-ds-inter text-ds-body font-semibold text-ds-charcoal">{stage.title}</p>
-                <p className="mt-1 font-ds-inter text-ds-body text-ds-steel">{stage.text}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </DsDialogPopup>
-    </DsDialog>
+    <ol className="grid gap-2">
+      {stages.map((stage, index) => (
+        <li key={stage.title} className="flex min-w-0 gap-3 rounded-lg border border-border/70 p-3">
+          <span
+            className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary"
+            aria-hidden="true"
+          >
+            {index + 1}
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground">{stage.title}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{stage.text}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
 export default async function LeadDistributionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; status?: string }>;
+  searchParams: Promise<{ view?: string; status?: string; escalaMes?: string }>;
 }) {
   const params = await searchParams;
   const queueFilter: QueueFilter =
@@ -130,11 +100,14 @@ export default async function LeadDistributionPage({
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const view = resolveDistributionView(context.role, params.view);
+  const monthlyDutySchedulingEnabled = view === "plantao"
+    ? (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true"
+    : false;
 
   if (context.role === "manager" && !context.branchId) {
     return (
       <>
-        <AppPageHeader title="Distribuição" breadcrumb="Operação comercial" />
+        <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
         <main className="flex min-h-full flex-col items-center justify-center bg-ds-canvas-white p-ds-48">
           <DsEmptyState
             icon={<InboxIcon size={20} />}
@@ -173,7 +146,7 @@ export default async function LeadDistributionPage({
   if (!branchIds.length) {
     return (
       <>
-        <AppPageHeader title="Distribuição" breadcrumb="Operação comercial" />
+        <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
         <main className="flex min-h-full flex-col items-center justify-center bg-ds-canvas-white p-ds-48">
           <DsEmptyState
             icon={<InboxIcon size={20} />}
@@ -181,7 +154,7 @@ export default async function LeadDistributionPage({
             description="Crie filiais para poder configurar as regras de distribuição de leads."
             bordered={false}
             action={
-              <Link href="/filiais" className={dsButtonVariants({ dsVariant: "outlined-action" })}>
+              <Link href="/equipe?visao=unidades" className={dsButtonVariants({ dsVariant: "outlined-action" })}>
                 Ir para Filiais
               </Link>
             }
@@ -195,7 +168,6 @@ export default async function LeadDistributionPage({
   const [
     brokers,
     unassignedLeads,
-    queueCountsByStatus,
     unassignedArchiveCount,
     activeBrokerLeads,
     brokerStatsByBranch,
@@ -270,31 +242,6 @@ export default async function LeadDistributionPage({
         ),
       )
       .orderBy(schema.leads.createdAt),
-    db
-      .select({
-        distributionStatus: schema.leads.distributionStatus,
-        oldestAt: sql<string | null>`min(${schema.leads.createdAt})`,
-        count: count(schema.leads.id),
-      })
-      .from(schema.leads)
-      .where(
-        and(
-          eq(schema.leads.tenantId, context.tenantId),
-          isNull(schema.leads.deletedAt),
-          isNull(schema.leads.archivedAt),
-          isNull(schema.leads.corretorId),
-          inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue", "manual_hold"]),
-          ne(schema.leads.status, "lost"),
-          or(
-            isNull(schema.leads.qualificationStatus),
-            ne(schema.leads.qualificationStatus, "disqualified"),
-          ),
-          context.role === "manager" && context.branchId
-            ? eq(schema.leads.branchId, context.branchId)
-            : undefined,
-        ),
-      )
-      .groupBy(schema.leads.distributionStatus),
     db
       .select({ count: count(schema.leads.id) })
       .from(schema.leads)
@@ -475,8 +422,13 @@ export default async function LeadDistributionPage({
         adId: schema.metaAds.adId,
         name: schema.metaAds.name,
         status: schema.metaAds.status,
+        campaignId: schema.metaAdSets.campaignId,
       })
       .from(schema.metaAds)
+      .leftJoin(
+        schema.metaAdSets,
+        and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)),
+      )
       .where(eq(schema.metaAds.tenantId, context.tenantId))
       .orderBy(schema.metaAds.name),
     db
@@ -614,50 +566,7 @@ export default async function LeadDistributionPage({
   const totalAvailable = [...availableByBranch.values()].reduce((a, b) => a + b, 0);
   const totalNewLeads = [...newByBranch.values()].reduce((a, b) => a + b, 0);
 
-  const queueCounts = new Map(
-    queueCountsByStatus.map((row) => [
-      row.distributionStatus,
-      { count: Number(row.count), oldestAt: row.oldestAt ? new Date(row.oldestAt) : null },
-    ]),
-  );
   const totalUnassignedForArchive = Number(unassignedArchiveCount[0]?.count ?? 0);
-
-  const queueCards = [
-    ...(context.role === "director"
-      ? [
-          {
-            status: "unassigned" as const,
-            title: "Sem unidade",
-            description: "Aguardando encaminhamento do Diretor.",
-          },
-        ]
-      : []),
-    {
-      status: "queued" as const,
-      title: "Sem corretor",
-      description: "Aguardando atribuição ou distribuição automática.",
-    },
-    {
-      status: "returned_to_queue" as const,
-      title: "Devolvidos à fila",
-      description: "Precisam de revisão antes de uma nova atribuição.",
-    },
-    {
-      status: "manual_hold" as const,
-      title: "Aguardando ação manual",
-      description: "Atribuição removida; não volta à distribuição automática.",
-    },
-  ].map((queue) => {
-    const aggregate = queueCounts.get(queue.status);
-    const oldest = aggregate?.oldestAt ?? null;
-    return {
-      ...queue,
-      count: aggregate?.count ?? 0,
-      oldestLabel: !oldest
-        ? "Fila em dia"
-        : `Item mais antigo desde ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(oldest)}`,
-    };
-  });
 
   const queueWaiting = new Map(queueLeadCounts.map((item) => [item.queueId, Number(item.waiting)]));
   const queuePoliciesMap = new Map(
@@ -681,27 +590,20 @@ export default async function LeadDistributionPage({
 
   return (
     <>
-      <AppPageHeader
-        title="Central de distribuição"
-        breadcrumb="Operação comercial / Distribuição"
-        description="Configure entradas, filas e plantões; acompanhe a operação no mesmo espaço."
-        context={
-          <DsStatusBadge
-            status={jobHealth.available && jobHealth.failed === 0 ? "success" : "warning"}
-            label={jobHealth.available && jobHealth.failed === 0 ? "Motor operacional" : "Atenção no motor"}
-          />
-        }
-        actions={
-          <div className="flex items-center gap-ds-16 font-ds-inter text-ds-body text-ds-steel">
-            <span className="flex items-center gap-ds-8">
+      <DashboardHeader
+        breadcrumb="Operação comercial"
+        title="Distribuição"
+        rightSlot={
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-ds-vivid-green" aria-hidden="true" />
               <span>
-                <strong className="font-semibold text-ds-charcoal">{totalAvailable}</strong> disponíveis
+                <strong className="font-semibold text-foreground">{totalAvailable}</strong> disponíveis
               </span>
             </span>
-            <span className="h-4 w-px bg-ds-ash" aria-hidden="true" />
+            <span className="h-3.5 w-px bg-border" aria-hidden="true" />
             <span>
-              <strong className="font-semibold text-ds-charcoal">{totalNewLeads}</strong> aguardando
+              <strong className="font-semibold text-foreground">{totalNewLeads}</strong> aguardando
             </span>
           </div>
         }
@@ -729,11 +631,6 @@ export default async function LeadDistributionPage({
                   brokers={brokers.map((b) => ({ id: b.id, name: b.name }))}
                   canEdit={context.role === "director" || context.role === "manager"}
                 />
-                <RoutingSimulatorPanel
-                  queues={queues.map((q) => ({ id: q.id, name: q.name }))}
-                  branches={branches.map((b) => ({ id: b.id, name: b.name }))}
-                  brokers={brokers.map((b) => ({ id: b.id, name: b.name }))}
-                />
               </div>
             }
             resumoDiaContent={
@@ -745,8 +642,6 @@ export default async function LeadDistributionPage({
             }
             filasContent={
               context.role === "director" ? (
-                <>
-                  <DistributionRulesDialog />
                   <QueueControlCenter
                     queues={queuesForControl}
                     branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
@@ -765,20 +660,41 @@ export default async function LeadDistributionPage({
                     }))}
                     adRoutes={metaAdRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
                     canEdit
+                    settingsPanels={[
+                      {
+                        id: "sla",
+                        label: "SLA de aceite e atendimento",
+                        description: "Quanto tempo o corretor tem para aceitar e iniciar o atendimento.",
+                        content: (
+                          <BrokerAcceptanceSlaPanel
+                            initialMinutes={Number(tenantSlaSettings?.slaFirstContactMinutes) || 15}
+                            initialAutoRedistribute={
+                              tenantSlaSettings?.autoRedistributeOnFeedbackTimeout ?? true
+                            }
+                            canEdit={context.role === "director" || context.role === "manager"}
+                          />
+                        ),
+                      },
+                      {
+                        id: "policy",
+                        label: "Distribuição inteligente",
+                        description: "Como o ranking escolhe o corretor depois do plantão.",
+                        content: (
+                          <DistributionPolicyPanel
+                            canEdit={context.role === "director"}
+                            brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+                            policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
+                          />
+                        ),
+                      },
+                      {
+                        id: "how",
+                        label: "Como funciona a distribuição",
+                        description: "Um único fluxo para qualquer origem: entrada, unidade, fila, corretor e redistribuição.",
+                        content: <DistributionStages />,
+                      },
+                    ]}
                   />
-                  <BrokerAcceptanceSlaPanel
-                    initialMinutes={Number(tenantSlaSettings?.slaFirstContactMinutes) || 15}
-                    initialAutoRedistribute={
-                      tenantSlaSettings?.autoRedistributeOnFeedbackTimeout ?? true
-                    }
-                    canEdit={context.role === "director" || context.role === "manager"}
-                  />
-                  <DistributionPolicyPanel
-                    canEdit={context.role === "director"}
-                    brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
-                    policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
-                  />
-                </>
               ) : null
             }
             operarContent={
@@ -793,53 +709,6 @@ export default async function LeadDistributionPage({
                     totalNewLeads,
                   }}
                 />
-                <section aria-labelledby="filas-de-acao" className="flex flex-col gap-ds-12">
-                  <div>
-                    <h2 id="filas-de-acao" className="font-ds-inter text-ds-body-lg font-semibold text-ds-charcoal">
-                      Filas de ação rápida
-                    </h2>
-                    <p className="mt-ds-4 font-ds-inter text-ds-body text-ds-fog">
-                      Priorize a fila mais antiga sob sua responsabilidade.
-                    </p>
-                  </div>
-                  {/* Was 2-3 full Cards, one per queue, each repeating the same
-                      header/border/padding chrome. Collapsed into a single
-                      card with a row per queue — same information, far less
-                      vertical space and easier to scan at a glance. */}
-                  <DsDashboardCard className="divide-y divide-ds-ash p-0">
-                    {queueCards.map((queue) => (
-                      <div
-                        key={queue.status}
-                        className="flex flex-col gap-ds-12 px-ds-16 py-ds-16 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex items-center gap-ds-12 min-w-0">
-                          <DsStatusBadge
-                            status={queue.count > 0 ? "warning" : "success"}
-                            label={queue.count}
-                          />
-                          <div className="min-w-0">
-                            <p className="font-ds-inter text-ds-body font-semibold text-ds-charcoal">
-                              {queue.title}
-                            </p>
-                            <p className="truncate font-ds-inter text-ds-caption text-ds-fog">
-                              {queue.description} · {queue.oldestLabel}
-                            </p>
-                          </div>
-                        </div>
-                        <Link
-                          href={`/leads/distribuicao?view=operar&status=${queue.status}#inbox-distribuicao`}
-                          className={cn(
-                            dsButtonVariants({ dsVariant: "outlined-action" }),
-                            "shrink-0 self-start gap-ds-4 !py-ds-4 !px-ds-12 text-ds-caption sm:self-auto",
-                          )}
-                        >
-                          Abrir fila
-                          <ArrowUpRight size={12} aria-hidden="true" />
-                        </Link>
-                      </div>
-                    ))}
-                  </DsDashboardCard>
-                </section>
                 <div id="inbox-distribuicao">
                   <DistributionInbox
                     key={queueFilter}
@@ -866,6 +735,9 @@ export default async function LeadDistributionPage({
             plantaoContent={
               <DutyOperationsWorkspace
                 snapshot={dutyRoster}
+                monthlySchedulingEnabled={monthlyDutySchedulingEnabled}
+                canPlanMonthlySchedule={context.role === "director"}
+                initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}
                 queues={queuesForControl
                   .filter((queue) => queue.status === "active")
                   .map((queue) => ({ id: queue.id, name: queue.name }))}
@@ -873,22 +745,19 @@ export default async function LeadDistributionPage({
             }
             saudeHistoricoContent={
               <div className="grid gap-ds-24 xl:grid-cols-[1.15fr_0.85fr]">
-                <DsDashboardCard className="!p-0">
-                  <div className="border-b border-ds-ash px-ds-16 py-ds-16">
-                    <p className="font-ds-inter text-ds-body-lg font-semibold text-ds-charcoal">
-                      Histórico auditável de decisões
-                    </p>
-                    <p className="mt-ds-4 font-ds-inter text-ds-body text-ds-steel">
-                      Atribuições, redistribuições e intervenções deste escopo.
-                    </p>
-                  </div>
+                <Card variant="overview">
+                  <SectionCardHeader
+                    icon={<History />}
+                    title="Histórico auditável de decisões"
+                    description="Atribuições, redistribuições e intervenções deste escopo."
+                  />
                   <div className="max-h-[500px] overflow-y-auto">
                     {recentEvents.length ? (
-                      <div className="divide-y divide-ds-ash">
+                      <div className="divide-y divide-border/50">
                         {recentEvents.map((event) => (
                           <div
                             key={event.id}
-                            className="flex flex-col gap-ds-4 px-ds-16 py-ds-16 sm:flex-row sm:items-center sm:justify-between"
+                            className="flex flex-col gap-ds-4 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
                           >
                             <div className="min-w-0">
                               <p className="font-ds-inter text-ds-body font-medium text-ds-charcoal">
@@ -921,51 +790,46 @@ export default async function LeadDistributionPage({
                       />
                     )}
                   </div>
-                </DsDashboardCard>
+                </Card>
 
                 <div className="flex flex-col gap-ds-24">
-                  <DsDashboardCard>
-                    <div className="flex items-start justify-between gap-ds-16">
-                      <div>
-                        <p className="font-ds-inter text-ds-body-lg font-semibold text-ds-charcoal">
-                          Automação da fila
-                        </p>
-                        <p className="mt-ds-4 font-ds-inter text-ds-body text-ds-steel">
-                          Estado atual do processamento automático.
-                        </p>
-                      </div>
-                      <DsStatusBadge
-                        status={
-                          !jobHealth.available
-                            ? "secondary"
-                            : !jobConfig.enabled
-                              ? "secondary"
-                              : jobHealth.failed > 0
-                                ? "warning"
-                                : "success"
-                        }
-                        label={
-                          !jobHealth.available
-                            ? "Aguardando migration"
-                            : !jobConfig.enabled
-                              ? "Pausada globalmente"
-                              : jobHealth.failed > 0
-                                ? "Requer atenção"
-                                : "Ativa"
-                        }
-                      />
-                    </div>
-                    <div className="mt-ds-16 grid gap-ds-16 border-t border-ds-ash pt-ds-16 sm:grid-cols-2">
-                      <DsStatTile label="Aguardando" value={jobHealth.pending + jobHealth.retrying} />
-                      <DsStatTile label="Em processamento" value={jobHealth.processing} />
-                      <DsStatTile
+                  <Card variant="overview">
+                    <SectionCardHeader
+                      icon={<Workflow />}
+                      title="Automação da fila"
+                      description="Estado atual do processamento automático."
+                      actions={
+                            <DsStatusBadge
+                              status={
+                                !jobHealth.available
+                                  ? "secondary"
+                                  : !jobConfig.enabled
+                                    ? "secondary"
+                                    : jobHealth.failed > 0
+                                      ? "warning"
+                                      : "success"
+                              }
+                              label={
+                                !jobHealth.available
+                                  ? "Aguardando migration"
+                                  : !jobConfig.enabled
+                                    ? "Pausada globalmente"
+                                    : jobHealth.failed > 0
+                                      ? "Requer atenção"
+                                      : "Ativa"
+                              }
+                            />
+                      }
+                    />
+                    <div className="grid grid-cols-2 gap-2 p-4 sm:gap-3">
+                      <StatCard label="Aguardando" value={jobHealth.pending + jobHealth.retrying} sublabel="na fila automática" />
+                      <StatCard label="Em processamento" value={jobHealth.processing} sublabel="agora" />
+                      <StatCard
+                        className="col-span-2"
                         label="Exceções"
                         value={jobHealth.failed}
-                        tone={jobHealth.failed > 0 ? "destructive" : "default"}
-                      />
-                      <DsStatTile
-                        label="Próximo passo"
-                        hint={
+                        valueClassName={jobHealth.failed > 0 ? "text-destructive" : undefined}
+                        sublabel={
                           jobHealth.failed > 0
                             ? "Revisar exceções com o Diretor"
                             : jobHealth.pending + jobHealth.retrying > 0
@@ -974,35 +838,33 @@ export default async function LeadDistributionPage({
                         }
                       />
                     </div>
-                  </DsDashboardCard>
+                  </Card>
 
-                  <DsDashboardCard>
-                    <div className="flex items-start justify-between gap-ds-16">
-                      <div>
-                        <p className="font-ds-inter text-ds-body-lg font-semibold text-ds-charcoal">
-                          Efeitos pendentes do intake
-                        </p>
-                        <p className="mt-ds-4 font-ds-inter text-ds-body text-ds-steel">
-                          Distribuição e notificações após a entrada do lead.
-                        </p>
-                      </div>
-                      <DsStatusBadge
-                        status={effectHealth.failed > 0 ? "warning" : "success"}
-                        label={effectHealth.failed > 0 ? "Requer revisão" : "Íntegro"}
-                      />
-                    </div>
-                    <div className="mt-ds-16 grid gap-ds-16 border-t border-ds-ash pt-ds-16 sm:grid-cols-2">
-                      <DsStatTile label="Aguardando" value={effectHealth.pending + effectHealth.retrying} />
-                      <DsStatTile label="Processando" value={effectHealth.processing} />
-                      <DsStatTile
+                  <Card variant="overview">
+                    <SectionCardHeader
+                      icon={<Activity />}
+                      title="Efeitos pendentes do intake"
+                      description="Distribuição e notificações após a entrada do lead."
+                      actions={
+                            <DsStatusBadge
+                              status={effectHealth.failed > 0 ? "warning" : "success"}
+                              label={effectHealth.failed > 0 ? "Requer revisão" : "Íntegro"}
+                            />
+                      }
+                    />
+                    <div className="grid grid-cols-2 gap-2 p-4 sm:gap-3">
+                      <StatCard label="Aguardando" value={effectHealth.pending + effectHealth.retrying} sublabel="na fila de efeitos" />
+                      <StatCard label="Processando" value={effectHealth.processing} sublabel="agora" />
+                      <StatCard
                         label="Exceções"
                         value={effectHealth.failed}
-                        tone={effectHealth.failed > 0 ? "destructive" : "default"}
+                        valueClassName={effectHealth.failed > 0 ? "text-destructive" : undefined}
+                        sublabel="aguardando revisão"
                       />
-                      <DsStatTile label="Concluídos" value={effectHealth.completed} tone="success" />
+                      <StatCard label="Concluídos" value={effectHealth.completed} sublabel="processados" />
                     </div>
                     {failedEffects.length > 0 ? (
-                      <div className="mt-ds-16 flex flex-col gap-ds-8 border-t border-ds-ash pt-ds-16">
+                      <div className="flex flex-col gap-ds-8 border-t border-border/50 p-4">
                         {failedEffects.map((effect) => (
                           <div
                             key={effect.id}
@@ -1027,11 +889,11 @@ export default async function LeadDistributionPage({
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-ds-16 border-t border-ds-ash pt-ds-16 font-ds-inter text-ds-caption text-ds-fog">
+                      <p className="border-t border-border/50 p-4 font-ds-inter text-ds-caption text-ds-fog">
                         Nenhuma exceção pendente.
                       </p>
                     )}
-                  </DsDashboardCard>
+                  </Card>
                 </div>
               </div>
             }

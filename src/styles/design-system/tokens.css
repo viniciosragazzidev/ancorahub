@@ -31,6 +31,9 @@
   --color-ds-tangerine: #ea580c;
   --color-ds-lavender: #7c3aed;
   --color-ds-primary-action-fill: #000000;
+  /* Text on the primary action fill, and its hover fill (dark mode: indigo) */
+  --color-ds-on-primary-action: #ffffff;
+  --color-ds-primary-action-hover: #171717;
   /* Fase 1 extension (docs/design-system.md) — semantic status pairs */
   --color-ds-powder-blue: #dbeaff;
   --color-ds-amber-wash: #fef3c7;
@@ -128,47 +131,44 @@
  * them here is enough for the whole Ds catalog to support dark — no
  * component file needs to change.
  *
- * Neutral ramp: the light ramp (canvas-white → midnight-ink, 12 steps) is
- * mirrored end-to-end using the SAME 12 hex values, just swapping which
- * token name maps to which step — no new neutral color invented.
- *
- * Chromatic: Electric Blue brightens for legibility on dark; Deep Sapphire
- * (the single CTA color) is promoted to light mode's Electric Blue value so
- * it stays distinctly more saturated than the accent, same as in light mode.
- * Primary Action Fill flips black→white, which — combined with the ramp
- * mirror — makes the Filled Dark CTA automatically render as a light-fill/
- * dark-text button in dark mode via the same token, no variant needed.
- * Status tint/ink pairs (soft-mint, amber, rose, powder-blue) are genuinely
- * new values here — a light tint doesn't work as a dark-mode wash, so these
- * follow the standard dark-mode convention (near-950 wash + 400-ish ink).
+ * Palette (2026-09-26): the reference admin panel's dark theme
+ * (jubayer910/Admin-panel, MIT). Neutral greys from a #151515 ground
+ * (#1C1C1C cards, #252525 fills, #2A2A2A borders), an indigo action
+ * (#3B1FE5, hover #4B33F0, white text via --color-ds-on-primary-action) and
+ * ink-over-wash status pairs. Electric Blue becomes the reference's pale blue
+ * ink #C0D4F2 on the #1E2A3F wash. Full table in docs/design-system.md.
  * --------------------------------------------------------------------------- */
 .dark {
-  --color-ds-canvas-white: #0a0a0a;
-  --color-ds-paper-mist: #171717;
-  --color-ds-ash: #262626;
-  --color-ds-smoke: #404040;
-  --color-ds-pebble: #525252;
-  --color-ds-silver: #737373;
-  --color-ds-fog: #a3a3a3;
-  --color-ds-steel: #c8c8c8;
+  /* Reference dark palette (jubayer910/Admin-panel): neutral greys from the
+     #151515 ground up, an indigo action and ink-over-wash status pairs. */
+  --color-ds-canvas-white: #1c1c1c;
+  --color-ds-paper-mist: #252525;
+  --color-ds-ash: #2a2a2a;
+  --color-ds-smoke: #353535;
+  --color-ds-pebble: #3a3a3a;
+  --color-ds-silver: #6b6b6b;
+  --color-ds-fog: #8a8a8a;
+  --color-ds-steel: #c7c7c7;
   --color-ds-slate: #d4d4d4;
-  --color-ds-graphite: #e5e5e5;
-  --color-ds-charcoal: #f5f5f5;
+  --color-ds-graphite: #e6e6e6;
+  --color-ds-charcoal: #f3f3f3;
   --color-ds-midnight-ink: #ffffff;
 
-  --color-ds-electric-blue: #3b82f6;
-  --color-ds-deep-sapphire: #2563eb;
-  --color-ds-primary-action-fill: #ffffff;
+  --color-ds-electric-blue: #c0d4f2;
+  --color-ds-deep-sapphire: #3b1fe5;
+  --color-ds-primary-action-fill: #3b1fe5;
+  --color-ds-on-primary-action: #ffffff;
+  --color-ds-primary-action-hover: #4b33f0;
 
-  --color-ds-soft-mint: #052e1a;
-  --color-ds-vivid-green: #4ade80;
-  --color-ds-forest-ink: #4ade80;
-  --color-ds-tangerine: #fb923c;
-  --color-ds-lavender: #a78bfa;
+  --color-ds-soft-mint: #1b3b2a;
+  --color-ds-vivid-green: #7fd1a0;
+  --color-ds-forest-ink: #7fd1a0;
+  --color-ds-tangerine: #dfb099;
+  --color-ds-lavender: #b6aede;
 
-  --color-ds-powder-blue: #16243d;
-  --color-ds-amber-wash: #3a2408;
-  --color-ds-amber-ink: #fbbf24;
-  --color-ds-rose-wash: #3d0e0e;
-  --color-ds-rose-ink: #f87171;
+  --color-ds-powder-blue: #1e2a3f;
+  --color-ds-amber-wash: #41271d;
+  --color-ds-amber-ink: #e8b98f;
+  --color-ds-rose-wash: #3e1c1c;
+  --color-ds-rose-ink: #f4a3a9;
 }

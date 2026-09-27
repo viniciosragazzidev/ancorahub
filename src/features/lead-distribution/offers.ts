@@ -16,6 +16,7 @@ import { evaluateBrokerOfferPacing, isOfferPacingEnabled, type OfferPacingConfig
 import { normalizePhone } from "@/shared/utils/phone";
 import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
 import { formatLeadTypeLabel, readSourcePlanType } from "./lead-type-label";
+import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
 
 /**
  * Tenants without an official (Meta) WhatsApp channel cannot deliver offers by
@@ -99,6 +100,7 @@ export async function createLeadOffersForBrokers(input: {
   /** Automatic offers only: interval / max-pending rules per broker (see offer-pacing.ts). */
   pacing?: OfferPacingConfig | null;
   assignmentSource?: "automatic_offer" | "manual_offer";
+  dutyScheduleIds?: string[];
 }) {
   const db = getDatabase();
   // Same bounds as the "SLA de Aceite" setting (1–1440 min).
@@ -238,6 +240,35 @@ export async function createLeadOffersForBrokers(input: {
         createdAt: now,
         updatedAt: now,
       });
+      const eligibleDutyRows = input.dutyScheduleIds?.length && input.assignmentSource !== "manual_offer"
+        ? await tx.select({
+          scheduleId: schema.dutyRosterAssignments.scheduleId,
+          dutyDate: schema.dutyRosterAssignments.dutyDate,
+          validFrom: schema.dutyRosterAssignments.validFrom,
+          validUntil: schema.dutyRosterAssignments.validUntil,
+          dayOfWeek: schema.unitDutySchedules.dayOfWeek,
+          startsAt: schema.unitDutySchedules.startsAt,
+          endsAt: schema.unitDutySchedules.endsAt,
+          timezone: schema.unitDutySchedules.timezone,
+        }).from(schema.dutyRosterAssignments)
+          .innerJoin(schema.unitDutySchedules, and(eq(schema.dutyRosterAssignments.scheduleId, schema.unitDutySchedules.id), eq(schema.unitDutySchedules.tenantId, input.tenantId)))
+          .where(and(
+            eq(schema.dutyRosterAssignments.tenantId, input.tenantId),
+            eq(schema.dutyRosterAssignments.brokerId, broker.id),
+            eq(schema.dutyRosterAssignments.status, "active"),
+            isNull(schema.dutyRosterAssignments.pausedAt),
+            inArray(schema.dutyRosterAssignments.scheduleId, input.dutyScheduleIds),
+            lte(schema.dutyRosterAssignments.validFrom, now),
+            or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now)),
+          ))
+        : [];
+      const matchingOccurrences = eligibleDutyRows.flatMap((row) => {
+        const occurrence = getRelevantDutyWindow(row, now, 0);
+        return occurrence && isDutyWindowActive(occurrence, now) && (row.dutyDate === null || row.dutyDate === occurrence.dutyDate)
+          ? [{ scheduleId: row.scheduleId, dutyDate: occurrence.dutyDate }] : [];
+      });
+      const distinctOccurrences = [...new Map(matchingOccurrences.map((occurrence) => [`${occurrence.scheduleId}:${occurrence.dutyDate}`, occurrence])).values()];
+      const exactOccurrence = distinctOccurrences.length === 1 ? distinctOccurrences[0] : null;
       if (destinationPhone) {
         const assignmentEventId = randomUUID();
         // The offered broker becomes the provisional owner immediately so the
@@ -267,13 +298,14 @@ export async function createLeadOffersForBrokers(input: {
           previousOwnerId: input.expectedCurrentBrokerId ?? null,
           newOwnerId: broker.id,
           action: "offer_sent",
+          toQueueId: input.queueId ?? null,
           source: input.assignmentSource === "manual_offer" ? "manual_manager" : input.expectedCurrentBrokerId ? "redistribution" : "automatic",
           strategy: input.assignmentSource === "manual_offer" ? "manual" : "automatic",
           reason: input.expectedCurrentBrokerId
             ? "Responsabilidade provisória transferida ao próximo corretor elegível."
             : "Responsabilidade provisória atribuída ao primeiro corretor elegível.",
           actorId: input.requestedBy ?? broker.id,
-          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true },
+          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true, offerId, ...(exactOccurrence ?? {}) },
           createdAt: now,
         });
         if (input.requestedBy) {

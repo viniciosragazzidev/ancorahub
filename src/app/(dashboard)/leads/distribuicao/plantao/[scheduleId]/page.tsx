@@ -3,13 +3,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircle2, Clock3, Download } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
-import { ArrowLeft, CalendarCheck, UserList, Users } from "@/components/huge-icons";
+import { ArrowLeft, UserList, Users } from "@/components/huge-icons";
 import { LeadStatusBadge } from "@/components/status-badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDutyScheduleProfile } from "@/features/lead-distribution/duty-schedule-profile-queries";
+import { getDutyOccurrenceHistory } from "@/features/lead-distribution/duty-occurrence-history";
+import { firstValidShift, isSingleOccurrencePlantao } from "@/features/lead-distribution/monthly-duty-plan";
+import { getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows } from "@/features/lead-distribution/duty-presence-domain";
+import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui";
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
@@ -20,24 +25,46 @@ import { BrokerPresenceInviteButton } from "../_components/broker-presence-invit
 import { BrokerPauseButton } from "../_components/broker-pause-button";
 import { groupDutyLeadsByShift, sortByAssignmentTime } from "@/features/lead-distribution/duty-leads-shift-groups";
 import { DragScrollTable } from "@/components/ui/drag-scroll-table";
+import { StatCard } from "@/components/dashboard/metric-card";
+import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 
 export const dynamic = "force-dynamic";
 
 const DAYS_FULL = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"] as const;
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Sao_Paulo" });
 const timeOnly = new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone: "America/Sao_Paulo" });
+const dayMonth = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
+const historyDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: "UTC" });
+function historyDateLabel(value: string) { return historyDate.format(new Date(`${value}T12:00:00Z`)); }
 
-function StatusBadge({ status }: { status: string }) {
-  if (status === "active") return <Badge variant="success">Ativo</Badge>;
-  if (status === "archived") return <Badge variant="outline">Arquivado</Badge>;
-  return <Badge variant="secondary">Inativo</Badge>;
+function DutyProfileHeader({
+  name, state, stateTone, description, details,
+}: {
+  name: string;
+  state: string;
+  stateTone: "success" | "info" | "secondary" | "outline";
+  description: string;
+  details: string[];
+}) {
+  return <section aria-label="Contexto do plantão" className="rounded-xl border border-border/70 bg-card p-4 sm:p-5">
+    <div className="flex flex-wrap items-center gap-2">
+      <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">{name}</h1>
+      <Badge variant={stateTone}>{state}</Badge>
+    </div>
+    <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
+    <div className="mt-4 flex flex-wrap gap-2" aria-label="Informações do plantão">
+      {details.map((detail) => <Badge key={detail} variant="outline">{detail}</Badge>)}
+    </div>
+  </section>;
 }
 
-export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string }> }) {
+export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { scheduleId } = await params;
-  const { situacao } = await searchParams;
+  const { situacao, data } = await searchParams;
 
   let profile: Awaited<ReturnType<typeof getDutyScheduleProfile>>;
   try {
@@ -47,6 +74,78 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   }
 
   const { schedule, roster, linkedQueues, leads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled } = profile;
+  const historyEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY)) === "true";
+  // A plantão lasts one day: there is no "other occurrence" to browse.
+  const singleDay = isSingleOccurrencePlantao(schedule);
+  const singleDayDate = singleDay ? firstValidShift(schedule)?.start ?? null : null;
+  const now = new Date();
+  const completedWindows = historyEnabled ? listCompletedDutyWindows(schedule, now) : [];
+  const liveWindow = getRelevantDutyWindow(schedule, now, 0);
+  const liveOrUpcoming = schedule.status === "active" && (isDutyWindowActive(liveWindow, now) || Boolean(leadsUpcomingStartsAt));
+  const requestedWindow = historyEnabled && data ? getDutyWindowOnDate(schedule, data) : null;
+  const requestedCompleted = requestedWindow && requestedWindow.endsAt <= now && requestedWindow.startsAt >= schedule.validFrom && (!schedule.validUntil || requestedWindow.startsAt < schedule.validUntil)
+    ? requestedWindow : null;
+  const invalidHistoryDate = Boolean(historyEnabled && data && !requestedCompleted);
+  const historicalWindow = requestedCompleted ?? (historyEnabled && !liveOrUpcoming ? completedWindows[0] ?? null : null);
+  const occurrenceHistory = historicalWindow
+    ? await getDutyOccurrenceHistory(context, schedule.id, linkedQueues.map((queue) => queue.id), historicalWindow)
+    : null;
+  if (historicalWindow && occurrenceHistory) {
+    return <>
+      <DashboardHeader breadcrumb="Distribuição · Plantões" title={schedule.name} rightSlot={<Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>} />
+      <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
+        <DutyProfileHeader
+          name={schedule.name}
+          state="Terminado"
+          stateTone="secondary"
+          description="Este turno foi encerrado. Consulte a distribuição, as ofertas e os corretores escalados sem alterar o plantão."
+          details={[
+            historyDateLabel(historicalWindow.dutyDate),
+            `${timeOnly.format(historicalWindow.startsAt)}–${timeOnly.format(historicalWindow.endsAt)}`,
+            schedule.branchName ?? "Todas as unidades",
+            schedule.queueName,
+          ]}
+        />
+        {invalidHistoryDate ? <p role="alert" className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground">A data informada não corresponde a um plantão encerrado desta regra. Exibindo o último turno terminado.</p> : null}
+        <section aria-label="Resumo da ocorrência encerrada" className="grid gap-2 sm:grid-cols-3">
+          <StatCard label="Leads atribuídos" value={occurrenceHistory.distributions.length} sublabel="Aceites e atribuições registradas" />
+          <StatCard label="Ofertas enviadas" value={occurrenceHistory.offers.total} sublabel={`${occurrenceHistory.offers.accepted} aceitas · ${occurrenceHistory.offers.declined} recusadas · ${occurrenceHistory.offers.expired} expiradas`} />
+          <StatCard label="Presenças confirmadas" value={`${occurrenceHistory.confirmations.confirmed}/${occurrenceHistory.confirmations.total}`} sublabel={occurrenceHistory.confirmations.total ? "Confirmações registradas na data" : "Sem confirmações registradas"} />
+        </section>
+        {singleDay ? null : <Card className="border-border/70 shadow-none">
+          <SectionCardHeader title="Histórico de ocorrências" badge={<Badge variant="secondary">{completedWindows.length} recentes</Badge>} description="Selecione outro turno encerrado desta regra semanal." />
+          <CardContent className="flex flex-wrap items-end gap-2 pt-4">
+            {completedWindows.map((window) => <Button key={window.dutyDate} size="sm" variant={window.dutyDate === historicalWindow.dutyDate ? "secondary" : "outline"} render={<Link href={`/leads/distribuicao/plantao/${schedule.id}?data=${window.dutyDate}`} />}>{historyDateLabel(window.dutyDate)}</Button>)}
+            <form method="get" className="flex items-end gap-2">
+              <label htmlFor="history-date" className="text-xs text-muted-foreground">Outra data<Input id="history-date" type="date" name="data" defaultValue={historicalWindow.dutyDate} className="mt-1" /></label>
+              <Button type="submit" size="sm" variant="outline">Consultar</Button>
+            </form>
+          </CardContent>
+        </Card>}
+        <Card className="border-border/70 shadow-none">
+          <SectionCardHeader
+            icon={<UserList />}
+            title="Leads distribuídos"
+            badge={<Badge variant="secondary">{occurrenceHistory.distributions.length}</Badge>}
+            description="Aceites e atribuições registrados neste turno. O vínculo antigo pode ser estimado quando a fila era compartilhada."
+          />
+          <CardContent className="p-0">
+          {occurrenceHistory.distributions.length ? <DragScrollTable><Table className={dataTableStyles.native}><TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Corretor na época</TableHead><TableHead>Distribuído em</TableHead><TableHead>Origem</TableHead><TableHead>Vínculo</TableHead></TableRow></TableHeader><TableBody>{occurrenceHistory.distributions.map((entry) => <TableRow key={entry.id}><TableCell className="font-medium">{entry.leadName}</TableCell><TableCell>{entry.brokerName}</TableCell><TableCell>{dateTime.format(entry.assignedAt)}</TableCell><TableCell><Badge variant="outline">{entry.kind}</Badge></TableCell><TableCell><Badge variant={entry.exact ? "success" : "outline"}>{entry.exact ? "Confirmado" : "Estimado pela fila"}</Badge></TableCell></TableRow>)}</TableBody></Table></DragScrollTable> : <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma atribuição registrada neste período.</p>}
+          {occurrenceHistory.truncated ? <p className="border-t border-border/70 p-3 text-xs text-muted-foreground">Exibindo os primeiros 200 registros deste período.</p> : null}
+          </CardContent>
+        </Card>
+        <Card className="border-border/70 shadow-none">
+          <SectionCardHeader
+            icon={<Users />}
+            title="Corretores escalados"
+            badge={<Badge variant="secondary">{occurrenceHistory.roster.length}</Badge>}
+            description="Vínculos válidos nesta data; alterações posteriores podem limitar a reconstituição de turnos antigos."
+          />
+          <CardContent className="flex flex-wrap gap-2 pt-4">{occurrenceHistory.roster.length ? occurrenceHistory.roster.map((entry) => <Badge key={entry.id} variant="outline">{entry.brokerName}</Badge>) : <p className="text-sm text-muted-foreground">Nenhum vínculo de escala encontrado para esta data.</p>}</CardContent>
+        </Card>
+      </main>
+    </>;
+  }
   const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
   const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
@@ -71,7 +170,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const sinceLabel = leadsSince.getTime() === 0
     ? "desde a criação deste plantão"
     : leadsUpcomingStartsAt
-      ? `aguardando o início de hoje às ${timeOnly.format(leadsUpcomingStartsAt)} (desde ${dateTime.format(leadsSince)})`
+      ? `aguardando o início ${dayKey.format(leadsUpcomingStartsAt) === dayKey.format(now) ? "de hoje" : `em ${dayMonth.format(leadsUpcomingStartsAt)}`} às ${timeOnly.format(leadsUpcomingStartsAt)}`
       : leadsUntil
       ? `nesta ocorrência (${dateTime.format(leadsSince)} – ${dateTime.format(leadsUntil)})`
       : `desde o início desta ocorrência (${dateTime.format(leadsSince)})`;
@@ -86,69 +185,54 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             <Download className="size-3.5" aria-hidden="true" /> Exportar PDF
           </Button>
         ) : null}
-        <Button render={<Link href="/leads/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>
+        <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>
       </div>}
     />
     <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
-      <Card className="border-transparent bg-transparent shadow-none">
-        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-semibold tracking-tight">{schedule.name}</h1>
-              <StatusBadge status={schedule.status} />
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-              <span>{schedule.branchName ?? "Todas as unidades"}</span>
-              <span className="text-border">•</span>
-              <span>{schedule.queueName}</span>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-xs sm:text-right">
-            <div>
-              <p className="text-muted-foreground">Dia / horário</p>
-              <p className="mt-1 font-medium">{DAYS_FULL[schedule.dayOfWeek]} · {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Fuso horário</p>
-              <p className="mt-1 font-medium">{schedule.timezone}</p>
-            </div>
-          </div>
+      <DutyProfileHeader
+        name={schedule.name}
+        state={isDutyWindowActive(liveWindow, now) ? "Em andamento" : leadsUpcomingStartsAt ? "Próximo turno" : schedule.status === "active" ? "Regra ativa" : schedule.status === "archived" ? "Arquivado" : "Inativo"}
+        stateTone={isDutyWindowActive(liveWindow, now) ? "success" : leadsUpcomingStartsAt ? "info" : schedule.status === "active" ? "success" : "secondary"}
+        description={leadsUpcomingStartsAt ? `O próximo turno começa em ${dateTime.format(leadsUpcomingStartsAt)}. Acompanhe a escala e os leads vinculados.` : "Acompanhe a cobertura da escala, os leads e a disponibilidade dos corretores deste plantão."}
+        details={[
+          `${DAYS_FULL[schedule.dayOfWeek]}${singleDayDate ? `, ${dayMonth.format(singleDayDate)}` : ""} · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}`,
+          schedule.branchName ?? "Todas as unidades",
+          schedule.queueName,
+          schedule.timezone,
+        ]}
+      />
+      {invalidHistoryDate ? <p role="alert" className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground">A data informada não corresponde a um plantão encerrado desta regra.</p> : null}
+      {historyEnabled && !singleDay && completedWindows.length ? <Card className="border-border/70 shadow-none">
+        <SectionCardHeader title="Histórico de ocorrências" badge={<Badge variant="secondary">{completedWindows.length} recentes</Badge>} description="Consulte os turnos encerrados; a regra semanal continua válida." />
+        <CardContent className="flex flex-wrap items-end gap-2 pt-4">
+          {completedWindows.map((window) => <Button key={window.dutyDate} size="sm" variant="outline" render={<Link href={`/leads/distribuicao/plantao/${schedule.id}?data=${window.dutyDate}`} />}>{historyDateLabel(window.dutyDate)}</Button>)}
+          <form method="get" className="flex items-end gap-2"><label htmlFor="history-date" className="text-xs text-muted-foreground">Outra data<Input id="history-date" type="date" name="data" className="mt-1" /></label><Button type="submit" size="sm" variant="outline">Consultar</Button></form>
         </CardContent>
-      </Card>
+      </Card> : null}
 
-      <section aria-label="Resumo do plantão" className="overflow-hidden rounded-xl border border-border bg-card shadow-none sm:grid sm:grid-cols-3">
-        <div className="min-w-0 border-b border-border/60 px-4 py-4 sm:border-b-0 sm:border-r">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">Cobertura</p>
-            <Users className="size-4 text-muted-foreground" />
-          </div>
-          <p className="mt-2 font-mono text-2xl font-semibold tracking-tight">{coverage.assigned}/{coverage.minimum}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{coverage.covered ? "Escala completa" : `Faltam ${coverage.missing} corretor(es)`}</p>
-        </div>
-        <div className="min-w-0 border-b border-border/60 px-4 py-4 sm:border-b-0 sm:border-r">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">Filas vinculadas</p>
-            <CalendarCheck className="size-4 text-muted-foreground" />
-          </div>
-          <p className="mt-2 font-mono text-2xl font-semibold tracking-tight">{linkedQueues.length}</p>
-          <p className="mt-1 truncate text-xs text-muted-foreground">{linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"}</p>
-        </div>
-        <div className="min-w-0 px-4 py-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">Leads {sinceLabel}</p>
-            <UserList className="size-4 text-muted-foreground" />
-          </div>
-          <p className="mt-2 font-mono text-2xl font-semibold tracking-tight">{leads.length}</p>
-          <p className="mt-1 text-xs text-muted-foreground">{distributedCount} distribuídos · {waitingCount} aguardando</p>
-        </div>
+      <section aria-label="Resumo do plantão" className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3">
+        <StatCard
+          label="Cobertura"
+          value={`${coverage.assigned}/${coverage.minimum}`}
+          sublabel={coverage.covered ? "Escala completa" : `Faltam ${coverage.missing} corretor(es)`}
+          valueClassName={coverage.covered ? undefined : "text-warning"}
+        />
+        <StatCard
+          label="Filas vinculadas"
+          value={linkedQueues.length}
+          sublabel={linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"}
+        />
+        <StatCard label="Leads no plantão" value={leads.length} sublabel={`${distributedCount} distribuídos · ${waitingCount} aguardando`} />
       </section>
 
       <div className="flex flex-col gap-5">
-        <Card className="border-transparent bg-transparent shadow-none">
-          <CardHeader className="border-b border-border/60 p-4">
-            <CardTitle className="text-base">Leads do plantão</CardTitle>
-            <CardDescription>Leads das filas deste plantão {sinceLabel} — aguardando distribuição, ofertados, distribuídos e em atendimento.</CardDescription>
-            <nav aria-label="Filtrar leads por situação" className="mt-3 flex flex-wrap gap-2">
+        <Card className="border-border/70 shadow-none">
+          <SectionCardHeader
+            icon={<UserList />}
+            title="Leads do plantão"
+            badge={<Badge variant="secondary">{leads.length}</Badge>}
+            description={`Leads das filas vinculadas ${sinceLabel}.`}
+            actions={<nav aria-label="Filtrar leads por situação" className="flex flex-wrap gap-2">
               {filters.map((item) => (
                 <Button
                   key={item.key}
@@ -156,15 +240,15 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   size="sm"
                   variant={filter === item.key ? "secondary" : "outline"}
                 >
-                  {item.label} <span className="ml-1 font-mono text-xs text-muted-foreground">{item.count}</span>
+                  {item.label} <Badge variant="outline">{item.count}</Badge>
                 </Button>
               ))}
-            </nav>
-          </CardHeader>
+            </nav>}
+          />
           <CardContent className="p-0">
             {visibleLeads.length ? (
               <DragScrollTable className="[&_[data-slot=table-container]]:max-h-[60vh] [&_[data-slot=table-container]]:overflow-y-auto [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
-                <Table>
+                <Table className={dataTableStyles.native}>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Lead</TableHead>
@@ -212,16 +296,15 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           </CardContent>
         </Card>
 
-        <Card className="border-transparent bg-transparent shadow-none">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{presenceEnabled ? "Checklist de confirmação" : "Corretores escalados"}</CardTitle>
-            <CardDescription>{presenceEnabled ? `${confirmedCount} de ${roster.length} corretores confirmaram a ocorrência atual.` : "Quem está na escala ativa deste plantão agora."}</CardDescription>
-            {liveStatusEnabled && roster.length ? (
-              <p className="mt-1 text-xs font-medium text-muted-foreground">
-                <span className="text-foreground">{readyNowCount}</span> de {roster.length} prontos para receber o próximo lead agora
-              </p>
-            ) : null}
-          </CardHeader>
+        <Card className="border-border/70 shadow-none">
+          <SectionCardHeader
+            icon={<Users />}
+            title={presenceEnabled ? "Confirmação da escala" : "Corretores escalados"}
+            badge={<Badge variant={presenceEnabled && confirmedCount === roster.length && roster.length ? "success" : "secondary"}>{presenceEnabled && roster.length ? `${confirmedCount}/${roster.length} confirmados` : `${roster.length} escalados`}</Badge>}
+            description={liveStatusEnabled && roster.length
+              ? `${readyNowCount} de ${roster.length} prontos para receber o próximo lead agora.`
+              : presenceEnabled ? "Acompanhe quem confirmou presença neste turno." : "Quem está na escala ativa deste plantão agora."}
+          />
           <CardContent className="space-y-3" role={presenceEnabled ? "group" : undefined} aria-label={presenceEnabled ? "Status de confirmação dos corretores escalados" : undefined}>
             {roster.length && roster.every((entry) => entry.blockedReason) ? (
               <div role="alert" className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-foreground">

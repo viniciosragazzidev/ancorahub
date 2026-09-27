@@ -234,6 +234,20 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
   },
+  DUTY_MONTHLY_SCHEDULING: {
+    key: "feature_duty_monthly_scheduling_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Permite configurar cotas mensais, gerar propostas automáticas e publicar escalas de plantão.",
+  },
+  DUTY_OCCURRENCE_HISTORY: {
+    key: "feature_duty_occurrence_history_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Mostra ocorrências encerradas e o histórico de leads distribuídos por plantão.",
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 
 // ─── Tipo utilitário ──────────────────────────────────────────────────────────

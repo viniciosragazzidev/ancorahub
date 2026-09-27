@@ -5,9 +5,13 @@ import { toast } from "@/components/ui/sonner";
 import { useRouter } from "next/navigation";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarDays } from "lucide-react";
+import { ptBR } from "date-fns/locale";
 import { Fingerprint } from "@/components/huge-icons";
 import { authClient } from "@/shared/auth/client";
 import { recordSecurityAuditAction } from "@/app/(dashboard)/settings/security-actions";
@@ -38,6 +42,12 @@ async function platformAuthenticatorAvailable(): Promise<boolean> {
   }
 }
 
+function parseBirthDate(value: string): Date | undefined {
+  if (!value) return undefined;
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export function OnboardingWizard({ invitation, profile }: Props) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState(profile.professionalName);
@@ -45,6 +55,7 @@ export function OnboardingWizard({ invitation, profile }: Props) {
   const [phone, setPhone] = useState(profile.phone);
   const [cpfInput, setCpfInput] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [birthDateOpen, setBirthDateOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -161,6 +172,7 @@ export function OnboardingWizard({ invitation, profile }: Props) {
   }
 
   const totalSteps = 5;
+  const selectedBirthDate = parseBirthDate(birthDate);
 
   return (
     <Card className="w-full max-w-lg border border-border shadow-md bg-card">
@@ -201,7 +213,7 @@ export function OnboardingWizard({ invitation, profile }: Props) {
                   disabled={Boolean(invitation.email)}
                   required
                   autoComplete="email"
-                  className={invitation.email ? "bg-muted text-muted-foreground cursor-not-allowed" : undefined}
+                  className={`border-border-strong dark:border-border-strong disabled:opacity-100 ${invitation.email ? "bg-muted text-muted-foreground cursor-not-allowed" : ""}`}
                 />
                 {!invitation.email ? <p className="text-xs text-muted-foreground">Defina o e-mail que será usado para entrar na plataforma.</p> : null}
               </div>
@@ -227,7 +239,45 @@ export function OnboardingWizard({ invitation, profile }: Props) {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="user-birth">Data de Nascimento</Label>
-                <Input id="user-birth" type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required />
+                <Popover open={birthDateOpen} onOpenChange={setBirthDateOpen}>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        id="user-birth"
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-start border-border-strong text-left font-normal dark:border-border-strong"
+                      />
+                    }
+                  >
+                    <CalendarDays className="size-4" aria-hidden="true" />
+                    <span className={selectedBirthDate ? "" : "text-muted-foreground"}>
+                      {selectedBirthDate ? selectedBirthDate.toLocaleDateString("pt-BR") : "Selecione sua data de nascimento"}
+                    </span>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      autoFocus
+                      mode="single"
+                      locale={ptBR}
+                      captionLayout="dropdown"
+                      startMonth={new Date(1900, 0)}
+                      endMonth={new Date()}
+                      defaultMonth={selectedBirthDate ?? new Date(new Date().getFullYear() - 25, 0)}
+                      disabled={{ after: new Date() }}
+                      selected={selectedBirthDate}
+                      formatters={{ formatMonthDropdown: (date) => date.toLocaleString("pt-BR", { month: "short" }) }}
+                      onSelect={(date) => {
+                        if (!date) return;
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, "0");
+                        const day = String(date.getDate()).padStart(2, "0");
+                        setBirthDate(`${year}-${month}-${day}`);
+                        setBirthDateOpen(false);
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="flex gap-2 pt-2">
                 <Button variant="outline" type="button" className="flex-1" onClick={prevStep}>

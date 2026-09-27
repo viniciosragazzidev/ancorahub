@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
@@ -8,13 +8,14 @@ import { getDatabase, schema } from "@/shared/db";
 import { BrokerQueueClient } from "./_components/queue-client";
 import { BrokerAvailabilityButton } from "./_components/broker-availability";
 import { Sparkline } from "./_components/sparkline";
-import { ChatCircleText, ClipboardText, ListChecks, Target, Users, Warning, XCircle, ChartLineUp, ArrowRight } from "@/components/huge-icons";
+import { ChatCircleText, ClipboardText, ListChecks, Target, Users, Warning, XCircle, ChartLineUp, ArrowRight, CalendarCheck } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 const activeLeadStatuses = [
   "new",
@@ -32,6 +33,33 @@ export default async function MinhaFilaPage() {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
   const experienceMode = await getExperienceMode(context);
+
+  // "Minha escala": the broker's published monthly occurrences (dated roster
+  // rows), from today through the next two months — the same rows distribution uses.
+  const monthlyDutySchedulingEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true";
+  const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  const [todayYear, todayMonth] = todayKey.split("-").map(Number);
+  const horizonKey = new Date(Date.UTC(todayYear, todayMonth + 2, 0)).toISOString().slice(0, 10);
+  const myDutyAssignments = monthlyDutySchedulingEnabled
+    ? (await db.select({
+      dutyDate: schema.dutyRosterAssignments.dutyDate,
+      startsAt: schema.dutyRosterAssignments.startsAt,
+      endsAt: schema.dutyRosterAssignments.endsAt,
+      scheduleName: schema.unitDutySchedules.name,
+    })
+      .from(schema.dutyRosterAssignments)
+      .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
+      .where(and(
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+        eq(schema.dutyRosterAssignments.brokerId, context.userId),
+        eq(schema.dutyRosterAssignments.status, "active"),
+        isNotNull(schema.dutyRosterAssignments.monthlyPlanId),
+        gte(schema.dutyRosterAssignments.dutyDate, todayKey),
+        lte(schema.dutyRosterAssignments.dutyDate, horizonKey),
+      ))
+      .orderBy(asc(schema.dutyRosterAssignments.dutyDate), asc(schema.dutyRosterAssignments.startsAt)))
+      .map((row) => ({ dutyDate: row.dutyDate!, startsAt: row.startsAt, endsAt: row.endsAt, scheduleName: row.scheduleName }))
+    : [];
 
   // ─── Availability Status ───
   const [membership] = await db
@@ -317,7 +345,7 @@ export default async function MinhaFilaPage() {
       updatedAt: lostLeadsMap.get(l.id)?.createdAt ?? l.stageEnteredAt,
     }));
 
-    return <LightLeadsList leads={[...activeLightLeads, ...lostLightLeads]} availabilityStatus={availabilityStatus} />;
+    return <LightLeadsList leads={[...activeLightLeads, ...lostLightLeads]} availabilityStatus={availabilityStatus} dutyAssignments={myDutyAssignments} showDutySchedule={monthlyDutySchedulingEnabled} />;
   }
 
   const enrichedActiveLeads = leads.map((lead) => ({
@@ -420,6 +448,19 @@ export default async function MinhaFilaPage() {
         }
       />
       <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-5 bg-background p-4 lg:gap-6 lg:p-6">
+        {monthlyDutySchedulingEnabled && <section aria-labelledby="my-duty-schedule-title" className="rounded-xl border border-border bg-card p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <CalendarCheck className="size-4 text-foreground" />
+            <h2 id="my-duty-schedule-title" className="text-sm font-semibold">Minha escala de plantões</h2>
+            <Badge variant="outline" className="ml-auto">Próximos 3 meses</Badge>
+          </div>
+          {myDutyAssignments.length ? <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {myDutyAssignments.map((assignment, index) => <li key={`${assignment.dutyDate}-${assignment.startsAt}-${index}`} className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm">
+              <span className="min-w-0 truncate font-medium">{assignment.scheduleName}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "short" }).format(new Date(`${assignment.dutyDate}T12:00:00Z`))} · {assignment.startsAt.slice(0, 5)}–{assignment.endsAt.slice(0, 5)}</span>
+            </li>)}
+          </ul> : <p className="text-sm text-muted-foreground">Ainda não há plantões publicados para você neste período.</p>}
+        </section>}
         {/* Contexto de página legado, preservado para eventual restauração.
         <section className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div>

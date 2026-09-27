@@ -210,7 +210,7 @@ export function SituationalPlaybooksPanel({
   return (
     <div className="space-y-6">
       {/* HEADER SECTION */}
-      <Card variant="subtle" className="rounded-2xl border-border/80">
+      <Card className="border-border/70">
         <CardHeader className="pb-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
@@ -223,7 +223,7 @@ export function SituationalPlaybooksPanel({
                   {playbooks.filter((p) => p.enabled).length} ativas / {playbooks.length} total
                 </Badge>
               </div>
-              <CardTitle className="text-xl font-bold tracking-tight">
+              <CardTitle>
                 Roteiros de Atendimento & Perguntas Humanizadas
               </CardTitle>
               <CardDescription className="text-xs leading-relaxed max-w-3xl">

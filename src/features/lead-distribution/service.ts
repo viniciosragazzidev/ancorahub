@@ -18,6 +18,7 @@ import { getDddRoutingSettings } from "./ddd-routing-settings";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
+import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
 import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, isDutyWindowActive, isLeadInDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
 
@@ -103,6 +104,8 @@ async function getRosterBrokerIds(
     endsAt: schema.dutyRosterAssignments.endsAt,
     validFrom: schema.dutyRosterAssignments.validFrom,
     validUntil: schema.dutyRosterAssignments.validUntil,
+    branchId: schema.dutyRosterAssignments.branchId,
+    dutyDate: schema.dutyRosterAssignments.dutyDate,
   })
     .from(schema.dutyRosterAssignments)
     .where(and(
@@ -120,15 +123,17 @@ async function getRosterBrokerIds(
       inArray(schema.dutyRosterAssignments.scheduleId, matchingScheduleIds),
     ));
 
+  const effectiveAssignments = await resolveEffectiveDutyAssignments(tenantId, assignments, date);
+
   // A matching plantão without escalated brokers has no eligible broker. It must
   // remain queued instead of silently falling back to the whole unit roster.
   const confirmedAssignmentIds = await getPresenceConfirmedAssignmentIds({
     tenantId,
-    assignments,
+    assignments: effectiveAssignments,
     schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
     now: date,
   });
-  return { brokerIds: new Set(assignments.filter((assignment) => confirmedAssignmentIds.has(assignment.id)).map((assignment) => assignment.brokerId)), hasActiveSelectedSchedule: true };
+  return { brokerIds: new Set(effectiveAssignments.filter((assignment) => confirmedAssignmentIds.has(assignment.id)).map((assignment) => assignment.brokerId)), hasActiveSelectedSchedule: true };
 }
 
 async function ensureDefaultQueue(tenantId: string, branchId: string, actorId: string) {
@@ -1090,6 +1095,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     queueId: lead.queueId,
     capacityPerBroker: queue?.capacityEnabled ? queue.capacity ?? null : null,
     pacing,
+    dutyScheduleIds: exclusiveScheduleIds ?? undefined,
   });
   if (!offer.createdOffers.length) {
     if (offer.pacingBlocked && !offer.capacityReached) {

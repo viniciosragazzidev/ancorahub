@@ -1362,3 +1362,61 @@ Complemento de 2026-09-25 (DEC-120): com o número da empresa conectado, todo
 texto livre para um corretor — digitado no chat da diretoria ou disparo de
 mensagem livre — sai por ele por padrão, com a Meta como fallback. Templates
 Meta só saem pelo número quando o aviso foi roteado explicitamente.
+
+## DEC-123 — Tipos configuráveis e escala mensal de plantões
+
+Decisão aprovada pelo usuário em 2026-09-26: os tipos de plantão são configurados
+por corretora e servem somente para classificar e exibir a escala; não alteram
+roteamento de leads nem elegibilidade de corretores. Plantões antigos podem ficar
+sem tipo. O teto de corretores por plantão é opcional e nulo significa ilimitado,
+preservando a operação existente. A escala mensal usa cotas por corretor e período
+explícito; a geração produz rascunho determinístico, revisável e ajustável, e não
+notifica nem entra em vigor até publicação explícita. Publicação precisa ser
+atômica, auditável e idempotente. Ocorrências datadas não serão confundidas com o
+roster semanal canônico; o runtime só as consumirá por integração explícita e
+validada. A capacidade fica atrás de controle global reversível pelo Super-admin.
+
+Atualização de implementação (2026-09-26): ocorrências publicadas ficam em
+`duty_roster_assignments` marcadas com `duty_date` e `monthly_plan_id` (migration
+0161), porque confirmação de presença e resolvedores dependem dessa tabela; a
+escala semanal e suas checagens ignoram linhas datadas. Num dia publicado, o
+plantão usa somente os corretores publicados em todas as unidades; plantão
+publicado sem ninguém mantém a escala semanal. Com a flag desligada o runtime
+ignora as linhas datadas. Plantão global gera uma ocorrência por data (não uma
+por unidade). Somente o Diretor gera, ajusta e publica; Gestor consulta a própria
+unidade. Uma publicação por corretora e mês (índice único parcial).
+
+Simplificação de uso (2026-09-26): a aba Plantões é guiada por um único mês. A
+lista mostra os plantões que acontecem nele, por dia da semana, e explica os de
+fora (terminou, começa depois, vigência vazia) com "Estender até o fim do mês".
+A escala mensal começa pela escolha dos plantões do mês (com "Novo plantão"
+pré-preenchido para o mês), depois cotas e proposta. O formulário fala em
+"Repete toda semana a partir de / até (opcional)" e o campo Tipo saiu da tela
+(o dado é preservado). Datas de vigência passam a ser dias de São Paulo: "até"
+inclui o dia informado; antes eram lidas como meia-noite UTC e o último dia
+terminava às 21h da véspera (e a data encolhia a cada salvar).
+
+Regra padrão (2026-09-26, decisão do usuário): um plantão dura um dia, o dia
+escolhido. "Novo plantão" cria por datas: um período vira vários plantões de um
+dia, cada um com a etiqueta da sua data; "Repetir toda semana" é opção
+secundária. Plantões de uma data só são editados por um único campo "Data" e não
+exibem histórico de outras ocorrências. A aba Plantões é um calendário do mês
+(passado apagado, hoje destacado, ↻ para regras semanais). O conflito de horário
+passou a considerar a vigência: um plantão já encerrado não bloqueia outro no
+mesmo dia da semana e horário.
+
+## DEC-124 — Histórico por ocorrência encerrada do plantão
+
+Aprovada pelo usuário em 2026-09-26: o fim de um turno encerra somente a ocorrência
+da data local, nunca a regra semanal que volta a operar no dia configurado. Cada
+ocorrência encerrada permanece consultável com os leads distribuídos e o corretor
+registrado no momento da atribuição. Eventos de ofertas futuras preservam a data e
+o identificador do plantão quando a correspondência é única; registros anteriores
+sem vínculo explícito podem ser reconstruídos pela fila e janela temporal, sempre
+marcados como estimados. A consulta é escopada por tenant/unidade e reversível pelo
+Super-admin, sem apagar os eventos.
+
+
+## DEC-122 - Renovar convite de ativação no reenvio manual
+
+Aprovada pelo usuário em 2026-09-25: o reenvio manual deve gerar e enviar novo convite quando não existir convite válido. Resolver o membro pelo vínculo ou perfil, preservando cargo e unidade; permitir convites vencidos ou revogados sem exigir novo cadastro. Contas já ativadas ou desabilitadas não são reativadas por esse fluxo. Tokens pendentes anteriores são substituídos; auditoria, prazo de 72h e controle do Super-admin são obrigatórios.

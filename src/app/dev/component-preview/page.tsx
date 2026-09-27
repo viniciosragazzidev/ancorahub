@@ -37,6 +37,8 @@ import {
 import { DsTrendStatCard } from "@/components/ui/ds-trend-stat-card";
 import { DsDonutChart } from "@/components/ui/ds-donut-chart";
 import { DsBarChart } from "@/components/ui/ds-bar-chart";
+import { DataTable } from "@/components/ui/data-table";
+import { StatusBadge } from "@/components/foundations";
 
 /**
  * Isolated preview of the docs/design-system.md foundation components.
@@ -291,6 +293,30 @@ export default function ComponentPreviewPage() {
               />
             </DsDashboardCard>
           </Row>
+        </Section>
+
+        <Section title="Tabela de Equipe e Unidades — produção">
+          <div className="w-full rounded-xl border bg-background p-4 text-foreground">
+            <div className="mb-4">
+              <p className="text-sm font-semibold">Unidades</p>
+              <p className="text-sm text-muted-foreground">Prévia dos componentes compartilhados usados nas rotas de gestão.</p>
+            </div>
+            <DataTable
+              columns={[
+                { accessorKey: "name", header: "Unidade", cell: ({ row }) => <span className="font-medium">{row.original.name}</span> },
+                { accessorKey: "externalId", header: "Identificador" },
+                { accessorKey: "members", header: "Equipe" },
+                { accessorKey: "status", header: "Status", cell: ({ row }) => <StatusBadge label={row.original.status} tone="success" dot /> },
+              ]}
+              data={[
+                { name: "Unidade Centro", externalId: "CT-01", members: 12, status: "Ativa" },
+                { name: "Unidade Norte", externalId: "NT-02", members: 7, status: "Ativa" },
+              ]}
+              searchPlaceholder="Buscar unidade..."
+              showColumnToggle={false}
+              pageSize={5}
+            />
+          </div>
         </Section>
 
         <Section title="Sidebar Nav Item">

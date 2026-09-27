@@ -13,10 +13,17 @@ import { canEditMemberAuthority, canManageMember } from "@/shared/auth/team-perm
 import { TeamInviteSection } from "./team-invite-section";
 import { TeamMembersTable } from "./team-members-table";
 import { isCustomRolesEnabled } from "@/features/custom-roles/service";
+import { TeamManagementTabs } from "./team-management-tabs";
+import { UnitsView } from "./units-view";
 
-export default async function TeamPage() {
+export default async function TeamPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role === "broker") redirect("/access-denied");
+  const params = await searchParams;
+  if (params.visao === "unidades") {
+    if (context.role !== "director" && !(context.role === "manager" && context.branchId)) redirect("/access-denied");
+    return <UnitsView context={context} />;
+  }
   const branchScope = context.role === "manager"
     ? context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : sql`false`
     : undefined;
@@ -212,10 +219,11 @@ export default async function TeamPage() {
     <>
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
-        title="Equipe"
+        title="Equipe e unidades"
         rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{context.role === "director" ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} customRoles={customRoles} /></div>}
       />
       <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
+        <TeamManagementTabs active="membros" />
         {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">GESTAO DE EQUIPE</p>

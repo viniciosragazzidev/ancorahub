@@ -2,6 +2,7 @@
 
 import { and, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
+import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getAuth } from "@/shared/auth";
 import { headers } from "next/headers";
 
@@ -34,7 +35,7 @@ async function checkBrokerOnDuty(tenantId: string, branchId: string, userId: str
 
   const scheduleIds = activeSchedules.map((s) => s.id);
 
-  const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id })
+  const assignments = await db.select({ id: schema.dutyRosterAssignments.id, scheduleId: schema.dutyRosterAssignments.scheduleId, dutyDate: schema.dutyRosterAssignments.dutyDate })
     .from(schema.dutyRosterAssignments)
     .where(and(
       eq(schema.dutyRosterAssignments.tenantId, tenantId),
@@ -46,10 +47,10 @@ async function checkBrokerOnDuty(tenantId: string, branchId: string, userId: str
       lte(schema.dutyRosterAssignments.validFrom, new Date()),
       or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, new Date())),
       inArray(schema.dutyRosterAssignments.scheduleId, scheduleIds),
-    ))
-    .limit(1);
+    ));
 
-  return !!assignment;
+  // Weekly row replaced by a published monthly occurrence today → not on duty.
+  return (await resolveEffectiveDutyAssignments(tenantId, assignments, new Date())).length > 0;
 }
 
 export async function isCurrentUserOnDuty(): Promise<boolean> {

@@ -19,6 +19,15 @@ Se algo não estiver coberto pelo design system, PARE e pergunte — não assuma
 - Satoshi só em 36px+ (headlines). Abaixo disso, Inter sempre.
 - Nunca mais de uma cor cromática (verde/laranja/violeta) no mesmo componente
 
+## Densidade de interface — REGRA OBRIGATÓRIA
+Só o essencial fica fixo na tela; o resto vai para drawer ou menu suspenso.
+Detalhes em `docs/design-system.md` § "Product Density".
+- Lista de entidades = uma tabela no padrão de `/equipe` (`DataTable` + `SectionCardHeader`), nunca grade de cards grandes
+- Clique na linha abre drawer lateral (`Sheet`) com detalhes e configurações da entidade
+- Ações secundárias e configurações auxiliares em dropdown (`⋯` na linha, "Configurações ▾" no card)
+- Adicionar itens relacionados = busca + botão "+" (`SearchAddList`), com "Só ativos" por padrão
+- Um único CTA primário por tela; reutilizar os componentes compartilhados, nunca recriar por página
+
 ## Fluxo de trabalho
 1. Nunca commitar direto na main — sempre branch por rota/lote
 2. Antes de codificar: apresentar plano de mudanças por componente

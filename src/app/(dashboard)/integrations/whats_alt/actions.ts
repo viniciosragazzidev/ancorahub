@@ -27,7 +27,7 @@ export async function startTenantChannelAction(options: { fresh?: boolean } = {}
   try {
     const context = await getRequiredTenantContext();
     const state = await startTenantChannel(context, options);
-    revalidatePath("/integrations/whats_alt");
+    revalidatePath("/integrations/whatsapp");
     return { success: true, ...state };
   } catch (error) {
     return failure(error, "Não foi possível iniciar a conexão do número da empresa.");
@@ -47,7 +47,7 @@ export async function disconnectTenantChannelAction(): Promise<Result<object>> {
   try {
     const context = await getRequiredTenantContext();
     await disconnectTenantChannel(context);
-    revalidatePath("/integrations/whats_alt");
+    revalidatePath("/integrations/whatsapp");
     return { success: true };
   } catch (error) {
     return failure(error, "Não foi possível desconectar o número da empresa.");
@@ -74,7 +74,7 @@ export async function saveTenantChannelRoutingAction(input: TenantChannelRouting
       id: randomUUID(), userId: context.userId, entidade: "tenant", entidadeId: context.tenantId,
       acao: `tenant_channel.routing_updated:${Object.keys(routing.events).sort().join(",") || "none"}`,
     });
-    revalidatePath("/integrations/whats_alt");
+    revalidatePath("/integrations/whatsapp");
     return { success: true };
   } catch (error) {
     return failure(error, "Não foi possível salvar os envios do número da empresa.");

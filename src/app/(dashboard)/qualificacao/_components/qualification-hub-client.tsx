@@ -41,7 +41,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
 import { AgentTriggersPanel } from "./agent-triggers-panel";
 import { MessageAutomationStudio } from "./message-automation-studio";
@@ -297,13 +297,13 @@ export function QualificationHubClient({
   const activeAlertsCount = alerts.filter((a) => a.status === "active").length;
 
   const tabs = [
-    { id: "overview", label: "1. Prompt & Comportamento", icon: MessageSquare, color: "text-primary" },
-    { id: "situational_playbooks", label: "2. Roteiros & Situações IA", icon: Sparkles, color: "text-amber-500" },
-    { id: "meta_templates", label: "3. Mensagens & Situações", icon: FileText, color: "text-blue-500" },
-    { id: "agent_triggers", label: "4. Triggers & Permissões MCP", icon: Zap, color: "text-amber-500" },
-    { id: "followup_rules", label: "5. Regras de Follow-up", icon: Clock, color: "text-purple-500" },
-    { id: "whatsapp_diag", label: "6. Conectividade & Testes QA", icon: Phone, color: "text-emerald-500" },
-    { id: "simulator", label: `7. Simulador & Alertas${activeAlertsCount > 0 ? ` (${activeAlertsCount})` : ""}`, icon: SlidersHorizontal, color: activeAlertsCount > 0 ? "text-rose-500" : undefined },
+    { id: "overview", label: "Prompt e comportamento", icon: MessageSquare },
+    { id: "situational_playbooks", label: "Roteiros", icon: Sparkles },
+    { id: "meta_templates", label: "Mensagens", icon: FileText },
+    { id: "agent_triggers", label: "Permissões", icon: Zap },
+    { id: "followup_rules", label: "Follow-up", icon: Clock },
+    { id: "whatsapp_diag", label: "Conectividade", icon: Phone },
+    { id: "simulator", label: `Simulador${activeAlertsCount > 0 ? ` (${activeAlertsCount})` : ""}`, icon: SlidersHorizontal },
   ];
 
   const requestedTab = searchParams.get("tab");
@@ -539,92 +539,56 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         }
       />
 
-      <main data-ui-surface="qualification" className="flex flex-1 flex-col gap-5 bg-background p-(--mobile-page-padding) sm:gap-6 lg:p-6">
-        {/* TOP METRICS SUMMARY */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-5">
-          <StatCard label="Leads atendidos" value={initialStats.operation.startedToday} sublabel={`${initialStats.operation.active} ativos | ${initialStats.operation.transferredToHuman} trans. humano`} icon={Activity} iconClassName="bg-primary/10 text-primary" />
-          <StatCard label="Taxa de qualificação" value={initialStats.qualification.totalQualified} sublabel={`${initialStats.qualification.hotLeads} quentes | ${initialStats.qualification.completionRatePct}% conclusão`} icon={Sparkles} iconClassName="bg-amber-500/10 text-amber-600" />
-          <StatCard label="Fila de espera" value={initialStats.distribution.waitingQueue} sublabel={`${initialStats.distribution.waitingQueue} em fila | SLA méd. 45s`} icon={Clock} iconClassName="bg-violet-500/10 text-violet-600" />
-          <StatCard label="Custo de operação" value={`R$ ${(initialStats.costs.aiCostBrl + initialStats.costs.whatsappCostBrl).toFixed(2)}`} sublabel={`R$ ${initialStats.costs.avgCostPerSessionBrl.toFixed(2)} / atendimento`} icon={DollarSign} iconClassName="bg-emerald-500/10 text-emerald-600" valueClassName="text-emerald-700" />
-          <StatCard label="Follow-ups ativos" value={`${initialStats.followup.sent} enviados`} sublabel={`${initialStats.followup.conversionsPostFollowup} rec. pós-followup`} icon={RotateCcw} iconClassName="bg-sky-500/10 text-sky-600" />
-        </div>
-
-        {/* 2-COLUMN SETTINGS-STYLE LAYOUT */}
-        <div className="grid gap-6 lg:grid-cols-[16.5rem_1fr] items-start">
-          {/* MOBILE HORIZONTAL SUBNAV */}
-          <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap lg:hidden">
-            <nav data-slot="qualification-tabs" className="flex snap-x snap-mandatory gap-1.5 rounded-[var(--radius-card)] border bg-card p-1">
+      <main data-ui-surface="qualification" className="flex min-w-0 flex-1 flex-col gap-5 bg-background px-(--mobile-page-padding) pb-(--mobile-page-padding) sm:gap-6 lg:px-6 lg:pb-6">
+        <Tabs value={activeTab} onValueChange={handleSelectTab} variant="underline" className="w-full min-w-0 gap-6">
+          <nav
+            aria-label="Áreas da qualificação"
+            data-slot="qualification-tabs"
+            className="sticky top-[var(--header-height)] z-20 -mx-(--mobile-page-padding) border-b border-border/70 bg-background/95 px-(--mobile-page-padding) backdrop-blur supports-[backdrop-filter]:bg-background/85 lg:-mx-6 lg:px-6 max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]"
+          >
+            <TabsList aria-label="Áreas da qualificação" className="h-auto w-full justify-start gap-1 overflow-x-auto border-0 bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {tabs.map((tab) => {
                 const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
                 return (
-                  <button
+                  <TabsTrigger
                     key={tab.id}
-                    type="button"
-                    onClick={() => handleSelectTab(tab.id)}
-                    aria-current={isActive ? "page" : undefined}
-                    className={cn(
-                      "flex min-h-(--mobile-touch-target) shrink-0 snap-start items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-all",
-                      isActive
-                        ? "bg-primary text-primary-foreground font-semibold shadow-xs"
-                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
+                    value={tab.id}
+                    className="min-h-10 shrink-0 gap-1.5 px-3 py-0 text-xs font-medium transition-colors duration-150"
+                    indicatorClassName="left-3 right-3 rounded-full"
                   >
-                    <Icon className="size-3.5 shrink-0" />
+                    <Icon aria-hidden="true" className="size-3.5" />
                     {tab.label}
-                  </button>
+                  </TabsTrigger>
                 );
               })}
-            </nav>
-          </ScrollArea>
-
-          {/* DESKTOP SIDEBAR SUBNAV */}
-          <nav data-slot="qualification-tabs" className="hidden lg:flex lg:flex-col gap-1 p-2 rounded-2xl border bg-card sticky top-4">
-            <div className="px-3 py-2 text-[10px] font-bold tracking-wider text-muted-foreground/80 uppercase border-b mb-1">
-              Menu de Configuração IA
-            </div>
-            {tabs.map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => handleSelectTab(tab.id)}
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs transition-all text-left w-full",
-                    isActive
-                      ? "bg-primary/10 text-primary font-semibold border-l-4 border-l-primary shadow-2xs"
-                      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground font-medium"
-                  )}
-                >
-                  <Icon className={cn("size-4 shrink-0", tab.color ?? "text-muted-foreground")} />
-                  <span className="truncate">{tab.label}</span>
-                </button>
-              );
-            })}
+            </TabsList>
           </nav>
 
-          {/* ACTIVE TAB CONTENT */}
-          <div className="min-w-0 space-y-6">
+          <div className="min-w-0 space-y-5">
             {activeTab === "overview" && (
               <div className="space-y-6">
+                <div className="grid grid-cols-1 gap-2 min-[380px]:grid-cols-2 sm:gap-3 lg:grid-cols-3 2xl:grid-cols-5">
+                  <StatCard label="Leads atendidos" value={initialStats.operation.startedToday} sublabel={`${initialStats.operation.active} ativos | ${initialStats.operation.transferredToHuman} trans. humano`} icon={Activity} iconClassName="bg-primary/10 text-primary" />
+                  <StatCard label="Taxa de qualificação" value={initialStats.qualification.totalQualified} sublabel={`${initialStats.qualification.hotLeads} quentes | ${initialStats.qualification.completionRatePct}% conclusão`} icon={Sparkles} iconClassName="bg-amber-500/10 text-amber-600" />
+                  <StatCard label="Fila de espera" value={initialStats.distribution.waitingQueue} sublabel={`${initialStats.distribution.waitingQueue} em fila`} icon={Clock} iconClassName="bg-violet-500/10 text-violet-600" />
+                  <StatCard label="Custo de operação" value={`R$ ${(initialStats.costs.aiCostBrl + initialStats.costs.whatsappCostBrl).toFixed(2)}`} sublabel={`R$ ${initialStats.costs.avgCostPerSessionBrl.toFixed(2)} / atendimento`} icon={DollarSign} iconClassName="bg-emerald-500/10 text-emerald-600" valueClassName="text-emerald-700" />
+                  <StatCard label="Follow-ups ativos" value={`${initialStats.followup.sent} enviados`} sublabel={`${initialStats.followup.conversionsPostFollowup} rec. pós-followup`} icon={RotateCcw} iconClassName="bg-sky-500/10 text-sky-600" />
+                </div>
                 <div className="grid gap-6 md:grid-cols-2">
-              <Card variant="subtle" className="rounded-xl border-border/80">
+              <Card className="border-border/70">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold">Status do Agente e Operação</CardTitle>
                   <CardDescription className="text-xs">Ative ou pause o robô de qualificação por tenant</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between rounded-lg border p-4 bg-muted/20">
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-card p-4">
                     <div className="space-y-0.5">
                       <div className="font-semibold text-sm">Operação da IA de Qualificação</div>
                       <div className="text-xs text-muted-foreground">
                         {enabled ? "O robô responderá novos atendimentos via WhatsApp." : "Automação pausada. Mensagens irão direto para fila humana."}
                       </div>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
+                    <label className="relative inline-flex shrink-0 cursor-pointer items-center">
                       <input
                         type="checkbox"
                         checked={enabled}
@@ -671,7 +635,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                 </CardContent>
               </Card>
 
-              <Card variant="subtle" className="rounded-xl border-border/80">
+              <Card className="border-border/70">
                 <CardHeader>
                   <CardTitle className="text-base font-semibold">Identidade do Assistente</CardTitle>
                   <CardDescription className="text-xs">Nome exibido e mensagem inicial de acolhimento</CardDescription>
@@ -697,7 +661,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                 </CardContent>
               </Card>
 
-              <Card variant="subtle" className="rounded-xl border-border/80 md:col-span-2">
+              <Card className="border-border/70 md:col-span-2">
                 <CardHeader className="flex flex-row items-center justify-between pb-3">
                   <div>
                     <CardTitle className="text-base font-semibold flex items-center gap-2">
@@ -764,9 +728,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
 
           <div className="space-y-6">
             <div className="grid gap-6 md:grid-cols-3">
-              <Card variant="subtle" className="rounded-xl border-border/80 md:col-span-1 space-y-4 p-5">
+              <Card className="border-border/70 md:col-span-1">
                 <div>
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
                     <Phone className="size-4 text-emerald-500" />
                     Status da Conexão WhatsApp
                   </h3>
@@ -782,7 +746,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Número oficial:</span>
-                    <span className="font-mono">{initialDiagnostic.officialNumber ?? "Não configurado"}</span>
+                    <span className="min-w-0 break-all text-right font-mono">{initialDiagnostic.officialNumber ?? "Não configurado"}</span>
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Nome exibido:</span>
@@ -790,7 +754,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Phone Number ID:</span>
-                    <span className="font-mono text-[11px]">{initialDiagnostic.phoneNumberId ?? "Não configurado"}</span>
+                    <span className="min-w-0 break-all text-right font-mono text-xs">{initialDiagnostic.phoneNumberId ?? "Não configurado"}</span>
                   </div>
                   <div className="flex justify-between border-b pb-1.5">
                     <span className="text-muted-foreground">Status do Webhook:</span>
@@ -826,9 +790,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         {activeTab === "agent_triggers" && (
           <div className="space-y-6">
             <AgentTriggersPanel />
-            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
+            <Card className="gap-6 border-border/70">
               <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
+                <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
                   <ShieldAlert className="size-4 text-amber-500" />
                   Governança & Permissões de Ferramentas (MCP)
                 </h3>
@@ -894,9 +858,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         {/* TAB 4: REGRAS DE FOLLOW-UP */}
         {activeTab === "followup_rules" && (
           <div className="space-y-6">
-            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-6">
+            <Card className="gap-6 border-border/70">
               <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
+                <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
                   <Clock className="size-4 text-purple-500" />
                   Regras de Acompanhamento (Follow-up)
                 </h3>
@@ -1027,9 +991,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         {activeTab === "simulator" && (
           <div className="space-y-6">
             {alerts.length > 0 && (
-              <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-4">
+              <Card className="border-border/70">
                 <div>
-                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
                     <AlertTriangle className="size-4 text-rose-500" />
                     Central de Alertas Operacionais ({activeAlertsCount} ativos)
                   </h3>
@@ -1074,9 +1038,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
               </Card>
             )}
 
-            <Card variant="subtle" className="rounded-xl border-border/80 p-5 space-y-4">
+            <Card className="border-border/70">
               <div>
-                <h3 className="text-sm font-semibold flex items-center gap-2">
+                <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
                   <MessageSquare className="size-4 text-primary" />
                   Simulador de Qualificação (Ambiente Dev Web)
                 </h3>
@@ -1134,7 +1098,7 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </div>
         )}
         </div>
-        </div>
+        </Tabs>
       </main>
     </div>
 );

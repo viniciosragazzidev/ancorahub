@@ -5,6 +5,7 @@ import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Gear } from "@/components/huge-icons";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { saveDistributionPolicyAction } from "@/features/lead-distribution/actions";
@@ -49,15 +50,18 @@ export function DistributionPolicyPanel({
     setSaving(false);
   }
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Distribuição inteligente</CardTitle>
-        <CardDescription>
+    <Card variant="overview">
+      <CardHeader className="gap-0 border-b border-border/50 p-4">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Gear className="size-4" />
+          Distribuição inteligente
+        </CardTitle>
+        <CardDescription className="mt-1 max-w-3xl text-xs leading-5">
           Leads qualificados vão primeiro ao plantão ativo; depois o ranking considera conversão,
           SLA, carga e tempo sem novo lead.
         </CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-4">
+      <CardContent className="grid gap-4 p-4">
         <label className="flex items-center gap-2 text-sm">
           <Checkbox
             checked={ranking.enabled}
