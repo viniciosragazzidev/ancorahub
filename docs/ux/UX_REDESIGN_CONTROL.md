@@ -5,6 +5,8 @@
 
 ## Estado atual
 
+Correção pontual em `/distribuicao?view=plantao` (2026-09-27): Diretor/Gestor consultam o mês e veem total de dias com plantão, próximos/encerrados e dias sem cobertura por data distinta. A ação principal “Novo plantão” e a escala mensal permanecem; estado vazio mostra zero. Sem novo token, primitiva ou mudança de etapa. Registro em `docs/implementations/completed/2026-09-27-contagem-dias-plantao.md`.
+
 Refinamento pontual em `/primeiro-acesso` (2026-09-26): papel membro convidado; ação principal confirmar identidade; data via calendário compartilhado e e-mail com borda visível. Estados vazio, escolhido, data futura desabilitada e e-mail fixado pelo convite preservados. Sem novo token, primitive ou mudança na etapa UX-M1.10. Registro em `docs/implementations/completed/2026-09-26-primeiro-acesso-calendario.md`.
 
 | Campo | Valor |

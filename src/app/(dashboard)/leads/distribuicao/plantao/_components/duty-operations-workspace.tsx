@@ -1153,7 +1153,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
       </section>
 
       <section className="grid grid-cols-2 gap-2 sm:gap-3">
-        <StatCard label={`Dias com plantão em ${monthLabel(month).replace(/ de \d{4}$/, "").toLocaleLowerCase("pt-BR")}`} value={monthDays.total} sublabel={`${monthDays.upcoming} por acontecer · ${monthDays.finished} encerrados`} />
+        <StatCard label={`Dias com plantão em ${monthLabel(month).replace(/ de \d{4}$/, "").toLocaleLowerCase("pt-BR")}`} value={monthDays.total} sublabel={`${monthDays.upcoming} por acontecer · ${monthDays.finished} ${monthDays.finished === 1 ? "encerrado" : "encerrados"}`} />
         <StatCard
           label="Dias sem cobertura"
           value={gapCount}

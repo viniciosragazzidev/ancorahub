@@ -1405,6 +1405,11 @@ exibem histórico de outras ocorrências. A aba Plantões é um calendário do m
 passou a considerar a vigência: um plantão já encerrado não bloqueia outro no
 mesmo dia da semana e horário.
 
+Contagem mensal (2026-09-27, decisão do usuário): o indicador da aba Plantões
+conta datas distintas com plantão no mês, incluindo datas encerradas. Regras
+semanais contribuem com cada data em que ocorrem; múltiplas regras na mesma data
+contam apenas um dia. A indicação de dias sem cobertura segue a mesma unidade.
+
 ## DEC-124 — Histórico por ocorrência encerrada do plantão
 
 Aprovada pelo usuário em 2026-09-26: o fim de um turno encerra somente a ocorrência
@@ -1420,3 +1425,42 @@ Super-admin, sem apagar os eventos.
 ## DEC-122 - Renovar convite de ativação no reenvio manual
 
 Aprovada pelo usuário em 2026-09-25: o reenvio manual deve gerar e enviar novo convite quando não existir convite válido. Resolver o membro pelo vínculo ou perfil, preservando cargo e unidade; permitir convites vencidos ou revogados sem exigir novo cadastro. Contas já ativadas ou desabilitadas não são reativadas por esse fluxo. Tokens pendentes anteriores são substituídos; auditoria, prazo de 72h e controle do Super-admin são obrigatórios.
+
+## DEC-125 — WAHA oficial para os avisos operacionais da equipe, com reserva Meta
+
+**Decisão aprovada pelo usuário em 2026-09-27.** Amplia a DEC-120 e substitui,
+para os avisos à equipe, a regra "Meta como único canal" da DEC-100. Os avisos
+operacionais a membros da equipe (novo lead, lead prestes a expirar, lembretes,
+atribuição, expiração, tarefa) saem **por padrão pelo número WAHA da empresa**,
+com **reserva automática pelos templates aprovados da Meta**. Se o WAHA for
+desligado, o número for banido/desconectado ou o envio falhar, o aviso volta ao
+comportamento normal: template Meta aprovado. Cada aviso tem liga/desliga
+próprio, e "desligado" significa **não enviar** (registrado como pulado), nunca
+trocar de canal por baixo. Uma única função decide cada envio e devolve
+enviar/pular/bloquear com motivo. A oferta de lead por WAHA exige que o aceite
+funcione sem o botão do template (link seguro para o CRM); até isso existir ela
+permanece na Meta. Convite de primeiro acesso e confirmação de presença (links
+com token) permanecem só na Meta. A conexão pessoal WAHA do corretor não muda.
+
+## DEC-126 — Motor novo de qualificação como base do atendimento por IA
+
+**Decisão aprovada pelo usuário em 2026-09-27.** O motor novo (máquina de estados
+em `src/features/ai-agent`, com agente de IA, follow-ups e passagem para humano)
+passa a ser a base; o motor antigo de perguntas fixas (`ai-qualification/service`,
+ativo hoje porque `feature_qualification_engine_enabled = false`) sai depois de
+validação lado a lado. A troca é gradual e reversível pela mesma chave, com
+testes de caracterização antes e verificação contínua depois, para não causar
+erros no atendimento em produção.
+
+## DEC-127 — Fluxos de atendimento por fila, versionados, com editor visual
+
+**Decisão aprovada pelo usuário em 2026-09-27.** Cada fila escolhe um fluxo de
+atendimento (um por vez). Fluxos têm rascunho, simulador e versão publicada; a
+versão publicada roda até outra ser publicada. Cada lead pertence a uma única
+execução, registrada passo a passo, com chave de idempotência por etapa. Blocos:
+início, enviar mensagem, enviar e aguardar resposta (com tempo limite), condição
+(sempre com "senão"), agente de IA, aguardar, transferir, atualizar lead e
+encerrar. O editor visual usa `@xyflow/react` (MIT). O primeiro fluxo publicado
+reproduz o comportamento atual, para que ligar o motor não mude o atendimento.
+Plano e fases em `docs/implementations/active/2026-09-27-motor-atendimento.md`.
+

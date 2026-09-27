@@ -6,6 +6,11 @@
 
 Este documento registra cronologicamente todas as alterações de UX/UI, estrutura de páginas, componentes e navegação realizadas no CRM Âncora.
 
+## 2026-09-27 — Resumo mensal de plantões por dia
+
+- Em `/distribuicao?view=plantao`, os indicadores mensais contam datas distintas com plantão, em vez de regras/tipos. O total inclui dias encerrados e informa separadamente os dias que ainda vão acontecer; falta de cobertura também usa dias distintos.
+- A escala e a distribuição não mudaram. Registro: `docs/implementations/completed/2026-09-27-contagem-dias-plantao.md`.
+
 ## 2026-09-26 — Primeiro acesso de membros
 
 - O campo de nascimento usa o calendário compartilhado com mês e ano selecionáveis, idioma português e datas futuras desabilitadas. A data exibida é brasileira; o envio ao servidor mantém o formato anterior.
