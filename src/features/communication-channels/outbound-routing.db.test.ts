@@ -1,5 +1,7 @@
 /**
- * Characterization of how a message is routed today (service engine, phase 0):
+ * Characterization of how a team notice is routed (service engine, DEC-125).
+ * Phase 0 fixed the old behaviour; phase 1 changed it on purpose and this file
+ * now pins the new one:
  * which channel, which content and which fallback each operational event gets,
  * from the outbox row written at enqueue to the provider called when the row is
  * processed. Runs against the real schema inside ONE transaction that is
@@ -12,7 +14,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as realSchema from "@/shared/db/schema";
 
@@ -63,7 +65,7 @@ class Rollback extends Error {}
 const FAKE_PHONE = "5521900000001"; // never a real person; providers are mocked anyway
 
 type Tx = NonNullable<typeof db>;
-type Outcome = { enqueue: { route: string | null; type: string | null; template: string | null; fallbackType: string | null } | { error: string }; process?: { status: string; route: string | null; error: string | null; calls: typeof calls } };
+type Outcome = { enqueue: { status: string; route: string | null; type: string | null; template: string | null; hold: string | null } | { error: string }; process?: { status: string; route: string | null; hold: string | null; error: string | null; calls: typeof calls } };
 
 async function inRollback(run: (tx: Tx, tenantId: string, brokerId: string) => Promise<void>) {
   await db!.transaction(async (tx) => {
@@ -101,83 +103,130 @@ async function scenario(tx: Tx, input: { tenantId: string; brokerId: string; pur
   }
   const s = realSchema;
   const [row] = await tx.select().from(s.whatsappOutboundMessages).where(eq(s.whatsappOutboundMessages.id, id));
-  const outcome: Outcome = { enqueue: { route: row.deliveryRoute, type: row.messageType, template: row.templateName, fallbackType: row.fallbackMessageType } };
-  if (input.process === false) return outcome;
+  const outcome: Outcome = { enqueue: { status: row.status, route: row.deliveryRoute, type: row.messageType, template: row.templateName, hold: row.holdReason } };
+  if (input.process === false || row.status === "skipped") return outcome;
   await outbound.processMetaOutboundBatch(1, input.tenantId, id);
   const [after] = await tx.select().from(s.whatsappOutboundMessages).where(eq(s.whatsappOutboundMessages.id, id));
-  outcome.process = { status: after.status, route: after.deliveryRoute, error: after.providerErrorCode ? `${after.providerErrorCode}: ${after.providerErrorMessage ?? ""}`.slice(0, 160) : null, calls: [...calls] };
+  outcome.process = { status: after.status, route: after.deliveryRoute, hold: after.holdReason, error: after.providerErrorCode ? `${after.providerErrorCode}: ${after.providerErrorMessage ?? ""}`.slice(0, 160) : null, calls: [...calls] };
   return outcome;
 }
 
-/** Connects a fake company number and routes one event to a free message through it. */
-async function routeEventThroughCompanyNumber(tx: Tx, tenantId: string, eventKey: string, options: { messageActive?: boolean; numberStatus?: string } = {}) {
+/** Sets the tenant's company number for the scenario: only a fresh fake one counts (rolled back). */
+async function companyNumber(tx: Tx, tenantId: string, status: "active" | "disconnected" | "paused") {
   const s = realSchema;
-  // Only the number created here counts: any real company number of the tenant is set aside (rolled back).
   await tx.update(s.wahaNumbers).set({ status: "disconnected" }).where(and(eq(s.wahaNumbers.tenantId, tenantId), eq(s.wahaNumbers.scope, "tenant")));
   const numberId = randomUUID();
-  await tx.insert(s.wahaNumbers).values({ id: numberId, relaySessionId: `phase0-${numberId}`, displayPhoneNumber: `55219${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`, tenantId, scope: "tenant", status: options.numberStatus ?? "active", capabilities: { inbound: false, cadence: false, ai: false } });
-  const messageId = randomUUID();
-  const [author] = await tx.select({ userId: s.tenantMemberships.userId }).from(s.tenantMemberships).where(eq(s.tenantMemberships.tenantId, tenantId)).limit(1);
-  await tx.insert(s.messageTemplates).values({ id: messageId, tenantId, name: `phase0 ${eventKey}`, category: "operational", content: "Aviso de teste para {{nome}}", variables: [], active: options.messageActive ?? true, createdBy: author.userId });
-  await tx.insert(s.systemSettings).values({ key: `tenant_channel_routing_${tenantId}`, value: JSON.stringify({ events: { [eventKey]: messageId } }) })
-    .onConflictDoUpdate({ target: s.systemSettings.key, set: { value: JSON.stringify({ events: { [eventKey]: messageId } }) } });
+  await tx.insert(s.wahaNumbers).values({
+    id: numberId, relaySessionId: `phase1-${numberId}`, displayPhoneNumber: `55219${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`,
+    tenantId, scope: "tenant", status: status === "disconnected" ? "disconnected" : "active",
+    pausedUntil: status === "paused" ? new Date(Date.now() + 10 * 60_000) : null,
+    createdAt: new Date(Date.now() + 60_000), // the newest number is the company number
+    capabilities: { inbound: false, cadence: false, ai: false },
+  });
+  return numberId;
 }
 
-const report: Record<string, Outcome> = {};
-beforeEach(() => { wahaBehavior.fail = false; });
+async function notice(tx: Tx, tenantId: string, key: string, enabled: boolean, channel: "company_number" | "meta") {
+  await tx.insert(realSchema.teamNoticeSettings).values({ tenantId, noticeKey: key, enabled, channel })
+    .onConflictDoUpdate({ target: [realSchema.teamNoticeSettings.tenantId, realSchema.teamNoticeSettings.noticeKey], set: { enabled, channel } });
+}
 
-describe.skipIf(!enabled)("outbound routing today (characterization, rolled back)", () => {
-  it("maps each operational event to a channel, content and fallback", async () => {
+// Wednesday 30/09/2026 10:00 in São Paulo: inside business hours.
+const WEDNESDAY_10AM = new Date("2026-09-30T13:00:00Z");
+const SATURDAY_10AM = new Date("2026-10-03T13:00:00Z");
+const report: Record<string, Outcome> = {};
+beforeEach(() => {
+  wahaBehavior.fail = false;
+  vi.useFakeTimers({ toFake: ["Date"], shouldAdvanceTime: true });
+  vi.setSystemTime(WEDNESDAY_10AM);
+});
+afterEach(() => { vi.useRealTimers(); });
+
+const sentBy = (key: string) => report[key].process?.calls.map((call) => call.provider);
+
+describe.skipIf(!enabled)("team notice routing (characterization, rolled back)", () => {
+  it("routes each team notice by its setting, with the company number first and Meta as the fallback", async () => {
     await inRollback(async (tx, tenantId, brokerId) => {
-      // Meta path (no company-number routing).
-      for (const purpose of ["newLeadAssignment", "leadAssignmentExpired", "leadAssignmentConfirmed", "leadFeedbackReminder", "taskReminder", "brokerAccountActivated"]) {
-        report[`meta:${purpose}`] = await scenario(tx, { tenantId, brokerId, purpose });
-      }
-      // Company number (WAHA) routing for a routable event.
-      await routeEventThroughCompanyNumber(tx, tenantId, "LEAD_ASSIGNMENT_EXPIRED");
-      report["waha:leadAssignmentExpired"] = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentExpired" });
+      await companyNumber(tx, tenantId, "active");
+      // Offer: locked to Meta (acceptance uses the template button).
+      report.offer = await scenario(tx, { tenantId, brokerId, purpose: "newLeadAssignment" });
+      // Lead information: company number first, built-in wording.
+      report.confirmedByCompany = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentConfirmed", variables: ["Corretor Teste", "Lead Teste", "(21) 90000-0000", "Plano de saúde", "Individual", "0", "Niterói", randomUUID()] });
+      // Meta first: the template is missing on the sending number, so the company number carries it.
+      await notice(tx, tenantId, "LEAD_ASSIGNMENT_CONFIRMED", true, "meta");
+      report.confirmedMetaThenCompany = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadAssignmentConfirmed", variables: ["Outro", "Lead", "(21) 90000-0001", "Plano", "Individual", "1", "Rio", randomUUID()] });
+      // Default off: an expired offer is not sent at all (and never through another channel).
+      report.expiredDefaultOff = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentExpired" });
+      // Reminder switched on: sent by the company number within business hours.
+      await notice(tx, tenantId, "TASK_REMINDER", true, "company_number");
+      vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 20_000)); // past the company number spacing
+      report.taskReminderOn = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "taskReminder", variables: ["Corretor Teste", "Ligar para o lead", "30/09 14:00"] });
+    });
+
+    await inRollback(async (tx, tenantId, brokerId) => {
+      // Company number down: back to normal, the approved Meta template.
+      await companyNumber(tx, tenantId, "disconnected");
+      report.confirmedNumberDown = await scenario(tx, { tenantId, brokerId, purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"] });
+      await companyNumber(tx, tenantId, "paused");
+      report.confirmedNumberPaused = await scenario(tx, { tenantId, brokerId, purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"] });
+    });
+
+    await inRollback(async (tx, tenantId, brokerId) => {
+      await companyNumber(tx, tenantId, "active");
+      // WAHA fails at send time: the notice still reaches the person through Meta.
       wahaBehavior.fail = true;
-      report["waha-down:leadAssignmentExpired"] = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentExpired" });
+      report.companyFailsFallsToMeta = await scenario(tx, { tenantId, brokerId, purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"] });
       wahaBehavior.fail = false;
-      // The offer is not routable: it stays on Meta even with a routing entry.
-      await routeEventThroughCompanyNumber(tx, tenantId, "LEAD_OFFER");
-      report["waha-attempt:newLeadAssignment"] = await scenario(tx, { tenantId, brokerId, purpose: "newLeadAssignment" });
     });
+
     await inRollback(async (tx, tenantId, brokerId) => {
-      await routeEventThroughCompanyNumber(tx, tenantId, "TASK_REMINDER", { messageActive: false });
-      report["waha-inactive-message:taskReminder"] = await scenario(tx, { tenantId, brokerId, purpose: "taskReminder" });
+      await companyNumber(tx, tenantId, "active");
+      await notice(tx, tenantId, "LEAD_FEEDBACK_REMINDER", true, "company_number");
+      // At most 2 feedback reminders per person per day, spaced apart.
+      report.reminder1 = await scenario(tx, { tenantId, brokerId, purpose: "leadFeedbackReminder", variables: ["Corretor Teste", "Lead B"] });
+      vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 2 * 60_000));
+      report.reminder2 = await scenario(tx, { tenantId, brokerId, purpose: "leadFeedbackReminder", variables: ["Corretor Teste", "Lead C"] });
+      vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 4 * 60_000));
+      report.reminder3 = await scenario(tx, { tenantId, brokerId, purpose: "leadFeedbackReminder", variables: ["Corretor Teste", "Lead D"] });
+      // Outside business hours: waits for Monday 08:00 instead of sending.
+      vi.setSystemTime(SATURDAY_10AM);
+      report.reminderSaturday = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadFeedbackReminder", variables: ["Corretor Teste", "Lead A"] });
+      // Lead information is never held, even on a Saturday.
+      report.confirmedSaturday = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentConfirmed", variables: ["Corretor Teste", "Lead S", "(21) 90000-0002", "Plano", "Individual", "0", "Rio", randomUUID()] });
     });
-    await inRollback(async (tx, tenantId, brokerId) => {
-      await routeEventThroughCompanyNumber(tx, tenantId, "TASK_REMINDER", { numberStatus: "disconnected" });
-      report["waha-disconnected:taskReminder"] = await scenario(tx, { tenantId, brokerId, purpose: "taskReminder" });
-    });
+
     if (process.env.OUTBOUND_REPORT_FILE) writeFileSync(process.env.OUTBOUND_REPORT_FILE, JSON.stringify(report, null, 2));
 
-    const sentBy = (key: string) => report[key].process?.calls.map((call) => call.provider);
-    // Meta path: every broker notice leaves as a Meta template.
-    expect(report["meta:newLeadAssignment"]).toMatchObject({ enqueue: { route: "meta_only", type: "template", template: "new_lead_broker" }, process: { status: "sent" } });
-    expect(report["meta:leadAssignmentExpired"]).toMatchObject({ enqueue: { route: "meta_only", template: "lead_assignment_expired" }, process: { status: "sent" } });
-    expect(report["meta:leadFeedbackReminder"]).toMatchObject({ enqueue: { template: "registrar_feedback_lead" }, process: { status: "sent" } });
-    expect(report["meta:brokerAccountActivated"]).toMatchObject({ enqueue: { template: "broker_account_activated" }, process: { status: "sent" } });
-    // KNOWN DEFECT today (fixed on purpose in phase 1): the resolver picks a
-    // template the sending number does not have, so the notice leaves through
-    // no channel at all. Seen in production as 31% of broker notices failing.
-    expect(report["meta:leadAssignmentConfirmed"].process).toMatchObject({ status: "failed", calls: [] });
-    expect(report["meta:leadAssignmentConfirmed"].process?.error).toMatch(/^TEMPLATE_NOT_IN_WABA/);
-    expect(report["meta:taskReminder"].process).toMatchObject({ status: "failed", calls: [] });
-    expect(report["meta:taskReminder"].process?.error).toMatch(/^TEMPLATE_NOT_IN_WABA/);
+    expect(report.offer).toMatchObject({ enqueue: { route: "meta_only", template: "new_lead_broker" }, process: { status: "sent" } });
+    expect(sentBy("offer")).toEqual(["meta_template"]);
 
-    // Company number (WAHA): the free message goes out, Meta is not called.
-    expect(report["waha:leadAssignmentExpired"]).toMatchObject({ enqueue: { route: "waha_direct" }, process: { status: "sent", route: "waha_direct" } });
-    expect(sentBy("waha:leadAssignmentExpired")).toEqual(["waha"]);
-    // WAHA down at send time: the same notice falls back to the Meta template.
-    expect(report["waha-down:leadAssignmentExpired"].process).toMatchObject({ status: "sent", route: "meta_only" });
-    expect(sentBy("waha-down:leadAssignmentExpired")).toEqual(["meta_template"]);
-    // The lead offer is not routable to WAHA today: it stays on Meta.
-    expect(sentBy("waha-attempt:newLeadAssignment")).toEqual(["meta_template"]);
-    // Inactive free message or disconnected number: back to Meta at enqueue
-    // (and, for an unapproved template, the known defect above).
-    expect(report["waha-inactive-message:taskReminder"].enqueue).toMatchObject({ route: "meta_only" });
-    expect(report["waha-disconnected:taskReminder"].enqueue).toMatchObject({ route: "meta_only" });
-  }, 180_000);
+    expect(report.confirmedByCompany).toMatchObject({ enqueue: { route: "waha_direct" }, process: { status: "sent", route: "waha_direct" } });
+    expect(sentBy("confirmedByCompany")).toEqual(["waha"]);
+    expect(report.confirmedByCompany.process?.calls[0].body).toContain("Atribuição Confirmada");
+
+    // Fixes the phase-0 defect: Meta has no template, the company number sends it.
+    expect(report.confirmedMetaThenCompany.process).toMatchObject({ status: "sent", route: "waha_direct" });
+    expect(sentBy("confirmedMetaThenCompany")).toEqual(["waha"]);
+
+    expect(report.expiredDefaultOff).toMatchObject({ enqueue: { status: "skipped", hold: "disabled" } });
+    expect(report.expiredDefaultOff.process).toBeUndefined();
+
+    expect(report.taskReminderOn.process).toMatchObject({ status: "sent", route: "waha_direct" });
+
+    expect(report.confirmedNumberDown).toMatchObject({ enqueue: { route: "meta_only", hold: "company_number_unavailable" }, process: { status: "sent" } });
+    expect(sentBy("confirmedNumberDown")).toEqual(["meta_template"]);
+    expect(report.confirmedNumberPaused).toMatchObject({ enqueue: { route: "meta_only", hold: "company_number_paused" } });
+
+    expect(report.companyFailsFallsToMeta.process).toMatchObject({ status: "sent", route: "meta_only" });
+    expect(sentBy("companyFailsFallsToMeta")).toEqual(["meta_template"]);
+
+    expect(report.reminderSaturday.process).toMatchObject({ status: "queued", hold: "outside_business_hours" });
+    expect(sentBy("reminderSaturday")).toEqual([]);
+    expect(report.confirmedSaturday.process).toMatchObject({ status: "sent" });
+
+    expect(report.reminder1.process).toMatchObject({ status: "sent" });
+    expect(report.reminder2.process).toMatchObject({ status: "sent" });
+    expect(report.reminder3.process).toMatchObject({ status: "skipped", hold: "reminder_daily_limit" });
+    expect(sentBy("reminder3")).toEqual([]);
+  }, 240_000);
 });

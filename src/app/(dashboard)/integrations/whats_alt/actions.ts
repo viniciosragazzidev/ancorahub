@@ -10,6 +10,7 @@ import { tenantChannelRoutingKey } from "@/features/waha-cadence/tenant-channel-
 import { normalizeTenantChannelRouting, type TenantChannelRouting } from "@/features/waha-cadence/tenant-channel-routing-rules";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { teamNoticeByKey, type NoticeChannel } from "@/features/team-notices/catalog";
 import {
   disconnectTenantChannel,
   readTenantChannelState,
@@ -78,5 +79,48 @@ export async function saveTenantChannelRoutingAction(input: TenantChannelRouting
     return { success: true };
   } catch (error) {
     return failure(error, "Não foi possível salvar os envios do número da empresa.");
+  }
+}
+
+export type TeamNoticeInput = { key: string; enabled: boolean; channel: NoticeChannel; freeMessageId: string | null };
+
+/** Team notices (DEC-125): on/off, primary channel and the company-number text of each notice. */
+export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<Result<object>> {
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") return { success: false, error: "Apenas o Diretor pode alterar os avisos da equipe." };
+    const rows = input.filter((item) => {
+      const notice = teamNoticeByKey(item.key);
+      return notice && !notice.metaOnly && (item.channel === "company_number" || item.channel === "meta");
+    });
+    const messageIds = [...new Set(rows.map((item) => item.freeMessageId).filter((id): id is string => Boolean(id)))];
+    if (messageIds.length) {
+      const found = await getDatabase().select({ id: schema.messageTemplates.id }).from(schema.messageTemplates).where(and(
+        eq(schema.messageTemplates.tenantId, context.tenantId),
+        eq(schema.messageTemplates.active, true),
+        inArray(schema.messageTemplates.id, messageIds),
+      ));
+      if (found.length !== messageIds.length) return { success: false, error: "Uma das mensagens escolhidas não existe ou está inativa." };
+    }
+    const now = new Date();
+    await getDatabase().transaction(async (tx) => {
+      for (const item of rows) {
+        await tx.insert(schema.teamNoticeSettings).values({
+          tenantId: context.tenantId, noticeKey: item.key, enabled: item.enabled, channel: item.channel,
+          freeMessageId: item.freeMessageId, updatedBy: context.userId, updatedAt: now,
+        }).onConflictDoUpdate({
+          target: [schema.teamNoticeSettings.tenantId, schema.teamNoticeSettings.noticeKey],
+          set: { enabled: item.enabled, channel: item.channel, freeMessageId: item.freeMessageId, updatedBy: context.userId, updatedAt: now },
+        });
+      }
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(), userId: context.userId, entidade: "tenant", entidadeId: context.tenantId,
+        acao: `team_notices.updated:${rows.map((item) => `${item.key}=${item.enabled ? item.channel : "off"}`).join(",")}`.slice(0, 500),
+      });
+    });
+    revalidatePath("/integrations/whatsapp");
+    return { success: true };
+  } catch (error) {
+    return failure(error, "Não foi possível salvar os avisos da equipe.");
   }
 }

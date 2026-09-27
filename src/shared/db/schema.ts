@@ -10,6 +10,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -2060,6 +2061,11 @@ export const wahaNumbers = pgTable(
     minIntervalSeconds: integer("min_interval_seconds").notNull().default(45),
     lastHealthAt: timestamp("last_health_at", { withTimezone: true }),
     lastErrorCode: text("last_error_code"),
+    /** Spacing slot: when this number last sent (compare-and-set before each send). */
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+    /** Circuit breaker: consecutive send failures and the pause they caused. */
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    pausedUntil: timestamp("paused_until", { withTimezone: true }),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,
@@ -2070,6 +2076,21 @@ export const wahaNumbers = pgTable(
     index("waha_numbers_status_idx").on(table.status),
     index("waha_numbers_tenant_scope_idx").on(table.tenantId, table.branchId, table.status),
   ],
+);
+
+/** Team notices (DEC-125): on/off and primary channel per tenant; missing rows use the catalog defaults. */
+export const teamNoticeSettings = pgTable(
+  "team_notice_settings",
+  {
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    noticeKey: text("notice_key").notNull(),
+    enabled: boolean("enabled").notNull(),
+    channel: text("channel", { enum: ["company_number", "meta"] }).notNull(),
+    freeMessageId: text("free_message_id").references(() => messageTemplates.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.noticeKey] })],
 );
 
 /** Tenant-owned cadence aggregate. Published versions are immutable. */
@@ -2970,6 +2991,10 @@ export const whatsappOutboundMessages = pgTable(
     attempts: integer("attempts").notNull().default(0),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     requestedBy: text("requested_by").references(() => user.id, { onDelete: "set null" }),
+    /** Why the row is waiting or was skipped (quiet hours, pacing, limit, disabled). */
+    holdReason: text("hold_reason"),
+    /** Team notice this row belongs to (DEC-125), for per-notice limits. */
+    noticeKey: text("notice_key"),
     createdAt,
     updatedAt,
   },

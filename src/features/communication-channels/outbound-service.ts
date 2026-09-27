@@ -19,6 +19,18 @@ import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
 import { findConnectedTenantChannelId, resolveTenantChannelDelivery, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
+import { teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
+import { companyNumberUsable, decideTeamNotice } from "@/features/team-notices/decision";
+import { DELIVERY_LIMITS } from "@/features/team-notices/guard";
+import {
+  evaluateNoticeRow,
+  getCompanyNumberState,
+  getTeamNoticeSetting,
+  recordCompanyNumberFailure,
+  recordCompanyNumberSuccess,
+  renderTeamNoticeText,
+  reserveCompanyNumberSlot,
+} from "@/features/team-notices/service";
 
 const phoneSchema = z.string().trim().transform((value) => value.replace(/\D/g, "")).pipe(z.string().min(10).max(15));
 const variablesSchema = z.array(z.string().trim().min(1).max(512)).max(10).default([]);
@@ -272,12 +284,48 @@ export async function enqueueMetaTemplateMessage(input: {
     ? null
     : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose, channel?.wabaId ?? null);
   const template = resolvedTemplate ?? (input.purpose === "brokerAccountActivated" || input.purpose === "dutyPresenceConfirmation" ? null : getMetaWhatsAppTemplate(input.purpose));
-  // A broker notice routed to the company number (WhatsApp da diretoria)
-  // leaves through WAHA with the chosen free message; the Meta resource
-  // resolved above stays on the row as the automatic fallback.
-  const tenantChannel = input.recipientType === "user"
-    ? await resolveTenantChannelDelivery({ tenantId: input.tenantId, purpose: input.purpose, variables }).catch(() => null)
-    : null;
+  // Team notices (DEC-125): one decision per notice. Disabled means not sent
+  // (kept as 'skipped'); company number first falls back to the Meta resource
+  // resolved above; Meta first keeps the company number as its fallback.
+  const teamNotice = input.recipientType === "user" ? teamNoticeForPurpose(input.purpose) : null;
+  let noticeRoute: { route: DeliveryRoute; wahaNumberId: string | null; text: string | null; skipped: boolean; note: string | null } | null = null;
+  if (teamNotice) {
+    const [setting, number] = await Promise.all([getTeamNoticeSetting(input.tenantId, teamNotice), getCompanyNumberState(input.tenantId)]);
+    const decision = decideTeamNotice(teamNotice, setting, number, new Date());
+    if (decision.action === "skip") {
+      noticeRoute = { route: "meta_only", wahaNumberId: null, text: null, skipped: true, note: "disabled" };
+    } else if (decision.primary === "company_number") {
+      const text = await renderTeamNoticeText({ tenantId: input.tenantId, notice: teamNotice, setting, variables, builtIn: resolveTemplateTextBody(input.purpose, variables) });
+      noticeRoute = text
+        ? { route: "waha_direct", wahaNumberId: decision.wahaNumberId, text, skipped: false, note: null }
+        : { route: "meta_only", wahaNumberId: null, text: null, skipped: false, note: "empty_company_text" };
+    } else {
+      noticeRoute = decision.wahaNumberId
+        ? { route: "meta_then_waha", wahaNumberId: decision.wahaNumberId, text: null, skipped: false, note: decision.note }
+        : { route: "meta_only", wahaNumberId: null, text: null, skipped: false, note: decision.note };
+    }
+  }
+  // Other broker messages keep the legacy company-number routing (DEC-120).
+  const tenantChannel = noticeRoute
+    ? (noticeRoute.route === "waha_direct" && noticeRoute.wahaNumberId && noticeRoute.text ? { wahaNumberId: noticeRoute.wahaNumberId, text: noticeRoute.text } : null)
+    : input.recipientType === "user"
+      ? await resolveTenantChannelDelivery({ tenantId: input.tenantId, purpose: input.purpose, variables }).catch(() => null)
+      : null;
+  if (noticeRoute?.skipped) {
+    const db = getDatabase();
+    const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
+    if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
+    const id = randomUUID();
+    const now = new Date();
+    await db.insert(schema.whatsappOutboundMessages).values({
+      id, tenantId: input.tenantId, channelId: channel?.id ?? null, deliveryRoute: "meta_only", wahaNumberId: null,
+      recipientType: input.recipientType, recipientId: input.recipientId ?? null, destinationPhone, purpose: input.purpose,
+      messageType: "text", templateName: "__skipped__", templateLanguage: "pt_BR", variables,
+      status: "skipped", holdReason: "disabled", noticeKey: teamNotice!.key, idempotencyKey: input.idempotencyKey,
+      queuedAt: now, requestedBy: input.requestedBy ?? null, createdAt: now, updatedAt: now,
+    });
+    return { id, status: "skipped" as WhatsAppOutboundStatus, duplicate: false };
+  }
   const primary = messagePlan?.primary ?? (template ? {
     type: "template" as const,
     templateName: template.name,
@@ -288,27 +336,40 @@ export async function enqueueMetaTemplateMessage(input: {
     templateLanguage: "pt_BR",
     renderedBody: tenantChannel.text,
   } : null);
-  if (!primary) throw new Error("Modelo de WhatsApp não permitido para esta operação.");
+  if (!primary && noticeRoute?.route === "meta_then_waha") {
+    // Meta has nothing approved for this notice: the company number carries it.
+    const text = await renderTeamNoticeText({ tenantId: input.tenantId, notice: teamNotice!, setting: await getTeamNoticeSetting(input.tenantId, teamNotice!), variables, builtIn: resolveTemplateTextBody(input.purpose, variables) });
+    if (text) noticeRoute = { route: "waha_direct", wahaNumberId: noticeRoute.wahaNumberId, text, skipped: false, note: "meta_template_missing" };
+  }
+  const primaryResolved = primary ?? (noticeRoute?.route === "waha_direct" && noticeRoute.text
+    ? { type: "text" as const, templateName: "__text__", templateLanguage: "pt_BR", renderedBody: noticeRoute.text }
+    : null);
+  if (!primaryResolved) throw new Error("Modelo de WhatsApp não permitido para esta operação.");
   const db = getDatabase();
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
   const delivery = resolveInternalBrokerDeliveryRoute(input);
-  if (!channel && !tenantChannel) throw new Error("Nenhum canal corporativo ativo foi configurado.");
+  if (!channel && !tenantChannel && !noticeRoute?.wahaNumberId) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const id = randomUUID();
   const now = new Date();
   await db.insert(schema.whatsappOutboundMessages).values({
-    id, tenantId: input.tenantId, channelId: channel?.id ?? null, deliveryRoute: tenantChannel ? "waha_direct" : delivery.route, wahaNumberId: tenantChannel?.wahaNumberId ?? delivery.wahaNumberId, recipientType: input.recipientType, recipientId: input.recipientId ?? null,
+    id, tenantId: input.tenantId, channelId: channel?.id ?? null,
+    deliveryRoute: noticeRoute ? noticeRoute.route : tenantChannel ? "waha_direct" : delivery.route,
+    holdReason: noticeRoute?.note ?? null,
+    wahaNumberId: noticeRoute ? noticeRoute.wahaNumberId : tenantChannel?.wahaNumberId ?? delivery.wahaNumberId,
+    noticeKey: teamNotice?.key ?? null,
+    recipientType: input.recipientType, recipientId: input.recipientId ?? null,
     destinationPhone,
     purpose: input.purpose,
-    messageType: primary.type,
-    templateName: primary.templateName,
-    templateLanguage: primary.templateLanguage,
+    messageType: primaryResolved.type,
+    templateName: primaryResolved.templateName,
+    templateLanguage: primaryResolved.templateLanguage,
     variables,
-    providerVariables: primary.providerVariables ?? null,
-    templateVariableNames: primary.templateVariableNames ?? null,
+    providerVariables: primaryResolved.providerVariables ?? null,
+    templateVariableNames: primaryResolved.templateVariableNames ?? null,
     messagePolicyId: messagePlan?.policyId ?? null,
     messagePolicyVersion: messagePlan?.policyVersion ?? null,
-    renderedBody: tenantChannel?.text ?? primary.renderedBody ?? null,
+    renderedBody: (noticeRoute?.route === "waha_direct" ? noticeRoute.text : null) ?? tenantChannel?.text ?? primaryResolved.renderedBody ?? null,
     fallbackMessageType: messagePlan?.fallback?.type ?? null,
     fallbackTemplateName: messagePlan?.fallback?.templateName ?? null,
     fallbackTemplateLanguage: messagePlan?.fallback?.templateLanguage ?? null,
@@ -490,12 +551,86 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     return `ℹ️ *Aviso de Atribuição*\n\nOlá *${brokerName}*, este lead já foi atribuído a outro corretor ou expirou.`;
   }
 
+  if (purpose === "leadFeedbackReminder") {
+    const brokerName = rawVariables[0]?.trim() || "Corretor(a)";
+    const leadName = rawVariables[1]?.trim() || "seu lead";
+    return `📝 *Registre o atendimento*\n\nOlá *${brokerName}*, falta registrar o feedback do atendimento de *${leadName}* no CRM.`;
+  }
+
   if (purpose === "leadAssignmentExpired") {
     const brokerName = rawVariables[0] || "Corretor(a)";
     return `⏳ *Tempo Expirado*\n\nOlá *${brokerName}*, o tempo para aceitar o lead expirou e a oportunidade foi repassada.`;
   }
 
   return rawVariables.filter(Boolean).join("\n") || "Notificação Âncora CRM";
+}
+
+type OutboundRow = typeof schema.whatsappOutboundMessages.$inferSelect;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Applies the delivery guard to a team notice row. "held": back to the queue
+ * with the reason and when to retry; "dropped": skipped for good (stale
+ * reminder, duplicate, daily reminder limit). An exact dispatch (a fresh lead
+ * notice) waits a few seconds inline instead of a whole cron cycle.
+ */
+async function guardNoticeRow(row: OutboundRow, channel: "company_number" | "meta", exact: boolean): Promise<"go" | "held" | "dropped"> {
+  const db = getDatabase();
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const verdict = await evaluateNoticeRow({ ...row, noticeKey: row.noticeKey! }, channel);
+    if (verdict.kind === "now") return "go";
+    if (verdict.kind === "drop") {
+      await db.update(schema.whatsappOutboundMessages).set({ status: "skipped", holdReason: verdict.reason, updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+      return "dropped";
+    }
+    const waitMs = verdict.until.getTime() - Date.now();
+    if (exact && attempt === 0 && waitMs <= 15_000) {
+      await sleep(Math.max(waitMs, 0));
+      continue;
+    }
+    await db.update(schema.whatsappOutboundMessages).set({ status: "queued", attempts: row.attempts, nextAttemptAt: verdict.until, holdReason: verdict.reason, updatedAt: new Date() }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+    return "held";
+  }
+  return "go";
+}
+
+/** Takes the company number's spacing slot; an exact dispatch retries once after the gap. */
+async function takeCompanySlot(wahaNumberId: string, noticeKey: string, exact: boolean) {
+  const critical = teamNoticeByKey(noticeKey)?.class === "critical";
+  const gapMs = critical ? DELIVERY_LIMITS.companyNumber.criticalGapMs : DELIVERY_LIMITS.companyNumber.gapMs;
+  if (await reserveCompanyNumberSlot(wahaNumberId, gapMs)) return true;
+  if (!exact) return false;
+  await sleep(gapMs);
+  return reserveCompanyNumberSlot(wahaNumberId, gapMs);
+}
+
+/** Company-number fallback for a team notice Meta could not send. True when it went out. */
+async function sendNoticeByCompanyNumber(row: OutboundRow, metaError: unknown, exact: boolean) {
+  const notice = teamNoticeByKey(row.noticeKey!);
+  if (!notice || notice.metaOnly) return false;
+  const db = getDatabase();
+  const [number] = await db.select({ id: schema.wahaNumbers.id, relaySessionId: schema.wahaNumbers.relaySessionId, status: schema.wahaNumbers.status, pausedUntil: schema.wahaNumbers.pausedUntil })
+    .from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.id, row.wahaNumberId!), eq(schema.wahaNumbers.tenantId, row.tenantId))).limit(1);
+  const now = new Date();
+  if (!number || !companyNumberUsable({ id: number.id, connected: TENANT_CHANNEL_CONNECTED_STATUSES.includes(number.status), pausedUntil: number.pausedUntil }, now).usable) return false;
+  const variables = stringList(row.variables);
+  const text = await renderTeamNoticeText({ tenantId: row.tenantId, notice, setting: await getTeamNoticeSetting(row.tenantId, notice), variables, builtIn: resolveTemplateTextBody(row.purpose, variables) });
+  if (!text) return false;
+  if (!await takeCompanySlot(number.id, notice.key, exact)) return false;
+  try {
+    const sentByWaha = await sendWahaRelayMessage({ idempotencyKey: `${row.idempotencyKey}:company`, sessionId: number.relaySessionId, destination: row.destinationPhone.replace(/\D/g, ""), body: text });
+    const reason = metaError instanceof Error ? metaError.message.slice(0, 120) : "Meta indisponível";
+    await db.update(schema.whatsappOutboundMessages).set({
+      status: "sent", deliveryRoute: "waha_direct", renderedBody: text, providerMessageId: sentByWaha.messageId,
+      providerErrorCode: null, providerErrorMessage: `Meta não enviou (${reason}); enviado pelo WhatsApp da empresa.`,
+      holdReason: null, sentAt: now, updatedAt: now,
+    }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+    await recordCompanyNumberSuccess(number.id).catch(() => undefined);
+    return true;
+  } catch {
+    await recordCompanyNumberFailure(number.id).catch(() => undefined);
+    return false;
+  }
 }
 
 export async function processMetaOutboundBatch(limit = 10, tenantId?: string, outboundId?: string): Promise<{ processed: number; sent: number; failed: number; retried: number }> {
@@ -525,7 +660,9 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       // A notice routed to the company number (WhatsApp da diretoria) keeps
       // its WAHA route; every other non-Meta row is legacy and migrates.
       const viaTenantChannel = row.deliveryRoute === "waha_direct" && Boolean(row.wahaNumberId) && Boolean(row.renderedBody);
-      if (!viaTenantChannel && (row.deliveryRoute !== "meta_only" || row.wahaNumberId)) {
+      // A team notice sent by Meta first keeps the company number as its fallback (DEC-125).
+      const companyFallback = row.deliveryRoute === "meta_then_waha" && Boolean(row.wahaNumberId) && Boolean(row.noticeKey);
+      if (!viaTenantChannel && !companyFallback && (row.deliveryRoute !== "meta_only" || row.wahaNumberId)) {
         await db.update(schema.whatsappOutboundMessages).set({
           deliveryRoute: "meta_only",
           wahaNumberId: null,
@@ -577,8 +714,15 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         return;
       }
 
+      // Delivery guard (DEC-125): business hours, spacing and limits for team notices.
+      if (row.noticeKey) {
+        const verdict = await guardNoticeRow(row, viaTenantChannel ? "company_number" : "meta", Boolean(outboundId));
+        if (verdict === "held") return;
+        if (verdict === "dropped") return;
+      }
+
       if (viaTenantChannel) {
-        const [tenantNumber] = await db.select({ relaySessionId: schema.wahaNumbers.relaySessionId }).from(schema.wahaNumbers)
+        const [tenantNumber] = await db.select({ relaySessionId: schema.wahaNumbers.relaySessionId, pausedUntil: schema.wahaNumbers.pausedUntil }).from(schema.wahaNumbers)
           .where(and(
             eq(schema.wahaNumbers.id, row.wahaNumberId!),
             eq(schema.wahaNumbers.tenantId, row.tenantId),
@@ -587,17 +731,25 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           .limit(1);
         try {
           if (!tenantNumber) throw new Error("Número da empresa desconectado.");
+          if (tenantNumber.pausedUntil && tenantNumber.pausedUntil > new Date()) throw new Error("Número da empresa pausado após falhas seguidas.");
+          if (row.noticeKey && !await takeCompanySlot(row.wahaNumberId!, row.noticeKey, Boolean(outboundId))) {
+            await db.update(schema.whatsappOutboundMessages).set({ status: "queued", attempts: row.attempts, nextAttemptAt: new Date(Date.now() + 5_000), holdReason: "number_spacing", updatedAt: new Date() })
+              .where(eq(schema.whatsappOutboundMessages.id, row.id));
+            return;
+          }
           const sentByWaha = await sendWahaRelayMessage({
             idempotencyKey: row.idempotencyKey,
             sessionId: tenantNumber.relaySessionId,
             destination: row.destinationPhone.replace(/\D/g, ""),
             body: row.renderedBody!,
           });
-          await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId: sentByWaha.messageId, providerErrorCode: null, providerErrorMessage: null, sentAt: new Date(), updatedAt: new Date() })
+          await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId: sentByWaha.messageId, providerErrorCode: null, providerErrorMessage: null, holdReason: null, sentAt: new Date(), updatedAt: new Date() })
             .where(eq(schema.whatsappOutboundMessages.id, row.id));
+          await recordCompanyNumberSuccess(row.wahaNumberId!).catch(() => undefined);
           sent += 1;
           return;
         } catch (wahaError) {
+          await recordCompanyNumberFailure(row.wahaNumberId!).catch(() => undefined);
           // Never lose the notice: fall back to the Meta resource on the row.
           console.warn("[tenant-channel] waha_send_failed_falling_back_to_meta", {
             outboundMessageId: row.id,
@@ -656,11 +808,11 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       // without a usable binding may still fall back to the tenant default.
       const channel = await resolveMetaOutboundChannel(row);
       if (!channel?.phoneNumberId || !channel.accessTokenCiphertext) throw new Error("Canal corporativo incompleto.");
-      if (row.channelId !== channel.id || row.deliveryRoute !== "meta_only" || row.wahaNumberId) {
+      if (row.channelId !== channel.id || (!companyFallback && (row.deliveryRoute !== "meta_only" || row.wahaNumberId))) {
         await db.update(schema.whatsappOutboundMessages).set({
           channelId: channel.id,
-          deliveryRoute: "meta_only",
-          wahaNumberId: null,
+          deliveryRoute: companyFallback ? "meta_then_waha" : "meta_only",
+          wahaNumberId: companyFallback ? row.wahaNumberId : null,
           updatedAt: new Date(),
         }).where(and(
           eq(schema.whatsappOutboundMessages.id, row.id),
@@ -826,6 +978,12 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       }
       sent += 1;
     } catch (error) {
+      // Meta could not send a team notice (template missing, number without the
+      // template, provider error): the company number carries it right away.
+      if (row.deliveryRoute === "meta_then_waha" && row.wahaNumberId && row.noticeKey && await sendNoticeByCompanyNumber(row, error, Boolean(outboundId))) {
+        sent += 1;
+        return;
+      }
       const message = error instanceof Error ? error.message : "Falha no envio via Meta Cloud API.";
       const code = error instanceof MetaCloudApiError
         ? String(error.code ?? error.status)

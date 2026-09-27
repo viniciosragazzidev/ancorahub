@@ -36,6 +36,17 @@ Resultado da caracterização:
 | Oferta com rota WAHA | Meta | enviado (oferta não é roteável) |
 | Texto livre inativo / número desconectado | Meta | cai no defeito acima quando o template não existe |
 
+## Fase 1 — avisos da equipe (entregue em `feat/motor-atendimento-fase1`)
+
+- Catálogo `src/features/team-notices/catalog.ts`: dez avisos, classe (imediato, informativo, lembrete), padrão ligado/desligado, travados na Meta (oferta, convite, confirmação de presença).
+- Decisão única `decision.ts`: desligado = pulado (linha `skipped`, motivo `disabled`), nunca outro canal; WhatsApp da empresa primeiro com reserva Meta; Meta primeiro com reserva no WhatsApp da empresa; número desconectado ou pausado volta à Meta.
+- Porteiro `guard.ts` (valores só no código): imediatos sem limite e sem horário, só 3–5 s entre mensagens do número; demais de seg. a sex. 08:00–18:00, 60 s entre avisos à mesma pessoa, 4/h e 15/dia por pessoa, lembretes 2/dia por pessoa, sem repetir o mesmo aviso em 6 h, lembrete com mais de 12 h descartado; número da empresa 8–15 s entre mensagens, 40/h e 250/dia (15/h nos 7 primeiros dias); disjuntor de 3 falhas seguidas pausa o número 30 min, avisa o Diretor e manda tudo pela Meta.
+- Fila de envio: rota `meta_then_waha` preservada, porteiro antes do envio (espera reagenda com `hold_reason`, sem falhar), vaga atômica do número (`waha_numbers.last_sent_at`), texto padrão ou mensagem livre escolhida, e envio pelo WhatsApp da empresa quando a Meta não consegue.
+- Migration `0164_team_notices_delivery_guard` (aditiva, aplicada em 2026-09-27): `team_notice_settings`, `whatsapp_outbound_messages.hold_reason/notice_key`, `waha_numbers.last_sent_at/consecutive_failures/paused_until`.
+- Tela: card "Avisos da equipe" em Integrações → WhatsApp (visão diretoria), substituindo a rota por evento.
+- Verificação: 14 testes das regras; caracterização com banco real (transação desfeita, provedores simulados) cobrindo WAHA, Meta primeiro sem template, desligado, número caído/pausado, falha do WAHA, sábado, limite de lembretes; 688 testes das áreas afetadas.
+- Fica para depois: oferta pelo WhatsApp da empresa com aceite por link (1b) e agrupar vários lembretes numa mensagem só.
+
 ## Fases
 
 1. **Avisos da equipe.** Tabela única por evento (ligado, canal: WAHA com reserva Meta / Meta / WAHA / Meta com reserva WAHA, template Meta, texto livre). Função única de decisão; desligado = pulado; validação ao salvar (template precisa existir no número); oferta por WAHA com aceite por link seguro. Migra `tenant_channel_routing_*` e as políticas internas; atualiza a caracterização para o comportamento novo.

@@ -778,6 +778,13 @@
                         "when":  1790218000000,
                         "tag":  "0163_duty_monthly_plan_superseded",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  111,
+                        "version":  "7",
+                        "when":  1790221600000,
+                        "tag":  "0164_team_notices_delivery_guard",
+                        "breakpoints":  true
                     }
                 ]
 }
