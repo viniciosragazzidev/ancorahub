@@ -16,6 +16,7 @@ import { routeLeadToBranchAction } from "@/features/lead-distribution/actions";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
+import { LeadAttendanceFlowStarter } from "./lead-attendance-flow-starter";
 
 type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null };
 type DutyRosterState = {
@@ -296,6 +297,8 @@ export function LeadDrawerManagementActions({
           />
         </div>
       ) : null}
+
+      {!currentOwner && isDirectorOrManager ? <LeadAttendanceFlowStarter leadId={leadId} /> : null}
 
       {/* Atribuir unidade */}
       {canReassignUnit && (

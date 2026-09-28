@@ -136,4 +136,42 @@ describe.skipIf(!enabled)("attendance flow runtime (real schema, rolled back)", 
       expect(await runtime.startAttendanceRun({ tenantId, leadId: offLead, queueId }, stubs().handlers(real))).toMatchObject({ started: false, reason: "not_enabled" });
     });
   }, 180_000);
+  it("starts a lead without broker in a queue's flow on request, and holds distribution while the agent serves it", async () => {
+    await inRollback(async (tx, { tenantId, queueId, branchId }) => {
+      const s = realSchema;
+      const runtime = await import("./runtime");
+      const { startLeadInQueueFlow } = await import("./manual-start");
+      const flows = await runtime.ensureBuiltinFlows(tenantId);
+      await tx.update(s.leadQueues).set({ attendanceFlowId: flows.get("qualify_new_engine")! }).where(eq(s.leadQueues.id, queueId));
+      const [actor] = await tx.select({ userId: s.tenantMemberships.userId }).from(s.tenantMemberships).where(eq(s.tenantMemberships.tenantId, tenantId)).limit(1);
+      const real = { distribute: async () => undefined };
+
+      // A lead with a broker is refused: the assignment must be removed first.
+      const owned = await newLead(tx, tenantId, queueId, branchId);
+      await tx.update(s.leads).set({ corretorId: actor.userId, queueId: null }).where(eq(s.leads.id, owned));
+      expect(await startLeadInQueueFlow({ tenantId, leadId: owned, queueId, actorUserId: actor.userId }, stubs().handlers(real)))
+        .toMatchObject({ started: false, error: expect.stringContaining("Remova a atribuição") });
+
+      // Agent serving: the lead waits in the queue marked as in qualification (distribution skips it).
+      const served = await newLead(tx, tenantId, queueId, branchId);
+      await tx.update(s.leads).set({ queueId: null, distributionStatus: "manual_hold", qualificationStatus: "cold", qualificationState: "QUALIFIED" }).where(eq(s.leads.id, served));
+      const agent = stubs({ agentStarted: true });
+      expect(await startLeadInQueueFlow({ tenantId, leadId: served, queueId, actorUserId: actor.userId }, agent.handlers(real))).toMatchObject({ started: true, waitingForAgent: true });
+      const [servedRow] = await tx.select({ queueId: s.leads.queueId, dist: s.leads.distributionStatus, state: s.leads.qualificationState }).from(s.leads).where(eq(s.leads.id, served));
+      expect(servedRow).toEqual({ queueId, dist: "queued", state: "IN_PROGRESS" });
+      expect(agent.calls).toMatchObject({ agent: 1, distribute: [] });
+      // Only one open run per lead.
+      expect(await startLeadInQueueFlow({ tenantId, leadId: served, queueId, actorUserId: actor.userId }, agent.handlers(real)))
+        .toMatchObject({ started: false, error: expect.stringContaining("já está em um fluxo") });
+
+      // Agent not serving (not a test number): the mark is undone and the flow distributes.
+      const other = await newLead(tx, tenantId, queueId, branchId);
+      await tx.update(s.leads).set({ queueId: null, distributionStatus: "manual_hold" }).where(eq(s.leads.id, other));
+      const notServed = stubs({ agentStarted: false });
+      expect(await startLeadInQueueFlow({ tenantId, leadId: other, queueId, actorUserId: actor.userId }, notServed.handlers(real))).toMatchObject({ started: true, waitingForAgent: false });
+      const [otherRow] = await tx.select({ state: s.leads.qualificationState, status: s.leads.qualificationStatus }).from(s.leads).where(eq(s.leads.id, other));
+      expect(otherRow).toEqual({ state: "NOT_STARTED", status: "pending" });
+      expect(notServed.calls.distribute).toEqual(["transfer"]);
+    });
+  }, 180_000);
 });
