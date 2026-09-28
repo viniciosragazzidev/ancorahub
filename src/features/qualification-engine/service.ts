@@ -334,6 +334,17 @@ export function buildPrivateQualificationContext(memory: ConversationMemory, upd
   };
 }
 
+/**
+ * Lead columns for an evaluation made inside a live AI conversation. Nothing
+ * collected yet still means "in qualification": NOT_STARTED/pending would let
+ * automatic distribution hand the lead to a broker mid-conversation.
+ */
+export function qualificationLeadColumns(result: Pick<QualificationEvaluation, "state" | "qualificationStatus">) {
+  return result.state === "NOT_STARTED"
+    ? { qualificationState: "IN_PROGRESS" as const, qualificationStatus: "qualifying" as const }
+    : { qualificationState: result.state, qualificationStatus: result.qualificationStatus };
+}
+
 export async function persistQualificationEvaluation(input: {
   tenantId: string;
   leadId: string;
@@ -367,9 +378,8 @@ export async function persistQualificationEvaluation(input: {
     const withoutAiContext = existingPrivateNotes.filter((note) => note.source !== "ai_qualification");
 
     await tx.update(schema.leads).set({
-      qualificationState: result.state,
+      ...qualificationLeadColumns(result),
       qualificationScore: result.score,
-      qualificationStatus: result.qualificationStatus,
       qualificationProfileKey: input.policy.qualification.profileKey,
       qualificationCompletedAt: ["QUALIFIED", "PARTIAL", "NOT_INTERESTED"].includes(result.state) ? now : null,
       qualificationDetails: {

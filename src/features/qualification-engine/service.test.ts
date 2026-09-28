@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPrivateQualificationContext, evaluateQualification, leadMatchesQualificationEntryRules } from "./service";
+import { buildPrivateQualificationContext, evaluateQualification, leadMatchesQualificationEntryRules, qualificationLeadColumns } from "./service";
 import { createEmptyMemory } from "@/features/ai-agent/memory";
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
 
@@ -8,6 +8,19 @@ const policy = {
   requiredFields: ["customerName", "city"], maxQuestions: 2, businessDays: "", handoffMessage: "Encaminho.", quickReplyTemplates: {}, knowledgePolicy: { enabled: false, requireSourceForCommercialClaims: true },
   qualification: { profileKey: "pf", fieldWeights: { customerName: 40, city: 60 }, entryRules: { origins: ["meta"], campaigns: [], leadTypes: ["PF"], branchIds: [], tags: [] } },
 } satisfies AgentBehaviorPolicy;
+
+describe("lead columns during a live AI conversation", () => {
+  it("keeps the lead in qualification while nothing was collected, so distribution waits", () => {
+    const empty = evaluateQualification(createEmptyMemory(), policy);
+    expect(empty.state).toBe("NOT_STARTED");
+    expect(qualificationLeadColumns(empty)).toEqual({ qualificationState: "IN_PROGRESS", qualificationStatus: "qualifying" });
+  });
+
+  it("writes any other outcome as evaluated", () => {
+    expect(qualificationLeadColumns({ state: "QUALIFIED", qualificationStatus: "hot" })).toEqual({ qualificationState: "QUALIFIED", qualificationStatus: "hot" });
+    expect(qualificationLeadColumns({ state: "IN_PROGRESS", qualificationStatus: "pending" })).toEqual({ qualificationState: "IN_PROGRESS", qualificationStatus: "pending" });
+  });
+});
 
 describe("qualification engine", () => {
   it("calculates a weighted, incomplete qualification without changing commercial status", () => {
