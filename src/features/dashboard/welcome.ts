@@ -1,11 +1,11 @@
 import "server-only";
 
-import { and, eq, gt, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNull, or, sql } from "drizzle-orm";
 
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
-import { pickNextDuty, upcomingShift } from "./welcome-rules";
+import { pickBusiestRunning, pickNextDuty, upcomingShift, type RunningDutyActivity } from "./welcome-rules";
 
 export type DashboardWelcome = {
   firstName: string | null;
@@ -62,7 +62,7 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
       .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt))),
   ]);
 
-  const next = pickNextDuty(schedules, now);
+  let next = pickNextDuty(schedules, now);
   const running = schedules.filter((schedule) => upcomingShift(schedule, now)?.running);
   const scheduleIds = [...new Set([...(next ? [next.schedule.id] : []), ...running.map((schedule) => schedule.id)])];
 
@@ -92,6 +92,48 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
       selectEffectiveDutyAssignments(assignments.filter((row) => ids.has(row.scheduleId) && !row.pausedAt), dutyDate, published)
         .map((row) => row.brokerId),
     ).size;
+
+  // Several plantões running at once: show the busiest (confirmed brokers,
+  // then leads today), not just the first to have started.
+  if (running.length > 1) {
+    const runningIds = running.map((schedule) => schedule.id);
+    const queuesOf = (scheduleId: string) => queues.filter((queue) => queue.exclusiveDutyScheduleIds.includes(scheduleId) || queue.exclusiveDutyScheduleId === scheduleId).map((queue) => queue.id);
+    const allQueueIds = [...new Set(runningIds.flatMap(queuesOf))];
+    const [confirmedRows, leadRows] = await Promise.all([
+      db.select({ scheduleId: schema.dutyPresenceConfirmations.scheduleId, total: sql<number>`count(distinct ${schema.dutyPresenceConfirmations.brokerId})::int` })
+        .from(schema.dutyPresenceConfirmations)
+        .where(and(
+          eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId),
+          inArray(schema.dutyPresenceConfirmations.scheduleId, runningIds),
+          eq(schema.dutyPresenceConfirmations.dutyDate, today),
+          eq(schema.dutyPresenceConfirmations.status, "confirmed"),
+        ))
+        .groupBy(schema.dutyPresenceConfirmations.scheduleId),
+      allQueueIds.length
+        ? db.select({ queueId: schema.leads.queueId, total: sql<number>`count(*)::int` })
+          .from(schema.leads)
+          .where(and(
+            eq(schema.leads.tenantId, context.tenantId),
+            inArray(schema.leads.queueId, allQueueIds),
+            gte(schema.leads.createdAt, new Date(`${today}T03:00:00Z`)),
+            isNull(schema.leads.deletedAt),
+          ))
+          .groupBy(schema.leads.queueId)
+        : Promise.resolve([]),
+    ]);
+    const confirmedBySchedule = new Map(confirmedRows.map((row) => [row.scheduleId, Number(row.total)]));
+    const leadsByQueue = new Map(leadRows.map((row) => [row.queueId, Number(row.total)]));
+    const activity = new Map<string, RunningDutyActivity>(runningIds.map((id) => [id, {
+      confirmedBrokers: confirmedBySchedule.get(id) ?? 0,
+      leadsToday: queuesOf(id).reduce((sum, queueId) => sum + (leadsByQueue.get(queueId) ?? 0), 0),
+      brokers: brokersOn(new Set([id]), today, publishedToday),
+    }]));
+    const candidates = running.flatMap((schedule) => {
+      const shift = upcomingShift(schedule, now);
+      return shift ? [{ schedule, shift }] : [];
+    });
+    next = pickBusiestRunning(candidates, activity) ?? next;
+  }
 
   const queueFor = (scheduleId: string, legacyQueueId: string | null) => {
     const linked = queues.find((queue) => queue.exclusiveDutyScheduleIds.includes(scheduleId) || queue.exclusiveDutyScheduleId === scheduleId);

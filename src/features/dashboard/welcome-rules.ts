@@ -37,6 +37,27 @@ export function upcomingShift(schedule: WelcomeSchedule, now: Date, horizonDays 
   return null;
 }
 
+export type RunningDutyActivity = { confirmedBrokers: number; leadsToday: number; brokers: number };
+
+/**
+ * Among plantões running at the same time, the busiest one: more brokers with
+ * confirmed presence, then more leads today, then more brokers on the roster,
+ * then the one that started first.
+ */
+export function pickBusiestRunning<T extends { schedule: { id: string }; shift: UpcomingShift }>(
+  candidates: readonly T[],
+  activity: ReadonlyMap<string, RunningDutyActivity>,
+): T | null {
+  const score = (candidate: T) => activity.get(candidate.schedule.id) ?? { confirmedBrokers: 0, leadsToday: 0, brokers: 0 };
+  return [...candidates].sort((a, b) => {
+    const sa = score(a), sb = score(b);
+    return sb.confirmedBrokers - sa.confirmedBrokers
+      || sb.leadsToday - sa.leadsToday
+      || sb.brokers - sa.brokers
+      || a.shift.start.getTime() - b.shift.start.getTime();
+  })[0] ?? null;
+}
+
 /** The plantão the dashboard shows first: one running now, else the soonest to start. */
 export function pickNextDuty<T extends WelcomeSchedule>(schedules: readonly T[], now: Date) {
   let best: { schedule: T; shift: UpcomingShift } | null = null;

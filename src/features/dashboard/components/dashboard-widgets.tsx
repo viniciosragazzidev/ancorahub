@@ -108,6 +108,13 @@ export function WelcomeHero({
                   {next.brokerCount === 0 ? "sem corretor" : `${next.brokerCount} ${next.brokerCount === 1 ? "corretor" : "corretores"}`}
                 </span>
               </span>
+              <Link
+                href={`/leads/distribuicao/plantao/${next.scheduleId}`}
+                className="group mt-1 inline-flex w-fit items-center gap-1 rounded-md text-xs font-medium text-ds-electric-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {next.running ? "Abrir plantão ativo" : "Abrir plantão"}
+                <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+              </Link>
             </>
           ) : (
             <>

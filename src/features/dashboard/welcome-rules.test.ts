@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pickNextDuty, upcomingShift, type WelcomeSchedule } from "./welcome-rules";
+import { pickBusiestRunning, pickNextDuty, upcomingShift, type WelcomeSchedule } from "./welcome-rules";
 
 const base: Omit<WelcomeSchedule, "id" | "name" | "dayOfWeek" | "validFrom" | "validUntil"> = {
   startsAt: "09:00",
@@ -42,5 +42,21 @@ describe("pickNextDuty", () => {
     const saturday: WelcomeSchedule = { ...base, id: "sat", name: "Sábado", dayOfWeek: 6, validFrom: new Date("2026-09-01T03:00:00Z"), validUntil: null };
     expect(pickNextDuty([monday, saturday], now)?.schedule.id).toBe("sat");
     expect(pickNextDuty([], now)).toBeNull();
+  });
+});
+
+describe("busiest running plantão", () => {
+  const shift = (hour: number) => ({ dutyDate: "2026-09-28", start: new Date(`2026-09-28T${String(hour).padStart(2, "0")}:00:00Z`), end: new Date("2026-09-28T21:00:00Z"), running: true });
+  const pf = { schedule: { id: "pf" }, shift: shift(12) };
+  const pme = { schedule: { id: "pme" }, shift: shift(12) };
+  it("shows the plantão with confirmed brokers, not the empty one that started at the same time", () => {
+    const activity = new Map([["pf", { confirmedBrokers: 0, leadsToday: 0, brokers: 0 }], ["pme", { confirmedBrokers: 3, leadsToday: 16, brokers: 3 }]]);
+    expect(pickBusiestRunning([pf, pme], activity)?.schedule.id).toBe("pme");
+  });
+  it("breaks ties by leads today, then roster size, then start time", () => {
+    expect(pickBusiestRunning([pf, pme], new Map([["pf", { confirmedBrokers: 2, leadsToday: 9, brokers: 2 }], ["pme", { confirmedBrokers: 2, leadsToday: 4, brokers: 5 }]]))?.schedule.id).toBe("pf");
+    expect(pickBusiestRunning([pf, pme], new Map([["pf", { confirmedBrokers: 1, leadsToday: 1, brokers: 1 }], ["pme", { confirmedBrokers: 1, leadsToday: 1, brokers: 4 }]]))?.schedule.id).toBe("pme");
+    const early = { schedule: { id: "early" }, shift: shift(11) };
+    expect(pickBusiestRunning([pf, early], new Map())?.schedule.id).toBe("early");
   });
 });
