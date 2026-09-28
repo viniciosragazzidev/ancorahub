@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { generateAiResponse } from "./service";
-import { handleInitialMessageFailure, resolveMemoryResetContext } from "./conversation-state-machine";
+import { handleInitialMessageFailure, isExistingQualificationConversation, resolveMemoryResetContext } from "./conversation-state-machine";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "./memory";
 
 describe("ai-agent service & state machine", () => {
@@ -15,6 +15,18 @@ describe("ai-agent service & state machine", () => {
     delete process.env.AI_PROVIDER_ORDER;
     delete process.env.DATABASE_URL;
     delete process.env.SUPABASE_DB_URL;
+  });
+
+  describe("isExistingQualificationConversation", () => {
+    it("opens a freshly created conversation with the greeting (its start time alone is not a conversation)", () => {
+      expect(isExistingQualificationConversation({ hasMessages: false, status: "NEW", lastProcessedMessageId: null })).toBe(false);
+    });
+
+    it("resumes when there are messages, the status moved on or a message was processed", () => {
+      expect(isExistingQualificationConversation({ hasMessages: true, status: "NEW" })).toBe(true);
+      expect(isExistingQualificationConversation({ hasMessages: false, status: "WAITING_CUSTOMER" })).toBe(true);
+      expect(isExistingQualificationConversation({ hasMessages: false, status: "NEW", lastProcessedMessageId: "wamid.1" })).toBe(true);
+    });
   });
 
   describe("resolveMemoryResetContext", () => {

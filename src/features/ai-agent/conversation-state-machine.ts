@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gt, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, ne, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
@@ -441,6 +441,16 @@ export async function getOrCreateAiConversation({
   return created;
 }
 
+/**
+ * Whether starting qualification resumes a conversation instead of opening a
+ * new one with the greeting. A conversation is created with its start time,
+ * so the start time alone never means "already talking" (it made every new
+ * lead skip the greeting).
+ */
+export function isExistingQualificationConversation(input: { hasMessages: boolean; status: string; lastProcessedMessageId?: string | null }) {
+  return input.hasMessages || input.status !== "NEW" || Boolean(input.lastProcessedMessageId);
+}
+
 export async function startQualificationConversationForLead(
   input: { tenantId: string; leadId: string; actorUserId: string },
   force: boolean = false,
@@ -488,7 +498,10 @@ export async function startQualificationConversationForLead(
 
   const last8Digits = lead.telefone.replace(/\D/g, "").slice(-8);
 
-  // CHECK IF THE LEAD ALREADY HAS ANY MESSAGES IN WHATSAPP MESSAGES HISTORY OR EXISTING CONVERSATION STATE
+  // CHECK IF THE LEAD ALREADY HAS ANY MESSAGES IN WHATSAPP MESSAGES HISTORY OR EXISTING CONVERSATION STATE.
+  // By phone alone only what the customer wrote counts (they may write before
+  // the lead exists); messages sent to that phone for other purposes (team
+  // notices to a broker with the same number) are not this conversation.
   const [existingMsg] = await db
     .select({ id: schema.whatsappMessages.id })
     .from(schema.whatsappMessages)
@@ -498,16 +511,20 @@ export async function startQualificationConversationForLead(
         or(
           eq(schema.whatsappMessages.leadId, input.leadId),
           eq(schema.whatsappMessages.conversationId, conversation.id),
-          sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
+          and(
+            sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`,
+            inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+          ),
         )
       )
     )
     .limit(1);
 
-  const isExistingConversation = Boolean(existingMsg)
-    || conversation.status !== "NEW"
-    || Boolean(conversation.lastProcessedMessageId)
-    || Boolean(conversation.startedAt);
+  const isExistingConversation = isExistingQualificationConversation({
+    hasMessages: Boolean(existingMsg),
+    status: conversation.status,
+    lastProcessedMessageId: conversation.lastProcessedMessageId,
+  });
 
   if (isExistingConversation) {
     if (isAlreadyQualifiedOrInHumanState) {
