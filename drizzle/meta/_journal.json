@@ -792,6 +792,13 @@
                         "when":  1790225200000,
                         "tag":  "0165_attendance_flows",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  113,
+                        "version":  "7",
+                        "when":  1790312400000,
+                        "tag":  "0166_duty_lead_cap_per_broker",
+                        "breakpoints":  true
                     }
                 ]
 }

@@ -144,6 +144,7 @@ async function findScheduleForMutation(scheduleId: string) {
       priority: schema.unitDutySchedules.priority,
       minimumBrokers: schema.unitDutySchedules.minimumBrokers,
       maximumBrokers: schema.unitDutySchedules.maximumBrokers,
+      maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
       typeId: schema.unitDutySchedules.typeId,
       validFrom: schema.unitDutySchedules.validFrom,
       validUntil: schema.unitDutySchedules.validUntil,
@@ -235,6 +236,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       endsAt: parsed.data.endsAt,
       minimumBrokers: parsed.data.minimumBrokers,
       maximumBrokers: parsed.data.maximumBrokers ?? null,
+      maxLeadsPerBroker: parsed.data.maxLeadsPerBroker ?? null,
       webhookCredentialId: parsed.data.webhookCredentialId,
     };
     // "Datas": one plantão per chosen date, valid only on that day.
@@ -264,6 +266,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
         priority: 100,
         minimumBrokers: schedule.minimumBrokers,
         maximumBrokers: schedule.maximumBrokers,
+        maxLeadsPerBroker: schedule.maxLeadsPerBroker,
         validFrom: schedule.validFrom,
         validUntil: schedule.validUntil ?? null,
         webhookCredentialId: schedule.webhookCredentialId ?? null,
@@ -325,6 +328,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         minimumBrokers: parsed.data.minimumBrokers,
         typeId,
         maximumBrokers: parsed.data.maximumBrokers ?? null,
+        maxLeadsPerBroker: parsed.data.maxLeadsPerBroker ?? null,
         validFrom: parsed.data.validFrom,
         validUntil: parsed.data.validUntil ?? null,
         webhookCredentialId: parsed.data.webhookCredentialId ?? null,

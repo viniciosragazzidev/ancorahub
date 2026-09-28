@@ -454,6 +454,20 @@ function DutyFormSheet({
               <p className="text-xs text-muted-foreground">Deixe em branco para não limitar a capacidade. Quando definido, não pode ser menor que o mínimo.</p>
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="duty-max-leads">Limite de leads por corretor neste plantão (opcional)</Label>
+              <Input
+                id="duty-max-leads"
+                name="maxLeadsPerBroker"
+                type="number"
+                min={1}
+                max={500}
+                defaultValue={schedule?.maxLeadsPerBroker ?? ""}
+              />
+              <p className="text-xs text-muted-foreground">
+                Quantos leads cada corretor pode receber em cada dia deste plantão. Quem atinge o limite para de receber até o próximo dia do plantão; oferta expirada ou recusada não conta. Em branco, sem limite.
+              </p>
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="duty-queue">Fila que recebe este plantão</Label>
               <AppSelect
                 id="duty-queue"
@@ -709,6 +723,10 @@ function DutyInspector({
                           ? dateTag(singleDutyDate(schedule)!)
                           : `${dateLabel(schedule.validFrom)} · ${dateLabel(lastIncludedDay(schedule.validUntil))}`}
                       </dd>
+                    </div>
+                    <div className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">Limite por corretor</dt>
+                      <dd className="text-right">{schedule.maxLeadsPerBroker ? `${schedule.maxLeadsPerBroker} leads por dia de plantão` : "Sem limite"}</dd>
                     </div>
                     <div className="flex justify-between gap-4">
                       <dt className="text-muted-foreground">Timezone</dt>
@@ -1112,6 +1130,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
     formData.set("endsAt", schedule.endsAt);
     formData.set("minimumBrokers", String(schedule.minimumBrokers));
     formData.set("maximumBrokers", schedule.maximumBrokers === null ? "" : String(schedule.maximumBrokers));
+    formData.set("maxLeadsPerBroker", schedule.maxLeadsPerBroker == null ? "" : String(schedule.maxLeadsPerBroker));
     formData.set("validFrom", dateInputValue(schedule.validFrom));
     formData.set("validUntil", lastDayOfMonth(month));
     if (schedule.webhookCredentialId) formData.set("webhookCredentialId", schedule.webhookCredentialId);

@@ -52,7 +52,7 @@ export function BrokerLiveStatus({ status, nextEventAt }: { status: BrokerLiveOf
   );
 }
 
-/** Compact capacity bar: leads actively assigned vs. the queue's per-broker limit. */
+/** Compact capacity bar: leads received in this plantão occurrence vs. the plantão's per-broker limit. */
 export function BrokerCapacityBar({ activeLeads, capacity }: { activeLeads: number; capacity: number | null }) {
   if (capacity === null) return null;
   const ratio = capacity > 0 ? Math.min(1, activeLeads / capacity) : 0;

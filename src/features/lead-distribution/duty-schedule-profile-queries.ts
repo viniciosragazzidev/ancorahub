@@ -15,10 +15,6 @@ import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads
 // Upper bound on how far back a lead can show even when the schedule has no
 // completed occurrence yet (brand-new schedule) — keeps the query sane.
 export const DUTY_PROFILE_LEADS_LIMIT = 200;
-// Same set the distribution engine uses to count a broker's active load against
-// queue capacity (service.ts's local `activeCommercialStatuses`) — kept in sync
-// by hand since neither file exports a shared constant.
-const ACTIVE_COMMERCIAL_STATUSES = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
 export type DutyScheduleProfile = Awaited<ReturnType<typeof getDutyScheduleProfile>>;
 
@@ -46,6 +42,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       endsAt: schema.unitDutySchedules.endsAt,
       priority: schema.unitDutySchedules.priority,
       minimumBrokers: schema.unitDutySchedules.minimumBrokers,
+      maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
       status: schema.unitDutySchedules.status,
       timezone: schema.unitDutySchedules.timezone,
       validFrom: schema.unitDutySchedules.validFrom,
@@ -118,7 +115,9 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // capacity, just with no pacing countdown to expect.
   const operatingQueue = linkedQueues.find((queue) => queue.assignmentMode === "automatic") ?? linkedQueues[0] ?? null;
   const pacing = normalizeOfferPacing(operatingQueue ? { intervalMinutes: operatingQueue.offerIntervalMinutes, maxPending: operatingQueue.maxPendingOffersPerBroker } : null);
-  const operatingCapacity = operatingQueue?.capacityEnabled ? operatingQueue.capacityPerBroker ?? null : null;
+  // The counter follows this plantão's own limit (leads each broker receives
+  // in the occurrence), the same rule the distribution applies.
+  const operatingCapacity = schedule.maxLeadsPerBroker ?? null;
 
   const queueIds = linkedQueues.map((queue) => queue.id);
   const now = new Date();
@@ -245,38 +244,23 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     : [];
   const presenceByAssignment = new Map(presenceRows.map((row) => [`${row.assignmentId}:${row.dutyDate}`, row]));
 
-  // Live offer status: how many leads the broker is actively carrying for the
-  // operating queue right now (the exact rule the distribution engine checks
-  // against capacity), plus their offers in the pacing lookback window.
+  // Live offer status: offers in the pacing lookback window. The capacity
+  // counter uses the leads each broker received in this plantão (see above).
   const brokerIds = roster.map((entry) => entry.brokerId);
-  const [activeLoadRows, recentOfferRows] = operatingQueue && brokerIds.length
-    ? await Promise.all([
-      db.select({ brokerId: schema.leads.corretorId, total: sql<number>`count(*)::int` })
-        .from(schema.leads)
-        .where(and(
-          eq(schema.leads.tenantId, context.tenantId),
-          eq(schema.leads.queueId, operatingQueue.id),
-          inArray(schema.leads.corretorId, brokerIds),
-          inArray(schema.leads.status, ACTIVE_COMMERCIAL_STATUSES),
-          isNull(schema.leads.deletedAt),
-          isNull(schema.leads.archivedAt),
-        ))
-        .groupBy(schema.leads.corretorId),
-      db.select({ brokerId: schema.leadOffers.brokerId, status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt })
-        .from(schema.leadOffers)
-        .innerJoin(schema.leads, eq(schema.leadOffers.leadId, schema.leads.id))
-        .where(and(
-          eq(schema.leadOffers.tenantId, context.tenantId),
-          eq(schema.leads.queueId, operatingQueue.id),
-          inArray(schema.leadOffers.brokerId, brokerIds),
-          or(
-            gte(schema.leadOffers.offeredAt, new Date(now.getTime() - Math.max(pacing.intervalMinutes, 1) * 60_000)),
-            gt(schema.leadOffers.expiresAt, now),
-          ),
-        )),
-    ])
-    : [[], []];
-  const activeLoadByBroker = new Map(activeLoadRows.map((row) => [row.brokerId, Number(row.total)]));
+  const recentOfferRows = operatingQueue && brokerIds.length
+    ? await db.select({ brokerId: schema.leadOffers.brokerId, status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt })
+      .from(schema.leadOffers)
+      .innerJoin(schema.leads, eq(schema.leadOffers.leadId, schema.leads.id))
+      .where(and(
+        eq(schema.leadOffers.tenantId, context.tenantId),
+        eq(schema.leads.queueId, operatingQueue.id),
+        inArray(schema.leadOffers.brokerId, brokerIds),
+        or(
+          gte(schema.leadOffers.offeredAt, new Date(now.getTime() - Math.max(pacing.intervalMinutes, 1) * 60_000)),
+          gt(schema.leadOffers.expiresAt, now),
+        ),
+      ))
+    : [];
   const offersByBroker = new Map<string, typeof recentOfferRows>();
   for (const offer of recentOfferRows) {
     const list = offersByBroker.get(offer.brokerId);
@@ -298,7 +282,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         paused: Boolean(entry.pausedAt),
         blockedReason,
         capacity: operatingCapacity,
-        activeLeads: activeLoadByBroker.get(entry.brokerId) ?? 0,
+        activeLeads: leadsPerBroker.get(entry.brokerId) ?? 0,
         pacing,
         offers: offersByBroker.get(entry.brokerId) ?? [],
         now,
@@ -316,7 +300,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       dutyDate: occurrence?.dutyDate ?? null,
       liveStatus: liveStatus.status,
       nextEventAt: liveStatus.nextEventAt,
-      activeLeads: activeLoadByBroker.get(entry.brokerId) ?? 0,
+      activeLeads: leadsPerBroker.get(entry.brokerId) ?? 0,
       capacity: operatingCapacity,
       };
     }),

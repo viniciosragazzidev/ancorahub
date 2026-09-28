@@ -27,6 +27,8 @@ const dutyScheduleFields = z.object({
   endsAt: z.string(),
   minimumBrokers: z.coerce.number().int().min(1).max(99),
   maximumBrokers: z.preprocess((value) => value === "" || value === undefined ? null : value, z.coerce.number().int().min(1).max(99).nullable().optional()),
+  /** Leads each broker may receive in one occurrence of this plantão; empty = no cap. */
+  maxLeadsPerBroker: z.preprocess((value) => value === "" || value === undefined ? null : value, z.coerce.number().int().min(1).max(500).nullable().optional()),
   validFrom: z.preprocess(startOfLocalDay, z.coerce.date()),
   validUntil: z.preprocess(endOfLocalDay, z.coerce.date().optional()),
   webhookCredentialId: z.string().uuid().optional().nullable(),

@@ -21,6 +21,7 @@ import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
 import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, isDutyWindowActive, isLeadInDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
+import { brokersUnderDutyCap, countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -673,8 +674,12 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // from an earlier, already-closed occurrence that never got to it) is not
   // swept into today's roster just because capacity freed up later — it sits
   // out of automatic distribution entirely until someone assigns it by hand.
+  // Per-plantão cap on leads each broker receives in the running occurrence.
+  let dutyLeadCap: DutyLeadCap | null = null;
   if (exclusiveScheduleIds?.length) {
     const dutySchedules = await db.select({
+      id: schema.unitDutySchedules.id,
+      maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
       dayOfWeek: schema.unitDutySchedules.dayOfWeek,
       startsAt: schema.unitDutySchedules.startsAt,
       endsAt: schema.unitDutySchedules.endsAt,
@@ -690,8 +695,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       if (!isLeadInDutyWindow(lead, bounds)) {
         return { status: "queued", leadId, reason: "Lead chegou antes do início deste plantão; aguarda atribuição manual e não entra na distribuição automática." };
       }
+      const occurrence = activeSchedule.maxLeadsPerBroker ? getRelevantDutyWindow(activeSchedule, activeNow, 0) : null;
+      if (activeSchedule.maxLeadsPerBroker && occurrence) {
+        dutyLeadCap = { scheduleId: activeSchedule.id, limit: activeSchedule.maxLeadsPerBroker, startsAt: occurrence.startsAt, endsAt: occurrence.endsAt };
+      }
     }
   }
+  let brokersStoppedByDutyCap = 0;
 
   const loadEligibleBrokers = async (branchIds: string[]) => {
     const allBrokers = await db
@@ -723,14 +733,26 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"))] as const));
     const rosterByBranch = new Map(rosterResults.map(([branchId, result]) => [branchId, result.brokerIds] as const));
     const hasActiveSelectedSchedule = rosterResults.some(([, result]) => result.hasActiveSelectedSchedule);
-    const brokers = allBrokers.filter((broker) => {
+    const rosterBrokers = allBrokers.filter((broker) => {
       const rosterBrokerIds = broker.branchId ? rosterByBranch.get(broker.branchId) : null;
       return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
     });
+    let brokers = rosterBrokers;
+    if (dutyLeadCap && rosterBrokers.length) {
+      const received = await countLeadsReceivedInDuty(db, context.tenantId, dutyLeadCap, rosterBrokers.map((broker) => broker.id));
+      const underCap = brokersUnderDutyCap(rosterBrokers.map((broker) => broker.id), received, dutyLeadCap.limit);
+      brokers = rosterBrokers.filter((broker) => underCap.has(broker.id));
+      brokersStoppedByDutyCap += rosterBrokers.length - brokers.length;
+    }
     return { brokers, rosterByBranch, hasActiveSelectedSchedule };
   };
 
   let { brokers, rosterByBranch, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
+  // Everyone on duty reached this plantão's cap: the lead waits (the queue's
+  // "no broker" rules are for an empty roster, not for a full one).
+  if (!brokers.length && brokersStoppedByDutyCap > 0) {
+    return { status: "queued", leadId, reason: "Todos os corretores escalados atingiram o limite de leads deste plantão; o lead aguarda." };
+  }
   const dutyFallbackPolicy = (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined)
     ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster");
   if (!brokers.length && exclusiveScheduleIds?.length && !hasActiveSelectedSchedule && dutyFallbackPolicy === "fallback_queue") {

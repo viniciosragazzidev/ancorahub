@@ -417,8 +417,10 @@ export function QueueControlCenter({
       name: form.name,
       assignmentMode: form.assignmentMode,
       assignmentStrategy: form.assignmentStrategy,
-      capacityEnabled: form.capacityEnabled,
-      capacityPerBroker: form.capacityEnabled ? Number(form.capacityPerBroker) : null,
+      // The per-broker lead cap now belongs to each plantão (Editar plantão);
+      // queues no longer cap active leads.
+      capacityEnabled: false,
+      capacityPerBroker: null,
       offerIntervalMinutes: Math.max(0, Math.trunc(Number(form.offerIntervalMinutes) || 0)),
       maxPendingOffersPerBroker: Math.max(0, Math.trunc(Number(form.maxPendingOffersPerBroker) || 0)),
       aiQualificationEnabled: form.aiQualificationEnabled,
@@ -991,36 +993,6 @@ export function QueueControlCenter({
                   Configurar entradas
                 </Button>
               </div>
-
-              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                <Checkbox
-                  checked={form.capacityEnabled}
-                  onCheckedChange={(checked) =>
-                    setForm({ ...form, capacityEnabled: checked === true })
-                  }
-                />
-                <span>Limitar leads ativos por corretor</span>
-                <InfoTooltip
-                  title="Capacidade"
-                  description="Quando o limite é atingido, o corretor deixa de ser elegível para novos leads dessa fila."
-                />
-              </label>
-
-              {form.capacityEnabled ? (
-                <label className="grid gap-1.5 text-sm font-medium">
-                  Máximo por corretor
-                  <Input
-                    type="number"
-                    min={1}
-                    max={200}
-                    value={form.capacityPerBroker}
-                    onChange={(event) =>
-                      setForm({ ...form, capacityPerBroker: event.target.value })
-                    }
-                    className="w-full"
-                  />
-                </label>
-              ) : null}
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <label className="grid gap-1.5 text-sm font-medium">

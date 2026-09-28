@@ -760,6 +760,8 @@ export const unitDutySchedules = pgTable(
     priority: integer("priority").notNull().default(100),
     minimumBrokers: integer("minimum_brokers").notNull().default(1),
     maximumBrokers: integer("maximum_brokers"),
+    /** Leads each broker may receive in one occurrence of this plantão; null = no cap. */
+    maxLeadsPerBroker: integer("max_leads_per_broker"),
     status: text("status").notNull().default("active"),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
