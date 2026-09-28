@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDutyStartHour, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, listCompletedDutyWindows } from "./duty-presence-domain";
+import { findRunningDutySchedule, formatDutyStartHour, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, listCompletedDutyWindows } from "./duty-presence-domain";
 
 describe("completed duty history", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
@@ -134,5 +134,30 @@ describe("getDutyOccurrenceLeadWindow", () => {
         upcomingStartsAt: new Date("2026-09-25T12:00:00.000Z"),
       });
     });
+  });
+});
+
+describe("findRunningDutySchedule", () => {
+  // Monday 28/09/2026 15:40 in São Paulo.
+  const now = new Date("2026-09-28T18:40:00Z");
+  const monday = { dayOfWeek: 1, startsAt: "09:00", endsAt: "18:00", timezone: "America/Sao_Paulo", status: "active" };
+  const next = { ...monday, id: "next-monday", validFrom: new Date("2026-10-05T03:00:00Z"), validUntil: new Date("2026-10-06T03:00:00Z") };
+  const today = { ...monday, id: "today", validFrom: new Date("2026-09-28T03:00:00Z"), validUntil: new Date("2026-09-29T03:00:00Z") };
+
+  it("picks the plantão valid today, not next Monday's with the same hours", () => {
+    expect(findRunningDutySchedule([next, today], now)?.schedule.id).toBe("today");
+  });
+
+  it("finds none when only another date's plantão shares the weekday and hours", () => {
+    expect(findRunningDutySchedule([next], now)).toBeNull();
+  });
+
+  it("ignores archived plantões and ones outside their hours", () => {
+    expect(findRunningDutySchedule([{ ...today, status: "archived" }], now)).toBeNull();
+    expect(findRunningDutySchedule([today], new Date("2026-09-28T22:00:00Z"))).toBeNull();
+  });
+
+  it("keeps an open-ended weekly plantão running", () => {
+    expect(findRunningDutySchedule([{ ...monday, id: "weekly", validFrom: new Date("2026-01-01T03:00:00Z"), validUntil: null }], now)?.schedule.id).toBe("weekly");
   });
 });

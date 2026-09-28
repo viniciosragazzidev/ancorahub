@@ -197,6 +197,26 @@ export function isDutyWindowActive(window: DutyWindow | null, now: Date) {
   return Boolean(window && window.startsAt <= now && window.endsAt > now);
 }
 
+/**
+ * The plantão running at `now` among several: active, inside its shift, and
+ * valid on that date (the shift starts in [validFrom, validUntil), same rule
+ * as the roster). Plantões of the same weekday and hours on other dates (next
+ * Monday's, say) are never the running one.
+ */
+export function findRunningDutySchedule<T extends WeeklyWindowInput & { status?: string | null; validFrom: Date; validUntil: Date | null }>(
+  schedules: readonly T[],
+  now: Date,
+): { schedule: T; window: DutyWindow } | null {
+  for (const schedule of schedules) {
+    if (schedule.status && schedule.status !== "active") continue;
+    const window = getRelevantDutyWindow(schedule, now, 0);
+    if (!window || !isDutyWindowActive(window, now)) continue;
+    if (window.startsAt < schedule.validFrom || (schedule.validUntil && window.startsAt >= schedule.validUntil)) continue;
+    return { schedule, window };
+  }
+  return null;
+}
+
 export function isConfirmationForActiveOccurrence(input: {
   confirmation: ConfirmedDutyOccurrence | null | undefined;
   assignment: { scheduleId: string; brokerId: string };
