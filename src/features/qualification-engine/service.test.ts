@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildPrivateQualificationContext, evaluateQualification, leadMatchesQualificationEntryRules, qualificationLeadColumns } from "./service";
+import { buildPrivateQualificationContext, evaluateQualification, leadMatchesQualificationEntryRules, qualificationLeadColumns, resolveDeterministicQualificationTurn } from "./service";
 import { createEmptyMemory } from "@/features/ai-agent/memory";
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
 
@@ -8,6 +8,15 @@ const policy = {
   requiredFields: ["customerName", "city"], maxQuestions: 2, businessDays: "", handoffMessage: "Encaminho.", quickReplyTemplates: {}, knowledgePolicy: { enabled: false, requireSourceForCommercialClaims: true },
   qualification: { profileKey: "pf", fieldWeights: { customerName: 40, city: 60 }, entryRules: { origins: ["meta"], campaigns: [], leadTypes: ["PF"], branchIds: [], tags: [] } },
 } satisfies AgentBehaviorPolicy;
+
+describe("scripted reply acknowledgement", () => {
+  const memory = { ...createEmptyMemory(), customerName: { value: "Teste Lead", confidence: 1 as const }, customerFirstName: { value: "Teste", confidence: 1 as const }, collectedFields: ["customerName"] };
+  it("says \"Perfeito\" only when the customer answered something", () => {
+    expect(resolveDeterministicQualificationTurn({ memory, policy }).reply.startsWith("Perfeito, Teste.")).toBe(true);
+    expect(resolveDeterministicQualificationTurn({ memory, policy, answeredNow: true }).reply.startsWith("Perfeito, Teste.")).toBe(true);
+    expect(resolveDeterministicQualificationTurn({ memory, policy, answeredNow: false }).reply.startsWith("Perfeito")).toBe(false);
+  });
+});
 
 describe("lead columns during a live AI conversation", () => {
   it("keeps the lead in qualification while nothing was collected, so distribution waits", () => {

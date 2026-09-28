@@ -1,6 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
+import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, isGroundedInMessage, shouldUseQualificationFallback } from "./qualification-fallback";
 import { createEmptyMemory, extractFieldsFromMessage } from "./memory";
+
+describe("model facts grounded in the customer message", () => {
+  it("does not turn a greeting or a question into a plan type (pilot conversation)", () => {
+    const proposed = [{ field: "planType", value: "individual", confidence: 0.95 }];
+    expect(applyAiMemoryUpdates(createEmptyMemory(), proposed, "m1", "Oi").applied).toEqual([]);
+    expect(applyAiMemoryUpdates(createEmptyMemory(), proposed, "m2", "Quais planos temos ?").applied).toEqual([]);
+    expect(applyAiMemoryUpdates(createEmptyMemory(), proposed, "m3", "é só pra mim").applied).toEqual([{ field: "planType", value: "individual", confidence: 1 }]);
+  });
+
+  it("accepts each field only when the message supports it", () => {
+    expect(isGroundedInMessage("planType", "familiar", "pra mim e minha esposa")).toBe(true);
+    expect(isGroundedInMessage("planType", "empresarial", "tenho CNPJ")).toBe(true);
+    expect(isGroundedInMessage("planType", "empresarial", "oi")).toBe(false);
+    expect(isGroundedInMessage("numberOfLives", "3", "três pessoas")).toBe(true);
+    expect(isGroundedInMessage("numberOfLives", "3", "bom dia")).toBe(false);
+    expect(isGroundedInMessage("age", "35", "tenho 35")).toBe(true);
+    expect(isGroundedInMessage("city", "Nova Iguaçu", "moro em nova iguacu")).toBe(true);
+    expect(isGroundedInMessage("city", "Rio de Janeiro", "oi")).toBe(false);
+    expect(isGroundedInMessage("email", "a@b.com", "a@b.com")).toBe(true);
+  });
+
+  it("keeps the previous behavior when no message is given", () => {
+    expect(applyAiMemoryUpdates(createEmptyMemory(), [{ field: "planType", value: "individual", confidence: 0.95 }], "m4").applied).toHaveLength(1);
+  });
+});
 
 describe("qualification AI fallback", () => {
   it("normalizes accented plan answers before the AI fallback is needed", () => {

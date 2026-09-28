@@ -129,10 +129,45 @@ export function shouldUseQualificationFallback(input: {
   return (!input.expectedWasAnswered && !input.advancedToAnotherField) || isComplexAnswer || isAttachment;
 }
 
+const normalizeForGrounding = (text: string) => text.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+/**
+ * Whether a fact the model proposed is supported by what the customer wrote.
+ * The model also sees the lead's registered type and the history, and must
+ * not turn those into answers (e.g. "individual" from a lead registered as PF
+ * when the customer only said "oi").
+ */
+export function isGroundedInMessage(field: string, value: string, customerMessage: string) {
+  const message = normalizeForGrounding(customerMessage);
+  const normalizedValue = normalizeForGrounding(value);
+  switch (field) {
+    case "planType":
+      if (normalizedValue === "individual") return /individual|\bpf\b|pessoa fisica|pa?ra mim|so eu|sozinh|eu mesm|apenas eu/.test(message);
+      if (normalizedValue === "familiar") return /famil|esposa|marido|filh|dependente|mulher|\bmae\b|\bpai\b|\bpais\b/.test(message);
+      return /empres|\bpme\b|\bpj\b|\bmei\b|cnpj|coletiv|funcionari|socio|pessoa juridica/.test(message);
+    case "numberOfLives":
+      return /\d|\b(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|so eu|sozinh|eu e)\b/.test(message);
+    case "age":
+    case "averageAge":
+      return /\d/.test(message);
+    case "email":
+      return message.includes("@") || message.includes(normalizedValue);
+    case "city":
+    case "customerName": {
+      const firstToken = normalizedValue.split(/\s+/).find((token) => token.length >= 3);
+      return Boolean(firstToken && message.includes(firstToken));
+    }
+    default:
+      return true;
+  }
+}
+
 export function applyAiMemoryUpdates(
   memory: ConversationMemory,
   updates: AiMemoryUpdate[] | undefined,
   sourceMessageId?: string,
+  /** When given, a proposed fact must be supported by this message to be kept. */
+  customerMessage?: string,
 ): { memory: ConversationMemory; applied: AppliedAiMemoryUpdate[] } {
   if (!updates?.length) return { memory, applied: [] };
 
@@ -147,6 +182,7 @@ export function applyAiMemoryUpdates(
     // Do not let a low-confidence guess advance a qualification stage. The
     // model must explicitly mark a fact as reliable before it is persisted.
     if (typeof update.confidence === "number" && update.confidence < 0.7) continue;
+    if (customerMessage !== undefined && !isGroundedInMessage(field, value, customerMessage)) continue;
     const confidence = 1 as const;
     const current = next[field] as MemoryField | undefined;
     if (current?.value && current.confidence > confidence) continue;

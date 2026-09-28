@@ -32,6 +32,7 @@ import { handlePostClosingInboundMessage } from "@/features/ai-qualification/clo
 import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
 import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
 import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
+import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
 
 
 export type ConversationStatus =
@@ -1403,6 +1404,7 @@ export async function processInboundAiResponse({
   // como intérprete: ela propõe fatos estruturados e o motor determinístico
   // continua responsável por validar a memória e escolher a próxima etapa.
   let aiFallbackResult: Awaited<ReturnType<typeof generateAiResponse>> | undefined;
+  let fallbackAppliedCount = 0;
   const pendingQuestionAfterExtraction = getNextQualificationQuestion(updatedMemory, behavior.policy, pastOutboundTexts);
   const expectedWasAnswered = Boolean(expectedQuestionBeforeMessage && fieldsExtractedFromCurrentMessage.includes(expectedQuestionBeforeMessage.key));
   const currentMessageAdvancedToAnotherField = Boolean(
@@ -1445,9 +1447,10 @@ export async function processInboundAiResponse({
         });
       }
 
-      const applied = applyAiMemoryUpdates(updatedMemory, aiFallbackResult?.structured?.memoryUpdates, sourceIdentifier ?? undefined);
+      const applied = applyAiMemoryUpdates(updatedMemory, aiFallbackResult?.structured?.memoryUpdates, sourceIdentifier ?? undefined, normalizedInboundMessage);
       if (applied.applied.length > 0) {
         updatedMemory = applied.memory;
+        fallbackAppliedCount = applied.applied.length;
         console.info("[qualification] ai_fallback_memory_applied", {
           tenantId,
           leadId,
@@ -1487,12 +1490,20 @@ export async function processInboundAiResponse({
     }
   }
 
-  const deterministicTurn = resolveDeterministicQualificationTurn({
+  const answeredNow = fieldsExtractedFromCurrentMessage.length > 0 || fallbackAppliedCount > 0;
+  let deterministicTurn = resolveDeterministicQualificationTurn({
     memory: updatedMemory,
     policy: behavior.policy,
     handoffMessage: tenantConfig.handoffMessage,
     pastOutboundTexts,
+    answeredNow,
   });
+  // Lateral answer (fase 5): the customer asked something instead of answering.
+  // Answer briefly, then the script resumes; on any failure the scripted reply goes alone.
+  if (deterministicTurn.kind === "collecting" && !answeredNow && effectiveMessageKind === "text" && isCustomerQuestion(normalizedInboundMessage)) {
+    const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: updatedMemory.customerFirstName?.value ?? null });
+    if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };
+  }
   return completeDeterministicQualificationTurn({
     tenantId,
     leadId,

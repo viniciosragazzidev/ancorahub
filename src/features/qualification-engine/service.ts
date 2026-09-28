@@ -149,8 +149,9 @@ function buildQualificationQuestionReply(
   question: QualificationQuestionDefinition,
   firstName?: string,
   repeated = false,
+  acknowledge = true,
 ) {
-  const greeting = firstName ? `Perfeito, ${firstName}. ` : "";
+  const greeting = firstName && acknowledge ? `Perfeito, ${firstName}. ` : "";
   const text = repeated ? clarificationByQuestionKey[question.key] ?? question.text : question.text;
   return `${greeting}${text}`;
 }
@@ -194,6 +195,8 @@ export function resolveDeterministicQualificationTurn(input: {
   policy: AgentBehaviorPolicy;
   handoffMessage?: string | null;
   pastOutboundTexts?: Set<string>;
+  /** false when the customer's last message answered nothing: no "Perfeito" before the question. */
+  answeredNow?: boolean;
 }): DeterministicQualificationTurn {
   const evaluation = evaluateQualification(input.memory, input.policy);
   const nextQuestion = getNextQualificationQuestion(input.memory, input.policy, input.pastOutboundTexts);
@@ -217,7 +220,7 @@ export function resolveDeterministicQualificationTurn(input: {
 
   return {
     kind: "collecting",
-    reply: buildQualificationQuestionReply(nextQuestion, firstName, repeatedQuestion),
+    reply: buildQualificationQuestionReply(nextQuestion, firstName, repeatedQuestion, input.answeredNow !== false),
     evaluation,
     nextQuestion,
   };
