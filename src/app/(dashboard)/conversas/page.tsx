@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lt, notInArray, or, sql } from "drizzle-orm";
 
 import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -705,6 +705,10 @@ export default async function ConversationsPage({
                 and(
                   eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
                   eq(schema.whatsappOutboundMessages.recipientType, "user"),
+                  // Skipped (notice switched off) and cancelled rows never reached the
+                  // broker: showing them made the chat display "Na fila" bubbles with
+                  // only the broker's name.
+                  notInArray(schema.whatsappOutboundMessages.status, ["skipped", "cancelled"]),
                   or(
                     inArray(schema.whatsappOutboundMessages.recipientId, [...brokerProfileIds, ...brokerUserIds]),
                     inArray(schema.whatsappOutboundMessages.destinationPhone, brokerPhones),
