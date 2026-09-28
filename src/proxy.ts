@@ -24,9 +24,9 @@ type SessionLookup = { userId: string; role: string | null; onboardingStatus: st
 const sessionCache = new Map<string, { expiresAt: number; value: SessionLookup }>();
 const SESSION_CACHE_TTL_MS = 60_000;
 
-async function lookupSession(token: string): Promise<SessionLookup> {
+async function lookupSession(token: string, fresh = false): Promise<SessionLookup | undefined> {
   const cached = sessionCache.get(token);
-  if (cached && cached.expiresAt > Date.now()) return cached.value;
+  if (!fresh && cached && cached.expiresAt > Date.now()) return cached.value;
   if (cached) sessionCache.delete(token);
   // Timeout after 3s to avoid blocking ALL requests when the connection pool
   // is exhausted by heavy pages (e.g. /super-admin/settings).
@@ -59,14 +59,55 @@ async function lookupSession(token: string): Promise<SessionLookup> {
     }
     return value;
   } catch {
-    return null;
+    // An unavailable database is not proof that the session was revoked.
+    return undefined;
   } finally {
     if (timerId) clearTimeout(timerId);
   }
 }
 
+/**
+ * Better Auth stores the session cookie signed: encodeURIComponent(`${token}.${hmacBase64}`)
+ * (HMAC-SHA256 with BETTER_AUTH_SECRET), while the session table keeps only
+ * the token. Returns the token when the signature matches, null when it does
+ * not (forged cookie or rotated secret). A cookie without a signature is taken
+ * as the token itself.
+ */
+export async function readSessionToken(rawValue: string, secret = process.env.BETTER_AUTH_SECRET ?? process.env.AUTH_SECRET): Promise<string | null> {
+  let value = rawValue;
+  try {
+    value = decodeURIComponent(rawValue);
+  } catch {
+    // Already decoded.
+  }
+  const signatureStart = value.lastIndexOf(".");
+  if (signatureStart < 1) return value || null;
+  const token = value.slice(0, signatureStart);
+  if (!secret) return token;
+  try {
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+    const signature = Uint8Array.from(atob(value.slice(signatureStart + 1)), (char) => char.charCodeAt(0));
+    return (await crypto.subtle.verify("HMAC", key, signature, new TextEncoder().encode(token))) ? token : null;
+  } catch {
+    return null;
+  }
+}
+
 function copyCookies(source: NextResponse, target: NextResponse) {
   source.cookies.getAll().forEach((cookie) => target.cookies.set(cookie));
+}
+
+function clearRevokedSessionCookies(request: NextRequest, response: NextResponse) {
+  for (const cookie of request.cookies.getAll()) {
+    if (!/^(?:__Secure-)?better-auth\.session_(?:token|data)(?:\.|$)/.test(cookie.name)) continue;
+    response.cookies.set(cookie.name, "", {
+      path: "/",
+      maxAge: 0,
+      httpOnly: true,
+      secure: cookie.name.startsWith("__Secure-"),
+      sameSite: "lax",
+    });
+  }
 }
 
 function hasSupabaseSessionCookie(request: NextRequest) {
@@ -101,6 +142,7 @@ async function getSafeSupabaseResponse(request: NextRequest) {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const isAuthPath = authPaths.some((path) => pathname.startsWith(path));
   const requestId = request.headers.get("x-request-id") ?? randomUUID();
   request.headers.set("x-request-id", requestId);
   request.headers.set("x-pathname", pathname);
@@ -118,51 +160,42 @@ export async function proxy(request: NextRequest) {
   logMiddlewareSpan(timing, "middleware.supabase_session", supabaseStartMs);
   const session = request.cookies.get("better-auth.session_token")
     ?? request.cookies.get("__Secure-better-auth.session_token")
-    ?? request.cookies.get("better-auth.session_token.value");
+    ?? request.cookies.get("better-auth.session_token.value")
+    ?? request.cookies.get("__Secure-better-auth.session_token.value");
+  const hasSessionCookie = Boolean(session?.value);
+  // The cookie is signed ("token.signature"); the session table holds the token only.
+  const sessionToken = session?.value ? await readSessionToken(session.value) : null;
 
   let userId: string | null = null;
-  let onboardingDone = true;
+  // Onboarding redirects used to live here but never ran in practice: the
+  // lookup could not match the signed cookie, so it always came back empty.
+  // Onboarding is handled inside the app; moving it here is a separate decision.
+  // A cookie whose signature does not match is not a session: treat it as revoked.
+  let sessionLookup: SessionLookup | undefined = hasSessionCookie && !sessionToken ? null : undefined;
 
-  if (session?.value) {
+  if (sessionToken) {
     try {
       const sessionLookupStartMs = performance.now();
-      const dbSession = await lookupSession(session.value);
+      const dbSession = await lookupSession(sessionToken, isAuthPath);
+      sessionLookup = dbSession;
       logMiddlewareSpan(timing, "middleware.session_lookup", sessionLookupStartMs);
 
-      if (dbSession) {
-        userId = dbSession.userId;
-        if (dbSession.role === "broker") {
-          onboardingDone = dbSession.onboardingStatus === "COMPLETED";
-        }
-      }
+      if (dbSession) userId = dbSession.userId;
     } catch (e) {
       console.error("Error fetching session from DB in proxy.ts:", e);
     }
   }
-
-  if (userId) {
-    if (!onboardingDone && !pathname.startsWith("/onboarding") && !pathname.startsWith("/primeiro-acesso") && !pathname.startsWith("/login") && !pathname.startsWith("/api/auth")) {
-      const response = NextResponse.redirect(new URL("/onboarding", request.url));
-      copyCookies(supabaseResponse, response);
-      response.headers.set("x-request-id", requestId);
-      return response;
-    }
-    if (onboardingDone && (pathname.startsWith("/primeiro-acesso") || pathname.startsWith("/onboarding"))) {
-      const response = NextResponse.redirect(new URL("/dashboard", request.url));
-      copyCookies(supabaseResponse, response);
-      response.headers.set("x-request-id", requestId);
-      return response;
-    }
-  }
+  const revokedSession = hasSessionCookie && sessionLookup === null;
 
   let response: NextResponse;
 
-  if (authPaths.some((p) => pathname.startsWith(p))) {
-    if (session) {
+  if (isAuthPath) {
+    if (userId) {
       response = NextResponse.redirect(new URL(pathname.startsWith("/admin") ? "/super-admin" : "/dashboard", request.url));
       copyCookies(supabaseResponse, response);
     } else {
       response = supabaseResponse;
+      if (revokedSession) clearRevokedSessionCookies(request, response);
     }
     response.headers.set("x-request-id", requestId);
     endMiddlewareTiming(timing, response.status);
@@ -184,9 +217,10 @@ export async function proxy(request: NextRequest) {
     return response;
   }
 
-  if (!session) {
+  if (!hasSessionCookie || revokedSession) {
     response = NextResponse.redirect(new URL(pathname.startsWith("/super-admin") ? "/admin/login" : "/login", request.url));
     copyCookies(supabaseResponse, response);
+    if (revokedSession) clearRevokedSessionCookies(request, response);
     response.headers.set("x-request-id", requestId);
     endMiddlewareTiming(timing, response.status);
     return response;
