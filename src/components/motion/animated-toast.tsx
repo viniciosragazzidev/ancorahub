@@ -3,6 +3,7 @@
 import React, { ReactNode } from "react";
 import { X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import {
   AnimatedBadge,
   type AnimatedBadgeStatus,
@@ -47,6 +48,7 @@ export function AnimatedToast({
   className,
 }: AnimatedToastProps) {
   const reduce = useReducedMotion();
+  const motionEnabled = useInterfaceMotionEnabled() && !reduce;
 
   const label =
     badgeLabel ??
@@ -65,12 +67,13 @@ export function AnimatedToast({
   return (
     <motion.div
       data-slot="animated-toast"
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: -12, scale: 0.96, filter: "blur(4px)" }}
-      animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.96, filter: "blur(4px)" }}
-      transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }}
+      initial={motionEnabled ? { opacity: 0, y: -12, scale: 0.96, filter: "blur(4px)" } : false}
+      animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+      exit={motionEnabled ? { opacity: 0, y: -8, scale: 0.96, filter: "blur(4px)" } : undefined}
+      transition={motionEnabled ? { type: "spring", stiffness: 420, damping: 28, mass: 0.8 } : { duration: 0 }}
       className={cn(
-        "group pointer-events-auto relative flex w-[380px] sm:w-[420px] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border bg-popover/95 p-4 text-popover-foreground shadow-2xl backdrop-blur-xl transition-all select-none",
+        "group pointer-events-auto relative flex w-[380px] sm:w-[420px] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border bg-popover/95 p-4 text-popover-foreground shadow-2xl backdrop-blur-xl select-none",
+        motionEnabled && "transition-all",
         "shadow-[0_12px_36px_-4px_rgba(0,0,0,0.16),0_4px_12px_-2px_rgba(0,0,0,0.08)] dark:shadow-[0_16px_40px_-6px_rgba(0,0,0,0.55)]",
         STATUS_ACCENTS[status],
         className
@@ -78,7 +81,7 @@ export function AnimatedToast({
     >
       {/* Top row: Status Badge + Close Button */}
       <div className="flex items-center justify-between gap-2">
-        <AnimatedBadge status={status} size="sm" pulse={status === "loading"}>
+        <AnimatedBadge status={status} size="sm" pulse={motionEnabled && status === "loading"}>
           {label}
         </AnimatedBadge>
 

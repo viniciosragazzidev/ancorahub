@@ -5,6 +5,8 @@
 
 ## Estado atual
 
+Hardening pontual de feedback (2026-09-27): o botão compartilhado e a confirmação pública de presença exibem estado inicial, pendência, sucesso confirmado e retry após erro. Toast e badge animados passam a respeitar o controle de movimento já auditado do Super Admin e `prefers-reduced-motion`. Papel: corretor escalado; ação principal: confirmar presença; estados: pendente, confirmado e falha recuperável. Não há novo token, primitiva, rota ou regra de domínio. Plano e validação de viabilidade: `docs/ux/INTERACTION_FEEDBACK_GAMIFICATION_PLAN.md`; registro de implementação: `docs/implementations/active/2026-09-27-feedback-interaction-pilot.md`. UX-M1.10 continua pendente.
+
 Correção pontual em `/distribuicao?view=plantao` (2026-09-27): Diretor/Gestor consultam o mês e veem total de dias com plantão, próximos/encerrados e dias sem cobertura por data distinta. A ação principal “Novo plantão” e a escala mensal permanecem; estado vazio mostra zero. Sem novo token, primitiva ou mudança de etapa. Registro em `docs/implementations/completed/2026-09-27-contagem-dias-plantao.md`.
 
 Refinamento pontual em `/primeiro-acesso` (2026-09-26): papel membro convidado; ação principal confirmar identidade; data via calendário compartilhado e e-mail com borda visível. Estados vazio, escolhido, data futura desabilitada e e-mail fixado pelo convite preservados. Sem novo token, primitive ou mudança na etapa UX-M1.10. Registro em `docs/implementations/completed/2026-09-26-primeiro-acesso-calendario.md`.

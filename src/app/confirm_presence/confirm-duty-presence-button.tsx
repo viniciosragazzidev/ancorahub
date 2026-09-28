@@ -24,12 +24,11 @@ export function ConfirmDutyPresenceButton({ confirmationId }: { confirmationId: 
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "Tente novamente em instantes.");
-      window.setTimeout(() => setState("idle"), 1400);
     }
   }
 
   return <div className="space-y-3">
-    <StatefulButton className="w-full" onClick={confirmPresence} state={state} loadingText="Confirmando…" successText="Presença confirmada" errorText="Tentar novamente" />
+    <StatefulButton className="w-full" onClick={confirmPresence} state={state} loadingText="Confirmando…" successText="Presença confirmada" errorText="Tentar novamente">Confirmar presença</StatefulButton>
     {message ? <p role={state === "error" ? "alert" : "status"} className="text-sm text-muted-foreground">{message}</p> : null}
   </div>;
 }

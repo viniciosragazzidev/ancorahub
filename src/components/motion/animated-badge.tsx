@@ -17,6 +17,7 @@ import {
   type Variants,
 } from "motion/react";
 import type { ReactNode } from "react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { cn } from "@/lib/utils";
 
 const EASE_OUT = [0.16, 1, 0.3, 1] as const;
@@ -110,6 +111,7 @@ export function AnimatedBadge({
   ...rest
 }: AnimatedBadgeProps) {
   const reduce = useReducedMotion();
+  const motionEnabled = useInterfaceMotionEnabled() && !reduce;
   const Icon = ICONS[status];
   const resolvedContentKey =
     contentKey ??
@@ -119,18 +121,18 @@ export function AnimatedBadge({
 
   return (
     <motion.span
-      layout
-      transition={{ type: "spring", stiffness: 420, damping: 30, mass: 0.7 }}
+      layout={motionEnabled}
+      transition={motionEnabled ? { type: "spring", stiffness: 420, damping: 30, mass: 0.7 } : { duration: 0 }}
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-full border font-medium tabular-nums select-none",
-        "transition-colors duration-300",
+        motionEnabled && "transition-colors duration-[var(--duration-fast)]",
         STATUS_CLASS[status],
         SIZE_CLASS[size],
         className,
       )}
       {...rest}
     >
-      {pulse && !reduce ? (
+      {pulse && motionEnabled ? (
         <motion.span
           aria-hidden
           className="absolute inset-0 rounded-full bg-current opacity-10 pointer-events-none"
@@ -145,13 +147,13 @@ export function AnimatedBadge({
               key={status}
               aria-hidden
               data-badge-icon
-              variants={ICON_ROLL_VARIANTS}
-              initial={reduce ? false : "initial"}
-              animate={reduce ? { opacity: 1 } : "animate"}
-              exit={reduce ? undefined : "exit"}
-              className="inline-flex will-change-transform"
+              variants={motionEnabled ? ICON_ROLL_VARIANTS : undefined}
+              initial={motionEnabled ? "initial" : false}
+              animate={motionEnabled ? "animate" : undefined}
+              exit={motionEnabled ? "exit" : undefined}
+              className="inline-flex"
             >
-              {status === "loading" && !reduce && !icon ? (
+              {status === "loading" && motionEnabled && !icon ? (
                 <motion.span
                   animate={{ rotate: 360 }}
                   transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
@@ -172,11 +174,11 @@ export function AnimatedBadge({
             <motion.span
               key={resolvedContentKey}
               data-badge-label
-              variants={TEXT_ROLL_VARIANTS}
-              initial={reduce ? false : "initial"}
-              animate={reduce ? { opacity: 1 } : "animate"}
-              exit={reduce ? undefined : "exit"}
-              className="inline-flex items-center gap-1.5 will-change-transform"
+              variants={motionEnabled ? TEXT_ROLL_VARIANTS : undefined}
+              initial={motionEnabled ? "initial" : false}
+              animate={motionEnabled ? "animate" : undefined}
+              exit={motionEnabled ? "exit" : undefined}
+              className="inline-flex items-center gap-1.5"
             >
               {children}
             </motion.span>

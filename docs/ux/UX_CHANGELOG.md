@@ -1,5 +1,11 @@
 # Histórico de Alterações de UX/UI (UX Changelog)
 
+## 2026-09-27 — Feedback de presença e movimento governado
+
+- A confirmação pública de presença deixa claro o estado inicial, processamento, confirmação do servidor e nova tentativa após falha. O botão compartilhado usa rótulos em português e cores semânticas existentes.
+- Toast e badge animados respeitam a configuração global de movimento e a preferência do sistema. O fluxo de elegibilidade e o servidor não mudam. UX-M1.10 continua pendente.
+- Validação e limites em `docs/ux/INTERACTION_FEEDBACK_GAMIFICATION_PLAN.md` e `docs/implementations/active/2026-09-27-feedback-interaction-pilot.md`.
+
 > **Documento Vivo**: `docs/ux/UX_CHANGELOG.md`  
 > **Framework de Governança**: `UX-GOV-1`  
 > **Fonte de Verdade**: `docs/ux/UX_REDESIGN_CONTRACT.md`  

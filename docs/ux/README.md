@@ -6,6 +6,8 @@ anterior.
 
 ## Leitura obrigatória
 
+Plano transversal proposto: [interação, feedback e gamificação](./INTERACTION_FEEDBACK_GAMIFICATION_PLAN.md). A implementação depende das etapas e decisões indicadas no plano.
+
 1. [Contrato de Redesign](./UX_REDESIGN_CONTRACT.md)
 2. [Controle de Execução](./UX_REDESIGN_CONTROL.md)
 3. [Governança do refinamento transversal](./UX_GOVERNANCE_PLAN.md)

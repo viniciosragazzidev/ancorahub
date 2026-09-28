@@ -3,6 +3,7 @@
 import { type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { CheckCircle, XCircle, Loader } from "lucide-react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants, type ButtonVariants } from "./button-variants";
@@ -67,9 +68,9 @@ export function StatefulButton({
   state = "idle",
   children,
   icon,
-  loadingText = "Loading",
-  successText = "Done",
-  errorText = "Try again",
+  loadingText = "Aguarde…",
+  successText = "Concluído",
+  errorText = "Tentar novamente",
   variant = "default",
   size = "default",
   pressScale = 0.97,
@@ -78,7 +79,8 @@ export function StatefulButton({
   ...props
 }: StatefulButtonProps) {
   const reduce = useReducedMotion();
-  const isActive = state !== "idle";
+  const motionEnabled = useInterfaceMotionEnabled() && !reduce;
+  const isPendingOrComplete = state === "loading" || state === "success";
 
   const stateContent: Record<ButtonState, ReactNode> = {
     idle: (
@@ -112,28 +114,27 @@ export function StatefulButton({
       data-slot="button"
       data-state={state}
       type="button"
-      disabled={disabled ?? isActive}
+      disabled={disabled || isPendingOrComplete}
+      aria-busy={state === "loading"}
       className={cn(
         buttonVariants({ variant, size }),
         "relative overflow-hidden",
-        state === "success" && "bg-emerald-600 border-emerald-600 text-white hover:brightness-95",
+        state === "success" && "bg-success border-success text-success-foreground",
         state === "error" && "bg-destructive/10 text-destructive border-destructive/20",
         className,
       )}
-      whileTap={reduce ? undefined : { scale: pressScale }}
-      whileHover={reduce ? undefined : { y: -1 }}
-      transition={pressTransition}
-      layout
+      whileTap={motionEnabled ? { scale: pressScale } : undefined}
+      transition={motionEnabled ? pressTransition : { duration: 0 }}
       {...props}
     >
       <AnimatePresence mode="popLayout" initial={false}>
         <motion.span
           key={state}
-          variants={reduce ? undefined : swapVariants}
-          initial="initial"
-          animate="animate"
-          exit="exit"
-          transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+          variants={motionEnabled ? swapVariants : undefined}
+          initial={motionEnabled ? "initial" : false}
+          animate={motionEnabled ? "animate" : undefined}
+          exit={motionEnabled ? "exit" : undefined}
+          transition={motionEnabled ? { duration: 0.15, ease: [0.16, 1, 0.3, 1] } : { duration: 0 }}
           className="flex items-center gap-2 whitespace-nowrap"
         >
           {stateContent[state]}
