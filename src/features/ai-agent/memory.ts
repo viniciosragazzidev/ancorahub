@@ -328,6 +328,26 @@ export function extractFieldsFromMessage(
       }
     }
 
+    // A quantity next to "vida(s)/pessoa(s)" anywhere in the sentence ("plano
+    // pra uma vida no MEI", "quero ta uma vida"), and short replies to the
+    // lives question with the word after the number ("uma só") or meaning one
+    // person ("só eu", "sozinha").
+    if (!memory.numberOfLives) {
+      const normalizedQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
+      const asksForLives = /quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizedQuestion);
+      const inSentence = normalizedMessage.match(new RegExp(`\\b(\\d{1,2}|${NUMBER_WORD_PATTERN})\\s+(?:pessoas?|vidas?|beneficiari[oa]s?)\\b`, "i"));
+      const shortReply = asksForLives
+        ? normalizedMessage.match(new RegExp(`^(?:e\\s+)?(\\d{1,2}|${NUMBER_WORD_PATTERN})\\s+(?:so|apenas|somente)$`, "i"))
+        : null;
+      const onlyMe = asksForLives && /^(?:(?:e\s+)?(?:so|apenas|somente)\s+(?:eu|pra mim|para mim)|eu mesm[oa]|sozinh[oa]|so minha pessoa)$/.test(normalizedMessage);
+      const token = inSentence?.[1] ?? shortReply?.[1];
+      const value = onlyMe ? 1 : token ? numberToken(token) : undefined;
+      if (value && value > 0 && value < 100) {
+        memory.numberOfLives = { value: String(value), confidence: 1, sourceMessageId };
+        addCollectedField(memory, "numberOfLives");
+      }
+    }
+
     for (const pattern of NUMBER_OF_LIVES_PATTERNS) {
       if (memory.numberOfLives) break;
       const match = trimmed.match(pattern);

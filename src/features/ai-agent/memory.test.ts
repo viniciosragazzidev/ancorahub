@@ -2,6 +2,27 @@ import { describe, expect, it } from "vitest";
 
 import { createEmptyMemory, extractFieldsFromMessage, isCoreQualificationComplete, COLLECTIBLE_FIELDS } from "./memory";
 
+describe("number of lives in real conversations", () => {
+  const asked = { ...createEmptyMemory(), lastQuestionAsked: "Perfeito, Maria. Quantas pessoas serão incluídas no plano?" };
+  it("understands the answers a customer actually gave (pilot conversation)", () => {
+    const first = extractFieldsFromMessage("Plano de saúde pra uma vida no mei", createEmptyMemory(), "m1");
+    expect(first.numberOfLives?.value).toBe("1");
+    expect(first.planType?.value).toBe("empresarial");
+    expect(extractFieldsFromMessage("Quero ta uma vida.", asked).numberOfLives?.value).toBe("1");
+    expect(extractFieldsFromMessage("Uma só", asked).numberOfLives?.value).toBe("1");
+    expect(extractFieldsFromMessage("só eu", asked).numberOfLives?.value).toBe("1");
+    expect(extractFieldsFromMessage("sozinha", asked).numberOfLives?.value).toBe("1");
+    expect(extractFieldsFromMessage("somos 3 pessoas em casa", asked).numberOfLives?.value).toBe("3");
+    expect(extractFieldsFromMessage("preciso pra duas vidas", createEmptyMemory()).numberOfLives?.value).toBe("2");
+  });
+
+  it("does not read an ordinary \"uma\" as a quantity", () => {
+    expect(extractFieldsFromMessage("tenho uma dúvida", asked).numberOfLives).toBeUndefined();
+    expect(extractFieldsFromMessage("uma pergunta antes", asked).numberOfLives).toBeUndefined();
+    expect(extractFieldsFromMessage("só eu mesmo queria saber o preço", createEmptyMemory()).numberOfLives).toBeUndefined();
+  });
+});
+
 describe("conversation memory", () => {
   it("records a bare number as lives when it answers the last lives question", () => {
     const memory = { ...createEmptyMemory(), lastQuestionAsked: "Quantas vidas serão incluídas no plano?" };
