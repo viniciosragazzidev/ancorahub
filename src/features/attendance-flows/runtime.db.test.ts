@@ -155,11 +155,16 @@ describe.skipIf(!enabled)("attendance flow runtime (real schema, rolled back)", 
       // Agent serving: the lead waits in the queue marked as in qualification (distribution skips it).
       const served = await newLead(tx, tenantId, queueId, branchId);
       await tx.update(s.leads).set({ queueId: null, distributionStatus: "manual_hold", qualificationStatus: "cold", qualificationState: "QUALIFIED" }).where(eq(s.leads.id, served));
+      // Its previous AI conversation had been closed by the qualification timeout.
+      await tx.insert(s.aiConversations).values({ id: randomUUID(), tenantId, leadId: served, status: "CLOSED", automationState: "CLOSED", lastProcessedMessageId: "wamid.old" } as typeof s.aiConversations.$inferInsert);
       const agent = stubs({ agentStarted: true });
       expect(await startLeadInQueueFlow({ tenantId, leadId: served, queueId, actorUserId: actor.userId }, agent.handlers(real))).toMatchObject({ started: true, waitingForAgent: true });
       const [servedRow] = await tx.select({ queueId: s.leads.queueId, dist: s.leads.distributionStatus, state: s.leads.qualificationState }).from(s.leads).where(eq(s.leads.id, served));
       expect(servedRow).toEqual({ queueId, dist: "queued", state: "IN_PROGRESS" });
       expect(agent.calls).toMatchObject({ agent: 1, distribute: [] });
+      // Started over: the agent gets a new conversation, not the closed one.
+      const [conversation] = await tx.select({ status: s.aiConversations.status, auto: s.aiConversations.automationState, processed: s.aiConversations.lastProcessedMessageId }).from(s.aiConversations).where(eq(s.aiConversations.leadId, served));
+      expect(conversation).toEqual({ status: "NEW", auto: "AI_ACTIVE", processed: null });
       // Only one open run per lead.
       expect(await startLeadInQueueFlow({ tenantId, leadId: served, queueId, actorUserId: actor.userId }, agent.handlers(real)))
         .toMatchObject({ started: false, error: expect.stringContaining("já está em um fluxo") });

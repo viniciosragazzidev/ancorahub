@@ -54,6 +54,11 @@ export async function startLeadInQueueFlow(
 
   const now = new Date();
   const branchId = queue.branchId ?? lead.branchId;
+  // "From the start, as a lead that just arrived": the agent opens a new conversation.
+  await db.update(schema.aiConversations).set({
+    status: "NEW", automationState: "AI_ACTIVE", memory: null, lastProcessedMessageId: null,
+    startedAt: now, lastActivityAt: now, closedAt: null, updatedAt: now,
+  }).where(and(eq(schema.aiConversations.tenantId, input.tenantId), eq(schema.aiConversations.leadId, input.leadId)));
   await db.update(schema.leads).set({
     queueId: queue.id, branchId, distributionStatus: "queued", distributionUpdatedAt: now,
     qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: now,
