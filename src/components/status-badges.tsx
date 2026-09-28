@@ -19,24 +19,21 @@ export function LeadQualificationBadge({ status }: { status: string }) {
 
   if (norm === "hot" || norm.includes("quente")) {
     return (
-      <AnimatedBadge status="danger" size="sm">
-        <Fire aria-hidden="true" className="size-3" weight="fill" />
+      <AnimatedBadge status="danger" size="sm" icon={<Fire aria-hidden="true" className="size-3" weight="fill" />}>
         Quente
       </AnimatedBadge>
     );
   }
   if (norm === "warm" || norm.includes("morno")) {
     return (
-      <AnimatedBadge status="warning" size="sm">
-        <Sun aria-hidden="true" className="size-3" weight="fill" />
+      <AnimatedBadge status="warning" size="sm" icon={<Sun aria-hidden="true" className="size-3" weight="fill" />}>
         Morno
       </AnimatedBadge>
     );
   }
   if (norm === "cold" || norm.includes("frio")) {
     return (
-      <AnimatedBadge status="info" size="sm">
-        <Snowflake aria-hidden="true" className="size-3" weight="bold" />
+      <AnimatedBadge status="info" size="sm" icon={<Snowflake aria-hidden="true" className="size-3" weight="bold" />}>
         Frio
       </AnimatedBadge>
     );
