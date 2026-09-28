@@ -162,21 +162,15 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
                 ))
                 .returning({ id: schema.leads.id });
               if (released) {
-                const reason = "Tempo para aceite esgotado e sem corretor elegível para repasse automático: lead devolvido para atribuição manual.";
+                // The lead is back in the queue (distributionStatus "queued") and the
+                // distribution offers it again as soon as a broker is eligible. It is
+                // not a manual task, so directors are not asked to assign it.
+                const reason = "Tempo para aceite esgotado e nenhum corretor livre agora: o lead voltou para a fila e será reofertado automaticamente.";
                 await db.insert(schema.leadDistributionEvents).values({
                   id: randomUUID(), tenantId: tenant.id, leadId: lead.id, fromBranchId: lead.branchId, toBranchId: lead.branchId,
-                  previousOwnerId, action: "released_for_manual_assignment", source: "sla", strategy: "manual",
+                  previousOwnerId, action: "returned_to_queue", source: "sla", strategy: "automatic",
                   reason, actorId: automationActor.userId, createdAt: now,
                 });
-                for (const recipient of recipients) {
-                  if (recipient.role === "manager" && recipient.branchId !== lead.branchId) continue;
-                  pending.push({
-                    id: randomUUID(), tenantId: tenant.id, recipientUserId: recipient.userId, leadId: lead.id,
-                    type: "lead_manual_assignment_needed", title: "Lead aguardando atribuição manual",
-                    message: `O tempo para aceitar o lead ${lead.nome} acabou e não havia corretor elegível para o repasse automático. Atribua manualmente.`,
-                    createdAt: now,
-                  });
-                }
                 void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
               }
             }
