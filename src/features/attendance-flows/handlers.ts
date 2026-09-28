@@ -7,10 +7,10 @@ import { getDatabase, schema } from "@/shared/db";
 import type { EffectHandlers } from "./runtime";
 
 /**
- * Real effects of a flow run. The AI agent on the new engine only starts for
- * leads whose phone is a registered qualification test number, until the
- * switch-over (DEC-126); any other lead takes the agent's "failed" exit, which
- * the ready-made flows send to distribution.
+ * Real effects of a flow run. Choosing a flow with the new engine for a queue
+ * is what turns the new engine on for that queue's leads (DEC-126); a lead the
+ * agent cannot start takes the agent's "failed" exit, which the ready-made
+ * flows send to distribution.
  */
 export function flowEffectHandlers(input: { tenantId: string; leadId: string; actorUserId: string; legacyIntake: () => Promise<void> }): EffectHandlers {
   return {
@@ -26,24 +26,9 @@ export function flowEffectHandlers(input: { tenantId: string; leadId: string; ac
         const result = await startAiQualificationForLead({ tenantId, leadId, actorUserId: input.actorUserId });
         return { started: Boolean(result.started) };
       }
-      if (!(await isQualificationTestLead(tenantId, leadId))) return { started: false };
       const { startQualificationConversationForLead } = await import("@/features/ai-agent/conversation-state-machine");
-      const result = await startQualificationConversationForLead({ tenantId, leadId, actorUserId: input.actorUserId }, false, { flowTestLead: true });
+      const result = await startQualificationConversationForLead({ tenantId, leadId, actorUserId: input.actorUserId }, false, { fromFlow: true });
       return { started: Boolean(result.started) };
     },
   };
-}
-
-/** Lead phone registered as a qualification test number (the only leads the new engine serves for now). */
-export async function isQualificationTestLead(tenantId: string, leadId: string) {
-  const db = getDatabase();
-  const [lead] = await db.select({ phone: schema.leads.telefone }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId))).limit(1);
-  const digits = lead?.phone?.replace(/\D/g, "") ?? "";
-  if (!digits) return false;
-  const numbers = await db.select({ phone: schema.aiQualificationTestNumbers.phoneNumber }).from(schema.aiQualificationTestNumbers)
-    .where(eq(schema.aiQualificationTestNumbers.tenantId, tenantId));
-  return numbers.some((row) => {
-    const test = row.phone.replace(/\D/g, "");
-    return test.length >= 8 && (digits.endsWith(test.slice(-11)) || test.endsWith(digits.slice(-11)));
-  });
 }

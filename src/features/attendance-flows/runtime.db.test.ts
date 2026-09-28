@@ -97,7 +97,7 @@ describe.skipIf(!enabled)("attendance flow runtime (real schema, rolled back)", 
       const effects = await tx.select({ key: s.leadEffectOutbox.idempotencyKey }).from(s.leadEffectOutbox).where(and(eq(s.leadEffectOutbox.leadId, directLead), eq(s.leadEffectOutbox.type, "DISTRIBUTE_LEAD")));
       expect(effects.map((row) => row.key)).toEqual([`attendance:${(directRun as { runId: string }).runId}:transfer`]);
 
-      // New engine for a lead outside the test group: the agent does not start, the flow distributes.
+      // New engine, agent could not start (e.g. no phone): the flow distributes.
       await setQueueFlow("qualify_new_engine");
       const outsider = await newLead(tx, tenantId, queueId, branchId);
       const notStarted = stubs({ agentStarted: false });
