@@ -11,7 +11,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { and, desc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -78,9 +78,8 @@ async function inRollback(run: (tx: Tx, tenantId: string, brokerId: string) => P
     const tenantId = channel?.tenantId ?? (await tx.select({ tenantId: s.communicationChannels.tenantId }).from(s.communicationChannels).where(eq(s.communicationChannels.status, "active")).limit(1))[0].tenantId;
     const [broker] = await tx.select({ userId: s.tenantMemberships.userId }).from(s.tenantMemberships)
       .where(and(eq(s.tenantMemberships.tenantId, tenantId), eq(s.tenantMemberships.role, "broker"), eq(s.tenantMemberships.status, "active"))).limit(1);
-    // Scenarios start with the company number switched on, whatever the live setting is.
-    await tx.insert(s.systemSettings).values({ key: `company_number_notices_enabled_${tenantId}`, value: "true" })
-      .onConflictDoUpdate({ target: s.systemSettings.key, set: { value: "true" } });
+    // Scenarios choose each channel themselves, whatever the live settings are.
+    await tx.delete(s.teamNoticeSettings).where(eq(s.teamNoticeSettings.tenantId, tenantId));
     await run(tx as unknown as Tx, tenantId, broker.userId);
     throw new Rollback();
   }).catch((error) => { if (!(error instanceof Rollback)) throw error; });
@@ -151,23 +150,24 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
   it("routes each team notice by its setting, with the company number first and Meta as the fallback", async () => {
     await inRollback(async (tx, tenantId, brokerId) => {
       await companyNumber(tx, tenantId, "active");
-      // Offer: company number by default; the link opens the lead in the CRM (same as the Meta button).
+      // Offer by the company number: the link opens the lead in the CRM (same as the Meta button).
+      await notice(tx, tenantId, "LEAD_OFFER", true, "company_number");
       const offerLeadId = randomUUID();
       report.offer = await scenario(tx, { tenantId, brokerId, purpose: "newLeadAssignment", variables: ["Corretor(a)", "Corretor Teste", "Lead Teste", "Plano de saúde", offerLeadId] });
       report.offerLink = { enqueue: { status: "", route: offerLeadId, type: null, template: null, hold: null } };
-      // Presence confirmation: always on; Meta by default, company number when chosen.
+      // Presence confirmation: always on; Meta only by default, company number when chosen.
       report.presenceDefault = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "dutyPresenceConfirmation", variables: ["Corretor Teste", "09:00", randomUUID()], process: false });
       await notice(tx, tenantId, "DUTY_PRESENCE_CONFIRMATION", false, "company_number");
       report.presenceByCompany = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "dutyPresenceConfirmation", variables: ["Corretor Teste", "09:00", randomUUID()], process: false });
       // Lead information: company number first, built-in wording (a few seconds after the offer).
+      await notice(tx, tenantId, "LEAD_ASSIGNMENT_CONFIRMED", true, "company_number");
       vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 10_000));
       report.confirmedByCompany = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentConfirmed", variables: ["Corretor Teste", "Lead Teste", "(21) 90000-0000", "Plano de saúde", "Individual", "0", "Niterói", randomUUID()] });
-      // Meta first: the template is missing on the sending number, so the company number carries it.
+      // Meta only: never the company number, even connected.
       await notice(tx, tenantId, "LEAD_ASSIGNMENT_CONFIRMED", true, "meta");
       vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 20_000));
-      report.confirmedMetaThenCompany = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadAssignmentConfirmed", variables: ["Outro", "Lead", "(21) 90000-0001", "Plano", "Individual", "1", "Rio", randomUUID()] });
+      report.confirmedMetaOnly = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadAssignmentConfirmed", variables: ["Outro", "Lead", "(21) 90000-0001", "Plano", "Individual", "1", "Rio", randomUUID()] });
       // Default off: an expired offer is not sent at all (and never through another channel).
-      await tx.delete(realSchema.teamNoticeSettings).where(and(eq(realSchema.teamNoticeSettings.tenantId, tenantId), eq(realSchema.teamNoticeSettings.noticeKey, "LEAD_ASSIGNMENT_EXPIRED")));
       report.expiredDefaultOff = await scenario(tx, { tenantId, brokerId, purpose: "leadAssignmentExpired" });
       // Reminder switched on: sent by the company number within business hours.
       await notice(tx, tenantId, "TASK_REMINDER", true, "company_number");
@@ -177,6 +177,7 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
 
     await inRollback(async (tx, tenantId, brokerId) => {
       // Company number down: back to normal, the approved Meta template.
+      await notice(tx, tenantId, "BROKER_ACCOUNT_ACTIVATED", true, "company_number");
       await companyNumber(tx, tenantId, "disconnected");
       report.confirmedNumberDown = await scenario(tx, { tenantId, brokerId, purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"] });
       await companyNumber(tx, tenantId, "paused");
@@ -185,6 +186,7 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
 
     await inRollback(async (tx, tenantId, brokerId) => {
       await companyNumber(tx, tenantId, "active");
+      await notice(tx, tenantId, "BROKER_ACCOUNT_ACTIVATED", true, "company_number");
       // WAHA fails at send time: the notice still reaches the person through Meta.
       wahaBehavior.fail = true;
       report.companyFailsFallsToMeta = await scenario(tx, { tenantId, brokerId, purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"] });
@@ -193,29 +195,25 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
 
     await inRollback(async (tx, tenantId, brokerId) => {
       await companyNumber(tx, tenantId, "active");
-      const switchCompanyNumber = (on: boolean) => tx.insert(realSchema.systemSettings).values({ key: `company_number_notices_enabled_${tenantId}`, value: on ? "true" : "false" })
-        .onConflictDoUpdate({ target: realSchema.systemSettings.key, set: { value: on ? "true" : "false" } });
-      // Queued for the company number, then the director switches it off: it leaves through Meta.
-      await switchCompanyNumber(true); // independent of the live setting
-      const queuedBefore = await scenario(tx, { tenantId, brokerId, purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"], process: false });
-      await switchCompanyNumber(false);
-      // Switched off: every notice goes through the official Meta only, even with the number connected.
-      report.switchedOff = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"] });
-      report.switchedOffConfirmed = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "leadAssignmentConfirmed", variables: ["Corretor Teste", "Lead Teste", "(21) 90000-0003", "Plano", "Individual", "0", "Rio", randomUUID()], process: false });
+      // Nothing chosen: every notice goes through the official Meta only, even with the number connected.
+      report.metaByDefault = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"] });
+      report.offerMetaByDefault = await scenario(tx, { tenantId, brokerId: randomUUID(), purpose: "newLeadAssignment", variables: ["Corretor(a)", "Corretor Teste", "Lead Teste", "Plano de saúde", randomUUID()], process: false });
+      // Messages typed in the chat: company number by default, Meta only when chosen.
       const outbound = await import("./outbound-service");
-      const [queuedRow] = await tx.select({ id: realSchema.whatsappOutboundMessages.id }).from(realSchema.whatsappOutboundMessages)
-        .where(and(eq(realSchema.whatsappOutboundMessages.tenantId, tenantId), eq(realSchema.whatsappOutboundMessages.deliveryRoute, "waha_direct"), eq(realSchema.whatsappOutboundMessages.purpose, "brokerAccountActivated")))
-        .orderBy(desc(realSchema.whatsappOutboundMessages.createdAt)).limit(1);
-      calls.length = 0;
-      await outbound.processMetaOutboundBatch(1, tenantId, queuedRow.id);
-      const [queuedAfter] = await tx.select().from(realSchema.whatsappOutboundMessages).where(eq(realSchema.whatsappOutboundMessages.id, queuedRow.id));
-      report.queuedThenSwitchedOff = { enqueue: queuedBefore.enqueue, process: { status: queuedAfter.status, route: queuedAfter.deliveryRoute, hold: queuedAfter.holdReason, error: null, calls: [...calls] } };
-      await switchCompanyNumber(true);
+      const chatText = async (key: string) => {
+        const queued = await outbound.enqueueMetaTextMessage({ tenantId, recipientType: "user", recipientId: brokerId, destinationPhone: FAKE_PHONE, body: "Oi, tudo certo?", idempotencyKey: `chat:${key}:${randomUUID()}` });
+        const [row] = await tx.select().from(realSchema.whatsappOutboundMessages).where(eq(realSchema.whatsappOutboundMessages.id, queued.id));
+        report[key] = { enqueue: { status: row.status, route: row.deliveryRoute, type: row.messageType, template: row.templateName, hold: row.holdReason } };
+      };
+      await chatText("chatByDefault");
+      await notice(tx, tenantId, "BROKER_CHAT", true, "meta");
+      await chatText("chatMetaOnly");
     });
 
     await inRollback(async (tx, tenantId, brokerId) => {
       await companyNumber(tx, tenantId, "active");
       await notice(tx, tenantId, "LEAD_FEEDBACK_REMINDER", true, "company_number");
+      await notice(tx, tenantId, "LEAD_ASSIGNMENT_CONFIRMED", true, "company_number");
       // At most 2 feedback reminders per person per day, spaced apart.
       report.reminder1 = await scenario(tx, { tenantId, brokerId, purpose: "leadFeedbackReminder", variables: ["Corretor Teste", "Lead B"] });
       vi.setSystemTime(new Date(WEDNESDAY_10AM.getTime() + 2 * 60_000));
@@ -238,16 +236,16 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
     expect(report.offer).toMatchObject({ enqueue: { route: "waha_direct" }, process: { status: "sent", route: "waha_direct" } });
     expect(sentBy("offer")).toEqual(["waha"]);
     expect(report.offer.process?.calls[0].body).toContain(`/leads/${(report.offerLink.enqueue as { route: string }).route}`);
-    expect(report.presenceDefault.enqueue).toMatchObject({ status: "queued", route: "meta_then_waha" });
+    expect(report.presenceDefault.enqueue).toMatchObject({ status: "queued", route: "meta_only" });
     expect(report.presenceByCompany.enqueue).toMatchObject({ status: "queued", route: "waha_direct" });
 
     expect(report.confirmedByCompany).toMatchObject({ enqueue: { route: "waha_direct" }, process: { status: "sent", route: "waha_direct" } });
     expect(sentBy("confirmedByCompany")).toEqual(["waha"]);
     expect(report.confirmedByCompany.process?.calls[0].body).toContain("Atribuição Confirmada");
 
-    // Fixes the phase-0 defect: Meta has no template, the company number sends it.
-    expect(report.confirmedMetaThenCompany.process).toMatchObject({ status: "sent", route: "waha_direct" });
-    expect(sentBy("confirmedMetaThenCompany")).toEqual(["waha"]);
+    // Meta only: the company number is never called, not even as a fallback.
+    expect(report.confirmedMetaOnly.enqueue).toMatchObject({ route: "meta_only", hold: null });
+    expect(sentBy("confirmedMetaOnly")).not.toContain("waha");
 
     expect(report.expiredDefaultOff).toMatchObject({ enqueue: { status: "skipped", hold: "disabled" } });
     expect(report.expiredDefaultOff.process).toBeUndefined();
@@ -266,12 +264,13 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
     expect(report.confirmedSaturday.process).toMatchObject({ status: "sent" });
     expect(report.expiredSaturday.process).toMatchObject({ status: "sent", route: "waha_direct" });
 
-    // Master switch off: Meta only, never the company number (not even as a fallback).
-    expect(report.switchedOff).toMatchObject({ enqueue: { route: "meta_only", hold: "company_number_off" }, process: { status: "sent", route: "meta_only" } });
-    expect(sentBy("switchedOff")).toEqual(["meta_template"]);
-    expect(report.switchedOffConfirmed.enqueue).toMatchObject({ route: "meta_only", hold: "company_number_off" });
-    expect(report.queuedThenSwitchedOff).toMatchObject({ enqueue: { route: "waha_direct" }, process: { status: "sent", route: "meta_only" } });
-    expect(sentBy("queuedThenSwitchedOff")).toEqual(["meta_template"]);
+    // Nothing chosen: Meta only, never the company number.
+    expect(report.metaByDefault).toMatchObject({ enqueue: { route: "meta_only", hold: null }, process: { status: "sent", route: "meta_only" } });
+    expect(sentBy("metaByDefault")).toEqual(["meta_template"]);
+    expect(report.offerMetaByDefault.enqueue).toMatchObject({ route: "meta_only", hold: null });
+    // Chat: company number by default; Meta only when chosen.
+    expect(report.chatByDefault.enqueue).toMatchObject({ route: "waha_direct" });
+    expect(report.chatMetaOnly.enqueue).toMatchObject({ route: "meta_only" });
 
     expect(report.reminder1.process).toMatchObject({ status: "sent" });
     expect(report.reminder2.process).toMatchObject({ status: "sent" });

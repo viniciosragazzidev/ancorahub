@@ -799,6 +799,13 @@
                         "when":  1790312400000,
                         "tag":  "0166_duty_lead_cap_per_broker",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  114,
+                        "version":  "7",
+                        "when":  1790398800000,
+                        "tag":  "0167_team_notices_per_notice_channel",
+                        "breakpoints":  true
                     }
                 ]
 }

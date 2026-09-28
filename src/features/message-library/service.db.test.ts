@@ -88,7 +88,7 @@ describe.skipIf(!enabled)("message library (real schema, rolled back)", () => {
       };
       const rendered: Record<string, string> = {};
       for (const notice of TEAM_NOTICES) {
-        if (notice.metaOnly) continue;
+        if (notice.metaOnly || notice.chat) continue;
         const variables = variablesFor[notice.purpose] ?? [vinicios.name];
         rendered[notice.label] = await renderTeamNoticeText({ tenantId: vinicios.tenantId, notice, setting: { enabled: true, channel: "company_number", freeMessageId: null }, variables, builtIn: resolveTemplateTextBody(notice.purpose, variables) });
         expect(rendered[notice.label], notice.label).toContain(vinicios.name);

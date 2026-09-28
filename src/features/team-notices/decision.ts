@@ -12,7 +12,7 @@ export type NoticeDecision =
       /** Company number used first, or as the fallback when Meta cannot send. */
       wahaNumberId: string | null;
       /** Why the preferred company number was not used, when it was the preference. */
-      note: "company_number_unavailable" | "company_number_paused" | "company_number_off" | null;
+      note: "company_number_unavailable" | "company_number_paused" | null;
     };
 
 export function companyNumberUsable(number: CompanyNumberState, now: Date) {
@@ -22,21 +22,17 @@ export function companyNumberUsable(number: CompanyNumberState, now: Date) {
 }
 
 /**
- * One decision per team notice (DEC-125). Disabled means "do not send": it is
- * never turned into another channel. Company number first falls back to Meta;
- * Meta first keeps the company number as the fallback for a Meta template the
- * sending number does not have. With the company number switched off, every
- * notice goes through Meta only.
+ * One decision per team notice (DEC-125), chosen notice by notice. Disabled
+ * means "do not send": it is never turned into another channel. "Meta" (the
+ * default) goes through the official Meta API only; "company_number" goes
+ * through the company WhatsApp (WAHA) and falls back to Meta when it is down,
+ * paused or banned.
  */
-export function decideTeamNotice(notice: TeamNotice, setting: TeamNoticeSetting, number: CompanyNumberState, now: Date, companyNumberOn = true): NoticeDecision {
+export function decideTeamNotice(notice: TeamNotice, setting: TeamNoticeSetting, number: CompanyNumberState, now: Date): NoticeDecision {
   if (!setting.enabled) return { action: "skip", reason: "disabled" };
-  if (!companyNumberOn) return { action: "send", primary: "meta", wahaNumberId: null, note: notice.metaOnly ? null : "company_number_off" };
+  if (notice.metaOnly || setting.channel !== "company_number") return { action: "send", primary: "meta", wahaNumberId: null, note: null };
   const company = companyNumberUsable(number, now);
-  if (notice.metaOnly) return { action: "send", primary: "meta", wahaNumberId: null, note: null };
-  if (setting.channel === "company_number") {
-    return company.usable
-      ? { action: "send", primary: "company_number", wahaNumberId: number!.id, note: null }
-      : { action: "send", primary: "meta", wahaNumberId: null, note: company.why };
-  }
-  return { action: "send", primary: "meta", wahaNumberId: company.usable ? number!.id : null, note: null };
+  return company.usable
+    ? { action: "send", primary: "company_number", wahaNumberId: number!.id, note: null }
+    : { action: "send", primary: "meta", wahaNumberId: null, note: company.why };
 }

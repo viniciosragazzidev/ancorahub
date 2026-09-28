@@ -22,8 +22,10 @@ export type TeamNotice = {
   metaOnly?: boolean;
   /** Cannot be switched off (turning it off would break the operation); the channel is still chosen. */
   alwaysOn?: boolean;
-  /** Channel before anything is saved. Company number unless stated. */
+  /** Channel before anything is saved. Meta only unless stated. */
   defaultChannel?: NoticeChannel;
+  /** Free text typed in the chat, not an automatic notice: only the channel is chosen. */
+  chat?: boolean;
 };
 
 export const TEAM_NOTICES: readonly TeamNotice[] = [
@@ -112,7 +114,20 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     alwaysOn: true,
     defaultChannel: "meta",
   },
+  {
+    key: "BROKER_CHAT",
+    purpose: "brokerChatText",
+    label: "Mensagens do chat",
+    description: "Mensagens escritas diretamente no chat para o corretor.",
+    class: "critical",
+    defaultEnabled: true,
+    alwaysOn: true,
+    defaultChannel: "company_number",
+    chat: true,
+  },
 ];
+
+export const BROKER_CHAT_NOTICE = TEAM_NOTICES.find((notice) => notice.chat)!;
 
 const byPurpose = new Map(TEAM_NOTICES.map((notice) => [notice.purpose, notice]));
 const byKey = new Map(TEAM_NOTICES.map((notice) => [notice.key, notice]));
@@ -127,12 +142,12 @@ export function teamNoticeByKey(key: string) {
 
 export type TeamNoticeSetting = { enabled: boolean; channel: NoticeChannel; freeMessageId: string | null };
 
-/** Stored setting, or the default: on/off from the catalog, company number first. */
+/** Stored setting, or the default: on/off from the catalog, Meta only. */
 export function effectiveNoticeSetting(notice: TeamNotice, stored: Partial<TeamNoticeSetting> | null | undefined): TeamNoticeSetting {
   if (notice.metaOnly) return { enabled: true, channel: "meta", freeMessageId: null };
   return {
     enabled: notice.alwaysOn ? true : stored?.enabled ?? notice.defaultEnabled,
-    channel: stored?.channel ?? notice.defaultChannel ?? "company_number",
-    freeMessageId: stored?.freeMessageId ?? null,
+    channel: stored?.channel ?? notice.defaultChannel ?? "meta",
+    freeMessageId: notice.chat ? null : stored?.freeMessageId ?? null,
   };
 }

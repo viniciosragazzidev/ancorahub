@@ -79,10 +79,10 @@ describe("team notice decision", () => {
   const number = { id: "waha-1", connected: true, pausedUntil: null };
   const now = wednesdayMorning;
 
-  it("uses the catalog defaults: reminders and expired offers off, lead notices on, company number first", () => {
-    expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_ASSIGNMENT_EXPIRED")!, null)).toEqual({ enabled: false, channel: "company_number", freeMessageId: null });
+  it("uses the catalog defaults: reminders and expired offers off, lead notices on, Meta only", () => {
+    expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_ASSIGNMENT_EXPIRED")!, null)).toEqual({ enabled: false, channel: "meta", freeMessageId: null });
     expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_FEEDBACK_REMINDER")!, null).enabled).toBe(false);
-    expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_ASSIGNMENT_CONFIRMED")!, null)).toEqual({ enabled: true, channel: "company_number", freeMessageId: null });
+    expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_ASSIGNMENT_CONFIRMED")!, null)).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
     expect(teamNoticeForPurpose("leadAssignmentConfirmed")?.class).toBe("critical");
   });
 
@@ -92,14 +92,11 @@ describe("team notice decision", () => {
     expect(decideTeamNotice(notice, { enabled: false, channel: "meta", freeMessageId: null }, null, now)).toEqual({ action: "skip", reason: "disabled" });
   });
 
-  it("sends everything through Meta only when the company number is switched off", () => {
-    const off = { enabled: true, channel: "company_number" as const, freeMessageId: null };
-    for (const key of ["LEAD_OFFER", "LEAD_ASSIGNMENT_CONFIRMED", "LEAD_ASSIGNMENT_EXPIRED"]) {
-      expect(decideTeamNotice(teamNoticeByKey(key)!, off, number, now, false)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: "company_number_off" });
-      expect(decideTeamNotice(teamNoticeByKey(key)!, { ...off, channel: "meta" }, number, now, false)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: "company_number_off" });
+  it("sends a notice set to Meta through Meta only, even with the company number connected", () => {
+    const meta = { enabled: true, channel: "meta" as const, freeMessageId: null };
+    for (const key of ["LEAD_OFFER", "LEAD_ASSIGNMENT", "LEAD_ASSIGNMENT_CONFIRMED", "LEAD_ASSIGNMENT_EXPIRED", "DUTY_PRESENCE_CONFIRMATION"]) {
+      expect(decideTeamNotice(teamNoticeByKey(key)!, meta, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: null });
     }
-    // Switched off still does not send a disabled notice.
-    expect(decideTeamNotice(teamNoticeByKey("TASK_REMINDER")!, { ...off, enabled: false }, number, now, false)).toEqual({ action: "skip", reason: "disabled" });
   });
 
   it("goes by the company number and falls back to Meta when it is down, paused or banned", () => {
@@ -110,9 +107,11 @@ describe("team notice decision", () => {
     expect(decideTeamNotice(notice, setting, { ...number, pausedUntil: new Date(now.getTime() + 60_000) }, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: "company_number_paused" });
   });
 
-  it("keeps the company number as the fallback when Meta comes first", () => {
-    const notice = teamNoticeByKey("LEAD_ASSIGNMENT")!;
-    expect(decideTeamNotice(notice, { enabled: true, channel: "meta", freeMessageId: null }, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: "waha-1", note: null });
+  it("sends the messages typed in the chat through the company number by default, with the channel as the only choice", () => {
+    const chat = teamNoticeByKey("BROKER_CHAT")!;
+    expect(chat.chat).toBe(true);
+    expect(effectiveNoticeSetting(chat, null)).toEqual({ enabled: true, channel: "company_number", freeMessageId: null });
+    expect(effectiveNoticeSetting(chat, { enabled: false, channel: "meta", freeMessageId: "x" })).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
   });
 
   it("locks only the first-access invitation to Meta", () => {
@@ -122,9 +121,9 @@ describe("team notice decision", () => {
     expect(decideTeamNotice(notice, setting, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: null });
   });
 
-  it("sends the lead offer by the company number by default (the link opens the lead in the CRM)", () => {
+  it("sends the lead offer through Meta only by default", () => {
     const notice = teamNoticeByKey("LEAD_OFFER")!;
-    expect(decideTeamNotice(notice, effectiveNoticeSetting(notice, null), number, now)).toEqual({ action: "send", primary: "company_number", wahaNumberId: "waha-1", note: null });
+    expect(decideTeamNotice(notice, effectiveNoticeSetting(notice, null), number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: null });
   });
 
   it("keeps the presence confirmation always on, Meta by default, with the company number as an option", () => {

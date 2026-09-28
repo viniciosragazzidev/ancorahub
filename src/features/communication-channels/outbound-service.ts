@@ -17,9 +17,9 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
-import { companyNumberNoticesEnabled, findConnectedTenantChannelId, resolveTenantChannelDelivery, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
+import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
-import { teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
+import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
 import { companyNumberUsable, decideTeamNotice } from "@/features/team-notices/decision";
 import { DELIVERY_LIMITS } from "@/features/team-notices/guard";
 import {
@@ -290,8 +290,8 @@ export async function enqueueMetaTemplateMessage(input: {
   const teamNotice = input.recipientType === "user" ? teamNoticeForPurpose(input.purpose) : null;
   let noticeRoute: { route: DeliveryRoute; wahaNumberId: string | null; text: string | null; skipped: boolean; note: string | null } | null = null;
   if (teamNotice) {
-    const [setting, number, companyNumberOn] = await Promise.all([getTeamNoticeSetting(input.tenantId, teamNotice), getCompanyNumberState(input.tenantId), companyNumberNoticesEnabled(input.tenantId)]);
-    const decision = decideTeamNotice(teamNotice, setting, number, new Date(), companyNumberOn);
+    const [setting, number] = await Promise.all([getTeamNoticeSetting(input.tenantId, teamNotice), getCompanyNumberState(input.tenantId)]);
+    const decision = decideTeamNotice(teamNotice, setting, number, new Date());
     if (decision.action === "skip") {
       noticeRoute = { route: "meta_only", wahaNumberId: null, text: null, skipped: true, note: "disabled" };
     } else if (decision.primary === "company_number") {
@@ -305,12 +305,11 @@ export async function enqueueMetaTemplateMessage(input: {
         : { route: "meta_only", wahaNumberId: null, text: null, skipped: false, note: decision.note };
     }
   }
-  // Other broker messages keep the legacy company-number routing (DEC-120).
-  const tenantChannel = noticeRoute
-    ? (noticeRoute.route === "waha_direct" && noticeRoute.wahaNumberId && noticeRoute.text ? { wahaNumberId: noticeRoute.wahaNumberId, text: noticeRoute.text } : null)
-    : input.recipientType === "user"
-      ? await resolveTenantChannelDelivery({ tenantId: input.tenantId, purpose: input.purpose, variables }).catch(() => null)
-      : null;
+  // Only a team notice set to the company WhatsApp goes through WAHA; every
+  // other broker message follows the official Meta channel.
+  const tenantChannel = noticeRoute?.route === "waha_direct" && noticeRoute.wahaNumberId && noticeRoute.text
+    ? { wahaNumberId: noticeRoute.wahaNumberId, text: noticeRoute.text }
+    : null;
   if (noticeRoute?.skipped) {
     const db = getDatabase();
     const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
@@ -452,9 +451,10 @@ export async function enqueueMetaTextMessage(input: {
     .where(channelQuery)
     .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
     .limit(1);
-  // Free text to a broker - typed in the chat or a free message - always
-  // leaves through the company number when it is connected (Meta fallback).
-  const tenantChannelId = input.recipientType === "user" ? await findConnectedTenantChannelId(input.tenantId).catch(() => null) : null;
+  // Free text to a broker follows the "Mensagens do chat" choice: the company
+  // WhatsApp when it is connected (Meta otherwise), or the official Meta only.
+  const chatSetting = input.recipientType === "user" ? await getTeamNoticeSetting(input.tenantId, BROKER_CHAT_NOTICE).catch(() => null) : null;
+  const tenantChannelId = chatSetting?.channel === "company_number" ? await findConnectedTenantChannelId(input.tenantId).catch(() => null) : null;
   if (!channel && !tenantChannelId) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
@@ -625,7 +625,6 @@ async function takeCompanySlot(wahaNumberId: string, noticeKey: string, exact: b
 async function sendNoticeByCompanyNumber(row: OutboundRow, metaError: unknown, exact: boolean) {
   const notice = teamNoticeByKey(row.noticeKey!);
   if (!notice || notice.metaOnly) return false;
-  if (!(await companyNumberNoticesEnabled(row.tenantId))) return false;
   const db = getDatabase();
   const [number] = await db.select({ id: schema.wahaNumbers.id, relaySessionId: schema.wahaNumbers.relaySessionId, status: schema.wahaNumbers.status, pausedUntil: schema.wahaNumbers.pausedUntil })
     .from(schema.wahaNumbers).where(and(eq(schema.wahaNumbers.id, row.wahaNumberId!), eq(schema.wahaNumbers.tenantId, row.tenantId))).limit(1);
@@ -677,12 +676,10 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
     if (!claimed) return;
     try {
       // A notice routed to the company number (WhatsApp da diretoria) keeps
-      // its WAHA route; every other non-Meta row is legacy and migrates. With
-      // the company number switched off, rows already queued go to Meta too.
-      const companyNumberOn = row.wahaNumberId ? await companyNumberNoticesEnabled(row.tenantId) : false;
-      const viaTenantChannel = companyNumberOn && row.deliveryRoute === "waha_direct" && Boolean(row.wahaNumberId) && Boolean(row.renderedBody);
-      // A team notice sent by Meta first keeps the company number as its fallback (DEC-125).
-      const companyFallback = companyNumberOn && row.deliveryRoute === "meta_then_waha" && Boolean(row.wahaNumberId) && Boolean(row.noticeKey);
+      // its WAHA route; every other non-Meta row is legacy and migrates.
+      const viaTenantChannel = row.deliveryRoute === "waha_direct" && Boolean(row.wahaNumberId) && Boolean(row.renderedBody);
+      // Rows queued before "Meta" became Meta only may still carry the company number as fallback.
+      const companyFallback = row.deliveryRoute === "meta_then_waha" && Boolean(row.wahaNumberId) && Boolean(row.noticeKey);
       if (!viaTenantChannel && !companyFallback && (row.deliveryRoute !== "meta_only" || row.wahaNumberId)) {
         await db.update(schema.whatsappOutboundMessages).set({
           deliveryRoute: "meta_only",
