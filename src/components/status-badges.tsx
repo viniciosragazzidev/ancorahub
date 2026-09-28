@@ -5,6 +5,15 @@ import { normalizeTeamMemberStatus } from "@/features/team/status";
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 import { Fire, Snowflake, Sun } from "@phosphor-icons/react";
 
+/**
+ * Lead temperature for distribution lists: Quente, Morno or Frio; anything
+ * else reads "Sem temperatura" (distributed together with the warm ones).
+ */
+export function LeadTemperature({ status }: { status: string | null | undefined }) {
+  if (status === "hot" || status === "warm" || status === "cold") return <LeadQualificationBadge status={status} />;
+  return <span className="text-xs text-muted-foreground" title="Distribuído junto com os mornos">Sem temperatura</span>;
+}
+
 export function LeadQualificationBadge({ status }: { status: string }) {
   const norm = (status || "").trim().toLowerCase();
 

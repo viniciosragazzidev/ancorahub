@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { CheckCircle2, Clock3, Download } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ArrowLeft, UserList, Users } from "@/components/huge-icons";
-import { LeadStatusBadge } from "@/components/status-badges";
+import { LeadStatusBadge, LeadTemperature } from "@/components/status-badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
 import { groupDutyLeadsByShift, sortByAssignmentTime } from "@/features/lead-distribution/duty-leads-shift-groups";
+import { sortByTemperaturePriority } from "@/features/lead-distribution/temperature-priority";
 import { DragScrollTable } from "@/components/ui/drag-scroll-table";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
@@ -159,10 +160,14 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // together and hid which bucket someone was actually looking at.
   const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
   // Distributed rows read as the order leads were handed out (earliest
-  // assignment first); the waiting list keeps its newest-arrival order.
+  // assignment first); the waiting list reads as the distribution order:
+  // hot, then warm (or no temperature), then cold, oldest first in each.
   const visibleLeads = filter === "distribuidos"
     ? sortByAssignmentTime(leads.filter(isDistributed))
-    : leads.filter((lead) => !isDistributed(lead));
+    : sortByTemperaturePriority([...leads.filter((lead) => !isDistributed(lead))].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()));
+  const leadGroups = filter === "distribuidos"
+    ? groupDutyLeadsByShift(visibleLeads)
+    : [{ key: "ordem", label: "Ordem de distribuição · quentes, mornos e frios", leads: visibleLeads }];
   const filters = [
     { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
     { key: "distribuidos", label: "Distribuídos", count: distributedCount },
@@ -252,6 +257,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   <TableHeader>
                     <TableRow>
                       <TableHead>Lead</TableHead>
+                      <TableHead>Temperatura</TableHead>
                       <TableHead>Fila</TableHead>
                       <TableHead>Corretor</TableHead>
                       <TableHead>Distribuição</TableHead>
@@ -261,10 +267,10 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {groupDutyLeadsByShift(visibleLeads).map((group) => (
+                    {leadGroups.map((group) => (
                       <Fragment key={group.key}>
                         <TableRow className="bg-[var(--surface-secondary)] hover:bg-[var(--surface-secondary)]">
-                          <TableCell colSpan={7} className="py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          <TableCell colSpan={8} className="py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                             <span className="flex items-center justify-between gap-2">
                               {group.label}
                               <span className="font-mono">{group.leads.length}</span>
@@ -276,6 +282,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                           return (
                             <TableRow key={lead.id} className={returnedUnaccepted.has(lead.id) ? "bg-warning/10 hover:bg-warning/15" : undefined}>
                               <TableCell className="font-medium">{lead.nome}</TableCell>
+                              <TableCell><LeadTemperature status={lead.qualificationStatus} /></TableCell>
                               <TableCell className="text-muted-foreground">{lead.queueName ?? "—"}</TableCell>
                               <TableCell className="text-muted-foreground">{returnedUnaccepted.has(lead.id) ? <span className="flex items-center gap-1.5 font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor"><span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />Devolvido — não aceito</span> : (lead.brokerName ?? "Sem corretor")}</TableCell>
                               <TableCell><Badge variant={distribution.tone}>{distribution.label}</Badge></TableCell>

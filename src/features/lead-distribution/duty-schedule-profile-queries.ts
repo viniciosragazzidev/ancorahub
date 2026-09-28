@@ -172,6 +172,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         telefone: schema.leads.telefone,
         status: schema.leads.status,
         distributionStatus: schema.leads.distributionStatus,
+        qualificationStatus: schema.leads.qualificationStatus,
         corretorId: schema.leads.corretorId,
         brokerName: schema.user.name,
         queueId: schema.leads.queueId,

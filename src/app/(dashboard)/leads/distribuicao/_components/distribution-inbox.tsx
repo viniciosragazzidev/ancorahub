@@ -56,6 +56,8 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/utils/core/cn";
 import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
+import { LeadTemperature } from "@/components/status-badges";
+import { sortByTemperaturePriority } from "@/features/lead-distribution/temperature-priority";
 
 type Lead = {
   id: string;
@@ -409,13 +411,14 @@ export function DistributionInbox({
       return true;
     });
   }, [archivePeriodDays, archiveScope, archiveStatus, inboxLeads]);
+  // Distribution order: hot, then warm (or no temperature), then cold; oldest first in each.
   const filtered = useMemo(
     () =>
-      selectable.filter((lead) => {
+      sortByTemperaturePriority(selectable.filter((lead) => {
         const matchesUnit = unitFilter === "all" || lead.branchId === unitFilter;
         const matchesStatus = statusFilter === "all" || lead.distributionStatus === statusFilter;
         return matchesUnit && matchesStatus;
-      }),
+      })),
     [selectable, statusFilter, unitFilter],
   );
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -754,6 +757,7 @@ export function DistributionInbox({
                         />
                       </TableHead>
                       <TableHead>Lead</TableHead>
+                      <TableHead>Temperatura</TableHead>
                       <TableHead>Destino atual</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="pr-5 text-right">Próxima ação</TableHead>
@@ -798,6 +802,9 @@ export function DistributionInbox({
                                 )}
                               </div>
                             )}
+                          </TableCell>
+                          <TableCell>
+                            <LeadTemperature status={lead.qualificationStatus} />
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-muted-foreground">
