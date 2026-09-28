@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { after } from "next/server";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -100,6 +100,15 @@ export function samePhone(left: string, right: string) {
   const a8 = a.length >= 8 ? a.slice(-8) : a;
   const b8 = b.length >= 8 ? b.slice(-8) : b;
   return a8.length >= 8 && a8 === b8;
+}
+
+/**
+ * Offer statuses a Meta delivery status may move forward from: "delivered"
+ * only from an offer still pending or sent, "read" also from delivered. Final
+ * statuses (accepted, declined, expired, cancelled) never change here.
+ */
+export function offerStatusesBefore(metaStatus: string): Array<"PENDING" | "SENT" | "DELIVERED"> {
+  return metaStatus === "read" ? ["PENDING", "SENT", "DELIVERED"] : ["PENDING", "SENT"];
 }
 
 export function matchesKnownBrokerPhone(phone: string, brokerPhones: readonly string[]) {
@@ -354,7 +363,8 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           outboundUpdate.providerErrorCode = deliveryFailure.code;
           outboundUpdate.providerErrorMessage = deliveryFailure.message;
         }
-        if (status.status === "sent") outboundUpdate.sentAt = new Date();
+        // A late "sent" status (Meta retries for days) must not move the real send time.
+        const recordSentAt = status.status === "sent";
         if (status.status === "delivered") outboundUpdate.deliveredAt = new Date();
         if (status.status === "read") outboundUpdate.readAt = new Date();
         if (status.status === "failed" || status.status === "deleted") {
@@ -384,11 +394,21 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           }
         }
         const [outbound] = await db.update(schema.whatsappOutboundMessages).set(outboundUpdate).where(and(eq(schema.whatsappOutboundMessages.tenantId, channel.tenantId), eq(schema.whatsappOutboundMessages.providerMessageId, status.id))).returning({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, purpose: schema.whatsappOutboundMessages.purpose, deliveryRoute: schema.whatsappOutboundMessages.deliveryRoute });
+        if (outbound && recordSentAt) {
+          await db.update(schema.whatsappOutboundMessages).set({ sentAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, outbound.id), isNull(schema.whatsappOutboundMessages.sentAt)));
+        }
 
         if (outbound?.purpose === "brokerInvitation" && outbound.recipientId && ["delivered", "read"].includes(status.status)) {
           await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryMessageId: status.id, deliveredAt: new Date() }).where(and(eq(schema.brokerInvitations.id, outbound.recipientId), eq(schema.brokerInvitations.tenantId, channel.tenantId)));
         } else if (outbound?.purpose === "newLeadAssignment" && ["delivered", "read"].includes(status.status)) {
-          await db.update(schema.leadOffers).set({ status: status.status.toUpperCase() as "DELIVERED" | "READ", updatedAt: new Date() }).where(and(eq(schema.leadOffers.outboundMessageId, outbound.id), eq(schema.leadOffers.tenantId, channel.tenantId)));
+          // Only an offer still waiting moves forward. A late status must never
+          // reopen an accepted, declined, expired or cancelled offer: a late
+          // "Aceitar" click could then take the lead from its current broker.
+          await db.update(schema.leadOffers).set({ status: status.status.toUpperCase() as "DELIVERED" | "READ", updatedAt: new Date() }).where(and(
+            eq(schema.leadOffers.outboundMessageId, outbound.id),
+            eq(schema.leadOffers.tenantId, channel.tenantId),
+            inArray(schema.leadOffers.status, offerStatusesBefore(status.status)),
+          ));
         }
 
         await setWebhookEventResult(eventId, "processed", outboundUpdate.providerErrorCode ?? undefined);

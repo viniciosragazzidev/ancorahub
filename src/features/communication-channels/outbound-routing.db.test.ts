@@ -78,6 +78,9 @@ async function inRollback(run: (tx: Tx, tenantId: string, brokerId: string) => P
     const tenantId = channel?.tenantId ?? (await tx.select({ tenantId: s.communicationChannels.tenantId }).from(s.communicationChannels).where(eq(s.communicationChannels.status, "active")).limit(1))[0].tenantId;
     const [broker] = await tx.select({ userId: s.tenantMemberships.userId }).from(s.tenantMemberships)
       .where(and(eq(s.tenantMemberships.tenantId, tenantId), eq(s.tenantMemberships.role, "broker"), eq(s.tenantMemberships.status, "active"))).limit(1);
+    // Scenarios start with the company number switched on, whatever the live setting is.
+    await tx.insert(s.systemSettings).values({ key: `company_number_notices_enabled_${tenantId}`, value: "true" })
+      .onConflictDoUpdate({ target: s.systemSettings.key, set: { value: "true" } });
     await run(tx as unknown as Tx, tenantId, broker.userId);
     throw new Rollback();
   }).catch((error) => { if (!(error instanceof Rollback)) throw error; });
@@ -193,6 +196,7 @@ describe.skipIf(!enabled)("team notice routing (characterization, rolled back)",
       const switchCompanyNumber = (on: boolean) => tx.insert(realSchema.systemSettings).values({ key: `company_number_notices_enabled_${tenantId}`, value: on ? "true" : "false" })
         .onConflictDoUpdate({ target: realSchema.systemSettings.key, set: { value: on ? "true" : "false" } });
       // Queued for the company number, then the director switches it off: it leaves through Meta.
+      await switchCompanyNumber(true); // independent of the live setting
       const queuedBefore = await scenario(tx, { tenantId, brokerId, purpose: "brokerAccountActivated", variables: ["Corretor Teste", "Âncora", "https://crm.example/login"], process: false });
       await switchCompanyNumber(false);
       // Switched off: every notice goes through the official Meta only, even with the number connected.
