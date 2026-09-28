@@ -20,7 +20,7 @@ import { normalizeQueueSource } from "./routing-catalog";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
-import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, isDutyWindowActive, isLeadInDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
+import { findRunningDutySchedule, getDutyOccurrenceLeadWindow, isLeadInDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
 import { brokersUnderDutyCap, countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
@@ -684,19 +684,25 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       startsAt: schema.unitDutySchedules.startsAt,
       endsAt: schema.unitDutySchedules.endsAt,
       timezone: schema.unitDutySchedules.timezone,
+      status: schema.unitDutySchedules.status,
+      validFrom: schema.unitDutySchedules.validFrom,
+      validUntil: schema.unitDutySchedules.validUntil,
     }).from(schema.unitDutySchedules).where(and(
       eq(schema.unitDutySchedules.tenantId, context.tenantId),
       inArray(schema.unitDutySchedules.id, exclusiveScheduleIds),
     ));
     const activeNow = new Date();
-    const activeSchedule = dutySchedules.find((candidate) => isDutyWindowActive(getRelevantDutyWindow(candidate, activeNow, 0), activeNow));
+    // Only the plantão valid today: next Monday's (same weekday and hours,
+    // maybe with a different cap) is not the one running now.
+    const running = findRunningDutySchedule(dutySchedules, activeNow);
+    const activeSchedule = running?.schedule;
     if (activeSchedule) {
       const bounds = resolveDutyLeadWindowBounds(getDutyOccurrenceLeadWindow(activeSchedule, dutySchedules, activeNow), activeNow);
       if (!isLeadInDutyWindow(lead, bounds)) {
         return { status: "queued", leadId, reason: "Lead chegou antes do início deste plantão; aguarda atribuição manual e não entra na distribuição automática." };
       }
-      const occurrence = activeSchedule.maxLeadsPerBroker ? getRelevantDutyWindow(activeSchedule, activeNow, 0) : null;
-      if (activeSchedule.maxLeadsPerBroker && occurrence) {
+      const occurrence = running.window;
+      if (activeSchedule.maxLeadsPerBroker) {
         dutyLeadCap = { scheduleId: activeSchedule.id, limit: activeSchedule.maxLeadsPerBroker, startsAt: occurrence.startsAt, endsAt: occurrence.endsAt };
       }
     }
