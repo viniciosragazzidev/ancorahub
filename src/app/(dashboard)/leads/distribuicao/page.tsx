@@ -236,6 +236,7 @@ export default async function LeadDistributionPage({
           isNull(schema.leads.deletedAt),
           isNull(schema.leads.archivedAt),
           isNull(schema.leads.corretorId),
+          isNull(schema.leads.distributionRemovedAt),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
             : undefined,

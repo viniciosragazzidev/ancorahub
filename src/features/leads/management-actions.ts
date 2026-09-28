@@ -20,6 +20,7 @@ import { canManuallyAssignLeadToBroker } from "@/features/lead-distribution/duty
 import { offerLeadToBrokerManually } from "@/features/lead-distribution/service";
 import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { DISTRIBUTION_REMOVAL_NOTE_MAX, DISTRIBUTION_REMOVAL_REASONS, type DistributionRemovalReason } from "@/features/lead-distribution/distribution-removal";
 
 const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable(), assignmentMode: z.enum(["direct", "offer"]).optional() });
 
@@ -37,6 +38,8 @@ export type ManagementActionState = {
     corretorId: string | null;
     status: string;
     distributionStatus?: string;
+    distributionRemovalReason?: string | null;
+    distributionRemovalNote?: string | null;
   };
 };
 
@@ -225,6 +228,112 @@ export async function removeLeadAssignmentAction(_prev: ManagementActionState, f
   });
 }
 
+const removalSchema = z.object({
+  leadId: z.string().uuid(),
+  reason: z.enum(Object.keys(DISTRIBUTION_REMOVAL_REASONS) as [DistributionRemovalReason, ...DistributionRemovalReason[]], { message: "Escolha o motivo da remoção." }),
+  note: z.string().trim().max(DISTRIBUTION_REMOVAL_NOTE_MAX, `A observação pode ter até ${DISTRIBUTION_REMOVAL_NOTE_MAX} caracteres.`).optional(),
+});
+
+/**
+ * Removes a lead without a broker from distribution, whatever its stage.
+ * Definitive: the engine never offers it again; only a manual assignment to a
+ * broker brings it back. Pending offers and distribution jobs are cancelled.
+ */
+export async function removeLeadFromDistributionAction(_prev: ManagementActionState, formData: FormData): Promise<ManagementActionState> {
+  return withServerActionTiming("/leads", "leads.remove_from_distribution", async () => {
+    const mutationId = randomUUID();
+    try {
+      const parsed = removalSchema.safeParse({ leadId: formData.get("leadId"), reason: formData.get("reason"), note: formData.get("note") || undefined });
+      if (!parsed.success) return { mutationId, error: parsed.error.issues[0]?.message ?? "Dados inválidos." };
+      const { context, db, lead } = await getManagedLead(parsed.data.leadId);
+      if (context.role !== "director" && context.role !== "manager") throw new AuthorizationError("Apenas Gestores e Diretores podem remover leads da distribuição.");
+      if (lead.corretorId) throw new Error("Este lead já tem corretor. Remova a atribuição antes de tirá-lo da distribuição.");
+      if (lead.archivedAt || lead.deletedAt) throw new Error("Lead arquivado ou excluído.");
+
+      const now = new Date();
+      const note = parsed.data.note || null;
+      const reasonLabel = DISTRIBUTION_REMOVAL_REASONS[parsed.data.reason].label;
+      const changed = await db.transaction(async (tx) => {
+        const updated = await tx.update(schema.leads).set({
+          distributionStatus: "removed",
+          distributionRemovedAt: now,
+          distributionRemovalReason: parsed.data.reason,
+          distributionRemovalNote: note,
+          distributionRemovedBy: context.userId,
+          distributionUpdatedAt: now,
+          updatedAt: now,
+        }).where(and(
+          eq(schema.leads.id, lead.id),
+          eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.corretorId),
+          isNull(schema.leads.distributionRemovedAt),
+          isNull(schema.leads.archivedAt),
+          isNull(schema.leads.deletedAt),
+        )).returning({ id: schema.leads.id });
+        if (!updated.length) return false;
+
+        await tx.update(schema.leadOffers).set({ status: "CANCELLED", updatedAt: now }).where(and(
+          eq(schema.leadOffers.tenantId, context.tenantId),
+          eq(schema.leadOffers.leadId, lead.id),
+          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+        ));
+        await tx.update(schema.leadDistributionJobs).set({
+          status: "completed",
+          completedAt: now,
+          lockedAt: null,
+          lockedBy: null,
+          leaseExpiresAt: null,
+          lastErrorCode: "REMOVED_FROM_DISTRIBUTION",
+          lastErrorMessage: reasonLabel,
+          updatedAt: now,
+        }).where(and(
+          eq(schema.leadDistributionJobs.tenantId, context.tenantId),
+          eq(schema.leadDistributionJobs.leadId, lead.id),
+          inArray(schema.leadDistributionJobs.status, ["pending", "retrying"]),
+        ));
+        await tx.insert(schema.leadDistributionEvents).values({
+          id: randomUUID(),
+          tenantId: context.tenantId,
+          leadId: lead.id,
+          fromBranchId: lead.branchId,
+          toBranchId: lead.branchId,
+          fromQueueId: lead.queueId,
+          toQueueId: lead.queueId,
+          previousOwnerId: null,
+          newOwnerId: null,
+          action: "removed_from_distribution",
+          source: context.role === "director" ? "manual_director" : "manual_manager",
+          strategy: "manual",
+          reason: note ? `${reasonLabel}. ${note}` : reasonLabel,
+          actorId: context.userId,
+          metadata: { removalReason: parsed.data.reason, note },
+          createdAt: now,
+        } as typeof schema.leadDistributionEvents.$inferInsert);
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "lead_distribution",
+          entidadeId: lead.id,
+          acao: `lead.removed_from_distribution:${parsed.data.reason}`,
+          createdAt: now,
+        });
+        return true;
+      });
+
+      if (!changed) throw new Error("O estado do lead mudou. Atualize a página antes de tentar novamente.");
+      void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId, branchIds: [lead.branchId], brokerIds: [] }).catch(() => undefined);
+      return {
+        success: true,
+        message: "Lead removido da distribuição.",
+        mutationId,
+        entity: { leadId: lead.id, branchId: lead.branchId, corretorId: null, status: lead.status, distributionStatus: "removed", distributionRemovalReason: parsed.data.reason, distributionRemovalNote: note },
+      };
+    } catch (error) {
+      return { mutationId, error: error instanceof Error ? error.message : "Não foi possível remover o lead da distribuição." };
+    }
+  });
+}
+
 export async function reassignLeadAction(_prev: ManagementActionState, formData: FormData): Promise<ManagementActionState> {
   return withServerActionTiming("/leads", "leads.reassign", async () => {
     const mutationId = randomUUID();
@@ -296,6 +405,11 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           serviceStartedBy: null,
           stageEnteredAt: now,
           motivoPerda: null,
+          // A manual assignment is the only way back from "removed from distribution".
+          distributionRemovedAt: null,
+          distributionRemovalReason: null,
+          distributionRemovalNote: null,
+          distributionRemovedBy: null,
         }).where(and(
           eq(schema.leads.id, lead.id),
           eq(schema.leads.tenantId, context.tenantId),

@@ -21,6 +21,7 @@ const LEAD_DISTRIBUTION: Record<LeadDistributionStatus, StatusUi> = {
   queued: { tone: "warning", label: "Aguardando corretor" },
   returned_to_queue: { tone: "warning", label: "Devolvido à fila" },
   manual_hold: { tone: "secondary", label: "Aguardando ação manual" },
+  removed: { tone: "secondary", label: "Fora da distribuição" },
   assigning: { tone: "info", label: "Atribuindo" },
   assigned: { tone: "success", label: "Atribuído" },
   distribution_failed: { tone: "destructive", label: "Falha na distribuição" },

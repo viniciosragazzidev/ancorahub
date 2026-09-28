@@ -394,6 +394,11 @@ export const leads = pgTable(
     version: integer("version").notNull().default(1),
     distributionStatus: text("distribution_status").notNull().default("unassigned"),
     distributionOrigin: text("distribution_origin"),
+    /** Removed from distribution by a director/manager; only a manual assignment brings it back. */
+    distributionRemovedAt: timestamp("distribution_removed_at", { withTimezone: true }),
+    distributionRemovalReason: text("distribution_removal_reason"),
+    distributionRemovalNote: text("distribution_removal_note"),
+    distributionRemovedBy: text("distribution_removed_by"),
     queueId: text("queue_id"),
     unitAssignedAt: timestamp("unit_assigned_at", { withTimezone: true }),
     assignmentSource: text("assignment_source"),

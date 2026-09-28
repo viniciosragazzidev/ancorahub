@@ -17,6 +17,7 @@ import { manuallyChangeQualificationStageAction } from "@/features/leads/qualifi
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
 import { LeadAttendanceFlowStarter } from "./lead-attendance-flow-starter";
+import { LeadDistributionRemoval, LeadDistributionRemovedTag } from "./lead-distribution-removal";
 
 type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null };
 type DutyRosterState = {
@@ -36,6 +37,8 @@ type ManagementCommit = {
     corretorId?: string | null;
     status?: string;
     distributionStatus?: string;
+    distributionRemovalReason?: string | null;
+    distributionRemovalNote?: string | null;
   };
 };
 
@@ -51,6 +54,8 @@ export function LeadDrawerManagementActions({
   qualificationStatus,
   qualificationState,
   currentOwner,
+  distributionRemovalReason,
+  distributionRemovalNote,
   onSuccess,
   onReassignOptimistic,
   onReassignRollback,
@@ -67,6 +72,9 @@ export function LeadDrawerManagementActions({
   qualificationStatus?: string | null;
   qualificationState?: string | null;
   currentOwner: string | null;
+  /** Set when the lead was removed from distribution (definitive until a manual assignment). */
+  distributionRemovalReason?: string | null;
+  distributionRemovalNote?: string | null;
   manualAssignmentChoiceEnabled?: boolean;
   onSuccess?: (result: ManagementCommit) => void;
   onReassignOptimistic?: (brokerId: string) => void;
@@ -298,7 +306,18 @@ export function LeadDrawerManagementActions({
         </div>
       ) : null}
 
-      {!currentOwner && isDirectorOrManager ? <LeadAttendanceFlowStarter leadId={leadId} /> : null}
+      {!currentOwner && isDirectorOrManager && distributionRemovalReason ? (
+        <div className="space-y-2 rounded-lg border border-border/70 bg-card p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-semibold text-foreground">Fora da distribuição</p>
+            <LeadDistributionRemovedTag reason={distributionRemovalReason} note={distributionRemovalNote} />
+          </div>
+          {distributionRemovalNote ? <p className="whitespace-pre-line text-xs leading-normal text-muted-foreground">{distributionRemovalNote}</p> : null}
+          <p className="text-xs leading-normal text-muted-foreground">Não recebe ofertas automáticas. Para voltar, atribua manualmente a um corretor abaixo.</p>
+        </div>
+      ) : null}
+      {!currentOwner && isDirectorOrManager && !distributionRemovalReason ? <LeadAttendanceFlowStarter leadId={leadId} /> : null}
+      {!currentOwner && isDirectorOrManager && !distributionRemovalReason ? <LeadDistributionRemoval leadId={leadId} leadName={leadName} onSuccess={onSuccess} /> : null}
 
       {/* Atribuir unidade */}
       {canReassignUnit && (

@@ -70,6 +70,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           isNull(schema.leads.corretorId),
           // A lead a manager put on hold waits for a manual action: never back to automatic distribution.
           ne(schema.leads.distributionStatus, "manual_hold"),
+          isNull(schema.leads.distributionRemovedAt),
           or(
             eq(schema.leads.qualificationState, "IN_PROGRESS"),
             eq(schema.leads.qualificationStatus, "qualifying"),

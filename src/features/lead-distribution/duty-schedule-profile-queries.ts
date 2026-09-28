@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, gt, gte, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
@@ -192,6 +192,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         ),
         isNull(schema.leads.deletedAt),
         isNull(schema.leads.archivedAt),
+        // Removed from distribution without a broker: out of the plantão.
+        or(isNull(schema.leads.distributionRemovedAt), isNotNull(schema.leads.corretorId)),
       ))
       .orderBy(desc(schema.leads.createdAt))
       .limit(DUTY_PROFILE_LEADS_LIMIT)

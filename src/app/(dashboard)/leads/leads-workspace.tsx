@@ -37,6 +37,7 @@ import { bulkChangeLeadStatusAction } from "./status-actions";
 import { distributeAllUnassignedLeadsAction } from "@/features/lead-distribution/actions";
 import { QueueColorDot, QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
+import { LeadDistributionRemovedTag } from "./_components/lead-distribution-removal";
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
@@ -129,6 +130,8 @@ export type LeadWorkspaceItem = {
   queueId?: string | null;
   queueName?: string | null;
   queueColorHue?: number | null;
+  distributionRemovalReason?: string | null;
+  distributionRemovalNote?: string | null;
 };
 
 const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
@@ -454,7 +457,7 @@ export function LeadsWorkspace({
   }, [applyLeadPatch, router]);
 
   const handleDrawerManagementCommitted = useCallback((result: {
-    entity?: { leadId: string; branchId?: string | null; corretorId?: string | null; status?: string; distributionStatus?: string };
+    entity?: { leadId: string; branchId?: string | null; corretorId?: string | null; status?: string; distributionStatus?: string; distributionRemovalReason?: string | null; distributionRemovalNote?: string | null };
   }) => {
     const entity = result.entity;
     if (entity) drawerOptimisticSnapshots.current.delete(entity.leadId);
@@ -468,6 +471,9 @@ export function LeadsWorkspace({
         status: entity.status ?? lead.status,
         assignedAt: entity.corretorId ? new Date().toISOString() : lead.assignedAt,
         distributionStatus: entity.distributionStatus ?? (entity.corretorId ? "assigned" : lead.distributionStatus),
+        // A manual assignment clears the removal; the removal action sets it.
+        distributionRemovalReason: entity.corretorId ? null : entity.distributionRemovalReason === undefined ? lead.distributionRemovalReason : entity.distributionRemovalReason,
+        distributionRemovalNote: entity.corretorId ? null : entity.distributionRemovalNote === undefined ? lead.distributionRemovalNote : entity.distributionRemovalNote,
       }));
     }
     setSelectedLead(null);
@@ -898,6 +904,7 @@ export function LeadsWorkspace({
             <div className="flex flex-wrap items-center gap-1.5 pt-1">
               <LeadStatusBadge status={selectedLead.status} />
               <LeadQualificationBadge status={selectedLead.qualificationStatus} />
+              {!selectedLead.corretorId ? <LeadDistributionRemovedTag reason={selectedLead.distributionRemovalReason} note={selectedLead.distributionRemovalNote} /> : null}
               {canDirectorMarkLeadInService({ role: contextRole, corretorId: selectedLead.corretorId, status: selectedLead.status }) ? (
                 <MarkLeadInServiceButton
                   leadId={selectedLead.id}
@@ -1004,6 +1011,8 @@ export function LeadsWorkspace({
                       qualificationStatus={selectedLead.qualificationStatus}
                       qualificationState={selectedLead.qualificationState}
                       currentOwner={selectedLead.corretorNome}
+                      distributionRemovalReason={selectedLead.distributionRemovalReason}
+                      distributionRemovalNote={selectedLead.distributionRemovalNote}
                       onSuccess={handleDrawerManagementCommitted}
                       onReassignOptimistic={handleDrawerReassignOptimistic}
                       onReassignRollback={handleDrawerReassignRollback}

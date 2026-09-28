@@ -211,6 +211,8 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
       isNull(schema.leads.deletedAt),
       isNull(schema.leads.archivedAt),
+      // Removed from distribution by a manager: never re-seeded.
+      or(isNull(schema.leads.distributionRemovedAt), isNotNull(schema.leads.corretorId)),
       not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
@@ -250,6 +252,7 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
       isNull(schema.leads.corretorId),
       isNull(schema.leads.deletedAt),
       isNull(schema.leads.archivedAt),
+      isNull(schema.leads.distributionRemovedAt),
       ne(schema.leads.status, "lost"),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),

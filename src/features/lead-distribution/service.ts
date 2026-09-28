@@ -472,6 +472,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     sourceChannel: schema.leads.sourceChannel,
     formData: schema.leads.formData,
     distributionUpdatedAt: schema.leads.distributionUpdatedAt,
+    distributionRemovedAt: schema.leads.distributionRemovedAt,
     distributionStatus: schema.leads.distributionStatus,
     corretorId: schema.leads.corretorId,
     assignmentSource: schema.leads.assignmentSource,
@@ -483,6 +484,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     createdAt: schema.leads.createdAt,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  if (lead.distributionRemovedAt && !lead.corretorId) {
+    return { status: "manual_required", leadId, reason: "Lead removido da distribuição; só uma atribuição manual o leva a um corretor." };
+  }
   if (lead.distributionStatus === "manual_hold") {
     return { status: "manual_required", leadId, reason: "A atribuição foi removida manualmente; o lead aguarda uma nova ação manual." };
   }
