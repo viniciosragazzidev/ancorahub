@@ -28,9 +28,10 @@ describe("Meta lead display details", () => {
     expect(readMetaLeadDisplayDetails("meta_lead_ads", {
       tipoPlano: "  Empresarial ", tipoPlanoStatus: "provided", tipoCnpj: " MEI ", operadora: " SulAmérica ",
       medicalHistory: "must not be surfaced",
-    })).toEqual({ tipoPlano: "Empresarial", tipoPlanoStatus: "provided", tipoCnpj: "MEI", operadora: "SulAmérica" });
+    })).toEqual({ tipoPlano: "Empresarial", tipoPlanoStatus: "provided", tipoCnpj: "MEI", operadora: "SulAmérica", entry: "form" });
     expect(readMetaLeadDisplayDetails("webhook", { operadora: "SulAmérica" })).toEqual({
-      tipoPlano: null, tipoPlanoStatus: null, tipoCnpj: null, operadora: null,
+      tipoPlano: null, tipoPlanoStatus: null, tipoCnpj: null, operadora: null, entry: null,
     });
+    expect(readMetaLeadDisplayDetails("meta_lead_ads", { entry: "whatsapp" }).entry).toBe("whatsapp");
   });
 });

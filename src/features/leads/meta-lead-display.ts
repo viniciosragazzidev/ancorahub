@@ -3,6 +3,8 @@ export type MetaLeadDisplayDetails = {
   tipoPlanoStatus: "provided" | "not_provided" | null;
   tipoCnpj: string | null;
   operadora: string | null;
+  /** "whatsapp" when the lead came from a click-to-WhatsApp ad instead of a form. */
+  entry: "form" | "whatsapp" | null;
 };
 
 function readShortText(value: unknown): string | null {
@@ -11,7 +13,7 @@ function readShortText(value: unknown): string | null {
 
 export function readMetaLeadDisplayDetails(sourceChannel: string | null | undefined, value: unknown): MetaLeadDisplayDetails {
   if (sourceChannel !== "meta_lead_ads" || !value || typeof value !== "object" || Array.isArray(value)) {
-    return { tipoPlano: null, tipoPlanoStatus: null, tipoCnpj: null, operadora: null };
+    return { tipoPlano: null, tipoPlanoStatus: null, tipoCnpj: null, operadora: null, entry: null };
   }
 
   const metadata = value as Record<string, unknown>;
@@ -24,6 +26,7 @@ export function readMetaLeadDisplayDetails(sourceChannel: string | null | undefi
     tipoPlanoStatus: status,
     tipoCnpj: readShortText(metadata.tipoCnpj),
     operadora: readShortText(metadata.operadora),
+    entry: metadata.entry === "whatsapp" ? "whatsapp" : "form",
   };
 }
 

@@ -8,6 +8,17 @@ export type MetaEmbeddedSignupPayload = {
   branchId?: string;
 };
 
+/** Present on the first message sent from a click-to-WhatsApp ad or post. */
+export type MetaWebhookReferral = {
+  source_url?: string;
+  source_id?: string;
+  source_type?: string;
+  headline?: string;
+  body?: string;
+  media_type?: string;
+  ctwa_clid?: string;
+};
+
 export type MetaWebhookMessage = {
   id: string;
   from: string;
@@ -20,6 +31,7 @@ export type MetaWebhookMessage = {
     button_reply?: { id?: string; title?: string };
   };
   context?: { id?: string };
+  referral?: MetaWebhookReferral;
   audio?: { id?: string; mime_type?: string } | unknown;
   image?: { id?: string; mime_type?: string; sha256?: string } | unknown;
   document?: { id?: string; mime_type?: string; filename?: string; sha256?: string } | unknown;
@@ -41,6 +53,7 @@ export type MetaWebhookChange = {
   field?: string;
   value?: {
     metadata?: { phone_number_id?: string; display_phone_number?: string };
+    contacts?: Array<{ wa_id?: string; profile?: { name?: string } }>;
     messages?: MetaWebhookMessage[];
     statuses?: MetaWebhookStatus[];
   };

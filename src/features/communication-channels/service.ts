@@ -19,6 +19,7 @@ import {
   type ConversationMediaKind,
 } from "./conversation-media";
 import { META_CLOUD_PROVIDER } from "./types";
+import { readCtwaAdReferral } from "./meta-ctwa-referral";
 import type { MetaWebhookPayload } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
 
@@ -287,7 +288,9 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         // Unknown first messages are retained as channel history only. Lead
         // creation is restricted to the governed intake/integration flow;
         // this prevents internal or unsolicited WhatsApp messages from being
-        // distributed as synthetic leads.
+        // distributed as synthetic leads. The one governed exception is a
+        // first message from a click-to-WhatsApp ad (see meta-ctwa-intake).
+        const ctwaReferral = !lead && !matchedClient ? readCtwaAdReferral(message.referral) : null;
 
         await db.insert(schema.whatsappMessages).values({
           id: randomUUID(),
@@ -308,6 +311,32 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           tenantId: channel.tenantId,
           participantUserIds: [lead?.corretorId],
         }).catch(() => undefined);
+
+        if (ctwaReferral) {
+          const profileName = change.value?.contacts?.find((contact) => contact.wa_id === message.from)?.profile?.name ?? change.value?.contacts?.[0]?.profile?.name;
+          const ctwaPromise = import("./meta-ctwa-intake").then(({ ingestCtwaLead }) => ingestCtwaLead({
+            tenantId: channel.tenantId,
+            phone,
+            profileName,
+            referral: ctwaReferral,
+            providerMessageId: message.id,
+            receivedAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
+          })).then(async (result) => {
+            if (result.status !== "ignored") {
+              await db.update(schema.whatsappMessages).set({ leadId: result.leadId })
+                .where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, message.id), isNull(schema.whatsappMessages.leadId)));
+              void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
+            }
+            console.info("[meta-ctwa] inbound.completed", { tenantId: channel.tenantId, status: result.status, ...(result.status === "ignored" ? { reason: result.reason } : { leadId: result.leadId }) });
+          }).catch((error) => {
+            console.error("[meta-ctwa] inbound.failed", { tenantId: channel.tenantId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+          });
+          try {
+            after(() => ctwaPromise);
+          } catch {
+            // Fallback: non-blocking execution outside a Next.js request context.
+          }
+        }
 
         if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
