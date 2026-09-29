@@ -34,7 +34,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ sche
     const db = getDatabase();
     if (new URL(request.url).searchParams.get("format") === "xlsx") {
       const body = encodeDutyScheduleSpreadsheet({ scheduleName: profile.schedule.name, leads: profile.leads });
-      await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "report", entidadeId: scheduleId, acao: `report.generated:duty-schedule:${profile.leads.length}:xlsx` });
+      const assignedLeadCount = profile.leads.filter((lead) => Boolean(lead.corretorId && lead.assignedAt)).length;
+      await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "report", entidadeId: scheduleId, acao: `report.generated:duty-schedule:${assignedLeadCount}:xlsx` });
       return new NextResponse(body.buffer as ArrayBuffer, {
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

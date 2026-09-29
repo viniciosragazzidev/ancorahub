@@ -16,6 +16,9 @@ Adicionar ao detalhe do plantão uma ação `Exportar planilha` ao lado de
   larguras e bordas compatíveis com a referência.
 - Leads usam `externalId` como código quando disponível, preservando o ID local
   como fallback; o canal PME Facebook é normalizado para `PME FACEBOOK`.
+- A exportação agora inclui somente leads atribuídos, ordena pelo `assignedAt`
+  do mais antigo ao mais novo, separa os blocos `MANHÃ` e `TARDE` e usa
+  temporariamente o número no final do nome do corretor como `CÓDIGO`.
 
 ## Validação
 

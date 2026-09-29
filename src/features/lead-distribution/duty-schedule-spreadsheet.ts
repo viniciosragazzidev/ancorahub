@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 
 import type { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
+import { getDutyLeadShift } from "./duty-leads-shift-groups";
 
 type DutyScheduleProfile = Awaited<ReturnType<typeof getDutyScheduleProfile>>;
 
@@ -26,20 +27,47 @@ function channelLabel(lead: DutyScheduleProfile["leads"][number]) {
   return lead.sourceChannel || lead.origem;
 }
 
+function brokerCodeFromName(name: string | null) {
+  return name?.match(/(\d+)\s*$/)?.[1] ?? "";
+}
+
+function sortAssignedLeads<T extends { assignedAt: Date | null; createdAt: Date; id: string }>(leads: T[]) {
+  return [...leads].sort((a, b) =>
+    (a.assignedAt?.getTime() ?? Number.POSITIVE_INFINITY) - (b.assignedAt?.getTime() ?? Number.POSITIVE_INFINITY)
+    || a.createdAt.getTime() - b.createdAt.getTime()
+    || a.id.localeCompare(b.id),
+  );
+}
+
 export function encodeDutyScheduleSpreadsheet(input: DutyScheduleSpreadsheetInput) {
   const title = `PLANTÃO ${input.scheduleName}`.toUpperCase();
-  const rows = [
+  // This export represents the handoff to brokers: waiting/unassigned leads
+  // are intentionally omitted and assignment time defines the order.
+  const assignedLeads = sortAssignedLeads(input.leads.filter((lead) => Boolean(lead.corretorId && lead.assignedAt)));
+  const morningLeads = assignedLeads.filter((lead) => getDutyLeadShift(lead) === "manha");
+  const afternoonLeads = assignedLeads.filter((lead) => getDutyLeadShift(lead) === "tarde");
+  const rows: Array<Array<string>> = [
     [title, "", "", "", "", ""],
     ["CÓDIGO", "CORRETOR", "CANAL", "CLIENTE", "TELEFONE", "E-MAIL"],
-    ...input.leads.map((lead) => [
-      safeCell(lead.externalId ?? lead.id),
-      safeCell(lead.brokerName ?? "Sem corretor"),
-      safeCell(channelLabel(lead)),
-      safeCell(lead.nome),
-      safeCell(lead.telefone),
-      safeCell(lead.email),
-    ]),
   ];
+  const sectionRows = new Set<number>();
+  const appendShift = (label: string, leads: typeof assignedLeads) => {
+    if (!leads.length) return;
+    sectionRows.add(rows.length);
+    rows.push([label, "", "", "", "", ""]);
+    for (const lead of leads) {
+      rows.push([
+        safeCell(brokerCodeFromName(lead.brokerName)),
+        safeCell(lead.brokerName ?? "Sem corretor"),
+        safeCell(channelLabel(lead)),
+        safeCell(lead.nome),
+        safeCell(lead.telefone),
+        safeCell(lead.email),
+      ]);
+    }
+  };
+  appendShift("MANHÃ", morningLeads);
+  appendShift("TARDE", afternoonLeads);
 
   const sheet = XLSX.utils.aoa_to_sheet(rows);
   sheet["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }];
@@ -71,6 +99,19 @@ export function encodeDutyScheduleSpreadsheet(input: DutyScheduleSpreadsheetInpu
   }
 
   for (let row = 2; row < rows.length; row += 1) {
+    if (sectionRows.has(row)) {
+      sheet["!merges"]?.push({ s: { r: row, c: 0 }, e: { r: row, c: 5 } });
+      for (let column = 0; column < 6; column += 1) {
+        const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
+        cell.s = {
+          font: { name: "Arial", sz: 11, bold: true },
+          alignment: { horizontal: "left", vertical: "center" },
+          border: ALL_BORDERS,
+          fill: { fgColor: { rgb: "D9EAF7" } },
+        };
+      }
+      continue;
+    }
     for (let column = 0; column < 6; column += 1) {
       const cell = sheet[XLSX.utils.encode_cell({ r: row, c: column })];
       cell.s = {
