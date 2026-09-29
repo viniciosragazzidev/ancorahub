@@ -425,6 +425,7 @@ export const getLeadsColumns = (
       const broker = row.original.assignedBrokerName;
       const isPlantaoAtivo = row.original.isPlantaoAtivo;
       const returnedUnaccepted = row.original.returnedUnaccepted;
+      const isManagementInvestigation = row.original.isManagementInvestigation;
       return (
         <span className="flex flex-col items-start gap-1">
           <span className={`text-xs font-medium flex items-center gap-1.5 ${isPlantaoAtivo ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
@@ -432,6 +433,7 @@ export const getLeadsColumns = (
             {broker || <span className="text-muted-foreground/70 italic font-normal">Sem atribuição</span>}
           </span>
           {isPlantaoAtivo ? <Badge variant="warning" size="sm">Plantão ativo</Badge> : null}
+          {isManagementInvestigation ? <Badge variant="secondary" size="sm">Investigação da gestão</Badge> : null}
           {returnedUnaccepted && !broker ? (
             <span className="flex items-center gap-1.5 text-[11px] font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor">
               <span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />

@@ -5,10 +5,11 @@ import { getAttentionSnapshot, getCommercialOverview, getFunnelSnapshot, getLead
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import type { PeriodValue } from "@/shared/period";
 import { resolveDashboardProfile, type DashboardViewModel } from "./contracts";
-import { and, count, desc, eq, gte, isNull, isNotNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, isNotNull, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { periodStart } from "@/shared/period";
 import { getDashboardWelcome, type DashboardWelcome } from "./welcome";
+import { managementInvestigationWhere } from "@/features/leads/management-investigation";
 
 export type DomainDashboard = { title: string; description: string; metrics: readonly { label: string; value: number | string }[]; actionHref: string };
 export type DashboardViewData = DashboardViewModel & {
@@ -65,14 +66,23 @@ export async function getDashboardViewModel(context: TenantContext, period: Peri
   const scope = await resolveReportDataScope(context);
   const db = getDatabase();
   const since = periodStart(period);
+  const managementUserRows = await db
+    .select({ userId: schema.tenantMemberships.userId })
+    .from(schema.tenantMemberships)
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      inArray(schema.tenantMemberships.role, ["director", "manager"]),
+    ));
+  const managementInvestigationFilter = managementInvestigationWhere(managementUserRows.map((row) => row.userId));
   const leadWhere = and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), gte(schema.leads.createdAt, since), scope.leadScope);
+  const brokerLeadWhere = and(leadWhere, managementInvestigationFilter);
   const [commercial, attention, funnel, trend, unitRows, brokerRows, recentLeads, welcome] = await Promise.all([
     getCommercialOverview(context, period, { includeFinancial: false }),
     getAttentionSnapshot(context, period),
     getFunnelSnapshot(context, period),
     getLeadTimeline(context, period),
     db.select({ id: schema.branches.id, name: schema.branches.name, received: count(), converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')` }).from(schema.leads).innerJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).where(leadWhere).groupBy(schema.branches.id, schema.branches.name).orderBy(desc(count())).limit(8),
-    db.select({ id: schema.user.id, name: schema.user.name, received: count(), converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')` }).from(schema.leads).innerJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(leadWhere).groupBy(schema.user.id, schema.user.name).orderBy(desc(count())).limit(8),
+    db.select({ id: schema.user.id, name: schema.user.name, received: count(), converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')` }).from(schema.leads).innerJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(brokerLeadWhere).groupBy(schema.user.id, schema.user.name).orderBy(desc(count())).limit(8),
     db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, branchName: schema.branches.name, createdAt: schema.leads.createdAt }).from(schema.leads).leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id)).where(leadWhere).orderBy(desc(schema.leads.createdAt)).limit(6),
     getDashboardWelcome(context),
   ]);

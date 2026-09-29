@@ -21,6 +21,7 @@ export type LeadWorkspaceItem = {
   corretorNome: string | null;
   isPlantaoAtivo?: boolean;
   returnedUnaccepted?: boolean;
+  isManagementInvestigation?: boolean;
   branchId: string | null;
   branchName: string | null;
   qualificationDetails?: Record<string, unknown> | null;

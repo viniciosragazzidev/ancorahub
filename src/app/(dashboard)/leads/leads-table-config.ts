@@ -15,6 +15,7 @@ export type LeadRow = {
   assignedBrokerName: string | null;
   isPlantaoAtivo: boolean;
   returnedUnaccepted?: boolean;
+  isManagementInvestigation?: boolean;
   branchName: string | null;
   qualificationStatus: string | null;
   queueName: string | null;

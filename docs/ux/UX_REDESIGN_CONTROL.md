@@ -34,6 +34,12 @@ mudança de etapa. Registro: `docs/implementations/completed/2026-09-29-dashboar
 **Atualizado em:** 2026-09-25
 **Fonte de verdade:** este documento e `UX_REDESIGN_CONTRACT.md`.
 
+Refinamento pontual no workspace de Leads (2026-09-29): leads em investigação
+atribuídos à gestão recebem o estado visual `Investigação da gestão` na tabela e
+no kanban, com destaque de superfície e badge, preservando o disclosure e as
+ações existentes. Sem novo token ou primitiva; a regra de domínio é resolvida
+no servidor. Registro: `docs/implementations/completed/2026-09-29-management-investigation-statistics.md`.
+
 ## Estado atual
 
 Hardening pontual da navegação mobile (2026-09-28): no Sheet da sidebar gerencial, Diretor/Gestor e demais papéis autorizados encontram a mesma lista de destinos em área rolável; marca e usuário ficam em uma linha, controles contextuais abaixo e Agente IA/perfil empilhados no rodapé. A ação principal é escolher uma rota. Abertura, fechamento, foco e alvos de toque seguem as primitivas compartilhadas. Não há novo token, rota ou regra de domínio; UX-M1.10 segue pendente em viewports autenticados. Registro: `docs/implementations/active/2026-09-28-mobile-sidebar-responsiveness.md`.

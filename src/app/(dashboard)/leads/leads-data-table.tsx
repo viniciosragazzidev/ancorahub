@@ -50,6 +50,7 @@ export function LeadsDataTable({
       assignedBrokerName: item.corretorNome ?? null,
       isPlantaoAtivo: item.isPlantaoAtivo ?? false,
       returnedUnaccepted: item.returnedUnaccepted ?? false,
+      isManagementInvestigation: item.isManagementInvestigation ?? false,
       branchName: item.branchName ?? null,
       qualificationStatus: item.qualificationStatus ?? null,
       queueName: item.queueName ?? null,
@@ -103,7 +104,11 @@ export function LeadsDataTable({
     <DataTable
       table={table}
       onRowClick={onRowClick ? handleRowClick : undefined}
-      getRowClassName={(row) => (row.returnedUnaccepted ? "bg-warning/10 hover:bg-warning/15" : undefined)}
+      getRowClassName={(row) => row.isManagementInvestigation
+        ? "bg-violet-500/[0.07] hover:bg-violet-500/[0.12]"
+        : row.returnedUnaccepted
+        ? "bg-warning/10 hover:bg-warning/15"
+        : undefined}
       isPending={isPending}
       actionBar={
         selectedRows.length > 0 ? (

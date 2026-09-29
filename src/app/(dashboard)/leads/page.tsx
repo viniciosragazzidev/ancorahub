@@ -34,6 +34,7 @@ import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
 import type { ExtendedColumnFilter, ExtendedColumnSort, JoinOperator } from "@/types/data-table";
 import { withPerfSpan, withRequestTiming } from "@/shared/observability/request-timing";
 import { getLocalDutyParts } from "@/features/leads/assignment";
+import { isManagementInvestigation } from "@/features/lead-distribution/duty-leads-shift-groups";
 import {
   getCachedLeadsBranches,
   getCachedPausedBranchCount,
@@ -439,6 +440,7 @@ async function LeadsPageContent({
     unassignedCountResult,
     unassignedRows,
     activeDutyAssignments,
+    managementUserRows,
   ] = await withPerfSpan("leads.data_loader", () => Promise.all([
     withPerfSpan("leads.count", () => db.select({ total: count() }).from(schema.leads).where(where)),
     withPerfSpan("leads.catalog_plans", () => listAvailableCatalogPlans(context)),
@@ -582,6 +584,13 @@ async function LeadsPageContent({
         .offset(offset)
       : Promise.resolve([])),
     withPerfSpan("leads.active_duty_assignments", () => getCachedActiveDutyAssignments(context.tenantId, dutyLocal, dutyNow)),
+    withPerfSpan("leads.management_users", () => db
+      .select({ userId: schema.tenantMemberships.userId })
+      .from(schema.tenantMemberships)
+      .where(and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        inArray(schema.tenantMemberships.role, ["director", "manager"]),
+      ))),
   ]));
 
   const totalItems = Number(totalCountResult[0]?.total ?? 0);
@@ -589,6 +598,7 @@ async function LeadsPageContent({
   const unassignedTotalItems = Number(unassignedCountResult[0]?.total ?? 0);
   const unassignedTotalPages = Math.ceil(unassignedTotalItems / pageSize) || 1;
   const activeDutyBrokerKeys = new Set(activeDutyAssignments.map((assignment) => `${assignment.branchId}:${assignment.brokerId}`));
+  const managementUserIds = new Set(managementUserRows.map((row) => row.userId));
   const isLeadOnActiveDuty = (lead: { branchId: string | null; corretorId: string | null }) => Boolean(
     lead.branchId && lead.corretorId && activeDutyBrokerKeys.has(`${lead.branchId}:${lead.corretorId}`),
   );
@@ -717,6 +727,7 @@ async function LeadsPageContent({
                 sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
+                isManagementInvestigation: isManagementInvestigation(lead, managementUserIds),
                 createdAt: lead.createdAt.toISOString(),
                 assignedAt: lead.assignedAt?.toISOString() ?? null,
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
@@ -745,6 +756,7 @@ async function LeadsPageContent({
                 sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
+                isManagementInvestigation: isManagementInvestigation(lead, managementUserIds),
                 createdAt: lead.createdAt.toISOString(),
                 assignedAt: lead.assignedAt?.toISOString() ?? null,
                 stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,

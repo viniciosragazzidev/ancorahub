@@ -980,6 +980,8 @@ function KanbanLeadCard({
       className={`group w-full text-left outline-none transition-all duration-200 ${
         selected
           ? "border-primary/40 bg-primary/[0.03] ring-1 ring-primary/20"
+          : lead.isManagementInvestigation
+          ? "border-violet-500/35 bg-violet-500/[0.06] hover:border-violet-500/55 hover:bg-violet-500/[0.1]"
           : "border-border/80 hover:border-primary/40 hover:shadow-xs hover:bg-card/80"
       }`}
     >
@@ -1045,6 +1047,7 @@ function KanbanLeadCard({
         <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/50 pt-2 text-[11px]">
           <div className="flex items-center gap-1.5 flex-wrap">
             <LeadStatusBadge status={lead.status} />
+            {lead.isManagementInvestigation ? <Badge variant="secondary" size="sm">Investigação da gestão</Badge> : null}
             <span className={`inline-flex items-center rounded-md px-1.5 py-0.2 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
               {lead.tipo}
             </span>
