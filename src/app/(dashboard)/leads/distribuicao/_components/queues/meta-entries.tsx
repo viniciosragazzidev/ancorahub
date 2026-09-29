@@ -73,6 +73,17 @@ export function MetaEntries({ queueId, data, canEdit }: { queueId: string | null
   const belongsHere = (route: { queueId: string | null; enabled: boolean } | undefined) =>
     Boolean(route) && (ignoredMode ? !route!.enabled : route!.enabled && route!.queueId === queueId);
 
+  /** Ads of a campaign whose own rule sends them somewhere else (an ad rule wins over the campaign). */
+  const adsElsewhere = (campaignId: string) =>
+    (adsByCampaign.get(campaignId) ?? []).filter((ad) => {
+      const own = adRouteById.get(ad.adId);
+      return Boolean(own) && !belongsHere(own);
+    });
+  const describeElsewhere = (ads: MetaAd[]) => {
+    const places = [...new Set(ads.map((ad) => destinationLabel(adRouteById.get(ad.adId))?.toLowerCase()).filter(Boolean))];
+    return places.join(", ");
+  };
+
   const allLinkedCampaigns = data.campaignRoutes.filter(belongsHere);
   const allLinkedAds = data.adRoutes.filter(belongsHere);
   // "Só ativos" also trims the linked list: paused entries stay routed, just hidden.
@@ -97,11 +108,21 @@ export function MetaEntries({ queueId, data, canEdit }: { queueId: string | null
           hint: [isActive(campaign.status) ? "Ativa" : "Pausada", `${ads.length} anúncio${ads.length === 1 ? "" : "s"}`, where].filter(Boolean).join(" · "),
         };
       });
+    // An ad without its own rule follows its campaign: when the campaign is
+    // already here, the ad is too and is not offered again. An ad with its own
+    // rule elsewhere (an exception) can still be brought here.
     const adItems = data.ads
-      .filter((ad) => (!onlyActive || isActive(ad.status)) && !belongsHere(adRouteById.get(ad.adId)))
+      .filter((ad) => {
+        if (onlyActive && !isActive(ad.status)) return false;
+        const own = adRouteById.get(ad.adId);
+        if (own) return !belongsHere(own);
+        return !(ad.campaignId && belongsHere(campaignRouteById.get(ad.campaignId)));
+      })
       .map((ad) => {
         const campaign = ad.campaignId ? campaignById.get(ad.campaignId) : undefined;
-        const where = destinationLabel(adRouteById.get(ad.adId));
+        const own = adRouteById.get(ad.adId);
+        const viaCampaign = !own && ad.campaignId ? campaignRouteById.get(ad.campaignId) : undefined;
+        const where = own ? destinationLabel(own) : viaCampaign ? `${destinationLabel(viaCampaign)} pela campanha` : null;
         return {
           id: `ad:${ad.adId}`,
           label: ad.name,
@@ -138,10 +159,27 @@ export function MetaEntries({ queueId, data, canEdit }: { queueId: string | null
     if (where && !window.confirm(`"${item.label}" está hoje: ${where}. Mover para ${ignoredMode ? "não registrar no CRM" : "esta fila"}?`)) return;
     const input = { queueId: ignoredMode ? null : queueId, enabled: !ignoredMode };
     if (kind === "campaign") {
-      run(item.id, () => saveMetaCampaignQueueRouteAction({ campaignId: id, ...input }), ignoredMode ? "Campanha não será registrada." : "Campanha adicionada com os anúncios dela.");
+      // Ads with their own rule would not come along: ask once, right here.
+      const elsewhere = ignoredMode ? [] : adsElsewhere(id);
+      const includeAds = elsewhere.length > 0 && window.confirm(
+        `${elsewhere.length} anúncio${elsewhere.length === 1 ? "" : "s"} desta campanha ${elsewhere.length === 1 ? "tem" : "têm"} regra própria e ${elsewhere.length === 1 ? "vai" : "vão"} para outro lugar (${describeElsewhere(elsewhere)}).
+
+OK: trazer esses anúncios para esta fila junto com a campanha.
+Cancelar: adicionar só a campanha e manter essas exceções.`,
+      );
+      run(item.id, () => saveMetaCampaignQueueRouteAction({ campaignId: id, ...input, includeAds }), ignoredMode
+        ? "Campanha não será registrada."
+        : elsewhere.length && !includeAds
+          ? `Campanha adicionada. ${elsewhere.length} anúncio${elsewhere.length === 1 ? "" : "s"} com regra própria ${elsewhere.length === 1 ? "continua" : "continuam"} fora desta fila.`
+          : "Campanha adicionada com todos os anúncios dela.");
     } else {
       run(item.id, () => saveMetaAdQueueRouteAction({ adId: id, ...input }), ignoredMode ? "Anúncio não será registrado." : "Anúncio adicionado à fila.");
     }
+  }
+
+  function bringCampaignAds(campaignId: string, name: string, count: number) {
+    if (!queueId || !window.confirm(`Trazer para esta fila ${count} anúncio${count === 1 ? "" : "s"} de "${name}" que hoje ${count === 1 ? "vai" : "vão"} para outro lugar? A regra própria ${count === 1 ? "dele é removida e ele passa" : "deles é removida e eles passam"} a seguir a campanha.`)) return;
+    run(`campaign:${campaignId}`, () => saveMetaCampaignQueueRouteAction({ campaignId, queueId, enabled: true, includeAds: true }), "Anúncios trazidos para esta fila.");
   }
 
   function removeCampaign(campaignId: string, name: string) {
@@ -194,6 +232,8 @@ export function MetaEntries({ queueId, data, canEdit }: { queueId: string | null
             const campaign = campaignById.get(route.campaignId);
             const name = campaign?.name ?? route.campaignId;
             const ads = adsByCampaign.get(route.campaignId) ?? [];
+            const elsewhere = ignoredMode ? [] : adsElsewhere(route.campaignId);
+            const included = ads.length - elsewhere.length;
             return (
               <li key={route.campaignId} className="px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
@@ -203,8 +243,14 @@ export function MetaEntries({ queueId, data, canEdit }: { queueId: string | null
                       <span className="truncate">{name}</span>
                     </p>
                     <p className="text-[11px] text-muted-foreground">
-                      {isActive(campaign?.status) ? "Ativa" : "Pausada"} · {ads.length} anúncio{ads.length === 1 ? "" : "s"} incluído{ads.length === 1 ? "" : "s"}
+                      {isActive(campaign?.status) ? "Ativa" : "Pausada"} · {included} anúncio{included === 1 ? "" : "s"} incluído{included === 1 ? "" : "s"}
+                      {elsewhere.length ? <span className="text-foreground"> · {elsewhere.length} com regra própria ({describeElsewhere(elsewhere)})</span> : null}
                     </p>
+                    {elsewhere.length && canEdit ? (
+                      <button type="button" className="text-[11px] font-medium text-primary hover:underline disabled:opacity-50" disabled={Boolean(busyId)} onClick={() => bringCampaignAds(route.campaignId, name, elsewhere.length)}>
+                        Trazer para esta fila
+                      </button>
+                    ) : null}
                   </div>
                   {removeButton(`campaign:${route.campaignId}`, name, () => removeCampaign(route.campaignId, name))}
                 </div>

@@ -61,6 +61,8 @@ const campaignQueueRouteInput = z.object({
   campaignId: z.string().trim().min(1).max(100),
   queueId: z.string().uuid().nullable(),
   enabled: z.boolean().default(true),
+  /** Also drop the campaign's ad-level rules, so every ad follows the campaign. */
+  includeAds: z.boolean().default(false),
 }).superRefine((input, context) => {
   if (input.enabled && !input.queueId) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["queueId"], message: "Selecione a fila que receberá os leads desta campanha." });
@@ -474,7 +476,28 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
     id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaign.campaignId,
     acao: input.enabled ? "meta_campaign_queue_route.saved" : "meta_campaign_queue_route.paused",
   });
-  return { campaignId: campaign.campaignId, queueId: queue?.id ?? null, enabled: input.enabled };
+  // An ad rule wins over the campaign rule. "Bring the ads" removes the rules of
+  // this campaign's ads, so each of them follows the campaign again.
+  let adsBrought = 0;
+  if (input.includeAds) {
+    const campaignAds = await db.select({ adId: schema.metaAds.adId }).from(schema.metaAds)
+      .innerJoin(schema.metaAdSets, and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)))
+      .where(and(eq(schema.metaAds.tenantId, context.tenantId), eq(schema.metaAdSets.campaignId, campaign.campaignId)));
+    const adIds = campaignAds.map((row) => row.adId);
+    if (adIds.length) {
+      const removed = await db.delete(schema.metaAdQueueRoutes)
+        .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), inArray(schema.metaAdQueueRoutes.adId, adIds)))
+        .returning({ adId: schema.metaAdQueueRoutes.adId });
+      adsBrought = removed.length;
+      if (adsBrought) {
+        await db.insert(schema.auditLogs).values({
+          id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaign.campaignId,
+          acao: `meta_campaign_queue_route.ads_follow_campaign:${adsBrought}`,
+        });
+      }
+    }
+  }
+  return { campaignId: campaign.campaignId, queueId: queue?.id ?? null, enabled: input.enabled, adsBrought };
 }
 
 export async function saveMetaAdQueueRoute(context: TenantContext, rawInput: unknown) {
