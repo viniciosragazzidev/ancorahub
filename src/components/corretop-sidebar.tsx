@@ -266,10 +266,11 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       className="sticky top-0 h-dvh max-h-dvh overflow-hidden select-none"
     >
       {/* Header: Logo & SuperAdmin Switcher */}
-      <SidebarHeader className={cn("gap-3 border-b border-sidebar-border/70 p-3", isMobile ? "min-h-[calc(4rem+var(--mobile-safe-top))] flex-row px-4 pt-[calc(0.75rem+var(--mobile-safe-top))] pr-14" : "")}>
-        <div className="flex min-w-0 items-center gap-3 group-data-[collapsible=icon]:justify-center">
+      <SidebarHeader className={cn("gap-3 border-b border-sidebar-border/70 p-3", isMobile && "px-3 pt-[calc(0.75rem+var(--mobile-safe-top))] pb-3")}>
+        <div className={cn("flex min-w-0 items-center gap-3 group-data-[collapsible=icon]:justify-center", isMobile && "min-h-11 w-full pr-10")}>
           <Link
             href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"}
+            onClick={() => isMobile && setOpenMobile(false)}
             className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-sidebar-border bg-sidebar-accent p-1.5 shadow-xs transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-sidebar-ring/50 hover:bg-sidebar-accent/80 active:scale-[0.96] motion-reduce:transition-none"
             title="Âncora CRM"
           >
@@ -277,20 +278,13 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           </Link>
           <div className="min-w-0 transition-[opacity,transform,max-width] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">
             <p className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">Âncora CRM</p>
-            <p className="truncate text-[11px] text-sidebar-foreground/55">Menu principal</p>
+            <p className="truncate text-xs text-sidebar-foreground/55">{isMobile ? userName : "Menu principal"}</p>
           </div>
         </div>
 
-        {isMobile ? (
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-sidebar-foreground">Menu principal</p>
-            <p className="truncate text-xs text-sidebar-foreground/55">{userName}</p>
-          </div>
-        ) : null}
-
         {user?.isPlatformAdmin && (
-          <div className="w-full flex justify-center">
-            <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} />
+          <div className="flex w-full min-w-0 justify-center">
+            <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} compact={isMobile} />
           </div>
         )}
 
@@ -326,7 +320,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       </SidebarHeader>
 
       {/* Navigation */}
-      <SidebarContent className={cn("min-h-0 flex-1 py-2", isMobile ? "px-2" : "px-2")}>
+      <SidebarContent className="min-h-0 min-w-0 flex-1 overflow-x-hidden px-2 py-2">
         <TooltipProvider delay={150}>
           <nav aria-label="Menu principal" className="flex w-full flex-col gap-1 pb-4">
             {visibleItems.map((item, index) => {
@@ -427,7 +421,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       </SidebarContent>
 
       {/* Footer: AI Agent & User Profile */}
-      <SidebarFooter className={cn("gap-1 border-t border-sidebar-border/70 p-2 pb-3", isMobile ? "flex-row justify-between px-4 pb-[max(0.75rem,var(--mobile-safe-bottom))]" : "")}>
+      <SidebarFooter className={cn("gap-1 border-t border-sidebar-border/70 p-2 pb-3", isMobile && "gap-2 px-3 pb-[max(0.75rem,var(--mobile-safe-bottom))]")}>
         <TooltipProvider delay={150}>
           {/* AI Agent Trigger */}
           <Tooltip>
@@ -439,10 +433,11 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   variant="ghost"
                   aria-label="Abrir Agente IA"
                   onClick={() => {
+                    if (isMobile) setOpenMobile(false);
                     const event = new CustomEvent("open-agent-drawer");
                     window.dispatchEvent(event);
                   }}
-                  className="h-10 w-full justify-start gap-3 rounded-[var(--radius-control)] border border-emerald-500/25 bg-emerald-500/10 px-3 text-emerald-700 shadow-xs transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-emerald-500/45 hover:bg-emerald-500/15 active:scale-[0.98] dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none"
+                  className={cn("h-10 w-full justify-start gap-3 rounded-[var(--radius-control)] border border-emerald-500/25 bg-emerald-500/10 px-3 text-emerald-700 shadow-xs transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-emerald-500/45 hover:bg-emerald-500/15 active:scale-[0.98] dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none", isMobile && "min-h-(--mobile-touch-target)")}
                 />
               }
             >
@@ -463,7 +458,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                   size="default"
                   variant="ghost"
                   aria-label="Abrir menu do perfil"
-                  className="h-10 w-full justify-start gap-3 rounded-[var(--radius-control)] px-2 text-sidebar-foreground transition-[background-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-sidebar-accent active:scale-[0.98] group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none"
+                  className={cn("h-10 w-full justify-start gap-3 rounded-[var(--radius-control)] px-2 text-sidebar-foreground transition-[background-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-sidebar-accent active:scale-[0.98] group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none", isMobile && "min-h-(--mobile-touch-target)")}
                 />
               }
             >
@@ -513,7 +508,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
               <DropdownMenuSeparator className="bg-border" />
               {user?.userProfileEnabled ? (
                 <DropdownMenuItem
-                  render={<Link href="/settings?tab=conta" />}
+                  render={<Link href="/settings?tab=conta" onClick={() => isMobile && setOpenMobile(false)} />}
                   className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
                 >
                   <UserCircle className="size-4 text-emerald-400" />
@@ -525,7 +520,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 user?.permissions?.includes("acessar_configuracoes_pessoais") ||
                 roleKey === "broker") ? (
                 <DropdownMenuItem
-                  render={<Link href="/settings" />}
+                  render={<Link href="/settings" onClick={() => isMobile && setOpenMobile(false)} />}
                   className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
                 >
                   <SlidersHorizontal className="size-4 text-emerald-400" />
