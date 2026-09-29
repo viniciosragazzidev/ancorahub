@@ -140,14 +140,15 @@ export function teamNoticeByKey(key: string) {
   return byKey.get(key) ?? null;
 }
 
-export type TeamNoticeSetting = { enabled: boolean; channel: NoticeChannel; freeMessageId: string | null };
+/** `freeMessageIds`: library messages that rotate on the company number; empty uses the built-in versions. */
+export type TeamNoticeSetting = { enabled: boolean; channel: NoticeChannel; freeMessageIds: string[] };
 
 /** Stored setting, or the default: on/off from the catalog, Meta only. */
 export function effectiveNoticeSetting(notice: TeamNotice, stored: Partial<TeamNoticeSetting> | null | undefined): TeamNoticeSetting {
-  if (notice.metaOnly) return { enabled: true, channel: "meta", freeMessageId: null };
+  if (notice.metaOnly) return { enabled: true, channel: "meta", freeMessageIds: [] };
   return {
     enabled: notice.alwaysOn ? true : stored?.enabled ?? notice.defaultEnabled,
     channel: stored?.channel ?? notice.defaultChannel ?? "meta",
-    freeMessageId: notice.chat ? null : stored?.freeMessageId ?? null,
+    freeMessageIds: notice.chat ? [] : [...new Set(stored?.freeMessageIds ?? [])],
   };
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, isNull, like, or } from "drizzle-orm";
+import { and, desc, eq, isNull, like, or, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
@@ -176,7 +176,13 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     if (source.kind === "number") {
       await db
         .update(schema.wahaNumbers)
-        .set({ status: normalizedStatus, lastHealthAt: new Date(), updatedAt: new Date() })
+        .set({
+          status: normalizedStatus,
+          // First time connected: the warm-up starts now (the phone reader resets it on a new phone).
+          ...(normalizedStatus === "active" ? { connectedAt: sql`coalesce(${schema.wahaNumbers.connectedAt}, now())` } : {}),
+          lastHealthAt: new Date(),
+          updatedAt: new Date(),
+        })
         .where(eq(schema.wahaNumbers.id, source.number.id));
     } else {
       await db

@@ -3,15 +3,18 @@
 import Link from "next/link";
 import { useMemo, useState, useTransition } from "react";
 
-import { LockKey, ChatCircleText } from "@/components/huge-icons";
+import { LockKey, ChatCircleText, Trash } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { SearchAddList } from "@/components/ui/search-add-list";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetSection, SheetSectionHeader, SheetTitle } from "@/components/ui/sheet";
 import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import type { NoticeChannel } from "@/features/team-notices/catalog";
+import { MAX_NOTICE_FREE_MESSAGES } from "@/features/team-notices/variants";
 import { saveTeamNoticesAction, type TeamNoticeInput } from "../actions";
 
 export type TeamNoticeRow = {
@@ -25,10 +28,13 @@ export type TeamNoticeRow = {
   immediate: boolean;
   enabled: boolean;
   channel: NoticeChannel;
-  freeMessageId: string | null;
+  /** Library messages that rotate on the company number; empty uses the built-in versions. */
+  freeMessageIds: string[];
+  /** The built-in versions with example values, for the preview. */
+  builtInPreviews: string[];
 };
 
-const DEFAULT_TEXT = "__default__";
+type FreeMessage = { id: string; name: string; content: string };
 
 const CHANNEL_LABEL: Record<NoticeChannel, string> = {
   meta: "Só Meta oficial",
@@ -48,21 +54,22 @@ export function TeamNoticesCard({
   channelConnected,
 }: {
   notices: TeamNoticeRow[];
-  freeMessages: Array<{ id: string; name: string }>;
+  freeMessages: FreeMessage[];
   channelConnected: boolean;
 }) {
   const [rows, setRows] = useState(notices);
   const [saved, setSaved] = useState(notices);
   const [isPending, startTransition] = useTransition();
   const dirty = JSON.stringify(rows) !== JSON.stringify(saved);
-  const messageName = useMemo(() => new Map(freeMessages.map((message) => [message.id, message.name])), [freeMessages]);
+  const [textsKey, setTextsKey] = useState<string | null>(null);
+  const textsRow = rows.find((row) => row.key === textsKey) ?? null;
   const activeCount = rows.filter((row) => row.enabled && !row.chat).length;
   const usesCompanyNumber = rows.some((row) => row.enabled && !row.metaOnly && row.channel === "company_number");
 
   const update = (key: string, patch: Partial<TeamNoticeRow>) => setRows((current) => current.map((row) => (row.key === key ? { ...row, ...patch } : row)));
 
   function save() {
-    const payload: TeamNoticeInput[] = rows.filter((row) => !row.metaOnly).map((row) => ({ key: row.key, enabled: row.enabled, channel: row.channel, freeMessageId: row.freeMessageId }));
+    const payload: TeamNoticeInput[] = rows.filter((row) => !row.metaOnly).map((row) => ({ key: row.key, enabled: row.enabled, channel: row.channel, freeMessageIds: row.freeMessageIds }));
     startTransition(async () => {
       const result = await saveTeamNoticesAction(payload);
       if (!result.success) {
@@ -127,15 +134,16 @@ export function TeamNoticesCard({
                 {row.chat ? (
                   <p className="text-xs text-muted-foreground">Texto escrito no chat.</p>
                 ) : (
-                <Select value={row.freeMessageId ?? DEFAULT_TEXT} disabled={!row.enabled || row.channel !== "company_number"} onValueChange={(value) => update(row.key, { freeMessageId: value === DEFAULT_TEXT ? null : String(value) })}>
-                  <SelectTrigger aria-label={`Texto de ${row.label} pelo WhatsApp da empresa`}>
-                    <SelectValue>{row.freeMessageId ? messageName.get(row.freeMessageId) ?? "Mensagem removida" : "Texto padrão"}</SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={DEFAULT_TEXT}>Texto padrão</SelectItem>
-                    {freeMessages.map((message) => <SelectItem key={message.id} value={message.id}>{message.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="justify-start"
+                  disabled={!row.enabled || row.channel !== "company_number"}
+                  aria-label={`Textos de ${row.label} pelo WhatsApp da empresa`}
+                  onClick={() => setTextsKey(row.key)}
+                >
+                  <span className="truncate">{textsSummary(row)}</span>
+                </Button>
                 )}
               </>
             )}
@@ -143,9 +151,143 @@ export function TeamNoticesCard({
         ))}
       </ul>
       <p className="border-t border-border/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
-        Novo lead e informações do lead saem na hora. Os demais avisos saem de segunda a sexta, das 8h às 18h, com intervalo entre mensagens, e cada pessoa recebe no máximo 2 lembretes por dia. O texto do WhatsApp da empresa pode ser uma mensagem de{" "}
+        Novo lead e informações do lead saem na hora. Os demais avisos saem de segunda a sexta, das 8h às 18h, com intervalo entre mensagens, e cada pessoa recebe no máximo 2 lembretes por dia. Pelo WhatsApp da empresa, cada envio sorteia uma versão do texto; os textos podem vir de{" "}
         <Link href="/qualificacao?tab=meta_templates" className="font-medium text-foreground underline-offset-4 hover:underline">Qualificação → Mensagens</Link>.
       </p>
+      <NoticeTextsSheet
+        row={textsRow}
+        freeMessages={freeMessages}
+        onChange={(freeMessageIds) => {
+          if (textsRow) update(textsRow.key, { freeMessageIds });
+        }}
+        onOpenChange={(open) => {
+          if (!open) setTextsKey(null);
+        }}
+      />
     </Card>
+  );
+}
+
+function textsSummary(row: TeamNoticeRow) {
+  const count = row.freeMessageIds.length;
+  if (!count) return `Texto padrão · ${row.builtInPreviews.length} versões`;
+  return count === 1 ? "1 texto próprio" : `${count} textos em rotação`;
+}
+
+/**
+ * The texts of one notice on the company number. Each send picks one at
+ * random and never repeats the version the same person got last. Without
+ * chosen messages the built-in versions rotate. Changes stay in the card and
+ * are saved with "Salvar avisos".
+ */
+function NoticeTextsSheet({
+  row,
+  freeMessages,
+  onChange,
+  onOpenChange,
+}: {
+  row: TeamNoticeRow | null;
+  freeMessages: FreeMessage[];
+  onChange: (freeMessageIds: string[]) => void;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const byId = useMemo(() => new Map(freeMessages.map((message) => [message.id, message])), [freeMessages]);
+  const chosen = row?.freeMessageIds ?? [];
+  const full = chosen.length >= MAX_NOTICE_FREE_MESSAGES;
+  const available = freeMessages
+    .filter((message) => !chosen.includes(message.id))
+    .map((message) => ({ id: message.id, label: message.name, hint: message.content.replace(/\s+/g, " ").slice(0, 90), keywords: message.content }));
+
+  return (
+    <Sheet open={Boolean(row)} onOpenChange={onOpenChange}>
+      <SheetContent className="data-[side=right]:w-[min(100vw-1rem,36rem)]">
+        {row ? (
+          <>
+            <SheetHeader>
+              <SheetTitle>Textos · {row.label}</SheetTitle>
+              <SheetDescription>Cada envio pelo WhatsApp da empresa sorteia um texto. A mesma pessoa nunca recebe o mesmo texto duas vezes seguidas.</SheetDescription>
+            </SheetHeader>
+            <SheetBody contentClassName="grid grid-cols-[minmax(0,1fr)] gap-4">
+              <SheetSection>
+                <SheetSectionHeader>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">Textos próprios</p>
+                    <p className="text-xs leading-5 text-muted-foreground">Mensagens da biblioteca, até {MAX_NOTICE_FREE_MESSAGES}. Sem nenhuma, valem as versões padrão.</p>
+                  </div>
+                  <Badge variant="secondary">{chosen.length}/{MAX_NOTICE_FREE_MESSAGES}</Badge>
+                </SheetSectionHeader>
+                <div className="grid grid-cols-[minmax(0,1fr)] gap-3 p-4">
+                  {chosen.length ? (
+                    <ul className="divide-y divide-border/60 rounded-lg border border-border/70">
+                      {chosen.map((id) => {
+                        const message = byId.get(id);
+                        return (
+                          <li key={id} className="flex items-start justify-between gap-2 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-medium text-foreground">{message?.name ?? "Mensagem removida ou inativa"}</p>
+                              {message ? (
+                                <p className="line-clamp-2 whitespace-pre-line text-[11px] leading-4 text-muted-foreground">{message.content}</p>
+                              ) : (
+                                <p className="text-[11px] text-muted-foreground">Não será enviada.</p>
+                              )}
+                            </div>
+                            <Button
+                              type="button"
+                              size="icon-sm"
+                              variant="ghost"
+                              className="shrink-0"
+                              aria-label={`Remover ${message?.name ?? "mensagem"}`}
+                              title="Remover"
+                              onClick={() => onChange(chosen.filter((item) => item !== id))}
+                            >
+                              <Trash className="size-4" />
+                            </Button>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : null}
+                  {chosen.length > 0 && chosen.length < 3 ? (
+                    <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                      Com menos de 3 textos a rotação fica fraca. Adicione mais, ou remova todos para usar as {row.builtInPreviews.length} versões padrão.
+                    </p>
+                  ) : null}
+                  <SearchAddList
+                    items={available}
+                    placeholder={full ? `Limite de ${MAX_NOTICE_FREE_MESSAGES} textos` : "Buscar mensagem ativa da biblioteca"}
+                    emptyLabel="Nenhuma mensagem ativa com esse nome."
+                    disabled={full}
+                    onAdd={(item) => onChange([...chosen, item.id])}
+                  />
+                </div>
+              </SheetSection>
+              <SheetSection>
+                <SheetSectionHeader>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">Versões padrão</p>
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      {chosen.length ? "Não usadas enquanto houver textos próprios." : "Em rotação agora. Exemplo com valores fictícios."}
+                    </p>
+                  </div>
+                </SheetSectionHeader>
+                <ol className="divide-y divide-border/60">
+                  {row.builtInPreviews.map((text, index) => (
+                    <li key={index} className="px-4 py-3">
+                      <p className="mb-1 text-[11px] font-medium text-muted-foreground">Versão {index + 1}</p>
+                      <p className="whitespace-pre-line break-words text-xs leading-5 text-foreground">{text}</p>
+                    </li>
+                  ))}
+                </ol>
+              </SheetSection>
+            </SheetBody>
+            <SheetFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Concluir
+              </Button>
+            </SheetFooter>
+          </>
+        ) : null}
+      </SheetContent>
+    </Sheet>
   );
 }

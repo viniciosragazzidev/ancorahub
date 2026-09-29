@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { WahaClient, resolveWebhookUrl } from "../src/integrations/waha/client.js";
 import { WahaClientError, normalizeWahaStatus } from "../src/integrations/waha/types.js";
+import { humanTypingMs } from "../src/app.js";
 
 const config = {
   baseUrl: "http://waha:3000",
@@ -162,6 +163,43 @@ test("sendText: resolve telefone para chatId @lid antes de enviar", async () => 
     chatId: "248309876846833@lid",
     text: "Olá",
   });
+});
+
+test("sendText: com typingMs mostra 'digitando' na conversa resolvida antes de enviar", async () => {
+  const paths: string[] = [];
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    paths.push(new URL(url).pathname);
+    if (url.includes("/api/contacts/check-exists")) {
+      return new Response(JSON.stringify({ exists: true, chatId: "248309876846833@lid" }), { status: 200 });
+    }
+    if (url.endsWith("/api/sendText")) return new Response(JSON.stringify({ id: "message-123" }), { status: 200 });
+    return new Response(JSON.stringify({}), { status: 200 });
+  }));
+
+  const result = await client.sendText("waha_test", "5521999999999", "Olá", { typingMs: 1 });
+
+  assert.equal(result.messageId, "message-123");
+  assert.deepEqual(paths, ["/api/contacts/check-exists", "/api/startTyping", "/api/stopTyping", "/api/sendText"]);
+});
+
+test("sendText: falha no 'digitando' não impede o envio", async () => {
+  const client = new WahaClient(config, mockFetch(async (url) => {
+    if (url.includes("/api/contacts/check-exists")) {
+      return new Response(JSON.stringify({ exists: true, chatId: "5521999999999@c.us" }), { status: 200 });
+    }
+    if (url.endsWith("/api/sendText")) return new Response(JSON.stringify({ id: "message-123" }), { status: 200 });
+    return new Response(JSON.stringify({ error: "boom" }), { status: 500 });
+  }));
+
+  const result = await client.sendText("waha_test", "5521999999999", "Olá", { typingMs: 1 });
+  assert.equal(result.messageId, "message-123");
+});
+
+test("humanTypingMs: cresce com o texto e fica entre 2s e 7s", () => {
+  assert.equal(humanTypingMs("", 0), 2_000);
+  assert.equal(humanTypingMs("a".repeat(40), 0), 3_000);
+  assert.equal(humanTypingMs("a".repeat(4_000), 0), 6_000);
+  assert.equal(humanTypingMs("a".repeat(4_000), 0.999), 6_999);
 });
 
 test("sendText: não envia para telefone quando o WAHA não resolve o destinatário", async () => {

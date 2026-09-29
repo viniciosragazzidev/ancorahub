@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { effectiveNoticeSetting, TEAM_NOTICES, teamNoticeByKey, type TeamNotice, type TeamNoticeSetting } from "./catalog";
 import type { CompanyNumberState } from "./decision";
 import { DELIVERY_LIMITS, evaluateDeliveryGuard, localDateKey, type GuardResult } from "./guard";
+import { pickNoticeVariant } from "./variants";
 
 /** Effective setting per notice: stored row, else the legacy company-number routing, else the catalog default. */
 export async function getTeamNoticeSettings(tenantId: string): Promise<Map<string, TeamNoticeSetting>> {
@@ -23,8 +24,8 @@ export async function getTeamNoticeSettings(tenantId: string): Promise<Map<strin
     const row = stored.get(notice.key);
     const legacyMessage = (legacy.events as Record<string, string | undefined>)[notice.key] ?? null;
     result.set(notice.key, effectiveNoticeSetting(notice, row
-      ? { enabled: row.enabled, channel: row.channel, freeMessageId: row.freeMessageId }
-      : { freeMessageId: legacyMessage }));
+      ? { enabled: row.enabled, channel: row.channel, freeMessageIds: row.freeMessageIds.length ? row.freeMessageIds : row.freeMessageId ? [row.freeMessageId] : [] }
+      : { freeMessageIds: legacyMessage ? [legacyMessage] : [] }));
   }
   return result;
 }
@@ -49,17 +50,49 @@ export async function getCompanyNumberState(tenantId: string): Promise<(NonNulla
   return { id: number.id, connected: TENANT_CHANNEL_CONNECTED_STATUSES.includes(number.status), pausedUntil: number.pausedUntil, createdAt: number.createdAt, lastSentAt: number.lastSentAt };
 }
 
-/** The text a team notice carries through the company number: the chosen free message, else the built-in wording. */
-export async function renderTeamNoticeText(input: { tenantId: string; notice: TeamNotice; setting: TeamNoticeSetting; variables: readonly string[]; builtIn: string }) {
-  if (input.setting.freeMessageId) {
-    const [message] = await getDatabase().select({ content: schema.messageTemplates.content }).from(schema.messageTemplates)
-      .where(and(eq(schema.messageTemplates.id, input.setting.freeMessageId), eq(schema.messageTemplates.tenantId, input.tenantId), eq(schema.messageTemplates.active, true)))
-      .limit(1);
+/**
+ * The text a team notice carries through the company number, rotated: one of
+ * the chosen library messages, else one of the built-in versions. The pick is
+ * stable per `seed` (a retry keeps its text) and avoids the version this
+ * person received last. Null when every candidate renders empty.
+ */
+export async function renderTeamNoticeText(input: {
+  tenantId: string;
+  notice: TeamNotice;
+  setting: TeamNoticeSetting;
+  variables: readonly string[];
+  builtIn: readonly string[];
+  seed: string;
+  recipientId: string | null;
+}): Promise<{ text: string; variant: string } | null> {
+  const db = getDatabase();
+  let pool: Array<{ key: string; text: string }> = [];
+  if (input.setting.freeMessageIds.length) {
     const event = getMessageEventByPurpose(input.notice.purpose);
-    const rendered = message && event ? renderTenantChannelMessage(event, message.content, input.variables) : "";
-    if (rendered) return rendered;
+    const messages = await db.select({ id: schema.messageTemplates.id, content: schema.messageTemplates.content }).from(schema.messageTemplates)
+      .where(and(inArray(schema.messageTemplates.id, input.setting.freeMessageIds), eq(schema.messageTemplates.tenantId, input.tenantId), eq(schema.messageTemplates.active, true)));
+    const byId = new Map(messages.map((message) => [message.id, message.content]));
+    pool = input.setting.freeMessageIds
+      .map((id) => ({ key: `msg:${id}`, text: event && byId.has(id) ? renderTenantChannelMessage(event, byId.get(id)!, input.variables) : "" }))
+      .filter((item) => item.text);
   }
-  return input.builtIn.trim();
+  if (!pool.length) pool = input.builtIn.map((text, index) => ({ key: `builtin:${index}`, text: text.trim() })).filter((item) => item.text);
+  if (!pool.length) return null;
+
+  const [last] = input.recipientId && pool.length > 1
+    ? await db.select({ variant: schema.whatsappOutboundMessages.textVariant }).from(schema.whatsappOutboundMessages)
+      .where(and(
+        eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
+        eq(schema.whatsappOutboundMessages.recipientId, input.recipientId),
+        eq(schema.whatsappOutboundMessages.noticeKey, input.notice.key),
+        isNotNull(schema.whatsappOutboundMessages.textVariant),
+        isNotNull(schema.whatsappOutboundMessages.sentAt),
+      ))
+      .orderBy(desc(schema.whatsappOutboundMessages.sentAt))
+      .limit(1)
+    : [];
+  const picked = pickNoticeVariant(pool, input.seed, last?.variant ?? null)!;
+  return { text: picked.text, variant: picked.key };
 }
 
 /** Stable value in [0, 1) per row: the spacing jitter must not change between two checks of the same message. */
@@ -102,14 +135,14 @@ export async function evaluateNoticeRow(row: {
 
   let number: { lastSentAt: Date | null; sentLastHour: number; sentToday: number; connectedAt: Date | null } | null = null;
   if (channel === "company_number" && row.wahaNumberId) {
-    const [numberRow] = await db.select({ lastSentAt: schema.wahaNumbers.lastSentAt, createdAt: schema.wahaNumbers.createdAt }).from(schema.wahaNumbers).where(eq(schema.wahaNumbers.id, row.wahaNumberId)).limit(1);
+    const [numberRow] = await db.select({ lastSentAt: schema.wahaNumbers.lastSentAt, connectedAt: schema.wahaNumbers.connectedAt, createdAt: schema.wahaNumbers.createdAt }).from(schema.wahaNumbers).where(eq(schema.wahaNumbers.id, row.wahaNumberId)).limit(1);
     const sent = await db.select({ sentAt: schema.whatsappOutboundMessages.sentAt }).from(schema.whatsappOutboundMessages)
       .where(and(eq(schema.whatsappOutboundMessages.wahaNumberId, row.wahaNumberId), isNotNull(schema.whatsappOutboundMessages.sentAt), gte(schema.whatsappOutboundMessages.sentAt, dayAgo)));
     number = {
       lastSentAt: numberRow?.lastSentAt ?? null,
       sentLastHour: sent.filter((item) => item.sentAt! >= hourAgo).length,
       sentToday: sent.filter((item) => localDateKey(item.sentAt!) === today).length,
-      connectedAt: numberRow?.createdAt ?? null,
+      connectedAt: numberRow?.connectedAt ?? numberRow?.createdAt ?? null,
     };
   }
 

@@ -69,9 +69,12 @@ export async function sendWahaRelayMessage(input: {
   sessionId: string;
   destination: string;
   body: string;
+  /** Automatic sends of the company number: the relay shows "typing…" first (a few seconds more). */
+  humanize?: boolean;
 }) {
   const config = relayConfig();
-  const payload = relaySendRequestSchema.parse({ requestId: randomUUID(), ...input });
+  const { humanize, ...message } = input;
+  const payload = relaySendRequestSchema.parse({ requestId: randomUUID(), ...message });
   if (config.transport === "relay") {
     const rawBody = JSON.stringify(payload);
     const timestamp = String(Date.now());
@@ -109,9 +112,11 @@ export async function sendWahaRelayMessage(input: {
       chatId: phone,
       text: input.body,
       idempotencyKey: input.idempotencyKey,
+      ...(humanize ? { humanize: true } : {}),
     }),
     cache: "no-store",
-    signal: AbortSignal.timeout(15_000),
+    // The "typing…" pause (up to 7s) happens inside the request.
+    signal: AbortSignal.timeout(humanize ? 30_000 : 15_000),
   });
 
   const fbData = (await fastifyRes.json().catch(() => null)) as { ok?: boolean; messageId?: string; error?: string; message?: string } | null;

@@ -52,8 +52,8 @@ describe.skipIf(!enabled)("message library (real schema, rolled back)", () => {
       // A free message used by a team notice.
       const messageId = randomUUID();
       await tx.insert(s.messageTemplates).values({ id: messageId, tenantId: vinicios.tenantId, name: "Teste biblioteca", category: "operational", content: "Olá {{nome}}, teste da biblioteca.", variables: [], active: true, createdBy: director.userId });
-      await tx.insert(s.teamNoticeSettings).values({ tenantId: vinicios.tenantId, noticeKey: "TASK_REMINDER", enabled: true, channel: "company_number", freeMessageId: messageId })
-        .onConflictDoUpdate({ target: [s.teamNoticeSettings.tenantId, s.teamNoticeSettings.noticeKey], set: { enabled: true, channel: "company_number", freeMessageId: messageId } });
+      await tx.insert(s.teamNoticeSettings).values({ tenantId: vinicios.tenantId, noticeKey: "TASK_REMINDER", enabled: true, channel: "company_number", freeMessageId: messageId, freeMessageIds: [messageId] })
+        .onConflictDoUpdate({ target: [s.teamNoticeSettings.tenantId, s.teamNoticeSettings.noticeKey], set: { enabled: true, channel: "company_number", freeMessageId: messageId, freeMessageIds: [messageId] } });
 
       const rows = await library.getMessageLibrary(vinicios.tenantId);
       const row = rows.find((item) => item.id === messageId)!;
@@ -67,13 +67,13 @@ describe.skipIf(!enabled)("message library (real schema, rolled back)", () => {
       expect(refused).toEqual({ success: false, error: expect.stringContaining("Aviso da equipe: Lembrete de tarefa") });
       const [still] = await tx.select({ active: s.messageTemplates.active }).from(s.messageTemplates).where(eq(s.messageTemplates.id, messageId));
       expect(still.active).toBe(true);
-      await tx.update(s.teamNoticeSettings).set({ freeMessageId: null }).where(and(eq(s.teamNoticeSettings.tenantId, vinicios.tenantId), eq(s.teamNoticeSettings.noticeKey, "TASK_REMINDER")));
+      await tx.update(s.teamNoticeSettings).set({ freeMessageId: null, freeMessageIds: [] }).where(and(eq(s.teamNoticeSettings.tenantId, vinicios.tenantId), eq(s.teamNoticeSettings.noticeKey, "TASK_REMINDER")));
       expect(await actions.deleteFreeMessageTemplateAction(messageId)).toEqual({ success: true });
 
       // Every team notice as Vinicios Ragazzi A. would read it through the company number.
       const { TEAM_NOTICES } = await import("@/features/team-notices/catalog");
       const { renderTeamNoticeText } = await import("@/features/team-notices/service");
-      const { resolveTemplateTextBody } = await import("@/features/communication-channels/outbound-service");
+      const { resolveNoticeTextVariants } = await import("@/features/communication-channels/outbound-service");
       const leadId = randomUUID();
       const variablesFor: Record<string, string[]> = {
         newLeadAssignment: ["Corretor(a)", vinicios.name, "Lead de teste", "Plano de saúde", leadId],
@@ -90,8 +90,16 @@ describe.skipIf(!enabled)("message library (real schema, rolled back)", () => {
       for (const notice of TEAM_NOTICES) {
         if (notice.metaOnly || notice.chat) continue;
         const variables = variablesFor[notice.purpose] ?? [vinicios.name];
-        rendered[notice.label] = await renderTeamNoticeText({ tenantId: vinicios.tenantId, notice, setting: { enabled: true, channel: "company_number", freeMessageId: null }, variables, builtIn: resolveTemplateTextBody(notice.purpose, variables) });
-        expect(rendered[notice.label], notice.label).toContain(vinicios.name);
+        const versions = resolveNoticeTextVariants(notice.purpose, variables);
+        expect(versions.length, notice.label).toBe(4);
+        // Every rotated version carries the person's name and, when the notice has one, its link.
+        for (const version of versions) {
+          expect(version, notice.label).toContain(vinicios.name);
+          if (versions[0]!.includes("https://")) expect(version, notice.label).toMatch(/https:\/\/\S+/);
+        }
+        const picked = await renderTeamNoticeText({ tenantId: vinicios.tenantId, notice, setting: { enabled: true, channel: "company_number", freeMessageIds: [] }, variables, builtIn: versions, seed: `test:${notice.key}`, recipientId: null });
+        rendered[notice.label] = picked!.text;
+        expect(versions, notice.label).toContain(picked!.text);
       }
       expect(rendered["Novo lead disponível"]).toContain(`/leads/${leadId}`);
       expect(rendered["Confirmação de presença no plantão"]).toContain("/confirm_presence?id=");

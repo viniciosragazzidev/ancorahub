@@ -111,6 +111,15 @@ function formatPhone(value: string | null | undefined) {
   return digits.length >= 10 ? digits : null;
 }
 
+/**
+ * A phone just paired: the warm-up (fewer messages per hour in the first days)
+ * restarts when it is a different phone than the one on record, or the first.
+ */
+function pairedPhoneUpdate(row: { displayPhoneNumber: string; connectedAt: Date | null } | null, phone: string | null, now: Date) {
+  if (!phone) return {};
+  return !row?.connectedAt || formatPhone(row.displayPhoneNumber) !== phone ? { connectedAt: now } : {};
+}
+
 export async function getTenantChannel(context: TenantContext): Promise<TenantChannelView | null> {
   let row = await findChannel(context.tenantId);
   if (!row) return null;
@@ -121,7 +130,7 @@ export async function getTenantChannel(context: TenantContext): Promise<TenantCh
     const phone = normalizeWahaUiStatus(live?.status) === "ready" ? formatPhone(live?.phoneNumber) : null;
     if (phone) {
       const now = new Date();
-      await getDatabase().update(schema.wahaNumbers).set({ displayPhoneNumber: phone, status: "active", lastHealthAt: now, updatedAt: now }).where(eq(schema.wahaNumbers.id, row.id)).catch(() => null);
+      await getDatabase().update(schema.wahaNumbers).set({ displayPhoneNumber: phone, status: "active", ...pairedPhoneUpdate(row, phone, now), lastHealthAt: now, updatedAt: now }).where(eq(schema.wahaNumbers.id, row.id)).catch(() => null);
       row = { ...row, displayPhoneNumber: phone, status: "active" };
     }
   }
@@ -164,6 +173,7 @@ export async function startTenantChannel(context: TenantContext, options: { fres
       relaySessionId: sessionName,
       status: normalizeWahaRelayStatus(live.status ?? "STARTING"),
       ...(phone ? { displayPhoneNumber: phone } : {}),
+      ...pairedPhoneUpdate(existing, phone, now),
       lastHealthAt: now,
       lastErrorCode: null,
       updatedAt: now,
@@ -182,6 +192,7 @@ export async function startTenantChannel(context: TenantContext, options: { fres
       label: TENANT_CHANNEL_LABEL,
       capabilities: { inbound: true, cadence: false, ai: false },
       status: normalizeWahaRelayStatus(live.status ?? "STARTING"),
+      connectedAt: phone ? now : null,
       createdBy: context.userId,
       lastHealthAt: now,
       updatedAt: now,
@@ -211,6 +222,7 @@ export async function readTenantChannelState(context: TenantContext): Promise<Te
     await getDatabase().update(schema.wahaNumbers).set({
       status: relayStatus,
       ...(phone ? { displayPhoneNumber: phone } : {}),
+      ...pairedPhoneUpdate(row, phone, now),
       lastHealthAt: now,
       updatedAt: now,
     }).where(eq(schema.wahaNumbers.id, row.id));

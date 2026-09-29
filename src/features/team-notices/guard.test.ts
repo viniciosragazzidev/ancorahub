@@ -80,20 +80,20 @@ describe("team notice decision", () => {
   const now = wednesdayMorning;
 
   it("uses the catalog defaults: reminders and expired offers off, lead notices on, Meta only", () => {
-    expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_ASSIGNMENT_EXPIRED")!, null)).toEqual({ enabled: false, channel: "meta", freeMessageId: null });
+    expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_ASSIGNMENT_EXPIRED")!, null)).toEqual({ enabled: false, channel: "meta", freeMessageIds: [] });
     expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_FEEDBACK_REMINDER")!, null).enabled).toBe(false);
-    expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_ASSIGNMENT_CONFIRMED")!, null)).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
+    expect(effectiveNoticeSetting(teamNoticeByKey("LEAD_ASSIGNMENT_CONFIRMED")!, null)).toEqual({ enabled: true, channel: "meta", freeMessageIds: [] });
     expect(teamNoticeForPurpose("leadAssignmentConfirmed")?.class).toBe("critical");
   });
 
   it("never sends a disabled notice through another channel", () => {
     const notice = teamNoticeByKey("TASK_REMINDER")!;
-    expect(decideTeamNotice(notice, { enabled: false, channel: "company_number", freeMessageId: null }, number, now)).toEqual({ action: "skip", reason: "disabled" });
-    expect(decideTeamNotice(notice, { enabled: false, channel: "meta", freeMessageId: null }, null, now)).toEqual({ action: "skip", reason: "disabled" });
+    expect(decideTeamNotice(notice, { enabled: false, channel: "company_number", freeMessageIds: [] }, number, now)).toEqual({ action: "skip", reason: "disabled" });
+    expect(decideTeamNotice(notice, { enabled: false, channel: "meta", freeMessageIds: [] }, null, now)).toEqual({ action: "skip", reason: "disabled" });
   });
 
   it("sends a notice set to Meta through Meta only, even with the company number connected", () => {
-    const meta = { enabled: true, channel: "meta" as const, freeMessageId: null };
+    const meta = { enabled: true, channel: "meta" as const, freeMessageIds: [] };
     for (const key of ["LEAD_OFFER", "LEAD_ASSIGNMENT", "LEAD_ASSIGNMENT_CONFIRMED", "LEAD_ASSIGNMENT_EXPIRED", "DUTY_PRESENCE_CONFIRMATION"]) {
       expect(decideTeamNotice(teamNoticeByKey(key)!, meta, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: null });
     }
@@ -101,7 +101,7 @@ describe("team notice decision", () => {
 
   it("goes by the company number and falls back to Meta when it is down, paused or banned", () => {
     const notice = teamNoticeByKey("LEAD_ASSIGNMENT_CONFIRMED")!;
-    const setting = { enabled: true, channel: "company_number" as const, freeMessageId: null };
+    const setting = { enabled: true, channel: "company_number" as const, freeMessageIds: [] };
     expect(decideTeamNotice(notice, setting, number, now)).toEqual({ action: "send", primary: "company_number", wahaNumberId: "waha-1", note: null });
     expect(decideTeamNotice(notice, setting, { ...number, connected: false }, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: "company_number_unavailable" });
     expect(decideTeamNotice(notice, setting, { ...number, pausedUntil: new Date(now.getTime() + 60_000) }, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: "company_number_paused" });
@@ -110,14 +110,14 @@ describe("team notice decision", () => {
   it("sends the messages typed in the chat through the company number by default, with the channel as the only choice", () => {
     const chat = teamNoticeByKey("BROKER_CHAT")!;
     expect(chat.chat).toBe(true);
-    expect(effectiveNoticeSetting(chat, null)).toEqual({ enabled: true, channel: "company_number", freeMessageId: null });
-    expect(effectiveNoticeSetting(chat, { enabled: false, channel: "meta", freeMessageId: "x" })).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
+    expect(effectiveNoticeSetting(chat, null)).toEqual({ enabled: true, channel: "company_number", freeMessageIds: [] });
+    expect(effectiveNoticeSetting(chat, { enabled: false, channel: "meta", freeMessageIds: ["x"] })).toEqual({ enabled: true, channel: "meta", freeMessageIds: [] });
   });
 
   it("locks only the first-access invitation to Meta", () => {
     const notice = teamNoticeByKey("BROKER_WELCOME")!;
     const setting = effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" });
-    expect(setting).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
+    expect(setting).toEqual({ enabled: true, channel: "meta", freeMessageIds: [] });
     expect(decideTeamNotice(notice, setting, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: null });
   });
 
@@ -128,7 +128,7 @@ describe("team notice decision", () => {
 
   it("keeps the presence confirmation always on, Meta by default, with the company number as an option", () => {
     const notice = teamNoticeByKey("DUTY_PRESENCE_CONFIRMATION")!;
-    expect(effectiveNoticeSetting(notice, null)).toEqual({ enabled: true, channel: "meta", freeMessageId: null });
-    expect(effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" })).toEqual({ enabled: true, channel: "company_number", freeMessageId: null });
+    expect(effectiveNoticeSetting(notice, null)).toEqual({ enabled: true, channel: "meta", freeMessageIds: [] });
+    expect(effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" })).toEqual({ enabled: true, channel: "company_number", freeMessageIds: [] });
   });
 });

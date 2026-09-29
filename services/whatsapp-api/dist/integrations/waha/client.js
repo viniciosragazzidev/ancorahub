@@ -421,9 +421,19 @@ export class WahaClient {
     /**
      * Envia uma mensagem de texto via WAHA.
      * Retorna o providerMessageId se sucesso.
+     *
+     * `typingMs` mostra "digitando…" por esse tempo antes do envio, como uma
+     * pessoa faria. Falha ao mostrar o "digitando" nunca impede o envio.
      */
-    async sendText(sessionName, chatId, text) {
+    async sendText(sessionName, chatId, text, options = {}) {
         const resolvedChatId = await this.resolveChatId(sessionName, chatId);
+        if (options.typingMs && options.typingMs > 0) {
+            const presence = { session: sessionName, chatId: resolvedChatId };
+            const headers = { "content-type": "application/json" };
+            await this.request("/api/startTyping", { method: "POST", timeoutMs: 3_000, body: presence, headers }).catch(() => undefined);
+            await new Promise((resolve) => setTimeout(resolve, options.typingMs));
+            await this.request("/api/stopTyping", { method: "POST", timeoutMs: 3_000, body: presence, headers }).catch(() => undefined);
+        }
         const result = await this.request("/api/sendText", {
             method: "POST",
             timeoutMs: 10_000,

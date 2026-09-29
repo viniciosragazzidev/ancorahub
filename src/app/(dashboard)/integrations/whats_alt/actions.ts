@@ -11,6 +11,7 @@ import { normalizeTenantChannelRouting, type TenantChannelRouting } from "@/feat
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { teamNoticeByKey, type NoticeChannel } from "@/features/team-notices/catalog";
+import { MAX_NOTICE_FREE_MESSAGES } from "@/features/team-notices/variants";
 import {
   disconnectTenantChannel,
   readTenantChannelState,
@@ -82,7 +83,7 @@ export async function saveTenantChannelRoutingAction(input: TenantChannelRouting
   }
 }
 
-export type TeamNoticeInput = { key: string; enabled: boolean; channel: NoticeChannel; freeMessageId: string | null };
+export type TeamNoticeInput = { key: string; enabled: boolean; channel: NoticeChannel; freeMessageIds: string[] };
 
 /** Team notices (DEC-125): on/off, channel (Meta only or company WhatsApp) and the company-number text of each notice. */
 export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<Result<object>> {
@@ -94,9 +95,12 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
       return notice && !notice.metaOnly && (item.channel === "company_number" || item.channel === "meta");
     }).map((item) => {
       const notice = teamNoticeByKey(item.key)!;
-      return { ...item, enabled: notice.alwaysOn ? true : item.enabled, freeMessageId: notice.chat ? null : item.freeMessageId };
+      const freeMessageIds = notice.chat ? [] : [...new Set((item.freeMessageIds ?? []).filter((id) => typeof id === "string" && id))];
+      return { ...item, enabled: notice.alwaysOn ? true : item.enabled, freeMessageIds };
     });
-    const messageIds = [...new Set(rows.map((item) => item.freeMessageId).filter((id): id is string => Boolean(id)))];
+    const tooMany = rows.find((item) => item.freeMessageIds.length > MAX_NOTICE_FREE_MESSAGES);
+    if (tooMany) return { success: false, error: `Cada aviso aceita no máximo ${MAX_NOTICE_FREE_MESSAGES} textos.` };
+    const messageIds = [...new Set(rows.flatMap((item) => item.freeMessageIds))];
     if (messageIds.length) {
       const found = await getDatabase().select({ id: schema.messageTemplates.id }).from(schema.messageTemplates).where(and(
         eq(schema.messageTemplates.tenantId, context.tenantId),
@@ -110,10 +114,10 @@ export async function saveTeamNoticesAction(input: TeamNoticeInput[]): Promise<R
       for (const item of rows) {
         await tx.insert(schema.teamNoticeSettings).values({
           tenantId: context.tenantId, noticeKey: item.key, enabled: item.enabled, channel: item.channel,
-          freeMessageId: item.freeMessageId, updatedBy: context.userId, updatedAt: now,
+          freeMessageId: item.freeMessageIds[0] ?? null, freeMessageIds: item.freeMessageIds, updatedBy: context.userId, updatedAt: now,
         }).onConflictDoUpdate({
           target: [schema.teamNoticeSettings.tenantId, schema.teamNoticeSettings.noticeKey],
-          set: { enabled: item.enabled, channel: item.channel, freeMessageId: item.freeMessageId, updatedBy: context.userId, updatedAt: now },
+          set: { enabled: item.enabled, channel: item.channel, freeMessageId: item.freeMessageIds[0] ?? null, freeMessageIds: item.freeMessageIds, updatedBy: context.userId, updatedAt: now },
         });
       }
       await tx.insert(schema.auditLogs).values({

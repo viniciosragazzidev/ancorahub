@@ -2075,6 +2075,8 @@ export const wahaNumbers = pgTable(
     /** Circuit breaker: consecutive send failures and the pause they caused. */
     consecutiveFailures: integer("consecutive_failures").notNull().default(0),
     pausedUntil: timestamp("paused_until", { withTimezone: true }),
+    /** When the current phone was paired: the warm-up counts from here, not from the row's creation. */
+    connectedAt: timestamp("connected_at", { withTimezone: true }),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,
@@ -2096,6 +2098,8 @@ export const teamNoticeSettings = pgTable(
     enabled: boolean("enabled").notNull(),
     channel: text("channel", { enum: ["company_number", "meta"] }).notNull(),
     freeMessageId: text("free_message_id").references(() => messageTemplates.id, { onDelete: "set null" }),
+    /** Library messages that rotate for this notice on the company number (the first is also `freeMessageId`). */
+    freeMessageIds: jsonb("free_message_ids").$type<string[]>().notNull().default([]),
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -3004,6 +3008,8 @@ export const whatsappOutboundMessages = pgTable(
     holdReason: text("hold_reason"),
     /** Team notice this row belongs to (DEC-125), for per-notice limits. */
     noticeKey: text("notice_key"),
+    /** Which text version a company-number notice used ("builtin:2", "msg:<id>"), so the next one differs. */
+    textVariant: text("text_variant"),
     createdAt,
     updatedAt,
   },

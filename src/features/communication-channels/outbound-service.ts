@@ -22,6 +22,7 @@ import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
 import { companyNumberUsable, decideTeamNotice } from "@/features/team-notices/decision";
 import { DELIVERY_LIMITS } from "@/features/team-notices/guard";
+import { builtInNoticeVariants, localHour, type NoticeFields } from "@/features/team-notices/variants";
 import {
   evaluateNoticeRow,
   getCompanyNumberState,
@@ -288,16 +289,21 @@ export async function enqueueMetaTemplateMessage(input: {
   // (kept as 'skipped'); company number first falls back to the Meta resource
   // resolved above; Meta first keeps the company number as its fallback.
   const teamNotice = input.recipientType === "user" ? teamNoticeForPurpose(input.purpose) : null;
-  let noticeRoute: { route: DeliveryRoute; wahaNumberId: string | null; text: string | null; skipped: boolean; note: string | null } | null = null;
+  let noticeRoute: { route: DeliveryRoute; wahaNumberId: string | null; text: string | null; variant?: string; skipped: boolean; note: string | null } | null = null;
+  // Rotation seed: the idempotency key, so a re-enqueue of the same notice keeps its text.
+  const noticeText = (setting: Parameters<typeof renderTeamNoticeText>[0]["setting"]) => renderTeamNoticeText({
+    tenantId: input.tenantId, notice: teamNotice!, setting, variables,
+    builtIn: resolveNoticeTextVariants(input.purpose, variables), seed: input.idempotencyKey, recipientId: input.recipientId ?? null,
+  });
   if (teamNotice) {
     const [setting, number] = await Promise.all([getTeamNoticeSetting(input.tenantId, teamNotice), getCompanyNumberState(input.tenantId)]);
     const decision = decideTeamNotice(teamNotice, setting, number, new Date());
     if (decision.action === "skip") {
       noticeRoute = { route: "meta_only", wahaNumberId: null, text: null, skipped: true, note: "disabled" };
     } else if (decision.primary === "company_number") {
-      const text = await renderTeamNoticeText({ tenantId: input.tenantId, notice: teamNotice, setting, variables, builtIn: resolveTemplateTextBody(input.purpose, variables) });
-      noticeRoute = text
-        ? { route: "waha_direct", wahaNumberId: decision.wahaNumberId, text, skipped: false, note: null }
+      const rendered = await noticeText(setting);
+      noticeRoute = rendered
+        ? { route: "waha_direct", wahaNumberId: decision.wahaNumberId, text: rendered.text, variant: rendered.variant, skipped: false, note: null }
         : { route: "meta_only", wahaNumberId: null, text: null, skipped: false, note: "empty_company_text" };
     } else {
       noticeRoute = decision.wahaNumberId
@@ -337,8 +343,8 @@ export async function enqueueMetaTemplateMessage(input: {
   } : null);
   if (!primary && noticeRoute?.route === "meta_then_waha") {
     // Meta has nothing approved for this notice: the company number carries it.
-    const text = await renderTeamNoticeText({ tenantId: input.tenantId, notice: teamNotice!, setting: await getTeamNoticeSetting(input.tenantId, teamNotice!), variables, builtIn: resolveTemplateTextBody(input.purpose, variables) });
-    if (text) noticeRoute = { route: "waha_direct", wahaNumberId: noticeRoute.wahaNumberId, text, skipped: false, note: "meta_template_missing" };
+    const rendered = await noticeText(await getTeamNoticeSetting(input.tenantId, teamNotice!));
+    if (rendered) noticeRoute = { route: "waha_direct", wahaNumberId: noticeRoute.wahaNumberId, text: rendered.text, variant: rendered.variant, skipped: false, note: "meta_template_missing" };
   }
   const primaryResolved = primary ?? (noticeRoute?.route === "waha_direct" && noticeRoute.text
     ? { type: "text" as const, templateName: "__text__", templateLanguage: "pt_BR", renderedBody: noticeRoute.text }
@@ -355,6 +361,7 @@ export async function enqueueMetaTemplateMessage(input: {
     id, tenantId: input.tenantId, channelId: channel?.id ?? null,
     deliveryRoute: noticeRoute ? noticeRoute.route : tenantChannel ? "waha_direct" : delivery.route,
     holdReason: noticeRoute?.note ?? null,
+    textVariant: noticeRoute?.route === "waha_direct" ? noticeRoute.variant ?? null : null,
     wahaNumberId: noticeRoute ? noticeRoute.wahaNumberId : tenantChannel?.wahaNumberId ?? delivery.wahaNumberId,
     noticeKey: teamNotice?.key ?? null,
     recipientType: input.recipientType, recipientId: input.recipientId ?? null,
@@ -475,8 +482,70 @@ export async function enqueueMetaTextMessage(input: {
   return { id, status: "queued" as const, duplicate: false };
 }
 
+function textBaseUrl() {
+  return process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || "https://crm.ancorasaude.cloud";
+}
+
+/** The values a team notice's text shows, read from the outbox variables (same order as the Meta template). */
+function noticeTextFields(purpose: string, rawVariables: string[], urlButtonParameter?: string): NoticeFields | null {
+  const baseUrl = textBaseUrl();
+  if (purpose === "brokerAccountActivated") {
+    return {
+      purpose,
+      name: rawVariables[0]?.trim() || "Corretor(a)",
+      company: rawVariables[1]?.trim() || "Âncora",
+      loginUrl: rawVariables[2]?.trim() || process.env.CRM_LOGIN_URL?.trim() || "https://crm.ancorasaude.cloud/login",
+    };
+  }
+  if (purpose === "brokerLeadNotification" || purpose === "newLeadAssignment") {
+    const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
+    const leadId = urlButtonParameter || split.urlButtonParameter;
+    return {
+      purpose,
+      broker: split.bodyVariables[1] || rawVariables[1] || "Corretor(a)",
+      lead: split.bodyVariables[2] || rawVariables[2] || "Cliente",
+      product: split.bodyVariables[3] || rawVariables[3] || "Plano de saúde",
+      link: leadId ? `${baseUrl}/leads/${leadId}` : null,
+    };
+  }
+  if (purpose === "leadAssignmentConfirmed") {
+    const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
+    const leadId = urlButtonParameter || split.urlButtonParameter;
+    return {
+      purpose,
+      broker: split.bodyVariables[0] || rawVariables[0] || "Corretor(a)",
+      lead: split.bodyVariables[1] || rawVariables[1] || "Cliente",
+      phone: split.bodyVariables[2] || rawVariables[2] || "",
+      interest: split.bodyVariables[3] || rawVariables[3] || "Plano de Saúde",
+      leadType: split.bodyVariables[4] || rawVariables[4] || "Individual",
+      dependents: split.bodyVariables[5] || rawVariables[5] || "0",
+      city: split.bodyVariables[6] || rawVariables[6] || "Não informada",
+      link: leadId ? `${baseUrl}/conversas?lead=${leadId}` : null,
+    };
+  }
+  if (purpose === "taskReminder") {
+    return { purpose, name: rawVariables[0] || "Usuário", task: rawVariables[1] || "Tarefa agendada", when: rawVariables[2] || "Hoje" };
+  }
+  if (purpose === "leadAssignmentUnavailable" || purpose === "leadAssignmentExpired") {
+    return { purpose, broker: rawVariables[0] || "Corretor(a)" };
+  }
+  if (purpose === "dutyPresenceConfirmation") {
+    const confirmationId = urlButtonParameter || rawVariables[2]?.trim() || "";
+    return {
+      purpose,
+      broker: rawVariables[0]?.trim() || "Corretor(a)",
+      hour: rawVariables[1]?.trim() || "",
+      link: confirmationId ? `${baseUrl}/confirm_presence?id=${confirmationId}` : null,
+    };
+  }
+  if (purpose === "leadFeedbackReminder") {
+    return { purpose, broker: rawVariables[0]?.trim() || "Corretor(a)", lead: rawVariables[1]?.trim() || "seu lead" };
+  }
+  return null;
+}
+
 export function resolveTemplateTextBody(purpose: string, rawVariables: string[], urlButtonParameter?: string): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL?.trim() || process.env.APP_URL?.trim() || "https://crm.ancorasaude.cloud";
+  const baseUrl = textBaseUrl();
 
   if (purpose === "brokerInvitation") {
     const nome = rawVariables[0]?.trim() || "Corretor(a)";
@@ -487,53 +556,9 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     return `Olá *${nome}*! 👋\n\nVocê recebeu um convite para criar seu acesso no sistema *${empresa}*.\n\nAcesse o link abaixo para definir sua senha e entrar no sistema:\n${link}\n\n_Este link é individual e seguro._`;
   }
 
-  if (purpose === "brokerAccountActivated") {
-    const nome = rawVariables[0]?.trim() || "Corretor(a)";
-    const empresa = rawVariables[1]?.trim() || "Âncora";
-    const loginUrl = rawVariables[2]?.trim() || process.env.CRM_LOGIN_URL?.trim() || "https://crm.ancorasaude.cloud/login";
-    return `Olá *${nome}*! 👋\n\nSua conta no *${empresa}* foi ativada com sucesso.\n\nAcesse o CRM pelo link:\n${loginUrl}`;
-  }
-
-  if (purpose === "brokerLeadNotification") {
-    const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
-    const corretorNome = split.bodyVariables[1] || rawVariables[1] || "Corretor(a)";
-    const leadNome = split.bodyVariables[2] || rawVariables[2] || "Cliente";
-    const produto = split.bodyVariables[3] || rawVariables[3] || "Plano de saúde";
-    const leadId = urlButtonParameter || split.urlButtonParameter;
-    const link = leadId ? `\n\n👉 *Acesse no CRM:* ${baseUrl}/leads/${leadId}` : "";
-    return `⚡ *Novo Lead Atribuído!*\n\nOlá *${corretorNome}*, um novo lead foi atribuído a você:\n\n👤 *Cliente:* ${leadNome}\n🏥 *Interesse:* ${produto}${link}`;
-  }
-
-  if (purpose === "leadAssignmentConfirmed") {
-    const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
-    const brokerName = split.bodyVariables[0] || rawVariables[0] || "Corretor(a)";
-    const leadNome = split.bodyVariables[1] || rawVariables[1] || "Cliente";
-    const leadPhone = split.bodyVariables[2] || rawVariables[2] || "";
-    const interesse = split.bodyVariables[3] || rawVariables[3] || "Plano de Saúde";
-    const leadType = split.bodyVariables[4] || rawVariables[4] || "Individual";
-    const dependentes = split.bodyVariables[5] || rawVariables[5] || "0";
-    const cidade = split.bodyVariables[6] || rawVariables[6] || "Não informada";
-    const leadId = urlButtonParameter || split.urlButtonParameter;
-    const link = leadId ? `\n\n👉 *Abrir conversa:* ${baseUrl}/conversas?lead=${leadId}` : "";
-    return `✅ *Atribuição Confirmada*\n\nOlá *${brokerName}*, você assumiu o atendimento de *${leadNome}*.\n\n📞 *Telefone:* ${leadPhone}\n📋 *Tipo:* ${leadType}\n🏥 *Interesse:* ${interesse}\n👥 *Dependentes:* ${dependentes}\n📍 *Cidade:* ${cidade}${link}`;
-  }
-
-  if (purpose === "newLeadAssignment") {
-    const split = splitMetaWhatsAppTemplateVariables(purpose, rawVariables);
-    const brokerName = split.bodyVariables[1] || rawVariables[1] || "Corretor(a)";
-    const leadNome = split.bodyVariables[2] || rawVariables[2] || "Cliente";
-    const produto = split.bodyVariables[3] || rawVariables[3] || "Plano de saúde";
-    const leadId = urlButtonParameter || split.urlButtonParameter;
-    const link = leadId ? `\n\n👉 *Aceitar o lead:* ${baseUrl}/leads/${leadId}` : "";
-    return `🚨 *Novo Lead Disponível!*\n\nOlá *${brokerName}*, o lead *${leadNome}* está disponível para atendimento.\n\n🏥 *Interesse:* ${produto}${link}`;
-  }
-
-  if (purpose === "taskReminder") {
-    const nome = rawVariables[0] || "Usuário";
-    const tarefa = rawVariables[1] || "Tarefa agendada";
-    const dataHora = rawVariables[2] || "Hoje";
-    return `⏰ *Lembrete de Tarefa*\n\nOlá *${nome}*, você tem uma tarefa pendente:\n📌 *${tarefa}*\n📅 *Horário:* ${dataHora}`;
-  }
+  // Team notices: the original wording is version 0 of the rotation.
+  const fields = noticeTextFields(purpose, rawVariables, urlButtonParameter);
+  if (fields) return builtInNoticeVariants(fields, 12)[0]!;
 
   if (purpose === "clientNotice") {
     const nome = rawVariables[0] || "Cliente";
@@ -546,31 +571,16 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     return `Olá *${nome}*! 👋\n\nSomos da equipe de atendimento. Como podemos te ajudar a encontrar o melhor plano de saúde hoje?`;
   }
 
-  if (purpose === "leadAssignmentUnavailable") {
-    const brokerName = rawVariables[0] || "Corretor(a)";
-    return `ℹ️ *Aviso de Atribuição*\n\nOlá *${brokerName}*, este lead já foi atribuído a outro corretor ou expirou.`;
-  }
-
-  if (purpose === "dutyPresenceConfirmation") {
-    const brokerName = rawVariables[0]?.trim() || "Corretor(a)";
-    const hour = rawVariables[1]?.trim() || "";
-    const confirmationId = urlButtonParameter || rawVariables[2]?.trim() || "";
-    const link = confirmationId ? `\n\n👉 *Confirmar presença:* ${baseUrl}/confirm_presence?id=${confirmationId}` : "";
-    return `📅 *Confirme seu plantão*\n\nOlá *${brokerName}*, seu plantão começa${hour ? ` às *${hour}*` : " em breve"}. Confirme que está disponível para receber leads.${link}`;
-  }
-
-  if (purpose === "leadFeedbackReminder") {
-    const brokerName = rawVariables[0]?.trim() || "Corretor(a)";
-    const leadName = rawVariables[1]?.trim() || "seu lead";
-    return `📝 *Registre o atendimento*\n\nOlá *${brokerName}*, falta registrar o feedback do atendimento de *${leadName}* no CRM.`;
-  }
-
-  if (purpose === "leadAssignmentExpired") {
-    const brokerName = rawVariables[0] || "Corretor(a)";
-    return `⏳ *Tempo Expirado*\n\nOlá *${brokerName}*, o tempo para aceitar o lead expirou e a oportunidade foi repassada.`;
-  }
-
   return rawVariables.filter(Boolean).join("\n") || "Notificação Âncora CRM";
+}
+
+/**
+ * Every built-in wording of a team notice for the company number (rotation
+ * against identical runs); other purposes have only their single text.
+ */
+export function resolveNoticeTextVariants(purpose: string, rawVariables: string[], now = new Date()): string[] {
+  const fields = noticeTextFields(purpose, rawVariables);
+  return fields ? builtInNoticeVariants(fields, localHour(now)) : [resolveTemplateTextBody(purpose, rawVariables)];
 }
 
 type OutboundRow = typeof schema.whatsappOutboundMessages.$inferSelect;
@@ -631,14 +641,18 @@ async function sendNoticeByCompanyNumber(row: OutboundRow, metaError: unknown, e
   const now = new Date();
   if (!number || !companyNumberUsable({ id: number.id, connected: TENANT_CHANNEL_CONNECTED_STATUSES.includes(number.status), pausedUntil: number.pausedUntil }, now).usable) return false;
   const variables = stringList(row.variables);
-  const text = await renderTeamNoticeText({ tenantId: row.tenantId, notice, setting: await getTeamNoticeSetting(row.tenantId, notice), variables, builtIn: resolveTemplateTextBody(row.purpose, variables) });
-  if (!text) return false;
+  const rendered = await renderTeamNoticeText({
+    tenantId: row.tenantId, notice, setting: await getTeamNoticeSetting(row.tenantId, notice), variables,
+    builtIn: resolveNoticeTextVariants(row.purpose, variables), seed: row.idempotencyKey, recipientId: row.recipientId,
+  });
+  if (!rendered) return false;
+  const text = rendered.text;
   if (!await takeCompanySlot(number.id, notice.key, exact)) return false;
   try {
-    const sentByWaha = await sendWahaRelayMessage({ idempotencyKey: `${row.idempotencyKey}:company`, sessionId: number.relaySessionId, destination: row.destinationPhone.replace(/\D/g, ""), body: text });
+    const sentByWaha = await sendWahaRelayMessage({ idempotencyKey: `${row.idempotencyKey}:company`, sessionId: number.relaySessionId, destination: row.destinationPhone.replace(/\D/g, ""), body: text, humanize: true });
     const reason = metaError instanceof Error ? metaError.message.slice(0, 120) : "Meta indisponível";
     await db.update(schema.whatsappOutboundMessages).set({
-      status: "sent", deliveryRoute: "waha_direct", renderedBody: text, providerMessageId: sentByWaha.messageId,
+      status: "sent", deliveryRoute: "waha_direct", renderedBody: text, textVariant: rendered.variant, providerMessageId: sentByWaha.messageId,
       providerErrorCode: null, providerErrorMessage: `Meta não enviou (${reason}); enviado pelo WhatsApp da empresa.`,
       holdReason: null, sentAt: now, updatedAt: now,
     }).where(eq(schema.whatsappOutboundMessages.id, row.id));
@@ -760,6 +774,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
             sessionId: tenantNumber.relaySessionId,
             destination: row.destinationPhone.replace(/\D/g, ""),
             body: row.renderedBody!,
+            humanize: true,
           });
           await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId: sentByWaha.messageId, providerErrorCode: null, providerErrorMessage: null, holdReason: null, sentAt: new Date(), updatedAt: new Date() })
             .where(eq(schema.whatsappOutboundMessages.id, row.id));
@@ -779,6 +794,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
             deliveryRoute: "meta_only",
             wahaNumberId: null,
             providerErrorMessage: "Número da empresa indisponível; enviado pela API oficial Meta.",
+            textVariant: null,
             updatedAt: new Date(),
           }).where(eq(schema.whatsappOutboundMessages.id, row.id));
         }

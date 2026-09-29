@@ -70,6 +70,13 @@ function requireInternalAuth(request, reply, token) {
     }
     return true;
 }
+/**
+ * Quanto tempo o "digitando…" fica visível: cresce com o texto, entre 2s e
+ * 6s, com até 1s de variação para que dois envios nunca tenham o mesmo ritmo.
+ */
+export function humanTypingMs(text, random = Math.random()) {
+    return Math.min(2_000 + text.length * 25, 6_000) + Math.floor(random * 1_000);
+}
 export function buildApp() {
     const app = Fastify({
         logger: {
@@ -1076,6 +1083,7 @@ export function buildApp() {
                     chatId: { type: "string", minLength: 10, maxLength: 20 },
                     text: { type: "string", minLength: 1, maxLength: 4000 },
                     idempotencyKey: { type: "string", minLength: 16, maxLength: 160 },
+                    humanize: { type: "boolean" },
                 },
             },
             response: {
@@ -1101,7 +1109,7 @@ export function buildApp() {
         catch {
             return reply.code(503).send({ ok: false, error: "WAHA_INTERNAL_ERROR" });
         }
-        const { sessionName, chatId, text, idempotencyKey } = request.body;
+        const { sessionName, chatId, text, idempotencyKey, humanize } = request.body;
         // Validate chatId format (digits only, 10-15 chars)
         if (!/^\d{10,15}$/.test(chatId)) {
             return reply.code(400).send({ ok: false, error: "INVALID_CHAT_ID" });
@@ -1125,7 +1133,9 @@ export function buildApp() {
             // O client resolve o telefone para o chatId canônico do WAHA (inclusive
             // @lid) antes de enviar. Não force @c.us aqui: algumas contas WebJS
             // recusam esse formato com "No LID for user".
-            const result = await client.sendText(sessionName, chatId, text);
+            // Envios automáticos do número da empresa mostram "digitando…" antes,
+            // como uma pessoa. Envios manuais do corretor não pedem (humanize ausente).
+            const result = await client.sendText(sessionName, chatId, text, humanize ? { typingMs: humanTypingMs(text) } : {});
             const durationMs = Date.now() - startedAt;
             request.log.info({
                 operation: "waha.message.send",

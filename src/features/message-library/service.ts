@@ -34,7 +34,7 @@ const eventLabel = (key: string) => getMessageEventByKey(key)?.label ?? key;
 export async function getMessageUsages(tenantId: string) {
   const db = getDatabase();
   const [notices, legacyRouting, policies, templateUsages, followUps] = await Promise.all([
-    db.select({ key: schema.teamNoticeSettings.noticeKey, freeMessageId: schema.teamNoticeSettings.freeMessageId, enabled: schema.teamNoticeSettings.enabled })
+    db.select({ key: schema.teamNoticeSettings.noticeKey, freeMessageId: schema.teamNoticeSettings.freeMessageId, freeMessageIds: schema.teamNoticeSettings.freeMessageIds, enabled: schema.teamNoticeSettings.enabled })
       .from(schema.teamNoticeSettings).where(eq(schema.teamNoticeSettings.tenantId, tenantId)),
     getTenantChannelRouting(tenantId),
     db.select({ eventKey: schema.communicationEventMessagePolicies.eventKey, metaTemplateId: schema.communicationEventMessagePolicies.metaTemplateId, freeMessageId: schema.communicationEventMessagePolicies.freeMessageTemplateId })
@@ -52,7 +52,8 @@ export async function getMessageUsages(tenantId: string) {
   const usages = new Map<string, MessageUsage[]>();
   const noticeKeysWithRow = new Set(notices.map((notice) => notice.key));
   for (const notice of notices) {
-    push(usages, notice.freeMessageId, { area: "team_notice", label: `Aviso da equipe: ${teamNoticeByKey(notice.key)?.label ?? notice.key}${notice.enabled ? "" : " (desligado)"}` });
+    const ids = notice.freeMessageIds.length ? notice.freeMessageIds : [notice.freeMessageId];
+    for (const id of ids) push(usages, id, { area: "team_notice", label: `Aviso da equipe: ${teamNoticeByKey(notice.key)?.label ?? notice.key}${notice.enabled ? "" : " (desligado)"}` });
   }
   // Company-number routing saved before the team notices existed still counts until the notice is saved.
   for (const [key, messageId] of Object.entries(legacyRouting.events)) {
