@@ -1,5 +1,13 @@
 # Controle de Execução do Redesign
 
+## 2026-09-29 — Linha inteira da lista de leads abre o sheet
+
+Refinamento pontual da etapa UX-1E: o papel é operação comercial, a ação
+principal é inspecionar um lead e os controles internos permanecem independentes.
+Toda a linha da tabela de `/leads` abre o sheet compartilhado; checkbox, botões e
+links não propagam a ação da linha. Registro:
+`docs/implementations/completed/2026-09-29-leads-row-click-sheet.md`.
+
 ## 2026-09-29 — Drawer de lead no plantão
 
 Refinamento pontual do detalhe do plantão: o papel é operação de distribuição,

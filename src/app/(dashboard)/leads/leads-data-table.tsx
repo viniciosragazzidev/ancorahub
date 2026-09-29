@@ -70,6 +70,11 @@ export function LeadsDataTable({
     [leads, onRowClick]
   );
 
+  const handleRowClick = React.useCallback((row: LeadRow) => {
+    const original = leads.find((lead) => lead.id === row.id);
+    if (original) onRowClick?.(original);
+  }, [leads, onRowClick]);
+
   const pageCount = pagination?.totalPages ?? 1;
 
   const { table, isPending } = useDataTable({
@@ -97,6 +102,7 @@ export function LeadsDataTable({
   return (
     <DataTable
       table={table}
+      onRowClick={onRowClick ? handleRowClick : undefined}
       getRowClassName={(row) => (row.returnedUnaccepted ? "bg-warning/10 hover:bg-warning/15" : undefined)}
       isPending={isPending}
       actionBar={
@@ -176,6 +182,11 @@ export function QualifyingLeadsDataTable({
     [leads, onOpen]
   );
 
+  const handleRowClick = React.useCallback((row: LeadRow) => {
+    const original = leads.find((lead) => lead.id === row.id);
+    if (original) onOpen?.(original);
+  }, [leads, onOpen]);
+
   const { table, isPending } = useDataTable({
     data: tableData,
     columns,
@@ -197,6 +208,7 @@ export function QualifyingLeadsDataTable({
   return (
     <DataTable
       table={table}
+      onRowClick={onOpen ? handleRowClick : undefined}
       getRowClassName={(row) => (row.returnedUnaccepted ? "bg-warning/10 hover:bg-warning/15" : undefined)}
       isPending={isPending}
     />

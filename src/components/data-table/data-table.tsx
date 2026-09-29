@@ -28,6 +28,7 @@ interface DataTableProps<TData> extends React.HTMLAttributes<HTMLDivElement> {
   headerClassName?: string;
   isPending?: boolean;
   getRowClassName?: (row: TData) => string | undefined;
+  onRowClick?: (row: TData) => void;
 }
 
 export function DataTable<TData>({
@@ -39,6 +40,7 @@ export function DataTable<TData>({
   headerClassName,
   isPending = false,
   getRowClassName,
+  onRowClick,
   ...props
 }: DataTableProps<TData>) {
   return (
@@ -85,7 +87,8 @@ export function DataTable<TData>({
                     data-state={row.getIsSelected() && "selected"}
                     className={cn(dataTableStyles.row, "cursor-pointer", getRowClassName?.(row.original))}
                     onClick={() => {
-                      table.options.meta?.onRowClick?.(row.original);
+                      onRowClick?.(row.original);
+                      if (!onRowClick) table.options.meta?.onRowClick?.(row.original);
                     }}
                   >
                     {row.getVisibleCells().map((cell) => (
@@ -96,8 +99,8 @@ export function DataTable<TData>({
                         }}
                         className={cn(dataTableStyles.cell, "text-xs")}
                         onClick={(e) => {
-                          // Prevent triggering row click when clicking on checkboxes or action buttons
-                          if ((e.target as HTMLElement).closest("button, input, [role='checkbox']")) {
+                          // Keep controls and navigation links independent from the row action.
+                          if ((e.target as HTMLElement).closest("button, input, a, [role='checkbox']")) {
                             e.stopPropagation();
                           }
                         }}
