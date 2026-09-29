@@ -1,5 +1,12 @@
 # Controle de Execução do Redesign
 
+## 2026-09-29 — Exportação estruturada do plantão
+
+Refinamento pontual da operação de distribuição: Diretor/Gestor exportam a lista
+do plantão em `.xlsx` usando a estrutura da planilha de referência. A ação fica
+ao lado do PDF, preserva o escopo e registra auditoria. Registro:
+`docs/implementations/completed/2026-09-29-plantao-export-spreadsheet.md`.
+
 ## 2026-09-29 — Linha inteira da lista de leads abre o sheet
 
 Refinamento pontual da etapa UX-1E: o papel é operação comercial, a ação

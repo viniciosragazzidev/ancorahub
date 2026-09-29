@@ -168,6 +168,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     ? await db
       .select({
         id: schema.leads.id,
+        externalId: schema.leads.externalId,
         nome: schema.leads.nome,
         telefone: schema.leads.telefone,
         email: schema.leads.email,
