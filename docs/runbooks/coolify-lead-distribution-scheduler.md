@@ -22,8 +22,8 @@ curl --fail --silent --show-error \
 legado `/api/internal/cron/distribution` continua disponível para schedulers já
 publicados, mas novas tarefas devem usar o caminho canônico acima.
 
-Não mantenha Vercel Cron e Coolify Scheduled Task ativos ao mesmo tempo. O job é
-idempotente, mas deve existir uma única fonte de agendamento por ambiente.
+O job é idempotente, mas deve existir uma única Scheduled Task por ambiente. Lista
+completa das tarefas: `coolify-scheduled-tasks.md`.
 
 ## Confirmação
 

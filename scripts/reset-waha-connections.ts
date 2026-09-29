@@ -15,7 +15,6 @@
  * Env necessários (presentes em .env.local):
  *   DATABASE_URL, VPS_API_URL, VPS_INTERNAL_API_TOKEN
  */
-import { readFileSync } from "node:fs";
 
 import { loadEnvConfig } from "@next/env";
 import { drizzle } from "drizzle-orm/postgres-js";
@@ -27,21 +26,7 @@ import * as schema from "../src/shared/db/schema";
 if (!process.env.SUPABASE_DB_URL?.trim() && !process.env.DATABASE_URL?.trim()) {
   loadEnvConfig(process.cwd());
 }
-// O DATABASE_URL de produção fica em .env.vercel.prod (não padrão do Next);
-// como fallback final, parseia esse arquivo.
-if (!process.env.DATABASE_URL?.trim()) {
-  try {
-    const raw = readFileSync(".env.vercel.prod", "utf8");
-    for (const line of raw.split(/\r?\n/)) {
-      const match = /^([A-Z0-9_]+)=(.*)$/.exec(line.trim());
-      if (match && !process.env[match[1]]?.trim()) {
-        process.env[match[1]] = match[2].replace(/^"|"$/g, "");
-      }
-    }
-  } catch {
-    // arquivo ausente — o erro de env obrigatória abaixo será reportado
-  }
-}
+// Produção: rode com DATABASE_URL (ou SUPABASE_DB_URL) do ambiente do Coolify.
 
 async function main() {
   const apply = process.argv.includes("--apply");

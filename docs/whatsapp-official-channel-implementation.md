@@ -21,7 +21,8 @@ em payload de navegador.
 - `sendMetaCloudTemplate` envia apenas modelos aprovados pelo catálogo interno.
 - `/api/internal/jobs/whatsapp` processa lotes pequenos com limite, tentativas,
   backoff e mensagens de erro seguras. O cron diário é apenas recuperação de
-  contingência no Vercel Hobby; processamento frequente exige worker/cron externo.
+  contingência; o processamento frequente é a Scheduled Task do Coolify
+  (`docs/runbooks/coolify-scheduled-tasks.md`).
 - O webhook Meta atualiza estados de entrega sem confiar em tenant enviado pela
   Meta: primeiro resolve o `phone_number_id` associado ao canal.
 - Operações de conexão, ativação/desativação e enfileiramento geram auditoria.
@@ -29,7 +30,7 @@ em payload de navegador.
 ## Dependências e pendências
 
 1. Cadastrar na Meta os modelos com os nomes do catálogo antes de enviar produção.
-2. Criar um worker persistente (ou Vercel Pro/serviço externo) para processar a
+2. Criar um worker persistente (Scheduled Task do Coolify) para processar a
    fila em intervalo inferior ao cron diário.
 3. Adicionar a superfície administrativa de histórico/teste e o fluxo de convite
    de corretor depois que os modelos forem aprovados.

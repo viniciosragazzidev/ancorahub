@@ -232,7 +232,7 @@ export default async function SuperDevIntegrityPage() {
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle>Infraestrutura VPS</CardTitle>
-              <CardDescription>Conexão privada Vercel → Caddy → Fastify</CardDescription>
+              <CardDescription>Conexão privada CRM → Caddy → Fastify</CardDescription>
             </div>
             <Badge variant={vpsHealth.status === "online" ? "success" : "destructive"} className="gap-1.5">
               <span aria-hidden className={vpsHealth.status === "online" ? "size-1.5 rounded-full bg-success-foreground" : "size-1.5 rounded-full bg-destructive-foreground"} />

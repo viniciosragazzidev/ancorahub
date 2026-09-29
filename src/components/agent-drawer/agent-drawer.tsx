@@ -78,7 +78,7 @@ export function AgentDrawer() {
           isExpanded ? "w-full sm:max-w-4xl" : "w-full sm:max-w-lg"
         }`}
       >
-        {/* Vercel-style Header with Dotted Canvas Background */}
+        {/* Header with dotted canvas background */}
         <div className="relative border-b border-border/80 bg-muted/20 overflow-hidden shrink-0">
           {/* Dotted Canvas Background */}
           <div
@@ -223,7 +223,7 @@ export function AgentDrawer() {
           )}
         </div>
 
-        {/* Input Box Footer (Vercel Style) */}
+        {/* Input box footer */}
         <div className="p-4 border-t border-border/80 bg-background space-y-2 shrink-0">
           <form onSubmit={handleSubmit} className="relative rounded-2xl border border-border/80 bg-card p-3 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <Textarea

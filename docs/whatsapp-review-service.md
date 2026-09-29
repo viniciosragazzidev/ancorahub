@@ -41,7 +41,7 @@ No serviço Fastify:
 - `META_GRAPH_API_TIMEOUT_MS=15000`
 - `WHATSAPP_REVIEW_ENABLED=true` somente durante o teste controlado
 
-No CRM hospedado na Vercel:
+No CRM (Coolify):
 
 - `WHATSAPP_REVIEW_API_URL` (URL HTTPS privada/pública do Fastify)
 - `WHATSAPP_REVIEW_INTERNAL_TOKEN` (o mesmo segredo interno)
@@ -50,7 +50,6 @@ Nenhuma dessas variáveis usa prefixo `NEXT_PUBLIC_`.
 
 ## Implantação
 
-Vercel hospeda o CRM, mas não deve hospedar este processo Fastify de longa duração.
 Publique a pasta `services/whatsapp-api` como serviço Docker/Node separado, configure
 os segredos no provedor escolhido e disponibilize `/health` para monitoramento. Antes
 da gravação, configure o domínio do serviço no CRM, habilite a capacidade global e use

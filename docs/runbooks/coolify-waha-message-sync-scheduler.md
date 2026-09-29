@@ -21,8 +21,8 @@ curl --fail --silent --show-error \
 ```
 
 Configure no serviço CRM e na tarefa o mesmo `CRON_SECRET`. `CRM_CRON_URL` deve
-ser a URL privada/HTTPS do frontend, sem depender de Vercel. A tarefa do Coolify
-é a única fonte de agendamento; não mantenha um cron Vercel concorrente.
+ser a URL privada/HTTPS do frontend. A tarefa do Coolify é a única fonte de
+agendamento (lista completa: `coolify-scheduled-tasks.md`).
 
 ## Resultado esperado
 

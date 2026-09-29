@@ -36,7 +36,7 @@ Medir em produção e em dados sintéticos; metas não substituem evidência.
 ## Jobs, webhooks e integrações
 
 - Cada job tem lock/idempotency key, timeout, retry limitado, backoff e dead-letter/registro de falha.
-- Não assumir que Vercel Hobby executa cron a cada poucos minutos; capacidades dependentes de frequência ficam documentadas e monitoradas.
+- Jobs agendados são Scheduled Tasks do Coolify (`docs/runbooks/coolify-scheduled-tasks.md`); capacidades dependentes de frequência ficam documentadas e monitoradas.
 - Webhooks retornam rapidamente, deduplicam evento externo e deixam processamento pesado para job/queue apropriado.
 - Timeout de rede, limite de payload e circuit breaker são obrigatórios em API externa.
 - Nunca fazer retry cego de operações não idempotentes.

@@ -238,7 +238,7 @@ export default async function PlatformOverviewPage() {
                 { label: "Database", value: "PostgreSQL (Neon)", status: "operational" as const },
                 { label: "Storage", value: "Supabase Storage", status: "operational" as const },
                 { label: "Auth", value: "BetterAuth", status: "operational" as const },
-                { label: "Deployment", value: "Vercel", status: "operational" as const },
+                { label: "Deployment", value: "Coolify (VPS)", status: "operational" as const },
               ].map((svc) => (
                 <div
                   key={svc.label}

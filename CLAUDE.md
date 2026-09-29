@@ -5,6 +5,13 @@
 - Estilização: Tailwind v4
 - Componentes compartilhados: `/components/ui`
 
+## Infraestrutura — REGRA OBRIGATÓRIA
+Produção roda no **Coolify** (VPS), em `https://crm.ancorasaude.cloud`. **Não usamos mais Vercel.**
+- Nunca criar `vercel.json`, crons da Vercel, scripts `vercel`, arquivos `.vercel*` ou referências a `*.vercel.app`
+- Jobs agendados são Scheduled Tasks do Coolify, documentados em `docs/runbooks/coolify-scheduled-tasks.md`; job novo entra nesse runbook
+- Variáveis de ambiente ficam no Coolify, não em arquivos locais versionados
+- A biblioteca `ai` (Vercel AI SDK) é dependência de código do agente, não hospedagem: pode continuar
+
 ## Design System — REGRA OBRIGATÓRIA
 Todo trabalho visual DEVE seguir estritamente `docs/design-system.md`.
 Nunca criar cor, radius, spacing ou tipografia fora dos tokens definidos ali.

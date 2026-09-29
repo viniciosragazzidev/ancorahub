@@ -1,0 +1,49 @@
+# Agendador Coolify — todas as tarefas agendadas do CRM
+
+## Objetivo
+
+Única fonte de agendamento dos jobs internos do CRM. Produção roda no Coolify
+(VPS); a Vercel não é mais usada e o antigo `vercel.json` foi removido. Cada job
+abaixo é uma Scheduled Task do serviço CRM no Coolify. Job novo entra nesta
+tabela.
+
+## Pré-requisitos
+
+- `CRON_SECRET` com o mesmo valor no serviço CRM e em cada tarefa.
+- Comando base de cada tarefa (troque o caminho):
+
+```sh
+curl --fail --silent --show-error \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  http://127.0.0.1:3000<caminho>
+```
+
+## Tarefas
+
+| Caminho | Frequência | O que faz | Detalhes |
+|---|---|---|---|
+| `/api/internal/jobs/whatsapp` | `* * * * *` | Outbox do WhatsApp (Meta e número da empresa): envia a fila, retentativas e avisos segurados por horário, espaçamento ou limite | Sem ele, avisos fora do horário comercial ou segurados pelo espaçamento não saem |
+| `/api/internal/jobs/distribution` | `*/2 * * * *` | Distribuição contínua de leads | `coolify-lead-distribution-scheduler.md` |
+| `/api/internal/jobs/qualification-timeout` | `*/2 * * * *` | Tempo limite da qualificação | `coolify-qualification-timeout-scheduler.md` |
+| `/api/internal/jobs/waha-sync` | `* * * * *` | Reconciliação de mensagens WAHA das conexões dos corretores | `coolify-waha-message-sync-scheduler.md` |
+| `/api/internal/jobs/lead-effects` | `* * * * *` | Efeitos pós-entrada do lead (outbox durável) | |
+| `/api/internal/jobs/purge` | `* * * * *` | Expurgo agendado de dados | |
+| `/api/internal/sla` | `*/5 * * * *` | SLA de primeiro contato: avisa gestores e diretores | |
+| `/api/internal/reminders` | `*/5 * * * *` | Lembretes de notificações | |
+| `/api/internal/jobs/meta-sync` | `*/10 * * * *` | Sincronização com a Meta | |
+| `/api/internal/jobs/waha-cadence` | `*/5 * * * *` | Cadências WAHA corporativas | Desligadas no código (`getWahaCadenceConfig`); a tarefa é opcional e hoje não envia nada |
+
+Os caminhos antigos em `/api/internal/cron/*` continuam respondendo para
+tarefas já publicadas; tarefas novas usam os caminhos acima.
+
+## Validação
+
+Cada execução saudável responde HTTP 200 com `success: true` e contadores. Após
+criar ou alterar tarefas, confira duas execuções seguidas de cada uma nos logs
+do Coolify. Mantenha uma única tarefa por caminho: duas fontes de agendamento
+para o mesmo job geram trabalho em dobro.
+
+## Rollback
+
+Desative a tarefa no Coolify. Os jobs são idempotentes: reativar retoma a fila
+sem perder itens.

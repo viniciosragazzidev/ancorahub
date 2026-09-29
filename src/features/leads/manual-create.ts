@@ -159,8 +159,8 @@ export async function createManualLead(rawInput: unknown) {
     brokerIds: corretorId ? [corretorId] : [],
   }).catch(() => undefined);
   
-  // Keep WhatsApp outbox processing inside the server action. Vercel can
-  // terminate a function immediately after returning, dropping unawaited work.
+  // Keep WhatsApp outbox processing inside the server action: a runtime may
+  // end the request right after returning, dropping unawaited work.
   void notifyLeadArrived(leadId, context.tenantId, branchId, input.nome).catch(console.error);
   void notifyNewLead(leadId, context.tenantId, branchId, corretorId, input.nome).catch((error) => {
     console.error("[createManualLead] notification delivery failed:", error);

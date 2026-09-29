@@ -20,7 +20,7 @@ O webhook não recebe `tenant_id`. Ele descobre o canal pelo `metadata.phone_num
 
 Use como referências primárias a coleção oficial [WhatsApp Business Platform da Meta no Postman](https://www.postman.com/meta/whatsapp-business-platform/folder/13382743-ba8d099d-007e-4b52-b9f2-3cf3c60e4fbc), que inclui Cloud API e Embedded Signup, e a documentação técnica hospedada pela Meta para [verificação de webhooks](https://whatsapp.github.io/WhatsApp-Nodejs-SDK/api-reference/webhooks/start/). A SDK citada está arquivada; ela é usada aqui apenas para o contrato de verificação, não como dependência do CorreTop.
 
-## 2. Configurar variáveis na Vercel
+## 2. Configurar variáveis no Coolify
 
 Cadastre estas variáveis somente em **Production**. Nunca crie `NEXT_PUBLIC_` para App Secret, verify token ou chave de cifra.
 
@@ -48,7 +48,7 @@ No produto WhatsApp do app Meta, informe:
 
 ```text
 Callback URL: https://crm.ancorasaude.cloud/api/webhooks/meta/whatsapp
-Verify Token: <o mesmo META_WHATSAPP_WEBHOOK_VERIFY_TOKEN da Vercel>
+Verify Token: <o mesmo META_WHATSAPP_WEBHOOK_VERIFY_TOKEN do Coolify>
 ```
 
 Assine inicialmente `messages`. Depois habilite `message_template_status_update`, `message_template_quality_update`, `phone_number_quality_update`, `account_alerts` e `business_capability_update` quando suas superfícies operacionais estiverem implementadas.

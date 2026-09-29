@@ -870,7 +870,7 @@ export default async function SuperAdminSettingsPage() {
                     <span>
                       <span className="font-medium">Integração oficial habilitada</span>
                       <span className="block text-xs text-muted-foreground">
-                        Exige as credenciais privadas da Meta configuradas no ambiente da Vercel.
+                        Exige as credenciais privadas da Meta configuradas no ambiente do Coolify.
                       </span>
                     </span>
                   </label>
@@ -1267,7 +1267,7 @@ export default async function SuperAdminSettingsPage() {
                 <CardTitle>Motor de Inteligência Artificial</CardTitle>
                 <CardDescription>
                   Gerencie o motor central de IA da plataforma CorreTop. Os recursos utilizam o
-                  Vercel AI SDK para streaming rápido de respostas.
+                  AI SDK (pacote `ai`) para streaming rápido de respostas.
                 </CardDescription>
               </CardHeader>
               <CardContent>
