@@ -11,10 +11,15 @@ const policy = {
 
 describe("scripted reply acknowledgement", () => {
   const memory = { ...createEmptyMemory(), customerName: { value: "Teste Lead", confidence: 1 as const }, customerFirstName: { value: "Teste", confidence: 1 as const }, collectedFields: ["customerName"] };
-  it("says \"Perfeito\" only when the customer answered something", () => {
-    expect(resolveDeterministicQualificationTurn({ memory, policy }).reply.startsWith("Perfeito, Teste.")).toBe(true);
-    expect(resolveDeterministicQualificationTurn({ memory, policy, answeredNow: true }).reply.startsWith("Perfeito, Teste.")).toBe(true);
-    expect(resolveDeterministicQualificationTurn({ memory, policy, answeredNow: false }).reply.startsWith("Perfeito")).toBe(false);
+  it("confirms only what the customer's last message answered", () => {
+    expect(resolveDeterministicQualificationTurn({ memory, policy, answered: ["customerName"] }).reply).toMatch(/^(Prazer|Obrigado), Teste! /);
+    expect(resolveDeterministicQualificationTurn({ memory, policy }).reply).toMatch(/^(Em qual|Qual a) cidade/);
+    expect(resolveDeterministicQualificationTurn({ memory, policy, answered: ["customerName"], answeredNow: false }).reply).toMatch(/^(Em qual|Qual a) cidade/);
+  });
+
+  it("renders the name and the summary in the handoff text", () => {
+    const done = { ...memory, city: { value: "Itaboraí", confidence: 1 as const }, collectedFields: ["customerName", "city"] };
+    expect(resolveDeterministicQualificationTurn({ memory: done, policy, handoffMessage: "Obrigado, {{nome}}! ({{resumo}})" }).reply).toBe("Obrigado, Teste! (Itaboraí)");
   });
 });
 

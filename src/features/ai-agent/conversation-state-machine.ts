@@ -20,7 +20,8 @@ import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/featur
 import { resolveCanonicalWhatsAppDestination } from "@/features/communication-channels/phone-resolution";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
-import { loadQuickReplyTemplates, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
+import { loadQuickReplyTemplates, matchFaqSituation, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
+import { DEFAULT_HUMAN_REQUEST_TEXT, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
@@ -1232,7 +1233,10 @@ export async function processInboundAiResponse({
     : resolvedQuickReply;
   if (quickReply.resolved) {
     const templates = await loadQuickReplyTemplates(tenantId);
-    const template = quickReply.templateKey ? templates[quickReply.templateKey] : undefined;
+    const rawTemplate = quickReply.templateKey ? templates[quickReply.templateKey] : undefined;
+    const [leadForTemplate] = await db.select({ nome: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId))).limit(1);
+    // {{nome}} and {{resumo}}: never ask again what the customer already told.
+    const template = rawTemplate ? { ...rawTemplate, body: renderConversationVariables(rawTemplate.body, currentMemory, leadForTemplate?.nome) } : undefined;
     const now = new Date();
     const suppressed = Boolean(quickReply.suppressReason);
     let deliveryStatus = suppressed ? "suppressed_cooldown" : "disabled_template";
@@ -1355,8 +1359,7 @@ export async function processInboundAiResponse({
   const tenantConfig = await loadTenantAiAgentConfig(tenantId);
 
   if (detectHumanTransferRequest(userMessageBody)) {
-    const handoffMessage = tenantConfig.handoffMessage
-      || "Claro. Vou encaminhar seu atendimento para um corretor da equipe agora.";
+    const handoffMessage = renderConversationVariables(tenantConfig.handoffMessage || DEFAULT_HUMAN_REQUEST_TEXT, updatedMemory, lead?.nome);
     const messageId = `ai_msg_handoff_${crypto.randomUUID()}`;
     await db.insert(schema.whatsappMessages).values({
       id: messageId,
@@ -1405,6 +1408,7 @@ export async function processInboundAiResponse({
   // continua responsável por validar a memória e escolher a próxima etapa.
   let aiFallbackResult: Awaited<ReturnType<typeof generateAiResponse>> | undefined;
   let fallbackAppliedCount = 0;
+  let fallbackAppliedFields: string[] = [];
   const pendingQuestionAfterExtraction = getNextQualificationQuestion(updatedMemory, behavior.policy, pastOutboundTexts);
   const expectedWasAnswered = Boolean(expectedQuestionBeforeMessage && fieldsExtractedFromCurrentMessage.includes(expectedQuestionBeforeMessage.key));
   const currentMessageAdvancedToAnotherField = Boolean(
@@ -1451,6 +1455,7 @@ export async function processInboundAiResponse({
       if (applied.applied.length > 0) {
         updatedMemory = applied.memory;
         fallbackAppliedCount = applied.applied.length;
+        fallbackAppliedFields = applied.applied.map((item) => String(item.field));
         console.info("[qualification] ai_fallback_memory_applied", {
           tenantId,
           leadId,
@@ -1491,18 +1496,33 @@ export async function processInboundAiResponse({
   }
 
   const answeredNow = fieldsExtractedFromCurrentMessage.length > 0 || fallbackAppliedCount > 0;
+  // What this message filled, for the confirmation ("Itaboraí, ótimo."). The
+  // lives implied by an individual plan were not said, so they are not echoed.
+  const answeredFields = Array.from(new Set([...fieldsExtractedFromCurrentMessage, ...fallbackAppliedFields]))
+    .filter((field) => !(field === "numberOfLives" && (updatedMemory.numberOfLives?.confidence ?? 1) < 1));
   let deterministicTurn = resolveDeterministicQualificationTurn({
     memory: updatedMemory,
     policy: behavior.policy,
     handoffMessage: tenantConfig.handoffMessage,
     pastOutboundTexts,
     answeredNow,
+    answered: answeredFields,
+    previousReply: currentMemory.lastQuestionAsked ?? null,
+    seed: `${conversation.id}:${pastOutboundTexts.size}`,
   });
-  // Lateral answer (fase 5): the customer asked something instead of answering.
-  // Answer briefly, then the script resumes; on any failure the scripted reply goes alone.
-  if (deterministicTurn.kind === "collecting" && !answeredNow && effectiveMessageKind === "text" && isCustomerQuestion(normalizedInboundMessage)) {
-    const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: updatedMemory.customerFirstName?.value ?? null });
-    if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };
+  // The customer asked something instead of answering. A common question
+  // (price, operators, waiting period, who is talking) gets its reviewed text;
+  // anything else the lateral answer. Then the pending question follows; on any
+  // failure the scripted reply goes alone.
+  if (deterministicTurn.kind === "collecting" && !answeredNow && effectiveMessageKind === "text") {
+    const faq = matchFaqSituation(normalizedInboundMessage);
+    if (faq) {
+      const faqTemplate = (await loadQuickReplyTemplates(tenantId))[faq];
+      if (faqTemplate?.active) deterministicTurn = { ...deterministicTurn, reply: `${renderConversationVariables(faqTemplate.body, updatedMemory, lead?.nome)}\n\n${deterministicTurn.reply}` };
+    } else if (isCustomerQuestion(normalizedInboundMessage)) {
+      const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: updatedMemory.customerFirstName?.value ?? null });
+      if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };
+    }
   }
   return completeDeterministicQualificationTurn({
     tenantId,

@@ -7,6 +7,13 @@ import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
 import type { ConversationMemory } from "@/features/ai-agent/memory";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { getDatabase, schema } from "@/shared/db";
+import {
+  composeQuestionReply,
+  DEFAULT_QUALIFIED_HANDOFF_TEXT,
+  renderConversationVariables,
+  wasQuestionAsked,
+  type QualificationFieldKey,
+} from "./reply-composer";
 
 export const qualificationStates = ["NOT_STARTED", "IN_PROGRESS", "QUALIFIED", "PARTIAL", "INCONCLUSIVE", "NOT_INTERESTED"] as const;
 export type QualificationState = (typeof qualificationStates)[number];
@@ -136,26 +143,6 @@ const memoryFieldByPolicyField: Record<string, keyof ConversationMemory> = {
   email: "email",
 };
 
-const clarificationByQuestionKey: Partial<Record<QualificationQuestionDefinition["key"], string>> = {
-  customerName: "Para continuar, qual é o seu nome completo?",
-  planType: "Só para confirmar: você busca um plano individual/familiar ou para empresa (PJ)?",
-  numberOfLives: "Para eu registrar corretamente, quantas pessoas serão incluídas no plano?",
-  age: "Para eu registrar corretamente, quais são as idades dos beneficiários (ou a média de idade, se for empresa)?",
-  city: "Para eu registrar corretamente, em qual cidade você pretende utilizar o plano de saúde?",
-  email: "Para eu enviar a cotação, qual é o seu melhor e-mail?",
-};
-
-function buildQualificationQuestionReply(
-  question: QualificationQuestionDefinition,
-  firstName?: string,
-  repeated = false,
-  acknowledge = true,
-) {
-  const greeting = firstName && acknowledge ? `Perfeito, ${firstName}. ` : "";
-  const text = repeated ? clarificationByQuestionKey[question.key] ?? question.text : question.text;
-  return `${greeting}${text}`;
-}
-
 export function getNextQualificationQuestion(
   memory: ConversationMemory,
   policy?: AgentBehaviorPolicy,
@@ -195,8 +182,14 @@ export function resolveDeterministicQualificationTurn(input: {
   policy: AgentBehaviorPolicy;
   handoffMessage?: string | null;
   pastOutboundTexts?: Set<string>;
-  /** false when the customer's last message answered nothing: no "Perfeito" before the question. */
+  /** false when the customer's last message answered nothing: no confirmation before the question. */
   answeredNow?: boolean;
+  /** Fields the customer's last message filled; the confirmation echoes them. */
+  answered?: string[];
+  /** The reply sent right before this one (to vary the opener and the name). */
+  previousReply?: string | null;
+  /** Stable per turn so a retry keeps the same wording. */
+  seed?: string;
 }): DeterministicQualificationTurn {
   const evaluation = evaluateQualification(input.memory, input.policy);
   const nextQuestion = getNextQualificationQuestion(input.memory, input.policy, input.pastOutboundTexts);
@@ -204,23 +197,30 @@ export function resolveDeterministicQualificationTurn(input: {
   if (!nextQuestion) {
     return {
       kind: "handoff",
-      reply: input.handoffMessage?.trim() || "Obrigado pelas informações. Vou encaminhar seu atendimento para um corretor da equipe agora.",
+      reply: renderConversationVariables(input.handoffMessage?.trim() || DEFAULT_QUALIFIED_HANDOFF_TEXT, input.memory),
       evaluation,
       nextQuestion: null,
     };
   }
 
-  const firstName = input.memory.customerFirstName?.value
-    ?? input.memory.customerName?.value?.split(/\s+/)[0];
-  const repeatedQuestion = Boolean(
-    Array.from(input.pastOutboundTexts ?? []).some((text) =>
-      text.includes(nextQuestion.text.trim().toLowerCase()),
-    ),
-  );
+  const key = nextQuestion.key as QualificationFieldKey;
+  const answered = input.answeredNow === false
+    ? []
+    : (input.answered ?? []).filter((field): field is QualificationFieldKey => field in ALL_QUESTIONS_DEFINITIONS);
+  const repeated = answered.length === 0
+    && wasQuestionAsked(key, input.memory, nextQuestion.text, input.pastOutboundTexts ?? []);
 
   return {
     kind: "collecting",
-    reply: buildQualificationQuestionReply(nextQuestion, firstName, repeatedQuestion, input.answeredNow !== false),
+    reply: composeQuestionReply({
+      key,
+      memory: input.memory,
+      answered,
+      previousReply: input.previousReply ?? input.memory.lastQuestionAsked ?? null,
+      seed: input.seed ?? `${key}:${evaluation.completedFields.length}`,
+      repeated,
+      last: evaluation.missingFields.length === 1 && (input.policy.requiredFields?.length ?? 0) >= 3,
+    }),
     evaluation,
     nextQuestion,
   };

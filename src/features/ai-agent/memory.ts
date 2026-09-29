@@ -174,6 +174,9 @@ export function isCoreQualificationComplete(memory: ConversationMemory): boolean
   );
 }
 
+/** Stored when the customer declines to give an e-mail; never saved on the lead (no "@"). */
+export const EMAIL_DECLINED = "não informado";
+
 function normalizeForMatching(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
@@ -282,6 +285,13 @@ export function extractFieldsFromMessage(
         break;
       }
     }
+  }
+
+  // An individual plan covers one person: the lives question is skipped. The
+  // confidence 0 marks it as implied, not said, so replies do not echo it.
+  if (memory.planType?.value === "individual" && !memory.numberOfLives) {
+    memory.numberOfLives = { value: "1", confidence: 0, sourceMessageId: memory.planType.sourceMessageId };
+    addCollectedField(memory, "numberOfLives");
   }
 
   // Number of lives
@@ -422,6 +432,13 @@ export function extractFieldsFromMessage(
         addCollectedField(memory, "email");
         break;
       }
+    }
+    // The e-mail is a convenience: "prefiro não informar" ends the question
+    // instead of repeating it. The lead's e-mail is only saved when it has "@".
+    const asksForEmail = /e-?mail/.test(normalizeForMatching(memory.lastQuestionAsked ?? ""));
+    if (!memory.email && asksForEmail && /^(?:(?:eu\s+)?(?:prefiro|quero)\s+nao\s+(?:informar|passar|dizer)|nao\s+(?:tenho|uso|quero\s+(?:informar|passar)|vou\s+(?:informar|passar))(?:\s+e-?mail)?|sem\s+e-?mail|pula|pular|pode\s+pular|depois\s+eu\s+(?:passo|mando))$/.test(normalizeForMatching(trimmed).replace(/[.!]+$/, ""))) {
+      memory.email = { value: EMAIL_DECLINED, confidence: 1, sourceMessageId };
+      addCollectedField(memory, "email");
     }
   }
 

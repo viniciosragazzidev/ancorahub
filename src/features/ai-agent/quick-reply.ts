@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
+import { DEFAULT_HUMAN_REQUEST_TEXT } from "@/features/qualification-engine/reply-composer";
 
 export const quickReplyIntentValues = [
   "GREETING", "CONFIRMATION", "NEGATION", "THANKS", "GOODBYE", "WAITING_FOR_RESPONSE",
@@ -122,6 +123,23 @@ export function parseOptOut(value: string | null | undefined) {
   return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse)$/.test(text) || /(nao tenho interesse|sem interesse|nao quero|nao tenho mais interesse|ja contratei|ja tenho|nao solicitei|nao pedi)/.test(text);
 }
 
+export type FaqSituation = "faq.price" | "faq.operators" | "faq.waiting_period" | "faq.who";
+
+/**
+ * Common questions asked in the middle of the qualification, answered with a
+ * reviewed text (editable per tenant as a quick reply template) before the
+ * pending question is asked again. Anything else goes to the lateral answer.
+ */
+export function matchFaqSituation(value: string | null | undefined): FaqSituation | null {
+  const text = normalizeQuickReplyText(value);
+  if (!text) return null;
+  if (/\b(carencia|carencias)\b/.test(text)) return "faq.waiting_period";
+  if (/(quanto custa|quanto fica|quanto sai|fica quanto|sai quanto|qual (?:o |a )?(?:valor|preco|mensalidade)|quais (?:os )?(?:valores|precos)|\bvalores?\b|\bprecos?\b|\bmensalidade\b)/.test(text)) return "faq.price";
+  if (/(\boperadoras?\b|\bamil\b|\bbradesco\b|sul ?america|\bunimed\b|\bhapvida\b|notre ?dame|porto seguro|\bprevent\b|golden cross|assim saude|\bleve saude\b)/.test(text)) return "faq.operators";
+  if (/(quem (?:e|esta falando|fala|ta falando)|e (?:um )?robo|e (?:um )?bot|voce e (?:humano|robo|real|uma pessoa)|e golpe|isso e golpe)/.test(text)) return "faq.who";
+  return null;
+}
+
 export function parseStartQualification(value: string | null | undefined) {
   const text = normalizeQuickReplyText(value);
   return /^(iniciar atendimento|iniciar|iniciar qualificacao|comecar|vamos la|quero iniciar)$/.test(text);
@@ -150,7 +168,9 @@ function isGoodbye(text: string) {
 export const quickReplyRules: QuickReplyRule[] = [
   { key: "opt_out", intent: "OPT_OUT", templateKey: "opt_out.confirmed", priority: 100, resolve: (input) => parseOptOut(input.body) },
   { key: "wrong_number", intent: "WRONG_NUMBER", templateKey: "wrong_number.confirmed", priority: 95, resolve: (input) => parseWrongNumber(input.body) },
-  { key: "request_human", intent: "REQUEST_HUMAN", templateKey: "human.requested", priority: 90, resolve: (input) => parseHumanRequest(input.body) },
+  // Already with (or waiting for) a person: asking again gets the reminder
+  // below instead of a second transfer and a second distribution.
+  { key: "request_human", intent: "REQUEST_HUMAN", templateKey: "human.requested", priority: 90, resolve: (input) => input.conversationState !== "WAITING_HUMAN" && input.conversationState !== "HUMAN_IN_PROGRESS" && parseHumanRequest(input.body) },
   { key: "media_received", intent: "MEDIA_RECEIVED", templateKey: "media.received", priority: 85, resolve: (input) => input.messageKind !== "text" && input.messageKind !== undefined },
   { key: "human_already_contacted", intent: "HUMAN_ALREADY_CONTACTED", templateKey: "human.already_assigned", priority: 80, resolve: (input) => input.conversationState === "HUMAN_IN_PROGRESS" },
   { key: "waiting_human", intent: "WAITING_FOR_RESPONSE", templateKey: "human.waiting_reminder", priority: 75, resolve: (input) => input.conversationState === "WAITING_HUMAN" },
@@ -240,7 +260,12 @@ export function getDefaultQuickReplyTemplates(): Record<string, QuickReplyTempla
     "human.waiting_reminder": { ruleKey: "human.waiting_reminder", templateKey: "human.waiting_reminder", body: "Sua mensagem foi recebida. Reforcei o chamado para o corretor respons\u00e1vel.", active: true },
     "conversation.returning_lead": { ruleKey: "conversation.returning_lead", templateKey: "conversation.returning_lead", body: "Ol\u00e1 novamente. Vou avisar o corretor que acompanhou seu atendimento.", active: true },
     "greeting.initial": { ruleKey: "greeting.initial", templateKey: "greeting.initial", body: "Ol\u00e1! Vou fazer algumas perguntas r\u00e1pidas para preparar seu atendimento.", active: true },
-    "human.requested": { ruleKey: "human.requested", templateKey: "human.requested", body: "Certo! Estou transferindo seu atendimento para a fila de um corretor especialista agora mesmo. Para agilizar seu atendimento, pode me informar seu nome e para quantas pessoas busca o plano?", active: true },
+    // {{nome}} and {{resumo}} come from what the customer already told; an empty one disappears with its punctuation.
+    "human.requested": { ruleKey: "human.requested", templateKey: "human.requested", body: DEFAULT_HUMAN_REQUEST_TEXT, active: true },
+    "faq.price": { ruleKey: "faq.price", templateKey: "faq.price", body: "O valor depende principalmente da idade, da cidade e do tipo de plano. Com essas respostas o corretor já te manda as opções com preço.", active: true },
+    "faq.operators": { ruleKey: "faq.operators", templateKey: "faq.operators", body: "Trabalhamos com as principais operadoras da região. O corretor vai te mostrar as que melhor atendem o seu perfil.", active: true },
+    "faq.waiting_period": { ruleKey: "faq.waiting_period", templateKey: "faq.waiting_period", body: "As carências variam por operadora e por plano, e em alguns casos dá para reduzir. O corretor te explica certinho junto com as opções.", active: true },
+    "faq.who": { ruleKey: "faq.who", templateKey: "faq.who", body: "Sou a assistente virtual da corretora e estou preparando seu atendimento para um corretor especialista.", active: true },
     "opt_out.confirmed": { ruleKey: "opt_out.confirmed", templateKey: "opt_out.confirmed", body: "Entendido. Registrei sua solicita\u00e7\u00e3o e o atendimento autom\u00e1tico ser\u00e1 interrompido.", active: true },
     "wrong_number.confirmed": { ruleKey: "wrong_number.confirmed", templateKey: "wrong_number.confirmed", body: "Entendido. Vou interromper este atendimento e sinalizar o contato para a equipe.", active: true },
     "media.received": { ruleKey: "media.received", templateKey: "media.received", body: "Recebi o arquivo. O corretor respons\u00e1vel foi avisado para verificar.", active: true },
@@ -252,9 +277,25 @@ export function getDefaultQuickReplyTemplates(): Record<string, QuickReplyTempla
   };
 }
 
+/**
+ * Former default texts. A tenant row that still holds one was saved without
+ * being customized, so the current default applies instead (the old
+ * human-request text asked again for the name and the number of people).
+ */
+const RETIRED_DEFAULT_BODIES: Record<string, readonly string[]> = {
+  "human.requested": ["Certo! Estou transferindo seu atendimento para a fila de um corretor especialista agora mesmo. Para agilizar seu atendimento, pode me informar seu nome e para quantas pessoas busca o plano?"],
+};
+
+export function isRetiredDefaultBody(ruleKey: string, body: string) {
+  return (RETIRED_DEFAULT_BODIES[ruleKey] ?? []).includes(body.trim());
+}
+
 export async function loadQuickReplyTemplates(tenantId: string) {
   const rows = await getDatabase().select({ ruleKey: schema.aiQuickReplyTemplates.ruleKey, templateKey: schema.aiQuickReplyTemplates.templateKey, body: schema.aiQuickReplyTemplates.body, active: schema.aiQuickReplyTemplates.active }).from(schema.aiQuickReplyTemplates).where(and(eq(schema.aiQuickReplyTemplates.tenantId, tenantId), eq(schema.aiQuickReplyTemplates.active, true)));
   const templates = getDefaultQuickReplyTemplates();
-  for (const row of rows) templates[row.ruleKey] = { ruleKey: row.ruleKey, templateKey: row.templateKey, body: row.body, active: row.active };
+  for (const row of rows) {
+    if (isRetiredDefaultBody(row.ruleKey, row.body)) continue;
+    templates[row.ruleKey] = { ruleKey: row.ruleKey, templateKey: row.templateKey, body: row.body, active: row.active };
+  }
   return templates;
 }

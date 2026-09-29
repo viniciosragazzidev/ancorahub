@@ -36,14 +36,10 @@ describe("E2E Qualification Flow Simulation Test", () => {
     nextQuestion = getNextQualificationQuestion(memory, policy);
     expect(nextQuestion?.key).toBe("planType");
 
-    // Step 3: User answers Q2 (planType)
+    // Step 3: User answers Q2 (planType). An individual plan is one person:
+    // the lives question is skipped and the age comes next.
     memory = extractFieldsFromMessage("Estou procurando um plano individual", memory);
     expect(memory.planType?.value).toBe("individual");
-    nextQuestion = getNextQualificationQuestion(memory, policy);
-    expect(nextQuestion?.key).toBe("numberOfLives");
-
-    // Step 4: User answers Q3 (numberOfLives)
-    memory = extractFieldsFromMessage("Seria apenas para 1 pessoa", memory);
     expect(memory.numberOfLives?.value).toBe("1");
     nextQuestion = getNextQualificationQuestion(memory, policy);
     expect(nextQuestion?.key).toBe("age");
