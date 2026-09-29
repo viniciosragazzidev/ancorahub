@@ -1,9 +1,27 @@
 # Controle de Execução do Redesign
 
+## 2026-09-29 — Drawer de lead no plantão
+
+Refinamento pontual do detalhe do plantão: o papel é operação de distribuição,
+a ação principal é inspecionar e agir sobre um lead da tabela, e os estados são
+detalhe, carregamento/fechamento e atualizações otimistas. O drawer reutiliza o
+mesmo componente de `/leads`, sem novo token, primitiva, rota ou regra de
+negócio. Registro: `docs/implementations/completed/2026-09-29-plantao-lead-details-drawer.md`.
+
+## 2026-09-29 — Funil do dashboard
+
+Refinamento pontual em `/dashboard`: o papel é gestão/corretor em leitura da
+operação, a ação principal é interpretar o fluxo de leads e os estados são
+dados, vazio e saída terminal. A área de funil agora usa o componente
+compartilhado `src/components/dashboard/funnel-chart.tsx`, sem novo token ou
+mudança de etapa. Registro: `docs/implementations/completed/2026-09-29-dashboard-funnel-chart.md`.
+
 **Atualizado em:** 2026-09-25
 **Fonte de verdade:** este documento e `UX_REDESIGN_CONTRACT.md`.
 
 ## Estado atual
+
+Hardening pontual da navegação mobile (2026-09-28): no Sheet da sidebar gerencial, Diretor/Gestor e demais papéis autorizados encontram a mesma lista de destinos em área rolável; marca e usuário ficam em uma linha, controles contextuais abaixo e Agente IA/perfil empilhados no rodapé. A ação principal é escolher uma rota. Abertura, fechamento, foco e alvos de toque seguem as primitivas compartilhadas. Não há novo token, rota ou regra de domínio; UX-M1.10 segue pendente em viewports autenticados. Registro: `docs/implementations/active/2026-09-28-mobile-sidebar-responsiveness.md`.
 
 Hardening pontual de feedback (2026-09-27): o botão compartilhado e a confirmação pública de presença exibem estado inicial, pendência, sucesso confirmado e retry após erro. Toast e badge animados passam a respeitar o controle de movimento já auditado do Super Admin e `prefers-reduced-motion`. Papel: corretor escalado; ação principal: confirmar presença; estados: pendente, confirmado e falha recuperável. Não há novo token, primitiva, rota ou regra de domínio. Plano e validação de viabilidade: `docs/ux/INTERACTION_FEEDBACK_GAMIFICATION_PLAN.md`; registro de implementação: `docs/implementations/active/2026-09-27-feedback-interaction-pilot.md`. UX-M1.10 continua pendente.
 

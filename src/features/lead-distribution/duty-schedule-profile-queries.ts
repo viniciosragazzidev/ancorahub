@@ -170,18 +170,35 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         id: schema.leads.id,
         nome: schema.leads.nome,
         telefone: schema.leads.telefone,
+        email: schema.leads.email,
+        origem: schema.leads.origem,
+        tipo: schema.leads.tipo,
+        sourceChannel: schema.leads.sourceChannel,
+        sourceCampaign: schema.leads.sourceCampaign,
+        sourceMetadata: schema.leads.sourceMetadata,
+        qualificationDetails: schema.leads.qualificationDetails,
+        qualificationState: schema.leads.qualificationState,
         status: schema.leads.status,
         distributionStatus: schema.leads.distributionStatus,
         qualificationStatus: schema.leads.qualificationStatus,
         corretorId: schema.leads.corretorId,
         brokerName: schema.user.name,
+        branchId: schema.leads.branchId,
+        branchName: schema.branches.name,
         queueId: schema.leads.queueId,
         queueName: schema.leadQueues.name,
+        queueColorHue: schema.leadQueues.colorHue,
         assignedAt: schema.leads.assignedAt,
         createdAt: schema.leads.createdAt,
+        stageEnteredAt: schema.leads.stageEnteredAt,
+        serviceStartedAt: schema.leads.serviceStartedAt,
+        firstContactAt: schema.leads.firstContactAt,
+        distributionRemovalReason: schema.leads.distributionRemovalReason,
+        distributionRemovalNote: schema.leads.distributionRemovalNote,
       })
       .from(schema.leads)
       .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
+      .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
       .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),

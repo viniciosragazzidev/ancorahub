@@ -14,7 +14,7 @@ import { getDutyScheduleProfile } from "@/features/lead-distribution/duty-schedu
 import { getDutyOccurrenceHistory } from "@/features/lead-distribution/duty-occurrence-history";
 import { firstValidShift, isSingleOccurrencePlantao } from "@/features/lead-distribution/monthly-duty-plan";
 import { getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows } from "@/features/lead-distribution/duty-presence-domain";
-import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
+import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui";
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
@@ -25,10 +25,14 @@ import { BrokerPresenceInviteButton } from "../_components/broker-presence-invit
 import { BrokerPauseButton } from "../_components/broker-pause-button";
 import { groupDutyLeadsByShift, sortByAssignmentTime } from "@/features/lead-distribution/duty-leads-shift-groups";
 import { sortByTemperaturePriority } from "@/features/lead-distribution/temperature-priority";
+import { normalizeRoutingQualificationStatus } from "@/features/lead-distribution/routing-catalog";
 import { DragScrollTable } from "@/components/ui/drag-scroll-table";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
+import { getCachedLeadsBranches, getCachedLeadsBrokers, getCachedSlaSettings } from "@/features/leads/reference-data";
+import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
+import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 
 export const dynamic = "force-dynamic";
 
@@ -150,12 +154,24 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
   const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
+  const [branches, brokers, slaSettings, managementActionsSetting, assignmentChoiceSetting] = await Promise.all([
+    getCachedLeadsBranches(context.tenantId),
+    getCachedLeadsBrokers(context.tenantId, context.role, context.branchId ?? null),
+    getCachedSlaSettings(context.tenantId),
+    getSystemSetting("feature_lead_management_actions_enabled"),
+    getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled"),
+  ]);
+  const drawerContextRole = managementActionsSetting !== "false" ? context.role : "broker";
   const returnedUnaccepted = await getReturnedUnacceptedLeadIds(context.tenantId, leads.map((lead) => lead.id));
   const canExportReport = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
 
   const isDistributed = (lead: (typeof leads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
   const distributedCount = leads.filter(isDistributed).length;
-  const waitingCount = leads.length - distributedCount;
+  // Desqualificados ficam retidos fora da distribuição automática, inclusive
+  // quando ainda estão sem corretor. Eles não devem aparecer nesta fila.
+  const isDisqualified = (lead: (typeof leads)[number]) => normalizeRoutingQualificationStatus(lead.qualificationStatus) === "disqualified";
+  const waitingLeads = leads.filter((lead) => !isDistributed(lead) && !isDisqualified(lead));
+  const waitingCount = waitingLeads.length;
   // Only two situations matter operationally here; "todos" mixed them back
   // together and hid which bucket someone was actually looking at.
   const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
@@ -164,7 +180,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // hot, then warm (or no temperature), then cold, oldest first in each.
   const visibleLeads = filter === "distribuidos"
     ? sortByAssignmentTime(leads.filter(isDistributed))
-    : sortByTemperaturePriority([...leads.filter((lead) => !isDistributed(lead))].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()));
+    : sortByTemperaturePriority([...waitingLeads].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()));
   const leadGroups = filter === "distribuidos"
     ? groupDutyLeadsByShift(visibleLeads)
     : [{ key: "ordem", label: "Ordem de distribuição · quentes, mornos e frios", leads: visibleLeads }];
@@ -279,9 +295,39 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                         </TableRow>
                         {group.leads.map((lead) => {
                           const distribution = leadDistributionStatusUi(lead.distributionStatus);
+                          const drawerLead: LeadWorkspaceItem = {
+                            id: lead.id,
+                            nome: lead.nome,
+                            telefone: lead.telefone,
+                            status: lead.status,
+                            qualificationStatus: lead.qualificationStatus ?? "",
+                            qualificationState: lead.qualificationState,
+                            distributionStatus: lead.distributionStatus,
+                            origem: lead.origem,
+                            email: lead.email,
+                            sourceChannel: lead.sourceChannel,
+                            sourceCampaign: lead.sourceCampaign,
+                            sourceMetadata: lead.sourceMetadata,
+                            tipo: lead.tipo,
+                            createdAt: lead.createdAt.toISOString(),
+                            assignedAt: lead.assignedAt?.toISOString() ?? null,
+                            stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
+                            serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
+                            firstContactAt: lead.firstContactAt?.toISOString() ?? null,
+                            corretorId: lead.corretorId,
+                            corretorNome: lead.brokerName,
+                            branchId: lead.branchId,
+                            branchName: lead.branchName,
+                            qualificationDetails: lead.qualificationDetails as Record<string, unknown> | null,
+                            queueId: lead.queueId,
+                            queueName: lead.queueName,
+                            queueColorHue: lead.queueColorHue,
+                            distributionRemovalReason: lead.distributionRemovalReason,
+                            distributionRemovalNote: lead.distributionRemovalNote,
+                          };
                           return (
-                            <TableRow key={lead.id} className={returnedUnaccepted.has(lead.id) ? "bg-warning/10 hover:bg-warning/15" : undefined}>
-                              <TableCell className="font-medium">{lead.nome}</TableCell>
+                            <TableRow key={lead.id} className={returnedUnaccepted.has(lead.id) ? "bg-warning/10 hover:bg-warning/15" : "group/lead-row"}>
+                              <TableCell className="font-medium"><DutyLeadDetailsTrigger lead={drawerLead} contextRole={drawerContextRole} contextJobTitle={context.jobTitle} contextBranchId={context.branchId} brokers={brokers} branches={branches} manualAssignmentChoiceEnabled={assignmentChoiceSetting !== "false"} slaFirstContactMinutes={Number.parseInt(slaSettings.slaFirstContactMinutes ?? "15", 10) || 15} slaStagnantDays={Number.parseInt(slaSettings.slaStagnantDays ?? "3", 10) || 3} /></TableCell>
                               <TableCell><LeadTemperature status={lead.qualificationStatus} /></TableCell>
                               <TableCell className="text-muted-foreground">{lead.queueName ?? "—"}</TableCell>
                               <TableCell className="text-muted-foreground">{returnedUnaccepted.has(lead.id) ? <span className="flex items-center gap-1.5 font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor"><span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />Devolvido — não aceito</span> : (lead.brokerName ?? "Sem corretor")}</TableCell>

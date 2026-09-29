@@ -77,6 +77,9 @@ import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/lead
 import { leadsViewRequiresServerData } from "./leads-view-navigation";
 import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-in-service-button";
 import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
+import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
+import { LeadDetailsDrawer } from "@/features/leads/components/lead-details-drawer";
+export type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 
 export type QualifyingLeadItem = {
   id: string;
@@ -99,39 +102,6 @@ export type QualifyingLeadItem = {
   branchId?: string | null;
   branchName?: string | null;
   createdAt: string;
-};
-
-export type LeadWorkspaceItem = {
-  id: string;
-  nome: string;
-  telefone: string;
-  status: string;
-  qualificationStatus: string;
-  qualificationState?: string | null;
-  distributionStatus?: string;
-  origem: string;
-  email?: string | null;
-  sourceChannel?: string | null;
-  sourceCampaign: string | null;
-  sourceMetadata?: unknown;
-  tipo: string;
-  createdAt: string;
-  assignedAt: string | null;
-  stageEnteredAt: string | null;
-  serviceStartedAt: string | null;
-  firstContactAt: string | null;
-  corretorId: string | null;
-  corretorNome: string | null;
-  isPlantaoAtivo?: boolean;
-  returnedUnaccepted?: boolean;
-  branchId: string | null;
-  branchName: string | null;
-  qualificationDetails?: Record<string, unknown> | null;
-  queueId?: string | null;
-  queueName?: string | null;
-  queueColorHue?: number | null;
-  distributionRemovalReason?: string | null;
-  distributionRemovalNote?: string | null;
 };
 
 const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
@@ -870,7 +840,7 @@ export function LeadsWorkspace({
       </Tabs>
 
       {/* ─── QUICK VIEW DETAIL DRAWER ─── */}
-      <DetailDrawer
+      {false ? <DetailDrawer
         open={Boolean(selectedLead)}
         onOpenChange={(open) => !open && setSelectedLead(null)}
         size="lg"
@@ -1126,7 +1096,22 @@ export function LeadsWorkspace({
             )}
           </div>
         ) : null}
-      </DetailDrawer>
+      </DetailDrawer> : selectedLead ? <LeadDetailsDrawer
+        lead={selectedLead}
+        contextRole={contextRole}
+        contextJobTitle={contextJobTitle}
+        contextBranchId={contextBranchId}
+        brokers={brokers}
+        branches={branches}
+        manualAssignmentChoiceEnabled={manualAssignmentChoiceEnabled}
+        slaFirstContactMinutes={slaFirstContactMinutes}
+        slaStagnantDays={slaStagnantDays}
+        onOpenChange={(open) => !open && setSelectedLead(null)}
+        onManagementCommitted={handleDrawerManagementCommitted}
+        onReassignOptimistic={handleDrawerReassignOptimistic}
+        onReassignRollback={handleDrawerReassignRollback}
+        onLeadPatch={(patch) => applyLeadPatch([selectedLead.id], (lead) => ({ ...lead, ...patch }))}
+      /> : null}
     </div>
   );
 }

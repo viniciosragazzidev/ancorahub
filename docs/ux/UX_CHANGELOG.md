@@ -1,5 +1,29 @@
 # Histórico de Alterações de UX/UI (UX Changelog)
 
+## 2026-09-29 — Detalhes do lead acessíveis no plantão
+
+- O nome do lead na tabela de um plantão agora abre o drawer compartilhado com
+  `/leads`, mantendo ações de gestão, reatribuição, atendimento, qualificação,
+  conversa, tarefas, documentos, notas e lembretes conforme papel e flags.
+- Não foram criados tokens ou regras de domínio; tenant, permissões e estados
+  existentes permanecem aplicados. Registro:
+  `docs/implementations/completed/2026-09-29-plantao-lead-details-drawer.md`.
+
+## 2026-09-29 — Funil ribbon no dashboard
+
+- A área `Funil` do `/dashboard` passou a usar uma faixa SVG contínua, com
+  espessura proporcional ao volume alcançado por etapa, legenda responsiva e
+  saída terminal `Perdido` separada.
+- Os dados continuam vindo do funil canônico do servidor; não foram criadas
+  métricas, regras de negócio ou tokens novos. QA autenticado UX-M1.10 segue
+  pendente. Registro: `docs/implementations/completed/2026-09-29-dashboard-funnel-chart.md`.
+
+## 2026-09-28 — Menu lateral legível no celular
+
+- O cabeçalho do Sheet reúne marca e usuário sem duplicar o título; seletor do Super Admin e plantão ocupam linhas próprias quando visíveis.
+- A lista mantém rolagem vertical, enquanto Agente IA e perfil ficam empilhados com alvos de toque e safe area. Navegar ou abrir o agente fecha o menu.
+- Desktop, permissões e destinos permanecem iguais. QA autenticado UX-M1.10 pendente. Registro: `docs/implementations/active/2026-09-28-mobile-sidebar-responsiveness.md`.
+
 ## 2026-09-27 — Feedback de presença e movimento governado
 
 - A confirmação pública de presença deixa claro o estado inicial, processamento, confirmação do servidor e nova tentativa após falha. O botão compartilhado usa rótulos em português e cores semânticas existentes.
