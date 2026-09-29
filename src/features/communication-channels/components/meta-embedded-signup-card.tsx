@@ -30,12 +30,33 @@ function parseMetaSignupMessage(value: unknown) {
   }
 }
 
-export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: string; configId: string; disabled?: boolean }) {
+const COPY = {
+  cloud_api: {
+    title: "Conectar número oficial",
+    description: "Abra o cadastro seguro da Meta para escolher a conta WhatsApp Business e o número corporativo. A confirmação do telefone acontece dentro da Meta; o CRM conclui a ativação técnica após o término.",
+    button: "Conectar número com Facebook",
+    done: "Cadastro concluído. O CRM confirmou a ativação do número na Cloud API.",
+  },
+  coexistence: {
+    title: "Conectar número que já usa no WhatsApp Business",
+    description: "O número continua no aplicativo WhatsApp Business do celular e passa a receber e responder também pelo CRM. Na Meta, escolha a conta, informe o número e confirme a conexão no aplicativo quando ele pedir.",
+    button: "Conectar número do aplicativo",
+    done: "Cadastro concluído. O número continua no aplicativo e já recebe pelo CRM.",
+  },
+} as const;
+
+/** Completion events: the standard flow sends FINISH; the WhatsApp Business app flow sends its own event with only the WABA. */
+export const META_SIGNUP_FINISH_EVENTS = new Set(["FINISH", "FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING"]);
+
+export function MetaEmbeddedSignupCard({ appId, configId, disabled, mode = "cloud_api" }: { appId: string; configId: string; disabled?: boolean; mode?: "cloud_api" | "coexistence" }) {
+  const copy = COPY[mode];
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const finishRef = useRef<SignupResult | null>(null);
   const codeRef = useRef<string | null>(null);
   const completingRef = useRef(false);
+  /** Only the card that opened Meta handles its events (the page may show two cards). */
+  const launchedRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearSignupTimeout = () => {
@@ -55,8 +76,9 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
         businessId: result?.businessId,
         wabaId: result?.wabaId,
         phoneNumberId: result?.phoneNumberId,
+        mode,
       });
-      setMessage("Cadastro concluído. O CRM confirmou a ativação do número na Cloud API.");
+      setMessage(copy.done);
       window.location.assign("/integrations/whatsapp?channel=connected");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Não foi possível concluir a conexão. Revise a conta e tente novamente.");
@@ -74,8 +96,8 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
         event?: string;
         data?: { business_id?: string; waba_id?: string; phone_number_id?: string; code?: string };
       } | null;
-      if (!META_ORIGINS.has(event.origin) || payload?.type !== "WA_EMBEDDED_SIGNUP") return;
-      if (payload.event === "FINISH") {
+      if (!launchedRef.current || !META_ORIGINS.has(event.origin) || payload?.type !== "WA_EMBEDDED_SIGNUP") return;
+      if (payload.event && META_SIGNUP_FINISH_EVENTS.has(payload.event)) {
         const data = payload.data ?? {};
         if (data.code) codeRef.current = data.code;
         finishRef.current = {
@@ -101,6 +123,7 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
   const start = () => {
     setMessage(null);
     setLoading(true);
+    launchedRef.current = true;
     finishRef.current = null;
     codeRef.current = null;
     completingRef.current = false;
@@ -132,11 +155,9 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
         config_id: configId,
         response_type: "code",
         override_default_response_type: true,
-        extras: {
-          feature: "whatsapp_embedded_signup",
-          version: "v4",
-          sessionInfoVersion: "3",
-        },
+        extras: mode === "coexistence"
+          ? { setup: {}, featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" }
+          : { feature: "whatsapp_embedded_signup", version: "v4", sessionInfoVersion: "3" },
       });
     };
     if (window.FB) {
@@ -155,5 +176,5 @@ export function MetaEmbeddedSignupCard({ appId, configId, disabled }: { appId: s
     document.head.appendChild(script);
   };
 
-  return <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>Conectar número oficial</CardTitle><CardDescription>Abra o cadastro seguro da Meta para escolher a conta WhatsApp Business e o número corporativo. A confirmação do telefone acontece dentro da Meta; o CRM conclui a ativação técnica após o término.</CardDescription></CardHeader><CardContent className="space-y-3"><Button onClick={start} disabled={disabled || loading} className="w-full">{loading ? "Conectando com a Meta…" : "Conectar número com Facebook"}</Button>{message ? <p role="status" className="flex gap-2 text-sm text-muted-foreground">{message.includes("concluído") ? <CheckCircle className="size-4 text-success" /> : <Warning className="size-4 text-warning" />}{message}</p> : null}</CardContent></Card>;
+  return <Card className="border-border bg-card shadow-none"><CardHeader><CardTitle>{copy.title}</CardTitle><CardDescription>{copy.description}</CardDescription></CardHeader><CardContent className="space-y-3"><Button onClick={start} disabled={disabled || loading} className="w-full">{loading ? "Conectando com a Meta…" : copy.button}</Button>{message ? <p role="status" className="flex gap-2 text-sm text-muted-foreground">{message.includes("concluído") ? <CheckCircle className="size-4 text-success" /> : <Warning className="size-4 text-warning" />}{message}</p> : null}</CardContent></Card>;
 }

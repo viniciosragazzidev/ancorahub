@@ -6,6 +6,7 @@ export type MetaEmbeddedSignupPayload = {
   wabaId?: string;
   phoneNumberId?: string;
   branchId?: string;
+  mode?: "cloud_api" | "coexistence";
 };
 
 /** Present on the first message sent from a click-to-WhatsApp ad or post. */

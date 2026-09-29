@@ -78,6 +78,30 @@ export async function subscribeWabaToApp(wabaId: string, accessToken: string) {
   return graphRequest<{ success?: boolean }>(`${encodeURIComponent(wabaId)}/subscribed_apps`, { method: "POST" }, accessToken);
 }
 
+/** Coexistence check: a number kept in the WhatsApp Business app reports is_on_biz_app. */
+export async function getMetaPhoneCoexistence(phoneNumberId: string, accessToken: string) {
+  return graphRequest<{ id: string; is_on_biz_app?: boolean; platform_type?: string }>(`${encodeURIComponent(phoneNumberId)}?fields=id,is_on_biz_app,platform_type`, { method: "GET" }, accessToken);
+}
+
+/** Numbers of the WABA that are kept in the WhatsApp Business app (coexistence). */
+export async function listMetaWabaCoexistencePhones(wabaId: string, accessToken: string) {
+  const payload = await graphRequest<{ data?: Array<{ id: string; display_phone_number?: string; is_on_biz_app?: boolean }> }>(`${encodeURIComponent(wabaId)}/phone_numbers?fields=id,display_phone_number,is_on_biz_app&limit=100`, { method: "GET" }, accessToken);
+  return (payload.data ?? []).filter((phone) => phone.is_on_biz_app === true);
+}
+
+/**
+ * One-time sync of a coexistence number: "smb_app_state_sync" (contacts) and
+ * "history" (past messages, when the business allowed it). Meta accepts it
+ * once per onboarding, within 24h; the data arrives later by webhook.
+ */
+export async function requestMetaSmbAppDataSync(phoneNumberId: string, accessToken: string, syncType: "smb_app_state_sync" | "history") {
+  return graphRequest<{ success?: boolean; request_id?: string }>(`${encodeURIComponent(phoneNumberId)}/smb_app_data`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", sync_type: syncType }),
+  }, accessToken);
+}
+
 /** Completes the backend portion of Embedded Signup; phone ownership stays in Meta's flow. */
 export async function registerMetaPhoneNumber(phoneNumberId: string, accessToken: string, pin: string) {
   return graphRequest<{ success?: boolean }>(`${encodeURIComponent(phoneNumberId)}/register`, {

@@ -338,6 +338,7 @@ export async function sendLeadMessageAction(
       tenantId: context.tenantId,
       branchId: lead.branchId,
       userId: context.userId,
+      customerPhone: lead.telefone,
     });
     if (officialChannel) {
       const sent = await sendMetaCloudChannelText({

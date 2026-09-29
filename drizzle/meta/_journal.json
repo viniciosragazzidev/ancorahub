@@ -834,6 +834,13 @@
                         "when":  1790744400000,
                         "tag":  "0171_attendance_situations",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  119,
+                        "version":  "7",
+                        "when":  1790830800000,
+                        "tag":  "0172_channel_coexistence",
+                        "breakpoints":  true
                     }
                 ]
 }

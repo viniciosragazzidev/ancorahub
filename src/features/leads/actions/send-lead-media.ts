@@ -111,6 +111,7 @@ export async function sendLeadMediaAction(
     const channel = await getPreferredMetaCloudChannel({
       tenantId: context.tenantId,
       userId: context.userId,
+      customerPhone: lead.telefone,
     });
     if (!channel) {
       return { success: false, error: "Nenhum canal oficial da Meta está ativo para envio de mídia." };

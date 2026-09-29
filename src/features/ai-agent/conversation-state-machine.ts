@@ -235,7 +235,7 @@ export async function sendAiOutbound(input: {
     }
   }
 
-  const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId });
+  const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId, customerPhone: input.phone });
   if (channel) {
     try {
       const sent = await sendMetaCloudChannelText({ channel, to: deliveryPhone ?? input.phone, body: input.body });

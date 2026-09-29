@@ -44,6 +44,10 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
       activatedAt: schema.communicationChannels.activatedAt,
       tokenExpiresAt: schema.communicationChannels.tokenExpiresAt,
       isDefault: schema.communicationChannels.isDefault,
+      onboardingMode: schema.communicationChannels.onboardingMode,
+      syncStatus: schema.communicationChannels.syncStatus,
+      syncRequestedAt: schema.communicationChannels.syncRequestedAt,
+      syncError: schema.communicationChannels.syncError,
       hasCredentials: sql<boolean>`${schema.communicationChannels.accessTokenCiphertext} is not null`.as("has_credentials"),
     }).from(schema.communicationChannels)
       .leftJoin(schema.branches, eq(schema.communicationChannels.branchId, schema.branches.id))

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import { after } from "next/server";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -20,6 +20,7 @@ import {
 } from "./conversation-media";
 import { META_CLOUD_PROVIDER } from "./types";
 import { readCtwaAdReferral } from "./meta-ctwa-referral";
+import { COEXISTENCE_WEBHOOK_FIELDS } from "./meta-coexistence-events";
 import type { MetaWebhookPayload } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
 
@@ -32,21 +33,48 @@ export async function isMetaCloudWhatsAppEnabled() {
   return row ? row.value !== "false" && row.value !== "disabled" : true;
 }
 
-export async function getPreferredMetaCloudChannel(input: { tenantId: string; branchId?: string | null; userId?: string | null }) {
+/**
+ * The official number to send from. With more than one number (e.g. a
+ * WhatsApp Business app number in coexistence), a reply goes out on the
+ * number the customer last wrote to: only that number has the customer's
+ * 24h window. Otherwise the default number.
+ */
+export async function getPreferredMetaCloudChannel(input: { tenantId: string; branchId?: string | null; userId?: string | null; customerPhone?: string | null }) {
   const db = getDatabase();
+  const usable = and(
+    eq(schema.communicationChannels.tenantId, input.tenantId),
+    eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
+    eq(schema.communicationChannels.status, "active"),
+    eq(schema.communicationChannels.registrationStatus, "registered"),
+    isNotNull(schema.communicationChannels.phoneNumberId),
+    isNotNull(schema.communicationChannels.accessTokenCiphertext),
+  );
+  const suffix = input.customerPhone?.replace(/\D/g, "").slice(-8) ?? "";
+  if (suffix.length === 8) {
+    const [lastInbound] = await db
+      .select({ channelId: schema.whatsappMessages.communicationChannelId })
+      .from(schema.whatsappMessages)
+      .where(and(
+        eq(schema.whatsappMessages.tenantId, input.tenantId),
+        eq(schema.whatsappMessages.provider, META_CLOUD_PROVIDER),
+        inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+        isNotNull(schema.whatsappMessages.communicationChannelId),
+        sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${suffix}`,
+      ))
+      .orderBy(desc(schema.whatsappMessages.sentAt))
+      .limit(1);
+    if (lastInbound?.channelId) {
+      const [conversationChannel] = await db.select().from(schema.communicationChannels)
+        .where(and(usable, eq(schema.communicationChannels.id, lastInbound.channelId)))
+        .limit(1);
+      if (conversationChannel) return conversationChannel;
+    }
+  }
   const [channel] = await db
     .select()
     .from(schema.communicationChannels)
-    .where(
-      and(
-        eq(schema.communicationChannels.tenantId, input.tenantId),
-        eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
-        eq(schema.communicationChannels.status, "active"),
-        eq(schema.communicationChannels.registrationStatus, "registered"),
-        isNotNull(schema.communicationChannels.phoneNumberId),
-        isNotNull(schema.communicationChannels.accessTokenCiphertext),
-      ),
-    )
+    .where(usable)
+    .orderBy(desc(schema.communicationChannels.isDefault), asc(schema.communicationChannels.createdAt))
     .limit(1);
   return channel ?? null;
 }
@@ -143,6 +171,19 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
 
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      // A WhatsApp Business app number in coexistence: app messages, history,
+      // contacts and disconnection. Never customer turns (no AI, no intake).
+      if (change.field && COEXISTENCE_WEBHOOK_FIELDS.has(change.field)) {
+        const { ingestCoexistenceChange } = await import("./meta-coexistence-ingest");
+        const result = await ingestCoexistenceChange({ wabaId: entry.id, field: change.field, value: change.value as Parameters<typeof ingestCoexistenceChange>[0]["value"] })
+          .catch((error) => {
+            console.error("[whatsapp/coexistence] ingest.failed", { field: change.field, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+            return { processed: 0, ignored: 1 };
+          });
+        processed += result.processed;
+        ignored += result.ignored;
+        continue;
+      }
       if (change.field !== "messages") continue;
       const phoneNumberId = change.value?.metadata?.phone_number_id;
       if (!phoneNumberId) { ignored += 1; continue; }

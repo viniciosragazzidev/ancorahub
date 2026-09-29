@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { MetaCloudSetupCard } from "@/features/communication-channels/components/meta-cloud-setup-card";
 import { MetaEmbeddedSignupCard } from "@/features/communication-channels/components/meta-embedded-signup-card";
+import { CoexistenceNumbersCard } from "@/features/communication-channels/components/coexistence-numbers-card";
 import { WhatsAppTestMessageCard } from "@/features/communication-channels/components/whatsapp-test-message-card";
 import { Button } from "@/components/ui/button";
 import { WhatsAppIntegrationHeading } from "../integrations/whatsapp/whatsapp-integration-heading";
@@ -31,6 +32,10 @@ type Channel = {
   activatedAt: Date | null;
   tokenExpiresAt: Date | null;
   isDefault: boolean;
+  onboardingMode: string;
+  syncStatus: string | null;
+  syncRequestedAt: Date | null;
+  syncError: string | null;
   hasCredentials: boolean;
 };
 
@@ -61,6 +66,9 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     official.appId &&
     official.embeddedSignupConfigId &&
     (!official.companyAccount?.hasCredentials || official.companyAccount.status !== "active");
+
+  const coexistenceChannels = official.channels.filter((channel) => channel.onboardingMode === "coexistence" && channel.id !== official.companyAccount?.id);
+  const canConnectCoexistence = Boolean(official.canConfigure && official.enabled && official.configured && official.appId && official.embeddedSignupConfigId);
 
   return (
     <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) antialiased sm:gap-6 lg:p-6">
@@ -111,6 +119,9 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
                   ) : null}
                 </CardContent>
               </Card>
+              {official.canConfigure || coexistenceChannels.length ? (
+                <CoexistenceNumbersCard channels={coexistenceChannels} appId={official.appId} configId={official.embeddedSignupConfigId} canConnect={canConnectCoexistence} />
+              ) : null}
               <WhatsAppTestMessageCard />
               {waha}
             </div>

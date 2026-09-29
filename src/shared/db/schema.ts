@@ -1576,6 +1576,12 @@ export const communicationChannels = pgTable(
     tokenKeyVersion: text("token_key_version"),
     tokenExpiresAt: timestamp("token_expires_at", { withTimezone: true }),
     isDefault: boolean("is_default").notNull().default(false),
+    /** "cloud_api" (number registered by the CRM) or "coexistence" (number kept in the WhatsApp Business app). */
+    onboardingMode: text("onboarding_mode").notNull().default("cloud_api"),
+    /** Coexistence only: the one-time contacts/history sync (requested, done, failed). */
+    syncStatus: text("sync_status"),
+    syncRequestedAt: timestamp("sync_requested_at", { withTimezone: true }),
+    syncError: text("sync_error"),
     lastWebhookAt: timestamp("last_webhook_at", { withTimezone: true }),
     activatedAt: timestamp("activated_at", { withTimezone: true }),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
