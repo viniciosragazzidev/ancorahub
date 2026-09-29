@@ -89,8 +89,8 @@ export function TenantChannelRoutingCard({
           {freeMessages.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               Nenhuma mensagem livre ativa. Crie em{" "}
-              <Link href="/qualificacao?tab=meta_templates" className="font-medium text-primary underline-offset-4 hover:underline">
-                Qualificação → Mensagens & Situações
+              <Link href="/atendimento/mensagens" className="font-medium text-primary underline-offset-4 hover:underline">
+                Atendimento → Mensagens
               </Link>
               .
             </p>
@@ -138,11 +138,11 @@ export function TenantChannelRoutingCard({
             <div className="min-w-0">
               <CardTitle>Mensagens livres</CardTitle>
               <CardDescription className="mt-1 max-w-2xl leading-5">
-                As mensagens de Qualificação → Mensagens & Situações que podem sair por este número.
+                As mensagens de Atendimento → Mensagens que podem sair por este número.
                 As variáveis são preenchidas com os dados do aviso (ex.: {"{{nome}}"} vira o nome do corretor).
               </CardDescription>
             </div>
-            <Button size="sm" variant="outline" render={<Link href="/qualificacao?tab=meta_templates" />}>
+            <Button size="sm" variant="outline" render={<Link href="/atendimento/mensagens" />}>
               Editar mensagens
             </Button>
           </div>

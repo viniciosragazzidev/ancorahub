@@ -8,6 +8,7 @@ import { toast } from "@/components/ui/sonner";
 import {
   SquaresFour,
   ChatCircleDots,
+  ChatCircleText,
   Lightbulb,
   PresentationChart,
   CurrencyCircleDollar,
@@ -133,6 +134,15 @@ const navigationItems: NavItemConfig[] = [
     iconTone: "text-fuchsia-600 dark:text-fuchsia-300",
   },
   {
+    label: "Atendimento",
+    fullLabel: "Atendimento: mensagens",
+    icon: ChatCircleText,
+    url: "/atendimento/mensagens",
+    permission: "acessar_qualificacao_ia",
+    section: "Marketing",
+    iconTone: "text-indigo-600 dark:text-indigo-300",
+  },
+  {
     label: "WhatsApp",
     fullLabel: "Conexões WhatsApp",
     icon: WhatsappLogo,
@@ -190,6 +200,7 @@ const managerHiddenPaths = [
   "/integrations",
   "/inteligencia",
   "/qualificacao",
+  "/atendimento",
   "/leads/distribuicao",
   "/automacoes",
 ];

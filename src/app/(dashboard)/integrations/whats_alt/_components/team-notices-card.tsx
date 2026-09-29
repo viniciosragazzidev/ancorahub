@@ -152,7 +152,7 @@ export function TeamNoticesCard({
       </ul>
       <p className="border-t border-border/60 px-4 py-3 text-xs leading-5 text-muted-foreground">
         Novo lead e informações do lead saem na hora. Os demais avisos saem de segunda a sexta, das 8h às 18h, com intervalo entre mensagens, e cada pessoa recebe no máximo 2 lembretes por dia. Pelo WhatsApp da empresa, cada envio sorteia uma versão do texto; os textos podem vir de{" "}
-        <Link href="/qualificacao?tab=meta_templates" className="font-medium text-foreground underline-offset-4 hover:underline">Qualificação → Mensagens</Link>.
+        <Link href="/atendimento/mensagens" className="font-medium text-foreground underline-offset-4 hover:underline">Atendimento → Mensagens</Link>.
       </p>
       <NoticeTextsSheet
         row={textsRow}

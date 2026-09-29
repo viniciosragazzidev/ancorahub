@@ -158,10 +158,10 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
           <div>
             <CardTitle>Mensagens automáticas</CardTitle>
             <CardDescription className="mt-1">
-              Templates Meta, mensagens livres e situações do fluxo agora possuem uma única configuração na Qualificação.
+              Templates Meta, mensagens livres e situações do fluxo ficam em Atendimento → Mensagens.
             </CardDescription>
           </div>
-          <Button render={<Link href="/qualificacao?tab=meta_templates" />}>
+          <Button render={<Link href="/atendimento/mensagens" />}>
             Configurar mensagens
           </Button>
         </CardHeader>

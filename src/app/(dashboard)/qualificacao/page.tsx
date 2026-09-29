@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { hasCapability } from "@/shared/auth/permissions";
@@ -55,7 +57,9 @@ async function loadQualificationSection<T>(section: string, loader: () => Promis
   }
 }
 
-export default async function QualificacaoPage() {
+export default async function QualificacaoPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> } = {}) {
+  // Messages moved to Atendimento → Mensagens; old links keep working.
+  if ((await searchParams)?.tab === "meta_templates") redirect("/atendimento/mensagens");
   const context = await getRequiredTenantContext();
   if (!hasCapability(context.role, "acessar_qualificacao_ia", context.jobTitle)) {
     throw new AuthorizationError("Apenas diretores, gestores e equipe de marketing têm permissão para acessar a qualificação por IA.");

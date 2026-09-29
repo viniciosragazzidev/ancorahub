@@ -22,6 +22,19 @@ Continuação de `2026-09-27-motor-atendimento.md` (DEC-126, DEC-127). Princípi
 
 Canal: as respostas da qualificação saem pelo canal da conversa, como antes.
 
+Mensagem de conclusão: os textos padrão antigos salvos nas empresas ("Vou encaminhar você para um corretor da equipe agora.") dão lugar ao novo padrão com `{{nome}}` e `{{resumo}}` no deploy (`effectiveHandoffText`); texto escrito pela empresa é mantido.
+
+## Fase B — Atendimento → Mensagens (entregue em `feat/atendimento-mensagens`)
+
+- Menu **Atendimento** (`/atendimento`, abre em `/atendimento/mensagens`), visível como a Qualificação (oculto para gestor, igual a `/qualificacao`); página só para Diretor e Gestor. Registrado em `proxy.ts`, cargos personalizados e busca de funcionalidades.
+- Uma tabela para tudo: templates Meta, textos livres e as 15 respostas da IA (padrão ou personalizada), com tipo, canal (onde vale), em uso e status; filtro por tipo e busca. CTA único "Nova mensagem" (texto livre ou template Meta pelo assistente existente); "Configurações ▾" com "Mensagem de cada situação" (o painel de políticas num painel lateral) e sincronização com a Meta.
+- Painel lateral por tipo: texto livre (editar, remover se não usado, variações criadas como novas mensagens), template Meta (prévia, rejeição, usar numa situação, teste, excluir) e resposta da IA (editar com `{{nome}}`/`{{resumo}}`, prévia com cliente de exemplo, voltar ao padrão). Em todos, "onde é usada" com o **canal de cada uso** (Meta oficial, WhatsApp da empresa, mesmo canal da conversa).
+- "Sugerir variações com IA": 3 versões com as mesmas variáveis, sem preço, percentual, carência ou promessa que a original não tenha; nada é salvo sem clique.
+- Qualificação perde a aba "Mensagens"; `?tab=meta_templates` e os links de Integrações/Ajustes levam à página nova.
+- Adiado a pedido: padronização de variáveis (templates Meta em aprovação não podem mudar agora).
+- Verificação: testes do catálogo (variações e variáveis) e da ação de salvar resposta da IA; página, painel e sugestões conferidos no servidor local.
+- Pendente: remover os componentes que ficaram sem uso (`message-automation-studio.tsx`, `message-library-card.tsx`, `template-list-view.tsx`).
+
 ## Próximas fases (plano aprovado em 2026-09-29)
 
 Menu **Atendimento** com 5 seções, no padrão de densidade (tabela + painel lateral, busca + "+", um CTA por tela). Em tudo que envia, o canal é visível e escolhível: Meta oficial, WhatsApp da empresa (reserva Meta) ou mesmo canal da conversa, com validação por canal ao salvar e publicar.

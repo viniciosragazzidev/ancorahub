@@ -70,6 +70,14 @@ export const routeCatalog: readonly RouteDefinition[] = [
     fallbackPermission: "acessar_qualificacao_ia",
   },
   {
+    key: "atendimento",
+    path: "/atendimento",
+    label: "Atendimento",
+    description: "Mensagens do atendimento: templates Meta, textos livres e respostas da IA.",
+    category: "Operação",
+    fallbackPermission: "acessar_qualificacao_ia",
+  },
+  {
     key: "whatsapp",
     path: "/integrations/whatsapp",
     label: "WhatsApp",

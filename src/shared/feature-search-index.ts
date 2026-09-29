@@ -113,6 +113,16 @@ export const FEATURE_SEARCH_INDEX: FeatureIndexItem[] = [
     iconName: "Target",
   },
   {
+    id: "atendimento_mensagens",
+    title: "Mensagens do atendimento",
+    description: "Templates Meta, textos livres e respostas da IA: onde valem, onde são usados e por qual canal saem.",
+    keywords: ["mensagens", "templates", "meta", "texto livre", "respostas da ia", "variações", "canal"],
+    url: "/atendimento/mensagens",
+    domain: "Automação",
+    permission: "acessar_qualificacao_ia",
+    iconName: "ChatCircleText",
+  },
+  {
     id: "qualificacao_followup",
     title: "Regras de Follow-up IA",
     description: "Configuração de disparos automáticos para retomar conversas inativas.",

@@ -13,7 +13,7 @@ const protectedPathPrefixes = [
   "/clientes", "/metas", "/relatorios", "/catalogo", "/minha-fila", "/minha-meta",
   "/notificacoes", "/filiais", "/financeiro", "/configuracoes", "/diretor", "/gestor",
   "/corretor", "/super-admin", "/checklist", "/materiais-divulgacao", "/marketing",
-  "/conversas", "/qualificacao", "/automacoes", "/inteligencia", "/integrations",
+  "/conversas", "/qualificacao", "/atendimento", "/automacoes", "/inteligencia", "/integrations",
   "/vendas", "/cotacao", "/empresas", "/tarefas", "/agentes-ia", "/assistente",
   "/noc", "/guia", "/propostas", "/ferramentas-vendas"
 ] as const;

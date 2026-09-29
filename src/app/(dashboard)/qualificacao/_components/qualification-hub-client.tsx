@@ -44,7 +44,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
 import { AgentTriggersPanel } from "./agent-triggers-panel";
-import { MessageAutomationStudio } from "./message-automation-studio";
 import { SituationalPlaybooksPanel } from "./situational-playbooks-panel";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
@@ -299,7 +298,6 @@ export function QualificationHubClient({
   const tabs = [
     { id: "overview", label: "Prompt e comportamento", icon: MessageSquare },
     { id: "situational_playbooks", label: "Roteiros", icon: Sparkles },
-    { id: "meta_templates", label: "Mensagens", icon: FileText },
     { id: "agent_triggers", label: "Permissões", icon: Zap },
     { id: "followup_rules", label: "Follow-up", icon: Clock },
     { id: "whatsapp_diag", label: "Conectividade", icon: Phone },
@@ -783,8 +781,6 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </div>
         )}
 
-        {/* TAB 2: MODELOS DE MENSAGEM META */}
-        {activeTab === "meta_templates" && <MessageAutomationStudio canManage={canManageMessages} />}
 
         {/* TAB 3: TRIGGERS & PERMISSÕES MCP */}
         {activeTab === "agent_triggers" && (
