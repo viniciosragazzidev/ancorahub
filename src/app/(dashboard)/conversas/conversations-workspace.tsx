@@ -112,6 +112,8 @@ export type ConversationMessage = {
   /** Divider for a change of broker (direction "transition"), not a message. */
   transition?: string | null;
   providerStatus?: string | null;
+  /** Number that received or sent it ("7276", "WAHA"); only when the tenant has more than one. */
+  channelLabel?: string | null;
   providerFailure?: {
     code: string;
     title: string;
@@ -1149,6 +1151,14 @@ function MessageRow({
           <time dateTime={message.sentAt} className="tabular-nums">
             {formatTime(message.sentAt)}
           </time>
+          {message.channelLabel ? (
+            <span
+              className="rounded-full border border-border px-1.5 text-[10px] leading-4 text-muted-foreground"
+              title={isOutbound ? `Enviada pelo número ${message.channelLabel}` : `Recebida no número ${message.channelLabel}`}
+            >
+              via {message.channelLabel}
+            </span>
+          ) : null}
           {isOutbound ? (
             <>
               <span aria-hidden="true" className="opacity-60">•</span>

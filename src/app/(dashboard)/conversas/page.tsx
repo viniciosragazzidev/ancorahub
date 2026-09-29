@@ -155,6 +155,14 @@ export default async function ConversationsPage({
     branches = branchRows;
     const leadIds = leads.map((lead) => lead.id);
 
+    // With more than one official number, every message says which number
+    // received or sent it (the reply goes out on the number the customer wrote to).
+    const officialChannels = await db
+      .select({ id: schema.communicationChannels.id, displayPhoneNumber: schema.communicationChannels.displayPhoneNumber })
+      .from(schema.communicationChannels)
+      .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER)));
+    const channelLabelOf = describeMessageChannel(officialChannels);
+
     const [messageRows, documentRows, aiConversationRows] = leadIds.length
       ? await Promise.all([
           db
@@ -169,6 +177,7 @@ export default async function ConversationsPage({
               providerStatus: schema.whatsappMessages.providerStatus,
               messageId: schema.whatsappMessages.messageId,
               communicationChannelId: schema.whatsappMessages.communicationChannelId,
+              provider: schema.whatsappMessages.provider,
               sentAt: schema.whatsappMessages.sentAt,
               mediaKind: schema.whatsappMessages.mediaKind,
               mediaMimeType: schema.whatsappMessages.mediaMimeType,
@@ -309,6 +318,7 @@ export default async function ConversationsPage({
           senderRole: msg.senderRole,
           providerStatus: msg.providerStatus,
           providerFailure,
+          channelLabel: channelLabelOf(msg),
           sentAt: msg.sentAt.toISOString(),
           ...(isMediaKindSupported(msg.mediaKind) && msg.mediaStorageKey
             ? {
@@ -478,6 +488,7 @@ export default async function ConversationsPage({
           senderRole: m.senderRole,
           providerStatus: m.providerStatus,
           providerFailure: m.messageId ? failureByProviderMessageId.get(m.messageId) ?? null : null,
+          channelLabel: channelLabelOf(m),
           sentAt: m.sentAt.toISOString(),
           ...(m.mediaKind && m.mediaStorageKey
             ? {
@@ -990,4 +1001,18 @@ function formatOfficialOutboundBody(
   if (purpose === "leadAssignmentConfirmed")
     return "Confirmação de lead atribuído enviada ao corretor.";
   return `Modelo oficial enviado: ${templateName}.`;
+}
+
+/**
+ * "7276" for an official number (only when the tenant has more than one, so
+ * a single-number tenant sees no noise) and "WAHA" for a WAHA number.
+ */
+function describeMessageChannel(channels: { id: string; displayPhoneNumber: string | null }[]) {
+  const labels = new Map(channels.map((channel) => [channel.id, (channel.displayPhoneNumber ?? "").replace(/\D/g, "").slice(-4) || null]));
+  const several = channels.length > 1;
+  return (message: { provider?: string | null; communicationChannelId?: string | null }) => {
+    if (message.provider === "waha") return "WAHA";
+    if (!several || !message.communicationChannelId) return null;
+    return labels.get(message.communicationChannelId) ?? null;
+  };
 }
