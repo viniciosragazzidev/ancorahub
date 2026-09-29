@@ -334,6 +334,20 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         webhookCredentialId: parsed.data.webhookCredentialId ?? null,
         updatedAt: new Date(),
       }).where(and(eq(schema.unitDutySchedules.id, schedule.id), eq(schema.unitDutySchedules.tenantId, context.tenantId)));
+      // The weekly roster keeps a copy of the plantão's validity (distribution
+      // and presence read it): it must follow the plantão, or a shortened
+      // plantão keeps its brokers "on duty" in later weeks.
+      await tx.update(schema.dutyRosterAssignments).set({
+        validFrom: parsed.data.validFrom,
+        validUntil: parsed.data.validUntil ?? null,
+        updatedBy: context.userId,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+        eq(schema.dutyRosterAssignments.scheduleId, schedule.id),
+        eq(schema.dutyRosterAssignments.status, "active"),
+        isNull(schema.dutyRosterAssignments.dutyDate),
+      ));
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: schedule.id, acao: "duty_schedule.updated",
       });

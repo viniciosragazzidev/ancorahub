@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, lt, ne, sql, isNull } from "drizzle-orm";
+import { and, eq, gt, lt, ne, or, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -61,7 +61,15 @@ type Database = ReturnType<typeof getDatabase>;
 /** The caller's transaction: checks must run on its connection, not on a second pooled one. */
 type DatabaseOrTransaction = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
 
-async function assertNoOverlap(db: DatabaseOrTransaction, tenantId: string, brokerId: string, dayOfWeek: number, startsAt: string, endsAt: string, excludedId?: string) {
+type Validity = { validFrom: Date; validUntil: Date | null };
+
+/**
+ * Same broker, same weekday, overlapping hours, in an active plantão whose
+ * validity shares at least one date with `period`. The plantão's own validity
+ * is the source of truth: a plantão from another week (e.g. "PME 24/09" when
+ * adding to "PME 01/10") never collides.
+ */
+async function assertNoOverlap(db: DatabaseOrTransaction, tenantId: string, brokerId: string, dayOfWeek: number, startsAt: string, endsAt: string, period: Validity, excludedId?: string) {
   const conditions = [
     eq(schema.dutyRosterAssignments.tenantId, tenantId),
     eq(schema.dutyRosterAssignments.brokerId, brokerId),
@@ -70,13 +78,17 @@ async function assertNoOverlap(db: DatabaseOrTransaction, tenantId: string, brok
     isNull(schema.dutyRosterAssignments.dutyDate),
     lt(schema.dutyRosterAssignments.startsAt, endsAt),
     gt(schema.dutyRosterAssignments.endsAt, startsAt),
+    eq(schema.unitDutySchedules.status, "active"),
+    or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, period.validFrom)),
+    period.validUntil ? lt(schema.unitDutySchedules.validFrom, period.validUntil) : undefined,
   ];
   if (excludedId) conditions.push(ne(schema.dutyRosterAssignments.id, excludedId));
-  const [conflict] = await db.select({ id: schema.dutyRosterAssignments.id })
+  const [conflict] = await db.select({ name: schema.unitDutySchedules.name, startsAt: schema.dutyRosterAssignments.startsAt, endsAt: schema.dutyRosterAssignments.endsAt })
     .from(schema.dutyRosterAssignments)
+    .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
     .where(and(...conditions))
     .limit(1);
-  if (conflict) throw new Error("Este corretor já está escalado em um horário sobreposto.");
+  if (conflict) throw new Error(`Este corretor já está no plantão "${conflict.name}" das ${conflict.startsAt} às ${conflict.endsAt}, no mesmo horário.`);
 }
 
 async function assertScheduleCapacity(db: DatabaseOrTransaction, tenantId: string, scheduleId: string, dayOfWeek: number, maximumBrokers: number | null, excludedId?: string) {
@@ -103,7 +115,7 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
     await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
-      await assertNoOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt);
+      await assertNoOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule);
       await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers);
       await tx.insert(schema.dutyRosterAssignments).values({ id: randomUUID(), tenantId: context.tenantId, branchId: brokerBranchId, scheduleId: schedule.id, brokerId: input.brokerId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, validFrom: schedule.validFrom, validUntil: schedule.validUntil, status: "active", createdBy: context.userId, updatedBy: context.userId, createdAt: now, updatedAt: now });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: input.brokerId, acao: "duty_roster_assignment.created" });
@@ -129,7 +141,7 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
     await db.transaction(async (tx) => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
-      await assertNoOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, assignment.id);
+      await assertNoOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule, assignment.id);
       await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers, assignment.id);
       await tx.update(schema.dutyRosterAssignments).set({ scheduleId: schedule.id, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, updatedBy: context.userId, updatedAt: new Date() }).where(and(eq(schema.dutyRosterAssignments.id, assignment.id), eq(schema.dutyRosterAssignments.tenantId, context.tenantId)));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.moved" });
