@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import {
   composeQuestionReply,
   DEFAULT_QUALIFIED_HANDOFF_TEXT,
+  effectiveHandoffText,
   renderConversationVariables,
   wasQuestionAsked,
   type QualificationFieldKey,
@@ -197,7 +198,7 @@ export function resolveDeterministicQualificationTurn(input: {
   if (!nextQuestion) {
     return {
       kind: "handoff",
-      reply: renderConversationVariables(input.handoffMessage?.trim() || DEFAULT_QUALIFIED_HANDOFF_TEXT, input.memory),
+      reply: renderConversationVariables(effectiveHandoffText(input.handoffMessage, DEFAULT_QUALIFIED_HANDOFF_TEXT), input.memory),
       evaluation,
       nextQuestion: null,
     };

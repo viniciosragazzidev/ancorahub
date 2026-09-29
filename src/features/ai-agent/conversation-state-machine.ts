@@ -21,7 +21,7 @@ import { resolveCanonicalWhatsAppDestination } from "@/features/communication-ch
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { loadQuickReplyTemplates, matchFaqSituation, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
-import { DEFAULT_HUMAN_REQUEST_TEXT, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
+import { DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
@@ -1359,7 +1359,7 @@ export async function processInboundAiResponse({
   const tenantConfig = await loadTenantAiAgentConfig(tenantId);
 
   if (detectHumanTransferRequest(userMessageBody)) {
-    const handoffMessage = renderConversationVariables(tenantConfig.handoffMessage || DEFAULT_HUMAN_REQUEST_TEXT, updatedMemory, lead?.nome);
+    const handoffMessage = renderConversationVariables(effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome);
     const messageId = `ai_msg_handoff_${crypto.randomUUID()}`;
     await db.insert(schema.whatsappMessages).values({
       id: messageId,

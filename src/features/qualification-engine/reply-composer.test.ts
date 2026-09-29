@@ -110,6 +110,18 @@ describe("mid-conversation situations", () => {
     expect(isRetiredDefaultBody("human.requested", "Texto próprio da empresa.")).toBe(false);
   });
 
+  it("closes a complete qualification with the summary, keeping a text the tenant wrote", () => {
+    const done: ConversationMemory = {
+      ...withName("Torquato"),
+      planType: { value: "individual", confidence: 1 }, numberOfLives: { value: "1", confidence: 0 },
+      age: { value: "40", confidence: 1 }, city: { value: "Itaboraí", confidence: 1 }, email: { value: "t@example.com", confidence: 1 },
+      collectedFields: ["customerName", "planType", "numberOfLives", "age", "city", "email"],
+    };
+    expect(resolveDeterministicQualificationTurn({ memory: done, policy, handoffMessage: "Vou encaminhar você para um corretor da equipe agora." }).reply)
+      .toBe("Obrigado, Torquato! Com essas informações (individual, 40 anos e Itaboraí), já passei seu atendimento para um corretor especialista. Ele continua a conversa por aqui em instantes.");
+    expect(resolveDeterministicQualificationTurn({ memory: done, policy, handoffMessage: "Texto nosso." }).reply).toBe("Texto nosso.");
+  });
+
   it("accepts declining the e-mail and moves on", () => {
     const asked = { ...createEmptyMemory(), lastQuestionAsked: "Última pergunta: qual o seu melhor e-mail para eu enviar a cotação?" };
     expect(extractFieldsFromMessage("Prefiro não informar", asked).email?.value).toBe(EMAIL_DECLINED);

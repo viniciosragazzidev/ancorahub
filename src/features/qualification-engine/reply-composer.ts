@@ -222,3 +222,18 @@ export function renderConversationVariables(text: string, memory: ConversationMe
 /** Default text when a customer asks for a person, and when the qualification is complete. */
 export const DEFAULT_HUMAN_REQUEST_TEXT = "Claro, {{nome}}! Já passei seu atendimento para um corretor especialista com o que você me contou ({{resumo}}). Ele continua a conversa por aqui em instantes.";
 export const DEFAULT_QUALIFIED_HANDOFF_TEXT = "Obrigado, {{nome}}! Com essas informações ({{resumo}}), já passei seu atendimento para um corretor especialista. Ele continua a conversa por aqui em instantes.";
+
+/**
+ * Former default handoff texts, saved on tenants without being customized.
+ * They give way to the current default (with name and summary); a text the
+ * tenant actually wrote is kept.
+ */
+const RETIRED_HANDOFF_TEXTS = new Set([
+  "Vou encaminhar você para um corretor da equipe agora.",
+  "Obrigado pelas informações. Vou encaminhar seu atendimento para um corretor da equipe agora.",
+]);
+
+export function effectiveHandoffText(configured: string | null | undefined, fallback: string) {
+  const text = configured?.trim();
+  return text && !RETIRED_HANDOFF_TEXTS.has(text) ? text : fallback;
+}
