@@ -19,7 +19,7 @@ import { renderConversationVariables } from "@/features/qualification-engine/rep
 import type { ConversationMemory } from "@/features/ai-agent/memory";
 
 /** What the example preview shows for {{nome}} and {{resumo}}. */
-const PREVIEW_MEMORY: ConversationMemory = {
+export const PREVIEW_MEMORY: ConversationMemory = {
   customerFirstName: { value: "Torquato", confidence: 1 },
   customerName: { value: "Torquato Silva", confidence: 1 },
   planType: { value: "individual", confidence: 1 },
@@ -46,7 +46,7 @@ function Section({ title, description, action, children }: { title: string; desc
 }
 
 /** Neutral example of how the text reaches the customer (no WhatsApp bubble token exists yet). */
-function Preview({ text }: { text: string }) {
+export function Preview({ text }: { text: string }) {
   return <p className="whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/30 p-3 text-sm leading-6 text-foreground">{text || "Sem texto."}</p>;
 }
 
@@ -75,7 +75,7 @@ function Usages({ message }: { message: LibraryMessage }) {
 }
 
 /** Up to 3 AI rewordings, each applied only on click. */
-function Suggestions({ text, onUse, useLabel }: { text: string; onUse: (suggestion: string) => void; useLabel: string }) {
+export function Suggestions({ text, onUse, useLabel }: { text: string; onUse: (suggestion: string) => void; useLabel: string }) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [pending, startTransition] = useTransition();
   return (

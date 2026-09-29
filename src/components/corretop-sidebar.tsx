@@ -135,9 +135,9 @@ const navigationItems: NavItemConfig[] = [
   },
   {
     label: "Atendimento",
-    fullLabel: "Atendimento: mensagens",
+    fullLabel: "Atendimento: situações e mensagens",
     icon: ChatCircleText,
-    url: "/atendimento/mensagens",
+    url: "/atendimento/situacoes",
     permission: "acessar_qualificacao_ia",
     section: "Marketing",
     iconTone: "text-indigo-600 dark:text-indigo-300",

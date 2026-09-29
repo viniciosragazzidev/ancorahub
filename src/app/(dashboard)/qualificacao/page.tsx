@@ -58,8 +58,10 @@ async function loadQualificationSection<T>(section: string, loader: () => Promis
 }
 
 export default async function QualificacaoPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> } = {}) {
-  // Messages moved to Atendimento → Mensagens; old links keep working.
-  if ((await searchParams)?.tab === "meta_templates") redirect("/atendimento/mensagens");
+  // Messages and roteiros moved to Atendimento; old links keep working.
+  const tab = (await searchParams)?.tab;
+  if (tab === "meta_templates") redirect("/atendimento/mensagens");
+  if (tab === "situational_playbooks" || tab === "situations" || tab === "playbooks") redirect("/atendimento/situacoes");
   const context = await getRequiredTenantContext();
   if (!hasCapability(context.role, "acessar_qualificacao_ia", context.jobTitle)) {
     throw new AuthorizationError("Apenas diretores, gestores e equipe de marketing têm permissão para acessar a qualificação por IA.");

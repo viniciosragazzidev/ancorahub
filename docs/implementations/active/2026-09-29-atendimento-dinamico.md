@@ -35,6 +35,16 @@ Mensagem de conclusão: os textos padrão antigos salvos nas empresas ("Vou enca
 - Verificação: testes do catálogo (variações e variáveis) e da ação de salvar resposta da IA; página, painel e sugestões conferidos no servidor local.
 - Pendente: remover os componentes que ficaram sem uso (`message-automation-studio.tsx`, `message-library-card.tsx`, `template-list-view.tsx`).
 
+## Fase C — Atendimento → Situações (entregue em `feat/atendimento-situacoes`)
+
+- Tabela `attendance_situations` (migração 0171, aditiva, aplicada): frases ensinadas e liga/desliga das situações do sistema; situações da empresa com frases, resposta e ação (continuar ou transferir). Textos do sistema seguem em `ai_quick_reply_templates`; Roteiros seguem no armazenamento atual.
+- `src/features/attendance-situations/catalog.ts` (puro): 9 situações do sistema (3 críticas sempre ligadas: pedir pessoa, parar, número errado), frases por palavra inteira sem acento, prioridade única (respostas rápidas com frases ensinadas → situações da empresa → perguntas comuns ensinadas → reconhecimento embutido). `matchFaqSituation` mudou para cá (re-exportado em `quick-reply.ts`).
+- Conversa real e simulador usam a mesma detecção; situação da empresa com "transferir" usa o mesmo caminho do pedido de humano (resumo, espera humana, distribuição).
+- Tela `/atendimento/situacoes` (abre o menu): tabela com tipo, como é reconhecida, o que acontece, canal ("mesmo canal da conversa", explicado) e status; "Nova situação"; painel por tipo (sistema: frases ensinadas, resposta, liga/desliga; empresa: nome, frases, resposta com variáveis e sugestões, ação; roteiro: orientação da IA). "Teste uma frase" roda a mesma detecção e mostra a resposta com cliente de exemplo, sem enviar.
+- Qualificação perde a aba "Roteiros"; links antigos redirecionam.
+- Verificação: testes da detecção (prioridade, frases ensinadas, críticas travadas, situação própria continuar/transferir); 142 testes das áreas afetadas; tela e "Teste uma frase" conferidos no servidor local (preço, pedido de atendente, pergunta sem situação).
+- Pendente: remover `situational-playbooks-panel.tsx`, sem uso.
+
 ## Próximas fases (plano aprovado em 2026-09-29)
 
 Menu **Atendimento** com 5 seções, no padrão de densidade (tabela + painel lateral, busca + "+", um CTA por tela). Em tudo que envia, o canal é visível e escolhível: Meta oficial, WhatsApp da empresa (reserva Meta) ou mesmo canal da conversa, com validação por canal ao salvar e publicar.

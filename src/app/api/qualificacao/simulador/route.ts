@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { generateLateralAnswer, isCustomerQuestion } from "@/features/ai-agent/lateral-answer";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "@/features/ai-agent/memory";
-import { loadQuickReplyTemplates, matchFaqSituation, parseHumanRequest, parseOptOut } from "@/features/ai-agent/quick-reply";
+import { loadQuickReplyTemplates, parseHumanRequest, parseOptOut } from "@/features/ai-agent/quick-reply";
+import { detectLateralSituation, phraseMatches, quickReplyTuning } from "@/features/attendance-situations/catalog";
+import { loadTenantSituations } from "@/features/attendance-situations/service";
 import { loadTenantAiAgentConfig } from "@/features/ai-agent/tenant-config";
 import { renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { resolveDeterministicQualificationTurn } from "@/features/qualification-engine/service";
@@ -30,11 +32,14 @@ export async function POST(req: NextRequest) {
     if (!lastUser) return NextResponse.json({ error: "messages array is required" }, { status: 400 });
 
     const startedAt = Date.now();
-    const [behavior, tenantConfig, templates] = await Promise.all([
+    const [behavior, tenantConfig, templates, situations] = await Promise.all([
       resolvePublishedAgentBehavior(tenantId),
       loadTenantAiAgentConfig(tenantId),
       loadQuickReplyTemplates(tenantId),
+      loadTenantSituations(tenantId),
     ]);
+    const { phrases } = quickReplyTuning(situations);
+    const asksForPerson = (text: string) => parseHumanRequest(text) || phraseMatches(text, phrases.request_human);
 
     // Replay the conversation: each assistant message is the question the next
     // customer message answers, exactly as in the real engine.
@@ -50,7 +55,7 @@ export async function POST(req: NextRequest) {
       }
       const isLast = index === messages.length - 1 || messages.slice(index + 1).every((next) => next.role !== "user");
       if (isLast) before = memory;
-      else if (parseHumanRequest(message.content)) transferred = true;
+      else if (asksForPerson(message.content)) transferred = true;
       memory = extractFieldsFromMessage(message.content, memory);
     });
     const reply = (text: string, extra: { transfer?: boolean } = {}) => NextResponse.json({
@@ -60,8 +65,8 @@ export async function POST(req: NextRequest) {
       shouldTransferToHuman: Boolean(extra.transfer),
     });
 
-    if (parseOptOut(lastUser)) return reply(templates["opt_out.confirmed"]?.body ?? "Entendido.");
-    if (parseHumanRequest(lastUser)) {
+    if (parseOptOut(lastUser) || phraseMatches(lastUser, phrases.opt_out)) return reply(templates["opt_out.confirmed"]?.body ?? "Entendido.");
+    if (asksForPerson(lastUser)) {
       return transferred
         ? reply(templates["human.waiting_reminder"]?.body ?? "Sua mensagem foi recebida.")
         : reply(renderConversationVariables(templates["human.requested"]?.body ?? "", before), { transfer: true });
@@ -83,9 +88,11 @@ export async function POST(req: NextRequest) {
 
     let text = turn.reply;
     if (turn.kind === "collecting" && answered.length === 0) {
-      const faq = matchFaqSituation(lastUser);
-      if (faq && templates[faq]?.active) text = `${renderConversationVariables(templates[faq].body, memory)}\n\n${turn.reply}`;
-      else if (!faq && isCustomerQuestion(lastUser)) {
+      const situation = detectLateralSituation(lastUser, situations);
+      if (situation?.kind === "custom" && situation.action === "transfer") return reply(renderConversationVariables(situation.response, memory), { transfer: true });
+      const situationText = situation?.kind === "custom" ? situation.response : situation ? templates[situation.key]?.body : undefined;
+      if (situationText) text = `${renderConversationVariables(situationText, memory)}\n\n${turn.reply}`;
+      else if (!situation && isCustomerQuestion(lastUser)) {
         const lateral = await generateLateralAnswer({ tenantId, question: lastUser, customerFirstName: memory.customerFirstName?.value ?? null }).catch(() => null);
         if (lateral) text = `${lateral}\n\n${turn.reply}`;
       }

@@ -20,7 +20,9 @@ import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/featur
 import { resolveCanonicalWhatsAppDestination } from "@/features/communication-channels/phone-resolution";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
-import { loadQuickReplyTemplates, matchFaqSituation, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
+import { detectLateralSituation, quickReplyTuning } from "@/features/attendance-situations/catalog";
+import { loadTenantSituations } from "@/features/attendance-situations/service";
+import { loadQuickReplyTemplates, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -1214,7 +1216,10 @@ export async function processInboundAiResponse({
       }
     : undefined;
 
+  // Phrases the tenant taught and its own situations (Atendimento → Situações).
+  const tenantSituations = await loadTenantSituations(tenantId);
   const resolvedQuickReply = quickReplyEnabled ? resolveQuickReply({
+    ...quickReplyTuning(tenantSituations),
     body: userMessageBody,
     messageKind: effectiveMessageKind,
     conversationState: automationState,
@@ -1358,8 +1363,8 @@ export async function processInboundAiResponse({
   // 6d. Carregar config do tenant para usar mensagens configuráveis e checar flag enabled
   const tenantConfig = await loadTenantAiAgentConfig(tenantId);
 
-  if (detectHumanTransferRequest(userMessageBody)) {
-    const handoffMessage = renderConversationVariables(effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome);
+  // One transfer path: an explicit request for a person, or a tenant situation whose action is "transfer".
+  const transferToHuman = async (handoffMessage: string, reason: string) => {
     const messageId = `ai_msg_handoff_${crypto.randomUUID()}`;
     await db.insert(schema.whatsappMessages).values({
       id: messageId,
@@ -1385,7 +1390,7 @@ export async function processInboundAiResponse({
     } catch (error) {
       console.error("[ai-wpp] handoff.failed", { tenantId, leadId, transport, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
     }
-    await transitionConversationState({ tenantId, conversationId: conversation.id, newStatus: "WAITING_HUMAN", reason: "Solicitação explícita de atendimento humano" });
+    await transitionConversationState({ tenantId, conversationId: conversation.id, newStatus: "WAITING_HUMAN", reason });
     const humanQualification = await persistQualificationEvaluation({ tenantId, leadId, conversationId: conversation.id, actorUserId: null, policy: behavior.policy, memory: updatedMemory, reason: "human_requested" });
     const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
     await distributeQualifiedLead({ tenantId, leadId, actorUserId: null }).catch((distErr) => {
@@ -1393,6 +1398,13 @@ export async function processInboundAiResponse({
     });
     console.info("[qualification] human_requested", { tenantId, leadId, conversationId: conversation.id, state: humanQualification.state, score: humanQualification.score });
     return { status: "transferred_to_human", deliveryStatus, reply: handoffMessage };
+  };
+
+  if (detectHumanTransferRequest(userMessageBody)) {
+    return transferToHuman(
+      renderConversationVariables(effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome),
+      "Solicitação explícita de atendimento humano",
+    );
   }
 
   // 6e. IA desativada para o tenant: silêncio. Pedidos explícitos de humano
@@ -1510,15 +1522,19 @@ export async function processInboundAiResponse({
     previousReply: currentMemory.lastQuestionAsked ?? null,
     seed: `${conversation.id}:${pastOutboundTexts.size}`,
   });
-  // The customer asked something instead of answering. A common question
-  // (price, operators, waiting period, who is talking) gets its reviewed text;
-  // anything else the lateral answer. Then the pending question follows; on any
+  // The customer asked something instead of answering. A registered situation
+  // (the tenant's own ones first, then the common questions) gets its reviewed
+  // text, or the transfer when that is its action; anything else the lateral
+  // answer guided by the roteiros. Then the pending question follows; on any
   // failure the scripted reply goes alone.
   if (deterministicTurn.kind === "collecting" && !answeredNow && effectiveMessageKind === "text") {
-    const faq = matchFaqSituation(normalizedInboundMessage);
-    if (faq) {
-      const faqTemplate = (await loadQuickReplyTemplates(tenantId))[faq];
-      if (faqTemplate?.active) deterministicTurn = { ...deterministicTurn, reply: `${renderConversationVariables(faqTemplate.body, updatedMemory, lead?.nome)}\n\n${deterministicTurn.reply}` };
+    const situation = detectLateralSituation(normalizedInboundMessage, tenantSituations);
+    if (situation?.kind === "custom" && situation.action === "transfer") {
+      return transferToHuman(renderConversationVariables(situation.response, updatedMemory, lead?.nome), `Situação: ${situation.label}`);
+    }
+    if (situation) {
+      const situationText = situation.kind === "custom" ? situation.response : (await loadQuickReplyTemplates(tenantId))[situation.key]?.body;
+      if (situationText) deterministicTurn = { ...deterministicTurn, reply: `${renderConversationVariables(situationText, updatedMemory, lead?.nome)}\n\n${deterministicTurn.reply}` };
     } else if (isCustomerQuestion(normalizedInboundMessage)) {
       const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: updatedMemory.customerFirstName?.value ?? null });
       if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };

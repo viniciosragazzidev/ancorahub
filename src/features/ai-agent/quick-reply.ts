@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
 import { DEFAULT_HUMAN_REQUEST_TEXT } from "@/features/qualification-engine/reply-composer";
+import { phraseMatches } from "@/features/attendance-situations/catalog";
 
 export const quickReplyIntentValues = [
   "GREETING", "CONFIRMATION", "NEGATION", "THANKS", "GOODBYE", "WAITING_FOR_RESPONSE",
@@ -74,7 +75,13 @@ export type QuickReplyInput = {
   hasPendingQuestion: boolean;
   cooldown?: QuickReplyCooldown;
   now?: Date;
+  /** Phrases the tenant taught, per rule key (Atendimento → Situações). */
+  phrases?: Partial<Record<string, readonly string[]>>;
+  /** Optional rules the tenant switched off (never the critical ones). */
+  disabledRules?: readonly string[];
 };
+
+const taught = (input: QuickReplyInput, ruleKey: string) => phraseMatches(input.body, input.phrases?.[ruleKey]);
 
 export type QuickReplyResolution = {
   resolved: boolean;
@@ -123,22 +130,8 @@ export function parseOptOut(value: string | null | undefined) {
   return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse)$/.test(text) || /(nao tenho interesse|sem interesse|nao quero|nao tenho mais interesse|ja contratei|ja tenho|nao solicitei|nao pedi)/.test(text);
 }
 
-export type FaqSituation = "faq.price" | "faq.operators" | "faq.waiting_period" | "faq.who";
-
-/**
- * Common questions asked in the middle of the qualification, answered with a
- * reviewed text (editable per tenant as a quick reply template) before the
- * pending question is asked again. Anything else goes to the lateral answer.
- */
-export function matchFaqSituation(value: string | null | undefined): FaqSituation | null {
-  const text = normalizeQuickReplyText(value);
-  if (!text) return null;
-  if (/\b(carencia|carencias)\b/.test(text)) return "faq.waiting_period";
-  if (/(quanto custa|quanto fica|quanto sai|fica quanto|sai quanto|qual (?:o |a )?(?:valor|preco|mensalidade)|quais (?:os )?(?:valores|precos)|\bvalores?\b|\bprecos?\b|\bmensalidade\b)/.test(text)) return "faq.price";
-  if (/(\boperadoras?\b|\bamil\b|\bbradesco\b|sul ?america|\bunimed\b|\bhapvida\b|notre ?dame|porto seguro|\bprevent\b|golden cross|assim saude|\bleve saude\b)/.test(text)) return "faq.operators";
-  if (/(quem (?:e|esta falando|fala|ta falando)|e (?:um )?robo|e (?:um )?bot|voce e (?:humano|robo|real|uma pessoa)|e golpe|isso e golpe)/.test(text)) return "faq.who";
-  return null;
-}
+/** Common questions mid-qualification now live with the situations (Atendimento → Situações). */
+export { matchFaqSituation, type FaqSituation } from "@/features/attendance-situations/catalog";
 
 export function parseStartQualification(value: string | null | undefined) {
   const text = normalizeQuickReplyText(value);
@@ -166,17 +159,17 @@ function isGoodbye(text: string) {
 }
 
 export const quickReplyRules: QuickReplyRule[] = [
-  { key: "opt_out", intent: "OPT_OUT", templateKey: "opt_out.confirmed", priority: 100, resolve: (input) => parseOptOut(input.body) },
-  { key: "wrong_number", intent: "WRONG_NUMBER", templateKey: "wrong_number.confirmed", priority: 95, resolve: (input) => parseWrongNumber(input.body) },
+  { key: "opt_out", intent: "OPT_OUT", templateKey: "opt_out.confirmed", priority: 100, resolve: (input) => parseOptOut(input.body) || taught(input, "opt_out") },
+  { key: "wrong_number", intent: "WRONG_NUMBER", templateKey: "wrong_number.confirmed", priority: 95, resolve: (input) => parseWrongNumber(input.body) || taught(input, "wrong_number") },
   // Already with (or waiting for) a person: asking again gets the reminder
   // below instead of a second transfer and a second distribution.
-  { key: "request_human", intent: "REQUEST_HUMAN", templateKey: "human.requested", priority: 90, resolve: (input) => input.conversationState !== "WAITING_HUMAN" && input.conversationState !== "HUMAN_IN_PROGRESS" && parseHumanRequest(input.body) },
+  { key: "request_human", intent: "REQUEST_HUMAN", templateKey: "human.requested", priority: 90, resolve: (input) => input.conversationState !== "WAITING_HUMAN" && input.conversationState !== "HUMAN_IN_PROGRESS" && (parseHumanRequest(input.body) || taught(input, "request_human")) },
   { key: "media_received", intent: "MEDIA_RECEIVED", templateKey: "media.received", priority: 85, resolve: (input) => input.messageKind !== "text" && input.messageKind !== undefined },
   { key: "human_already_contacted", intent: "HUMAN_ALREADY_CONTACTED", templateKey: "human.already_assigned", priority: 80, resolve: (input) => input.conversationState === "HUMAN_IN_PROGRESS" },
   { key: "waiting_human", intent: "WAITING_FOR_RESPONSE", templateKey: "human.waiting_reminder", priority: 75, resolve: (input) => input.conversationState === "WAITING_HUMAN" },
   { key: "waiting_response", intent: "WAITING_FOR_RESPONSE", templateKey: "human.waiting_reminder", priority: 74, resolve: (input) => isWaiting(normalizeQuickReplyText(input.body)) },
-  { key: "urgent", intent: "URGENT_REQUEST", templateKey: "urgent.requested", priority: 70, resolve: (input) => isUrgent(normalizeQuickReplyText(input.body)) },
-  { key: "callback", intent: "REQUEST_CALLBACK", templateKey: "callback.requested", priority: 65, resolve: (input) => isCallback(normalizeQuickReplyText(input.body)) },
+  { key: "urgent", intent: "URGENT_REQUEST", templateKey: "urgent.requested", priority: 70, resolve: (input) => isUrgent(normalizeQuickReplyText(input.body)) || taught(input, "urgent") },
+  { key: "callback", intent: "REQUEST_CALLBACK", templateKey: "callback.requested", priority: 65, resolve: (input) => isCallback(normalizeQuickReplyText(input.body)) || taught(input, "callback") },
   // During AI qualification, greetings and short confirmations can be the
   // customer's answer to the persisted question. They must reach extraction
   // and the next-field resolver, never replace the flow with a generic reply.
@@ -243,7 +236,8 @@ export function resolveQuickReply(input: QuickReplyInput & { cooldownConfig?: Qu
   if (parseStartQualification(input.body)) {
     return { resolved: false, intent: "GREETING", ruleKey: "start_qualification", templateKey: null, nextState: "AI_ACTIVE", notifyHuman: false };
   }
-  const rule = [...quickReplyRules].sort((a, b) => b.priority - a.priority).find((candidate) => candidate.resolve(input));
+  const disabled = new Set(input.disabledRules ?? []);
+  const rule = [...quickReplyRules].sort((a, b) => b.priority - a.priority).find((candidate) => !disabled.has(candidate.key) && candidate.resolve(input));
   if (!rule) return { resolved: false, intent: null, ruleKey: null, templateKey: null, notifyHuman: false };
   const suppressed = isQuickReplySuppressed({ templateKey: rule.templateKey, ruleKey: rule.key, cooldown: input.cooldown, now: input.now, cooldownConfig: input.cooldownConfig });
   if (suppressed) return { resolved: true, intent: rule.intent, ruleKey: rule.key, templateKey: rule.templateKey, notifyHuman: rule.intent !== "GREETING", suppressReason: suppressed };

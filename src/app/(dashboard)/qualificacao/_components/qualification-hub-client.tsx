@@ -44,7 +44,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AgentTrainingTab } from "@/app/(dashboard)/settings/_components/agent-training-tab";
 import { AgentTriggersPanel } from "./agent-triggers-panel";
-import { SituationalPlaybooksPanel } from "./situational-playbooks-panel";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -297,7 +296,6 @@ export function QualificationHubClient({
 
   const tabs = [
     { id: "overview", label: "Prompt e comportamento", icon: MessageSquare },
-    { id: "situational_playbooks", label: "Roteiros", icon: Sparkles },
     { id: "agent_triggers", label: "Permissões", icon: Zap },
     { id: "followup_rules", label: "Follow-up", icon: Clock },
     { id: "whatsapp_diag", label: "Conectividade", icon: Phone },
@@ -313,8 +311,6 @@ export function QualificationHubClient({
     brokers: "overview",
     system_messages: "overview",
     alerts: "simulator",
-    situations: "situational_playbooks",
-    playbooks: "situational_playbooks",
     training: "overview",
   };
 
@@ -713,13 +709,6 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
           </div>
         )}
 
-        {/* TAB 2: ROTEIROS & SITUAÇÕES IA */}
-        {activeTab === "situational_playbooks" && (
-          <SituationalPlaybooksPanel
-            assistantName={assistantName}
-            onTestInSimulator={handleTestInSimulator}
-          />
-        )}
 
         {/* TAB 7: WHATSAPP DIAGNÓSTICO & TESTES */}
         {activeTab === "whatsapp_diag" && (

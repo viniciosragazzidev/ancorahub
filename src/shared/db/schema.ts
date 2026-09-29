@@ -2422,6 +2422,30 @@ export const extensionSettings = pgTable(
   (table) => [uniqueIndex("extension_settings_tenant_unique").on(table.tenantId)],
 );
 
+/**
+ * Atendimento → Situações. `builtin`: phrases a tenant taught for a system
+ * situation (key = its rule key) and whether an optional one is on.
+ * `custom`: the tenant's own situation with a fixed reply and action.
+ */
+export const attendanceSituations = pgTable(
+  "attendance_situations",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    situationKey: text("situation_key").notNull(),
+    kind: text("kind", { enum: ["builtin", "custom"] }).notNull(),
+    title: text("title"),
+    examplePhrases: jsonb("example_phrases").$type<string[]>().notNull().default([]),
+    response: text("response"),
+    action: text("action", { enum: ["continue", "transfer"] }),
+    enabled: boolean("enabled").notNull().default(true),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [uniqueIndex("attendance_situations_tenant_key_unique").on(table.tenantId, table.situationKey)],
+);
+
 export const aiQuickReplyTemplates = pgTable(
   "ai_quick_reply_templates",
   {
