@@ -20,6 +20,7 @@ import {
 } from "@/components/huge-icons";
 import { Card } from "@/components/ui/card";
 import { DsBarChart } from "@/components/ui/ds-bar-chart";
+import { FunnelChart } from "@/components/dashboard/funnel-chart";
 import { dsButtonVariants } from "@/components/ui/ds-button-variants";
 import { DsEmptyState } from "@/components/ui/ds-empty-state";
 import { DsStatusBadge, type DsStatusBadgeStatus } from "@/components/ui/ds-status-badge";
@@ -334,27 +335,15 @@ export function FlowCard({ trend, period }: { trend: DashboardViewData["trend"];
 }
 
 export function FunnelCard({ funnel }: { funnel: DashboardViewData["funnel"] }) {
-  const base = Math.max(funnel.received, 1);
   const rows = [
-    ...funnel.stages.map((row) => ({ key: row.stage, label: LEAD_STATUS[row.stage]?.label ?? row.stage, value: row.reached, lost: false })),
-    { key: "lost", label: "Perdido", value: funnel.lost, lost: true },
+    ...funnel.stages.map((row) => ({ stage: LEAD_STATUS[row.stage]?.label ?? row.stage, volume: row.reached })),
+    { stage: "Perdido", volume: funnel.lost, lost: true },
   ];
   return (
     <Card variant="overview" className="h-full">
       <SectionCardHeader icon={<TrendUp />} title="Funil" description={`${funnel.received.toLocaleString("pt-BR")} leads no período.`} />
-      <div className="flex flex-col divide-y divide-border/70">
-        {rows.map((row) => (
-          <div key={row.key} className="grid grid-cols-[7.5rem_minmax(0,1fr)_3rem] items-center gap-3 px-4 py-2.5 text-[13px]">
-            <span className="truncate text-muted-foreground">{row.label}</span>
-            <span className="h-2 overflow-hidden rounded-full bg-ds-paper-mist">
-              <span
-                className={cn("block h-full rounded-full", row.lost ? "bg-ds-smoke" : "bg-ds-electric-blue")}
-                style={{ width: `${Math.min(100, (row.value / base) * 100)}%` }}
-              />
-            </span>
-            <span className="text-right font-ds-mono font-medium tabular-nums text-foreground">{row.value.toLocaleString("pt-BR")}</span>
-          </div>
-        ))}
+      <div className="px-4 pb-5 pt-4">
+        <FunnelChart data={rows} />
       </div>
     </Card>
   );
