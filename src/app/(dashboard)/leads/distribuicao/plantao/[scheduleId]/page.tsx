@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, Clock3, Download } from "lucide-react";
+import { CheckCircle2, Clock3, Download, FileSpreadsheet } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ArrowLeft, UserList, Users } from "@/components/huge-icons";
 import { LeadStatusBadge, LeadTemperature } from "@/components/status-badges";
@@ -204,6 +204,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
         {canExportReport ? (
           <Button render={<a href={`/api/reports/duty-schedule/${schedule.id}`} download />} size="sm" variant="outline" className="gap-1.5">
             <Download className="size-3.5" aria-hidden="true" /> Exportar PDF
+          </Button>
+        ) : null}
+        {canExportReport ? (
+          <Button render={<a href={`/api/reports/duty-schedule/${schedule.id}?format=xlsx`} download />} size="sm" variant="outline" className="gap-1.5">
+            <FileSpreadsheet className="size-3.5" aria-hidden="true" /> Exportar planilha
           </Button>
         ) : null}
         <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>
