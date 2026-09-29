@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ShieldCheck } from "@/components/huge-icons";
@@ -9,12 +9,21 @@ import { Button } from "@/components/ui/button";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isTeamMemberProfileEnabled } from "@/features/team/member-profile";
+import { canEditMemberAuthority, canManageMember } from "@/shared/auth/team-permissions";
 import { TeamInviteSection } from "./team-invite-section";
 import { TeamMembersTable } from "./team-members-table";
+import { isCustomRolesEnabled } from "@/features/custom-roles/service";
+import { TeamManagementTabs } from "./team-management-tabs";
+import { UnitsView } from "./units-view";
 
-export default async function TeamPage() {
+export default async function TeamPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role === "broker") redirect("/access-denied");
+  const params = await searchParams;
+  if (params.visao === "unidades") {
+    if (context.role !== "director" && !(context.role === "manager" && context.branchId)) redirect("/access-denied");
+    return <UnitsView context={context} />;
+  }
   const branchScope = context.role === "manager"
     ? context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : sql`false`
     : undefined;
@@ -25,7 +34,13 @@ export default async function TeamPage() {
     ? context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`
     : undefined;
 
-  const [tenant, branches, brokers, nonBrokers, unassignedLeads, salesTotal, memberProfileEnabled] = await Promise.all([
+  const customRolesPromise = context.role === "director"
+    ? isCustomRolesEnabled(context.tenantId).then((enabled) => enabled
+      ? getDatabase().select({ id: schema.customRoles.id, name: schema.customRoles.name, scope: schema.customRoles.scope }).from(schema.customRoles).where(and(eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active"))).orderBy(asc(schema.customRoles.name))
+      : [])
+    : Promise.resolve([] as Array<{ id: string; name: string; scope: "none" | "own" | "branch" | "tenant" }>);
+
+  const [tenant, branches, brokers, nonBrokers, unassignedLeads, salesTotal, memberProfileEnabled, customRoles] = await Promise.all([
     getDatabase()
       .select({ name: schema.tenants.name })
       .from(schema.tenants)
@@ -41,13 +56,16 @@ export default async function TeamPage() {
         id: sql<string>`coalesce(${schema.tenantMemberships.id}, ${schema.brokerProfiles.id})`,
         userId: schema.brokerProfiles.userId,
         name: schema.brokerProfiles.professionalName,
-        email: schema.brokerProfiles.invitedEmail,
+        email: sql<string>`coalesce(${schema.brokerProfiles.invitedEmail}, '')`,
+        phone: schema.brokerProfiles.phone,
         role: sql<"director" | "manager" | "supervisor" | "broker">`coalesce(${schema.tenantMemberships.role}::text, ${schema.brokerInvitations.role}::text, 'broker')::tenant_role`,
         jobTitle: sql<string>`coalesce(${schema.tenantMemberships.jobTitle}, ${schema.brokerInvitations.jobTitle}, 'broker')`,
         customRoleScope: schema.customRoles.scope,
+        customRoleId: sql<string | null>`coalesce(${schema.tenantMemberships.customRoleId}, ${schema.brokerInvitations.customRoleId})`,
+        customRoleName: schema.customRoles.name,
         status: sql<"pending" | "active" | "disabled">`
           case
-            when ${schema.user.status}::text = 'pending' or ${schema.brokerProfiles.lifecycleStatus}::text = 'INVITED' then 'pending'
+            when ${schema.brokerProfiles.userId} is null or ${schema.user.status}::text = 'pending' or ${schema.brokerProfiles.lifecycleStatus}::text in ('DRAFT', 'INVITED', 'INVITATION_EXPIRED', 'ONBOARDING') then 'pending'
             when ${schema.user.status}::text = 'disabled' or ${schema.tenantMemberships.status}::text = 'inactive' then 'disabled'
             else 'active'
           end
@@ -66,7 +84,13 @@ export default async function TeamPage() {
         eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId),
         eq(schema.brokerInvitations.status, "PENDING")
       ))
-      .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
+      .leftJoin(schema.customRoles, and(
+        eq(schema.customRoles.tenantId, context.tenantId),
+        or(
+          eq(schema.tenantMemberships.customRoleId, schema.customRoles.id),
+          eq(schema.brokerInvitations.customRoleId, schema.customRoles.id),
+        ),
+      ))
       .where(and(
         eq(schema.brokerProfiles.tenantId, context.tenantId),
         context.role === "manager" && context.branchId ? eq(schema.brokerProfiles.branchId, context.branchId) : undefined
@@ -77,6 +101,7 @@ export default async function TeamPage() {
         userId: schema.user.id,
         name: schema.user.name,
         email: schema.user.email,
+        phone: schema.brokerProfiles.phone,
         role: schema.tenantMemberships.role,
         jobTitle: sql<string>`case
           when ${schema.tenantMemberships.role}::text in ('director', 'manager', 'supervisor')
@@ -85,6 +110,8 @@ export default async function TeamPage() {
           else ${schema.tenantMemberships.jobTitle}
         end`,
         customRoleScope: schema.customRoles.scope,
+        customRoleId: schema.tenantMemberships.customRoleId,
+        customRoleName: schema.customRoles.name,
         status: sql<"pending" | "active" | "disabled">`
           case
             when ${schema.user.status}::text = 'pending' then 'pending'
@@ -98,7 +125,10 @@ export default async function TeamPage() {
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.tenantMemberships.branchId, schema.branches.id))
-      .leftJoin(schema.brokerProfiles, eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId))
+      .leftJoin(schema.brokerProfiles, and(
+        eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId),
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+      ))
       .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
@@ -115,6 +145,7 @@ export default async function TeamPage() {
       .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
       .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadBranchScope)),
     isTeamMemberProfileEnabled(),
+    customRolesPromise,
   ]);
 
   // Tendências mensais (últimos 6 meses) para os cards do topo
@@ -160,11 +191,26 @@ export default async function TeamPage() {
 
   // Dedup por id: gestores/supervisores/diretores com broker_profiles + tenant_memberships
   // aparecem nas duas queries; a versão de tenant_memberships (nome/e-mail atuais) vence.
+  type TeamMemberRow = (typeof brokers)[number] | (typeof nonBrokers)[number];
   const members = [
-    ...new Map<string, (typeof brokers)[number]>(
+    ...new Map<string, TeamMemberRow>(
       [...brokers, ...nonBrokers].map((member) => [member.id, member])
     ).values(),
-  ].sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  ]
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
+    .map((member) => {
+      const target = {
+        role: member.role,
+        branchId: member.branchId,
+        userId: member.userId ?? member.id,
+      };
+
+      return {
+        ...member,
+        canEditAuthority: canEditMemberAuthority(context, target),
+        canManage: canManageMember(context, target),
+      };
+    });
   const activeMembers = members.filter((member) => member.status === "active").length;
   const unassignedCount = unassignedLeads[0]?.count ?? 0;
   const totalVolume = salesTotal[0]?.sum ?? 0;
@@ -173,10 +219,11 @@ export default async function TeamPage() {
     <>
       <DashboardHeader
         breadcrumb={tenant[0]?.name ?? "Gestao"}
-        title="Equipe"
-        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{context.role === "director" ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} /></div>}
+        title="Equipe e unidades"
+        rightSlot={<div className="flex items-center gap-1.5 sm:gap-2">{context.role === "director" ? <Button aria-label="Cargos e permissões" render={<Link href="/equipe/cargos" />} variant="outline" className="max-[559px]:px-2.5"><ShieldCheck className="size-4" /><span className="max-[559px]:hidden">Cargos e permissões</span></Button> : null}<TeamInviteSection branches={branches} canInviteManager={context.role === "director"} canInviteDirector={context.role === "director"} customRoles={customRoles} /></div>}
       />
-      <main className="flex flex-1 flex-col gap-6 p-4 lg:p-6">
+      <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) sm:gap-6 lg:p-6">
+        <TeamManagementTabs active="membros" />
         {/* Contexto de página legado, preservado para eventual restauração:
         <section>
           <p className="text-xs font-medium text-primary">GESTAO DE EQUIPE</p>
@@ -188,7 +235,7 @@ export default async function TeamPage() {
           </p>
         </section>
         */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
           <StatCard label="Total de membros" value={members.length} sublabel="últimos 6 meses" sparklineData={membersTrend} sparklineColor="var(--chart-1)" />
           <StatCard label="Acessos ativos" value={activeMembers} sublabel="membros com acesso" sparklineData={membersTrend} sparklineColor="var(--chart-3)" />
           <StatCard label="Leads sem atendimento" value={unassignedCount} sublabel="aguardando corretor" sparklineData={leadsTrend} sparklineColor="var(--chart-4)" />
@@ -200,6 +247,7 @@ export default async function TeamPage() {
           currentRole={context.role}
           currentUserId={context.userId}
           members={members}
+          customRoles={customRoles}
           canViewProfile={memberProfileEnabled}
         />
       </main>

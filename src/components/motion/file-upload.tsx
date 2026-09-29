@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { useCallback, useId, useRef, useState } from "react";
+import { createElement, useCallback, useId, useRef, useState } from "react";
 import { EASE_OUT } from "@/lib/ease";
 import { cn } from "@/lib/utils";
 
@@ -269,7 +269,7 @@ function FileUploadRow({
   const progress = clampProgress(item.progress, status);
   const progressRatio = progress / 100;
   const showProgress = status === "uploading" || status === "success";
-  const LeadingIcon = getFileIcon(item);
+  const leadingIcon = getFileIcon(item);
 
   return (
     <motion.li
@@ -294,7 +294,7 @@ function FileUploadRow({
             classNames?.leading,
           )}
         >
-          <LeadingIcon className="h-5 w-5" />
+          {createElement(leadingIcon, { className: "h-5 w-5" })}
         </div>
 
         <div className={cn("min-w-0 flex-1", classNames?.content)}>

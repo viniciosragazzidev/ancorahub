@@ -40,9 +40,12 @@ export const MOTIVOS_PERDA = [
   "preco",
   "carência",
   "encontrou_mais_barato",
+  "ja_contratou",
   "desistiu",
   "problema_saude",
   "nao_qualificado",
+  "sem_interesse",
+  "sem_contato",
   "outro",
 ] as const;
 
@@ -52,8 +55,34 @@ export const MOTIVO_PERDA_LABELS: Record<MotivoPerda, string> = {
   preco: "Preço acima do esperado",
   carência: "Período de carência incompatível",
   encontrou_mais_barato: "Encontrou opção mais barata",
+  ja_contratou: "Já contratou com outra opção",
   desistiu: "Desistiu da contratação",
   problema_saude: "Problema de saúde não coberto",
   nao_qualificado: "Lead não qualificado",
+  sem_interesse: "Sem interesse",
+  sem_contato: "Sem contato / Não atende",
   outro: "Outro motivo",
 };
+
+/**
+ * Keeps status changes compatible with older broker clients that submitted
+ * the visible label instead of the canonical loss-reason code.
+ */
+export function normalizeMotivoPerda(value: string | null | undefined): string | null {
+  const normalized = value?.trim();
+  if (!normalized) return null;
+
+  const aliases: Record<string, MotivoPerda> = {
+    "Preço": "preco",
+    "Preço alto": "preco",
+    "Já contratou": "ja_contratou",
+    "Já contratou com outro": "ja_contratou",
+    "Desistiu": "desistiu",
+    "Desistiu de contratar": "desistiu",
+    "Sem interesse": "sem_interesse",
+    "Sem contato / Não atende": "sem_contato",
+    "Outro": "outro",
+  };
+
+  return aliases[normalized] ?? normalized;
+}

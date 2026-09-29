@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { getDatabase, schema } from "@/shared/db";
 import { normalizeInvitationToken } from "@/features/team/invitation-token";
 import { OnboardingWizard } from "./onboarding-wizard";
@@ -40,10 +41,18 @@ export default async function PrimeiroAcessoPage({
     .from(schema.brokerInvitations)
     .innerJoin(schema.tenants, eq(schema.brokerInvitations.tenantId, schema.tenants.id))
     .innerJoin(schema.branches, eq(schema.brokerInvitations.branchId, schema.branches.id))
-    .where(and(eq(schema.brokerInvitations.tokenHash, tokenHash), eq(schema.brokerInvitations.status, "PENDING")))
+    .where(eq(schema.brokerInvitations.tokenHash, tokenHash))
     .limit(1);
 
-  if (!invitation || new Date() > invitation.expiresAt) {
+  if (!invitation) {
+    redirect("/login");
+  }
+
+  if (invitation.status === "EXPIRED" || new Date() >= invitation.expiresAt) {
+    redirect("/login");
+  }
+
+  if (invitation.status !== "PENDING") {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center bg-background">
         <div className="max-w-md w-full rounded-xl border border-border p-6 shadow-sm bg-card">

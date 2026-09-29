@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { toast } from "@/components/ui/sonner";
 
 import {
   DndContext,
@@ -23,7 +23,8 @@ import {
 } from "@dnd-kit/sortable";
 import { restrictToHorizontalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowLeft, ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, SquaresFour, Target, UserList, WhatsappLogo, X } from "@/components/huge-icons";
+import { ArrowLeft, ArrowUpRight, ArrowsClockwise, ChatCircleText, FileText, ListChecks, Phone, SlidersHorizontal, Sparkle, SquaresFour, Target, UserList, UserSwitch, WhatsappLogo, X, XCircle } from "@/components/huge-icons";
+import { NegotiationsRadarTab } from "@/features/conversation-intelligence/components/negotiations-radar-tab";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SelectionToolbar } from "@/components/ui/selection-toolbar";
@@ -33,23 +34,23 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { cn } from "@/lib/utils";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkChangeLeadStatusAction } from "./status-actions";
+import { distributeAllUnassignedLeadsAction } from "@/features/lead-distribution/actions";
+import { QueueColorDot, QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
 import { LeadDrawerManagementActions } from "./_components/lead-drawer-management-actions";
+import { LeadDistributionRemovedTag } from "./_components/lead-distribution-removal";
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
+import { UserAvatar } from "@/components/ui/user-avatar";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatCard } from "@/components/dashboard/metric-card";
+import { DetailDrawer } from "@/components/foundations/detail-drawer";
 import {
-  Sheet,
   SheetBody,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
   SheetSection,
-  SheetTitle,
+  SheetSectionHeader,
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
@@ -72,6 +73,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { LeadQuickNote } from "@/features/leads/components/lead-quick-note";
 import { LeadReminder } from "@/features/leads/components/lead-reminder";
+import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
+import { leadsViewRequiresServerData } from "./leads-view-navigation";
+import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-in-service-button";
+import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
+import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
+import { LeadDetailsDrawer } from "@/features/leads/components/lead-details-drawer";
+export type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 
 export type QualifyingLeadItem = {
   id: string;
@@ -86,34 +94,14 @@ export type QualifyingLeadItem = {
   origem: string;
   sourceChannel?: string | null;
   sourceCampaign?: string | null;
+  sourceMetadata?: unknown;
   tipo: string;
   queueId?: string | null;
   queueName?: string | null;
+  queueColorHue?: number | null;
   branchId?: string | null;
   branchName?: string | null;
   createdAt: string;
-};
-
-export type LeadWorkspaceItem = {
-  id: string;
-  nome: string;
-  telefone: string;
-  status: string;
-  qualificationStatus: string;
-  qualificationState?: string | null;
-  distributionStatus?: string;
-  origem: string;
-  sourceCampaign: string | null;
-  tipo: string;
-  createdAt: string;
-  assignedAt: string | null;
-  stageEnteredAt: string | null;
-  serviceStartedAt: string | null;
-  firstContactAt: string | null;
-  corretorId: string | null;
-  corretorNome: string | null;
-  branchId: string | null;
-  branchName: string | null;
 };
 
 const KANBAN_STORAGE_KEY = "ancorahub_kanban_config";
@@ -199,25 +187,33 @@ export function LeadsWorkspace({
   qualifyingLeads = [],
   queues = [],
   contextRole,
+  showUnassignedFilter = false,
+  initialView,
   contextJobTitle,
   contextBranchId,
   slaFirstContactMinutes = 15,
   slaStagnantDays = 3,
   brokers = [],
   branches = [],
+  manualAssignmentChoiceEnabled = true,
   pageSize = 20,
   pagination,
+  unassignedLeads = [],
+  unassignedPagination,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
   queues?: Array<{ id: string; name: string; branchId: string | null }>;
   contextRole: string;
+  showUnassignedFilter?: boolean;
+  initialView?: string;
   contextJobTitle?: string | null;
   contextBranchId?: string | null;
   slaFirstContactMinutes?: number;
   slaStagnantDays?: number;
   brokers?: Array<{ id: string; name: string; branchId: string | null }>;
   branches?: Array<{ id: string; name: string }>;
+  manualAssignmentChoiceEnabled?: boolean;
   pageSize?: number;
   pagination?: {
     currentPage: number;
@@ -225,14 +221,27 @@ export function LeadsWorkspace({
     totalItems: number;
     totalPages: number;
   };
+  unassignedLeads?: LeadWorkspaceItem[];
+  unassignedPagination?: {
+    currentPage: number;
+    pageSize: number;
+    totalItems: number;
+    totalPages: number;
+  };
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
+  const selectedMetaDetails = selectedLead
+    ? readMetaLeadDisplayDetails(selectedLead.sourceChannel, selectedLead.sourceMetadata)
+    : null;
   const drawerOptimisticSnapshots = useRef(new Map<string, LeadWorkspaceItem>());
-  const [activeTab, setActiveTab] = useState<string>(() => (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
+  const [activeTab, setActiveTab] = useState<string>(() => initialView ?? (qualifyingLeads.length > 0 ? "qualificacoes" : "list"));
   const kanbanRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isDistributingAll, startDistribution] = useTransition();
+  const [, startViewTransition] = useTransition();
 
   const [orderedStatuses, setOrderedStatuses] = useState<string[]>(() => {
     const saved = loadKanbanConfig();
@@ -249,6 +258,8 @@ export function LeadsWorkspace({
   // while the next navigation or realtime reconciliation is pending.
   useEffect(() => {
     setWorkspaceLeads(leads);
+    // The open drawer holds its own copy; keep it in step with the fresh payload.
+    setSelectedLead((current) => current ? leads.find((lead) => lead.id === current.id) ?? current : current);
   }, [leads]);
 
   const visibleStatuses = useMemo(
@@ -267,6 +278,32 @@ export function LeadsWorkspace({
         : [...current, status],
     );
   }
+
+  const handleViewChange = useCallback((view: string) => {
+    setActiveTab(view);
+    const currentQuery = typeof window === "undefined" ? searchParams.toString() : window.location.search;
+    const currentView = new URLSearchParams(currentQuery).get("view");
+    const requiresServerData = leadsViewRequiresServerData(view, currentView);
+    const params = new URLSearchParams(currentQuery);
+    params.delete("page");
+    if (view === "list") params.delete("view");
+    else params.set("view", view);
+    const query = params.toString();
+    const target = `/leads${query ? `?${query}` : ""}`;
+
+    // List, Kanban, qualification, radar and lost views all use the data that
+    // is already in this payload. Updating only the address bar keeps those
+    // tabs instant instead of re-running the full /leads server loader.
+    if (!requiresServerData) {
+      window.history.replaceState(window.history.state, "", target);
+      return;
+    }
+
+    window.history.replaceState(window.history.state, "", target);
+    startViewTransition(() => {
+      router.replace(target, { scroll: false });
+    });
+  }, [router, searchParams]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -297,8 +334,11 @@ export function LeadsWorkspace({
     viewport.scrollTo({ left: 0, behavior: "smooth" });
   }, []);
 
-  const leadsIds = useMemo(() => workspaceLeads.map((l) => l.id), [workspaceLeads]);
-  const multiSelect = useMultiSelect(leadsIds);
+  const activeLeadIds = useMemo(
+    () => (activeTab === "sem-atribuicao" ? unassignedLeads : workspaceLeads).map((lead) => lead.id),
+    [activeTab, unassignedLeads, workspaceLeads],
+  );
+  const multiSelect = useMultiSelect(activeLeadIds);
   const isMarketing = contextJobTitle === "marketing";
   const shouldMask = (lead: LeadWorkspaceItem) => {
     return isMarketing && lead.branchId !== contextBranchId;
@@ -315,9 +355,27 @@ export function LeadsWorkspace({
     return brokers.filter((b) => b.branchId === selectedLead.branchId);
   }, [selectedLead, brokers]);
 
-  const unassignedCount = useMemo(() => workspaceLeads.filter((l) => !l.corretorId).length, [workspaceLeads]);
+  const unassignedCount = unassignedPagination?.totalItems ?? unassignedLeads.length;
+  const leadCount = pagination?.totalItems ?? workspaceLeads.length;
   const canCall =
     selectedLead && !(contextRole === "broker" && selectedLead.status === "distributed");
+
+  const handleDistributeAll = useCallback(() => {
+    startDistribution(async () => {
+      const result = await distributeAllUnassignedLeadsAction();
+      if (result.error) {
+        toast.error("Não foi possível distribuir os leads", {
+          description: result.error,
+        });
+        return;
+      }
+
+      toast.success("Distribuição iniciada", {
+        description: result.message,
+      });
+      router.refresh();
+    });
+  }, [router]);
 
   const applyLeadPatch = useCallback((leadIds: string[], patch: (lead: LeadWorkspaceItem) => LeadWorkspaceItem) => {
     const changedIds = new Set(leadIds);
@@ -369,7 +427,7 @@ export function LeadsWorkspace({
   }, [applyLeadPatch, router]);
 
   const handleDrawerManagementCommitted = useCallback((result: {
-    entity?: { leadId: string; branchId?: string | null; corretorId?: string | null; status?: string; distributionStatus?: string };
+    entity?: { leadId: string; branchId?: string | null; corretorId?: string | null; status?: string; distributionStatus?: string; distributionRemovalReason?: string | null; distributionRemovalNote?: string | null };
   }) => {
     const entity = result.entity;
     if (entity) drawerOptimisticSnapshots.current.delete(entity.leadId);
@@ -381,8 +439,11 @@ export function LeadsWorkspace({
         corretorId: entity.corretorId === undefined ? lead.corretorId : entity.corretorId,
         corretorNome: entity.corretorId === undefined ? lead.corretorNome : broker?.name ?? null,
         status: entity.status ?? lead.status,
-        assignedAt: new Date().toISOString(),
+        assignedAt: entity.corretorId ? new Date().toISOString() : lead.assignedAt,
         distributionStatus: entity.distributionStatus ?? (entity.corretorId ? "assigned" : lead.distributionStatus),
+        // A manual assignment clears the removal; the removal action sets it.
+        distributionRemovalReason: entity.corretorId ? null : entity.distributionRemovalReason === undefined ? lead.distributionRemovalReason : entity.distributionRemovalReason,
+        distributionRemovalNote: entity.corretorId ? null : entity.distributionRemovalNote === undefined ? lead.distributionRemovalNote : entity.distributionRemovalNote,
       }));
     }
     setSelectedLead(null);
@@ -486,55 +547,63 @@ export function LeadsWorkspace({
   }
 
   return (
-    <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-5">
-
-        <div className="grid gap-3 sm:grid-cols-3">
-        <StatCard
-          label="Sem responsável"
-          value={unassignedCount}
-          sublabel="Aguardando distribuição"
-          sparklineData={leadsTrend.map((day) => day.unassigned)}
-          sparklineColor="var(--chart-1)"
-        />
-        <StatCard
-          label="Em atendimento"
-          value={activeCount}
-          sublabel="Contatos em negociação"
-          sparklineData={leadsTrend.map((day) => day.active)}
-          sparklineColor="var(--chart-3)"
-        />
-        <StatCard
-          label="Finalizados"
-          value={convertedCount}
-          sublabel="Vendas convertidas"
-          sparklineData={leadsTrend.map((day) => day.converted)}
-          sparklineColor="var(--chart-5)"
-        />
-      </div>
-
+    <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-4">
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
-      <Tabs defaultValue={qualifyingLeads.length > 0 ? "qualificacoes" : "list"} className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border/50 pb-2">
+      <Tabs value={activeTab} onValueChange={handleViewChange} className="flex min-h-0 flex-1 flex-col">
+        <div className="flex items-center gap-2 border-b border-border/60 pb-2">
           <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
-            <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
-              <Target className="size-4 text-primary" />
-              Qualificações
-              {qualifyingLeads.length > 0 ? (
-                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {qualifyingLeads.length}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
             <TabsTrigger value="list" className="text-xs gap-1.5">
               <UserList className="size-4" />
-              <span className="hidden sm:inline">Leads Qualificados & Distribuídos</span>
-              <span className="sm:hidden">Distribuídos</span>
+              <span className="hidden sm:inline">Todos os Leads</span>
+              <span className="sm:hidden">Lista</span>
+              {leadCount > 0 ? (
+                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                  {leadCount}
+                </Badge>
+              ) : null}
             </TabsTrigger>
             <TabsTrigger value="kanban" className="text-xs gap-1.5">
               <SquaresFour className="size-4" />
               <span className="hidden sm:inline">Kanban do Funil</span>
               <span className="sm:hidden">Kanban</span>
             </TabsTrigger>
+            <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
+              <Target className="size-4 text-primary" />
+              <span className="hidden sm:inline">Qualificação IA</span>
+              <span className="sm:hidden">Qualificação</span>
+              {qualifyingLeads.length > 0 ? (
+                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                  {qualifyingLeads.length}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
+            <TabsTrigger value="radar" className="text-xs gap-1.5">
+              <Sparkle className="size-4 text-primary" />
+              <span className="hidden sm:inline">Radar de Negociações (IA)</span>
+              <span className="sm:hidden">Radar IA</span>
+            </TabsTrigger>
+            <TabsTrigger value="perdidos" className="text-xs gap-1.5 text-muted-foreground data-[state=active]:text-destructive">
+              <XCircle className="size-4 text-destructive" />
+              <span className="hidden sm:inline">Perdidos & Inativos</span>
+              <span className="sm:hidden">Perdidos</span>
+              {workspaceLeads.filter((l) => l.status === "lost").length > 0 ? (
+                <Badge variant="destructive" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                  {workspaceLeads.filter((l) => l.status === "lost").length}
+                </Badge>
+              ) : null}
+            </TabsTrigger>
+            {showUnassignedFilter ? (
+              <TabsTrigger value="sem-atribuicao" className="text-xs gap-1.5">
+                <UserSwitch className="size-4 text-warning" />
+                <span className="hidden sm:inline">Sem Atribuição</span>
+                <span className="sm:hidden">Sem atrib.</span>
+                {unassignedCount > 0 ? (
+                  <Badge variant="warning" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+                    {unassignedCount}
+                  </Badge>
+                ) : null}
+              </TabsTrigger>
+            ) : null}
           </TabsList>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
@@ -558,41 +627,7 @@ export function LeadsWorkspace({
           </DropdownMenu>
         </div>
 
-        {/* ─── TAB 1: QUALIFICAÇÕES ─── */}
-        <TabsContent value="qualificacoes" className="mt-4">
-          {qualifyingLeads.length === 0 ? (
-            <EmptyState
-              variant="ghost"
-              icon={Target}
-              title="Nenhum lead em qualificação no momento"
-              description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
-            />
-          ) : (
-            <Card className="border-transparent bg-transparent shadow-none">
-              <CardHeader className="border-b border-border/50 p-4">
-                <div className="flex flex-col gap-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Target size={17} />
-                    Leads em qualificação por IA
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {qualifyingLeads.length} lead(s) em triagem · o robô qualifica e encaminha para a fila de distribuição.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <QualifyingLeadsDataTable
-                  leads={qualifyingLeads}
-                  queues={queues}
-                  pageSize={pageSize}
-                  onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
-                />
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* ─── TAB 2: LEADS QUALIFICADOS & DISTRIBUÍDOS ─── */}
+        {/* ─── TAB 1: LISTA PRINCIPAL (TABELA) ─── */}
         <TabsContent value="list" className="mt-4">
           <div className="space-y-4">
             <SelectionToolbar
@@ -602,41 +637,29 @@ export function LeadsWorkspace({
             >
               {selectionActions}
             </SelectionToolbar>
-            <Card className="border-transparent bg-transparent shadow-none">
-              <CardHeader className="border-b border-border/50 p-4">
-                <div className="flex flex-col gap-1">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <UserList size={17} />
-                    Leads qualificados & distribuídos
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    {workspaceLeads.length} lead(s) no total · ordenados pela entrada mais recente.
-                  </CardDescription>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <LeadsDataTable
-                  leads={workspaceLeads}
-                  contextRole={contextRole}
-                  shouldMask={shouldMask}
-                  slaFirstContactMinutes={slaFirstContactMinutes}
-                  slaStagnantDays={slaStagnantDays}
-                  pageSize={pageSize}
-                  pagination={pagination}
-                  selectedIds={multiSelect.selectedIds}
-                  isAllSelected={multiSelect.isAllSelected}
-                  onToggleRow={multiSelect.toggle}
-                  onSelectAll={(checked) => {
-                    if (checked) multiSelect.setSelected(leadsIds);
-                    else multiSelect.clear();
-                  }}
-                  onRowClick={setSelectedLead}
-                />
-              </CardContent>
-            </Card>
+            <div className="w-full">
+              <LeadsDataTable
+                leads={workspaceLeads}
+                contextRole={contextRole}
+                shouldMask={shouldMask}
+                slaFirstContactMinutes={slaFirstContactMinutes}
+                slaStagnantDays={slaStagnantDays}
+                pageSize={pageSize}
+                pagination={pagination}
+                selectedIds={multiSelect.selectedIds}
+                isAllSelected={multiSelect.isAllSelected}
+                onToggleRow={multiSelect.toggle}
+                onSelectAll={(checked: boolean) => {
+                  if (checked) multiSelect.setSelected(workspaceLeads.map((lead) => lead.id));
+                  else multiSelect.clear();
+                }}
+                onRowClick={setSelectedLead}
+              />
+            </div>
           </div>
         </TabsContent>
 
+        {/* ─── TAB 2: KANBAN DO FUNIL ─── */}
         <TabsContent value="kanban" className="relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]">
           <SelectionToolbar
             selectedCount={multiSelect.count}
@@ -697,182 +720,142 @@ export function LeadsWorkspace({
             </button>
           )}
           <p className="mt-3 text-xs text-muted-foreground">
-            Arraste as colunas para reordenar. Use o botão "Colunas" para exibir/ocultar etapas.
+            Arraste as colunas para reordenar. Use o botão &quot;Colunas&quot; para exibir/ocultar etapas.
           </p>
         </TabsContent>
+
+        {/* ─── TAB 3: QUALIFICAÇÃO IA ─── */}
+        <TabsContent value="qualificacoes" className="mt-4">
+          {qualifyingLeads.length === 0 ? (
+            <EmptyState
+              variant="ghost"
+              icon={Target}
+              title="Nenhum lead em qualificação no momento"
+              description="Os contatos recebidos via webhook, WhatsApp ou CSV com qualificação ativa aparecerão aqui enquanto o assistente realiza a triagem."
+            />
+          ) : (
+            <div className="w-full">
+              <QualifyingLeadsDataTable
+                leads={qualifyingLeads}
+                queues={queues}
+                pageSize={pageSize}
+                onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}
+              />
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ─── TAB 4: RADAR DE NEGOCIAÇÕES (IA) ─── */}
+        <TabsContent value="radar" className="mt-4">
+          <NegotiationsRadarTab
+            leads={workspaceLeads}
+            branches={branches}
+            brokers={brokers}
+            contextRole={contextRole}
+          />
+        </TabsContent>
+
+        {/* ─── TAB 5: PERDIDOS & INATIVOS ─── */}
+        <TabsContent value="perdidos" className="mt-4">
+          <div className="space-y-4">
+            <div className="w-full">
+              <LeadsDataTable
+                leads={workspaceLeads.filter((l) => l.status === "lost")}
+                contextRole={contextRole}
+                shouldMask={shouldMask}
+                slaFirstContactMinutes={slaFirstContactMinutes}
+                slaStagnantDays={slaStagnantDays}
+                pageSize={pageSize}
+                pagination={pagination}
+                selectedIds={multiSelect.selectedIds}
+                isAllSelected={false}
+                onToggleRow={multiSelect.toggle}
+                onSelectAll={() => {}}
+                onRowClick={setSelectedLead}
+              />
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ─── TAB 6: SEM ATRIBUIÇÃO (DIREÇÃO) ─── */}
+        {showUnassignedFilter ? (
+          <TabsContent value="sem-atribuicao" className="mt-4">
+            {unassignedLeads.length === 0 ? (
+              <EmptyState
+                variant="ghost"
+                icon={UserSwitch}
+                title="Nenhum lead sem atribuição"
+                description="Todos os leads operacionais possuem um corretor responsável no momento."
+              />
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Recuperar leads sem corretor</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Reenvia todos os leads elegíveis para as ofertas automáticas da fila.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="shrink-0"
+                    disabled={isDistributingAll}
+                    onClick={handleDistributeAll}
+                  >
+                    <ArrowsClockwise className="size-4" />
+                    {isDistributingAll ? "Distribuindo..." : "Distribuir todos"}
+                  </Button>
+                </div>
+                <SelectionToolbar
+                  selectedCount={multiSelect.count}
+                  totalCount={unassignedLeads.length}
+                  onClear={multiSelect.clear}
+                >
+                  {selectionActions}
+                </SelectionToolbar>
+                <div className="w-full">
+                  <LeadsDataTable
+                    leads={unassignedLeads}
+                    contextRole={contextRole}
+                    shouldMask={shouldMask}
+                    slaFirstContactMinutes={slaFirstContactMinutes}
+                    slaStagnantDays={slaStagnantDays}
+                    pageSize={unassignedPagination?.pageSize ?? pageSize}
+                    pagination={unassignedPagination ?? pagination}
+                    selectedIds={multiSelect.selectedIds}
+                    isAllSelected={unassignedLeads.every((lead) => multiSelect.isSelected(lead.id))}
+                    onToggleRow={multiSelect.toggle}
+                    onSelectAll={(checked: boolean) => {
+                      if (checked) multiSelect.setSelected(unassignedLeads.map((lead) => lead.id));
+                      else multiSelect.clear();
+                    }}
+                    onRowClick={setSelectedLead}
+                  />
+                </div>
+              </div>
+            )}
+          </TabsContent>
+        ) : null}
       </Tabs>
 
-      <Sheet open={Boolean(selectedLead)} onOpenChange={(open) => !open && setSelectedLead(null)}>
-        <SheetContent className="w-full sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>Detalhes do lead</SheetTitle>
-            <SheetDescription>
-              Contexto rápido para decidir o próximo passo sem sair da fila.
-            </SheetDescription>
-          </SheetHeader>
-          {selectedLead ? (
-            <SheetBody>
-              <div className="space-y-5">
-                <SheetSection>
-                  <div className="space-y-4 p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <p className={`truncate text-lg font-semibold tracking-tight ${shouldMask(selectedLead) ? "blur-[3px] select-none" : ""}`}>
-                          {shouldMask(selectedLead) ? maskName(selectedLead.nome) : selectedLead.nome}
-                        </p>
-                        <p className={`mt-1 truncate text-sm text-muted-foreground ${shouldMask(selectedLead) ? "blur-[3px] select-none" : ""}`}>
-                          {shouldMask(selectedLead) ? "••••-••••" : (contextRole === "broker" && selectedLead.status === "distributed" ? maskPhone(selectedLead.telefone) : selectedLead.telefone)}
-                        </p>
-                      </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1.5">
-                          <LeadStatusBadge status={selectedLead.status} />
-                          <LeadQualificationBadge status={selectedLead.qualificationStatus} />
-                          <LeadHealthBadge
-                          health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </SheetSection>
-
-                {/* ── Alerta de corretor excluído ─────────────────────────── */}
-                {(contextRole === "director" || contextRole === "manager") && !selectedLead.corretorId && selectedLead.distributionStatus === "returned_to_queue" && (
-                  <div className="mx-4 rounded-lg border border-warning/20 bg-warning/5 px-4 py-3">
-                    <p className="flex items-center gap-2 text-xs font-semibold text-warning">
-                      <svg className="size-4 shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
-                      </svg>
-                      Lead aguardando reatribuição
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
-                      O corretor responsável por este lead foi excluído. O lead foi devolvido à fila da unidade e precisa ser reatribuído manualmente por um gestor ou diretor.
-                    </p>
-                  </div>
-                )}
-                <Tabs defaultValue="summary" variant="underline" className="min-h-0">
-                  <TabsList aria-label="Informações do lead no drawer" className="w-full justify-start">
-                    <TabsTrigger value="summary">Resumo</TabsTrigger>
-                    {!shouldMask(selectedLead) && <TabsTrigger value="actions">Ações</TabsTrigger>}
-                  </TabsList>
-                  <TabsContent value="summary" className="mt-4 space-y-4">
-                    <SheetSection className="p-4">
-                      <div>
-                        <div>
-                          <p className="text-sm font-semibold">Dados do atendimento</p>
-                          <p className="mt-1 text-xs text-muted-foreground">Contexto essencial para continuar o lead.</p>
-                        </div>
-                      </div>
-                      <dl className="mt-4 space-y-3">
-                        <DetailRow
-                          label="Saúde"
-                          value={
-                            <LeadHealthBadge
-                              health={computeLeadHealth(selectedLead, slaFirstContactMinutes, slaStagnantDays)}
-                            />
-                          }
-                        />
-                        <DetailRow label="Responsável" value={[selectedLead.corretorNome ?? "Aguardando distribuição", selectedLead.branchName ?? "Sem unidade"].join(" · ")} />
-                        <DetailRow label="Tipo" value={
-                          <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${selectedLead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
-                            {selectedLead.tipo === "PME" ? "PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
-                          </span>
-                        } />
-                        <DetailRow label="Origem" value={selectedLead.sourceCampaign || (selectedLead.origem === "manual" ? "Manual" : "Webhook")} />
-                        <DetailRow label="Entrada" value={formatDate(selectedLead.createdAt, { day: "2-digit", month: "short" })} />
-                      </dl>
-                    </SheetSection>
-                    <LeadAssignmentHistory
-                      leadId={selectedLead.id}
-                      assignedAt={selectedLead.assignedAt}
-                      corretorNome={selectedLead.corretorNome}
-                    />
-                    <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />} variant="outline">
-                      Ver detalhe completo
-                      <ArrowUpRight />
-                    </Button>
-                  </TabsContent>
-                  <TabsContent value="actions" className="mt-4 space-y-3">
-                    {!(
-                      selectedLead.status === "distributed" ||
-                      ["in_contact", "quote_sent", "negotiation", "converted", "lost"].includes(selectedLead.status) ||
-                      selectedLead.qualificationState === "QUALIFIED" ||
-                      selectedLead.qualificationState === "COMPLETED" ||
-                      (Boolean(selectedLead.qualificationStatus) && ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified"].includes(selectedLead.qualificationStatus))
-                    ) && (
-                      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-                        <p className="text-xs font-semibold text-foreground mb-1.5">Qualificação Manual por IA</p>
-                        <StartQualificationButton leadId={selectedLead.id} leadName={selectedLead.nome} variant="secondary" size="sm" className="w-full justify-center" />
-                      </div>
-                    )}
-                    {contextRole === "manager" || contextRole === "director" ? (
-                      <LeadDrawerManagementActions
-                        leadId={selectedLead.id}
-                        leadName={selectedLead.nome}
-                        brokers={filteredBrokers}
-                        branches={branches}
-                        leadBranchId={selectedLead.branchId}
-                        contextRole={contextRole}
-                        currentStatus={selectedLead.status}
-                        qualificationStatus={selectedLead.qualificationStatus}
-                        qualificationState={selectedLead.qualificationState}
-                        currentOwner={selectedLead.corretorNome}
-                        onSuccess={handleDrawerManagementCommitted}
-                        onReassignOptimistic={handleDrawerReassignOptimistic}
-                        onReassignRollback={handleDrawerReassignRollback}
-                      />
-                    ) : (
-                      <>
-                        <div className={cn("grid gap-2", hasPermission(contextRole, "acessar_conversas") ? "grid-cols-2" : "grid-cols-1")}>
-                          <Button className="w-full" render={<Link href={`/leads/${selectedLead.id}`} />}>
-                            <ArrowUpRight />
-                            Abrir atendimento
-                          </Button>
-                          {hasPermission(contextRole, "acessar_conversas") ? (
-                            <Button className="w-full" render={<Link href={`/conversas?leadId=${selectedLead.id}`} />} variant="outline">
-                              <ChatCircleText />
-                              Conversas
-                            </Button>
-                          ) : null}
-                        </div>
-                        {canCall ? (
-                          <div className="grid grid-cols-2 gap-2">
-                            <Button className="w-full" render={<a href={`tel:${selectedLead.telefone}`} />} variant="outline">
-                              <Phone />
-                              Ligar
-                            </Button>
-                            <Button className="w-full" render={<a href={`https://wa.me/${selectedLead.telefone.replace(/\D/g, "")}`} rel="noreferrer" target="_blank" />} variant="outline">
-                              <WhatsappLogo />
-                              WhatsApp
-                            </Button>
-                          </div>
-                        ) : (
-                          <p className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm text-muted-foreground">
-                            Os dados de contato serão liberados quando você iniciar este atendimento.
-                          </p>
-                        )}
-                        <div className="grid grid-cols-2 gap-2">
-                          <Button className="w-full" render={<Link href={`/tarefas?leadId=${selectedLead.id}`} />} variant="outline">
-                            <ListChecks />
-                            Tarefas
-                          </Button>
-                          <Button className="w-full" render={<Link href="#documentos" />} variant="outline">
-                            <FileText />
-                            Documentos
-                          </Button>
-                        </div>
-                        <div className="flex flex-wrap gap-2 border-t border-border pt-3">
-                          <LeadQuickNote leadId={selectedLead.id} />
-                          <LeadReminder leadId={selectedLead.id} />
-                        </div>
-                      </>
-                    )}
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </SheetBody>
-          ) : null}
-        </SheetContent>
-      </Sheet>
+      {/* ─── QUICK VIEW DETAIL DRAWER ─── */}
+      {selectedLead ? <LeadDetailsDrawer
+        lead={selectedLead}
+        contextRole={contextRole}
+        contextJobTitle={contextJobTitle}
+        contextBranchId={contextBranchId}
+        brokers={brokers}
+        branches={branches}
+        manualAssignmentChoiceEnabled={manualAssignmentChoiceEnabled}
+        slaFirstContactMinutes={slaFirstContactMinutes}
+        slaStagnantDays={slaStagnantDays}
+        onOpenChange={(open) => !open && setSelectedLead(null)}
+        onManagementCommitted={handleDrawerManagementCommitted}
+        onReassignOptimistic={handleDrawerReassignOptimistic}
+        onReassignRollback={handleDrawerReassignRollback}
+        onLeadPatch={(patch) => applyLeadPatch([selectedLead.id], (lead) => ({ ...lead, ...patch }))}
+      /> : null}
     </div>
   );
 }
@@ -989,14 +972,15 @@ function KanbanLeadCard({
 }) {
   const selected = isSelected(lead.id);
   const sla = useMemo(() => computeSlaInfo(lead, slaFirstContactMinutes, slaStagnantDays), [lead, slaFirstContactMinutes, slaStagnantDays]);
+  const phoneDigits = lead.telefone ? lead.telefone.replace(/\D/g, "") : "";
 
   return (
     <Card
       variant="kanban"
-      className={`group w-full text-left outline-none ${
+      className={`group w-full text-left outline-none transition-all duration-200 ${
         selected
           ? "border-primary/40 bg-primary/[0.03] ring-1 ring-primary/20"
-          : "border-border hover:border-primary/30 hover:bg-muted/30"
+          : "border-border/80 hover:border-primary/40 hover:shadow-xs hover:bg-card/80"
       }`}
     >
       {/* Checkbox row */}
@@ -1007,7 +991,21 @@ function KanbanLeadCard({
           onCheckedChange={() => onToggle(lead.id)}
           onClick={(event) => event.stopPropagation()}
         />
-        <ArrowUpRight className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        <div className="flex items-center gap-1.5">
+          {phoneDigits && (
+            <a
+              href={`https://wa.me/55${phoneDigits}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              title="Abrir WhatsApp"
+              className="text-muted-foreground hover:text-emerald-500 transition-colors"
+            >
+              <WhatsappLogo className="size-3.5" weight="fill" />
+            </a>
+          )}
+          <ArrowUpRight className="size-3 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+        </div>
       </div>
 
       {/* SLA bar */}
@@ -1015,29 +1013,44 @@ function KanbanLeadCard({
 
       {/* Card body */}
       <button
-        className="w-full p-4 pt-3 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
+        className="w-full p-3.5 pt-2.5 text-left focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset focus-visible:outline-none"
         onClick={() => onOpen(lead)}
         type="button"
       >
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="line-clamp-2 break-words font-medium leading-5 text-foreground">
+        <div className="flex items-center gap-2.5">
+          <UserAvatar
+            seed={lead.nome}
+            name={lead.nome}
+            className="size-7 rounded-lg shrink-0 border border-border/60 text-[10px] font-bold"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-semibold text-xs text-foreground group-hover:text-primary transition-colors">
               {lead.nome}
             </p>
-            <p className="mt-1 truncate text-xs text-muted-foreground">
-              <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-xs" />
+            <p className="truncate text-[11px] text-muted-foreground font-mono tabular-nums">
+              {lead.telefone}
             </p>
           </div>
+          {lead.queueName ? (
+            <span title={`Fila: ${lead.queueName}`}>
+              <QueueColorDot hue={lead.queueColorHue} />
+            </span>
+          ) : null}
         </div>
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+
+        <p className="mt-2 truncate text-[11px] text-muted-foreground">
+          <OwnershipContext brokerName={lead.corretorNome} branchName={lead.branchName} className="text-[11px]" />
+        </p>
+
+        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border/50 pt-2 text-[11px]">
           <div className="flex items-center gap-1.5 flex-wrap">
             <LeadStatusBadge status={lead.status} />
-            <span className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
+            <span className={`inline-flex items-center rounded-md px-1.5 py-0.2 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
               {lead.tipo}
             </span>
             <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
           </div>
-          <span className="shrink-0 text-xs text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>
+          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>
         </div>
       </button>
     </Card>
@@ -1190,6 +1203,15 @@ function DetailRow({ label, value }: { label: string; value: string | ReactNode 
       <div className="min-w-0 text-right font-medium break-words">
         {value}
       </div>
+    </div>
+  );
+}
+
+function OperationalDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 border-b border-border/70 px-4 py-3 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(odd)]:border-border/70">
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 truncate text-sm font-medium text-foreground" title={value}>{value}</dd>
     </div>
   );
 }

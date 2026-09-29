@@ -8,6 +8,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getAssignableCapabilities, type CustomRoleScope } from "./catalog";
+import { isRoutePermission, routeCatalog, routePermissionKey } from "./routes";
 import { PERMISSIONS, type PermissionKey, hasCapability } from "@/shared/auth/permissions";
 
 const roleInput = z.object({
@@ -17,7 +18,7 @@ const roleInput = z.object({
   color: z.enum(["primary", "emerald", "blue", "amber", "rose"]),
   icon: z.enum(["shield", "chart", "megaphone", "wallet", "headphones"]),
   scope: z.enum(["none", "own", "branch", "tenant"]),
-  permissions: z.array(z.string()).max(60),
+  permissions: z.array(z.string()).max(100),
   status: z.enum(["draft", "active"]),
 });
 
@@ -61,6 +62,27 @@ export async function listEffectiveCapabilities(input: { tenantId: string; role:
   return grants.map((grant) => grant.key as PermissionKey);
 }
 
+export async function listEffectiveRoutes(input: { tenantId: string; customRoleId: string | null }) {
+  if (!input.customRoleId || !(await isCustomRolesEnabled(input.tenantId))) return [];
+  const [role] = await getDatabase().select({ id: schema.customRoles.id, status: schema.customRoles.status })
+    .from(schema.customRoles).where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, input.tenantId))).limit(1);
+  if (!role || role.status !== "active") return [];
+  const grants = await getDatabase().select({ key: schema.customRolePermissions.permissionKey })
+    .from(schema.customRolePermissions).where(eq(schema.customRolePermissions.customRoleId, role.id));
+  return grants.map((grant) => grant.key).filter(isRoutePermission);
+}
+
+export async function hasEffectiveRouteAccess(input: { tenantId: string; role: TenantRole; jobTitle: string; customRoleId: string | null; routeKey: string; fallbackPermission: PermissionKey }) {
+  if (!input.customRoleId || !(await isCustomRolesEnabled(input.tenantId))) return hasCapability(input.role, input.fallbackPermission, input.jobTitle);
+  const [role] = await getDatabase().select({ id: schema.customRoles.id, status: schema.customRoles.status })
+    .from(schema.customRoles).where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, input.tenantId))).limit(1);
+  if (!role || role.status !== "active") return false;
+  const grants = await getDatabase().select({ key: schema.customRolePermissions.permissionKey })
+    .from(schema.customRolePermissions).where(eq(schema.customRolePermissions.customRoleId, role.id));
+  const explicitRoutes = grants.map((grant) => grant.key).filter(isRoutePermission);
+  return grants.some((grant) => grant.key === input.fallbackPermission) && (explicitRoutes.length === 0 || explicitRoutes.includes(routePermissionKey(input.routeKey)));
+}
+
 /** Creates the tenant-local default used for the Marketing pilot without widening access. */
 export async function provisionDefaultMarketingRole(input: { tenantId: string; actorUserId: string }) {
   const db = getDatabase();
@@ -80,9 +102,10 @@ export async function provisionDefaultMarketingRole(input: { tenantId: string; a
 
 function validatePermissions(scope: CustomRoleScope, permissions: string[]) {
   const allowed = new Set(getAssignableCapabilities(scope).map((item) => item.key));
-  const invalid = permissions.filter((permission) => !allowed.has(permission as PermissionKey));
+  const allowedRoutes = new Set(routeCatalog.map((route) => routePermissionKey(route.key)));
+  const invalid = permissions.filter((permission) => !allowed.has(permission as PermissionKey) && !allowedRoutes.has(permission));
   if (invalid.length) throw new Error("Há permissões incompatíveis com o escopo seguro escolhido.");
-  return [...new Set(permissions)] as PermissionKey[];
+  return [...new Set(permissions)];
 }
 
 async function writeEvent(input: { tenantId: string; customRoleId: string; actorUserId: string; action: string; version: number; snapshot: Record<string, unknown> }) {
@@ -107,6 +130,7 @@ export async function getCustomRolesWorkspace() {
     enabled,
     catalog: getAssignableCapabilities("none").concat(getAssignableCapabilities("own"), getAssignableCapabilities("branch"), getAssignableCapabilities("tenant"))
       .filter((item, index, list) => list.findIndex((candidate) => candidate.key === item.key) === index),
+    routeCatalog,
     roles: roles.map((role) => ({ ...role, memberCount: counts.get(role.id) ?? 0, permissions: permissions.filter((item) => item.customRoleId === role.id).map((item) => item.permissionKey) })),
   };
 }

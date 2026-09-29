@@ -22,7 +22,7 @@ VPS Hostinger
 Fora dela continuam:
 
 ```text
-Vercel
+Coolify (frontend)
 └── Next.js
 
 Supabase
@@ -600,7 +600,7 @@ Não configure Redis para consumir os 16 GB só porque eles existem. Deixe marge
 Sua arquitetura final fica:
 
 ```text
-                  Vercel
+             Coolify (frontend)
                     │
                  Next.js
                     │

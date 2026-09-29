@@ -1,4 +1,5 @@
 const META_DYNAMIC_TOKEN_PREFIX = "{{activation_token}}";
+const STALE_META_TOKEN_SUFFIXES = ["{{id}}", "{{activation_token}}"] as const;
 
 /**
  * Older approved Meta templates may preserve an encoded named URL placeholder
@@ -19,7 +20,26 @@ export function normalizeInvitationToken(rawToken: string | undefined) {
     }
   }
 
-  return token.startsWith(META_DYNAMIC_TOKEN_PREFIX)
+  // Remove placeholder codificado do modelo meta bugado: {{id}} ou {id} (já decodificado)
+  // Também remove a versão codificada caso não tenha passado pelo decode
+  if (token.startsWith("{{id}}")) {
+    token = token.slice(6);
+  } else if (token.startsWith("{id}")) {
+    token = token.slice(4);
+  }
+  if (token.startsWith("%7B%7Bid%7D%7D")) {
+    token = token.slice(12);
+  }
+
+  token = token.startsWith(META_DYNAMIC_TOKEN_PREFIX)
     ? token.slice(META_DYNAMIC_TOKEN_PREFIX.length)
     : token;
+
+  for (const suffix of STALE_META_TOKEN_SUFFIXES) {
+    if (token.endsWith(suffix)) {
+      token = token.slice(0, -suffix.length);
+    }
+  }
+
+  return token;
 }

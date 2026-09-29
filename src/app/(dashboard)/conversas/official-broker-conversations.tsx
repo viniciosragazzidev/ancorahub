@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -33,8 +33,15 @@ import {
   ShieldCheck,
   WhatsappLogo,
 } from "@/components/huge-icons";
-import { FileText, Send, Sparkles, Users, Check, Zap } from "lucide-react";
+import { ExternalLink, FileText, Send, Sparkles, Users, Check, Zap } from "lucide-react";
+import type { TemplateMessagePreview } from "@/features/communication-channels/template-preview";
 import { cn } from "@/lib/utils";
+import {
+  MediaBubble,
+  MediaUnavailable,
+  isMediaKindSupported,
+  type MediaBubbleData,
+} from "@/features/conversations/components/media-bubble";
 
 import {
   sendBrokerTemplateAction,
@@ -53,8 +60,18 @@ export type OfficialBrokerMessage = {
   status: "pending" | "queued" | "sent" | "delivered" | "read" | "failed" | "received";
   purpose?: string;
   templateName?: string;
+  /** The approved Meta template as the broker received it (header/body/footer/buttons), when it could be resolved. */
+  template?: TemplateMessagePreview | null;
   attempts?: number;
   error?: string | null;
+  /** DEC-098: inbound broker media streamed through the authenticated route. */
+  media?: {
+    kind: string;
+    mimeType: string | null;
+    filename: string | null;
+    sizeBytes: number | null;
+    url: string | null;
+  } | null;
 };
 
 export type OfficialBrokerConversation = {
@@ -96,9 +113,12 @@ const invitationLabels: Record<string, { label: string; variant: "success" | "wa
 
 export function OfficialBrokerConversations({
   enabled,
+  deliveryChannel,
   conversations,
 }: {
   enabled: boolean;
+  /** The outbound transport for internal system-to-broker notices. */
+  deliveryChannel: "meta" | "waha_direct";
   conversations: OfficialBrokerConversation[];
 }) {
   const router = useRouter();
@@ -303,8 +323,8 @@ export function OfficialBrokerConversations({
 
   return (
     <section
-      aria-label="Conversas oficiais com corretores"
-      className="flex h-[calc(100dvh-var(--header-height,3.5rem))] w-full flex-col overflow-hidden bg-card"
+      aria-label="Central de mensagens oficiais com corretores"
+      className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
       {/* Header com Ações de Disparo */}
       <header className="shrink-0 border-b border-border bg-card px-4 py-3 lg:px-6">
@@ -316,12 +336,14 @@ export function OfficialBrokerConversations({
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-semibold tracking-tight">
-                  Canal Oficial com Corretores
+                  {deliveryChannel === "waha_direct" ? "Canal Interno com Corretores" : "Canal Oficial com Corretores"}
                 </h2>
                 <Badge variant="secondary">{conversations.length}</Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Envio individual ou em massa de mensagens e modelos oficiais para a equipe.
+                {deliveryChannel === "waha_direct"
+                  ? "Histórico centralizado no CRM; avisos internos são enviados pelo número WAHA selecionado."
+                  : "Envio individual ou em massa de mensagens e modelos oficiais para a equipe."}
               </p>
             </div>
           </div>
@@ -335,7 +357,7 @@ export function OfficialBrokerConversations({
               Disparo em Massa
             </Button>
             <Badge variant="outline" className="gap-1 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/5">
-              <ShieldCheck className="size-3.5" /> Canal Oficial Meta
+              <ShieldCheck className="size-3.5" /> {deliveryChannel === "waha_direct" ? "WAHA interno direto" : "Canal Oficial Meta"}
             </Badge>
           </div>
         </div>
@@ -540,7 +562,9 @@ export function OfficialBrokerConversations({
               <div className="border-b border-border bg-card/50 px-4 py-2">
                 <ContextNote variant="info" icon={InfoIcon} className="py-1.5 text-[11px]">
                   <span>
-                    Canal Oficial de Comunicação. Envie mensagens diretas ou escolha um modelo cadastrado no sistema.
+                    {deliveryChannel === "waha_direct"
+                      ? "Canal interno de comunicação. O CRM preserva este histórico e envia os avisos pelo número WAHA selecionado."
+                      : "Canal Oficial de Comunicação. Envie mensagens diretas ou escolha um modelo cadastrado no sistema."}
                   </span>
                 </ContextNote>
               </div>
@@ -554,19 +578,33 @@ export function OfficialBrokerConversations({
                     </MarkerContent>
                   </Marker>
 
-                  {selected.messages.map((message) => (
-                    <MessageBubble
-                      brokerName={selected.name}
-                      key={message.id}
-                      message={message}
-                    />
-                  ))}
+                  {selected.messages.map((message, index) => {
+                    const previous = selected.messages[index - 1];
+                    const dateLabel = formatDateDivider(message.sentAt);
+                    const previousDateLabel = previous ? formatDateDivider(previous.sentAt) : null;
+                    return (
+                      <Fragment key={message.id}>
+                        {dateLabel !== previousDateLabel ? (
+                          <div className="my-2 flex items-center justify-center gap-3" role="separator" aria-label={dateLabel}>
+                            <div className="h-px flex-1 bg-border/50" />
+                            <span className="rounded-full border border-border/60 bg-muted/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shadow-2xs">
+                              {dateLabel}
+                            </span>
+                            <div className="h-px flex-1 bg-border/50" />
+                          </div>
+                        ) : null}
+                        <MessageBubble brokerName={selected.name} message={message} />
+                      </Fragment>
+                    );
+                  })}
 
                   {!selected.messages.length ? (
                     <EmptyState
                       icon={ChatCircleText}
                       title="Nenhuma mensagem no histórico"
-                      description="As mensagens enviadas pelo número oficial aparecerão neste espaço."
+                      description={deliveryChannel === "waha_direct"
+                        ? "As mensagens enviadas pelo número WAHA selecionado aparecerão neste espaço."
+                        : "As mensagens enviadas pelo número oficial aparecerão neste espaço."}
                     />
                   ) : null}
                 </div>
@@ -822,6 +860,7 @@ function MessageBubble({
   brokerName: string;
 }) {
   const isOutgoing = message.direction === "outgoing";
+  const hasMedia = Boolean(message.media && isMediaKindSupported(message.media?.kind));
 
   return (
     <div
@@ -836,8 +875,26 @@ function MessageBubble({
 
       <div className={cn("flex max-w-[85%] sm:max-w-[75%] flex-col gap-1", isOutgoing && "items-end")}>
         <Bubble variant={isOutgoing ? "default" : "muted"}>
-          <BubbleContent className="text-xs leading-relaxed whitespace-pre-wrap">
-            {message.body}
+          <BubbleContent className="text-xs leading-relaxed">
+            {hasMedia && message.media?.url ? (
+              <MediaBubble
+                media={{
+                  kind: message.media.kind,
+                  mimeType: message.media.mimeType,
+                  filename: message.media.filename,
+                  sizeBytes: message.media.sizeBytes,
+                  url: message.media.url,
+                  caption: message.body?.startsWith("[") && message.body?.endsWith("]") ? null : message.body,
+                }}
+                isOutbound={isOutgoing}
+              />
+            ) : hasMedia ? (
+              <MediaUnavailable isOutbound={isOutgoing} />
+            ) : message.template ? (
+              <TemplateMessageContent template={message.template} />
+            ) : (
+              <span className="whitespace-pre-wrap">{message.body}</span>
+            )}
           </BubbleContent>
         </Bubble>
 
@@ -861,6 +918,42 @@ function MessageBubble({
   );
 }
 
+/** WhatsApp inline formatting: *bold*, _italic_, ~strike~. */
+function WhatsAppFormattedText({ text }: { text: string }) {
+  const parts = text.split(/(\*[^*\n]+\*|_[^_\n]+_|~[^~\n]+~)/g);
+  return (
+    <span className="whitespace-pre-wrap">
+      {parts.map((part, index) => {
+        if (part.length > 2 && part.startsWith("*") && part.endsWith("*")) return <strong key={index} className="font-semibold">{part.slice(1, -1)}</strong>;
+        if (part.length > 2 && part.startsWith("_") && part.endsWith("_")) return <em key={index}>{part.slice(1, -1)}</em>;
+        if (part.length > 2 && part.startsWith("~") && part.endsWith("~")) return <s key={index}>{part.slice(1, -1)}</s>;
+        return part;
+      })}
+    </span>
+  );
+}
+
+/** Renders a sent template the way WhatsApp shows it to the broker; buttons are a preview only, never links. */
+function TemplateMessageContent({ template }: { template: TemplateMessagePreview }) {
+  return (
+    <div className="flex flex-col gap-1">
+      {template.header ? <p className="font-semibold"><WhatsAppFormattedText text={template.header} /></p> : null}
+      <WhatsAppFormattedText text={template.body} />
+      {template.footer ? <p className="opacity-70">{template.footer}</p> : null}
+      {template.buttons.length ? (
+        <div className="-mx-3 mt-1 flex flex-col">
+          {template.buttons.map((label, index) => (
+            <span key={index} className="flex items-center justify-center gap-1.5 border-t border-current/20 px-3 pt-2 font-medium">
+              <ExternalLink className="size-3.5" aria-hidden="true" />
+              {label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function formatTime(isoDate: string) {
   try {
     const d = new Date(isoDate);
@@ -868,4 +961,14 @@ function formatTime(isoDate: string) {
   } catch {
     return "";
   }
+}
+
+function formatDateDivider(value: string) {
+  const date = new Date(value);
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) return "Hoje";
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) return "Ontem";
+  return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric" }).format(date);
 }

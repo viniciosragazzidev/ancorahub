@@ -14,6 +14,18 @@ inclusive quando a notificação chega enquanto ele está em outra tela.
 - O shell móvel reserva espaço para a navegação e aplica `scrollPaddingBottom`; o
   último card de qualquer rota continua rolável e visível. Card de novo lead e CTA
   de instalação da PWA ficam acima dessa área segura.
+- O CTA flutuante da PWA é global para todos os papéis, inclusive Corretor. Em
+  navegadores mobile que não expõem `beforeinstallprompt` ou entregam o evento antes
+  da hidratação, o botão continua visível e apresenta a instrução manual adequada;
+  quando o evento está disponível, preserva a instalação nativa.
+
+## Complemento — cadastro manual sem e-mail
+
+- No cadastro manual de equipe, nome e WhatsApp continuam obrigatórios e o e-mail
+  passa a ser opcional, igualando o comportamento da importação CSV.
+- Quando o gestor deixa o campo vazio, perfil e convite permanecem pendentes sem
+  identidade de login. O onboarding exige um e-mail válido e único antes de criar a
+  conta e associa o endereço escolhido ao perfil, convite e usuário.
 - `RealtimeSyncProvider` invalida o cache local, propaga para outras abas com
   `BroadcastChannel` e executa `router.refresh()` coalescido para atualizar os Server
   Components. Atualização é adiada enquanto há formulário ou diálogo com foco para

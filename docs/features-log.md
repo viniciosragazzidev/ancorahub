@@ -2,6 +2,60 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 24/09/2026 - Sincronização em tempo real da carteira e "Marcar em atendimento" do diretor
+
+- Oferta criada, aceite (WhatsApp ou CRM), recusa, expiração, atribuição direta e início
+  de atendimento agora sinalizam, após o commit, os corretores afetados (novo e anterior)
+  e a gestão da unidade; as telas (Lite e `/leads`) se atualizam sem F5.
+- Redes de segurança no cliente: refresh ao reconectar o canal, ao voltar à aba após 15 s
+  oculta e ao voltar a ficar online; com canal indisponível ou realtime desligado, a tela
+  visível se reconcilia a cada 20 s.
+- O drawer de `/leads` passa a refletir o lead atualizado do servidor em vez de uma cópia.
+- Diretor pode marcar um lead atribuído e ainda "Distribuído" como "Em atendimento" na
+  página e no drawer do lead. Usa a mesma transação do "Iniciar atendimento" (confirma a
+  oferta e bloqueia redistribuição); auditoria registra o diretor e o corretor é avisado.
+
+## 24/09/2026 - "Aceitar lead" no CRM Lite registra o aceite
+
+- O botão "ACEITAR LEAD" da lista e do dashboard Lite era apenas um link para o lead e
+  não registrava aceite; agora usa o mesmo aceite atômico do botão do WhatsApp antes de
+  abrir o lead, confirmando a titularidade e bloqueando qualquer redistribuição automática.
+- Oferta expirada ou assumida por outro corretor mostra erro e atualiza a lista; clique
+  repetido em lead já aceito apenas abre o lead.
+
+## 24/09/2026 - Oferta aceita não é mais redistribuída pelo SLA
+
+- A varredura de SLA de primeiro contato redistribuía leads com oferta aceita pelo
+  WhatsApp quando o corretor ainda não havia iniciado o atendimento, pois o aceite deixa
+  o lead em `distributed` sem `firstContactAt`. Isso gerava ciclos aceite → redistribuição.
+- Oferta aceita (`whatsapp_offer_accepted`) agora é titularidade confirmada: o guard de
+  rotação bloqueia a troca mesmo com exclusão do owner, e o SLA só alerta corretor e gestão.
+- O aviso ao corretor que já aceitou não ameaça mais redistribuição.
+
+## 24/09/2026 - Aceite e recusa no histórico de atribuição do lead
+
+- O histórico do drawer mostra o aceite com o nome do corretor e o horário persistido.
+- Quando o corretor inicia o primeiro contato enquanto a oferta ainda aparece pendente,
+  o histórico reconhece a aceitação pelo início real do atendimento, sem esperar o job
+  de expiração.
+- Recusa explícita e prazo expirado aparecem como resultados diferentes; ofertas perdidas
+  para outro corretor não são rotuladas como recusa.
+- A leitura continua limitada ao tenant e ao escopo autorizado do lead; a distribuição
+  e seus prazos não foram alterados pela consulta do histórico.
+- Correção complementar: iniciar atendimento agora confirma a oferta e encerra a tentativa
+  de distribuição atomicamente; o worker não re-semeia nem rotaciona um lead com contato
+  iniciado. A primeira mensagem de saída detectada na conexão WAHA também registra o início.
+- Implementação: `docs/implementations/completed/2026-09-24-lead-assignment-acceptance-history.md`.
+
+## 22/09/2026 - Tipo de CNPJ capturado da Meta
+
+- A normalização de Meta Lead Ads agora identifica a resposta `Tipo de CNPJ`, sem
+  confundi-la com a classificação comercial PF/PME.
+- O dado é persistido nos metadados de origem Meta do lead; quando a entrada
+  corresponde a lead existente pelo telefone, os metadados são mesclados sem perda.
+- Os detalhes do lead mostram o campo somente quando ele veio da integração Meta.
+- Implementação: `docs/implementations/active/2026-09-22-meta-cnpj-type.md`.
+
 ---
 
 ## 03/08/2026 - Seletor de período 7/14/30/90 nas rotas de dados
@@ -352,3 +406,13 @@ por categoria e com documentação local.
 * **Motion**: a entrada usa spring curto e pulso único; `prefers-reduced-motion`
   reduz a transição a uma troca de opacidade. A fila mantém até três eventos.
 * **Validação**: testes unitários da fila, type-check e build de produção passaram.
+# 24/09/2026 - Produto, Tipo de CNPJ e operadora em leads Meta
+
+- O intake de Meta Lead Ads normaliza respostas allowlisted de tipo de plano/produto,
+  tipo de CNPJ e operadora, incluindo rótulos com acentos/aliases; respostas desconhecidas
+  não são classificadas automaticamente.
+- `/leads`, drawer e detalhe mostram o produto informado; para uma nova captura Meta sem
+  resposta de produto, exibem “Não informado” em vez de confundir o default PF com resposta.
+- O Tipo de CNPJ continua separado da classificação comercial, e respostas ausentes em
+  leads existentes não sobrescrevem valores já registrados. Outros canais não mudam.
+- Implementação: `docs/implementations/completed/2026-09-24-meta-lead-product-details.md`.

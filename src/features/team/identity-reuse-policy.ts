@@ -1,0 +1,28 @@
+export type ExistingTeamIdentity = {
+  id: string;
+  active: boolean;
+  status: "pending" | "active" | "disabled";
+};
+
+export type ExistingTeamMembership = { id: string } | null;
+
+/**
+ * Global identities are intentionally preserved when a tenant member is
+ * deleted. They may still be used by another tenant, so a new invitation may
+ * reuse one only when this tenant no longer has a membership for it. A
+ * disabled identity is returned as `reactivate` so the onboarding transaction
+ * can explicitly restore the credential after the invite is accepted.
+ */
+export function classifyExistingTeamIdentity(
+  identity: ExistingTeamIdentity | null,
+  tenantMembership: ExistingTeamMembership,
+  invitedPendingUserId: string | null = null,
+) {
+  if (!identity) return { kind: "new" as const };
+  if (tenantMembership && identity.status === "pending" && identity.id === invitedPendingUserId) {
+    return { kind: "reactivate" as const, userId: identity.id };
+  }
+  if (tenantMembership) return { kind: "tenant-conflict" as const };
+  if (!identity.active || identity.status !== "active") return { kind: "reactivate" as const, userId: identity.id };
+  return { kind: "reuse" as const, userId: identity.id };
+}

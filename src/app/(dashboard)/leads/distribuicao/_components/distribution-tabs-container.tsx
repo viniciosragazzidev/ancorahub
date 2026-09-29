@@ -1,7 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  ArrowsDownUp,
+  Buildings,
+  CalendarBlank,
+  ChartBar,
+  ChartLineUp,
+  FileArrowDown,
+} from "@/components/huge-icons";
 
 export function DistributionTabsContainer({
   initialView,
@@ -11,6 +19,7 @@ export function DistributionTabsContainer({
   operarContent,
   plantaoContent,
   saudeHistoricoContent,
+  showQueueDefinition = false,
 }: {
   initialView: string;
   roteamentoContent: React.ReactNode;
@@ -19,8 +28,18 @@ export function DistributionTabsContainer({
   operarContent: React.ReactNode;
   plantaoContent: React.ReactNode;
   saudeHistoricoContent: React.ReactNode;
+  showQueueDefinition?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState(initialView);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const nextView = new URL(window.location.href).searchParams.get("view");
+      setActiveTab(nextView ?? "resumo_dia");
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   const handleValueChange = (val: string) => {
     setActiveTab(val);
@@ -31,23 +50,68 @@ export function DistributionTabsContainer({
     }
   };
 
+  const tabs = [
+    { id: "resumo_dia", label: "Resumo", icon: ChartLineUp },
+    { id: "roteamento", label: "Entradas e regras", icon: ArrowsDownUp },
+    { id: "operar", label: "Operação", icon: FileArrowDown },
+    ...(showQueueDefinition ? [{ id: "filas", label: "Filas", icon: Buildings }] : []),
+    { id: "plantao", label: "Plantões", icon: CalendarBlank },
+    { id: "saude_historico", label: "Saúde", icon: ChartBar },
+  ];
   return (
-    <Tabs value={activeTab} onValueChange={handleValueChange} variant="segment" className="w-full space-y-6">
-      <TabsList className="max-w-5xl w-full justify-start overflow-x-auto">
-        <TabsTrigger value="roteamento">🔀 Matriz de Roteamento</TabsTrigger>
-        <TabsTrigger value="resumo_dia">📈 Resumo do Dia</TabsTrigger>
-        <TabsTrigger value="filas">🏢 Filas & Unidades</TabsTrigger>
-        <TabsTrigger value="operar">📥 Operar & Inbox</TabsTrigger>
-        <TabsTrigger value="plantao">📅 Plantão & Escala</TabsTrigger>
-        <TabsTrigger value="saude_historico">📊 Saúde & Auditoria</TabsTrigger>
-      </TabsList>
+    <Tabs
+      value={activeTab}
+      onValueChange={handleValueChange}
+      variant="underline"
+      className="w-full gap-6"
+    >
+      {/* Sits right below the sticky DashboardHeader (the page is back on the
+          compact header shared by the other routes), so the two never overlap. */}
+      <nav
+        aria-label="Áreas da distribuição"
+        className="sticky top-[var(--header-height)] z-20 -mx-4 border-b border-border/70 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:-mx-6 sm:px-6 max-[559px]:top-[calc(var(--mobile-header-height)+var(--mobile-safe-top))]"
+      >
+        <TabsList
+          aria-label="Áreas da distribuição"
+          className="h-auto w-full justify-start gap-1 overflow-x-auto border-0 bg-transparent p-0 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            return (
+              <TabsTrigger
+                key={tab.id}
+                value={tab.id}
+                className="min-h-10 shrink-0 gap-1.5 px-3 py-0 text-xs font-medium transition-colors duration-150"
+                indicatorClassName="left-3 right-3 rounded-full"
+              >
+                <Icon aria-hidden="true" className="size-3.5" />
+                {tab.label}
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </nav>
 
-      <TabsContent value="roteamento" className="space-y-6">{roteamentoContent}</TabsContent>
-      <TabsContent value="resumo_dia" className="space-y-6">{resumoDiaContent}</TabsContent>
-      <TabsContent value="filas" className="space-y-6">{filasContent}</TabsContent>
-      <TabsContent value="operar" className="space-y-6">{operarContent}</TabsContent>
-      <TabsContent value="plantao" className="space-y-6">{plantaoContent}</TabsContent>
-      <TabsContent value="saude_historico" className="space-y-6">{saudeHistoricoContent}</TabsContent>
+      <TabsContent value="roteamento" className="space-y-5">
+        {roteamentoContent}
+      </TabsContent>
+      <TabsContent value="resumo_dia" className="space-y-5">
+        {resumoDiaContent}
+      </TabsContent>
+      {showQueueDefinition ? (
+        <TabsContent value="filas" className="space-y-5">
+          {filasContent}
+        </TabsContent>
+      ) : null}
+      <TabsContent value="operar" className="space-y-5">
+        {operarContent}
+      </TabsContent>
+      <TabsContent value="plantao" className="space-y-5">
+        {plantaoContent}
+      </TabsContent>
+      <TabsContent value="saude_historico" className="space-y-5">
+        {saudeHistoricoContent}
+      </TabsContent>
     </Tabs>
   );
 }

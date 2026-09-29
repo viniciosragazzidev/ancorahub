@@ -3,29 +3,32 @@
 import { useEffect, useState, useMemo, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { Building06Icon, LinkSquare01Icon, SecurityCheckIcon, UserIcon, Store01Icon, Message01Icon, PuzzleIcon } from "@hugeicons/core-free-icons";
+import { Building06Icon, CalendarCheckIcon, LinkSquare01Icon, SecurityCheckIcon, UserIcon, Store01Icon, Message01Icon, PuzzleIcon } from "@hugeicons/core-free-icons";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 
-export type TabId = "conta" | "empresa" | "unidade" | "whatsapp" | "integracoes" | "seguranca" | "atendimento" | "passkey" | "extensao";
+export type TabId = "conta" | "empresa" | "unidade" | "disponibilidade" | "whatsapp" | "integracoes" | "seguranca" | "atendimento" | "passkey" | "extensao";
 type Tab = { id: TabId; label: string; icon: typeof UserIcon };
 
-export function SettingsTabs({ account, company, unit, whatsapp, integrations, security, atendimento, extension, tabIds }: { account: ReactNode; company?: ReactNode; unit?: ReactNode; whatsapp: ReactNode; integrations?: ReactNode; security: ReactNode; atendimento?: ReactNode; extension?: ReactNode; tabIds: TabId[] }) {
+const ALL_TABS: Tab[] = [
+  { id: "conta", label: "Minha conta", icon: UserIcon },
+  { id: "empresa", label: "Empresa", icon: Building06Icon },
+  { id: "unidade", label: "Unidade", icon: Store01Icon },
+  { id: "disponibilidade", label: "Disponibilidade", icon: CalendarCheckIcon },
+  { id: "atendimento", label: "Atendimento", icon: Message01Icon },
+  { id: "whatsapp", label: "WhatsApp", icon: LinkSquare01Icon },
+  { id: "integracoes", label: "Integrações", icon: LinkSquare01Icon },
+  { id: "seguranca", label: "Segurança", icon: SecurityCheckIcon },
+  { id: "extensao", label: "Extensão", icon: PuzzleIcon },
+];
+
+export function SettingsTabs({ account, company, unit, availability, whatsapp, integrations, security, atendimento, extension, tabIds }: { account: ReactNode; company?: ReactNode; unit?: ReactNode; availability?: ReactNode; whatsapp: ReactNode; integrations?: ReactNode; security: ReactNode; atendimento?: ReactNode; extension?: ReactNode; tabIds: TabId[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const allTabs: Tab[] = [
-    { id: "conta", label: "Minha conta", icon: UserIcon },
-    { id: "empresa", label: "Empresa", icon: Building06Icon },
-    { id: "unidade", label: "Unidade", icon: Store01Icon },
-    { id: "atendimento", label: "Atendimento", icon: Message01Icon },
-    { id: "whatsapp", label: "WhatsApp", icon: LinkSquare01Icon },
-    { id: "integracoes", label: "Integrações", icon: LinkSquare01Icon },
-    { id: "seguranca", label: "Segurança", icon: SecurityCheckIcon },
-    { id: "extensao", label: "Extensão", icon: PuzzleIcon },
-  ];
   const tabs = useMemo(() => {
-    return allTabs.filter((tab) => tabIds.includes(tab.id));
-  }, [tabIds, allTabs]);
+    return ALL_TABS.filter((tab) => tabIds.includes(tab.id));
+  }, [tabIds]);
 
   const requested = searchParams.get("tab") as string | null;
   const isPasskeyRequested = requested === "passkey";
@@ -64,32 +67,34 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
   return (
     <div className="grid gap-4 lg:grid-cols-[13.5rem_1fr]">
       <ScrollArea orientation="horizontal" className="w-full whitespace-nowrap lg:hidden">
-        <nav className="flex gap-1 pb-1">
+        <nav className="flex snap-x snap-mandatory gap-1 pb-1">
           {tabs.map((tab) => (
-            <button
+            <Button
               key={tab.id}
               type="button"
               onClick={() => selectTab(tab.id)}
-              className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors ${active === tab.id ? "bg-secondary font-semibold text-foreground border border-border/80 shadow-2xs" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"}`}
+              className={`h-auto min-h-(--mobile-touch-target) shrink-0 snap-start justify-start gap-2.5 px-3 py-2.5 text-sm ${active === tab.id ? "bg-secondary font-semibold text-foreground" : "text-muted-foreground"}`}
+              variant="ghost"
             >
               <HugeiconsIcon icon={tab.icon} size={16} />
               {tab.label}
-            </button>
+            </Button>
           ))}
         </nav>
       </ScrollArea>
 
       <nav className="hidden gap-1 lg:flex lg:flex-col">
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.id}
             type="button"
             onClick={() => selectTab(tab.id)}
-            className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors ${active === tab.id ? "bg-secondary font-semibold text-foreground border border-border/80 shadow-2xs" : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"}`}
+            className={`h-auto shrink-0 justify-start gap-2.5 px-3 py-2.5 text-sm ${active === tab.id ? "bg-secondary font-semibold text-foreground" : "text-muted-foreground"}`}
+            variant="ghost"
           >
             <HugeiconsIcon icon={tab.icon} size={16} />
             {tab.label}
-          </button>
+          </Button>
         ))}
       </nav>
 
@@ -97,6 +102,7 @@ export function SettingsTabs({ account, company, unit, whatsapp, integrations, s
         {active === "conta" ? account : null}
         {active === "empresa" ? company : null}
         {active === "unidade" ? unit : null}
+        {active === "disponibilidade" ? availability : null}
         {active === "whatsapp" ? whatsapp : null}
         {active === "integracoes" ? integrations : null}
         {active === "atendimento" ? atendimento : null}

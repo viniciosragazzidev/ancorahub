@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useCallback, useEffect, useRef } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { AlertCircleIcon, CheckmarkCircle02Icon, Delete02Icon, Loading02Icon, ShieldKeyIcon } from "@hugeicons/core-free-icons";
 

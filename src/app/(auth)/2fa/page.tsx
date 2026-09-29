@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { ArrowRight, Key } from "@/components/huge-icons";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { authClient } from "@/shared/auth/client";
 import { Button } from "@/components/ui/button";

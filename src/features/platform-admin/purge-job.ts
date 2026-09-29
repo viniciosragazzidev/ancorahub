@@ -56,7 +56,7 @@ export async function startPurgeJob(tenantId: string): Promise<{ jobId: string }
     .limit(1);
 
   if (existing) {
-    throw new Error("JÃ¡ existe um purge em andamento para esta empresa.");
+    throw new Error("Já existe um purge em andamento para esta empresa.");
   }
 
   // Count leads and conversations for progress tracking

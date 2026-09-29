@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, lt, lte, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, lt, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { notifyLeadArrived, notifyNewLead, publishNotification } from "@/features/notifications/send-push-helper";
@@ -19,6 +19,7 @@ const payloadSchema = z.object({
   leadName: z.string().min(1).max(160).optional(),
   brokerId: z.string().min(1).optional(),
   isRedistribution: z.enum(["true", "false"]).optional(),
+  skipBrokerWhatsapp: z.enum(["true", "false"]).optional(),
   failedEffectId: z.string().min(1).optional(),
   failedEffectType: z.enum(effectTypes).optional(),
 }).strict();
@@ -123,11 +124,26 @@ async function notifyException(effect: typeof schema.leadEffectOutbox.$inferSele
   })));
 }
 
+/** A soft-deleted lead must never produce a durable side effect. */
+export function isLeadEligibleForEffect(lead: { deletedAt: Date | null } | null | undefined) {
+  return Boolean(lead && lead.deletedAt === null);
+}
+
 async function executeEffect(effect: typeof schema.leadEffectOutbox.$inferSelect) {
+  const [lead] = await getDatabase().select({ deletedAt: schema.leads.deletedAt })
+    .from(schema.leads)
+    .where(and(
+      eq(schema.leads.id, effect.leadId),
+      eq(schema.leads.tenantId, effect.tenantId),
+      isNull(schema.leads.deletedAt),
+    ))
+    .limit(1);
+  if (!isLeadEligibleForEffect(lead)) return;
+
   const payload = payloadSchema.parse(effect.payload);
   if (effect.type === "DISTRIBUTE_LEAD") {
-    const { enqueueLeadDistributionJob } = await import("@/features/lead-distribution/jobs");
-    await enqueueLeadDistributionJob({ tenantId: effect.tenantId, leadId: effect.leadId });
+    const { enqueueAndProcessLeadDistribution } = await import("@/features/lead-distribution/jobs");
+    await enqueueAndProcessLeadDistribution({ tenantId: effect.tenantId, leadId: effect.leadId, source: "intake" });
     return;
   }
   if (effect.type === "NOTIFY_LEAD_ARRIVED") {
@@ -143,7 +159,10 @@ async function executeEffect(effect: typeof schema.leadEffectOutbox.$inferSelect
       payload.brokerId,
       payload.leadName ?? "Novo lead",
       `lead-assigned:${effect.id}`,
-      { isRedistribution: payload.isRedistribution === "true" },
+      {
+        isRedistribution: payload.isRedistribution === "true",
+        skipBrokerWhatsApp: payload.skipBrokerWhatsapp === "true",
+      },
     );
     return;
   }

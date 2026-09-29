@@ -11,6 +11,7 @@ vi.mock("@/shared/observability/metrics", () => ({
 vi.mock("@/shared/observability/request-timing", () => ({
   getRequestTiming: () => undefined,
   getDurations: () => ({ authMs: 0, tenantMs: 0, dbMs: 0 }),
+  withRequestTiming: async (_route: string, callback: () => Promise<unknown>) => ({ result: await callback() }),
 }));
 
 import { POST } from "./route";

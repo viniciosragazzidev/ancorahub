@@ -232,7 +232,7 @@ export default async function SuperDevIntegrityPage() {
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle>Infraestrutura VPS</CardTitle>
-              <CardDescription>Conexão privada Vercel → Caddy → Fastify</CardDescription>
+              <CardDescription>Conexão privada CRM → Caddy → Fastify</CardDescription>
             </div>
             <Badge variant={vpsHealth.status === "online" ? "success" : "destructive"} className="gap-1.5">
               <span aria-hidden className={vpsHealth.status === "online" ? "size-1.5 rounded-full bg-success-foreground" : "size-1.5 rounded-full bg-destructive-foreground"} />
@@ -243,13 +243,13 @@ export default async function SuperDevIntegrityPage() {
             {vpsHealth.status === "online" ? (
               <>
                 <p><span className="font-medium text-foreground">Fastify:</span> OK</p>
-                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(vpsHealth.checkedAt))}</p>
+                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(vpsHealth.checkedAt))}</p>
                 <p><span className="font-medium text-foreground">Latência:</span> {vpsHealth.latencyMs} ms</p>
               </>
             ) : (
               <>
                 <p><span className="font-medium text-foreground">Último erro:</span> {vpsHealth.errorCode.toUpperCase()}</p>
-                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(vpsHealth.checkedAt))}</p>
+                <p><span className="font-medium text-foreground">Última verificação:</span> {new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(vpsHealth.checkedAt))}</p>
                 <p><span className="font-medium text-foreground">Latência:</span> {vpsHealth.latencyMs} ms</p>
               </>
             )}

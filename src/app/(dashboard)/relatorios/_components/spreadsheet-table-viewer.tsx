@@ -22,6 +22,9 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AppSelect } from "@/components/ui/select";
+import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getSpreadsheetDataAction, type ImportedSpreadsheet } from "./spreadsheet-actions";
 
 export function SpreadsheetTableViewer({
@@ -126,16 +129,13 @@ export function SpreadsheetTableViewer({
       </div>
 
       {/* Table */}
-      <div className="overflow-x-auto rounded-lg border border-border">
-        <table className="w-full">
-          <thead>
+      <DataTableFrame density="compact">
+        <Table>
+          <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b border-border bg-muted/30">
+              <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <th
-                    key={header.id}
-                    className="px-3 py-2 text-left text-xs font-medium text-muted-foreground"
-                  >
+                  <TableHead key={header.id}>
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
@@ -153,29 +153,27 @@ export function SpreadsheetTableViewer({
                         )}
                       </button>
                     </div>
-                  </th>
+                  </TableHead>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </thead>
-          <tbody>
+          </TableHeader>
+          <TableBody>
             {table.getRowModel().rows.map((row, i) => (
-              <tr
+              <TableRow
                 key={row.id}
-                className={`border-b border-border transition-colors hover:bg-muted/20 ${
-                  i % 2 === 0 ? "bg-background" : "bg-muted/10"
-                }`}
+                className={i % 2 === 0 ? undefined : "bg-muted/15"}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-3 py-1.5 text-sm">
+                  <TableCell key={cell.id}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
+                  </TableCell>
                 ))}
-              </tr>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </TableBody>
+        </Table>
+      </DataTableFrame>
 
       {/* Pagination */}
       <div className="flex items-center justify-between gap-2">
@@ -185,17 +183,14 @@ export function SpreadsheetTableViewer({
             {table.getPageCount()}
           </span>
           <span className="mx-1">·</span>
-          <select
-            value={table.getState().pagination.pageSize}
-            onChange={(e) => table.setPageSize(Number(e.target.value))}
-            className="rounded border border-border bg-background px-1 py-0.5 text-xs"
-          >
-            {[10, 25, 50, 100].map((size) => (
-              <option key={size} value={size}>
-                {size} por página
-              </option>
-            ))}
-          </select>
+          <AppSelect
+            aria-label="Linhas por página"
+            className="w-32"
+            onValueChange={(value) => table.setPageSize(Number(value))}
+            options={[10, 25, 50, 100].map((size) => ({ value: String(size), label: `${size} por página` }))}
+            size="sm"
+            value={String(table.getState().pagination.pageSize)}
+          />
         </div>
         <div className="flex items-center gap-1">
           <Button

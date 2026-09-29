@@ -1,75 +1,50 @@
-import NocDashboardContent from "./_components/noc-dashboard-content";
-import MarketingDashboardContent from "./_components/marketing-dashboard-content";
-import { BrokerWorkspace } from "./_components/broker-workspace";
-import { getBrokerWorkspaceData, isBrokerWorkspaceEnabled } from "@/features/broker-workspace/queries";
-import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { parsePeriod } from "@/shared/period";
-import { getBrokerDashboardData, getDirectorDashboardData, getManagerDashboardData, getMarketingDashboardData } from "./data";
-
+import { withRequestTiming } from "@/shared/observability/request-timing";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightDashboard } from "@/features/broker-workspace/components/light-dashboard";
-import { eq } from "drizzle-orm";
-import { Suspense } from "react";
+import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { getDatabase, schema } from "@/shared/db";
-import DashboardLoading from "./loading";
+import { eq } from "drizzle-orm";
+import { getDashboardViewModel } from "@/features/dashboard/service";
+import { OperationalDashboard } from "@/features/dashboard/components/operational-dashboard";
+import { parsePeriod } from "@/shared/period";
 
+/**
+ * The reporting center is the canonical operational dashboard. The old
+ * dashboard variants were split across several surfaces and made the primary
+ * route unpredictable; role-aware report tabs are now the single entry point.
+ */
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; tab?: string }>;
 }) {
-  const context = await getRequiredTenantContext();
-  return (
-    <Suspense fallback={<DashboardLoading />}>
-      <DashboardContent context={context} searchParams={searchParams} />
-    </Suspense>
-  );
-}
+  const resolvedSearchParams = await searchParams;
+  const period = parsePeriod(resolvedSearchParams.period);
+  const { result } = await withRequestTiming("/dashboard", async () => {
+    const context = await getRequiredTenantContext();
 
-async function DashboardContent({
-  context,
-  searchParams,
-}: {
-  context: Awaited<ReturnType<typeof getRequiredTenantContext>>;
-  searchParams: Promise<{ period?: string }>;
-}) {
-  const period = parsePeriod((await searchParams).period);
+    // The Lite experience is a role-scoped home, not a reporting tab. Resolve it
+    // before the shared reporting feature so the broker never falls through to
+    // the management dashboard.
+    if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
+      const [tenantRows, data] = await Promise.all([
+        getDatabase()
+          .select({ logoUrl: schema.tenants.logoUrl })
+          .from(schema.tenants)
+          .where(eq(schema.tenants.id, context.tenantId))
+          .limit(1),
+        getBrokerWorkspaceData(),
+      ]);
 
-  if (context.jobTitle === "marketing") {
-    const data = await getMarketingDashboardData(period);
-    return <MarketingDashboardContent data={data} period={period} />;
-  }
+      return <LightDashboard data={data} logoUrl={tenantRows[0]?.logoUrl ?? null} />;
+    }
 
-  if (context.role === "director") {
-    const data = await getDirectorDashboardData(period);
-    return <NocDashboardContent role="director" data={data} period={period} />;
-  }
-  if (context.role === "manager") {
-    return <NocDashboardContent role="manager" data={await getManagerDashboardData(period)} period={period} />;
-  }
+    const model = await getDashboardViewModel(context, period);
+    return <OperationalDashboard model={model} period={period} />;
+  });
 
-  const mode = await getExperienceMode(context);
-  if (mode === "LIGHT") {
-    const [tenantRows, data] = await Promise.all([
-      getDatabase()
-        .select({ logoUrl: schema.tenants.logoUrl })
-        .from(schema.tenants)
-        .where(eq(schema.tenants.id, context.tenantId))
-        .limit(1),
-      getBrokerWorkspaceData(),
-    ]);
-    return <LightDashboard data={data} logoUrl={tenantRows[0]?.logoUrl ?? null} />;
-  }
-
-  const [brokerWorkspaceEnabled, cleanUiEnabled] = await Promise.all([
-    isBrokerWorkspaceEnabled(),
-    isCleanUiOperationalEnabled(context.tenantId),
-  ]);
-  if (brokerWorkspaceEnabled && cleanUiEnabled) {
-    return <BrokerWorkspace data={await getBrokerWorkspaceData()} />;
-  }
-  return <NocDashboardContent role="broker" data={await getBrokerDashboardData(period)} period={period} />;
+  return result;
 }

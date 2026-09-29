@@ -20,10 +20,22 @@
 
 ## Distribuição de leads
 
-- **Plantão multiunidade**: criação coordenada de regras de plantão independentes para mais de uma unidade. Não é uma regra compartilhada: cada unidade conserva fila, escala, cobertura e histórico próprios.
+- **Plantão multiunidade/multidia**: criação coordenada de regras de plantão independentes para mais de uma unidade e/ou dia da semana. Não é uma regra compartilhada: cada combinação de unidade, fila e dia conserva escala, cobertura e histórico próprios.
 - **Central de distribuição**: superfície operacional única para configurar filas, acompanhar exceções e explicar decisões. Ela não substitui o motor: toda ação manual, qualificação e automação deve usar o mesmo resolver determinístico.
 - **Decisão de distribuição**: resultado explicável de uma tentativa de roteamento, contendo fila, candidatos elegíveis, estratégia, corretor selecionado — quando houver — e os motivos de exclusão ou fallback.
-- **Fila de espera**: estado recuperável de um lead sem corretor elegível. O lead permanece visível para ação humana e nunca é descartado silenciosamente.
+- **Regra de roteamento**: definição ordenada que combina um destino com filtros de entrada; uma condição vazia significa qualquer valor, exceto status desqualificado, que exige opt-in explícito. O destino pode ser uma fila, unidade, corretor/grupo ou todas as unidades ativas.
+- **Modo manual de roteamento**: a regra encaminha o lead ao destino sem criar oferta ou proprietário; o lead aguarda ação explícita da gestão.
+- **Escopo de entrada**: conjunto de atributos que decide quais leads uma regra pode receber. Canal/origem é filtrado na matriz; campanha, anúncio e formulário Meta são regras de entrada próprias em Filas e campanhas.
+- **Fila de espera**: estado recuperável de um lead ainda sem corretor elegível ou sem aceite. O executor recorrente tenta novos ciclos automáticos sem apagar o histórico; a ação humana permanece disponível, mas a espera não encerra a automação.
+- **Lote de leads**: conjunto importado por CSV que preserva a unidade e a fila escolhidas. Cada lead é persistido sem owner e entra individualmente no motor durável de ofertas; a importação não constitui uma atribuição paralela.
+- **Agenda pessoal do corretor**: janelas semanais declaradas pelo próprio corretor, no fuso operacional. Elas determinam quando ele entra na distribuição automática e não revogam a possibilidade de atribuição manual assistida.
+- **Roster ativo do plantão da fila**: corretores com vínculo ativo no tenant e escala vigente em um plantão ativo explicitamente ligado à fila do lead e compatível com sua origem. A seleção pode atravessar unidades; a unidade do lead não é alterada pela atribuição manual.
+- **Ocorrência do plantão**: instância de uma escala recorrente em uma data local específica, delimitada por horário de início e fim no fuso configurado. Confirmações se aplicam apenas a essa ocorrência, nunca ao plantão recorrente em geral.
+- **Histórico de ocorrência**: registro consultável de um turno já encerrado, com os eventos de distribuição e os corretores ligados à data; não encerra a regra semanal recorrente.
+- **Tipo de plantão**: rótulo configurado por uma corretora para organizar e comunicar uma escala. É classificatório e não decide quais leads ou corretores participam.
+- **Cota mensal de plantões**: quantidade planejada de ocorrências para um corretor dentro de um mês definido; pode ficar parcialmente não atendida quando as restrições não permitem alocação segura.
+- **Rascunho de escala**: proposta revisável de ocorrências datadas, sem efeito para o atendimento até ser publicada pela gestão.
+- **Escala publicada**: versão aprovada pela gestão que comunica as ocorrências aos corretores e conserva o histórico de publicação e mudanças.
 
 ## Canais de comunicação
 
@@ -37,6 +49,7 @@
 - **Regra de entrada Meta**: configuração que resolve uma fila a partir da atribuição de mídia. Ela nunca escolhe um corretor; depois dela, o motor central de distribuição decide elegibilidade, capacidade e responsável.
 - **Catálogo de integrações**: ponto de entrada administrativo que lista conectores disponíveis e planejados. Ele não concede acesso por si só: cada conector conserva sua própria autorização, configuração e controles de capacidade.
 - **Canal legado OpenWA**: conexão temporária por QR Code mantida apenas durante a migração. Não deve receber novas capacidades estruturais.
+- **Histórico de conversa**: conjunto de mensagens armazenadas pelo CRM para um telefone dentro de um tenant. Excluir o histórico não exclui o lead, cliente, integrante da equipe, convite ou demais registros operacionais vinculados.
 - **Atendimento externo temporário**: enquanto o chat interno não estiver operacional, o Corretor inicia o atendimento auditado no CorreTop e é direcionado ao WhatsApp pessoal pelo número autorizado do lead. A interface não apresenta mensagens como se estivessem sincronizadas.
 
 ## Extensão CorreTop Assistant
@@ -50,6 +63,12 @@
 
 - **Relatório operacional supervisionado**: exportação de leads, qualificação, tarefas, distribuição, conversão e desempenho restrita aos corretores ativos vinculados ao Supervisor. Nunca contém valores ou comissões.
 - **Relatório consolidado**: exportação autorizada no escopo do Diretor (tenant) ou Gestor (filial atual), com as limitações da permissão do relatório.
+- **Métrica canônica**: definição versionada de um indicador (identificador estável, numerador, denominador e dimensões permitidas) mantida no catálogo de métricas. Toda superfície consome a mesma definição; nenhuma tela recalcula o indicador localmente.
+- **Taxa de conversão (coorte de entrada)**: leads recebidos em um período que alcançaram o estágio `converted` divididos pelos leads recebidos no mesmo período, excluídos duplicados e descartados. Numerador e denominador pertencem à mesma população de leads.
+- **Família de relatórios**: agrupamento de análises sobre o mesmo recorte do negócio (Visão geral, Comercial, Equipe, Unidades, Financeiro) dentro da rota única de relatórios. Não é uma rota nem uma regra de negócio própria.
+- **Drill-down**: caminho de um número agregado até a população exata de registros que o compõe, respeitando o escopo da sessão. Todo número de relatório precisa ter um drill-down explicável.
+- **Item de atenção**: contagem derivada de fatos persistidos (não de opinião) que aponta uma pendência operacional atual, com threshold configurável pelo Diretor e população recuperável por drill-down.
+- **Janela anterior equivalente**: período imediatamente anterior ao selecionado, com a mesma duração, usado para comparação. Diferenças entre taxas são apresentadas em pontos percentuais, nunca como variação percentual.
 
 ## Engenharia
 

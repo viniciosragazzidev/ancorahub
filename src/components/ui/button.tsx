@@ -1,42 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { motion, useReducedMotion, type MotionProps } from "motion/react";
 import { Slot } from "@radix-ui/react-slot";
 
 import { cn } from "@/lib/utils";
 import { buttonVariants, type ButtonVariants } from "./button-variants";
 
 // ---------------------------------------------------------------------------
-// Spring config
-// ---------------------------------------------------------------------------
-
-const pressTransition = {
-  type: "spring" as const,
-  stiffness: 600,
-  damping: 28,
-  mass: 0.8,
-};
-
-const createMotionSlot = () => {
-  if (typeof motion !== "undefined" && typeof (motion as any).create === "function") {
-    return (motion as any).create(Slot);
-  }
-  if (typeof motion === "function") {
-    return (motion as any)(Slot);
-  }
-  return Slot;
-};
-const MotionSlot = createMotionSlot();
-
-// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type NativeButtonProps = Omit<
-  React.ComponentPropsWithoutRef<"button"> & MotionProps,
-  "ref"
->;
+type NativeButtonProps = React.ComponentPropsWithoutRef<"button">;
 
 export interface ButtonProps extends NativeButtonProps, ButtonVariants {
   /**
@@ -47,7 +21,7 @@ export interface ButtonProps extends NativeButtonProps, ButtonVariants {
   render?: React.ReactElement<Record<string, unknown>>;
   /** Use Radix asChild pattern instead of render prop. */
   asChild?: boolean;
-  /** Spring press scale override. Default 0.97. */
+  /** @deprecated A interação pressionada é definida pelo CSS canônico. */
   pressScale?: number;
 }
 
@@ -63,27 +37,13 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size = "default",
       render,
       asChild = false,
-      pressScale = 0.97,
+      pressScale: _pressScale,
       children,
-      // absorb any lingering motion overrides from callers
-      whileTap: _whileTap,
-      whileHover: _whileHover,
-      transition: _transition,
       ...restProps
     },
     ref,
   ) {
-    const reduce = useReducedMotion();
-
     const mergedClass = cn(buttonVariants({ variant, size }), className);
-
-    const motionProps = reduce
-      ? {}
-      : {
-          whileTap: { scale: pressScale },
-          whileHover: { y: -1 },
-          transition: pressTransition,
-        };
 
     // -------------------------------------------------------------------------
     // render-prop path  →  <Button render={<Link href="/..." />}>label</Button>
@@ -104,17 +64,16 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       };
 
       // Slot merges safeRestProps (onClick, disabled, aria-*, data-*, …) onto
-      // the render element and animates the resulting DOM node.
+      // the render element and styles the resulting DOM node.
       return (
-        <MotionSlot
+        <Slot
           ref={ref as React.Ref<HTMLElement>}
           data-slot="button"
           className={mergedClass}
-          {...motionProps}
           {...safeRestProps}
         >
           {React.cloneElement(render, renderOwnProps, children)}
-        </MotionSlot>
+        </Slot>
       );
     }
 
@@ -127,15 +86,14 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         [key: string]: unknown;
       };
       return (
-        <MotionSlot
+        <Slot
           ref={ref as React.Ref<HTMLElement>}
           data-slot="button"
           className={mergedClass}
-          {...motionProps}
           {...safeRestProps}
         >
           {children}
-        </MotionSlot>
+        </Slot>
       );
     }
 
@@ -143,7 +101,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // Native button (default path)
     // -------------------------------------------------------------------------
     return (
-      <motion.button
+      <button
         ref={ref}
         data-slot="button"
         type={
@@ -151,11 +109,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           "button"
         }
         className={mergedClass}
-        {...motionProps}
         {...restProps}
       >
         {children}
-      </motion.button>
+      </button>
     );
   },
 );

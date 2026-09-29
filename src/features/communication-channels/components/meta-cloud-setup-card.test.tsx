@@ -27,7 +27,7 @@ const activeChannel = {
   id: "channel-1", displayPhoneNumber: "+55 71 99999-9999", verifiedName: "Âncora Saúde", status: "active",
   qualityRating: "GREEN", messagingLimit: "1K", businessId: "business-1", wabaId: "waba-1", phoneNumberId: "phone-1",
   registrationStatus: "registered", registrationErrorCode: null, registeredAt: new Date("2026-08-12T12:00:00Z"),
-  lastWebhookAt: null, activatedAt: new Date("2026-08-12T12:00:00Z"),
+  lastWebhookAt: null, activatedAt: new Date("2026-08-12T12:00:00Z"), hasCredentials: true,
 };
 
 describe("MetaCloudSetupCard", () => {
@@ -54,6 +54,15 @@ describe("MetaCloudSetupCard", () => {
     expect(screen.getByText("Este número ainda precisa de ativação técnica")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Ativar número na Cloud API" })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "Pausar" })).not.toBeInTheDocument();
+  });
+
+  it("requires a new Meta authorization when a disconnected channel has no credentials", () => {
+    render(<MetaCloudSetupCard enabled configured missing={[]} companyAccount={{ ...activeChannel, hasCredentials: false }} canManage />);
+
+    expect(screen.getByText("Reconexão necessária")).toBeInTheDocument();
+    expect(screen.getByText("A autorização da Meta não está mais disponível no CRM. Reconecte o número para restaurar os envios.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pausar" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reativar" })).not.toBeInTheDocument();
   });
 
   it("shows an error toast when disconnecting the official number fails", async () => {

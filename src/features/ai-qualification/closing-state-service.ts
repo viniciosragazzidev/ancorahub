@@ -139,7 +139,11 @@ export async function handlePostClosingInboundMessage(
   const db = getDatabase();
   const state = await getQualificationClosingState(tenantId, sessionId);
 
-  if (!state?.postClosingNoticeSentAt) {
+  if (!state) {
+    return { noticeSent: false, messageText: null };
+  }
+
+  if (!state.postClosingNoticeSentAt) {
     const now = new Date();
     const noticeText = "Seu atendimento já foi encaminhado. Um corretor entrará em contato assim que estiver disponível.";
 
@@ -162,3 +166,4 @@ export async function handlePostClosingInboundMessage(
   // Already sent post-closing notice once. Simply store message and notify queue.
   return { noticeSent: false, messageText: null };
 }
+

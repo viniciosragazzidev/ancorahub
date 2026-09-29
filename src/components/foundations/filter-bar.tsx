@@ -1,0 +1,157 @@
+"use client";
+
+import * as React from "react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+
+export interface FilterBarProps {
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  searchPlaceholder?: string;
+  searchLabel?: string;
+  quickFilters?: React.ReactNode;
+  advancedFiltersTrigger?: {
+    activeCount?: number;
+    onClick?: () => void;
+  };
+  advancedFiltersContent?: React.ReactNode;
+  isAdvancedFiltersOpen?: boolean;
+  onAdvancedFiltersOpenChange?: (open: boolean) => void;
+  popoverContentClassName?: string;
+  onClearFilters?: () => void;
+  hasActiveFilters?: boolean;
+  children?: React.ReactNode;
+  className?: string;
+}
+
+export function FilterBar({
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = "Buscar...",
+  searchLabel = "Buscar",
+  quickFilters,
+  advancedFiltersTrigger,
+  advancedFiltersContent,
+  isAdvancedFiltersOpen,
+  onAdvancedFiltersOpenChange,
+  popoverContentClassName,
+  onClearFilters,
+  hasActiveFilters,
+  children,
+  className,
+}: FilterBarProps) {
+  return (
+    <div
+      data-slot="canonical-filter-bar"
+      className={cn(
+        "flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between",
+        className,
+      )}
+    >
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 max-[559px]:w-full">
+        {onSearchChange !== undefined && (
+          <div className="relative min-w-[12rem] max-w-sm flex-1 max-[559px]:max-w-none">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              type="text"
+              value={searchValue ?? ""}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={searchPlaceholder}
+              aria-label={searchLabel}
+              className="bg-background pl-8.5 pr-8 max-[559px]:h-(--mobile-touch-target)"
+            />
+            {searchValue && (
+              <button
+                type="button"
+                onClick={() => onSearchChange("")}
+                aria-label="Limpar campo de busca"
+                className="absolute right-1 top-1/2 grid size-(--mobile-touch-target) -translate-y-1/2 place-items-center text-muted-foreground hover:text-foreground sm:right-2.5 sm:size-auto"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {quickFilters}
+
+        {advancedFiltersContent ? (
+          <Popover
+            open={isAdvancedFiltersOpen}
+            onOpenChange={onAdvancedFiltersOpenChange}
+          >
+            <PopoverTrigger
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 font-medium max-[559px]:min-h-(--mobile-touch-target)"
+                />
+              }
+            >
+              <SlidersHorizontal className="size-3.5 text-muted-foreground" />
+              <span>Filtros</span>
+              {Boolean(advancedFiltersTrigger?.activeCount && advancedFiltersTrigger.activeCount > 0) && (
+                <Badge
+                  variant="secondary"
+                  className="ml-0.5 px-1.5 py-0 text-[10px] font-bold"
+                >
+                  {advancedFiltersTrigger?.activeCount}
+                </Badge>
+              )}
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              side="bottom"
+              sideOffset={8}
+              className={cn(
+                "w-84 rounded-xl border border-border bg-popover p-0 shadow-lg sm:w-96",
+                popoverContentClassName,
+              )}
+            >
+              {advancedFiltersContent}
+            </PopoverContent>
+          </Popover>
+        ) : advancedFiltersTrigger ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={advancedFiltersTrigger.onClick}
+            className="gap-1.5 font-medium max-[559px]:min-h-(--mobile-touch-target)"
+          >
+            <SlidersHorizontal className="size-3.5 text-muted-foreground" />
+            <span>Filtros</span>
+            {Boolean(advancedFiltersTrigger.activeCount && advancedFiltersTrigger.activeCount > 0) && (
+              <Badge
+                variant="secondary"
+                className="ml-0.5 px-1.5 py-0 text-[10px] font-bold"
+              >
+                {advancedFiltersTrigger.activeCount}
+              </Badge>
+            )}
+          </Button>
+        ) : null}
+
+        {hasActiveFilters && onClearFilters && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onClearFilters}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Limpar tudo
+          </Button>
+        )}
+      </div>
+
+      {children && <div className="flex shrink-0 items-center gap-2 max-[559px]:w-full max-[559px]:overflow-x-auto max-[559px]:pb-0.5 max-[559px]:[scrollbar-width:none]">{children}</div>}
+    </div>
+  );
+}

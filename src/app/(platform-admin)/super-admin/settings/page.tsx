@@ -6,6 +6,7 @@ import {
   updateCentralAtencaoSettingsAction,
   updateGlobalSearchSettingsAction,
   updateBrokerWorkspaceSettingsAction,
+  updateBrokerAvailabilityOnboardingSettingsAction,
   updateWorkflowAutomationSettingsAction,
   updateCleanUiOperationalSettingsAction,
   updateInterfaceMotionSettingsAction,
@@ -29,11 +30,21 @@ import {
   updateWahaCadenceSettingsAction,
   updateWahaConnectionSettingsAction,
   updateLeadManagementActionsSettingsAction,
+  updateManualLeadAssignmentOfferChoiceSettingsAction,
+  updateDutyPresenceConfirmationSettingsAction,
+  updateAttendanceFlowsSettingsAction,
+  updateDutyMonthlySchedulingSettingsAction,
+  updateDutyOccurrenceHistorySettingsAction,
   updateCustomRolesGlobalSettingsAction,
   updatePerformanceRankingSettingsAction,
   updateTeamMemberProfileSettingsAction,
+  updateTeamInvitationResendSettingsAction,
   updateUserProfileSettingsAction,
+  updateReportingCenterSettingsAction,
+  updateUnlinkedConversationDeletionSettingsAction,
+  updateConversationMediaSettingsAction,
 } from "@/app/(platform-admin)/super-admin/actions";
+import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import {
@@ -48,6 +59,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
 import { SuperAdminSettingsTabs } from "./super-admin-settings-tabs";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +69,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_central_atencao_stagnant_days",
     "feature_global_search_enabled",
     "feature_broker_workspace_enabled",
+    "feature_broker_availability_onboarding_enabled",
     "feature_workflow_automation_enabled",
     CLEAN_UI_FEATURE,
     "feature_interface_motion_enabled",
@@ -80,13 +93,21 @@ export default async function SuperAdminSettingsPage() {
     "feature_waha_cadence_enabled",
     "feature_waha_connections_enabled",
     "feature_waha_ai_enabled",
+    "feature_waha_internal_broker_notifications_enabled",
     "waha_cadence_max_attempts",
     "waha_cadence_retry_base_seconds",
     "waha_cadence_lease_seconds",
     "lead_intake_outbox_max_attempts",
     "lead_intake_outbox_retry_base_seconds",
     "lead_intake_outbox_lease_seconds",
+    META_OUTBOUND_STALE_AFTER_HOURS_SETTING,
     "feature_lead_management_actions_enabled",
+    "feature_manual_lead_assignment_offer_choice_enabled",
+    FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key,
+    FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key,
+    FEATURE_FLAGS.ATTENDANCE_FLOWS.key,
+    FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key,
+    FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
     "feature_ai_quick_reply_enabled",
@@ -96,6 +117,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_custom_roles_enabled",
     "feature_performance_ranking_enabled",
     "feature_team_member_profile_enabled",
+    "feature_team_invitation_resend_enabled",
     "feature_user_profile_enabled",
     "ai_primary_provider",
     "ai_primary_model",
@@ -115,6 +137,7 @@ export default async function SuperAdminSettingsPage() {
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
   const brokerWorkspaceEnabled = settingMap.get("feature_broker_workspace_enabled") !== "false";
+  const brokerAvailabilityOnboardingEnabled = settingMap.get("feature_broker_availability_onboarding_enabled") !== "false";
   const workflowAutomationEnabled =
     settingMap.get("feature_workflow_automation_enabled") === "true";
   const cleanUiOperationalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
@@ -123,6 +146,8 @@ export default async function SuperAdminSettingsPage() {
   const routeOnboardingEnabled = settingMap.get("feature_route_onboarding_enabled") !== "false";
   const metaCloudWhatsAppEnabled = settingMap.get("feature_whatsapp_meta_cloud_enabled") === "true";
   const systemReportEnabled = settingMap.get(SYSTEM_REPORT_ENABLED_KEY) !== "false";
+  const reportingCenterEnabled = settingMap.get("feature_reporting_center_enabled") !== "false";
+  const conversationMediaEnabled = settingMap.get("feature_conversation_media_enabled") !== "false";
   const systemReportDestination = settingMap.get(SYSTEM_REPORT_DESTINATION_KEY) ?? "";
   const metaLeadAdsEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
   const realtimeSyncEnabled = settingMap.get("feature_realtime_sync_enabled") !== "false";
@@ -136,6 +161,13 @@ export default async function SuperAdminSettingsPage() {
     settingMap.get("feature_lead_distribution_jobs_enabled") !== "false";
   const leadManagementActionsEnabled =
     settingMap.get("feature_lead_management_actions_enabled") !== "false";
+  const manualLeadAssignmentOfferChoiceEnabled = settingMap.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false";
+  const dutyPresenceConfirmationEnabled = settingMap.get(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key) === "true";
+  const dutyMonthlySchedulingEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key) ?? FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue) === "true";
+  const attendanceFlowsEnabled = (settingMap.get(FEATURE_FLAGS.ATTENDANCE_FLOWS.key) ?? FEATURE_FLAGS.ATTENDANCE_FLOWS.defaultValue) === "true";
+  const dutyOccurrenceHistoryEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key) ?? FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.defaultValue) === "true";
+  const unlinkedConversationDeletionEnabled =
+    settingMap.get(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key) !== "false";
   const distributionBatchSize = settingMap.get("lead_distribution_jobs_batch_size") ?? "25";
   const distributionMaxAttempts = settingMap.get("lead_distribution_jobs_max_attempts") ?? "8";
   const distributionRetryBaseSeconds =
@@ -148,9 +180,12 @@ export default async function SuperAdminSettingsPage() {
   const leadEffectOutboxRetryBaseSeconds =
     settingMap.get("lead_intake_outbox_retry_base_seconds") ?? "60";
   const leadEffectOutboxLeaseSeconds = settingMap.get("lead_intake_outbox_lease_seconds") ?? "120";
+  const whatsappOutboxStaleAfterHours = settingMap.get(META_OUTBOUND_STALE_AFTER_HOURS_SETTING)
+    ?? String(DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS);
   const wahaCadenceEnabled = settingMap.get("feature_waha_cadence_enabled") === "true";
   const wahaConnectionsEnabled = settingMap.get("feature_waha_connections_enabled") === "true";
   const wahaAiEnabled = settingMap.get("feature_waha_ai_enabled") === "true";
+  const wahaInternalBrokerNotificationsEnabled = settingMap.get("feature_waha_internal_broker_notifications_enabled") !== "false";
   const wahaMaxAttempts = settingMap.get("waha_cadence_max_attempts") ?? "5";
   const wahaRetryBaseSeconds = settingMap.get("waha_cadence_retry_base_seconds") ?? "60";
   const wahaLeaseSeconds = settingMap.get("waha_cadence_lease_seconds") ?? "120";
@@ -166,6 +201,7 @@ export default async function SuperAdminSettingsPage() {
   const customRolesEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
   const performanceRankingEnabled =
     settingMap.get("feature_performance_ranking_enabled") !== "false";
+  const teamInvitationResendEnabled = settingMap.get("feature_team_invitation_resend_enabled") !== "false";
   const teamMemberProfileEnabled =
     settingMap.get("feature_team_member_profile_enabled") !== "false";
   const userProfileEnabled = settingMap.get("feature_user_profile_enabled") !== "false";
@@ -237,6 +273,23 @@ export default async function SuperAdminSettingsPage() {
                   <Button type="submit" variant={brokerWorkspaceEnabled ? "outline" : "default"}>
                     {brokerWorkspaceEnabled ? "Salvar controle" : "Liberar Workspace"}
                   </Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Agenda obrigatória do corretor</CardTitle>
+                <CardDescription>
+                  Exige a configuração da disponibilidade semanal e usa a agenda para filtrar a distribuição automática. Atribuições manuais continuam possíveis.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateBrokerAvailabilityOnboardingSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="brokerAvailabilityOnboardingEnabled" value="true" defaultChecked={brokerAvailabilityOnboardingEnabled} className="size-4" />
+                    <span><span className="font-medium">Exigir agenda para novos leads automáticos</span><span className="block text-xs text-muted-foreground">Desativar preserva as agendas salvas, mas deixa de usá-las para bloquear a distribuição.</span></span>
+                  </label>
+                  <Button type="submit" variant={brokerAvailabilityOnboardingEnabled ? "outline" : "default"}>{brokerAvailabilityOnboardingEnabled ? "Salvar controle" : "Ativar agenda obrigatória"}</Button>
                 </form>
               </CardContent>
             </Card>
@@ -353,6 +406,66 @@ export default async function SuperAdminSettingsPage() {
 
             <Card className="border-border bg-card shadow-none">
               <CardHeader>
+                <CardTitle>Exclusão de históricos de conversa</CardTitle>
+                <CardDescription>
+                  Controla a remoção de históricos no CRM. Diretor pode excluir qualquer conversa; Gestor permanece limitado a chats sem vínculo.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateUnlinkedConversationDeletionSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="unlinkedConversationDeletionEnabled"
+                      value="true"
+                      defaultChecked={unlinkedConversationDeletionEnabled}
+                      className="size-4 warning-[var(--primary)]"
+                    />
+                    <span>
+                      <span className="font-medium">Permitir exclusão governada de históricos</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Cada exclusão registra auditoria sem guardar telefone ou conteúdo da conversa.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar controle</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Mídia nas conversas oficiais</CardTitle>
+                <CardDescription>
+                  Receber e enviar imagem, áudio, documento e vídeo pelo canal Meta com armazenamento privado e acesso autenticado. Desativar interrompe novos downloads e envios sem apagar histórico ou objetos.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateConversationMediaSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="conversationMediaEnabled"
+                      value="true"
+                      defaultChecked={conversationMediaEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">Habilitar mídia oficial nas conversas</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Cada acesso a mídia é auditado; desativado, o workspace informa a indisponibilidade.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={conversationMediaEnabled ? "outline" : "default"}>
+                    {conversationMediaEnabled ? "Salvar controle" : "Liberar mídia"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
                 <CardTitle>Temporadas e ranking comercial</CardTitle>
                 <CardDescription>
                   Kill switch global para a gestão de temporadas, metas e premiações. Desativar
@@ -418,6 +531,40 @@ export default async function SuperAdminSettingsPage() {
                   </label>
                   <Button type="submit" variant={teamMemberProfileEnabled ? "outline" : "default"}>
                     {teamMemberProfileEnabled ? "Salvar controle" : "Liberar perfis"}
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Reenvio de convites de ativação</CardTitle>
+                <CardDescription>
+                  Permite renovar e reenviar convites de ativação para membros pendentes, inclusive quando o convite anterior expirou ou não existe. Cada reenvio é auditado.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  action={updateTeamInvitationResendSettingsAction}
+                  className="flex flex-wrap items-center justify-between gap-4"
+                >
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="teamInvitationResendEnabled"
+                      value="true"
+                      defaultChecked={teamInvitationResendEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">Reenvio de convites habilitado</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Desativar bloqueia novos reenvios sem apagar os convites e o histórico.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={teamInvitationResendEnabled ? "outline" : "default"}>
+                    {teamInvitationResendEnabled ? "Salvar controle" : "Liberar reenvio"}
                   </Button>
                 </form>
               </CardContent>
@@ -723,7 +870,7 @@ export default async function SuperAdminSettingsPage() {
                     <span>
                       <span className="font-medium">Integração oficial habilitada</span>
                       <span className="block text-xs text-muted-foreground">
-                        Exige as credenciais privadas da Meta configuradas no ambiente da Vercel.
+                        Exige as credenciais privadas da Meta configuradas no ambiente do Coolify.
                       </span>
                     </span>
                   </label>
@@ -778,6 +925,46 @@ export default async function SuperAdminSettingsPage() {
                       {systemReportEnabled ? "Salvar controle" : "Ativar central de report"}
                     </Button>
                   </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Central de Relatórios (Reporting 1)</CardTitle>
+                <CardDescription>
+                  Ativa o catálogo canônico de métricas, abas por papel (Visão geral, Comercial,
+                  Equipe, Unidades, Financeiro), funil de 8 estágios, seção de atenção com
+                  parâmetros do tenant e drill-down explicável. Desativa para o layout legado
+                  anterior.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  action={updateReportingCenterSettingsAction}
+                  className="flex flex-wrap items-center justify-between gap-4"
+                >
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="reportingCenterEnabled"
+                      value="true"
+                      defaultChecked={reportingCenterEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">Central de relatórios habilitada</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Desativação restaura o layout legado e preserva auditoria.
+                      </span>
+                    </span>
+                  </label>
+                  <Button
+                    type="submit"
+                    variant={reportingCenterEnabled ? "outline" : "default"}
+                  >
+                    {reportingCenterEnabled ? "Salvar controle" : "Ativar central de relatórios"}
+                  </Button>
                 </form>
               </CardContent>
             </Card>
@@ -971,10 +1158,116 @@ export default async function SuperAdminSettingsPage() {
 
             <Card className="border-border bg-card shadow-none">
               <CardHeader>
+                <CardTitle>Escala mensal automática de plantões</CardTitle>
+                <CardDescription>
+                  Permite que Diretores e Gestores definam cotas mensais por corretor, gerem uma proposta equilibrada, revisem e publiquem a escala. Cada publicação fica auditada e pode ser desativada globalmente.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateDutyMonthlySchedulingSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="dutyMonthlySchedulingEnabled" value="true" defaultChecked={dutyMonthlySchedulingEnabled} className="size-4 accent-primary" />
+                    <span>
+                      <span className="font-medium">Geração de escala mensal habilitada</span>
+                      <span className="block text-xs text-muted-foreground">Desativar impede novas gerações e publicações; escalas já publicadas permanecem registradas.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Fluxos de atendimento por fila</CardTitle>
+                <CardDescription>
+                  Permite escolher, em cada fila, o fluxo que atende os leads que chegam (DEC-127). Desligado, toda fila segue o atendimento atual, mesmo com um fluxo escolhido.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateAttendanceFlowsSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="attendanceFlowsEnabled" value="true" defaultChecked={attendanceFlowsEnabled} className="size-4 accent-primary" />
+                    <span>
+                      <span className="font-medium">Fluxos de atendimento habilitados</span>
+                      <span className="block text-xs text-muted-foreground">O motor novo de IA só atende números de teste de Qualificação até a troca definitiva.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Histórico de plantões encerrados</CardTitle>
+                <CardDescription>Permite consultar cada ocorrência encerrada e os registros de distribuição associados. Desativar oculta a consulta sem apagar eventos.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateDutyOccurrenceHistorySettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="dutyOccurrenceHistoryEnabled" value="true" defaultChecked={dutyOccurrenceHistoryEnabled} className="size-4 accent-primary" />
+                    <span className="font-medium">Histórico de ocorrências habilitado</span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Escolha de oferta na atribuição manual</CardTitle>
+                <CardDescription>
+                  Permite que Gestores e Diretores escolham entre atribuição direta com aviso interno ou oferta exclusiva com aceite por WhatsApp.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateManualLeadAssignmentOfferChoiceSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="manualLeadAssignmentOfferChoiceEnabled"
+                      value="true"
+                      defaultChecked={manualLeadAssignmentOfferChoiceEnabled}
+                      className="size-4 accent-primary"
+                    />
+                    <span>
+                      <span className="font-medium">Escolha de oferta manual habilitada</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Ativada por padrão. Desative para restaurar a atribuição direta sem exibir o diálogo.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Confirmação de presença em plantões</CardTitle>
+                <CardDescription>
+                  Exige confirmação por ocorrência antes de um corretor escalado entrar na distribuição. O lembrete usa o template Meta aprovado plantao_confirm_presence ou o WhatsApp da empresa, conforme Avisos da equipe.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateDutyPresenceConfirmationSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="dutyPresenceConfirmationEnabled" value="true" defaultChecked={dutyPresenceConfirmationEnabled} className="size-4 accent-primary" />
+                    <span>
+                      <span className="font-medium">Confirmação obrigatória habilitada</span>
+                      <span className="block text-xs text-muted-foreground">Desligada por padrão. Antes de ativar, aplique a migration 0156, aprove/sincronize o template e confirme a agenda de distribuição.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
                 <CardTitle>Motor de Inteligência Artificial</CardTitle>
                 <CardDescription>
                   Gerencie o motor central de IA da plataforma CorreTop. Os recursos utilizam o
-                  Vercel AI SDK para streaming rápido de respostas.
+                  AI SDK (pacote `ai`) para streaming rápido de respostas.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1205,7 +1498,7 @@ export default async function SuperAdminSettingsPage() {
               <CardContent className="space-y-4">
                 <form
                   action={updateLeadEffectOutboxSettingsAction}
-                  className="grid gap-4 lg:grid-cols-3"
+                  className="grid gap-4 lg:grid-cols-4"
                 >
                   <label className="flex items-center gap-2 text-sm lg:col-span-3">
                     <input
@@ -1251,6 +1544,19 @@ export default async function SuperAdminSettingsPage() {
                       type="number"
                       defaultValue={leadEffectOutboxLeaseSeconds}
                     />
+                  </label>
+                  <label className="grid gap-1 text-xs font-medium">
+                    Cancelar pendentes após (horas)
+                    <Input
+                      name="staleAfterHours"
+                      min={1}
+                      max={168}
+                      type="number"
+                      defaultValue={whatsappOutboxStaleAfterHours}
+                    />
+                    <span className="font-normal text-muted-foreground">
+                      Evita que mensagens antigas sejam entregues em lote depois de uma indisponibilidade.
+                    </span>
                   </label>
                   <div className="flex items-end">
                     <Button type="submit">Salvar outbox</Button>
@@ -1323,6 +1629,21 @@ export default async function SuperAdminSettingsPage() {
                       <span className="font-medium">Cadências habilitadas</span>
                       <span className="block text-xs text-muted-foreground">
                         Pausa a fila sem apagar histórico.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm md:col-span-3">
+                    <input
+                      type="checkbox"
+                      name="internalBrokerNotificationsEnabled"
+                      value="true"
+                      defaultChecked={wahaInternalBrokerNotificationsEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">WAHA para avisos internos de corretores</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Kill switch reversível: não altera o atendimento de leads pelo canal oficial.
                       </span>
                     </span>
                   </label>

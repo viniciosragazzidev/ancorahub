@@ -10,7 +10,7 @@ metadados, o vínculo com lead/cliente/beneficiário e o checksum em
    Não habilite domínio público nem acesso anônimo.
 2. Crie um token R2 S3 com permissões **Object Read & Write**, limitado a esse
    bucket, e guarde Access Key ID e Secret Access Key apenas no ambiente servidor.
-3. No ambiente do servidor (Vercel, Render ou VPS), configure:
+3. No ambiente do CRM no Coolify, configure:
 
    ```env
    R2_ACCOUNT_ID=identificador_da_conta_cloudflare

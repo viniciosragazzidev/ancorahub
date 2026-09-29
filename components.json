@@ -13,7 +13,7 @@
   "iconLibrary": "hugeicons",
   "rtl": false,
   "menuColor": "default",
-  "menuwarning": "subtle",
+  "menuAccent": "subtle",
   "aliases": {
     "components": "@/components",
     "utils": "@/lib/utils",
@@ -22,6 +22,7 @@
     "hooks": "@/hooks"
   },
   "registries": {
+    "@efferd": "https://efferd.com/r/{style}/{name}.json",
     "@unlumen-ui": "https://ui.unlumen.com/r/{name}.json"
   }
 }

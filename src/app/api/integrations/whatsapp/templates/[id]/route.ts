@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { and, eq } from "drizzle-orm";
-import { deleteTenantTemplateFromMeta } from "@/features/communication-channels/template-sync-service";
+import { deleteTenantTemplate } from "@/features/communication-channels/template-sync-service";
 
 export async function GET(
   _request: NextRequest,
@@ -55,16 +55,13 @@ export async function DELETE(
 ) {
   try {
     const context = await getRequiredTenantContext();
-    if (context.role === "broker") {
+    if (context.role !== "director" && context.role !== "manager") {
       return NextResponse.json({ error: "Acesso negado." }, { status: 403 });
     }
-
     const { id } = await params;
-    const result = await deleteTenantTemplateFromMeta(context.tenantId, context.userId, id);
-
-    return NextResponse.json(result);
+    return NextResponse.json(await deleteTenantTemplate(context.tenantId, context.userId, id));
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro ao excluir template.";
+    const message = error instanceof Error ? error.message : "Erro ao excluir template na Meta.";
     return NextResponse.json({ error: message }, { status: 400 });
   }
 }

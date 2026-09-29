@@ -308,7 +308,7 @@ export function evaluateDashboardRules(ctx: DashboardActionContext): NextBestAct
         priority: "high",
         actionType: "navigate",
         label: "Analisar Relatório da Unidade",
-        href: "/relatorios",
+        href: "/dashboard",
         reason: "Indicador de conversão com desvio relevante.",
         ruleId: "branch_conversion_drop",
         entityType: "system",

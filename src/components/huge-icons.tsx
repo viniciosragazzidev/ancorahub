@@ -163,6 +163,15 @@ const aliases: Record<string, string> = {
   Flame: "FireIcon",
   ThermometerCold: "SnowflakeIcon",
   ShieldX: "SecurityValidationIcon",
+  Image: "Image01Icon",
+  ImageIcon: "Image01Icon",
+  Music: "NoteIcon",
+  Microphone: "Mic01Icon",
+  Video: "Video01Icon",
+  File: "File01Icon",
+  Paperclip: "Attachment01Icon",
+  Play: "PlayIcon",
+  PauseCircle: "PauseIcon",
 };
 
 function resolveIcon(name: string): HugeIconProps["icon"] {
@@ -407,3 +416,13 @@ export const UserCheck = staticAnimated("UserCheck");
 export const Flame = staticAnimated("Flame");
 export const ThermometerCold = staticAnimated("ThermometerCold");
 export const ShieldX = staticAnimated("ShieldX");
+
+export const ImageIcon = staticAnimated("ImageIcon");
+export const Image = staticAnimated("Image");
+export const Music = staticAnimated("Music");
+export const Microphone = staticAnimated("Microphone");
+export const Video = staticAnimated("Video");
+export const File = staticAnimated("File");
+export const Paperclip = staticAnimated("Paperclip");
+export const Play = staticAnimated("Play");
+export const PauseCircle = staticAnimated("PauseCircle");

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   Plus,
@@ -247,14 +247,14 @@ export function DocumentsWorkspace({
         if (s === "approved") {
           return (
             <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-[11px]">
-              Aprovado ✓
+                                Aprovado
             </Badge>
           );
         }
         if (s === "rejected") {
           return (
             <Badge variant="destructive" className="font-semibold text-[11px]">
-              Rejeitado ✕
+                                Rejeitado
             </Badge>
           );
         }

@@ -1,23 +1,50 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, ArrowUp, ArrowDown, Trash2, Edit3, ShieldAlert, CheckCircle2, Sliders, Zap, Tag } from "lucide-react";
+import {
+  Plus,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  Edit3,
+  ShieldAlert,
+  CheckCircle2,
+  Sliders,
+  Zap,
+  Tag,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogPopup, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogPopup,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/sonner";
 import {
   saveRoutingRuleAction,
   deleteRoutingRuleAction,
   reorderRoutingRulesAction,
   type RoutingRuleInput,
 } from "@/features/lead-distribution/routing-actions";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import type { RoutingRule } from "@/features/lead-distribution/routing-engine";
+import { ALL_BRANCHES_TARGET_ID, ALL_ROUTING_SOURCES_ID, getRoutingQualificationStatusLabel, getRoutingSourceLabel, ROUTING_QUALIFICATION_STATUS_OPTIONS, ROUTING_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
 
 type QueueItem = { id: string; name: string };
 type BranchItem = { id: string; name: string };
@@ -29,21 +56,6 @@ const availablePlanTypes = [
   { id: "familia", label: "Familiar" },
   { id: "adesao", label: "Adesão" },
   { id: "odonto", label: "Odontológico" },
-];
-
-const availableSources = [
-  { id: "meta_ads", label: "Meta Ads (Facebook/Instagram)" },
-  { id: "google_ads", label: "Google Ads" },
-  { id: "whatsapp", label: "WhatsApp Direto" },
-  { id: "indicacao", label: "Indicação" },
-  { id: "site", label: "Site / Orgânico" },
-];
-
-const availableIAStatuses = [
-  { id: "hot", label: "Lead Quente (Alta Intenção)" },
-  { id: "warm", label: "Lead Morno (Em Qualificação)" },
-  { id: "cold", label: "Lead Frio (Sem Resposta)" },
-  { id: "handoff", label: "Encaminhado p/ Humano" },
 ];
 
 export function RoutingMatrixPanel({
@@ -66,8 +78,11 @@ export function RoutingMatrixPanel({
 
   // Form states
   const [name, setName] = useState("");
-  const [targetType, setTargetType] = useState<"queue" | "branch" | "broker_group" | "specific_broker">("queue");
+  const [targetType, setTargetType] = useState<
+    "queue" | "branch" | "all_branches" | "broker_group" | "specific_broker"
+  >("queue");
   const [targetId, setTargetId] = useState("");
+  const [distributionMode, setDistributionMode] = useState<"automatic" | "manual">("automatic");
   const [fallbackQueueId, setFallbackQueueId] = useState<string>("");
   const [selectedPlans, setSelectedPlans] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
@@ -81,6 +96,7 @@ export function RoutingMatrixPanel({
     setName("");
     setTargetType("queue");
     setTargetId(queues[0]?.id ?? "");
+    setDistributionMode("automatic");
     setFallbackQueueId("");
     setSelectedPlans([]);
     setSelectedSources([]);
@@ -96,6 +112,7 @@ export function RoutingMatrixPanel({
     setName(rule.name);
     setTargetType(rule.targetType);
     setTargetId(rule.targetId);
+    setDistributionMode(rule.distributionMode ?? "automatic");
     setFallbackQueueId(rule.fallbackQueueId ?? "");
     setSelectedPlans(rule.conditions.planTypes ?? []);
     setSelectedSources(rule.conditions.sources ?? []);
@@ -129,6 +146,7 @@ export function RoutingMatrixPanel({
         enabled: editingRule ? editingRule.enabled : true,
         targetType,
         targetId,
+        distributionMode,
         fallbackQueueId: fallbackQueueId || null,
         planTypes: selectedPlans,
         sources: selectedSources,
@@ -138,7 +156,11 @@ export function RoutingMatrixPanel({
         qualificationStatuses: selectedIAStatuses,
       };
 
-      await saveRoutingRuleAction(payload);
+      const result = await saveRoutingRuleAction(payload);
+      if (!result.success) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(editingRule ? "Regra atualizada com sucesso!" : "Regra criada com sucesso!");
       setIsModalOpen(false);
 
@@ -150,8 +172,9 @@ export function RoutingMatrixPanel({
               ? {
                   ...r,
                   name: payload.name,
-                  targetType: payload.targetType,
-                  targetId: payload.targetId,
+                   targetType: payload.targetType,
+                   targetId: payload.targetId,
+                   distributionMode: payload.distributionMode,
                   fallbackQueueId: payload.fallbackQueueId ?? null,
                   conditions: {
                     planTypes: selectedPlans,
@@ -172,8 +195,9 @@ export function RoutingMatrixPanel({
           name: payload.name,
           priority: rules.length + 1,
           enabled: true,
-          targetType: payload.targetType,
-          targetId: payload.targetId,
+           targetType: payload.targetType,
+           targetId: payload.targetId,
+           distributionMode: payload.distributionMode,
           fallbackQueueId: payload.fallbackQueueId ?? null,
           conditions: {
             planTypes: selectedPlans,
@@ -232,6 +256,7 @@ export function RoutingMatrixPanel({
         enabled: nextEnabled,
         targetType: rule.targetType,
         targetId: rule.targetId,
+        distributionMode: rule.distributionMode ?? "automatic",
         fallbackQueueId: rule.fallbackQueueId,
         planTypes: rule.conditions.planTypes ?? [],
         sources: rule.conditions.sources ?? [],
@@ -250,7 +275,9 @@ export function RoutingMatrixPanel({
   const resolveTargetName = (type: string, id: string) => {
     if (type === "queue") return queues.find((q) => q.id === id)?.name ?? `Fila #${id}`;
     if (type === "branch") return branches.find((b) => b.id === id)?.name ?? `Filial #${id}`;
-    if (type === "specific_broker") return brokers.find((b) => b.id === id)?.name ?? `Corretor #${id}`;
+    if (type === "all_branches") return "Todas as unidades ativas";
+    if (type === "specific_broker")
+      return brokers.find((b) => b.id === id)?.name ?? `Corretor #${id}`;
     if (type === "broker_group") return `Grupo de Corretores (#${id})`;
     return id;
   };
@@ -264,37 +291,37 @@ export function RoutingMatrixPanel({
   };
 
   return (
-    <Card variant="overview" className="space-y-6 p-6">
-      <CardHeader className="p-0">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Sliders className="h-5 w-5 text-primary" />
-              Matriz Inteligente de Roteamento de Leads
-            </CardTitle>
-            <CardDescription className="mt-1 text-xs">
-              Defina visualmente qual tipo de lead deve ir para cada fila, filial ou grupo de corretores em ordem de prioridade.
-            </CardDescription>
-          </div>
-          {canEdit && (
-            <Button onClick={handleOpenCreateModal} size="sm" className="gap-2 shrink-0">
+    <Card variant="overview">
+      <SectionCardHeader
+        icon={<Sliders />}
+        title="Matriz inteligente de roteamento de leads"
+        description="Defina, em ordem de prioridade, para onde cada tipo de lead deve ser encaminhado."
+        actions={
+          canEdit ? (
+            <Button onClick={handleOpenCreateModal} size="sm" className="gap-2">
               <Plus className="h-4 w-4" />
-              Nova Regra de Roteamento
+              Nova regra de roteamento
             </Button>
-          )}
-        </div>
-      </CardHeader>
+          ) : null
+        }
+      />
 
-      <CardContent className="p-0 space-y-4">
+      <CardContent className="space-y-4 p-4">
         {rules.length === 0 ? (
           <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
             <Zap className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />
             <p className="text-sm font-semibold">Nenhuma regra de roteamento configurada</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
-              Todos os novos leads seguirão o fluxo padrão da Fila Geral da Unidade. Crie a primeira regra para direcionar por Tipo de Plano, Origem ou Localidade.
+              Todos os novos leads seguirão o fluxo padrão da Fila Geral da Unidade. Crie a primeira
+              regra para direcionar por Tipo de Plano, Origem ou Localidade.
             </p>
             {canEdit && (
-              <Button onClick={handleOpenCreateModal} size="sm" variant="outline" className="mt-4 gap-2">
+              <Button
+                onClick={handleOpenCreateModal}
+                size="sm"
+                variant="outline"
+                className="mt-4 gap-2"
+              >
                 <Plus className="h-4 w-4" /> Criar Primeira Regra
               </Button>
             )}
@@ -315,7 +342,9 @@ export function RoutingMatrixPanel({
                 <div
                   key={rule.id}
                   className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors ${
-                    rule.enabled ? "bg-card border-border/80" : "bg-muted/30 border-dashed opacity-75"
+                    rule.enabled
+                      ? "bg-card border-border/80"
+                      : "bg-muted/30 border-dashed opacity-75"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -326,16 +355,27 @@ export function RoutingMatrixPanel({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <h4 className="font-semibold text-sm truncate">{rule.name}</h4>
-                          <Badge variant={rule.enabled ? "success" : "outline"} className="text-[10px]">
+                          <Badge
+                            variant={rule.enabled ? "success" : "outline"}
+                            className="text-[10px]"
+                          >
                             {rule.enabled ? "Ativa" : "Pausada"}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {rule.distributionMode === "manual" ? "Ação manual" : "Oferta automática"}
                           </Badge>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1 truncate">
                           <span>Destino:</span>
-                          <strong className="text-foreground">{resolveTargetName(rule.targetType, rule.targetId)}</strong>
+                          <strong className="text-foreground">
+                            {resolveTargetName(rule.targetType, rule.targetId)}
+                          </strong>
                           {rule.fallbackQueueId && (
                             <span className="text-[11px] text-muted-foreground ml-1">
-                              (Fallback: {queues.find((q) => q.id === rule.fallbackQueueId)?.name ?? "Fila Geral"})
+                              (Fallback:{" "}
+                              {queues.find((q) => q.id === rule.fallbackQueueId)?.name ??
+                                "Fila Geral"}
+                              )
                             </span>
                           )}
                         </p>
@@ -376,7 +416,9 @@ export function RoutingMatrixPanel({
                           onClick={() => toggleRuleEnabled(rule)}
                           title={rule.enabled ? "Pausar regra" : "Ativar regra"}
                         >
-                          <CheckCircle2 className={`h-3.5 w-3.5 ${rule.enabled ? "text-emerald-500" : "text-muted-foreground"}`} />
+                          <CheckCircle2
+                            className={`h-3.5 w-3.5 ${rule.enabled ? "text-emerald-500" : "text-muted-foreground"}`}
+                          />
                         </Button>
                         <Button
                           size="icon-xs"
@@ -407,7 +449,7 @@ export function RoutingMatrixPanel({
                         ))}
                         {cond.sources?.map((sc) => (
                           <Badge key={sc} variant="secondary" className="text-[10px]">
-                            Origem: {availableSources.find((s) => s.id === sc)?.label ?? sc}
+                            Origem: {getRoutingSourceLabel(sc)}
                           </Badge>
                         ))}
                         {cond.cities?.map((ct) => (
@@ -415,14 +457,15 @@ export function RoutingMatrixPanel({
                             Cidade: {ct}
                           </Badge>
                         ))}
-                        {(typeof cond.minLives === "number" || typeof cond.maxLives === "number") && (
+                        {(typeof cond.minLives === "number" ||
+                          typeof cond.maxLives === "number") && (
                           <Badge variant="secondary" className="text-[10px]">
                             Vidas: {cond.minLives ?? 1} a {cond.maxLives ?? "∞"}
                           </Badge>
                         )}
                         {cond.qualificationStatuses?.map((st) => (
                           <Badge key={st} variant="secondary" className="text-[10px]">
-                            IA: {availableIAStatuses.find((s) => s.id === st)?.label ?? st}
+                            IA: {getRoutingQualificationStatusLabel(st)}
                           </Badge>
                         ))}
                       </>
@@ -444,11 +487,25 @@ export function RoutingMatrixPanel({
               {editingRule ? "Editar Regra de Roteamento" : "Nova Regra de Roteamento"}
             </DialogTitle>
             <DialogDescription>
-              Configure os filtros e selecione o destino exato para onde os leads correspondentes devem ser enviados.
+              Configure os filtros e selecione o destino exato para onde os leads correspondentes
+              devem ser enviados.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-6 py-2">
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+              <p className="font-semibold text-foreground">Como esta regra decide</p>
+              <p className="mt-1 leading-5 text-muted-foreground">
+                O destino acima só recebe leads que passarem por todos os filtros abaixo. Sem origem,
+                plano, cidade ou status selecionado, o filtro funciona como “qualquer valor”.
+              </p>
+              <p className="mt-2 leading-5 text-muted-foreground">
+                Campanhas Meta são uma regra de entrada separada em <strong>Filas e campanhas</strong>;
+                quando configurada, ela define quais leads entram na fila antes desta matriz. O status
+                <strong> Desqualificado</strong> é sempre opt-in: se não for marcado, não será enviado a
+                este destino.
+              </p>
+            </div>
             {/* Rule Name */}
             <div className="space-y-2">
               <Label htmlFor="rule-name">Nome da Regra</Label>
@@ -470,6 +527,7 @@ export function RoutingMatrixPanel({
                     setTargetType(val);
                     if (val === "queue" && queues[0]) setTargetId(queues[0].id);
                     if (val === "branch" && branches[0]) setTargetId(branches[0].id);
+                    if (val === "all_branches") setTargetId(ALL_BRANCHES_TARGET_ID);
                     if (val === "specific_broker" && brokers[0]) setTargetId(brokers[0].id);
                   }}
                 >
@@ -479,6 +537,7 @@ export function RoutingMatrixPanel({
                   <SelectContent>
                     <SelectItem value="queue">Fila Específica</SelectItem>
                     <SelectItem value="branch">Unidade / Filial Específica</SelectItem>
+                    <SelectItem value="all_branches">Todas as unidades</SelectItem>
                     <SelectItem value="specific_broker">Corretor Específico</SelectItem>
                   </SelectContent>
                 </Select>
@@ -503,6 +562,9 @@ export function RoutingMatrixPanel({
                           {b.name}
                         </SelectItem>
                       ))}
+                    {targetType === "all_branches" && (
+                      <SelectItem value={ALL_BRANCHES_TARGET_ID}>Todas as unidades ativas</SelectItem>
+                    )}
                     {targetType === "specific_broker" &&
                       brokers.map((br) => (
                         <SelectItem key={br.id} value={br.id}>
@@ -531,8 +593,25 @@ export function RoutingMatrixPanel({
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
-                Se os corretores do destino primário estiverem lotados ou ausentes, o lead irá para esta fila.
+                Se os corretores do destino primário estiverem lotados ou ausentes, o lead irá para
+                esta fila.
               </p>
+            </div>
+
+            <div className="flex items-start justify-between gap-4 rounded-lg border border-border/70 bg-muted/20 p-3">
+              <div className="space-y-1">
+                <Label htmlFor="automatic-distribution">Distribuição automática</Label>
+                <p className="text-[11px] leading-4 text-muted-foreground">
+                  Desative para encaminhar o lead ao destino sem oferecer a corretores. Ele ficará sem
+                  responsável, aguardando uma ação manual.
+                </p>
+              </div>
+              <Switch
+                id="automatic-distribution"
+                checked={distributionMode === "automatic"}
+                onCheckedChange={(checked) => setDistributionMode(checked ? "automatic" : "manual")}
+                aria-label="Ativar distribuição automática"
+              />
             </div>
 
             <hr className="border-border/60" />
@@ -567,9 +646,13 @@ export function RoutingMatrixPanel({
 
               {/* Sources */}
               <div className="space-y-2">
-                <Label className="text-xs font-medium">Origens / Canais de Entrada</Label>
+                <Label className="text-xs font-medium">Origem / canal de entrada (opcional)</Label>
+                <p className="text-[11px] leading-4 text-muted-foreground">
+                  Escolha um ou mais canais. Deixe vazio para qualquer origem; uma campanha específica
+                  é configurada na seção Filas e campanhas.
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  {availableSources.map((sc) => {
+                  {ROUTING_SOURCE_OPTIONS.map((sc) => {
                     const isSelected = selectedSources.includes(sc.id);
                     return (
                       <Button
@@ -577,7 +660,16 @@ export function RoutingMatrixPanel({
                         type="button"
                         size="xs"
                         variant={isSelected ? "primary" : "outline"}
-                        onClick={() => toggleArrayItem(selectedSources, sc.id, setSelectedSources)}
+                        onClick={() => {
+                          if (sc.id === ALL_ROUTING_SOURCES_ID) {
+                            setSelectedSources(isSelected ? [] : [ALL_ROUTING_SOURCES_ID]);
+                            return;
+                          }
+                          setSelectedSources((current) => [
+                            ...current.filter((id) => id !== ALL_ROUTING_SOURCES_ID),
+                            ...(current.includes(sc.id) ? [] : [sc.id]),
+                          ]);
+                        }}
                       >
                         {sc.label}
                       </Button>
@@ -588,7 +680,9 @@ export function RoutingMatrixPanel({
 
               {/* Cities */}
               <div className="space-y-2">
-                <Label htmlFor="cities-input" className="text-xs font-medium">Cidades / Localidades (Separadas por vírgula)</Label>
+                <Label htmlFor="cities-input" className="text-xs font-medium">
+                  Cidades / Localidades (Separadas por vírgula)
+                </Label>
                 <Input
                   id="cities-input"
                   placeholder="Ex: São Paulo, Campinas, Guarulhos"
@@ -600,7 +694,9 @@ export function RoutingMatrixPanel({
               {/* Number of Lives */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="min-lives" className="text-xs font-medium">Mínimo de Vidas</Label>
+                  <Label htmlFor="min-lives" className="text-xs font-medium">
+                    Mínimo de Vidas
+                  </Label>
                   <Input
                     id="min-lives"
                     type="number"
@@ -610,7 +706,9 @@ export function RoutingMatrixPanel({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="max-lives" className="text-xs font-medium">Máximo de Vidas</Label>
+                  <Label htmlFor="max-lives" className="text-xs font-medium">
+                    Máximo de Vidas
+                  </Label>
                   <Input
                     id="max-lives"
                     type="number"
@@ -623,9 +721,12 @@ export function RoutingMatrixPanel({
 
               {/* IA Statuses */}
               <div className="space-y-2">
-                <Label className="text-xs font-medium">Status da Qualificação por IA</Label>
+                <Label className="text-xs font-medium">Status de qualificação (opcional)</Label>
+                <p className="text-[11px] leading-4 text-muted-foreground">
+                  Desqualificado só será roteado quando selecionado explicitamente nesta regra.
+                </p>
                 <div className="flex flex-wrap gap-2">
-                  {availableIAStatuses.map((st) => {
+                  {ROUTING_QUALIFICATION_STATUS_OPTIONS.map((st) => {
                     const isSelected = selectedIAStatuses.includes(st.id);
                     return (
                       <Button
@@ -633,7 +734,9 @@ export function RoutingMatrixPanel({
                         type="button"
                         size="xs"
                         variant={isSelected ? "primary" : "outline"}
-                        onClick={() => toggleArrayItem(selectedIAStatuses, st.id, setSelectedIAStatuses)}
+                        onClick={() =>
+                          toggleArrayItem(selectedIAStatuses, st.id, setSelectedIAStatuses)
+                        }
                       >
                         {st.label}
                       </Button>

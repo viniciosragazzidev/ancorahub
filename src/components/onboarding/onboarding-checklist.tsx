@@ -95,12 +95,13 @@ export function OnboardingChecklist() {
         {!collapsed && (
           <div className="mt-3 space-y-1.5 pt-1">
             {items.map((item) => (
-              <button
+              <Button
                 key={item.id}
                 type="button"
+                variant="ghost"
                 onClick={() => toggleItem(item.id, item.tourKey, item.targetRoute)}
                 className={cn(
-                  "flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors duration-150",
+                  "h-auto w-full justify-between px-2.5 py-1.5 text-left text-xs",
                   item.completed
                     ? "text-muted-foreground/70 line-through hover:bg-muted/30"
                     : "text-foreground font-medium hover:bg-muted/50",
@@ -119,7 +120,7 @@ export function OnboardingChecklist() {
                     Ver tour →
                   </span>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         )}

@@ -2,18 +2,20 @@ import { NextResponse } from "next/server";
 import { and, desc, eq, isNull, count } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { withPerfSpan, withRequestTiming } from "@/shared/observability/request-timing";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  try {
+  return withRequestTiming("/api/internal/unread-count", async () => {
+    try {
     const context = await getRequiredTenantContext();
     const url = new URL(request.url);
     const mode = url.searchParams.get("mode");
 
     if (mode === "recent") {
-      const notifications = await getDatabase()
+      const notifications = await withPerfSpan("unread.recent_list", () => getDatabase()
         .select({
           id: schema.notifications.id,
           title: schema.notifications.title,
@@ -31,9 +33,9 @@ export async function GET(request: Request) {
           ),
         )
         .orderBy(desc(schema.notifications.createdAt))
-        .limit(5);
+        .limit(5));
 
-      const [countResult] = await getDatabase()
+      const [countResult] = await withPerfSpan("unread.unread_count", () => getDatabase()
         .select({ total: count() })
         .from(schema.notifications)
         .where(
@@ -42,9 +44,9 @@ export async function GET(request: Request) {
             eq(schema.notifications.recipientUserId, context.userId),
             isNull(schema.notifications.readAt),
           ),
-        );
+        ));
 
-      const [totalResult] = await getDatabase()
+      const [totalResult] = await withPerfSpan("unread.total_count", () => getDatabase()
         .select({ total: count() })
         .from(schema.notifications)
         .where(
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
             eq(schema.notifications.tenantId, context.tenantId),
             eq(schema.notifications.recipientUserId, context.userId),
           ),
-        );
+        ));
 
       const serialized = notifications.map((n) => ({
         ...n,
@@ -67,7 +69,7 @@ export async function GET(request: Request) {
       });
     }
 
-    const [result] = await getDatabase()
+    const [result] = await withPerfSpan("unread.count", () => getDatabase()
       .select({ count: count() })
       .from(schema.notifications)
       .where(
@@ -76,9 +78,10 @@ export async function GET(request: Request) {
           eq(schema.notifications.recipientUserId, context.userId),
           isNull(schema.notifications.readAt),
         ),
-      );
+      ));
     return NextResponse.json({ count: result?.count ?? 0 });
-  } catch {
+    } catch {
     return NextResponse.json({ count: 0 });
-  }
+    }
+  }, request.headers.get("x-request-id")).then(({ result }) => result);
 }

@@ -3,6 +3,7 @@
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
+import { hasCapability } from "@/shared/auth/permissions";
 import {
   getQualificationTenantSettings,
   updateQualificationTenantSettings,
@@ -180,8 +181,9 @@ export async function fetchMetaTemplatesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { listTenantTemplates, syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
+  const { isBrokerLeadEventKey, isCanonicalBrokerLeadTemplateName } = await import("@/features/communication-channels/broker-lead-template-contract");
   const { getDatabase, schema } = await import("@/shared/db");
-  const { and, eq, isNull } = await import("drizzle-orm");
+  const { and, eq } = await import("drizzle-orm");
 
   const db = getDatabase();
 
@@ -220,7 +222,10 @@ export async function fetchMetaTemplatesAction() {
 
   return templates.map((t) => {
     const assignedSituations = activeUsages
-      .filter((u) => u.templateId === t.id)
+      .filter((u) => {
+        if (u.templateId !== t.id) return false;
+        return !(isBrokerLeadEventKey(u.eventKey) && !isCanonicalBrokerLeadTemplateName(t.name));
+      })
       .map((u) => u.eventKey);
 
     return {
@@ -240,6 +245,21 @@ export async function setMetaTemplateSituationsAction(templateId: string, eventK
 
   const db = getDatabase();
   const now = new Date();
+
+  if (eventKeys.some((eventKey) => eventKey === "LEAD_OFFER" || eventKey === "LEAD_ASSIGNMENT")) {
+    const { isCanonicalBrokerLeadTemplateName } = await import("@/features/communication-channels/broker-lead-template-contract");
+    const [template] = await db
+      .select({ name: schema.metaWhatsAppTemplates.name })
+      .from(schema.metaWhatsAppTemplates)
+      .where(and(
+        eq(schema.metaWhatsAppTemplates.id, templateId),
+        eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
+      ))
+      .limit(1);
+    if (!isCanonicalBrokerLeadTemplateName(template?.name)) {
+      throw new Error("As situações de novo lead usam exclusivamente o template padrão new_lead_broker.");
+    }
+  }
 
   // 1. Fetch current active usages for this template
   const currentUsages = await db
@@ -349,14 +369,96 @@ export async function syncMetaTemplatesAction() {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { syncTenantTemplates } = await import("@/features/communication-channels/template-sync-service");
-  await syncTenantTemplates(context.tenantId).catch(() => undefined);
-  return { success: true };
+  try {
+    const result = await syncTenantTemplates(context.tenantId);
+    return { success: true as const, syncedCount: result.syncedCount };
+  } catch (error) {
+    console.warn("[syncMetaTemplatesAction] Meta template sync failed", {
+      message: error instanceof Error ? error.message : "unknown",
+    });
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Não foi possível sincronizar os modelos com a Meta.",
+    };
+  }
+}
+
+export async function fetchMessageEventPoliciesAction() {
+  const context = await getRequiredTenantContext();
+  if (!hasCapability(context.role, "acessar_qualificacao_ia", context.jobTitle)) {
+    throw new AuthorizationError("Você não tem permissão para visualizar as mensagens da qualificação.");
+  }
+  const { listMessageEventPolicies } = await import("@/features/communication-channels/message-policy-service");
+  try {
+    return await listMessageEventPolicies(context.tenantId);
+  } catch (error) {
+    // Nunca devolva o erro bruto do banco ao cliente. A tela permanece útil com
+    // o catálogo tipado e permite tentar novamente depois que a infraestrutura
+    // voltar a responder.
+    console.error("[qualification] message_policies_load_failed", {
+      errorType: error instanceof Error ? error.name : "unknown",
+      code: typeof error === "object" && error !== null && "code" in error
+        ? String((error as { code?: unknown }).code ?? "unknown")
+        : "unknown",
+    });
+    const { MESSAGE_EVENT_CATALOG } = await import("@/features/communication-channels/message-event-catalog");
+    return {
+      globallyEnabled: false,
+      loadError: "Não foi possível consultar as mensagens e situações agora. Tente novamente em instantes.",
+      events: MESSAGE_EVENT_CATALOG.map((event) => ({ ...event, variables: event.variables.map((variable) => ({ ...variable })), policy: null })),
+      metaTemplates: [],
+      freeMessages: [],
+    };
+  }
+}
+
+export async function saveMessageEventPolicyAction(input: {
+  eventKey: string;
+  primaryKind: "meta_template" | "free_message";
+  metaTemplateId: string | null;
+  freeMessageTemplateId: string | null;
+  fallbackKind: "meta_template" | "free_message" | null;
+  active: boolean;
+}) {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { saveMessageEventPolicy } = await import("@/features/communication-channels/message-policy-service");
+  try {
+    return await saveMessageEventPolicy(context.tenantId, context.userId, input);
+  } catch (error) {
+    const databaseError = error as { code?: unknown; cause?: { code?: unknown } };
+    console.error("[qualification] message_policy_save_failed", {
+      eventKey: input.eventKey,
+      errorType: error instanceof Error ? error.name : "unknown",
+      code: String(databaseError.code ?? databaseError.cause?.code ?? "unknown"),
+    });
+
+    const message = error instanceof Error ? error.message : "";
+    const isSafeDomainMessage = [
+      "A situação",
+      "O template Meta",
+      "A variável",
+      "A mensagem livre",
+      "Para usar mensagem livre",
+      "A contingência",
+      "Selecione um template Meta",
+      "Selecione uma mensagem livre",
+    ].some((prefix) => message.startsWith(prefix));
+
+    return {
+      success: false as const,
+      error: isSafeDomainMessage
+        ? message
+        : "Não foi possível publicar esta situação. Atualize a página e tente novamente.",
+    };
+  }
 }
 
 /* ─── Modelos Livres (Janela de 24 Horas / Sem Aprovação) ─── */
 
 export async function fetchFreeMessageTemplatesAction() {
   const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
   const { getDatabase, schema } = await import("@/shared/db");
   const { and, desc, eq } = await import("drizzle-orm");
 
@@ -478,12 +580,26 @@ export async function saveFreeMessageTemplateAction(input: {
   }
 }
 
-export async function deleteFreeMessageTemplateAction(templateId: string) {
+/** Every message with its kind, where it is valid and where it is used (message library). */
+export async function fetchMessageLibraryAction() {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { getMessageLibrary } = await import("@/features/message-library/service");
+  return getMessageLibrary(context.tenantId);
+}
+
+export async function deleteFreeMessageTemplateAction(templateId: string): Promise<{ success: true } | { success: false; error: string }> {
   const context = await getRequiredTenantContext();
   assertAdminRole(context.role);
   const { getDatabase, schema } = await import("@/shared/db");
   const { and, eq } = await import("drizzle-orm");
   const { randomUUID } = await import("node:crypto");
+  const { getMessageUsages } = await import("@/features/message-library/service");
+  const { describeUsages } = await import("@/features/message-library/catalog");
+
+  // A message in use is never removed silently: the place using it would change what it sends.
+  const inUse = (await getMessageUsages(context.tenantId)).get(templateId) ?? [];
+  if (inUse.length) return { success: false, error: `Esta mensagem está em uso (${describeUsages(inUse)}). Troque a mensagem nesses lugares antes de removê-la.` };
 
   const db = getDatabase();
   await db
@@ -506,3 +622,57 @@ export async function deleteFreeMessageTemplateAction(templateId: string) {
 
   return { success: true };
 }
+
+export async function fetchSituationalPlaybooksAction() {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { getTenantPlaybooks } = await import("./playbooks-storage");
+  return getTenantPlaybooks(context.tenantId);
+}
+
+export async function saveSituationalPlaybooksAction(playbooks: any[]) {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { saveTenantPlaybooks } = await import("./playbooks-storage");
+  const { SituationalPlaybookItemSchema } = await import("./situations-catalog");
+  const { getDatabase, schema } = await import("@/shared/db");
+  const { randomUUID } = await import("node:crypto");
+
+  const validated = playbooks.map((p) => SituationalPlaybookItemSchema.parse(p));
+  await saveTenantPlaybooks(context.tenantId, validated);
+
+  const db = getDatabase();
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "ai_qualification_configs",
+    entidadeId: context.tenantId,
+    acao: "atualizou_roteiros_situacionais_ia",
+  });
+
+  return { success: true };
+}
+
+export async function resetSituationalPlaybooksAction() {
+  const context = await getRequiredTenantContext();
+  assertAdminRole(context.role);
+  const { saveTenantPlaybooks } = await import("./playbooks-storage");
+  const { getDefaultPlaybooks } = await import("./situations-catalog");
+  const { getDatabase, schema } = await import("@/shared/db");
+  const { randomUUID } = await import("node:crypto");
+
+  const defaults = getDefaultPlaybooks();
+  await saveTenantPlaybooks(context.tenantId, defaults);
+
+  const db = getDatabase();
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "ai_qualification_configs",
+    entidadeId: context.tenantId,
+    acao: "restaurou_roteiros_situacionais_ia_padrao",
+  });
+
+  return { success: true, playbooks: defaults };
+}
+

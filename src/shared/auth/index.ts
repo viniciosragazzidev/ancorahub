@@ -10,12 +10,10 @@ import { getDatabase, schema } from "@/shared/db";
 let authInstance: ReturnType<typeof createAuth> | undefined;
 
 const CANONICAL_PRODUCTION_ORIGIN = "https://crm.ancorasaude.cloud";
-const LEGACY_PRODUCTION_ORIGIN = "https://corretop.vercel.app";
 
 export function getTrustedAuthOrigins() {
   return Array.from(new Set([
     CANONICAL_PRODUCTION_ORIGIN,
-    LEGACY_PRODUCTION_ORIGIN,
     "https://staging.crm.ancorasaude.cloud",
     process.env.BETTER_AUTH_URL,
     process.env.NEXT_PUBLIC_APP_URL,
@@ -56,8 +54,8 @@ function createAuth() {
       }),
       // rpID fixado no domínio canônico: passkeys ficam válidas em qualquer
       // subdomínio/host confiado do mesmo registrante (DEC-082). Sem rpID, a
-      // credencial seria emitida para o host da requisição (ex.: preview da
-      // Vercel) e não funcionaria na origem de produção.
+      // credencial seria emitida para o host da requisição (ex.: um ambiente
+      // de teste) e não funcionaria na origem de produção.
       passkey({
         rpName: "Âncora Corretora",
         rpID: process.env.PASSKEY_RP_ID ?? "ancorasaude.cloud",

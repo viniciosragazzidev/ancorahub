@@ -22,9 +22,21 @@ export function AgentDrawerProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<UserDisplayInfo | null>(null);
   const [activePrompt, setActivePrompt] = useState<string | null>(null);
 
+  // A busca do usuário roda UMA vez. Ela ficava no mesmo efeito dos atalhos, cuja
+  // dependência inclui `user`: cada resposta chega como um objeto novo, o que
+  // reexecutava o efeito, que buscava de novo — um laço infinito de chamadas de
+  // servidor (centenas por segundo) a cada carregamento de página.
   useEffect(() => {
-    getUserDisplayInfo().then(setUser);
+    let cancelled = false;
+    void getUserDisplayInfo().then((info) => {
+      if (!cancelled) setUser(info);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Cmd+J or Ctrl+J to toggle drawer
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "j") {

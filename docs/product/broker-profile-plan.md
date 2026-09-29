@@ -323,7 +323,7 @@ export const progressbarVariants: Variants = {
 };
 ```
 
-### Regras de motion (de `DESIGN.md` e `ui-foundation.md`):
+### Regras de motion (do Contrato de Redesign):
 - **Sem motion decorativo** em tabelas, valores financeiros e dados sensíveis
 - **`prefers-reduced-motion`** sempre respeitado
 - **Durações:** 0.15s–0.25s para UI, 0.5s–0.7s para barras de progresso

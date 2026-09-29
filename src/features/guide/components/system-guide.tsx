@@ -91,9 +91,9 @@ export function SystemGuide({ role }: { role: GuideRole }) {
           </div>
           <div className="mt-4 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {["Todas", ...guideCategories].map((item) => (
-              <button key={item} type="button" onClick={() => setCategory(item as typeof category)} className={cn("shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors duration-[var(--duration-quick)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", category === item ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground")}>
+              <Button key={item} type="button" onClick={() => setCategory(item as typeof category)} className="shrink-0 rounded-full px-3 text-xs" size="sm" variant={category === item ? "default" : "outline"}>
                 {item}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -139,7 +139,7 @@ export function SystemGuide({ role }: { role: GuideRole }) {
 
 function GuideNavItem({ section, active, onClick }: { section: GuideSection; active: boolean; onClick: () => void }) {
   const Icon = iconMap[section.icon as keyof typeof iconMap] ?? Note;
-  return <button type="button" onClick={onClick} className={cn("flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition-colors duration-[var(--duration-quick)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", active ? "bg-accent font-medium text-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground")}><Icon className="size-4 shrink-0" /><span className="truncate">{section.title}</span></button>;
+  return <Button type="button" onClick={onClick} className={cn("h-auto w-full justify-start gap-2 px-3 py-2 text-left text-xs", active ? "bg-accent font-medium text-foreground" : "text-muted-foreground")} variant="ghost"><Icon className="size-4 shrink-0" /><span className="truncate">{section.title}</span></Button>;
 }
 
 function GuideSectionCard({ section, index, onFocus }: { section: GuideSection; index: number; onFocus: () => void }) {

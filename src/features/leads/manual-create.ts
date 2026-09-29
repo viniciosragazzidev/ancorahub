@@ -10,7 +10,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
-import { chooseAvailableBroker } from "@/features/leads/assignment";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 
 const formDataSchema = z.object({
@@ -43,6 +43,8 @@ const leadInput = z.object({
 export type DuplicateLeadNotice = { id: string; nome: string; createdAt: Date; corretorNome: string | null };
 
 function normalizePhone(phone: string) {
+  // Normalização agressiva: remove formatação, garante DDD+9+8d para números de 10 dígitos,
+  // e sempre retorna com prefixo 55.
   let digits = phone.replace(/\D/g, "");
   if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) {
     digits = digits.slice(2);
@@ -100,7 +102,7 @@ export async function createManualLead(rawInput: unknown) {
   }
   const [duplicate] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, createdAt: schema.leads.createdAt, corretorNome: schema.user.name }).from(schema.leads).leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id)).where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.telefone, telefone))).orderBy(asc(schema.leads.createdAt)).limit(1);
   if (duplicate && input.duplicateConfirmed !== "true") return { duplicate: duplicate as DuplicateLeadNotice };
-  const corretorId = context.role === "broker" ? context.userId : await chooseAvailableBroker(context.tenantId, branchId);
+  const corretorId = context.role === "broker" ? context.userId : null;
   const leadId = randomUUID();
   const cnpj = input.tipo === "PF" ? null : normalizeCnpj(input.formData.cnpj);
   if (input.tipo !== "PF" && input.formData.cnpj && !cnpj) {
@@ -157,16 +159,16 @@ export async function createManualLead(rawInput: unknown) {
     brokerIds: corretorId ? [corretorId] : [],
   }).catch(() => undefined);
   
-  // Keep WhatsApp outbox processing inside the server action. Vercel can
-  // terminate a function immediately after returning, dropping unawaited work.
+  // Keep WhatsApp outbox processing inside the server action: a runtime may
+  // end the request right after returning, dropping unawaited work.
   void notifyLeadArrived(leadId, context.tenantId, branchId, input.nome).catch(console.error);
   void notifyNewLead(leadId, context.tenantId, branchId, corretorId, input.nome).catch((error) => {
     console.error("[createManualLead] notification delivery failed:", error);
   });
 
-  // Enqueue distribution job if lead was queued (no broker available immediately)
+  // All non-broker intake delegates broker selection to the canonical engine.
   if (!assigned) {
-    void enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId }).catch(console.error);
+    await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId, source: "intake" });
   }
 
   // Auto-initiate AI qualification if active

@@ -209,7 +209,7 @@ A direção é determinada pelo campo `fromMe`:
 
 | `fromMe` | Direção | Resultado |
 |----------|---------|-----------|
-| `true` | `outgoing` | Mensagem enviada pelo corretor |
+| `true` | `outgoing` | Mensagem enviada pelo corretor no próprio WhatsApp |
 | `false` | `incoming` | Mensagem recebida de terceiro |
 
 **Regras importantes:**
@@ -483,10 +483,10 @@ Evento com sessionId inexistente
 ### 5. Mensagem do corretor
 
 ```
-Corretor envia mensagem (fromMe: true)
+Corretor envia mensagem pelo próprio WhatsApp (fromMe: true)
 → direction: outgoing
 → Se não há lead: descartado (outgoing_no_lead)
-→ Se há lead: persistida como outgoing
+→ Se há lead: persistida como outgoing para leitura e insights
 ```
 
 ### 6. Restart WAHA

@@ -3,6 +3,10 @@ import { loadEnvConfig } from "@next/env";
 import { hashPassword } from "better-auth/crypto";
 import { and, eq, ne } from "drizzle-orm";
 import { getDatabase, schema } from "../src/shared/db/client";
+import {
+  buildCredentialAccount,
+  buildCredentialAccountPasswordUpdate,
+} from "../src/shared/auth/credential-account";
 
 loadEnvConfig(process.cwd());
 
@@ -91,16 +95,14 @@ async function main() {
   if (credentialAccount) {
     await db
       .update(schema.account)
-      .set({ password: passwordHash, updatedAt: new Date() })
+      .set(buildCredentialAccountPasswordUpdate(director.id, passwordHash))
       .where(eq(schema.account.id, credentialAccount.id));
   } else {
-    await db.insert(schema.account).values({
+    await db.insert(schema.account).values(buildCredentialAccount({
       id: randomUUID(),
       userId: director.id,
-      providerId: "credential",
-      accountId: director.id,
       password: passwordHash,
-    });
+    }));
   }
 
   const [membership] = await db.select().from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.userId, director.id))).limit(1);

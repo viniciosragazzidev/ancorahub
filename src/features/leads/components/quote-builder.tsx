@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Calculator, Plus, Trash } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Sparkle, CheckCircle, UserCheck, Flame, ThermometerCold, ShieldX } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import {
@@ -102,8 +102,8 @@ export function ManualQualificationDialog({
                     : "border-border/70 hover:bg-muted/40"
                 }`}
               >
-                <Flame className="size-4 text-rose-500" />
-                <span>Quente (Urgente 🔥)</span>
+                <Flame aria-hidden="true" className="size-4 text-rose-500" />
+                <span>Quente (Urgente)</span>
               </button>
 
               <button

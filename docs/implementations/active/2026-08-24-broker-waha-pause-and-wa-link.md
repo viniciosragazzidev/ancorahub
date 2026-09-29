@@ -3,6 +3,11 @@
 **Data:** 2026-08-24  
 **Estado:** em validação
 
+> **Atualização 03/09:** a área Lite deixou de ser atendimento interno. Com o
+> recurso ativo, ela exibe apenas insights de conversas de leads/clientes atribuídos;
+> com o recurso desativado, a sincronização e a área são pausadas sem desconectar a
+> sessão. A resposta continua sendo feita no WhatsApp externo.
+
 ## Objetivo
 
 Pausar temporariamente a superfície interna de WhatsApp do corretor sem apagar
@@ -18,8 +23,7 @@ ou WhatsApp Web pelo endereço `wa.me`.
   `/minha-fila` durante a pausa. O corretor nunca é redirecionado à central geral,
   que é uma superfície de gestão.
 - O botão **WhatsApp** do detalhe do lead sempre usa `https://wa.me/<telefone>` em
-  nova aba. O botão interno **Conversar** não é exibido para o corretor enquanto o
-  controle estiver desligado.
+  nova aba. Não existe envio interno pela sessão WAHA do corretor.
 - A barra inferior Lite não apresenta **Conversas** enquanto a área interna está
   pausada. Nenhuma sessão WAHA é desconectada e nenhum dado é excluído.
 

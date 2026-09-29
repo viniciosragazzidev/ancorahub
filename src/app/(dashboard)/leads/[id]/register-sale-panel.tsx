@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -155,7 +155,7 @@ export function RegisterSalePanel({
                     )}
                     {documents.map((doc) => (
                       <option key={doc.id} value={doc.id} disabled={doc.status !== "approved"}>
-                        {doc.filename}{doc.status === "pending" ? " (aguardando aprovação)" : doc.status === "rejected" ? " (rejeitado)" : " ✓"}
+                    {doc.filename}{doc.status === "pending" ? " (aguardando aprovação)" : doc.status === "rejected" ? " (rejeitado)" : " (aprovado)"}
                       </option>
                     ))}
                   </select>

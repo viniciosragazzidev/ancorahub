@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lt, notInArray, or, sql } from "drizzle-orm";
 
 import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -17,9 +17,16 @@ import {
   type OfficialBrokerConversation,
   type OfficialBrokerMessage,
 } from "./official-broker-conversations";
+import { ConversasHeaderNav } from "./_components/conversas-header-nav";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
+import { isMediaKindSupported } from "@/features/conversations/media-kinds";
+import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
+import { renderTemplatePreview } from "@/features/communication-channels/template-preview";
+import { describeOwnerTransition } from "@/features/conversations/owner-transitions";
+import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
@@ -34,12 +41,25 @@ export const maxDuration = 300;
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadId?: string; tab?: string; draft?: string }>;
+  searchParams: Promise<{ leadId?: string; lead?: string; tab?: string }>;
 }) {
-  const { leadId, tab, draft } = await searchParams;
+  const { leadId: leadIdParam, lead: leadAlias, tab } = await searchParams;
+  // WhatsApp offer/assignment messages link here with `?lead=`.
+  const leadId = leadIdParam ?? leadAlias;
   const context = await getRequiredTenantContext();
   if (!hasPermission(context.role, "acessar_conversas")) {
     redirect("/minha-fila");
+  }
+
+  // "Aceitar Lead" in the text-fallback offer message is this very link: opening
+  // it as the offered broker is the acceptance (no-op if there is no active offer).
+  if (leadAlias && context.role === "broker") {
+    await handleLeadOfferWebhookResponse({
+      tenantId: context.tenantId,
+      brokerId: context.userId,
+      leadId: leadAlias,
+      buttonText: "aceitar",
+    }).catch((error) => console.error("[conversas] accept via link failed", error));
   }
 
   // A experiência Lite conectada é exclusiva do corretor. Enquanto o controle
@@ -51,14 +71,13 @@ export default async function ConversationsPage({
     }
     const params = new URLSearchParams();
     if (leadId) params.set("leadId", leadId);
-    if (draft === "broker_intro") params.set("draft", draft);
     redirect(params.size ? `/conversas/broker?${params}` : "/conversas/broker");
   }
 
   const db = getDatabase();
 
   const isDirector = context.role === "director";
-  const canSeeBrokerTab = isDirector || context.role === "manager";
+  const canSeeBrokerTab = isDirector || (context.role === "manager" && Boolean(context.branchId));
   const officialBrokerTab = canSeeBrokerTab && tab === "corretores";
   const scope =
     context.role === "manager" && context.branchId
@@ -67,298 +86,532 @@ export default async function ConversationsPage({
         ? eq(schema.leads.corretorId, context.userId)
         : undefined;
 
-  const [leads, branches] = await Promise.all([
-    db
-      .select({
-        id: schema.leads.id,
-        nome: schema.leads.nome,
-        telefone: schema.leads.telefone,
-        email: schema.leads.email,
-        status: schema.leads.status,
-        qualificationStatus: schema.leads.qualificationStatus,
-        origem: schema.leads.origem,
-        branchId: schema.leads.branchId,
-        queueName: schema.leadQueues.name,
-        corretorId: schema.leads.corretorId,
-        corretorNome: schema.user.name,
-        branchName: schema.branches.name,
-        consentimentoLgpd: schema.leads.consentimentoLgpd,
-        createdAt: schema.leads.createdAt,
-        stageEnteredAt: schema.leads.stageEnteredAt,
-        planName: schema.carrierPlans.name,
-        carrierName: schema.carriers.name,
-      })
-      .from(schema.leads)
-      .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
-      .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
-      .leftJoin(
-        schema.leadQueues,
-        and(
-          eq(schema.leads.queueId, schema.leadQueues.id),
-          eq(schema.leadQueues.tenantId, context.tenantId),
-        ),
-      )
-      .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
-      .leftJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
-      .where(
-        and(
-          eq(schema.leads.tenantId, context.tenantId),
-          isNull(schema.leads.deletedAt),
-          ...(scope ? [scope] : []),
-        ),
-      )
-      .orderBy(desc(schema.leads.stageEnteredAt))
-      .limit(isDirector ? 500 : 150),
-    isDirector
-      ? db
-          .select({ id: schema.branches.id, name: schema.branches.name })
-          .from(schema.branches)
-          .where(
-            and(
-              eq(schema.branches.tenantId, context.tenantId),
-              eq(schema.branches.status, "active"),
+  let finalConversations: ConversationItem[] = [];
+  let branches: { id: string; name: string }[] = [];
+
+  if (!officialBrokerTab) {
+    const [leads, branchRows, brokerPhoneRows] = await Promise.all([
+      db
+        .select({
+          id: schema.leads.id,
+          nome: schema.leads.nome,
+          telefone: schema.leads.telefone,
+          email: schema.leads.email,
+          status: schema.leads.status,
+          qualificationStatus: schema.leads.qualificationStatus,
+          origem: schema.leads.origem,
+          branchId: schema.leads.branchId,
+          queueName: schema.leadQueues.name,
+          corretorId: schema.leads.corretorId,
+          corretorNome: schema.user.name,
+          branchName: schema.branches.name,
+          consentimentoLgpd: schema.leads.consentimentoLgpd,
+          createdAt: schema.leads.createdAt,
+          stageEnteredAt: schema.leads.stageEnteredAt,
+          planName: schema.carrierPlans.name,
+          carrierName: schema.carriers.name,
+          qualificationDetails: schema.leads.qualificationDetails,
+        })
+        .from(schema.leads)
+        .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
+        .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+        .leftJoin(
+          schema.leadQueues,
+          and(
+            eq(schema.leads.queueId, schema.leadQueues.id),
+            eq(schema.leadQueues.tenantId, context.tenantId),
+          ),
+        )
+        .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
+        .leftJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
+        .where(
+          and(
+            eq(schema.leads.tenantId, context.tenantId),
+            isNull(schema.leads.deletedAt),
+            isNull(schema.leads.archivedAt),
+            ...(scope ? [scope] : []),
+          ),
+        )
+        .orderBy(desc(schema.leads.stageEnteredAt))
+        .limit(isDirector ? 500 : 150),
+      isDirector
+        ? db
+            .select({ id: schema.branches.id, name: schema.branches.name })
+            .from(schema.branches)
+            .where(
+              and(
+                eq(schema.branches.tenantId, context.tenantId),
+                eq(schema.branches.status, "active"),
+              ),
+            )
+            .orderBy(asc(schema.branches.name))
+        : Promise.resolve([] as { id: string; name: string }[]),
+      db
+        .select({ phone: schema.brokerProfiles.phone })
+        .from(schema.brokerProfiles)
+        .where(eq(schema.brokerProfiles.tenantId, context.tenantId)),
+    ]);
+
+    branches = branchRows;
+    const leadIds = leads.map((lead) => lead.id);
+
+    const [messageRows, documentRows, aiConversationRows] = leadIds.length
+      ? await Promise.all([
+          db
+            .select({
+              id: schema.whatsappMessages.id,
+              leadId: schema.whatsappMessages.leadId,
+              clientId: schema.whatsappMessages.clientId,
+              phone: schema.whatsappMessages.phone,
+              body: schema.whatsappMessages.body,
+              direction: schema.whatsappMessages.direction,
+              senderRole: schema.whatsappMessages.senderRole,
+              providerStatus: schema.whatsappMessages.providerStatus,
+              messageId: schema.whatsappMessages.messageId,
+              communicationChannelId: schema.whatsappMessages.communicationChannelId,
+              sentAt: schema.whatsappMessages.sentAt,
+              mediaKind: schema.whatsappMessages.mediaKind,
+              mediaMimeType: schema.whatsappMessages.mediaMimeType,
+              mediaFilename: schema.whatsappMessages.mediaFilename,
+              mediaSizeBytes: schema.whatsappMessages.mediaSizeBytes,
+              mediaStorageKey: schema.whatsappMessages.mediaStorageKey,
+            })
+            .from(schema.whatsappMessages)
+            .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
+            .orderBy(desc(schema.whatsappMessages.sentAt))
+            .limit(2000),
+          db
+            .select({
+              id: schema.leadDocuments.id,
+              leadId: schema.leadDocuments.leadId,
+              filename: schema.leadDocuments.filename,
+              fileUrl: schema.leadDocuments.fileUrl,
+              status: schema.leadDocuments.status,
+              requirementName: schema.documentRequirements.name,
+              createdAt: schema.leadDocuments.createdAt,
+            })
+            .from(schema.leadDocuments)
+            .leftJoin(
+              schema.documentRequirements,
+              eq(schema.leadDocuments.requirementId, schema.documentRequirements.id),
+            )
+            .where(
+              and(
+                eq(schema.leadDocuments.tenantId, context.tenantId),
+                inArray(schema.leadDocuments.leadId, leadIds),
+              ),
+            )
+            .orderBy(desc(schema.leadDocuments.createdAt)),
+          db
+            .select({
+              id: schema.aiConversations.id,
+              leadId: schema.aiConversations.leadId,
+              status: schema.aiConversations.status,
+              aiModel: schema.aiConversations.aiModel,
+              transferReason: schema.aiConversations.transferReason,
+              qualificationSummary: schema.aiConversations.qualificationSummary,
+              assignedUserId: schema.aiConversations.assignedUserId,
+            })
+            .from(schema.aiConversations)
+            .where(
+              and(
+                eq(schema.aiConversations.tenantId, context.tenantId),
+                inArray(schema.aiConversations.leadId, leadIds),
+              ),
+            ),
+        ])
+      : ([[], [], []] as const);
+
+    const failedMessageEventKeys = isDirector
+      ? Array.from(
+          new Set(
+            messageRows
+              .filter((message) => message.providerStatus === "failed" || message.providerStatus === "deleted")
+              .flatMap((message) =>
+                message.messageId
+                  ? [`${message.messageId}:failed`, `${message.messageId}:deleted`]
+                  : [],
+              ),
+          ),
+        )
+      : [];
+
+    const failedDeliveryEvents = failedMessageEventKeys.length
+      ? await db
+          .select({
+            externalEventId: schema.communicationChannelWebhookEvents.externalEventId,
+            errorCode: schema.communicationChannelWebhookEvents.errorCode,
+          })
+          .from(schema.communicationChannelWebhookEvents)
+          .innerJoin(
+            schema.communicationChannels,
+            eq(
+              schema.communicationChannelWebhookEvents.channelId,
+              schema.communicationChannels.id,
             ),
           )
-          .orderBy(asc(schema.branches.name))
-      : Promise.resolve([] as { id: string; name: string }[]),
-  ]);
-
-  const leadIds = leads.map((lead) => lead.id);
-
-  const [messageRows, documentRows, aiConversationRows] = leadIds.length
-    ? await Promise.all([
-        db
-          .select({
-            id: schema.whatsappMessages.id,
-            leadId: schema.whatsappMessages.leadId,
-            phone: schema.whatsappMessages.phone,
-            body: schema.whatsappMessages.body,
-            direction: schema.whatsappMessages.direction,
-            senderRole: schema.whatsappMessages.senderRole,
-            providerStatus: schema.whatsappMessages.providerStatus,
-            sentAt: schema.whatsappMessages.sentAt,
-          })
-          .from(schema.whatsappMessages)
-          .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
-          .orderBy(desc(schema.whatsappMessages.sentAt))
-          .limit(2000),
-        db
-          .select({
-            id: schema.leadDocuments.id,
-            leadId: schema.leadDocuments.leadId,
-            filename: schema.leadDocuments.filename,
-            fileUrl: schema.leadDocuments.fileUrl,
-            status: schema.leadDocuments.status,
-            requirementName: schema.documentRequirements.name,
-            createdAt: schema.leadDocuments.createdAt,
-          })
-          .from(schema.leadDocuments)
-          .leftJoin(
-            schema.documentRequirements,
-            eq(schema.leadDocuments.requirementId, schema.documentRequirements.id),
-          )
           .where(
             and(
-              eq(schema.leadDocuments.tenantId, context.tenantId),
-              inArray(schema.leadDocuments.leadId, leadIds),
+              eq(schema.communicationChannels.tenantId, context.tenantId),
+              inArray(
+                schema.communicationChannelWebhookEvents.externalEventId,
+                failedMessageEventKeys,
+              ),
             ),
           )
-          .orderBy(desc(schema.leadDocuments.createdAt)),
-        db
-          .select({
-            id: schema.aiConversations.id,
-            leadId: schema.aiConversations.leadId,
-            status: schema.aiConversations.status,
-            aiModel: schema.aiConversations.aiModel,
-            transferReason: schema.aiConversations.transferReason,
-            qualificationSummary: schema.aiConversations.qualificationSummary,
-            assignedUserId: schema.aiConversations.assignedUserId,
-          })
-          .from(schema.aiConversations)
-          .where(
-            and(
-              eq(schema.aiConversations.tenantId, context.tenantId),
-              inArray(schema.aiConversations.leadId, leadIds),
-            ),
-          )
-          .catch(() => []),
-      ])
-    : ([[], [], []] as const);
+      : [];
 
-  const messagesByLead = new Map<string, ConversationMessage[]>();
-  for (const lead of leads) {
-    const rawMatched = messageRows
-      .filter(
-        (msg) =>
-          msg.leadId === lead.id ||
-          (Boolean(msg.phone && lead.telefone) && samePhone(msg.phone, lead.telefone)),
-      )
-      .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
+    const failureByProviderMessageId = new Map(
+      failedDeliveryEvents.flatMap((event) => {
+        if (!event.externalEventId || !event.errorCode) return [];
+        const messageId = event.externalEventId.replace(/:(?:failed|deleted)$/, "");
+        const failure = getDirectorFacingMetaDeliveryFailure(event.errorCode);
+        return failure ? [[messageId, failure] as const] : [];
+      }),
+    );
 
-    const seenIds = new Set<string>();
-    const seenContentKeys = new Set<string>();
-    const matched: ConversationMessage[] = [];
+    const messagesByLead = new Map<string, ConversationMessage[]>();
+    for (const lead of leads) {
+      const rawMatched = messageRows
+        .filter(
+          (msg) =>
+            msg.leadId === lead.id ||
+            (Boolean(msg.phone && lead.telefone) && samePhone(msg.phone, lead.telefone)),
+        )
+        .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
 
-    for (const msg of rawMatched) {
-      if (seenIds.has(msg.id)) continue;
-      seenIds.add(msg.id);
+      const seenIds = new Set<string>();
+      const seenContentKeys = new Set<string>();
+      const deduplicated: ConversationMessage[] = [];
 
-      // Deduplicate identical content sent within 5 seconds of each other
-      const window5s = Math.floor(msg.sentAt.getTime() / 5000);
-      const contentKey = `${msg.direction}:${msg.body.trim()}:${window5s}`;
-      if (seenContentKeys.has(contentKey)) continue;
-      seenContentKeys.add(contentKey);
+      for (const msg of rawMatched) {
+        if (seenIds.has(msg.id)) continue;
+        seenIds.add(msg.id);
 
-      matched.push({
-        id: msg.id,
-        leadId: lead.id,
-        body: msg.body,
-        direction: msg.direction,
-        senderRole: msg.senderRole,
-        providerStatus: msg.providerStatus,
-        sentAt: msg.sentAt.toISOString(),
+        const normalizedBody = msg.body?.trim().toLowerCase() || "";
+        const timeBucket = Math.floor(msg.sentAt.getTime() / 2000);
+        const contentKey = `${msg.direction}:${normalizedBody}:${timeBucket}`;
+
+        if (normalizedBody.length > 0 && seenContentKeys.has(contentKey)) {
+          continue;
+        }
+        seenContentKeys.add(contentKey);
+
+        const providerFailure = msg.messageId
+          ? failureByProviderMessageId.get(msg.messageId) ?? null
+          : null;
+
+        deduplicated.push({
+          id: msg.id,
+          leadId: lead.id,
+          body: msg.body,
+          direction: msg.direction,
+          senderRole: msg.senderRole,
+          providerStatus: msg.providerStatus,
+          providerFailure,
+          sentAt: msg.sentAt.toISOString(),
+          ...(isMediaKindSupported(msg.mediaKind) && msg.mediaStorageKey
+            ? {
+                media: {
+                  kind: msg.mediaKind as string,
+                  mimeType: msg.mediaMimeType,
+                  filename: msg.mediaFilename,
+                  sizeBytes: msg.mediaSizeBytes,
+                  url: `/api/conversations/media/${msg.id}`,
+                },
+              }
+            : isMediaKindSupported(msg.mediaKind)
+              ? {
+                  media: {
+                    kind: msg.mediaKind as string,
+                    mimeType: msg.mediaMimeType,
+                    filename: msg.mediaFilename,
+                    sizeBytes: msg.mediaSizeBytes,
+                    url: null,
+                  },
+                }
+              : {}),
+        });
+      }
+
+      messagesByLead.set(lead.id, deduplicated);
+    }
+
+    // Changes of broker become dividers in the conversation, so messages that
+    // kept arriving on a former broker's WhatsApp read in context.
+    const leadsWithMessages = [...messagesByLead.entries()].filter(([, list]) => list.length).map(([leadId]) => leadId);
+    if (leadsWithMessages.length) {
+      const ownerEvents = await db
+        .select({
+          id: schema.leadDistributionEvents.id,
+          leadId: schema.leadDistributionEvents.leadId,
+          previousOwnerId: schema.leadDistributionEvents.previousOwnerId,
+          newOwnerId: schema.leadDistributionEvents.newOwnerId,
+          createdAt: schema.leadDistributionEvents.createdAt,
+        })
+        .from(schema.leadDistributionEvents)
+        .where(and(
+          eq(schema.leadDistributionEvents.tenantId, context.tenantId),
+          inArray(schema.leadDistributionEvents.leadId, leadsWithMessages),
+          or(isNotNull(schema.leadDistributionEvents.previousOwnerId), isNotNull(schema.leadDistributionEvents.newOwnerId)),
+        ))
+        .orderBy(asc(schema.leadDistributionEvents.createdAt))
+        .catch(() => []);
+      const ownerIds = [...new Set(ownerEvents.flatMap((event) => [event.previousOwnerId, event.newOwnerId]).filter((id): id is string => Boolean(id)))];
+      const ownerNames = new Map(ownerIds.length
+        ? (await db.select({ id: schema.user.id, name: schema.user.name }).from(schema.user).where(inArray(schema.user.id, ownerIds))).map((row) => [row.id, row.name])
+        : []);
+      for (const event of ownerEvents) {
+        const label = describeOwnerTransition(
+          event.previousOwnerId ? ownerNames.get(event.previousOwnerId) ?? "corretor" : null,
+          event.newOwnerId ? ownerNames.get(event.newOwnerId) ?? "corretor" : null,
+        );
+        const list = messagesByLead.get(event.leadId);
+        if (!label || !list) continue;
+        list.push({ id: `transition:${event.id}`, leadId: event.leadId, body: "", direction: "transition", transition: label, sentAt: event.createdAt.toISOString() });
+      }
+      for (const list of messagesByLead.values()) list.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+    }
+
+    const documentsByLead = new Map<
+      string,
+      {
+        id: string;
+        filename: string;
+        fileUrl: string;
+        status: string;
+        requirementName: string | null;
+        createdAt: string;
+      }[]
+    >();
+    for (const doc of documentRows) {
+      if (!doc.leadId) continue;
+      const list = documentsByLead.get(doc.leadId) || [];
+      list.push({
+        id: doc.id,
+        filename: doc.filename,
+        fileUrl: doc.fileUrl,
+        status: doc.status,
+        requirementName: doc.requirementName,
+        createdAt: doc.createdAt.toISOString(),
+      });
+      documentsByLead.set(doc.leadId, list);
+    }
+
+    const aiConversationByLead = new Map<string, {
+      id: string;
+      status: "NEW" | "AI_ACTIVE" | "WAITING_CUSTOMER" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED" | "FAILED";
+      aiModel: string | null;
+      transferReason: string | null;
+      qualificationSummary: string | null;
+      assignedUserId: string | null;
+    }>();
+    for (const row of aiConversationRows) {
+      if (!row.leadId) continue;
+      aiConversationByLead.set(row.leadId, {
+        id: row.id,
+        status: row.status as "NEW" | "AI_ACTIVE" | "WAITING_CUSTOMER" | "WAITING_HUMAN" | "HUMAN_ACTIVE" | "CLOSED" | "FAILED",
+        aiModel: row.aiModel,
+        transferReason: row.transferReason,
+        qualificationSummary: row.qualificationSummary,
+        assignedUserId: row.assignedUserId,
       });
     }
 
-    if (matched.length > 0) {
-      messagesByLead.set(lead.id, matched.slice(-200));
+    const unassignedSyntheticId = "00000000-0000-0000-0000-000000000000";
+    const leadPhones = new Set<string>();
+    const brokerPhones = brokerPhoneRows.map((profile) => profile.phone);
+    for (const l of leads) {
+      if (l.telefone) {
+        leadPhones.add(l.telefone.replace(/\D/g, ""));
+      }
     }
-  }
 
-  const documentsByLead = new Map<
-    string,
-    {
-      id: string;
-      filename: string;
-      fileUrl: string;
-      status: string;
-      requirementName: string | null;
-      createdAt: string;
-    }[]
-  >();
-  for (const document of documentRows) {
-    const items = documentsByLead.get(document.leadId) ?? [];
-    items.push({ ...document, createdAt: document.createdAt.toISOString() });
-    documentsByLead.set(document.leadId, items);
-  }
+    const unlinkedMessages = messageRows.filter((msg) => {
+      return shouldCreateSyntheticCustomerConversation(
+        msg,
+        leadPhones,
+        brokerPhones,
+      );
+    });
 
-  const aiConversationsByLead = new Map<string, (typeof aiConversationRows)[number]>();
-  for (const aiConv of aiConversationRows) {
-    if (aiConv.leadId) {
-      aiConversationsByLead.set(aiConv.leadId, aiConv);
+    const unlinkedByPhone = new Map<string, typeof unlinkedMessages>();
+    for (const msg of unlinkedMessages) {
+      if (!msg.phone) continue;
+      const key = msg.phone.replace(/\D/g, "");
+      const current = unlinkedByPhone.get(key) || [];
+      current.push(msg);
+      unlinkedByPhone.set(key, current);
     }
-  }
 
-  const conversations: ConversationItem[] = leads.map((lead) => {
-    let messages = messagesByLead.get(lead.id) ?? [];
-    const aiConv = aiConversationsByLead.get(lead.id) ?? null;
+    const syntheticLeadConversations: ConversationItem[] = [];
+    for (const [phone, msgs] of unlinkedByPhone.entries()) {
+      msgs.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
+      const latest = msgs[msgs.length - 1];
+      const rawBody = latest?.body || "Conversa iniciada pelo WhatsApp";
+      const snippet = rawBody.length > 80 ? `${rawBody.slice(0, 80)}...` : rawBody;
+      const syntheticId = `unassigned-${phone}`;
 
-    if (messages.length === 0 && aiConv) {
-      const syntheticTime = lead.stageEnteredAt || lead.createdAt;
-      const initialGreeting =
-        "Olá! Sou o atendente virtual da Âncora Saúde. Vou fazer algumas perguntas rápidas para preparar seu atendimento.";
-      messages = [
-        {
-          id: `synth_ai_start_${lead.id}`,
-          leadId: lead.id,
-          body: initialGreeting,
-          direction: "outbound",
-          sentAt: syntheticTime.toISOString(),
-        },
-      ];
-      if (aiConv.qualificationSummary) {
-        messages.push({
-          id: `synth_ai_summary_${lead.id}`,
-          leadId: lead.id,
-          body: `Resumo da Qualificação por IA: ${aiConv.qualificationSummary}`,
-          direction: "outbound",
-          sentAt: new Date(syntheticTime.getTime() + 1000).toISOString(),
+      syntheticLeadConversations.push({
+        id: syntheticId,
+        nome: `Contato (${phone})`,
+        telefone: phone,
+        email: null,
+        status: "new",
+        qualificationStatus: "PENDING",
+        origem: "whatsapp_unassigned",
+        branchId: null,
+        queueName: "Fila Geral WhatsApp",
+        corretorId: unassignedSyntheticId,
+        corretorNome: "Não atribuído",
+        branchName: "Entrada Geral",
+        consentimentoLgpd: false,
+        createdAt: latest?.sentAt.toISOString() || new Date().toISOString(),
+        stageEnteredAt: latest?.sentAt.toISOString() || new Date().toISOString(),
+        planName: null,
+        carrierName: null,
+        messages: msgs.map((m) => ({
+          id: m.id,
+          leadId: syntheticId,
+          body: m.body,
+          direction: m.direction,
+          senderRole: m.senderRole,
+          providerStatus: m.providerStatus,
+          providerFailure: m.messageId ? failureByProviderMessageId.get(m.messageId) ?? null : null,
+          sentAt: m.sentAt.toISOString(),
+          ...(m.mediaKind && m.mediaStorageKey
+            ? {
+                media: {
+                  kind: m.mediaKind,
+                  mimeType: m.mediaMimeType,
+                  filename: m.mediaFilename,
+                  sizeBytes: m.mediaSizeBytes,
+                  url: `/api/conversations/media/${m.id}`,
+                },
+              }
+            : {}),
+        })),
+        documents: [],
+        latestMessage: latest
+          ? {
+              body: snippet,
+              direction: latest.direction,
+              sentAt: latest.sentAt.toISOString(),
+            }
+          : null,
+      });
+    }
+
+    const mappedLeadConversations: ConversationItem[] = leads.map((lead) => {
+      const messages = messagesByLead.get(lead.id) || [];
+      const documents = documentsByLead.get(lead.id) || [];
+      const aiConversation = aiConversationByLead.get(lead.id) || null;
+      const latestMessage = messages.filter((message) => !message.transition).at(-1);
+
+      return {
+        id: lead.id,
+        nome: lead.nome,
+        telefone: lead.telefone,
+        email: lead.email,
+        status: lead.status,
+        qualificationStatus: lead.qualificationStatus,
+        origem: lead.origem,
+        branchId: lead.branchId,
+        queueName: lead.queueName,
+        corretorId: lead.corretorId,
+        corretorNome: lead.corretorNome,
+        branchName: lead.branchName,
+        consentimentoLgpd: lead.consentimentoLgpd,
+        createdAt: lead.createdAt.toISOString(),
+        stageEnteredAt: lead.stageEnteredAt ? lead.stageEnteredAt.toISOString() : lead.createdAt.toISOString(),
+        planName: lead.planName,
+        carrierName: lead.carrierName,
+        privateNotes: (() => {
+          const details = lead.qualificationDetails;
+          if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+          const notes = (details as Record<string, unknown>).privateNotes;
+          if (!Array.isArray(notes)) return null;
+          const aiNote = notes.find((note) => note && typeof note === "object" && (note as Record<string, unknown>).source === "ai_qualification") as Record<string, unknown> | undefined;
+          return typeof aiNote?.summary === "string" ? aiNote.summary : null;
+        })(),
+        messages,
+        documents,
+        aiConversation,
+        latestMessage: latestMessage
+          ? {
+              body: latestMessage.body,
+              direction: latestMessage.direction,
+              sentAt: latestMessage.sentAt,
+            }
+          : null,
+      };
+    });
+
+    // A conversation only exists once at least one WhatsApp message is
+    // persisted. Leads without history stay in Leads/Distribuição and must
+    // not appear as empty rows in the Conversations workspace.
+    const allConversations = [...mappedLeadConversations, ...syntheticLeadConversations]
+      .filter((conversation) => conversation.messages.length > 0);
+    const uniqueConversationsByPhone = new Map<string, ConversationItem>();
+
+    for (const conv of allConversations) {
+      const phone = conv.telefone ? conv.telefone.replace(/\D/g, "") : "";
+      if (!phone) {
+        uniqueConversationsByPhone.set(conv.id, conv);
+        continue;
+      }
+      const existing = uniqueConversationsByPhone.get(phone);
+      if (!existing) {
+        uniqueConversationsByPhone.set(phone, conv);
+      } else {
+        const primary = existing.id.startsWith("unassigned-") ? conv : existing;
+        const secondary = existing.id.startsWith("unassigned-") ? existing : conv;
+        const mergedMessages = [...primary.messages];
+        const seenMsgIds = new Set(primary.messages.map((m) => m.id));
+        for (const msg of secondary.messages) {
+          if (!seenMsgIds.has(msg.id)) {
+            seenMsgIds.add(msg.id);
+            mergedMessages.push(msg);
+          }
+        }
+        mergedMessages.sort((a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime());
+
+        uniqueConversationsByPhone.set(phone, {
+          ...primary,
+          messages: mergedMessages,
+          latestMessage: mergedMessages[mergedMessages.length - 1]
+            ? {
+                body: mergedMessages[mergedMessages.length - 1].body,
+                direction: mergedMessages[mergedMessages.length - 1].direction,
+                sentAt: mergedMessages[mergedMessages.length - 1].sentAt,
+              }
+            : primary.latestMessage,
+          aiConversation: primary.aiConversation || secondary.aiConversation,
         });
       }
     }
 
-    const latest = messages.at(-1) ?? null;
-    return {
-      ...lead,
-      createdAt: lead.createdAt.toISOString(),
-      stageEnteredAt: lead.stageEnteredAt.toISOString(),
-      latestMessage: latest
-        ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt }
-        : null,
-      messages,
-      documents: documentsByLead.get(lead.id) ?? [],
-      aiConversation: aiConv
-        ? {
-            id: aiConv.id,
-            status: aiConv.status as any,
-            aiModel: aiConv.aiModel,
-            transferReason: aiConv.transferReason,
-            qualificationSummary: aiConv.qualificationSummary,
-            assignedUserId: aiConv.assignedUserId,
-          }
-        : null,
-    };
-  });
-
-  // Deduplicate conversations by phone number so duplicate DB lead records render as 1 contact
-  const uniqueConversationsByPhone = new Map<string, ConversationItem>();
-
-  for (const conv of conversations) {
-    const rawPhone = conv.telefone ? conv.telefone.replace(/\D/g, "") : "";
-    const phoneKey = rawPhone.length >= 8 ? rawPhone.slice(-11) : conv.id;
-
-    const existing = uniqueConversationsByPhone.get(phoneKey);
-    if (!existing) {
-      uniqueConversationsByPhone.set(phoneKey, conv);
-    } else {
-      const allMsgs = [...existing.messages, ...conv.messages].sort(
-        (a, b) => new Date(a.sentAt).getTime() - new Date(b.sentAt).getTime(),
-      );
-      const seenMsgIds = new Set<string>();
-      const dedupedMsgs = allMsgs.filter((m) => {
-        if (seenMsgIds.has(m.id)) return false;
-        seenMsgIds.add(m.id);
-        return true;
-      });
-
-      const isConvDistributed =
-        conv.status === "distributed" ||
-        (conv.qualificationStatus && conv.qualificationStatus !== "pending");
-      const primary = isConvDistributed ? conv : existing;
-      const secondary = primary === conv ? existing : conv;
-      const latest = dedupedMsgs.at(-1) ?? null;
-
-      uniqueConversationsByPhone.set(phoneKey, {
-        ...primary,
-        qualificationStatus: primary.qualificationStatus || secondary.qualificationStatus,
-        messages: dedupedMsgs,
-        latestMessage: latest
-          ? { body: latest.body, direction: latest.direction, sentAt: latest.sentAt }
-          : primary.latestMessage,
-        documents: [...primary.documents, ...secondary.documents],
-        aiConversation: primary.aiConversation || secondary.aiConversation,
-      });
-    }
+    finalConversations = Array.from(uniqueConversationsByPhone.values());
+    finalConversations.sort((a, b) => {
+      const timeA = a.latestMessage
+        ? new Date(a.latestMessage.sentAt).getTime()
+        : new Date(a.stageEnteredAt).getTime();
+      const timeB = b.latestMessage
+        ? new Date(b.latestMessage.sentAt).getTime()
+        : new Date(b.stageEnteredAt).getTime();
+      return timeB - timeA;
+    });
   }
 
-  const finalConversations = Array.from(uniqueConversationsByPhone.values());
-  finalConversations.sort((a, b) => {
-    const timeA = a.latestMessage
-      ? new Date(a.latestMessage.sentAt).getTime()
-      : new Date(a.stageEnteredAt).getTime();
-    const timeB = b.latestMessage
-      ? new Date(b.latestMessage.sentAt).getTime()
-      : new Date(b.stageEnteredAt).getTime();
-    return timeB - timeA;
-  });
-
   let officialBrokerConversations: OfficialBrokerConversation[] = [];
-  const officialBrokerMessagesEnabled = officialBrokerTab
-    ? await isMetaCloudWhatsAppEnabled()
-    : false;
-  if (officialBrokerTab && officialBrokerMessagesEnabled) {
-    const [brokers, invitations, outboundMessages, inboundMessages] = await Promise.all([
-      db
+  let officialBrokerMessagesEnabled = false;
+  const internalBrokerDeliveryChannel = "meta" as const;
+
+  if (officialBrokerTab) {
+    officialBrokerMessagesEnabled = await isMetaCloudWhatsAppEnabled();
+
+    if (officialBrokerMessagesEnabled) {
+      const brokers = await db
         .select({
           id: schema.brokerProfiles.id,
           userId: schema.brokerProfiles.userId,
@@ -367,197 +620,305 @@ export default async function ConversationsPage({
           branchName: schema.branches.name,
         })
         .from(schema.brokerProfiles)
+        .leftJoin(schema.user, eq(schema.brokerProfiles.userId, schema.user.id))
+        .leftJoin(
+          schema.tenantMemberships,
+          and(
+            eq(schema.tenantMemberships.userId, schema.user.id),
+            eq(schema.tenantMemberships.tenantId, context.tenantId),
+          ),
+        )
         .leftJoin(
           schema.branches,
           and(
-            eq(schema.brokerProfiles.branchId, schema.branches.id),
+            eq(schema.tenantMemberships.branchId, schema.branches.id),
             eq(schema.branches.tenantId, context.tenantId),
           ),
         )
-        .where(eq(schema.brokerProfiles.tenantId, context.tenantId))
-        .orderBy(asc(schema.brokerProfiles.professionalName)),
-      db
-        .select({
-          id: schema.brokerInvitations.id,
-          brokerProfileId: schema.brokerInvitations.brokerProfileId,
-          status: schema.brokerInvitations.status,
-          deliveryStatus: schema.brokerInvitations.deliveryStatus,
-          createdAt: schema.brokerInvitations.createdAt,
-        })
-        .from(schema.brokerInvitations)
-        .where(eq(schema.brokerInvitations.tenantId, context.tenantId))
-        .orderBy(desc(schema.brokerInvitations.createdAt)),
-      db
-        .select({
-          id: schema.whatsappOutboundMessages.id,
-          recipientId: schema.whatsappOutboundMessages.recipientId,
-          destinationPhone: schema.whatsappOutboundMessages.destinationPhone,
-          purpose: schema.whatsappOutboundMessages.purpose,
-          messageType: schema.whatsappOutboundMessages.messageType,
-          templateName: schema.whatsappOutboundMessages.templateName,
-          variables: schema.whatsappOutboundMessages.variables,
-          status: schema.whatsappOutboundMessages.status,
-          createdAt: schema.whatsappOutboundMessages.createdAt,
-          sentAt: schema.whatsappOutboundMessages.sentAt,
-          deliveredAt: schema.whatsappOutboundMessages.deliveredAt,
-          readAt: schema.whatsappOutboundMessages.readAt,
-          attempts: schema.whatsappOutboundMessages.attempts,
-          providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage,
-        })
-        .from(schema.whatsappOutboundMessages)
-        .innerJoin(
-          schema.communicationChannels,
-          and(
-            eq(schema.whatsappOutboundMessages.channelId, schema.communicationChannels.id),
-            eq(schema.communicationChannels.tenantId, context.tenantId),
+        .where(and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          or(
+            inArray(schema.brokerProfiles.lifecycleStatus, ["DRAFT", "INVITED", "INVITATION_EXPIRED", "ONBOARDING"]),
+            and(
+              eq(schema.tenantMemberships.role, "broker"),
+              eq(schema.tenantMemberships.status, "active"),
+              eq(schema.user.active, true),
+              eq(schema.user.status, "active"),
+            ),
           ),
-        )
-        .where(
-          and(
-            eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
-            eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
-            eq(schema.whatsappOutboundMessages.recipientType, "user"),
-          ),
-        )
-        .orderBy(desc(schema.whatsappOutboundMessages.createdAt))
-        .limit(500),
-      db
-        .select({
-          id: schema.whatsappMessages.id,
-          phone: schema.whatsappMessages.phone,
-          body: schema.whatsappMessages.body,
-          providerStatus: schema.whatsappMessages.providerStatus,
-          sentAt: schema.whatsappMessages.sentAt,
-        })
-        .from(schema.whatsappMessages)
-        .where(
-          and(
-            eq(schema.whatsappMessages.tenantId, context.tenantId),
-            eq(schema.whatsappMessages.provider, META_CLOUD_PROVIDER),
-            eq(schema.whatsappMessages.direction, "incoming"),
-            isNull(schema.whatsappMessages.leadId),
-          ),
-        )
-        .orderBy(desc(schema.whatsappMessages.sentAt))
-        .limit(500),
-    ]);
+          context.role === "manager" ? eq(schema.brokerProfiles.branchId, context.branchId!) : undefined,
+        ))
+        .orderBy(asc(schema.brokerProfiles.professionalName));
 
-    const brokerByProfileId = new Map(brokers.map((b) => [b.id, b]));
-    const brokerByUserId = new Map(brokers.filter((b) => b.userId).map((b) => [b.userId!, b]));
-    const invitationToBrokerId = new Map(invitations.map((inv) => [inv.id, inv.brokerProfileId]));
-
-    const brokerByPhone = new Map<string, (typeof brokers)[number]>();
-    for (const broker of brokers) {
-      const digits = normalizePhone(broker.phone);
-      if (digits) {
-        brokerByPhone.set(digits, broker);
-        if (digits.length >= 11) brokerByPhone.set(digits.slice(-11), broker);
-        if (digits.length >= 10) brokerByPhone.set(digits.slice(-10), broker);
-      }
-    }
-
-    const findBroker = (recipientId: string | null, phone: string) => {
-      if (recipientId) {
-        if (brokerByProfileId.has(recipientId)) return brokerByProfileId.get(recipientId);
-        if (brokerByUserId.has(recipientId)) return brokerByUserId.get(recipientId);
-        const fromInv = invitationToBrokerId.get(recipientId);
-        if (fromInv && brokerByProfileId.has(fromInv)) return brokerByProfileId.get(fromInv);
-      }
-      const digits = normalizePhone(phone);
-      if (!digits) return undefined;
-      return (
-        brokerByPhone.get(digits) ||
-        (digits.length >= 11 ? brokerByPhone.get(digits.slice(-11)) : undefined) ||
-        (digits.length >= 10 ? brokerByPhone.get(digits.slice(-10)) : undefined)
-      );
-    };
-
-    const invitationByBroker = new Map<string, (typeof invitations)[number]>();
-    for (const invitation of invitations)
-      if (!invitationByBroker.has(invitation.brokerProfileId))
-        invitationByBroker.set(invitation.brokerProfileId, invitation);
-    const messagesByBroker = new Map<string, OfficialBrokerMessage[]>();
-    const addMessage = (brokerId: string, message: OfficialBrokerMessage) =>
-      messagesByBroker.set(brokerId, [...(messagesByBroker.get(brokerId) ?? []), message]);
-
-    for (const message of outboundMessages) {
-      const broker = findBroker(message.recipientId, message.destinationPhone);
-      if (!broker) continue;
-      addMessage(broker.id, {
-        id: `out:${message.id}`,
-        direction: "outgoing",
-        body: formatOfficialOutboundBody(message.purpose, message.messageType, message.templateName, message.variables),
-        sentAt: (
-          message.readAt ??
-          message.deliveredAt ??
-          message.sentAt ??
-          message.createdAt
-        ).toISOString(),
-        status: normalizeOutboundStatus(message.status),
-        purpose: message.purpose,
-        templateName: message.templateName === "__text__" ? undefined : message.templateName,
-        attempts: message.attempts,
-        error:
-          message.status === "failed"
-            ? message.providerErrorMessage ?? "A Meta não confirmou a entrega. Consulte o status do canal e reenvie pelo fluxo de equipe."
-            : null,
+      const brokerProfileIds = brokers.map((broker) => broker.id);
+      const brokerUserIds = brokers.flatMap((broker) => broker.userId ? [broker.userId] : []);
+      const brokerPhones = brokers.flatMap((broker) => {
+        const phone = normalizePhone(broker.phone);
+        return phone ? [phone] : [];
       });
-    }
-    for (const message of inboundMessages) {
-      const broker = findBroker(null, message.phone);
-      if (!broker) continue;
-      const cleanBody = message.body?.trim();
-      addMessage(broker.id, {
-        id: `in:${message.id}`,
-        direction: "incoming",
-        body: cleanBody && cleanBody !== "[text]" ? cleanBody : "Mensagem recebida do corretor",
-        sentAt: message.sentAt.toISOString(),
-        status: "received",
-      });
-    }
 
-    officialBrokerConversations = brokers
-      .map((broker) => {
-        const invitation = invitationByBroker.get(broker.id);
-        const brokerMsgs = (messagesByBroker.get(broker.id) ?? []).sort(
-          (left, right) => new Date(left.sentAt).getTime() - new Date(right.sentAt).getTime(),
+      const [invitations, outboundMessages, inboundMessages] = brokerProfileIds.length > 0
+        ? await Promise.all([
+            db
+              .select({
+                id: schema.brokerInvitations.id,
+                brokerProfileId: schema.brokerInvitations.brokerProfileId,
+                status: schema.brokerInvitations.status,
+                deliveryStatus: schema.brokerInvitations.deliveryStatus,
+                createdAt: schema.brokerInvitations.createdAt,
+              })
+              .from(schema.brokerInvitations)
+              .where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), inArray(schema.brokerInvitations.brokerProfileId, brokerProfileIds)))
+              .orderBy(desc(schema.brokerInvitations.createdAt)),
+            db
+              .select({
+                id: schema.whatsappOutboundMessages.id,
+                recipientId: schema.whatsappOutboundMessages.recipientId,
+                destinationPhone: schema.whatsappOutboundMessages.destinationPhone,
+                purpose: schema.whatsappOutboundMessages.purpose,
+                messageType: schema.whatsappOutboundMessages.messageType,
+                templateName: schema.whatsappOutboundMessages.templateName,
+                templateLanguage: schema.whatsappOutboundMessages.templateLanguage,
+                variables: schema.whatsappOutboundMessages.variables,
+                providerVariables: schema.whatsappOutboundMessages.providerVariables,
+                templateVariableNames: schema.whatsappOutboundMessages.templateVariableNames,
+                renderedBody: schema.whatsappOutboundMessages.renderedBody,
+                wabaId: schema.communicationChannels.wabaId,
+                status: schema.whatsappOutboundMessages.status,
+                createdAt: schema.whatsappOutboundMessages.createdAt,
+                sentAt: schema.whatsappOutboundMessages.sentAt,
+                deliveredAt: schema.whatsappOutboundMessages.deliveredAt,
+                readAt: schema.whatsappOutboundMessages.readAt,
+                attempts: schema.whatsappOutboundMessages.attempts,
+                deliveryRoute: schema.whatsappOutboundMessages.deliveryRoute,
+                providerErrorMessage: schema.whatsappOutboundMessages.providerErrorMessage,
+              })
+              .from(schema.whatsappOutboundMessages)
+              .leftJoin(
+                schema.communicationChannels,
+                and(
+                  eq(schema.whatsappOutboundMessages.channelId, schema.communicationChannels.id),
+                  eq(schema.communicationChannels.tenantId, context.tenantId),
+                ),
+              )
+              .where(
+                and(
+                  eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+                  eq(schema.whatsappOutboundMessages.recipientType, "user"),
+                  // Skipped (notice switched off) and cancelled rows never reached the
+                  // broker: showing them made the chat display "Na fila" bubbles with
+                  // only the broker's name.
+                  notInArray(schema.whatsappOutboundMessages.status, ["skipped", "cancelled"]),
+                  or(
+                    inArray(schema.whatsappOutboundMessages.recipientId, [...brokerProfileIds, ...brokerUserIds]),
+                    inArray(schema.whatsappOutboundMessages.destinationPhone, brokerPhones),
+                  ),
+                ),
+              )
+              .orderBy(desc(schema.whatsappOutboundMessages.createdAt))
+              .limit(500),
+            db
+              .select({
+                id: schema.whatsappMessages.id,
+                phone: schema.whatsappMessages.phone,
+                body: schema.whatsappMessages.body,
+                providerStatus: schema.whatsappMessages.providerStatus,
+                sentAt: schema.whatsappMessages.sentAt,
+                mediaKind: schema.whatsappMessages.mediaKind,
+                mediaMimeType: schema.whatsappMessages.mediaMimeType,
+                mediaFilename: schema.whatsappMessages.mediaFilename,
+                mediaSizeBytes: schema.whatsappMessages.mediaSizeBytes,
+                mediaStorageKey: schema.whatsappMessages.mediaStorageKey,
+              })
+              .from(schema.whatsappMessages)
+              .where(
+                and(
+                  eq(schema.whatsappMessages.tenantId, context.tenantId),
+                  eq(schema.whatsappMessages.direction, "incoming"),
+                  or(
+                    inArray(schema.whatsappMessages.phone, brokerPhones),
+                    ...brokerPhones.map((phone) =>
+                      like(schema.whatsappMessages.phone, `%${phone.slice(-4)}`),
+                    ),
+                  ),
+                ),
+              )
+              .orderBy(desc(schema.whatsappMessages.sentAt))
+              .limit(500),
+          ])
+        : [[], [], []] as const;
+
+      // The approved templates as synchronized from Meta, so each sent
+      // template renders with its real header/body/buttons instead of a
+      // hand-written approximation.
+      const templateNames = [...new Set(outboundMessages.filter((m) => m.messageType === "template" && m.templateName).map((m) => m.templateName))];
+      const syncedTemplates = templateNames.length
+        ? await db
+          .select({
+            name: schema.metaWhatsAppTemplates.name,
+            language: schema.metaWhatsAppTemplates.language,
+            wabaId: schema.metaWhatsAppTemplates.wabaId,
+            componentsJson: schema.metaWhatsAppTemplates.componentsJson,
+          })
+          .from(schema.metaWhatsAppTemplates)
+          .where(and(
+            eq(schema.metaWhatsAppTemplates.tenantId, context.tenantId),
+            inArray(schema.metaWhatsAppTemplates.name, templateNames),
+            isNull(schema.metaWhatsAppTemplates.deletedAt),
+          ))
+          .orderBy(desc(schema.metaWhatsAppTemplates.lastSyncedAt))
+        : [];
+      const findSyncedTemplate = (message: (typeof outboundMessages)[number]) => {
+        // Only the sending number's account: a same-named template approved on
+        // another WABA is not what the broker received (Meta rejects it).
+        const candidates = syncedTemplates.filter((t) => t.name === message.templateName && (!message.wabaId || t.wabaId === message.wabaId));
+        return candidates.find((t) => t.language === message.templateLanguage) ?? candidates[0];
+      };
+
+      const brokerByProfileId = new Map(brokers.map((b) => [b.id, b]));
+      const brokerByUserId = new Map(brokers.filter((b) => b.userId).map((b) => [b.userId!, b]));
+      const invitationToBrokerId = new Map(invitations.map((inv) => [inv.id, inv.brokerProfileId]));
+
+      const brokerByPhone = new Map<string, (typeof brokers)[number]>();
+      for (const broker of brokers) {
+        const digits = normalizePhone(broker.phone);
+        if (digits) {
+          brokerByPhone.set(digits, broker);
+          if (digits.length >= 11) brokerByPhone.set(digits.slice(-11), broker);
+          if (digits.length >= 10) brokerByPhone.set(digits.slice(-10), broker);
+        }
+      }
+
+      const findBroker = (recipientId: string | null, phone: string) => {
+        if (recipientId) {
+          if (brokerByProfileId.has(recipientId)) return brokerByProfileId.get(recipientId);
+          if (brokerByUserId.has(recipientId)) return brokerByUserId.get(recipientId);
+          const fromInv = invitationToBrokerId.get(recipientId);
+          if (fromInv && brokerByProfileId.has(fromInv)) return brokerByProfileId.get(fromInv);
+        }
+        const digits = normalizePhone(phone);
+        if (!digits) return undefined;
+        return (
+          brokerByPhone.get(digits) ??
+          (digits.length >= 11 ? brokerByPhone.get(digits.slice(-11)) : undefined) ??
+          (digits.length >= 10 ? brokerByPhone.get(digits.slice(-10)) : undefined)
         );
-        return {
-          brokerProfileId: broker.id,
-          name: broker.name,
-          phoneMasked: maskPhone(broker.phone),
-          branchName: broker.branchName,
-          invitationStatus: invitation?.status ?? null,
-          invitationDeliveryStatus: invitation?.deliveryStatus ?? null,
-          messages: brokerMsgs,
-        };
-      })
-      .filter(
-        (conversation) =>
-          conversation.messages.length > 0 || Boolean(conversation.invitationStatus),
-      )
-      .sort((a, b) => {
-        const lastA = a.messages.at(-1)?.sentAt;
-        const lastB = b.messages.at(-1)?.sentAt;
-        const timeA = lastA ? new Date(lastA).getTime() : 0;
-        const timeB = lastB ? new Date(lastB).getTime() : 0;
-        if (timeA !== timeB) return timeB - timeA;
-        return a.name.localeCompare(b.name, "pt-BR");
-      });
+      };
 
-    await db
-      .insert(schema.auditLogs)
-      .values({
-        id: randomUUID(),
-        userId: context.userId,
-        entidade: "official_broker_conversations",
-        entidadeId: context.tenantId,
-        acao: "consultou_historico",
-      });
+      const messagesByBroker = new Map<string, OfficialBrokerMessage[]>();
+      const addMessage = (brokerId: string, message: OfficialBrokerMessage) => {
+        const current = messagesByBroker.get(brokerId) ?? [];
+        current.push(message);
+        messagesByBroker.set(brokerId, current);
+      };
+
+      for (const message of outboundMessages) {
+        const broker = findBroker(message.recipientId, message.destinationPhone);
+        if (!broker) continue;
+        // Sent through the company number (WAHA): the free-message text is what the broker got.
+        const synced = message.messageType === "template" && message.deliveryRoute !== "waha_direct" ? findSyncedTemplate(message) : undefined;
+        const template = synced
+          ? renderTemplatePreview({
+            purpose: message.purpose,
+            componentsJson: synced.componentsJson,
+            variables: message.variables,
+            providerVariables: message.providerVariables,
+            templateVariableNames: message.templateVariableNames,
+          })
+          : null;
+        addMessage(broker.id, {
+          id: `out:${message.id}`,
+          direction: "outgoing",
+          body: template?.body ?? message.renderedBody ?? formatOfficialOutboundBody(
+            message.purpose,
+            message.messageType,
+            message.templateName,
+            message.variables,
+          ),
+          template,
+          sentAt: (message.sentAt ?? message.createdAt).toISOString(),
+          status: normalizeOutboundStatus(message.status),
+          purpose: message.purpose,
+          templateName: message.templateName,
+          attempts: message.attempts,
+          error:
+            message.status === "failed" || (message.status === "pending" && Boolean(message.providerErrorMessage))
+              ? getOfficialBrokerDeliveryError(message.deliveryRoute, message.providerErrorMessage)
+              : null,
+        });
+      }
+
+      for (const message of inboundMessages) {
+        const broker = findBroker(null, message.phone);
+        if (!broker) continue;
+        const cleanBody = message.body?.trim();
+        addMessage(broker.id, {
+          id: `in:${message.id}`,
+          direction: "incoming",
+          body: cleanBody && cleanBody !== "[text]" ? cleanBody : "Mensagem recebida do corretor",
+          sentAt: message.sentAt.toISOString(),
+          status: "received",
+          ...(message.mediaKind && message.mediaStorageKey
+            ? {
+                media: {
+                  kind: message.mediaKind,
+                  mimeType: message.mediaMimeType,
+                  filename: message.mediaFilename,
+                  sizeBytes: message.mediaSizeBytes,
+                  url: `/api/conversations/media/${message.id}`,
+                },
+              }
+            : {}),
+        });
+      }
+
+      const invitationByBroker = new Map<string, (typeof invitations)[number]>();
+      for (const inv of invitations) {
+        if (!invitationByBroker.has(inv.brokerProfileId)) {
+          invitationByBroker.set(inv.brokerProfileId, inv);
+        }
+      }
+
+      officialBrokerConversations = brokers
+        .map((broker) => {
+          const invitation = invitationByBroker.get(broker.id);
+          const brokerMsgs = (messagesByBroker.get(broker.id) ?? []).sort(
+            (left, right) => new Date(left.sentAt).getTime() - new Date(right.sentAt).getTime(),
+          );
+          return {
+            brokerProfileId: broker.id,
+            name: broker.name,
+            phoneMasked: maskPhone(broker.phone),
+            phoneRaw: broker.phone,
+            branchName: broker.branchName,
+            invitationStatus: invitation?.status ?? null,
+            invitationDeliveryStatus: invitation?.deliveryStatus ?? null,
+            messages: brokerMsgs,
+          };
+        })
+        .sort((a, b) => {
+          const lastA = a.messages.at(-1)?.sentAt;
+          const lastB = b.messages.at(-1)?.sentAt;
+          const timeA = lastA ? new Date(lastA).getTime() : 0;
+          const timeB = lastB ? new Date(lastB).getTime() : 0;
+          if (timeA !== timeB) return timeB - timeA;
+          return a.name.localeCompare(b.name, "pt-BR");
+        });
+
+      await db
+        .insert(schema.auditLogs)
+        .values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "official_broker_conversations",
+          entidadeId: context.tenantId,
+          acao: "consultou_historico",
+        });
+    }
   }
 
   return (
-    <>
+    <div className="flex h-dvh min-h-0 w-full flex-1 flex-col overflow-hidden">
       <DashboardHeader
         breadcrumb="Atendimento"
         title="Conversas"
@@ -565,42 +926,20 @@ export default async function ConversationsPage({
           canSeeBrokerTab ? (
             <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
               <BulkQualificationDialog />
-              <div className="flex items-center rounded-lg border border-border/80 bg-muted/50 p-1 backdrop-blur-sm shadow-xs">
-                <Link
-                  href="/conversas"
-                  className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150",
-                    !officialBrokerTab
-                      ? "bg-background text-foreground shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-background/40",
-                  )}
-                >
-                  Leads
-                  <Badge variant="outline" className="ml-0.5 text-[10px] px-1.5 py-0">
-                    {finalConversations.length}
-                  </Badge>
-                </Link>
-                <Link
-                  href="/conversas?tab=corretores"
-                  className={cn(
-                    "flex items-center gap-2 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-150",
-                    officialBrokerTab
-                      ? "bg-background text-foreground shadow-xs font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-background/40",
-                  )}
-                >
-                  Número oficial <span className="hidden lg:inline">· corretores</span>
-                </Link>
-              </div>
+              <ConversasHeaderNav
+                currentTab={officialBrokerTab ? "corretores" : "leads"}
+                leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
+              />
             </nav>
           ) : undefined
         }
       />
-      <main className="min-h-0 w-full flex-1 bg-background p-0">
-        <div className="h-full min-h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:min-h-0 w-full overflow-hidden bg-card">
+      <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background p-0">
+        <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card">
           {officialBrokerTab ? (
             <OfficialBrokerConversations
               enabled={officialBrokerMessagesEnabled}
+              deliveryChannel={internalBrokerDeliveryChannel}
               conversations={officialBrokerConversations}
             />
           ) : (
@@ -615,23 +954,21 @@ export default async function ConversationsPage({
           )}
         </div>
       </main>
-    </>
+    </div>
   );
 }
 
-function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
-}
-function maskPhone(phone: string) {
-  const digits = normalizePhone(phone);
-  return digits.length > 4
-    ? `+${digits.slice(0, Math.max(0, digits.length - 8))} ****-${digits.slice(-4)}`
-    : "Número protegido";
-}
+import { normalizePhone, maskPhone } from "@/shared/utils/phone";
 function normalizeOutboundStatus(status: string): OfficialBrokerMessage["status"] {
   return ["pending", "queued", "sent", "delivered", "read", "failed"].includes(status)
     ? (status as OfficialBrokerMessage["status"])
     : "queued";
+}
+function getOfficialBrokerDeliveryError(deliveryRoute: string, providerErrorMessage: string | null) {
+  if (deliveryRoute === "waha_direct") {
+    return "O WAHA não confirmou o envio. Verifique a conexão do número selecionado e tente novamente.";
+  }
+  return providerErrorMessage ?? "A Meta não confirmou a entrega. Consulte o status do canal e reenvie pelo fluxo de equipe.";
 }
 function formatOfficialOutboundBody(
   purpose: string,
@@ -652,6 +989,5 @@ function formatOfficialOutboundBody(
   if (purpose === "newLeadAssignment") return "Oferta de novo lead enviada ao corretor.";
   if (purpose === "leadAssignmentConfirmed")
     return "Confirmação de lead atribuído enviada ao corretor.";
-  if (messageType === "text") return "Mensagem de texto enviada pelo número oficial.";
   return `Modelo oficial enviado: ${templateName}.`;
 }

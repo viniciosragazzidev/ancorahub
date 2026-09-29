@@ -5,7 +5,7 @@ import path from "node:path";
 import { loadEnvConfig } from "@next/env";
 import postgres from "postgres";
 
-// Preserve variables injected by Vercel/CI. Only load local env files when the
+// Preserve variables injected by Coolify/CI. Only load local env files when the
 // process was started without a database connection configured.
 if (!process.env.SUPABASE_DB_URL?.trim() && !process.env.DATABASE_URL?.trim()) {
   loadEnvConfig(process.cwd());

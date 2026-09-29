@@ -5,9 +5,13 @@ import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { changeLeadStatus, type ChangeLeadStatusInput } from "@/features/leads/change-lead-status";
 import { assignLeadToBroker } from "@/features/lead-distribution/service";
+import { routeLeadToBranch } from "@/features/lead-distribution/service";
+import { enqueueLeadDistributionJob, runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
+import { scheduleAfterResponse } from "@/shared/async/after-response";
+import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
 export type StatusChangeState = {
   success?: boolean;
@@ -92,6 +96,13 @@ export async function bulkReassignLeadsAction(
         branchIds: changedLeads.map((lead) => lead.branchId),
         brokerIds: [brokerId, ...changedLeads.map((lead) => lead.corretorId)],
       }).catch(() => undefined);
+
+      scheduleAfterResponse("lead-reassign-batch-effects", async () => {
+        await runLeadEffectOutboxProcessor({
+          tenantId: context.tenantId,
+          limit: Math.max(changedLeadIds.length * 2, 10),
+        });
+      });
     }
 
     if (errorCount === 0) {
@@ -128,6 +139,8 @@ export async function changeLeadStatusAction(
     leadId: (formData.get("leadId") ?? "") as string,
     newStatus: (formData.get("newStatus") ?? formData.get("status") ?? "") as string,
     motivoPerda: (formData.get("motivoPerda") ?? formData.get("lossReason")) as string | null,
+    justificativaRegressao: (formData.get("justificativaRegressao") ??
+      formData.get("regressionJustification")) as string | null,
   };
 
   try {
@@ -255,6 +268,7 @@ export type BulkBranchReassignState = {
   mutationId?: string;
   changedLeadIds?: string[];
   branchId?: string;
+  branchIds?: string[];
 };
 
 export async function bulkReassignBranchAction(
@@ -264,11 +278,11 @@ export async function bulkReassignBranchAction(
   const mutationId = randomUUID();
   const parsed = z.object({
     leadIds: z.array(z.string().uuid()).min(1),
-    branchId: z.string().uuid(),
-  }).safeParse({ leadIds: formData.getAll("leadIds"), branchId: formData.get("branchId") });
+    branchIds: z.array(z.string().uuid()).min(1),
+  }).safeParse({ leadIds: formData.getAll("leadIds"), branchIds: formData.getAll("branchIds").length ? formData.getAll("branchIds") : [formData.get("branchId")] });
 
   if (!parsed.success) return { mutationId, error: "Selecione leads e uma unidade válidos." };
-  const { leadIds, branchId } = parsed.data;
+  const { leadIds, branchIds } = parsed.data;
 
   try {
     const context = await getRequiredTenantContext();
@@ -277,31 +291,39 @@ export async function bulkReassignBranchAction(
     }
 
     const db = getDatabase();
-    const now = new Date();
-    await db.update(schema.leads)
-      .set({
-        branchId,
-        corretorId: null,
-        status: "new",
-        distributionStatus: "unassigned",
-        assignedAt: null,
-        updatedAt: now,
-      })
-      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds)));
+    const branches = await db.select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status })
+      .from(schema.branches)
+      .where(and(eq(schema.branches.tenantId, context.tenantId), inArray(schema.branches.id, branchIds)));
+    if (branches.length !== new Set(branchIds).size || branches.some((branch) => branch.status !== "active" || !branch.acceptingLeads)) {
+      return { mutationId, error: "Selecione apenas unidades ativas e aptas a receber leads." };
+    }
+
+    const changedLeadIds: string[] = [];
+    for (let index = 0; index < leadIds.length; index += 1) {
+      const targetBranchId = branchIds[index % branchIds.length];
+      const result = await routeLeadToBranch(context, leadIds[index], targetBranchId, "Distribuição manual por unidade");
+      if (result.status === "routed") {
+        changedLeadIds.push(leadIds[index]);
+        await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: leadIds[index] });
+      }
+    }
+    if (!changedLeadIds.length) return { mutationId, error: "Nenhum lead elegível para distribuição foi encontrado." };
+    scheduleAfterResponse("lead-branch-distribution", () => runLeadDistributionProcessor({ tenantId: context.tenantId, limit: Math.min(changedLeadIds.length, 100) }));
 
     void publishLeadInvalidation({
       tenantId: context.tenantId,
       actorId: context.userId,
-      branchIds: [branchId],
+      branchIds,
       brokerIds: [],
     }).catch(() => undefined);
 
     return {
       success: true,
       mutationId,
-      changedLeadIds: leadIds,
-      branchId,
-      message: `${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} transferido${leadIds.length === 1 ? "" : "s"} para a nova unidade com sucesso.`,
+      changedLeadIds,
+      branchId: branchIds[0],
+      branchIds,
+      message: `${changedLeadIds.length} lead${changedLeadIds.length === 1 ? "" : "s"} enviado${changedLeadIds.length === 1 ? "" : "s"} para distribuição entre ${branchIds.length === 1 ? "a unidade selecionada" : "as unidades selecionadas"}.`,
     };
   } catch (error) {
     return {

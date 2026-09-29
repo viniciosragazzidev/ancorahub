@@ -18,11 +18,12 @@ describe("trusted auth origins", () => {
     process.env.NEXT_PUBLIC_APP_URL = originalAppUrl;
   });
 
-  it("accepts the canonical CRM domain even while legacy configuration is present", () => {
-    process.env.BETTER_AUTH_URL = "https://corretop.vercel.app";
-    process.env.NEXT_PUBLIC_APP_URL = "https://corretop.vercel.app";
+  it("accepts the canonical CRM domain even while another host is configured", () => {
+    process.env.BETTER_AUTH_URL = "https://staging.ancorasaude.cloud";
+    process.env.NEXT_PUBLIC_APP_URL = "https://staging.ancorasaude.cloud";
 
     expect(getTrustedAuthOrigins()).toContain("https://crm.ancorasaude.cloud");
-    expect(getTrustedAuthOrigins()).toContain("https://corretop.vercel.app");
+    expect(getTrustedAuthOrigins()).toContain("https://staging.ancorasaude.cloud");
+    expect(getTrustedAuthOrigins()).not.toContain("https://corretop.vercel.app");
   });
 });

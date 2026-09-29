@@ -49,7 +49,7 @@ export default async function SuperAdminSessionsPage() {
                       {session.userAgent || "—"}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(session.expiresAt))}
+                      {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(session.expiresAt))}
                     </TableCell>
                     <TableCell className="pr-5">
                       <form action={terminateSessionAction}>

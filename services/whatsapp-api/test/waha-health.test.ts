@@ -49,6 +49,21 @@ test("GET /internal/waha/health com Bearer inválido retorna 401", async () => {
   await app.close();
 });
 
+test("GET /internal/waha/health aceita o alias VPS_INTERNAL_API_TOKEN", async () => {
+  delete process.env.WHATSAPP_API_INTERNAL_TOKEN;
+  process.env.VPS_INTERNAL_API_TOKEN = "internal-test-token";
+  process.env.WAHA_BASE_URL = "http://localhost:3000";
+  process.env.WAHA_API_KEY = "test-waha-key";
+  const app = buildApp();
+  const response = await app.inject({
+    method: "GET",
+    url: "/internal/waha/health",
+    headers: { "x-corretop-internal-token": "internal-test-token" },
+  });
+  assert.notEqual(response.statusCode, 401);
+  await app.close();
+});
+
 test("GET /internal/waha/health sem WAHA_BASE_URL retorna 503", async () => {
   delete process.env.WAHA_BASE_URL;
   process.env.WHATSAPP_API_INTERNAL_TOKEN = "internal-test-token";

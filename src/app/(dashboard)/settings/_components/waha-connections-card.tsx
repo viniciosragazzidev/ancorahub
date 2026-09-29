@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
+import { QrCode, SpinnerGap, X } from "@phosphor-icons/react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,8 +50,37 @@ export function WahaConnectionsCard({
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [qrCode, setQrCode] = useState<string | null>(null);
+  const [activeConnectingId, setActiveConnectingId] = useState<string | null>(null);
   const [disconnectTarget, setDisconnectTarget] = useState<Connection | null>(null);
   const scopeCopy = role === "director" ? "toda a empresa" : "a sua unidade";
+
+  // Polling para atualizar QR Code e detectar quando o número for pareado
+  useEffect(() => {
+    if (!activeConnectingId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const result = await refreshWahaConnectionAction(activeConnectingId);
+        if (!result.success) return;
+
+        if (result.result.qrCode) {
+          setQrCode(result.result.qrCode);
+        }
+
+        const rawStatus = String(result.result.status || "").toLowerCase();
+        if (rawStatus === "active" || rawStatus === "working" || rawStatus === "ready" || rawStatus === "connected") {
+          setActiveConnectingId(null);
+          setQrCode(null);
+          toast.success("WhatsApp corporativo conectado com sucesso!");
+          router.refresh();
+        }
+      } catch {
+        // Ignorar falhas transitórias de polling
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [activeConnectingId, router]);
 
   async function create(formData: FormData): Promise<void> {
     setPending(true);
@@ -60,23 +90,30 @@ export function WahaConnectionsCard({
       toast.error(result.error);
       return;
     }
-    setQrCode(result.result.qrCode);
-    toast.success("Sessão criada. Escaneie o QR Code.");
+    setActiveConnectingId(result.result.id);
+    if (result.result.qrCode) {
+      setQrCode(result.result.qrCode);
+    }
+    toast.success("Sessão iniciada. Escaneie o QR Code.");
+    router.refresh();
   }
+
   async function refresh(id: string) {
     setPending(true);
+    setActiveConnectingId(id);
     const result = await refreshWahaConnectionAction(id);
     setPending(false);
     if (!result.success) return toast.error(result.error);
-    setQrCode(result.result.qrCode);
+    if (result.result.qrCode) setQrCode(result.result.qrCode);
     toast.success(result.result.status === "active" ? "Número conectado." : "QR atualizado.");
   }
+
   async function change(id: string, operation: "pause" | "resume" | "disconnect") {
     setPending(true);
     const result = await changeWahaConnectionAction(id, operation);
     setPending(false);
     if (!result.success) return toast.error(result.error);
-    setQrCode(result.result.qrCode);
+    if (result.result.qrCode) setQrCode(result.result.qrCode);
     toast.success(
       operation === "disconnect"
         ? "Número desconectado."
@@ -86,12 +123,14 @@ export function WahaConnectionsCard({
     );
     router.refresh();
   }
+
   async function confirmDisconnect() {
     if (!disconnectTarget) return;
     const target = disconnectTarget;
     setDisconnectTarget(null);
     await change(target.id, "disconnect");
   }
+
   async function saveCapabilities(id: string, formData: FormData): Promise<void> {
     setPending(true);
     const result = await updateWahaCapabilitiesAction(id, formData);
@@ -128,19 +167,74 @@ export function WahaConnectionsCard({
             </Button>
           </form>
         ) : null}
-        {qrCode ? (
-          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-center">
-            <p className="mb-3 text-sm font-medium">Escaneie o QR Code no WhatsApp do número</p>
-            <img
-              alt="QR Code para conectar WhatsApp"
-              className="mx-auto size-56 rounded bg-white p-2 outline outline-1 outline-black/10 dark:outline-white/10"
-              src={`data:image/png;base64,${qrCode}`}
-            />
-            <p className="mt-3 text-xs text-muted-foreground">
-              O código expira rapidamente. Atualize se necessário.
+
+        {(activeConnectingId || qrCode) ? (
+          <div className="relative rounded-xl border border-primary/30 bg-primary/5 p-6 text-center shadow-sm">
+            <Button
+              onClick={() => {
+                setActiveConnectingId(null);
+                setQrCode(null);
+              }}
+              variant="ghost"
+              size="icon-sm"
+              className="absolute right-3 top-3 rounded-full p-1 text-muted-foreground hover:bg-muted"
+              title="Fechar QR Code"
+              type="button"
+            >
+              <X className="size-4" />
+            </Button>
+
+            <p className="mb-1 text-base font-semibold text-foreground">
+              Escaneie o QR Code no WhatsApp
             </p>
+            <p className="mb-4 text-xs text-muted-foreground">
+              Abra o WhatsApp no celular &gt; Aparelhos conectados &gt; Conectar um aparelho
+            </p>
+
+            {qrCode ? (
+              <div className="inline-block rounded-xl bg-white p-3 shadow-md">
+                <img
+                  alt="QR Code para conectar WhatsApp"
+                  className="mx-auto size-56 rounded"
+                  src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`}
+                />
+              </div>
+            ) : (
+              <div className="flex h-56 flex-col items-center justify-center gap-3 rounded-xl bg-white/60 p-6">
+                <SpinnerGap className="size-8 animate-spin text-primary" />
+                <p className="text-sm font-medium text-muted-foreground">
+                  Iniciando sessão do WhatsApp e gerando QR Code…
+                </p>
+              </div>
+            )}
+
+            <div className="mt-4 flex items-center justify-center gap-3">
+              {activeConnectingId ? (
+                <Button
+                  disabled={pending}
+                  onClick={() => refresh(activeConnectingId)}
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <QrCode className="size-4" />
+                  {pending ? "Atualizando..." : "Atualizar QR Code"}
+                </Button>
+              ) : null}
+              <Button
+                onClick={() => {
+                  setActiveConnectingId(null);
+                  setQrCode(null);
+                }}
+                size="sm"
+                variant="ghost"
+              >
+                Concluir / Fechar
+              </Button>
+            </div>
           </div>
         ) : null}
+
         <div className="divide-y rounded-lg border">
           {connections.length ? (
             connections.map((connection) => (
@@ -163,7 +257,9 @@ export function WahaConnectionsCard({
                       size="sm"
                       variant="outline"
                     >
-                      Atualizar QR
+                      {connection.status === "active" || connection.status === "WORKING"
+                        ? "Atualizar status"
+                        : "Ver / Atualizar QR"}
                     </Button>
                     {connection.status === "paused" ? (
                       <Button
@@ -176,7 +272,7 @@ export function WahaConnectionsCard({
                       </Button>
                     ) : (
                       <Button
-                        disabled={pending || connection.status !== "active"}
+                        disabled={pending || (connection.status !== "active" && connection.status !== "WORKING")}
                         onClick={() => change(connection.id, "pause")}
                         size="sm"
                         variant="outline"
@@ -271,9 +367,7 @@ export function WahaConnectionsCard({
             <DialogHeader>
               <DialogTitle>Desconectar este número?</DialogTitle>
               <DialogDescription>
-                O número {disconnectTarget?.displayPhoneNumber ?? ""} deixará de enviar e receber
-                mensagens pelo CRM. O histórico é preservado e você pode conectá-lo novamente
-                depois.
+                A sessão do número {disconnectTarget?.displayPhoneNumber ?? ""} será desconectada do servidor e removida do CRM para que você possa gerar uma nova conexão limpa.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>

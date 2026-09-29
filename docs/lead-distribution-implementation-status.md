@@ -1,21 +1,55 @@
 # Sistema de distribuição de leads — estado da implementação
 
+## Oferta pendente, owner provisório e autoridade única (DEC-104) — 16/09/2026
+
+- `src/features/lead-distribution` resolve unidade, fila, elegibilidade, ordem,
+  oferta, redistribuição e SLA; os canais de entrada não escolhem corretor.
+- A criação durável da oferta vincula o corretor como owner provisório com origem
+  `automatic_offer`, fazendo o lead aparecer imediatamente em sua carteira.
+- A carteira do corretor também consulta ofertas ativas (`PENDING`, `SENT`,
+  `DELIVERED` e `READ`) diretamente, garantindo que a aba “Aguardando aceite” não
+  dependa apenas do status comercial ou do vínculo provisório do lead.
+- O aceite confirma o atendimento; recusa, expiração, falha de enqueue e SLA
+  liberam ou transferem o vínculo diretamente ao próximo elegível, sem sobrescrever
+  um owner confirmado por ação concorrente.
+- Leads sem unidade usam a unidade automática de menor carga com desempate estável.
+- Cooldown, menor fila sem contato e menor carga evitam sequências no mesmo corretor;
+  capacidade é meta e não deixa o lead órfão quando todos atingem o alvo.
+- As tasks rodam 24/7 e re-semeiam `queued`/`unassigned`, campos de qualificação
+  nulos e ofertas provisórias vencidas. A janela da Meta continua na outbox.
+- Fila manual, qualificação ativa ou ausência real de corretor elegível permanecem
+  com motivo auditável; nunca se burlam tenant, unidade, plantão ou disponibilidade.
+
+## Capacidade rígida e retenção manual da atribuição — DEC-113 — 23/09/2026
+
+- O teto de leads ativos é contado por tenant, fila e corretor; filas diferentes
+  mantêm capacidades independentes.
+- A reserva de vaga ocorre dentro da transação e usa lock por tenant/fila/corretor,
+  para que processadores concorrentes não ultrapassem o teto.
+- Sem vaga, a oferta não é criada e o lead permanece aguardando para reavaliação.
+- Diretor/Gestor podem remover a atribuição de um lead ativo antes ou depois do
+  início do atendimento. Etapa comercial, horários de contato e histórico são
+  preservados; a ação cancela ofertas/trabalhos pendentes, audita e cria `manual_hold`.
+- `manual_hold` não participa de re-seed automático; uma ação manual explícita é
+  necessária para voltar à operação. Leads encerrados, arquivados ou excluídos são
+  inelegíveis para remoção.
+
 ## Motor resiliente — 20/07/2026
 
 - A tabela `lead_distribution_jobs` persiste trabalhos de atribuição e impede jobs ativos duplicados por lead.
 - O executor interno trabalha em lotes, usa atualização condicional, lease recuperável, backoff e falha visível após o limite configurado.
-- A rota protegida `/api/internal/jobs/distribution` é executada pelo Vercel Cron a cada dois minutos; `CRON_SECRET` é obrigatório. A frequência é compatível com o ambiente Vercel pago e a fila continua preservada para nova tentativa se uma execução falhar.
+- A rota protegida `/api/internal/jobs/distribution` é executada por agendador a cada minuto; `CRON_SECRET` é obrigatório. A fila continua preservada para nova tentativa se uma execução falhar.
 - O Super-admin pode pausar, parametrizar e executar um ciclo manual com auditoria.
 - A tela de Distribuição informa pendências, processamento e exceções reais. A migration 0059 é pré-requisito para esta telemetria.
 
 ### Pendência obrigatória de infraestrutura
 
-Em qualquer mudança de ambiente, manter a chamada autenticada para `/api/internal/jobs/distribution` a cada **2 minutos** e preservar `CRON_SECRET` tanto no executor quanto no CRM. O Super-admin pode processar a fila manualmente em contingência.
+Em qualquer mudança de ambiente, manter as chamadas autenticadas para `/api/internal/jobs/distribution` e `/api/internal/jobs/qualification-timeout` a cada **1 minuto** e preservar `CRON_SECRET` tanto no executor quanto no CRM. O Super-admin pode processar a fila manualmente em contingência.
 
 ## Pendência urgente de infraestrutura
 
-- **Upgrade do agendador:** atualizar o projeto para Vercel Pro ou configurar um executor externo autorizado para recuperar a frequência de 2 minutos. O cron diário atual existe somente para manter o deploy compatível com o plano Hobby; ele não atende o SLA operacional de recebimento e distribuição.
-- **Critério de conclusão:** deploy de produção aprovado com `schedule: "*/2 * * * *"`, duas execuções consecutivas confirmadas nos logs e um lead de teste processado sem intervenção manual.
+- **Upgrade do agendador:** atualizar o projeto para Vercel Pro ou configurar um executor externo autorizado para recuperar a frequência de 1 minuto. O executor ativo deve ser único por ambiente; chamadas concorrentes continuam protegidas por claim/lease idempotente.
+- **Critério de conclusão:** deploy de produção aprovado com `schedule: "* * * * *"`, duas execuções consecutivas confirmadas nos logs e um lead de teste processado sem intervenção manual.
 
 Atualizado em 15/07/2026.
 
@@ -30,7 +64,7 @@ Atualizado em 15/07/2026.
 - Plantões em `/leads/distribuicao/plantao`, com horário, prioridade, vigência, ativação e desativação.
 - Notificação in-app ao corretor atribuído.
 - Eventos de movimentação e auditoria em cada ação relevante.
-- Estouro do SLA de primeiro contato desatrela o corretor vencido, exclui-o da tentativa seguinte, redistribui leads da origem Diretor na mesma unidade e devolve-os à fila central quando não há elegíveis; leads da origem Gestor ficam na fila da unidade para distribuição manual.
+- Estouro do SLA de primeiro contato mantém o owner vencido até a troca atômica e oferece diretamente ao próximo corretor elegível da mesma unidade.
 - Ajuda contextual em `/guia`, no tema “Distribuição de leads”.
 
 ## Regras de segurança
@@ -43,12 +77,11 @@ O servidor resolve tenant, papel, unidade e elegibilidade. IDs enviados pelo nav
 
 ## Operação diária
 
-1. Diretor ou Gestor abre Distribuição.
-2. Leads sem destino aparecem na Inbox.
-3. O responsável envia para uma unidade.
-4. A fila recebe o lead e pode atribuir manualmente ou executar Auto.
-5. O corretor recebe a notificação e passa a ser o owner.
-6. O histórico da movimentação permanece disponível para auditoria.
+1. O canal de entrada registra o lead e a intenção durável.
+2. O motor resolve unidade e fila pelas regras configuradas em `/distribuicao`.
+3. O corretor elegível melhor ranqueado recebe a oferta e o vínculo provisório na carteira.
+4. Aceite confirma a atribuição; recusa, expiração ou SLA liberam/trocam para o próximo elegível.
+5. As tasks recuperam qualquer pendência e o histórico permanece auditável.
 
 ## Próxima camada
 

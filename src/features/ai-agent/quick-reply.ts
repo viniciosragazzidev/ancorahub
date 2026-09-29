@@ -10,11 +10,35 @@ export const quickReplyIntentValues = [
 ] as const;
 export type QuickReplyIntent = (typeof quickReplyIntentValues)[number];
 
+/**
+ * Terminal quick replies stop the automated conversation, but they must not
+ * orphan a real lead. The lead can still be offered internally; the opt-out
+ * guard remains responsible for preventing any outbound message to the lead.
+ */
+export function shouldQueueLeadAfterTerminalReply(intent: QuickReplyIntent | null | undefined) {
+  return intent === "OPT_OUT" || intent === "NO_LONGER_INTERESTED" || intent === "WRONG_NUMBER";
+}
+
 export const conversationAutomationStateValues = ["AI_ACTIVE", "WAITING_HUMAN", "HUMAN_IN_PROGRESS", "PAUSED", "CLOSED"] as const;
 export type ConversationAutomationState = (typeof conversationAutomationStateValues)[number];
 
 export const quickReplyMessageKindValues = ["text", "audio", "image", "document", "video", "sticker", "unknown"] as const;
 export type QuickReplyMessageKind = (typeof quickReplyMessageKindValues)[number];
+
+/** Attachments are acknowledged by a quick reply only when no qualification
+ * question is pending. During an active qualification the attachment must
+ * continue through the state machine, otherwise the generic media template
+ * short-circuits the next question. */
+export function shouldContinueQualificationAfterMedia(input: {
+  messageKind?: QuickReplyMessageKind;
+  hasPendingQuestion: boolean;
+  conversationState: ConversationAutomationState;
+}) {
+  return input.messageKind !== undefined
+    && input.messageKind !== "text"
+    && input.hasPendingQuestion
+    && input.conversationState === "AI_ACTIVE";
+}
 
 export const quickReplyTemplateSchema = z.object({
   ruleKey: z.string().trim().min(1).max(80),

@@ -1,11 +1,12 @@
 import "server-only";
 
-import { and, count, eq, gte, inArray, isNotNull, lt, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, isNull, lt, sql } from "drizzle-orm";
 
 import { type TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { brazilDayKey } from "@/shared/trends";
 import { DEFAULT_PERIOD, periodStart, type PeriodValue } from "@/shared/period";
+import { resolveCohortConversion } from "@/features/reports/metrics/metrics-service";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -150,6 +151,8 @@ async function getNocKpis(
   function baseLeadWhere(start: Date, end: Date) {
     const base = and(
       eq(schema.leads.tenantId, scope.tenantId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
       gte(schema.leads.createdAt, start),
       lt(schema.leads.createdAt, end),
     );
@@ -167,8 +170,6 @@ async function getNocKpis(
     todayLeads,
     yesterdayLeads,
     activeNow,
-    monthMetrics,
-    lastMonthMetrics,
     contactTimeToday,
     contactTimeYesterday,
     ticketMonth,
@@ -193,28 +194,12 @@ async function getNocKpis(
       .where(
         and(
           eq(schema.leads.tenantId, scope.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           inArray(schema.leads.status, activeStatuses),
           ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
         ),
       ),
-
-    // Period conversion metrics
-    db
-      .select({
-        total: count(),
-        converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`,
-      })
-      .from(schema.leads)
-      .where(baseLeadWhere(start, end)),
-
-    // Previous period conversion
-    db
-      .select({
-        total: count(),
-        converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')`,
-      })
-      .from(schema.leads)
-      .where(baseLeadWhere(prevStart, start)),
 
     // Avg first contact time today (seconds)
     db
@@ -250,6 +235,8 @@ async function getNocKpis(
       .where(
         and(
           eq(schema.sales.tenantId, scope.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           gte(schema.sales.saleDate, start),
           lt(schema.sales.saleDate, end),
           eq(schema.sales.status, "active"),
@@ -265,6 +252,8 @@ async function getNocKpis(
       .where(
         and(
           eq(schema.sales.tenantId, scope.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           gte(schema.sales.saleDate, prevStart),
           lt(schema.sales.saleDate, start),
           eq(schema.sales.status, "active"),
@@ -273,19 +262,20 @@ async function getNocKpis(
       ),
   ]);
 
+  const [currentConversion, previousConversion] = await Promise.all([
+    resolveCohortConversion(context, start, end),
+    resolveCohortConversion(context, prevStart, start),
+  ]);
+
   const leadsT = Number(todayLeads[0]?.cnt ?? 0);
   const leadsY = Number(yesterdayLeads[0]?.cnt ?? 0);
-  const convM = Number(monthMetrics[0]?.converted ?? 0);
-  const totalM = Number(monthMetrics[0]?.total ?? 0);
-  const convLM = Number(lastMonthMetrics[0]?.converted ?? 0);
-  const totalLM = Number(lastMonthMetrics[0]?.total ?? 0);
 
   return {
     leadsToday: leadsT,
     leadsTodayVsYesterday: leadsY === 0 ? 0 : Math.round(((leadsT - leadsY) / leadsY) * 100),
     activeAttendances: Number(activeNow[0]?.cnt ?? 0),
-    conversionRateMonth: totalM > 0 ? Math.round((convM / totalM) * 100) : 0,
-    conversionRateLastMonth: totalLM > 0 ? Math.round((convLM / totalLM) * 100) : 0,
+    conversionRateMonth: Math.round(currentConversion.rate),
+    conversionRateLastMonth: Math.round(previousConversion.rate),
     avgFirstContactSeconds: contactTimeToday[0]?.avg ? Number(contactTimeToday[0].avg) : null,
     avgFirstContactSecondsYesterday: contactTimeYesterday[0]?.avg ? Number(contactTimeYesterday[0].avg) : null,
     avgTicketMonth: Number(ticketMonth[0]?.avg ?? 0),
@@ -303,6 +293,8 @@ async function getLeadFlow(context: TenantContext, period: PeriodValue): Promise
 
   const baseWhere = and(
     eq(schema.leads.tenantId, scope.tenantId),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
     gte(schema.leads.createdAt, start),
     ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
   );
@@ -353,6 +345,8 @@ async function getStatusDistribution(context: TenantContext, period: PeriodValue
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, start),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
       ),
@@ -388,6 +382,8 @@ async function getFirstContactTrend(context: TenantContext, period: PeriodValue)
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, start),
         isNotNull(schema.leads.firstContactAt),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
@@ -424,6 +420,8 @@ async function getTicketTrend(context: TenantContext, period: PeriodValue): Prom
     .where(
       and(
         eq(schema.sales.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.sales.saleDate, start),
         eq(schema.sales.status, "active"),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
@@ -457,6 +455,8 @@ async function getHourlyActivity(context: TenantContext): Promise<HourlyBucket[]
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, today.start),
         lt(schema.leads.createdAt, today.end),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
@@ -498,6 +498,8 @@ async function getTeamPerformance(context: TenantContext): Promise<TeamMemberPer
       and(
         eq(schema.leads.corretorId, schema.tenantMemberships.userId),
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, today.start),
         lt(schema.leads.createdAt, today.end),
       ),
@@ -555,6 +557,8 @@ async function getRecentActivity(context: TenantContext, period: PeriodValue): P
     .where(
       and(
         eq(schema.leads.tenantId, scope.tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         sql`${schema.leadInteractions.tipo} = ANY(ARRAY['status_change','quote_generated','service_started']::lead_interaction_type[])`,
         gte(schema.leadInteractions.createdAt, start),
         ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
@@ -630,7 +634,7 @@ async function getBranchHealth(context: TenantContext): Promise<BranchHealth[]> 
       activeAttendances: sql<number>`count(*) filter (where ${schema.leads.status} in ('in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis'))`,
       unassignedLeads: sql<number>`count(*) filter (where ${schema.leads.corretorId} is null and ${schema.leads.distributionStatus} in ('unassigned', 'queued', 'awaiting_unit', 'returned_to_queue'))`,
       slaRiskLeads: sql<number>`count(*) filter (where ${schema.leads.status} = 'distributed' and ${schema.leads.corretorId} is not null and ${schema.leads.firstContactAt} is null and ${schema.leads.assignedAt} is not null and ${schema.leads.assignedAt} < ${slaDeadline.toISOString()})`,
-    }).from(schema.leads).where(and(eq(schema.leads.tenantId, scope.tenantId), inArray(schema.leads.branchId, branchIds))).groupBy(schema.leads.branchId),
+    }).from(schema.leads).where(and(eq(schema.leads.tenantId, scope.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.branchId, branchIds))).groupBy(schema.leads.branchId),
     db.select({
       branchId: schema.tenantMemberships.branchId,
       totalBrokers: count(),

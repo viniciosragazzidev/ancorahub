@@ -48,7 +48,7 @@ export default async function UnitProfilePage({
   // Determine where the back link should go per role.
   const backHref =
     context.role === "director"
-      ? "/filiais"
+      ? "/equipe?visao=unidades"
       : context.role === "manager"
         ? "/gestor"
         : "/corretor";

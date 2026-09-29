@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   customType,
   date,
   foreignKey,
@@ -9,6 +10,7 @@ import {
   numeric,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -240,6 +242,7 @@ export const tenants = pgTable("tenants", {
   feedbackRequiredEnabled: boolean("feedback_required_enabled").notNull().default(true),
   feedbackGraceMinutes: text("feedback_grace_minutes").notNull().default("5"),
   autoRedistributeOnFeedbackTimeout: boolean("auto_redistribute_on_feedback_timeout").notNull().default(true),
+  holdDisqualifiedLeads: boolean("hold_disqualified_leads").notNull().default(false),
   feedbackReminderIntervalMinutes: text("feedback_reminder_interval_minutes").notNull().default("30"),
   feedbackReminderMaxAttempts: integer("feedback_reminder_max_attempts").notNull().default(5),
   feedbackPushEnabled: boolean("feedback_push_enabled").notNull().default(true),
@@ -391,6 +394,11 @@ export const leads = pgTable(
     version: integer("version").notNull().default(1),
     distributionStatus: text("distribution_status").notNull().default("unassigned"),
     distributionOrigin: text("distribution_origin"),
+    /** Removed from distribution by a director/manager; only a manual assignment brings it back. */
+    distributionRemovedAt: timestamp("distribution_removed_at", { withTimezone: true }),
+    distributionRemovalReason: text("distribution_removal_reason"),
+    distributionRemovalNote: text("distribution_removal_note"),
+    distributionRemovedBy: text("distribution_removed_by"),
     queueId: text("queue_id"),
     unitAssignedAt: timestamp("unit_assigned_at", { withTimezone: true }),
     assignmentSource: text("assignment_source"),
@@ -423,6 +431,8 @@ export const leads = pgTable(
     redistributionCount: integer("redistribution_count").notNull().default(0),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
     deletedBy: text("deleted_by").references(() => user.id, { onDelete: "set null" }),
+    archivedAt: timestamp("archived_at", { withTimezone: true }),
+    archivedBy: text("archived_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,
   },
@@ -435,6 +445,7 @@ export const leads = pgTable(
     index("leads_tenant_company_idx").on(table.tenantId, table.companyId),
     index("leads_webhook_credential_idx").on(table.webhookCredentialId),
     index("leads_tenant_deleted_idx").on(table.tenantId, table.deletedAt),
+    index("leads_tenant_archived_idx").on(table.tenantId, table.archivedAt),
     uniqueIndex("leads_credential_external_id_unique").on(table.webhookCredentialId, table.externalId).where(sql`${table.externalId} IS NOT NULL`),
     uniqueIndex("leads_tenant_source_external_id_unique").on(table.tenantId, table.sourceChannel, table.externalId).where(sql`${table.externalId} IS NOT NULL AND ${table.sourceChannel} <> 'landing_page'`),
   ],
@@ -616,6 +627,11 @@ export const leadQueues = pgTable(
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     branchId: text("branch_id").references(() => branches.id, { onDelete: "cascade" }),
     exclusiveDutyScheduleId: text("exclusive_duty_schedule_id"),
+    exclusiveDutyScheduleIds: jsonb("exclusive_duty_schedule_ids").$type<string[]>().notNull().default([]),
+    dutyFallbackPolicy: text("duty_fallback_policy").notNull().default("unit_roster"),
+    dutyFallbackQueueId: text("duty_fallback_queue_id"),
+    /** Attendance flow of this queue (DEC-127); null keeps today's intake. */
+    attendanceFlowId: text("attendance_flow_id"),
     name: text("name").notNull(),
     slug: text("slug").notNull(),
     status: text("status").notNull().default("active"),
@@ -623,8 +639,15 @@ export const leadQueues = pgTable(
     assignmentStrategy: text("assignment_strategy").notNull().default("capacity"),
     capacityEnabled: boolean("capacity_enabled").notNull().default(false),
     capacityPerBroker: integer("capacity_per_broker"),
+    // Offer pacing (see lead-distribution/offer-pacing.ts): 0 disables each rule.
+    offerIntervalMinutes: integer("offer_interval_minutes").notNull().default(5),
+    maxPendingOffersPerBroker: integer("max_pending_offers_per_broker").notNull().default(1),
     aiQualificationEnabled: boolean("ai_qualification_enabled").notNull().default(true),
     isDefault: boolean("is_default").notNull().default(false),
+    // Hue (0-359) on the HSL wheel used to tag this queue's leads in tables/boards.
+    // Assigned automatically (farthest from hues already in use) or picked manually
+    // from a curated swatch grid — see src/features/lead-distribution/queue-color.ts.
+    colorHue: integer("color_hue"),
     createdAt,
     updatedAt,
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -708,19 +731,42 @@ export const leadDistributionSettings = pgTable(
   (table) => [index("lead_distribution_settings_tenant_idx").on(table.tenantId, table.branchId, table.queueId)],
 );
 
+export const dutyScheduleTypes = pgTable(
+  "duty_schedule_types",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status").notNull().default("active"),
+    createdBy: text("created_by").notNull().references(() => user.id),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("duty_schedule_types_tenant_name_unique").on(table.tenantId, sql`lower(${table.name})`),
+    index("duty_schedule_types_tenant_status_idx").on(table.tenantId, table.status, table.name),
+  ],
+);
+
 export const unitDutySchedules = pgTable(
   "unit_duty_schedules",
   {
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-    branchId: text("branch_id").notNull().references(() => branches.id, { onDelete: "cascade" }),
-    queueId: text("queue_id").notNull().references(() => leadQueues.id, { onDelete: "cascade" }),
+    // Null means this is a tenant-wide plantão. Legacy rows may still keep
+    // their historical unit and queue references until they are edited.
+    branchId: text("branch_id").references(() => branches.id, { onDelete: "cascade" }),
+    queueId: text("queue_id").references(() => leadQueues.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    typeId: text("type_id").references(() => dutyScheduleTypes.id, { onDelete: "set null" }),
     dayOfWeek: integer("day_of_week").notNull(),
     startsAt: text("starts_at").notNull(),
     endsAt: text("ends_at").notNull(),
     priority: integer("priority").notNull().default(100),
     minimumBrokers: integer("minimum_brokers").notNull().default(1),
+    maximumBrokers: integer("maximum_brokers"),
+    /** Leads each broker may receive in one occurrence of this plantão; null = no cap. */
+    maxLeadsPerBroker: integer("max_leads_per_broker"),
     status: text("status").notNull().default("active"),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
@@ -731,6 +777,30 @@ export const unitDutySchedules = pgTable(
     updatedAt,
   },
   (table) => [index("unit_duty_schedules_tenant_status_idx").on(table.tenantId, table.status, table.dayOfWeek, table.startsAt)],
+);
+
+export const dutyScheduleMonthlyPlans = pgTable(
+  "duty_schedule_monthly_plans",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    monthKey: text("month_key").notNull(),
+    revision: integer("revision").notNull().default(1),
+    status: text("status").notNull().default("draft"),
+    quotas: jsonb("quotas").notNull().default([]),
+    occurrences: jsonb("occurrences").notNull().default([]),
+    assignments: jsonb("assignments").notNull().default([]),
+    generatedBy: text("generated_by").notNull().references(() => user.id),
+    publishedBy: text("published_by").references(() => user.id),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("duty_schedule_monthly_plans_tenant_month_revision_unique").on(table.tenantId, table.monthKey, table.revision),
+    uniqueIndex("duty_schedule_monthly_plans_one_published").on(table.tenantId, table.monthKey).where(sql`${table.status} = 'published'`),
+    index("duty_schedule_monthly_plans_tenant_month_status_idx").on(table.tenantId, table.monthKey, table.status),
+  ],
 );
 
 export const clients = pgTable(
@@ -1301,6 +1371,29 @@ export const userOnboardingProgress = pgTable(
   ],
 );
 
+/**
+ * Weekly availability declared by a broker for automatic lead distribution.
+ * Times are stored in the tenant's operational timezone (America/Sao_Paulo
+ * for the current distribution engine) and each row represents one interval.
+ */
+export const brokerAvailabilityWindows = pgTable(
+  "broker_availability_windows",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    dayOfWeek: integer("day_of_week").notNull(),
+    startsAt: text("starts_at").notNull(),
+    endsAt: text("ends_at").notNull(),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("broker_availability_windows_lookup_idx").on(table.tenantId, table.brokerId, table.dayOfWeek, table.startsAt),
+    unique("broker_availability_windows_unique_interval").on(table.tenantId, table.brokerId, table.dayOfWeek, table.startsAt, table.endsAt),
+  ],
+);
+
 export const dutyRosterAssignments = pgTable(
   "duty_roster_assignments",
   {
@@ -1315,15 +1408,53 @@ export const dutyRosterAssignments = pgTable(
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
     validUntil: timestamp("valid_until", { withTimezone: true }),
     status: text("status").notNull().default("active"),
+    // Distinct from `status`: a paused escalado stays visible on the roster
+    // (still "active") but is excluded from automatic distribution until
+    // resumed — a temporary "skip this shift" toggle, not a removal.
+    pausedAt: timestamp("paused_at", { withTimezone: true }),
+    pausedBy: text("paused_by").references(() => user.id),
+    // Published monthly occurrence (DEC-123): the one date it covers and the
+    // plan that published it. Both NULL on the weekly roster.
+    dutyDate: date("duty_date"),
+    monthlyPlanId: text("monthly_plan_id").references(() => dutyScheduleMonthlyPlans.id, { onDelete: "cascade" }),
     createdBy: text("created_by").notNull().references(() => user.id),
     updatedBy: text("updated_by").notNull().references(() => user.id),
     createdAt,
     updatedAt,
   },
   (table) => [
+    index("duty_roster_assignments_dated_idx").on(table.tenantId, table.dutyDate, table.scheduleId).where(sql`${table.dutyDate} is not null`),
+    uniqueIndex("duty_roster_assignments_dated_unique").on(table.tenantId, table.dutyDate, table.scheduleId, table.brokerId).where(sql`${table.dutyDate} is not null and ${table.status} = 'active'`),
     index("duty_roster_assignments_tenant_branch_idx").on(table.tenantId, table.branchId, table.dayOfWeek, table.startsAt),
     index("duty_roster_assignments_broker_idx").on(table.tenantId, table.brokerId, table.dayOfWeek),
     index("duty_roster_assignments_schedule_idx").on(table.scheduleId, table.status),
+  ],
+);
+
+export const dutyPresenceConfirmations = pgTable(
+  "duty_presence_confirmations",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    scheduleId: text("schedule_id").notNull().references(() => unitDutySchedules.id, { onDelete: "cascade" }),
+    assignmentId: text("assignment_id").notNull().references(() => dutyRosterAssignments.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    dutyDate: date("duty_date").notNull(),
+    shiftStartsAt: timestamp("shift_starts_at", { withTimezone: true }).notNull(),
+    shiftEndsAt: timestamp("shift_ends_at", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("pending"),
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    notificationStatus: text("notification_status").notNull().default("pending"),
+    notificationErrorCode: text("notification_error_code"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("duty_presence_occurrence_assignment_unique").on(table.tenantId, table.assignmentId, table.dutyDate, table.shiftStartsAt, table.shiftEndsAt),
+    index("duty_presence_schedule_date_idx").on(table.tenantId, table.scheduleId, table.dutyDate),
+    index("duty_presence_broker_date_idx").on(table.tenantId, table.brokerId, table.dutyDate, table.status),
+    check("duty_presence_status_check", sql`${table.status} in ('pending', 'confirmed', 'expired')`),
+    check("duty_presence_notification_status_check", sql`${table.notificationStatus} in ('pending', 'dispatching', 'queued', 'sent', 'error')`),
   ],
 );
 
@@ -1891,6 +2022,14 @@ export const whatsappMessages = pgTable(
     direction: text("direction").notNull(),
     body: text("body").notNull(),
     sentAt: timestamp("sent_at", { withTimezone: true }).notNull().defaultNow(),
+    /** Official conversation media (DEC-098): metadata only; binaries live in private R2. */
+    mediaKind: text("media_kind"),
+    mediaMimeType: text("media_mime_type"),
+    mediaFilename: text("media_filename"),
+    mediaSizeBytes: integer("media_size_bytes"),
+    mediaStorageKey: text("media_storage_key"),
+    mediaProviderId: text("media_provider_id"),
+    mediaSha256: text("media_sha256"),
     createdAt,
   },
   (table) => [index("whatsapp_messages_tenant_lead_idx").on(table.tenantId, table.leadId, table.createdAt), uniqueIndex("whatsapp_messages_message_unique").on(table.tenantId, table.messageId)],
@@ -1931,6 +2070,13 @@ export const wahaNumbers = pgTable(
     minIntervalSeconds: integer("min_interval_seconds").notNull().default(45),
     lastHealthAt: timestamp("last_health_at", { withTimezone: true }),
     lastErrorCode: text("last_error_code"),
+    /** Spacing slot: when this number last sent (compare-and-set before each send). */
+    lastSentAt: timestamp("last_sent_at", { withTimezone: true }),
+    /** Circuit breaker: consecutive send failures and the pause they caused. */
+    consecutiveFailures: integer("consecutive_failures").notNull().default(0),
+    pausedUntil: timestamp("paused_until", { withTimezone: true }),
+    /** When the current phone was paired: the warm-up counts from here, not from the row's creation. */
+    connectedAt: timestamp("connected_at", { withTimezone: true }),
     createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,
@@ -1941,6 +2087,23 @@ export const wahaNumbers = pgTable(
     index("waha_numbers_status_idx").on(table.status),
     index("waha_numbers_tenant_scope_idx").on(table.tenantId, table.branchId, table.status),
   ],
+);
+
+/** Team notices (DEC-125): on/off and primary channel per tenant; missing rows use the catalog defaults. */
+export const teamNoticeSettings = pgTable(
+  "team_notice_settings",
+  {
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    noticeKey: text("notice_key").notNull(),
+    enabled: boolean("enabled").notNull(),
+    channel: text("channel", { enum: ["company_number", "meta"] }).notNull(),
+    freeMessageId: text("free_message_id").references(() => messageTemplates.id, { onDelete: "set null" }),
+    /** Library messages that rotate for this notice on the company number (the first is also `freeMessageId`). */
+    freeMessageIds: jsonb("free_message_ids").$type<string[]>().notNull().default([]),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.noticeKey] })],
 );
 
 /** Tenant-owned cadence aggregate. Published versions are immutable. */
@@ -2185,6 +2348,7 @@ export const leadRoutingRules = pgTable(
     name: text("name").notNull(),
     priority: integer("priority").notNull().default(1),
     enabled: boolean("enabled").notNull().default(true),
+    distributionMode: text("distribution_mode").notNull().default("automatic"), // "automatic" | "manual"
     conditions: jsonb("conditions").$type<{
       planTypes?: string[];
       sources?: string[];
@@ -2804,7 +2968,9 @@ export const whatsappOutboundMessages = pgTable(
   {
     id: text("id").primaryKey(),
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
-    channelId: text("channel_id").notNull().references(() => communicationChannels.id, { onDelete: "restrict" }),
+    channelId: text("channel_id").references(() => communicationChannels.id, { onDelete: "restrict" }),
+    deliveryRoute: text("delivery_route", { enum: ["meta_only", "meta_then_waha", "waha_direct"] }).notNull().default("meta_only"),
+    wahaNumberId: text("waha_number_id").references(() => wahaNumbers.id, { onDelete: "set null" }),
     recipientType: text("recipient_type").notNull(),
     recipientId: text("recipient_id"),
     destinationPhone: text("destination_phone").notNull(),
@@ -2813,6 +2979,17 @@ export const whatsappOutboundMessages = pgTable(
     templateName: text("template_name").notNull(),
     templateLanguage: text("template_language").notNull().default("pt_BR"),
     variables: jsonb("variables").notNull().default([]),
+    providerVariables: jsonb("provider_variables"),
+    templateVariableNames: jsonb("template_variable_names"),
+    messagePolicyId: text("message_policy_id"),
+    messagePolicyVersion: integer("message_policy_version"),
+    renderedBody: text("rendered_body"),
+    fallbackMessageType: text("fallback_message_type", { enum: ["template", "text"] }),
+    fallbackTemplateName: text("fallback_template_name"),
+    fallbackTemplateLanguage: text("fallback_template_language"),
+    fallbackRenderedBody: text("fallback_rendered_body"),
+    fallbackProviderVariables: jsonb("fallback_provider_variables"),
+    fallbackTemplateVariableNames: jsonb("fallback_template_variable_names"),
     status: text("status").notNull().default("pending"),
     providerMessageId: text("provider_message_id"),
     providerErrorCode: text("provider_error_code"),
@@ -2827,6 +3004,12 @@ export const whatsappOutboundMessages = pgTable(
     attempts: integer("attempts").notNull().default(0),
     nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }),
     requestedBy: text("requested_by").references(() => user.id, { onDelete: "set null" }),
+    /** Why the row is waiting or was skipped (quiet hours, pacing, limit, disabled). */
+    holdReason: text("hold_reason"),
+    /** Team notice this row belongs to (DEC-125), for per-notice limits. */
+    noticeKey: text("notice_key"),
+    /** Which text version a company-number notice used ("builtin:2", "msg:<id>"), so the next one differs. */
+    textVariant: text("text_variant"),
     createdAt,
     updatedAt,
   },
@@ -2835,7 +3018,27 @@ export const whatsappOutboundMessages = pgTable(
     index("whatsapp_outbound_messages_queue_idx").on(table.status, table.nextAttemptAt, table.createdAt),
     index("whatsapp_outbound_messages_tenant_idx").on(table.tenantId, table.createdAt),
     index("whatsapp_outbound_messages_provider_idx").on(table.providerMessageId),
+    index("whatsapp_outbound_messages_waha_number_idx").on(table.wahaNumberId),
+    index("whatsapp_outbound_messages_policy_idx").on(table.tenantId, table.messagePolicyId),
   ],
+);
+
+/**
+ * Delivery policy for operational notices sent to brokers. This is deliberately
+ * separate from the Meta channel because it must never affect lead attendance.
+ */
+export const tenantInternalNotificationSettings = pgTable(
+  "tenant_internal_notification_settings",
+  {
+    tenantId: text("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(true),
+    deliveryMode: text("delivery_mode", { enum: ["meta_then_waha", "waha_direct"] }).notNull().default("meta_then_waha"),
+    wahaNumberId: text("waha_number_id").references(() => wahaNumbers.id, { onDelete: "set null" }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("tenant_internal_notification_waha_idx").on(table.wahaNumberId)],
 );
 
 export const leadOffers = pgTable(
@@ -3395,6 +3598,48 @@ export const messageTemplateRelations = relations(
   }),
 );
 
+/**
+ * Published selection of Meta/free-message resources for a registered business
+ * event. The event catalog and eligibility rules live in the communication
+ * domain; this table stores only tenant choices and their revision.
+ */
+export const communicationEventMessagePolicies = pgTable(
+  "communication_event_message_policies",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    eventKey: text("event_key").notNull(),
+    primaryKind: text("primary_kind", { enum: ["meta_template", "free_message"] })
+      .notNull()
+      .default("meta_template"),
+    metaTemplateId: text("meta_template_id").references(() => metaWhatsAppTemplates.id, {
+      onDelete: "set null",
+    }),
+    freeMessageTemplateId: text("free_message_template_id").references(() => messageTemplates.id, {
+      onDelete: "set null",
+    }),
+    metaVariableMappingsJson: jsonb("meta_variable_mappings_json").notNull().default({}),
+    fallbackKind: text("fallback_kind", { enum: ["meta_template", "free_message"] }),
+    active: boolean("active").notNull().default(true),
+    version: integer("version").notNull().default(1),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("communication_event_message_policies_tenant_event_unique").on(
+      table.tenantId,
+      table.eventKey,
+    ),
+    index("communication_event_message_policies_tenant_active_idx").on(
+      table.tenantId,
+      table.active,
+    ),
+  ],
+);
+
 export const importedSpreadsheets = pgTable(
   "imported_spreadsheets",
   {
@@ -3451,7 +3696,7 @@ export const brokerProfiles = pgTable(
     internalCode: text("internal_code").notNull(),
     professionalName: text("professional_name").notNull(),
     phone: text("phone").notNull(),
-    invitedEmail: text("invited_email").notNull(),
+    invitedEmail: text("invited_email"),
     cpf: text("cpf"),
     lifecycleStatus: brokerLifecycleStatus("lifecycle_status").notNull().default("DRAFT"),
     managerId: text("manager_id")
@@ -3485,9 +3730,10 @@ export const brokerInvitations = pgTable(
     brokerProfileId: text("broker_profile_id")
       .notNull()
       .references(() => brokerProfiles.id, { onDelete: "cascade" }),
-    email: text("email").notNull(),
+    email: text("email"),
     role: tenantRole("role").notNull().default("broker"),
     jobTitle: text("job_title").notNull().default("broker"),
+    customRoleId: text("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
     tokenHash: text("token_hash").notNull().unique(),
     tokenCiphertext: text("token_ciphertext"),
     status: text("status", { enum: ["PENDING", "ACCEPTED", "EXPIRED", "REVOKED", "REPLACED"] })
@@ -3506,6 +3752,7 @@ export const brokerInvitations = pgTable(
   (table) => [
     index("broker_invitations_tenant_idx").on(table.tenantId),
     index("broker_invitations_profile_idx").on(table.brokerProfileId),
+    index("broker_invitations_custom_role_idx").on(table.customRoleId),
   ],
 );
 
@@ -4183,3 +4430,58 @@ export type PasswordResetRequestStatus = "requested" | "approved" | "rejected" |
 export type ProposalStatus = (typeof proposalStatusValues)[number];
 export type AutomationStatus = (typeof automationStatusValues)[number];
 export type AutomationLogStatus = (typeof automationLogStatusValues)[number];
+
+/** Attendance flows per queue (DEC-127). */
+export const attendanceFlows = pgTable("attendance_flows", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  description: text("description"),
+  builtinKey: text("builtin_key"),
+  status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
+  publishedVersionId: text("published_version_id"),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const attendanceFlowVersions = pgTable("attendance_flow_versions", {
+  id: text("id").primaryKey(),
+  flowId: text("flow_id").notNull().references(() => attendanceFlows.id, { onDelete: "cascade" }),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(),
+  status: text("status", { enum: ["draft", "published", "superseded"] }).notNull().default("draft"),
+  definition: jsonb("definition").notNull(),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const attendanceRuns = pgTable("attendance_runs", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+  flowVersionId: text("flow_version_id").notNull().references(() => attendanceFlowVersions.id),
+  queueId: text("queue_id"),
+  status: text("status", { enum: ["running", "waiting", "completed", "failed", "cancelled"] }).notNull(),
+  currentNodeId: text("current_node_id"),
+  waitingFor: text("waiting_for"),
+  wakeAt: timestamp("wake_at", { withTimezone: true }),
+  lastReply: text("last_reply"),
+  error: text("error"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  endedAt: timestamp("ended_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const attendanceRunSteps = pgTable("attendance_run_steps", {
+  id: text("id").primaryKey(),
+  runId: text("run_id").notNull().references(() => attendanceRuns.id, { onDelete: "cascade" }),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  nodeId: text("node_id").notNull(),
+  kind: text("kind").notNull(),
+  status: text("status", { enum: ["done", "failed"] }).notNull(),
+  idempotencyKey: text("idempotency_key").notNull().unique(),
+  detail: jsonb("detail"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

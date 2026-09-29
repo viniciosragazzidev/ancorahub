@@ -1,5 +1,9 @@
 # Janela comercial para distribuição e WhatsApp
 
+> **Semântica operacional supersedida:** DEC-097 tornou o motor 24/7 e DEC-104
+> tornou `new_lead_broker` imediato por outbound exato. Este registro permanece
+> como histórico; a retenção segura de erros Meta continua válida.
+
 ## Objetivo
 
 Limitar a distribuição automática entre corretores e o aviso oficial

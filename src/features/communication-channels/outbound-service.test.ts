@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { getInvitationDeliveryFailureUpdate, resolveTemplateTextBody, whatsappOutboundStatusValues } from "./outbound-service";
-import { BROKER_LEAD_NOTIFICATION_INTERVAL_MS, scheduleBrokerLeadNotification } from "@/features/notifications/broker-lead-cadence";
+import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, getInvitationDeliveryFailureUpdate, parseMetaOutboundStaleAfterHours, resolveTemplateTextBody, selectInternalBrokerDeliveryRoute, whatsappOutboundStatusValues } from "./outbound-service";
 
 vi.mock("server-only", () => ({}));
 
@@ -23,29 +22,64 @@ describe("outboundService", () => {
     });
   });
 
-  it("spaces broker lead notifications by the configured interval", () => {
-    const now = new Date("2026-08-24T12:00:00.000Z");
-    expect(scheduleBrokerLeadNotification({ now }).toISOString()).toBe(now.toISOString());
-    expect(scheduleBrokerLeadNotification({ now, lastScheduledAt: now }).toISOString())
-      .toBe(new Date(now.getTime() + BROKER_LEAD_NOTIFICATION_INTERVAL_MS).toISOString());
+  it("routes every official notification through Meta Cloud", () => {
+    expect(selectInternalBrokerDeliveryRoute({
+      enabled: true,
+      deliveryMode: "waha_direct",
+      configuredWahaNumberId: "selected-waha",
+      activeWahaNumberId: null,
+    })).toEqual({ route: "meta_only", wahaNumberId: null });
+
+    expect(selectInternalBrokerDeliveryRoute({
+      enabled: true,
+      deliveryMode: "meta_then_waha",
+      configuredWahaNumberId: "selected-waha",
+      activeWahaNumberId: "selected-waha",
+    })).toEqual({ route: "meta_only", wahaNumberId: null });
+
+    expect(selectInternalBrokerDeliveryRoute({
+      enabled: false,
+      deliveryMode: "waha_direct",
+      configuredWahaNumberId: "selected-waha",
+      activeWahaNumberId: "selected-waha",
+    })).toEqual({ route: "meta_only", wahaNumberId: null });
+  });
+
+  it("bounds the stale outbox safety window", () => {
+    expect(parseMetaOutboundStaleAfterHours(undefined)).toBe(DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS);
+    expect(parseMetaOutboundStaleAfterHours("24")).toBe(24);
+    expect(parseMetaOutboundStaleAfterHours("0")).toBe(DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS);
+    expect(parseMetaOutboundStaleAfterHours("999")).toBe(DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS);
+  });
+
+  it("always routes official template messages through Meta Cloud", () => {
+    expect(selectInternalBrokerDeliveryRoute({
+      enabled: true,
+      deliveryMode: "waha_direct",
+      configuredWahaNumberId: "selected-waha",
+      activeWahaNumberId: "selected-waha",
+      messageType: "template",
+    })).toEqual({ route: "meta_only", wahaNumberId: null });
   });
 
   it("formats template messages into clean plain text for WAHA fallback", () => {
     const inviteText = resolveTemplateTextBody("brokerInvitation", ["Carlos", "Âncora Seguros"], "token-123");
     expect(inviteText).toContain("Olá *Carlos*!");
     expect(inviteText).toContain("Âncora Seguros");
-    expect(inviteText).toContain("https://ancorahub.com.br/convite/token-123");
+    expect(inviteText).toContain("https://crm.ancorasaude.cloud/convite/token-123");
 
     const leadNotifText = resolveTemplateTextBody("brokerLeadNotification", ["Corretor", "João Silva", "Maria Souza", "Plano de Saúde PME"], "lead-999");
     expect(leadNotifText).toContain("⚡ *Novo Lead Atribuído!*");
     expect(leadNotifText).toContain("Maria Souza");
     expect(leadNotifText).toContain("Plano de Saúde PME");
-    expect(leadNotifText).toContain("https://ancorahub.com.br/conversas?lead=lead-999");
+    // Same destination as the Meta template button: the lead in the CRM.
+    expect(leadNotifText).toContain("https://crm.ancorasaude.cloud/leads/lead-999");
 
-    const confirmedText = resolveTemplateTextBody("leadAssignmentConfirmed", ["João Silva", "Ana Lima", "(11) 98888-7777", "Individual", "Saúde Bradesco", "2", "lead-999"]);
+    const confirmedText = resolveTemplateTextBody("leadAssignmentConfirmed", ["João Silva", "Ana Lima", "(11) 98888-7777", "Individual", "Saúde Bradesco", "2", "Nova Iguaçu", "lead-999"]);
     expect(confirmedText).toContain("✅ *Atribuição Confirmada*");
     expect(confirmedText).toContain("Ana Lima");
     expect(confirmedText).toContain("(11) 98888-7777");
+    expect(confirmedText).toContain("Nova Iguaçu");
 
     const taskText = resolveTemplateTextBody("taskReminder", ["Carlos", "Retornar orçamento", "15:30"]);
     expect(taskText).toContain("⏰ *Lembrete de Tarefa*");
@@ -55,4 +89,10 @@ describe("outboundService", () => {
     expect(qualifText).toContain("Olá *Fernanda*!");
     expect(qualifText).toContain("Como podemos te ajudar");
   });
+
+  it("formats the activation notice with the configured CRM login URL", () => {
+    expect(resolveTemplateTextBody("brokerAccountActivated", ["Ana", "Âncora", "https://crm.ancorasaude.cloud/login"]))
+      .toContain("https://crm.ancorasaude.cloud/login");
+  });
+
 });

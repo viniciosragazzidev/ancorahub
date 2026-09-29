@@ -7,12 +7,27 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret, encryptChannelSecret } from "./secret-crypto";
-import { exchangeEmbeddedSignupCode, getMetaPhoneNumber, getMetaWaba, MetaCloudApiError, registerMetaPhoneNumber, subscribeWabaToApp } from "./meta-cloud-client";
+import {
+  discoverMetaWabaAndPhone,
+  exchangeEmbeddedSignupCode,
+  getMetaPhoneNumber,
+  getMetaWaba,
+  MetaCloudApiError,
+  registerMetaPhoneNumber,
+  subscribeWabaToApp,
+} from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "./service";
+import { getMetaCloudChannelActivationError } from "./channel-lifecycle";
 import { META_CLOUD_PROVIDER, type MetaEmbeddedSignupPayload } from "./types";
 
-const signupInput = z.object({ code: z.string().trim().min(12).max(4096), businessId: z.string().trim().regex(/^\d{5,40}$/), wabaId: z.string().trim().regex(/^\d{5,40}$/), phoneNumberId: z.string().trim().regex(/^\d{5,40}$/), branchId: z.string().uuid().optional() });
+const signupInput = z.object({
+  code: z.string().trim().min(12).max(4096),
+  businessId: z.string().trim().regex(/^\d{5,40}$/).optional(),
+  wabaId: z.string().trim().regex(/^\d{5,40}$/).optional(),
+  phoneNumberId: z.string().trim().regex(/^\d{5,40}$/).optional(),
+  branchId: z.string().uuid().optional(),
+});
 
 function requireSignupValue(value: string | undefined, label: string) {
   if (!value) throw new Error(`A Meta não retornou ${label}. Refaça o cadastro.`);
@@ -81,13 +96,22 @@ export async function completeMetaEmbeddedSignupAction(rawInput: MetaEmbeddedSig
   if (!(await isMetaCloudWhatsAppEnabled())) throw new Error("A integração oficial está desativada pelo Super-admin.");
   if (input.branchId) throw new Error("O canal oficial é corporativo e deve ser conectado pela matriz.");
   const code = requireSignupValue(input.code, "o código de autorização");
-  const businessId = requireSignupValue(input.businessId, "o Business ID");
-  const wabaId = requireSignupValue(input.wabaId, "a WABA");
-  const phoneNumberId = requireSignupValue(input.phoneNumberId, "o Phone Number ID");
   const db = getDatabase();
 
   const token = await exchangeEmbeddedSignupCode(code);
   const accessToken = requireSignupValue(token.access_token, "o token de autorização");
+
+  let businessId = input.businessId;
+  let wabaId = input.wabaId;
+  let phoneNumberId = input.phoneNumberId;
+
+  if (!wabaId || !phoneNumberId || !businessId) {
+    const discovered = await discoverMetaWabaAndPhone(accessToken);
+    businessId = businessId || discovered.businessId;
+    wabaId = wabaId || discovered.wabaId;
+    phoneNumberId = phoneNumberId || discovered.phoneNumberId;
+  }
+
   const [waba, phone] = await Promise.all([getMetaWaba(wabaId, accessToken), getMetaPhoneNumber(phoneNumberId, accessToken)]);
   if (waba.id !== wabaId || phone.id !== phoneNumberId) throw new Error("A Meta retornou uma conta diferente da selecionada no cadastro.");
   await subscribeWabaToApp(wabaId, accessToken);
@@ -143,8 +167,21 @@ export async function setMetaCloudChannelStatusAction(channelId: string, active:
   const context = await getRequiredTenantContext();
   if (context.role !== "director") throw new Error("Somente o Diretor pode alterar canais oficiais.");
   const db = getDatabase();
-  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.id, channelId), eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER))).limit(1);
+  const [channel] = await db.select({
+    id: schema.communicationChannels.id,
+    phoneNumberId: schema.communicationChannels.phoneNumberId,
+    registrationStatus: schema.communicationChannels.registrationStatus,
+    accessTokenCiphertext: schema.communicationChannels.accessTokenCiphertext,
+  }).from(schema.communicationChannels).where(and(eq(schema.communicationChannels.id, channelId), eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER))).limit(1);
   if (!channel) throw new Error("Canal oficial não encontrado.");
+  if (active) {
+    const activationError = getMetaCloudChannelActivationError({
+      phoneNumberId: channel.phoneNumberId,
+      registrationStatus: channel.registrationStatus,
+      hasCredentials: Boolean(channel.accessTokenCiphertext),
+    });
+    if (activationError) throw new Error(activationError);
+  }
   await db.update(schema.communicationChannels).set({ status: active ? "active" : "inactive", updatedAt: new Date() }).where(eq(schema.communicationChannels.id, channelId));
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channel.id, acao: active ? "meta_cloud_channel_activated" : "meta_cloud_channel_deactivated" });
 }

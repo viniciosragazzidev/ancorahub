@@ -51,3 +51,9 @@ Garantir que uma falha da Graph API nunca materialize um lead fictício, que um 
 - Só a resposta bem-sucedida marca o canal `active`. Uma falha deixa envio bloqueado, registra o resultado sem segredo e permite ao Diretor repetir somente a ativação técnica de uma conexão anterior, sem reconectar nem repetir OTP.
 
 Reverter o registro do número preserva histórico, WABA e telefone, mas o canal permanece bloqueado até que uma ativação válida volte a ser confirmada pela Meta. A migration não expõe credenciais e o rollback não remove dados de conversa.
+
+## Catálogo de templates Meta em modo somente leitura
+
+- O Embedded Signup persiste o `businessId`, `wabaId`, `phoneNumberId` e o token retornados pela Meta no canal oficial ativo do tenant. A sincronização consulta exclusivamente esse canal; não aceita WABA, número ou token do navegador.
+- O CRM não cria, recria, edita, exclui ou vincula templates nesta superfície nem pela rota de catálogo. A criação, edição e aprovação acontecem no Gerenciador do WhatsApp da Meta.
+- A sincronização retorna falha explícita quando não consegue consultar a Meta; a interface não declara sucesso sem uma leitura concluída da conta conectada. A listagem também é limitada ao `wabaId` atualmente conectado, para não misturar templates históricos de outra conta do mesmo tenant.

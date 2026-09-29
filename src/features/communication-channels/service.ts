@@ -1,7 +1,8 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq, isNull, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
+import { after } from "next/server";
 
 import { getDatabase, schema } from "@/shared/db";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
@@ -9,6 +10,14 @@ import { publishConversationInvalidation } from "@/features/notifications/realti
 import { decryptChannelSecret } from "./secret-crypto";
 import { sendMetaCloudText } from "./meta-cloud-client";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
+import {
+  CONVERSATION_MEDIA_KINDS,
+  downloadMetaMediaObject,
+  isConversationMediaEnabled,
+  normalizeMediaKind,
+  storeConversationMedia,
+  type ConversationMediaKind,
+} from "./conversation-media";
 import { META_CLOUD_PROVIDER } from "./types";
 import type { MetaWebhookPayload } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
@@ -33,6 +42,8 @@ export async function getPreferredMetaCloudChannel(input: { tenantId: string; br
         eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER),
         eq(schema.communicationChannels.status, "active"),
         eq(schema.communicationChannels.registrationStatus, "registered"),
+        isNotNull(schema.communicationChannels.phoneNumberId),
+        isNotNull(schema.communicationChannels.accessTokenCiphertext),
       ),
     )
     .limit(1);
@@ -61,8 +72,17 @@ export async function sendMetaCloudChannelText(input: { channel: typeof schema.c
   return { messageId };
 }
 
-export function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
+import { normalizePhone } from "@/shared/utils/phone";
+export { normalizePhone };
+
+/** Extracts the provider media id for any supported inbound media type. */
+function getMetaInboundMediaId(message: import("./types").MetaWebhookMessage, kind: string): string | null {
+  if (kind === "audio") return (message.audio as { id?: string } | undefined)?.id ?? null;
+  if (kind === "image") return (message.image as { id?: string } | undefined)?.id ?? null;
+  if (kind === "video") return (message.video as { id?: string } | undefined)?.id ?? null;
+  if (kind === "document") return (message.document as { id?: string; filename?: string } | undefined)?.id ?? null;
+  if (kind === "sticker") return (message.sticker as { id?: string } | undefined)?.id ?? null;
+  return null;
 }
 
 export function samePhone(left: string, right: string) {
@@ -80,6 +100,15 @@ export function samePhone(left: string, right: string) {
   const a8 = a.length >= 8 ? a.slice(-8) : a;
   const b8 = b.length >= 8 ? b.slice(-8) : b;
   return a8.length >= 8 && a8 === b8;
+}
+
+/**
+ * Offer statuses a Meta delivery status may move forward from: "delivered"
+ * only from an offer still pending or sent, "read" also from delivered. Final
+ * statuses (accepted, declined, expired, cancelled) never change here.
+ */
+export function offerStatusesBefore(metaStatus: string): Array<"PENDING" | "SENT" | "DELIVERED"> {
+  return metaStatus === "read" ? ["PENDING", "SENT", "DELIVERED"] : ["PENDING", "SENT"];
 }
 
 export function matchesKnownBrokerPhone(phone: string, brokerPhones: readonly string[]) {
@@ -148,6 +177,49 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           text = buttonText || buttonPayload || text;
         }
 
+        // DEC-098: download official conversation media inbound and persist it
+        // in the tenant's private R2 prefix. A failed download never drops the
+        // message: it is stored with media metadata but no storage key and the
+        // workspace renders it as unavailable.
+        const inboundMediaKind = normalizeMediaKind(message.type === "sticker" ? "image" : message.type);
+        const inboundMediaId = inboundMediaKind ? getMetaInboundMediaId(message, message.type ?? "") : null;
+        let mediaColumns: {
+          kind: ConversationMediaKind;
+          mimeType: string;
+          filename: string | null;
+          sizeBytes: number;
+          storageKey: string | null;
+        } | null = null;
+        if (inboundMediaKind && inboundMediaId && (await isConversationMediaEnabled())) {
+          try {
+            const mediaId = inboundMediaId;
+            const downloaded = await downloadMetaMediaObject({ channel, mediaId });
+            const persistedMessageId = randomUUID();
+            const stored = await storeConversationMedia({
+              tenantId: channel.tenantId,
+              messageId: persistedMessageId,
+              kind: inboundMediaKind,
+              mimeType: downloaded.mimeType,
+              filename: downloaded.filename,
+              body: downloaded.body,
+            });
+            mediaColumns = {
+              kind: stored.kind,
+              mimeType: stored.mimeType,
+              filename: stored.filename,
+              sizeBytes: stored.sizeBytes,
+              storageKey: stored.storageKey,
+            };
+          } catch (mediaError) {
+            console.error("[whatsapp] media.download_failed", {
+              tenantId: channel.tenantId,
+              providerMessageId: message.id,
+              kind: inboundMediaKind,
+              error: mediaError instanceof Error ? mediaError.message.slice(0, 240) : "unknown_error",
+            });
+          }
+        }
+
         const phone = normalizePhone(message.from);
         const brokerProfile = brokerProfiles.find((profile) => matchesKnownBrokerPhone(phone, [profile.phone]));
 
@@ -176,6 +248,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
             phone,
             direction: "incoming",
             body: text || `[${messageKind}]`,
+            ...(mediaColumns ? { mediaKind: mediaColumns.kind, mediaMimeType: mediaColumns.mimeType, mediaFilename: mediaColumns.filename, mediaSizeBytes: mediaColumns.sizeBytes, mediaStorageKey: mediaColumns.storageKey, mediaProviderId: inboundMediaId } : {}),
             sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
           }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
           console.info("[whatsapp/broker-channel] inbound.received", { tenantId: channel.tenantId, brokerProfileId: brokerProfile.id, messageKind });
@@ -185,7 +258,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           continue;
         }
 
-        if (!text && messageKind === "text" && message.type !== "text") { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
+        if (!text && messageKind === "text" && message.type !== "text" && !mediaColumns) { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
         // OPTIMIZED: Query only leads matching the incoming phone (last 8 digits) instead of fetching ALL leads
         const incomingDigits = normalizePhone(phone);
         const suffix8 = incomingDigits.slice(-8);
@@ -210,20 +283,11 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         const matchingLeads = leads.filter((item) => samePhone(item.phone, phone));
         const lead = matchingLeads.find((item) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(item.status)) ?? matchingLeads[0];
         const matchedClient = clients.find((item) => samePhone(item.phone, phone));
-        let activeLeadId = lead?.id;
-        if (!lead && !matchedClient) {
-          // Etapa 2 — Criar novo lead automaticamente para contato recebido sem cadastro
-          activeLeadId = randomUUID();
-          await db.insert(schema.leads).values({
-            id: activeLeadId,
-            tenantId: channel.tenantId,
-            nome: `Lead WhatsApp (${phone.slice(-4)})`,
-            telefone: phone,
-            origem: "webhook",
-            status: "new",
-            serviceStartedAt: new Date(),
-          });
-        }
+        const activeLeadId = lead?.id;
+        // Unknown first messages are retained as channel history only. Lead
+        // creation is restricted to the governed intake/integration flow;
+        // this prevents internal or unsolicited WhatsApp messages from being
+        // distributed as synthetic leads.
 
         await db.insert(schema.whatsappMessages).values({
           id: randomUUID(),
@@ -237,6 +301,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           phone,
           direction: "incoming",
           body: text || `[${messageKind}]`,
+          ...(mediaColumns ? { mediaKind: mediaColumns.kind, mediaMimeType: mediaColumns.mimeType, mediaFilename: mediaColumns.filename, mediaSizeBytes: mediaColumns.sizeBytes, mediaStorageKey: mediaColumns.storageKey, mediaProviderId: inboundMediaId } : {}),
           sentAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
         }).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] });
         void publishConversationInvalidation({
@@ -270,10 +335,9 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           });
 
           try {
-            const { waitUntil } = require("next/server");
-            if (typeof waitUntil === "function") waitUntil(aiPromise);
+            after(() => aiPromise);
           } catch {
-            // Fallback: non-blocking execution in environment without waitUntil
+            // Fallback: non-blocking execution outside a Next.js request context.
           }
         } else if (activeLeadId) {
           console.info("[ai-wpp] inbound.ignored_non_pending_qualification", {
@@ -299,7 +363,8 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           outboundUpdate.providerErrorCode = deliveryFailure.code;
           outboundUpdate.providerErrorMessage = deliveryFailure.message;
         }
-        if (status.status === "sent") outboundUpdate.sentAt = new Date();
+        // A late "sent" status (Meta retries for days) must not move the real send time.
+        const recordSentAt = status.status === "sent";
         if (status.status === "delivered") outboundUpdate.deliveredAt = new Date();
         if (status.status === "read") outboundUpdate.readAt = new Date();
         if (status.status === "failed" || status.status === "deleted") {
@@ -328,12 +393,22 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
             }
           }
         }
-        const [outbound] = await db.update(schema.whatsappOutboundMessages).set(outboundUpdate).where(and(eq(schema.whatsappOutboundMessages.tenantId, channel.tenantId), eq(schema.whatsappOutboundMessages.providerMessageId, status.id))).returning({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, purpose: schema.whatsappOutboundMessages.purpose });
+        const [outbound] = await db.update(schema.whatsappOutboundMessages).set(outboundUpdate).where(and(eq(schema.whatsappOutboundMessages.tenantId, channel.tenantId), eq(schema.whatsappOutboundMessages.providerMessageId, status.id))).returning({ id: schema.whatsappOutboundMessages.id, recipientId: schema.whatsappOutboundMessages.recipientId, purpose: schema.whatsappOutboundMessages.purpose, deliveryRoute: schema.whatsappOutboundMessages.deliveryRoute });
+        if (outbound && recordSentAt) {
+          await db.update(schema.whatsappOutboundMessages).set({ sentAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, outbound.id), isNull(schema.whatsappOutboundMessages.sentAt)));
+        }
 
         if (outbound?.purpose === "brokerInvitation" && outbound.recipientId && ["delivered", "read"].includes(status.status)) {
           await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryMessageId: status.id, deliveredAt: new Date() }).where(and(eq(schema.brokerInvitations.id, outbound.recipientId), eq(schema.brokerInvitations.tenantId, channel.tenantId)));
         } else if (outbound?.purpose === "newLeadAssignment" && ["delivered", "read"].includes(status.status)) {
-          await db.update(schema.leadOffers).set({ status: status.status.toUpperCase() as "DELIVERED" | "READ", updatedAt: new Date() }).where(and(eq(schema.leadOffers.outboundMessageId, outbound.id), eq(schema.leadOffers.tenantId, channel.tenantId)));
+          // Only an offer still waiting moves forward. A late status must never
+          // reopen an accepted, declined, expired or cancelled offer: a late
+          // "Aceitar" click could then take the lead from its current broker.
+          await db.update(schema.leadOffers).set({ status: status.status.toUpperCase() as "DELIVERED" | "READ", updatedAt: new Date() }).where(and(
+            eq(schema.leadOffers.outboundMessageId, outbound.id),
+            eq(schema.leadOffers.tenantId, channel.tenantId),
+            inArray(schema.leadOffers.status, offerStatusesBefore(status.status)),
+          ));
         }
 
         await setWebhookEventResult(eventId, "processed", outboundUpdate.providerErrorCode ?? undefined);

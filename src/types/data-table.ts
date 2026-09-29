@@ -5,13 +5,14 @@ import type { FilterItemSchema } from "@/lib/parsers";
 declare module "@tanstack/react-table" {
   interface TableMeta<TData extends RowData> {
     queryKeys?: QueryKeys;
+    onRowClick?: (row: TData) => void;
   }
 
   interface ColumnMeta<TData extends RowData, TValue> {
     label?: string;
     placeholder?: string;
     variant?: FilterVariant;
-    options?: Option[];
+    options?: readonly Option[];
     range?: [number, number];
     unit?: string;
     icon?: React.ComponentType<React.ComponentProps<"svg">>;

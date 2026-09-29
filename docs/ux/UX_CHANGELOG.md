@@ -1,0 +1,740 @@
+# Histórico de Alterações de UX/UI (UX Changelog)
+
+## 2026-09-29 — Detalhes do lead acessíveis no plantão
+
+- O nome do lead na tabela de um plantão agora abre o drawer compartilhado com
+  `/leads`, mantendo ações de gestão, reatribuição, atendimento, qualificação,
+  conversa, tarefas, documentos, notas e lembretes conforme papel e flags.
+- Não foram criados tokens ou regras de domínio; tenant, permissões e estados
+  existentes permanecem aplicados. Registro:
+  `docs/implementations/completed/2026-09-29-plantao-lead-details-drawer.md`.
+
+## 2026-09-29 — Funil ribbon no dashboard
+
+- A área `Funil` do `/dashboard` passou a usar uma faixa SVG contínua, com
+  espessura proporcional ao volume alcançado por etapa, legenda responsiva e
+  saída terminal `Perdido` separada.
+- Os dados continuam vindo do funil canônico do servidor; não foram criadas
+  métricas, regras de negócio ou tokens novos. QA autenticado UX-M1.10 segue
+  pendente. Registro: `docs/implementations/completed/2026-09-29-dashboard-funnel-chart.md`.
+
+## 2026-09-28 — Menu lateral legível no celular
+
+- O cabeçalho do Sheet reúne marca e usuário sem duplicar o título; seletor do Super Admin e plantão ocupam linhas próprias quando visíveis.
+- A lista mantém rolagem vertical, enquanto Agente IA e perfil ficam empilhados com alvos de toque e safe area. Navegar ou abrir o agente fecha o menu.
+- Desktop, permissões e destinos permanecem iguais. QA autenticado UX-M1.10 pendente. Registro: `docs/implementations/active/2026-09-28-mobile-sidebar-responsiveness.md`.
+
+## 2026-09-27 — Feedback de presença e movimento governado
+
+- A confirmação pública de presença deixa claro o estado inicial, processamento, confirmação do servidor e nova tentativa após falha. O botão compartilhado usa rótulos em português e cores semânticas existentes.
+- Toast e badge animados respeitam a configuração global de movimento e a preferência do sistema. O fluxo de elegibilidade e o servidor não mudam. UX-M1.10 continua pendente.
+- Validação e limites em `docs/ux/INTERACTION_FEEDBACK_GAMIFICATION_PLAN.md` e `docs/implementations/active/2026-09-27-feedback-interaction-pilot.md`.
+
+> **Documento Vivo**: `docs/ux/UX_CHANGELOG.md`  
+> **Framework de Governança**: `UX-GOV-1`  
+> **Fonte de Verdade**: `docs/ux/UX_REDESIGN_CONTRACT.md`  
+
+Este documento registra cronologicamente todas as alterações de UX/UI, estrutura de páginas, componentes e navegação realizadas no CRM Âncora.
+
+## 2026-09-27 — Resumo mensal de plantões por dia
+
+- Em `/distribuicao?view=plantao`, os indicadores mensais contam datas distintas com plantão, em vez de regras/tipos. O total inclui dias encerrados e informa separadamente os dias que ainda vão acontecer; falta de cobertura também usa dias distintos.
+- A escala e a distribuição não mudaram. Registro: `docs/implementations/completed/2026-09-27-contagem-dias-plantao.md`.
+
+## 2026-09-26 — Primeiro acesso de membros
+
+- O campo de nascimento usa o calendário compartilhado com mês e ano selecionáveis, idioma português e datas futuras desabilitadas. A data exibida é brasileira; o envio ao servidor mantém o formato anterior.
+- O campo de e-mail corporativo recebeu borda mais visível nos estados editável e preenchido pelo convite. Registro: `docs/implementations/completed/2026-09-26-primeiro-acesso-calendario.md`.
+
+## 2026-09-26 — Integrações WhatsApp e Meta mais diretas
+
+- O aviso redundante “Proteção de dados” foi removido da aba Oficial do WhatsApp. A aba Diretoria usa toda a largura disponível até o limite de leitura, com o conjunto de cartões centralizado.
+- `/integrations/meta` abre no painel de conexão e ativos, sem a introdução duplicada e sem os blocos explicativos sobre o número corporativo e `leadgen`. Estado da conexão, ações, permissões e regras de integração permanecem no fluxo existente.
+
+---
+
+## 2026-09-26 — Qualificação alinhada à Distribuição
+
+- `/qualificacao` agora usa uma única faixa horizontal de abas compartilhadas em desktop e mobile, com rolagem, indicador e estado preservado em `?tab=`. O menu lateral duplicado foi removido.
+- Os indicadores ficaram na aba inicial; os painéis de configuração, roteiros e permissões adotaram a superfície neutra dos cards. A grade se ajusta à largura disponível e títulos/descrições seguem a hierarquia comum.
+- O texto de SLA fixo de 45 segundos foi removido do card da fila por não corresponder a uma medição. Nenhuma regra de qualificação ou autorização foi alterada.
+
+---
+
+## 2026-09-26 — WhatsApp unificado e distribuição por Resumo
+
+- `/integrations/whatsapp` reúne o número oficial Meta e o canal WAHA da diretoria em abas com estado na URL. A segunda aba mantém acesso exclusivo do Diretor; `/integrations/whats_alt` redireciona para ela e o catálogo tem um único destino WhatsApp.
+- O cabeçalho interno grande foi removido da integração WhatsApp; o título da barra superior e as abas identificam o contexto.
+- `/distribuicao` abre em Resumo, que também é a primeira aba. Links explícitos para Plantões e outras áreas continuam selecionando a aba solicitada.
+- O detalhe do plantão ativo e encerrado usa cabeçalho de contexto comum, estado em badge, metadados em etiquetas e títulos/descrições padronizados nos painéis. Turnos futuros sem histórico não exibem um bloco histórico vazio.
+
+---
+
+## 2026-09-26 — Histórico dos plantões encerrados
+
+- O detalhe de cada plantão oferece datas encerradas e permite consultar outra data da mesma regra semanal. Cada ocorrência passada é rotulada como “Terminado” e reúne os leads distribuídos, o corretor na época e a escala registrada.
+- Vínculos legados sem identificação exata do plantão são indicados como estimados pela fila; a regra semanal permanece operante nos próximos dias. O Super-admin pode ocultar a consulta sem excluir eventos.
+
+## 2026-09-26 — Planejamento mensal em painel lateral
+
+- A lista permanente de corretores saiu da página de Plantão. Um resumo compacto abre o sheet de planejamento, com meses separados e busca de corretores por nome ou unidade.
+- As cotas são ajustadas por corretor em grupos de unidade; a revisão organiza as alocações por data e evidencia cotas sem cobertura antes da confirmação de publicação.
+- A seleção do mês é recuperável pela URL. A interface informa alterações ainda não geradas, indisponibilidade pela flag, carregamento, erro e mês publicado somente para leitura.
+- O sheet reutiliza os componentes compartilhados e suas transições; os estados de seleção usam os tokens de duração e respeitam `prefers-reduced-motion`. QA autenticado permanece pendente.
+
+---
+
+## 2026-09-26 — Cotas e proposta de escala mensal de plantões
+
+- Em `/distribuicao?view=plantao`, a gestão escolhe o mês e define a cota por corretor; a proposta automática mostra cada corretor, plantão, data e horário antes da publicação.
+- Cotas sem cobertura são destacadas e exigem confirmação explícita para publicar escala parcial. Publicações ficam identificadas e protegidas contra sobrescrita.
+- O novo painel usa os componentes e tokens existentes; o Super-admin pode pausar a geração mensal globalmente.
+- Publicar materializa as ocorrências datadas para que o runtime use a escala do dia e preserve as regras semanais nos demais dias. QA autenticado continua pendente.
+- Referência: `docs/implementations/active/2026-09-26-duty-scheduling-quotas.md`.
+
+---
+
+## 2026-09-25 — Gestão unificada de equipe e unidades
+
+- A navegação lateral reúne as duas áreas em **Equipe & Unidades**. `/equipe` abre a lista de membros e `/equipe?visao=unidades` abre unidades; `/filiais` permanece como URL legada e redireciona para a visão equivalente.
+- A lista de unidades agora usa o `DataTable` compartilhado, com busca, paginação e ordenação; as alterações de dados ficam em uma folha lateral e as operações ficam agrupadas por unidade.
+- O escopo do tenant e os limites de perfil continuam determinados no servidor. Gestores consultam somente a própria unidade; Diretores acessam e gerenciam a lista do tenant.
+- `/dev/component-preview` inclui uma amostra da tabela de produção para inspeção visual dos componentes compartilhados.
+- Validação: `npm run type-check`, lint direcionado e `git diff --check` concluídos. O harness `agent:verify --level fast` não iniciou por `uv_os_get_passwd returned ENOMEM`; QA autenticado responsivo M1.10 permanece pendente.
+
+---
+
+## 2026-09-22 — Tipo de CNPJ nas informações do lead
+
+- Os detalhes do lead exibem a resposta `Tipo de CNPJ` enviada pelo formulário Meta,
+  tanto na ficha de gestão quanto no painel de detalhes do Corretor Lite, sem
+  misturá-la à classificação PF/PME.
+- O campo só aparece quando a Meta realmente forneceu um valor, evitando espaço ou
+  rótulo vazio em leads de outras origens.
+- A hierarquia, os componentes e os tokens existentes foram preservados.
+
+---
+
+## 2026-09-21 — Diálogo de conexão WhatsApp (Lite): feedback por fase
+
+### Resultado
+
+- fases explícitas — preparando, QR, finalizando (pós-scan), conectado e falha — com stepper de três etapas, Status Badge e Callout por tom do design system;
+- QR se renova sozinho, com contagem de validade e animação de troca; sucesso permanece visível antes de fechar;
+- aviso inline (sem toasts repetidos) quando o servidor WhatsApp não responde; recuperação automática quando o QR expira;
+- toda a copy/tom/ícone por fase em `src/features/waha-cadence/pairing-copy.ts`; revisão visual em `/dev/whatsapp-connect` (somente desenvolvimento);
+- somente tokens `ds-*`; nenhuma cor, raio ou tipografia fora do design system.
+
+### Referência
+
+`docs/implementations/active/2026-09-21-waha-lite-connection-flow.md`
+
+---
+
+## 2026-09-15 — `/distribuicao` refinamento geral da superfície
+
+### Resultado
+
+- shell da página limitado e centralizado, com padding e ritmo vertical consistentes;
+- fluxo de distribuição condensado em uma faixa única com cinco etapas e textos objetivos;
+- Matriz, Simulador, Filiais, filas e Saúde/Auditoria passaram a usar cabeçalho, divisor e espaçamento canônicos;
+- ações de unidades agrupadas e métricas reorganizadas por breakpoint, reduzindo quebras e ruído visual;
+- nenhuma regra de negócio, consulta, permissão ou estado operacional foi alterado.
+
+### Validação
+
+`git diff --check` e lint direcionado aos arquivos da rota concluídos sem erros.
+O type-check global continua com o bloqueio preexistente em `src/features/waha-cadence/sync.ts`; QA autenticado em larguras reais permanece o gate M1.10.
+
+---
+
+## 2026-09-14 — `/leads/distribuicao` hierarquia visual
+
+### Resultado
+
+- A área recebeu um cabeçalho canônico com contexto, estado do motor e resumo operacional.
+- O fundo de trabalho e a navegação por abas ganharam superfícies e contraste próprios,
+  mantendo os componentes compartilhados e sem alterar regras de negócio.
+- A navegação permanece acessível em telas estreitas e fixa abaixo do cabeçalho global.
+
+### Validação
+
+Type-check executado após a alteração. A validação autenticada nas larguras previstas
+permanece pendente conforme o gate M1.10.
+
+---
+
+## 2026-09-14 — `/leads/distribuicao` refinamento operacional
+
+### Resultado
+
+- A navegação por abas agora permanece disponível durante a rolagem, com contraste
+  de superfície, blur discreto e rolagem horizontal acessível em viewport estreito.
+- O estado da aba acompanha o histórico do navegador (`popstate`), preservando o
+  contexto compartilhável em `?view=` sem duplicar regras de distribuição.
+- Os cards de métricas deixaram de deslocar no hover/tap: são indicadores, não
+  controles, e agora reservam movimento apenas para mudanças que comunicam estado.
+
+### Validação
+
+Fluxo preserva as seis visões existentes, os filtros e ações server-side. Testes de
+fundação e build de produção permanecem aprovados; QA autenticado em larguras reais
+continua sendo o gate M1.10 do Controle de Execução.
+
+---
+
+## 2026-09-14 — UX-H1 Design engineering hardening
+
+### Resultado
+
+- Os botões canônicos passaram a usar feedback de pressão `scale(0.96)`, com
+  transição interrompível e preservação de `prefers-reduced-motion`.
+- As fundações de seções e abas deixaram `transition-all` e passaram a declarar
+  somente propriedades visuais, com curva e duração rápidas e consistentes.
+- O utilitário legado `transition-all` recebeu uma contenção global para não
+  animar propriedades de layout ou dimensões não intencionais nas rotas existentes.
+- A correção é transversal e não altera regras de negócio, permissões, escopo,
+  consultas ou integrações.
+
+### Componentes afetados
+
+- `src/components/ui/button-variants.ts`
+- `src/components/foundations/section.tsx`
+- `src/components/foundations/page-tabs.tsx`
+- `src/app/globals.css`
+
+### Validação
+
+Testes das fundações: 14 aprovados. Auditoria estrutural de componentes: sem novas
+divergências. QA autenticado em dispositivos reais permanece o gate M1.10 do
+Controle de Execução.
+
+---
+
+## 2026-09-05 — UX-M1 Mobile Experience
+
+### Resultado
+
+- viewport com `viewport-fit=cover`, tokens de safe area, padding, touch target,
+  header e navegação principal centralizados no shell;
+- a rail do CRM é persistente apenas no desktop e abre como Sheet lateral fixo no
+  mobile; a barra inferior duplicada foi removida para Diretor, Gestor e Supervisor;
+- dashboard recomposto com KPIs 2×2, atenção priorizada e listas semânticas no lugar
+  de tabelas densas;
+- conversas usam estados explícitos `list | chat`, contexto em Sheet e mantêm o
+  composer livre de navegação sobreposta;
+- clientes, equipe, vendas, cronograma, qualificação, configurações e integrações
+  receberam composição touch-first reutilizando primitives existentes;
+- detalhes de lead e cliente usam tabs horizontais com snap e alvo mínimo de toque;
+- Corretor Lite mantém sua composição clássica pela DEC-015, volta a ser resolvido
+  corretamente em `/dashboard` e recebe todos os destinos no menu mobile.
+
+### Limites e gate
+
+Nenhuma rota, API, regra de negócio ou autorização mobile paralela foi criada.
+`/tarefas` e `/metas` continuam ausentes por decisão documental. O código passou
+TypeScript, lint dirigido, testes de regressão e auditoria estrutural; a promoção
+para `PRESERVED` depende da matriz autenticada M1.10 em viewports reais.
+
+---
+
+## 2026-09-04 — /leads/[id] (UX-1F — Detalhe do Lead)
+
+### Problema
+1. O detalhe do lead continha blocos legados duplicados escondidos (`<div className="hidden">`), inflando o DOM e criando inconsistências de manutenção.
+2. O espaçamento e a tipografia das abas operacionais (`<TabsList>`) possuíam classes fora de padrão (`h-30`, `py-8`), dificultando a visualização e navegabilidade em telas médias.
+3. A densidade da coluna lateral e os cartões operacionais precisavam de alinhamento com a arquitetura canônica de 2 colunas responsivas do design system.
+
+### Objetivo
+1. Estruturar `/leads/[id]` em um layout canônico de 2 colunas (`max-w-[1400px]`, área operacional principal + sticky sidebar de identidade e contexto).
+2. Otimizar as abas operacionais (Atendimento, Documentos, Histórico, Tarefas) com cabeçalhos e badges informativos compactos.
+3. Eliminar código morto e duplicações ocultas no DOM mantendo 100% da integridade multi-tenant, autorizações de cargo e integrações (Meta Ads, IA Insight, Documentos, Tarefas, Histórico).
+
+### Antes
+- Container `max-w-[1200px]` com padding rígido.
+- Bloco escondido de ~100 linhas duplicando dados de contato e beneficiários.
+- Altura ad-hoc nas abas de navegação.
+
+### Depois
+- Container canônico `max-w-[1400px]` com padding responsivo (`p-4 sm:p-6 lg:p-8`).
+- Header card ergonômico com avatar, status semântico, metadados de contato e ações contextuais rápidas.
+- Tabs segmentadas e limpas para Atendimento, Documentos (com contagem), Histórico e Tarefas (com contagem de pendências).
+- Sticky sidebar direita persistente para consulta rápida de dados de contato e unidade sem poluição visual.
+
+### Componentes reutilizados
+- `<DashboardHeader />` de `@/components/dashboard-header`.
+- `<UserAvatar />` de `@/components/ui/user-avatar`.
+- `<Badge />` de `@/components/ui/badge`.
+- `<Button />` de `@/components/ui/button`.
+- `<Card />`, `<CardHeader />`, `<CardTitle />`, `<CardDescription />`, `<CardContent />` de `@/components/ui/card`.
+- `<Tabs />`, `<TabsList />`, `<TabsTrigger />`, `<TabsContent />` de `@/components/ui/tabs`.
+- `<NextBestActionCard />` de `@/features/next-best-action`.
+- `<SupervisionPanel />`, `<LeadActionHub />`, `<LeadStatusSelector />`, `<AiConversationInsightCard />`, `<LeadTimeline />`, `<LeadTasks />`, `<LeadChat />`, `<LeadDocumentsSection />`, `<PersonRecordDetails />`, `<BeneficiariesSection />`.
+
+### Funcionalidades preservadas
+- 100% das regras multi-tenant (`getRequiredTenantContext()`, `buildLeadScopeWhere()`), permissões de visualização e mascaramento (LGPD), alternância de modo Light do Corretor, SLAs e histórico de auditoria.
+
+### Responsive
+- Desktop/Ultrawide (>= 1280px): Grid de 2 colunas com sticky sidebar à direita.
+- Tablet/Mobile (< 1280px): Layout empilhado fluído com abas deslizantes sem scroll horizontal quebrado.
+
+### Visual QA
+- [x] Hierarquia visual limpa e alinhada ao lema "Complexidade disponível, não complexidade exposta".
+- [x] Zero código legado oculto no DOM.
+- [x] 100% dos testes passando (652/652).
+
+---
+
+## 2026-09-04 — / (Global) & /conversas
+
+### Problema
+1. A sidebar textual antiga possuía 13 itens espalhados em 4 seções, ocupando 240px de largura horizontal e gerando sobrecarga cognitiva.
+2. Na rota `/conversas`, o cabeçalho (`DashboardHeader`) e o topo dos filtros estavam sendo cortados/empurrados para fora da viewport devido a um overflow de altura fixa (`h-[calc(100dvh-...)]`) somado ao padding do shell.
+3. O contraste de ícones e legendas da nova sidebar em modo dark/light estava com visibilidade reduzida.
+
+### Objetivo
+1. Transformar a sidebar em uma **Vertical Rail** compacta (80px / 5rem) com tiles canônicos (ícone no topo + legenda embaixo).
+2. Ajustar o contraste para alta definição (`text-slate-200`, active `text-emerald-300` com fundo `#183134`).
+3. Corrigir o layout de `/conversas` para ocupar `100%` da altura útil sem scroll externo na página principal.
+
+### Antes
+- Sidebar com 240px de largura e listas textuais longas.
+- `/conversas` com scroll interno duplo que fazia o cabeçalho sumir ao interagir com a lista de chats.
+- Ícones da rail pouco visíveis em telas escuras.
+
+### Depois
+- Sidebar compacta de 80px com tiles ergonômicos e tooltips laterais (`src/components/corretop-sidebar.tsx`).
+- Rota `/conversas` com container `flex h-dvh min-h-0 flex-col overflow-hidden` e cada painel interno com seu próprio `ScrollArea` independente.
+- Ícones com contraste cristalino, active state com glow esmeralda e WhatsApp com badge BETA.
+
+### Componentes reutilizados
+- `<Sidebar />`, `<SidebarHeader />`, `<SidebarContent />`, `<SidebarFooter />` de `@/components/ui/sidebar`.
+- `<Tooltip />`, `<TooltipTrigger />`, `<TooltipContent />` de `@/components/ui/tooltip`.
+- `<DropdownMenu />`, `<DropdownMenuTrigger />`, `<DropdownMenuContent />` de `@/components/ui/dropdown-menu`.
+- `<DashboardHeader />` de `@/components/dashboard-header`.
+- `<ConversationsWorkspace />` de `@/app/(dashboard)/conversas/conversations-workspace`.
+
+### Componentes alterados
+- `src/components/corretop-sidebar.tsx`: Reescrito para o padrão vertical rail com tiles canônicos e alto contraste.
+- `src/components/app-shell.tsx`: Ajustado `--sidebar-width` para `5rem` no CRM padrão e `16rem` no Financeiro.
+- `src/app/(dashboard)/conversas/page.tsx`: Corrigido container raiz para `flex h-dvh min-h-0 flex-col overflow-hidden`.
+- `src/app/(dashboard)/conversas/conversations-workspace.tsx`: Ajustado container raiz para `flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-card`.
+- `src/app/(dashboard)/conversas/official-broker-conversations.tsx`: Ajustado container raiz para `flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-card`.
+
+### Funcionalidades movidas
+- Nenhuma funcionalidade removida. Todos os links de navegação continuam acessíveis diretamente na rail ou no menu de perfil do rodapé.
+
+### Funcionalidades preservadas
+- 100% de preservação de rotas, permissões por cargo, super-admin switcher, plantão ao vivo com pulse em tempo real, drawer de IA (Ctrl+J), logout seguro e alternância de modo Full/Lite.
+
+### Responsive
+- Desktop/Notebook: Rail fixa de 80px com tooltips ao passar o mouse.
+- Mobile (<560px): `MobileBottomNav` preservado com 4 ações prioritárias e gatilho "Mais".
+- Drawer de conversas mobile: Sheet lateral deslizante com botão de retorno.
+
+### Accessibility
+- Suporte a navegação por teclado (`Tab`, `Enter`, `Escape`), atributos WAI-ARIA `aria-label`, foco visível com anéis de foco, `TooltipProvider` com delay de 150ms e sem aninhamento inválido de `<button>` dentro de `<button>`.
+
+### Visual QA
+- [x] Page padding consistente? Sim.
+- [x] Título e header visíveis sem corte no topo? Sim.
+- [x] Ícones com contraste e tamanho corretos (size-6)? Sim.
+- [x] Texto secundário e legendas legíveis? Sim.
+- [x] Sem bugs de scroll externo? Sim.
+
+---
+
+## 2026-09-04 — /unidades (Piloto UX-1B)
+
+### Problema
+A listagem de filiais em `src/features/branches/components/branches-manager.tsx` usava tabelas sem container estrutural padronizado, badges manuais sem tokens semânticos e não possuía estado vazio canônico quando não haviam filiais cadastradas.
+
+### Objetivo
+Validar a biblioteca canônica de `src/components/foundations/` em uma página piloto de baixo risco.
+
+### Antes
+- Tabela isolada em card cru.
+- Badges com classes Tailwind ad-hoc.
+- Ausência de empty state semântico.
+
+### Depois
+- Encapsulado em `<Section title="Filiais da corretora" description="..." actions={<CreateBranchSheet />} />`.
+- Status unificados com `<StatusBadge label="Ativa" tone="success" dot />`.
+- `<EmptyState type="EMPTY_DATA" />` para lista vazia com instrução clara.
+
+### Componentes reutilizados
+- `<Section />`, `<StatusBadge />`, `<EmptyState />` de `src/components/foundations/`.
+
+### Funcionalidades preservadas
+- 100% de formulários server actions (`useActionState`), feedbacks por toast, métricas de equipe com sparklines (`StatCard`) e toggles de recebimento de leads.
+
+### Visual QA
+- [x] Espaçamento vertical e padding de tabela padronizados.
+- [x] Status visualmente coerentes com os 5 tons semânticos.
+
+---
+
+## 2026-09-04 — /dashboard (UX-1D — Dashboard Unificado)
+
+### Problema
+1. Dispersão de métricas operacionais e gerenciais entre dashboards com inconsistência de padding e escalas visuais.
+2. Necessidade de unificar os modos de visualização (Executivo/Diretoria, Marketing, Corretor Full, Corretor Lite) respeitando a governança UX-GOV-1 sem criar monólitos de rota nem calcular métricas no cliente.
+
+### Objetivo
+1. Alinhar o `ExecutiveDashboard` com a escala canônica de espaçamento (`p-4 sm:p-6 lg:p-8`, `space-y-6 sm:space-y-8`), tipografia (`text-2xl font-bold tracking-tight`) e abas canônicas via `<PageTabs />`.
+2. Assegurar contraste aperfeiçoado nos cards de KPI (`KpiComparisonCard`), funil de 8 estágios (`FunnelSection`) e blocos de atenção (`AttentionSection`).
+3. Garantir 100% de integridade com o catálogo canônico de métricas no servidor (`features/reports/metrics/metric-catalog.ts` e `metrics-service.ts`).
+
+### Antes
+- Paddings divergentes em breakpoints (`p-4 lg:p-6`).
+- Badges de delta com contraste reduzido no dark mode.
+- Barras de funil com cores estáticas sem adaptação a temas.
+
+### Depois
+- Layout unificado com escala de espaçamento canônica (`p-4 sm:p-6 lg:p-8`), ritmo vertical consistente e `<PageTabs />` animados com sincronização `?tab=`.
+- `DeltaBadge` com contraste nítido em light (`text-emerald-600` / `text-red-600`) e dark (`dark:text-emerald-400` / `dark:text-red-400`) com tipografia `tabular-nums font-semibold`.
+- `FunnelSection` com fundos semitransparentes adaptáveis e suporte total a temas claro e escuro.
+
+### Componentes reutilizados
+- `<DashboardHeader />` de `@/components/dashboard-header`.
+- `<PageTabs />` de `src/components/foundations/page-tabs`.
+- `<PeriodSelect />` de `@/components/period-select`.
+- `<KpiComparisonCard />`, `<FunnelSection />`, `<AttentionSection />` de `src/app/(dashboard)/relatorios/_components/`.
+- `<OverviewTab />`, `<CommercialTab />`, `<TeamTab />`, `<UnitsTab />`, `<FinancialTab />`.
+
+### Componentes alterados
+- `src/app/(dashboard)/dashboard/_components/executive-dashboard.tsx`: Alinhamento canônico de layout, padding, tipografia e ritmo vertical.
+- `src/app/(dashboard)/relatorios/_components/kpi-comparison-card.tsx`: Contraste e acessibilidade de badges e deltas aprimorados.
+- `src/app/(dashboard)/relatorios/_components/funnel-section.tsx`: Paleta de estágios adaptativa a temas claro e escuro.
+
+### Funcionalidades preservadas
+- 100% das métricas do catálogo canônico: funil de conversão de 8 estágios, coorte diária de entradas/conversões, atenção operacional com links profundos filtrados, detalhamento por canal, equipe, unidade e financeiro (sob controle de permissão `ver_relatorios_financeiros`).
+
+### Responsive
+- Testado e visualmente consistente em 1366×768, 1440×900, 1920×1080 e dispositivos móveis (<560px).
+
+### Accessibility
+- Conformidade WCAG 2.2 AA: contraste de texto tabular, foco visível, rótulos ARIA para gráficos de coorte e tabelas com tags semânticas `<th scope="...">` e `tabular-nums`.
+
+### Visual QA
+- [x] Page padding consistente (p-4 sm:p-6 lg:p-8)? Sim.
+- [x] Título no tamanho correto (text-2xl font-bold)? Sim.
+- [x] Ritmo cabeçalho → abas → conteúdo (space-y-6 sm:space-y-8)? Sim.
+- [x] Contraste de texto secundário e delta badges? Sim.
+- [x] Sem aninhamento inválido e foco por teclado visível? Sim.
+- [x] 0 erros no TypeScript (tsc --noEmit) e 100% de testes passando? Sim.
+
+---
+
+## 2026-09-04 — /leads (UX-1E — Leads Workspace & List Restructure)
+
+### Problema
+1. Dispersão de filtros ad-hoc com componentes customizados despadronizados.
+2. Três cards de métricas (StatCards) fixos no topo de `/leads` consumindo altura útil da visualização em telas de notebook (1366×768 / 1440×900).
+3. Painel de detalhes legado em `<Sheet>` básico sem diferenciação entre resumo operacional (L1) e seções colapsáveis/detalhadas (L2).
+4. Necessidade de alinhar a experiência de listagem com a filosofia de *"Complexidade disponível, não complexidade exposta"*.
+
+### Objetivo
+1. Unificar a barra de filtros utilizando a `<FilterBar>` canônica e chips de filtros ativos com remoção atômica via `<ActiveFilterChips>`.
+2. Remover o card-soup do topo de `/leads` para que o catálogo de oportunidades e funil dominem a viewport.
+3. Integrar o `<DetailDrawer>` canônico (L1 visível, L2 sob demanda, ações de WhatsApp, ligação e links profundos).
+4. Preservar 100% das regras de negócio, segurança multi-tenant no servidor, ações em lote, importação/exportação e qualificação IA.
+
+### Antes
+- Filtros em container com inputs desacoplados e chips manuais.
+- 3 StatCards empurrando o Kanban e a lista para baixo.
+- Sheet lateral padrão sem cabeçalho contextual de saúde do lead e atalhos rápidos.
+
+### Depois
+- `<FilterBar>` canônica com busca rápida, atalho para limpar, trigger com badge de contagem de filtros ativos e `<ActiveFilterChips>` com remoção individual.
+- Tabela e Kanban ocupando 100% da viewport útil com ritmo vertical limpo (`p-4 sm:p-6 lg:p-8`, `max-w-[1400px]`).
+- Quick View Drawer utilizando `<DetailDrawer>` com resumo L1, ações imediatas (Ligar, WhatsApp, Chat, Tarefas, Notas) e seções de gestão e qualificação L2.
+- Ações em lote contextuais flutuantes (`SelectionToolbar`) ativadas somente sob seleção de linhas.
+
+### Componentes reutilizados
+- `<FilterBar />` de `src/components/foundations/filter-bar`.
+- `<ActiveFilterChips />` de `src/components/foundations/active-filter-chips`.
+- `<DetailDrawer />` de `src/components/foundations/detail-drawer`.
+- `<DashboardHeader />` de `@/components/dashboard-header`.
+- `<SelectionToolbar />` de `@/components/ui/selection-toolbar`.
+- `<LeadsDataTable />`, `<QualifyingLeadsDataTable />` de `src/app/(dashboard)/leads/leads-data-table`.
+- `<NegotiationsRadarTab />` de `src/features/conversation-intelligence/components/negotiations-radar-tab`.
+- `<LeadStatusBadge />`, `<LeadQualificationBadge />`, `<LeadHealthBadge />`.
+
+### Componentes alterados
+- `src/app/(dashboard)/leads/_components/leads-filters.tsx`: Integrado com `<FilterBar />` e `<ActiveFilterChips />`.
+- `src/app/(dashboard)/leads/leads-workspace.tsx`: Removido card-soup do topo, integrado `<DetailDrawer />` e atualizadas abas de perspectiva.
+- `src/app/(dashboard)/leads/page.tsx`: Ajustada escala de padding canônica e container `max-w-[1400px]`.
+- `docs/ux/UX_REDESIGN_CONTROL.md`: Etapa `UX-1E` atualizada para `COMPLETE`.
+
+### Funcionalidades preservadas
+- 100% de integridade com autorização multi-tenant no servidor (`getRequiredTenantContext`, `buildLeadScopeWhere`).
+- Distribuição de filas, reatribuição de corretores, alteração de filiais, exportação CSV, importação em lote, qualificação IA e manual.
+- Modo Lite do corretor intacto e preservado.
+
+### Responsive
+- Testado e perfeitamente ajustado em 1366×768, 1440×900, 1920×1080 e mobile (<560px).
+
+### Accessibility
+- Suporte a navegação por teclado (`Tab`, `Enter`, `Escape`), conformidade WCAG 2.2 AA, botões de ação com `aria-label`, foco visível e contraste adequado em todos os badges de status.
+
+### Visual QA
+- [x] Page padding consistente (p-4 sm:p-6 lg:p-8)? Sim.
+- [x] Título no tamanho correto (text-2xl font-bold)? Sim.
+- [x] Sem card-soup poluindo o topo da página? Sim.
+- [x] Filtros canônicos e chips ativos funcionais? Sim.
+- [x] DetailDrawer com L1 e L2 ergonômicos? Sim.
+- [x] 0 erros no TypeScript (tsc --noEmit) e 100% de testes passando? Sim.
+
+---
+
+## 2026-09-04 — /leads & /dashboard (UX Polish & Dashboard Instant Tabs)
+
+### Problema
+1. As abas do `/dashboard` apresentavam latência perceptível ao clicar devido a roundtrip de navegação no servidor sem feedback de transição imediato.
+2. O gráfico de "Entradas e conversões" no dashboard executivo ocupava uma altura vertical excessiva (`h-72`), desproporcional ao restante do grid.
+3. A listagem de `/leads` e o Kanban podiam ter um visual ainda mais moderno, leve e distinto no estilo "Linear/CRM Simples" (pills horizontais de status com dots luminosos, avatar com iniciais para leads, atalhos diretos de WhatsApp na linha e cartões de Kanban aprimorados).
+
+### Objetivo
+1. Tornar a troca de abas no `/dashboard` instantânea através de estado otimista com `useTransition`.
+2. Compactar a altura do gráfico de linha temporal para `h-44 sm:h-48` (~180px), mantendo legibilidade total.
+3. Modernizar os filtros rápidos de status em `/leads` com pills roláveis e dot badges brilhantes (`shadow-[0_0_8px_...]`).
+4. Adicionar avatar com iniciais coloridas, botão de ação rápida de WhatsApp e visualização clara de contato na tabela e no Kanban de `/leads`.
+
+### Componentes alterados
+- `src/app/(dashboard)/dashboard/_components/executive-dashboard.tsx`: Otimização instantânea de abas com `useTransition` e redimensionamento do gráfico de entradas/conversões.
+- `src/app/(dashboard)/leads/_components/leads-filters.tsx`: Pills de status rápidos com dots luminosos e integração de chips de filtros.
+- `src/app/(dashboard)/leads/leads-table-columns.tsx`: Linhas com avatar de iniciais, botão direto do WhatsApp, badge luminoso e menu de ações expandido.
+- `src/app/(dashboard)/leads/leads-workspace.tsx`: Cartões de Kanban com avatar, telefone e atalho direto para WhatsApp.
+
+---
+
+## 2026-09-04 — Refinamento Visual e Feedback de Estado (Sonner Toast, Loading Skeletons & Filtros)
+
+### Problema
+1. O toast do Sonner apresentava layout com botões espremidos e texto quebrado, além de vazar um texto duplicado sem background abaixo do componente.
+2. A troca de abas no `/dashboard` exibia área em branco antes do carregamento completo dos dados.
+3. A tabela de `/leads` e os filtros não apresentavam indicador visual de loading ao filtrar e paginar.
+4. O status de filtro em `/leads` aparecia duplicado tanto nas pílulas rápidas de status quanto nos chips de filtros ativos abaixo.
+5. O link de equipe na barra lateral exibia o rótulo "Contatos".
+
+### Objetivo
+1. Corrigir e refinar a estrutura do toast (Sonner) e remover o leak de texto duplicado.
+2. Adicionar skeleton e barra de pulso na troca de abas do dashboard.
+3. Adicionar barra de loading e transição de opacidade na tabela durante filtragem/paginação.
+4. Remover a duplicação do status nos chips de filtro e no DOM.
+5. Atualizar o rótulo da barra lateral para "Equipe".
+
+### Componentes alterados
+- `src/components/ui/sonner.tsx`: Sanitização das opções para impedir duplicação no container nativo do Sonner.
+- `src/components/motion/animated-toast.tsx`: Novo layout com header dedicado (badge + close), corpo e botões inferiores com `whitespace-nowrap shrink-0`.
+- `src/app/globals.css`: Limpeza de CSS legado do toast.
+- `src/app/(dashboard)/dashboard/_components/executive-dashboard.tsx`: Inclusão de `DashboardTabLoadingSkeleton`.
+- `src/components/data-table/data-table.tsx`: Adição de barra de progresso no topo e opacidade transitória no corpo da tabela.
+- `src/app/(dashboard)/leads/_components/leads-filters.tsx`: Omissão do status em `chips` e remoção da chamada duplicada de `<ActiveFilterChips>`.
+- `src/components/corretop-sidebar.tsx`: Atualização do label de navegação para "Equipe".
+
+## 2026-09-04 — UX-GOV-1: refinamento transversal governado
+
+### Entregue
+
+- Rollout Clean UI resolvido no servidor e aplicado ao shell autenticado sem
+  alterar o escopo do tenant.
+- Tokens de superfície, borda, controle e raio consolidados em
+  `src/styles/operational-ui.css`.
+- Rail, abas, filtros e campos passaram a expor slots semânticos para uma única
+  camada visual; o link de aba preserva a posição de scroll.
+- Cards de KPI, atenção, funil e equipe receberam a mesma composição leve do
+  dashboard.
+- Removido o ocultamento global de scrollbar dentro de `Card`, preservando a
+  descoberta de regiões roláveis.
+
+### Ainda pendente
+
+QA visual autenticado por rota, validação de estados vazios/loading/error em
+desktop e mobile, extração futura das composições compartilhadas de relatórios e
+certificação individual das etapas UX-1G–UX-1J.
+
+## 2026-09-05 — `/dashboard` tabs sem espera perceptível
+
+### Causa confirmada
+
+A troca de tab usa `router.replace` com `searchParams`; isso reexecuta o Server
+Component e as consultas métricas da aba. O cliente já atualizava o rótulo, mas
+exibia um skeleton imediatamente, tornando todo o roundtrip visível.
+
+### Correção
+
+`PageTabs` agora comunica intenção por hover e foco. O dashboard chama
+`router.prefetch` para aquecer a próxima resposta RSC e agenda o restante em
+idle. A seleção visual continua imediata, sem reset de scroll e sem cache global
+de métricas entre tenants.
+
+## 2026-09-05 — Dashboard canônico e navegação sem “Tarefas” duplicada
+
+- `/dashboard` passou a usar o Reporting Center, mantendo abas, filtros de
+  período, escopo por papel e estados da rota de relatórios.
+- `/relatorios` agora é um redirecionamento de compatibilidade para
+  `/dashboard`, incluindo `period` e `tab`.
+- O item de sidebar “Tarefas” (que apontava incorretamente para relatórios)
+  foi removido e `/qualificacao` foi adicionado como entrada explícita de
+  Qualificação IA.
+
+## 2026-09-05 — primitives compartilhados alinhados ao dashboard
+
+- `Section` (`variant="card"`) passou a usar a mesma superfície leve e sem
+  sombra do dashboard canônico.
+- `Table` e `DataTable` passaram a compartilhar cabeçalho recuado, bordas
+  discretas e hover de linha suave; `/filiais` e `/leads` herdam o padrão sem
+  lógica específica de rota.
+
+## 2026-09-05 — canvas claro, `/leads` e `/qualificacao`
+
+- O canvas do tema claro do shell Clean UI passou para branco (`#ffffff`),
+  mantendo o tema escuro e o rollback por tenant.
+- `DataTable` e as tabelas de `/leads` passaram a usar a superfície opaca de
+  card, removendo a mistura transparente que deixava o fundo acinzentado.
+- Os indicadores de `/qualificacao` foram compostos com `StatCard`, os mesmos
+  tokens de métrica do `/dashboard`; a subnavegação recebeu slot semântico,
+  borda leve e `aria-current` para o estado ativo.
+
+## 2026-09-05 — UX-H1: biblioteca única e fiscalização por rota
+
+- A sidebar passou a usar fundo preto e tokens semânticos, removendo cores,
+  brilho e Motion fixos do rail.
+- `Button` deixou de carregar Motion obrigatoriamente; `Table` e `Field` são
+  primitives estruturais server-safe.
+- As duas APIs TanStack passaram a compartilhar `DataTableFrame` e o mesmo
+  contrato de cabeçalho, corpo, linha e célula. `/leads` deixou de sobrescrever
+  a superfície e agora herda o mesmo fundo claro de `/equipe`.
+- O auditor passou a catalogar controles nativos, emoji de interface e magic
+  values, com baseline de não regressão e modo strict; o catálogo transitive
+  cobre todos os `page.tsx`.
+- O manual e o plano de conversão deixam explícito que dívida catalogada não
+  equivale a padronização concluída.
+
+## 2026-09-05 — UX-H1: conversão do CRM operacional
+
+- Escopo formalizado: somente páginas autenticadas do CRM; Super Admin,
+  desenvolvimento/diagnóstico, autenticação e páginas públicas foram excluídos
+  desta rodada sem receber aprovação implícita.
+- Botões, checkboxes, inputs, selects, textareas e tabelas visíveis do CRM
+  passaram a usar os primitives compartilhados de `src/components/ui`.
+- Tabelas interativas convergiram para `DataTableFrame`; `/leads` herda a mesma
+  superfície clara e o mesmo cabeçalho de `/equipe`.
+- Emojis de chrome foram substituídos por ícones, e sombras/raios/cores
+  arbitrárias detectadas no escopo foram removidas.
+- `MetricCard` deixou gráficos em um client island pequeno e `Button` deixou de
+  carregar Motion por padrão, reduzindo JavaScript de interação comum.
+- `npm run ui:audit:strict` agora exige zero divergência no CRM. Próximo passo:
+  QA visual e funcional por papel nos viewports definidos no contrato.
+- Validação técnica: build direto do Next.js 16.2.10 concluído, type-check sem
+  erros, 652 testes globais e 19 testes focados aprovados. O `prebuild` do
+  pacote de extensão permanece bloqueado localmente por permissão de leitura do
+  diretório, e o lint global mantém dívida preexistente registrada pelo harness.
+
+## 2026-09-05 — restauração visual do Corretor Lite
+
+- O workspace exclusivo do Corretor Lite voltou ao estado visual imediatamente
+  anterior ao UX-H1 em dashboard, fila/leads, clientes, detalhe, feedback e
+  insights de conversas.
+- A restauração ficou limitada aos componentes `Light*` e à navegação superior
+  Lite; nenhum acesso, query, regra de distribuição, conexão WAHA ou fluxo dos
+  demais papéis foi alterado.
+- O Corretor Lite passa a ser uma exceção documentada da conversão transversal até
+  que exista nova aprovação visual específica para essa experiência.
+
+## 2026-09-06 — estúdio de mensagens por situação
+
+- O catálogo completo de templates da WABA saiu da tela de conexão e passou a
+  compor a aba `Mensagens & Situações` de `/qualificacao`.
+- A mesma superfície reúne templates Meta, mensagens livres e políticas por
+  evento, com principal, contingência, variáveis compatíveis e estado publicado.
+- `/integrations/whatsapp` permanece a autoridade de conexão e saúde do canal e
+  oferece apenas um atalho para o estúdio, eliminando formulários duplicados.
+- Diretor e Gestor editam; Supervisor consulta. Estados de carregamento, vazio,
+  erro, pausa global e indisponibilidade de canal permanecem explícitos.
+
+## 2026-09-07 — dashboard gerencial com composição Efferd
+
+- Registrado e instalado `@efferd/dashboard-2` no shadcn local.
+- Preservados os primitives Base UI, o shell e a sidebar existentes; arquivos de
+  demonstração incompatíveis ou com dados fictícios foram descartados após a
+  instalação.
+- Criados `DashboardGrid` e `DashboardCard` reutilizáveis com borda contínua,
+  divisores finos, superfície neutra e sombra zero.
+- Visão geral, Comercial e Financeiro adotam os novos cards; Funil e Atenção
+  compartilham a mesma composição sem mudanças de dados ou autorização.
+- O dashboard Lite do corretor não foi modificado.
+
+## 2026-09-10 — exclusão de histórico em Conversas
+
+- O menu contextual de `/conversas` passou a exibir `Excluir conversa` em todos
+  os atendimentos para Diretor; Gestor mantém o controle apenas em chats avulsos.
+- A confirmação explica que somente as mensagens serão removidas e que os
+  cadastros vinculados serão preservados.
+- A permissão continua revalidada no servidor, com isolamento por tenant,
+  auditoria sem PII e controle global reversível pelo Super-Admin.
+
+## 2026-09-10 — instalação PWA disponível no mobile
+
+- O botão flutuante de instalação permanece global para todos os papéis e agora
+  também aparece de forma confiável para Corretores no mobile.
+- O fluxo usa o prompt nativo quando suportado e oferece instruções pelo menu do
+  navegador como fallback, sem desaparecer após fechar o cartão informativo.
+- O controle preserva área segura, alvo de toque móvel e preferência por movimento
+  reduzido.
+
+## 2026-09-10 — filas completas na importação de leads
+
+- O seletor de importação em massa passou a reunir as filas gerais da corretora e as
+  filas pertencentes à unidade escolhida, sem exibir filas de outra unidade.
+- Filas manuais continuam identificáveis, mas ficam desabilitadas porque não podem
+  cumprir o fluxo automático prometido pelo formulário.
+- O texto de apoio explica que cada lead será ofertado sequencialmente aos corretores
+  elegíveis até aceite, sem alterar componentes ou tokens compartilhados.
+
+## 2026-09-10 — recuperação dos leads sem atribuição
+
+- A aba `Sem atribuição` de `/leads` ganhou a ação contextual `Distribuir todos` para
+  Diretor e Gestor.
+- O estado de carregamento impede disparos repetidos, e o retorno informa quantos leads
+  operacionais foram reenfileirados ou por que nenhum estava pronto.
+- A ação reutiliza o botão, o toast e os tokens existentes; não cria uma segunda Home de
+  distribuição nem substitui o aceite do corretor por atribuição direta.
+
+## 2026-09-14 — refinamento visual do dashboard gerencial
+
+- `/dashboard` passou a compor todos os blocos com `DashboardGrid` e
+  `DashboardCard` (piloto Efferd, DEC-017): KPIs, tendência, atenção, rankings,
+  qualificações e atividade recente compartilham a mesma superfície contínua
+  com divisores de 1 px, raio canônico na borda externa e sombra zero.
+- O cabeçalho ganhou hierarquia de leitura (kicker em versalete, título com
+  tracking apertado, linha de status semântica com exceções e pico do período)
+  e uma única ação primária "Abrir leads", conforme DEC-002.
+- A tendência virou gráfico em camadas: barra de recebidos com sobreposição de
+  convertidos, tooltip por barra, eixo de dias separado e legenda com pico.
+- Atenção, rankings e listas recentes usam listas divididas com números
+  tabulares/monoespaçados, badges semânticos e estados vazios compostos.
+- Nenhuma métrica, consulta, permissão, escopo ou integração foi alterada; o
+  Corretor Lite permanece preservado pela DEC-015. Validações: tsc, ESLint
+  dirigido e build de produção.
+
+## 2026-09-21 — composição ERP premium do dashboard
+
+- `/dashboard` passou a usar uma composição responsiva assimétrica: KPIs, evolução,
+  atenção, fluxo comercial, qualificação, desempenho e atividade recente.
+- Os blocos foram extraídos para widgets reutilizáveis com os primitives shadcn já
+  instalados (`Card`, `Badge`, `Chart`, `Table`, `Separator` e `Skeleton`).
+- Animações de entrada respeitam `prefers-reduced-motion`; estados vazios e loading
+  preservam a estrutura do conteúdo para reduzir deslocamento visual.
+- A fonte dos dados permaneceu no resolvedor existente; nenhuma métrica, permissão,
+  autorização, escopo ou integração foi alterada.
+
+## 2026-09-23 — agrupamento mensal dos plantões
+
+- A grade semanal existente agora fica dentro de seções recolhíveis organizadas pelo
+  mês de início da vigência do plantão; cards, escalas e ações foram preservados.
+- O mês atual abre inicialmente e uma nova vigência é aberta após criação ou edição.
+- O grupo mensal usa controles e tokens compartilhados, com regiões acessíveis; não
+  foram introduzidos tokens, primitivas nem animações novas.

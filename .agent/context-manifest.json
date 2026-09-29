@@ -17,7 +17,7 @@
       "id": "broker-workspace",
       "keywords": ["workspace", "próxima ação", "proxima acao", "meu dia", "inbox operacional", "corretor"],
       "paths": ["src/features/broker-workspace", "src/app/(dashboard)/dashboard"],
-      "documents": ["docs/product/corretor-resume-dashboard-plan.md", "docs/business-rules.md", "docs/decision-log.md", "docs/ux-audit-2026-07-13.md"]
+      "documents": ["docs/product/corretor-resume-dashboard-plan.md", "docs/business-rules.md", "docs/decision-log.md", "docs/ux/UX_REDESIGN_CONTRACT.md", "docs/ux/UX_REDESIGN_CONTROL.md"]
     },
     {
       "id": "ai-agent",
@@ -41,7 +41,7 @@
       "id": "frontend",
       "keywords": ["ui", "sidebar", "design", "tela", "componente", "acessibilidade", "motion"],
       "paths": ["src/components", "src/app"],
-      "documents": ["DESIGN.md", "docs/ui-foundation.md", "docs/ux-audit-2026-07-13.md"]
+      "documents": ["docs/ux/UX_REDESIGN_CONTRACT.md", "docs/ux/UX_REDESIGN_CONTROL.md"]
     },
     {
       "id": "database-security",

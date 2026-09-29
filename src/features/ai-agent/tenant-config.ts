@@ -1,3 +1,8 @@
+import { eq } from "drizzle-orm";
+import { getDatabase, schema } from "@/shared/db";
+import { type SituationalPlaybookItem } from "@/shared/domain-root/situational-playbooks-root";
+import { buildSituationalPromptSection } from "@/features/ai-qualification/situational-response-engine";
+
 /**
  * Phase 4 — Tenant AI Agent Configuration
  *
@@ -6,10 +11,6 @@
  *
  * Falls back to sensible defaults when no config row exists.
  */
-
-import { eq } from "drizzle-orm";
-import { getDatabase, schema } from "@/shared/db";
-
 export type TenantAiAgentConfig = {
   /** The display name of the AI assistant (e.g. "Ana", "Assistente Âncora Corretora") */
   assistantName: string;
@@ -58,6 +59,30 @@ export type TenantAiAgentConfig = {
 
   /** Message sent to the customer when transferring to a human agent */
   handoffMessage?: string;
+
+  /** Playbooks situacionais configurados pelo tenant */
+  playbooks?: SituationalPlaybookItem[];
+};
+
+/**
+ * Built-in default configuration. Safe, conservative, ready for production.
+ */
+export const DEFAULT_TENANT_AI_CONFIG: TenantAiAgentConfig = {
+  enabled: true,
+  assistantName: "Ana",
+  formOfAddress: "voce",
+  useEmojis: true,
+  tone: "friendly",
+  language: "pt-BR",
+  maxQuestions: 6,
+  requiredFields: [
+    "nome completo",
+    "tipo de plano (Individual, Familiar ou PME)",
+    "número de vidas",
+    "faixa etária das vidas",
+    "cidade e estado",
+    "e-mail",
+  ],
 };
 
 /**
@@ -104,13 +129,8 @@ export async function loadTenantAiAgentConfig(
 
 /**
  * Configuração de emergência usada apenas quando o banco não está acessível
- * (tabela inexistente, timeout, etc.).
- *
- * ⚠️  NÃO usar para inicializar novos registros — essa é a responsabilidade de
- * `tenant-settings-service.ts::createQualificationTenantSettings()`.
- * Os defaults configuráveis por tenant vivem na tabela `aiQualificationConfigs`.
  */
-function getDefaultConfig(): TenantAiAgentConfig {
+export function getDefaultConfig(): TenantAiAgentConfig {
   return {
     assistantName: "Assistente Âncora Corretora",
     tone: "friendly",
@@ -119,6 +139,14 @@ function getDefaultConfig(): TenantAiAgentConfig {
     language: "pt-BR",
     enabled: true,
     maxQuestions: 6,
+    requiredFields: [
+      "nome completo",
+      "tipo de plano (Individual, Familiar ou PME)",
+      "número de vidas",
+      "faixa etária das vidas",
+      "cidade e estado",
+      "e-mail",
+    ],
   };
 }
 
@@ -186,6 +214,15 @@ export function buildAgentSystemPrompt(
     .map((f, i) => `${i + 1}. ${f}`)
     .join("\n");
 
+  const situationalBlock = buildSituationalPromptSection({
+    playbooks: config.playbooks,
+    variables: {
+      assistente_nome: config.assistantName,
+      corretora_nome: companyName,
+      horario_atendimento: config.businessHoursStart && config.businessHoursEnd ? `${config.businessHoursStart} às ${config.businessHoursEnd}` : "08h às 18h",
+    },
+  });
+
   let prompt = `Você é ${config.assistantName}, atendente virtual especialista em planos de saúde da corretora ${companyName}.
 Sua missão é qualificar leads de forma natural e fluida, como uma conversa real no WhatsApp.
 
@@ -241,6 +278,10 @@ REGRAS INEGOCIÁVEIS
 
 TOM E ESTILO:
 ${formalityBlock}`;
+
+  if (situationalBlock) {
+    prompt += `\n\n${situationalBlock}`;
+  }
 
   if (config.businessContext) {
     prompt += `\n\nCONTEXTO DA CORRETORA (use para responder perguntas laterais):\n${config.businessContext}`;

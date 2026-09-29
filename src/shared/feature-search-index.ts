@@ -167,7 +167,7 @@ export const FEATURE_SEARCH_INDEX: FeatureIndexItem[] = [
     title: "Relatórios & BI",
     description: "Análise de conversão, tempos de SLA e custos daoperação de IA.",
     keywords: ["relatórios", "métrica", "custos ia", "conversão", "bi", "dados"],
-    url: "/relatorios",
+    url: "/dashboard",
     domain: "Gestão",
     permission: "acessar_relatorios",
     iconName: "ChartBar",

@@ -23,6 +23,7 @@ import { LeadProgressStepper } from "@/features/leads/components/lead-progress-s
 import { LeadReminder } from "@/features/leads/components/lead-reminder";
 import { LeadQuickNote } from "@/features/leads/components/lead-quick-note";
 import { InlineFeedbackForm } from "@/app/(dashboard)/leads/[id]/inline-feedback-form";
+import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
 
 type NextTask = {
   title: string;
@@ -190,6 +191,7 @@ export function LeadActionHub({
             render={
               <a
                 href={`https://wa.me/${phone.replace(/\D/g, "")}`}
+                onClick={() => { void recordWhatsAppOpenedAction(leadId); }}
                 rel="noreferrer"
                 target="_blank"
               />

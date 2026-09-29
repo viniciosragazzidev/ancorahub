@@ -7,10 +7,12 @@ import { Button } from "@/components/ui/button";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
 import { X, SlidersHorizontal } from "@/components/huge-icons";
+import { FilterBar } from "@/components/foundations/filter-bar";
+import { ActiveFilterChips, type FilterChipItem } from "@/components/foundations/active-filter-chips";
+import { cn } from "@/lib/utils";
 import {
   hasLeadFilterQuery,
   parseLeadFilterPreferences,
@@ -19,6 +21,25 @@ import {
 
 type Branch = { id: string; name: string };
 type Broker = { id: string; name: string };
+
+const statusLabels: Record<string, string> = {
+  new: "Novos",
+  distributed: "Distribuídos",
+  in_contact: "Em Atendimento",
+  quote_sent: "Cotação Enviada",
+  negotiation: "Negociação",
+  documentation_pending: "Doc Pendente",
+  under_analysis: "Em Análise",
+  converted: "Convertidos",
+  lost: "Perdidos",
+};
+
+const qualificationLabels: Record<string, string> = {
+  unqualified: "Sem Qualificação",
+  warm: "Morna",
+  hot: "Quente",
+  disqualified: "Desqualificado",
+};
 
 export function LeadsFilters({
   initialSearch,
@@ -50,12 +71,14 @@ export function LeadsFilters({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-
   const [open, setOpen] = useState(false);
 
   // States
   const [search, setSearch] = useState(initialSearch ?? "");
   const [status, setStatus] = useState(initialStatus ?? "");
+  // Keep the clicked pill responsive while the server-rendered table is
+  // revalidating. The URL remains the source of truth once navigation lands.
+  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
   const [branch, setBranch] = useState(initialBranch ?? "");
   const [tipo, setTipo] = useState(initialTipo ?? "");
   const [origem, setOrigem] = useState(initialOrigem ?? "");
@@ -70,7 +93,8 @@ export function LeadsFilters({
   });
 
   function buildUrl(preferences: LeadFilterPreferences) {
-    const params = new URLSearchParams(searchParams.toString());
+    const currentQuery = typeof window === "undefined" ? searchParams.toString() : window.location.search;
+    const params = new URLSearchParams(currentQuery);
     params.delete("page");
 
     if (preferences.search) params.set("search", preferences.search); else params.delete("search");
@@ -93,15 +117,40 @@ export function LeadsFilters({
     const stored = parseLeadFilterPreferences(window.localStorage.getItem(storageKey));
     if (!stored) return;
     const target = buildUrl(stored);
-    // localStorage is unavailable to the Server Component. A native replace
-    // guarantees the first data query receives the restored filters instead
-    // of only repainting the filter controls with their saved values.
     if (`${window.location.pathname}${window.location.search}` !== target) {
       window.location.replace(target);
     }
-  // Local preferences restore once; an explicit URL remains authoritative.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restored, searchParams, storageKey]);
+
+  // Keep controls aligned with URL changes (pagination, sorting, browser back)
+  // without remounting the whole leads workspace.
+  const serializedSearchParams = searchParams.toString();
+  useEffect(() => {
+    const params = new URLSearchParams(serializedSearchParams);
+    const nextStatus = params.get("status") ?? "";
+    setSearch(params.get("search") ?? "");
+    setStatus(nextStatus);
+    setOptimisticStatus(null);
+    setBranch(params.get("branch") ?? "");
+    setTipo(params.get("tipo") ?? "");
+    setOrigem(params.get("origem") ?? "");
+    setQualification(params.get("qualification") ?? "");
+    setCorretor(params.get("corretor") ?? "");
+    setEligibleCampaigns(params.get("eligibleCampaigns") === "1");
+    setPageSize(params.get("pageSize") ?? "20");
+  }, [serializedSearchParams]);
+
+  function navigateTo(target: string) {
+    // Update the address bar immediately so rapid filter changes cannot appear
+    // stuck while the App Router waits for the next server payload.
+    if (`${window.location.pathname}${window.location.search}` !== target) {
+      window.history.replaceState(window.history.state, "", target);
+    }
+    startTransition(() => {
+      router.replace(target, { scroll: false });
+    });
+  }
 
   const activeCount = [
     status,
@@ -116,10 +165,11 @@ export function LeadsFilters({
 
   const hasAnyFilter = Boolean(search || activeCount > 0);
 
-  function applyFilters() {
-    const preferences = currentPreferences();
+  function applyFilters(overridePrefs?: LeadFilterPreferences) {
+    const preferences = overridePrefs ?? currentPreferences();
     window.localStorage.setItem(storageKey, JSON.stringify(preferences));
-    startTransition(() => router.push(buildUrl(preferences)));
+    setOpen(false);
+    navigateTo(buildUrl(preferences));
   }
 
   function handleReset() {
@@ -134,63 +184,66 @@ export function LeadsFilters({
     setPageSize("20");
 
     window.localStorage.removeItem(storageKey);
-    startTransition(() => router.push("/leads"));
+    navigateTo("/leads");
   }
 
-  const statusLabels: Record<string, string> = {
-    new: "Novos",
-    distributed: "Distribuídos",
-    in_contact: "Em Atendimento",
-    quote_sent: "Cotação Enviada",
-    negotiation: "Negociação",
-    documentation_pending: "Doc Pendente",
-    under_analysis: "Em Análise",
-    converted: "Convertidos",
-    lost: "Perdidos",
-  };
+  // Active filter chips (status is displayed in the quick pills bar above, so omitted here to avoid duplication)
+  const chips: FilterChipItem[] = [];
+  if (search) chips.push({ id: "search", label: "Busca", value: `"${search}"` });
+  if (tipo) chips.push({ id: "tipo", label: "Tipo", value: tipo === "PME" ? "PJ" : tipo });
+  if (origem) chips.push({ id: "origem", label: "Origem", value: origem === "manual" ? "Manual" : "Webhook" });
+  if (eligibleCampaigns) chips.push({ id: "eligibleCampaigns", label: "Meta", value: "Elegíveis agora" });
+  if (qualification) chips.push({ id: "qualification", label: "Qualificação", value: qualificationLabels[qualification] ?? qualification });
+  if (branch) chips.push({ id: "branch", label: "Filial", value: branches.find((b) => b.id === branch)?.name ?? "Filial" });
+  if (corretor) chips.push({ id: "corretor", label: "Corretor", value: brokers.find((b) => b.id === corretor)?.name ?? "Corretor" });
+  if (pageSize !== "20") chips.push({ id: "pageSize", label: "Por página", value: `${pageSize}/pág.` });
 
-  const qualificationLabels: Record<string, string> = {
-    unqualified: "Sem Qualificação",
-    warm: "Morna",
-    hot: "Quente",
-    disqualified: "Desqualificado",
-  };
+  function handleRemoveChip(chipId: string) {
+    const updated = { ...currentPreferences() };
+    if (chipId === "search") { setSearch(""); updated.search = ""; }
+    if (chipId === "tipo") { setTipo(""); updated.tipo = ""; }
+    if (chipId === "origem") { setOrigem(""); updated.origem = ""; }
+    if (chipId === "eligibleCampaigns") { setEligibleCampaigns(false); updated.eligibleCampaigns = false; }
+    if (chipId === "qualification") { setQualification(""); updated.qualification = ""; }
+    if (chipId === "branch") { setBranch(""); updated.branch = ""; }
+    if (chipId === "corretor") { setCorretor(""); updated.corretor = ""; }
+    if (chipId === "pageSize") { setPageSize("20"); updated.pageSize = "20"; }
+
+    window.localStorage.setItem(storageKey, JSON.stringify(updated));
+    navigateTo(buildUrl(updated));
+  }
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Top Search Bar + Filter Trigger */}
-      <div className="flex w-full items-center gap-2">
-        <form
-          className="relative flex-1 max-w-[300px]"
-          onSubmit={(e) => {
-            e.preventDefault();
-            applyFilters();
-          }}
-        >
-          <Input
-            aria-label="Buscar leads"
-            className="h-9 w-full bg-background px-3 text-xs shadow-xs placeholder:text-muted-foreground focus-visible:ring-1"
-            name="search"
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Buscar por nome ou telefone..."
-            value={search}
-          />
-        </form>
-
-        {/* Filter Popup Button */}
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger render={<Button size="sm" variant={activeCount > 0 ? "default" : "outline"} className="h-9 gap-2 px-3 text-xs font-medium shrink-0 shadow-xs sm:px-3.5" />}>
-            <SlidersHorizontal className="size-4" />
-            <span className="hidden sm:inline">Filtros Avançados</span>
-            <span className="sm:hidden">Filtros</span>
-            {activeCount > 0 && (
-              <Badge variant="secondary" className="ml-0.5 rounded-full px-1.5 py-0 text-[10px] font-bold">
-                {activeCount}
-              </Badge>
-            )}
-          </PopoverTrigger>
-
-          <PopoverContent aria-busy={isPending} align="end" side="bottom" sideOffset={8} className="w-84 rounded-xl border border-border bg-popover p-0 shadow-[0_18px_45px_rgb(15_23_42/0.14)] sm:w-96">
+    <div className="flex flex-col gap-2.5">
+      <FilterBar
+        searchValue={search}
+        onSearchChange={(val) => setSearch(val)}
+        searchPlaceholder="Buscar por nome ou telefone..."
+        quickFilters={
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              applyFilters();
+            }}
+            className="flex items-center gap-2"
+          >
+            <Button
+              type="submit"
+              size="sm"
+              variant="secondary"
+              className="h-8 gap-1.5 px-3 text-xs font-medium"
+            >
+              Buscar
+            </Button>
+          </form>
+        }
+        advancedFiltersTrigger={{
+          activeCount,
+        }}
+        isAdvancedFiltersOpen={open}
+        onAdvancedFiltersOpenChange={setOpen}
+        advancedFiltersContent={
+          <>
             <div className="flex items-center justify-between border-b border-border/70 p-3.5">
               <div className="flex items-center gap-2">
                 <div className="flex size-7 items-center justify-center rounded-lg border border-border/60 bg-muted/40">
@@ -198,7 +251,7 @@ export function LeadsFilters({
                 </div>
                 <div>
                   <h3 className="text-xs font-bold text-foreground">Filtros da Fila</h3>
-                  <p className="text-[11px] text-muted-foreground">Refine os resultados do Kanban e da tabela</p>
+                  <p className="text-[11px] text-muted-foreground">Refine os resultados do Kanban e da lista</p>
                 </div>
               </div>
               {activeCount > 0 ? (
@@ -215,58 +268,69 @@ export function LeadsFilters({
 
             <ScrollArea className="h-[min(65dvh,32rem)]">
               <div className="space-y-4 p-4 pb-6">
-                {/* Tipo (PF / PME) - Segmented Control */}
+                {/* Tipo (PF / PJ) */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Tipo de Lead</label>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Tipo de Lead
+                  </label>
                   <div className="grid grid-cols-3 rounded-lg bg-muted/50 p-0.5 border border-border/40">
                     {[
                       { label: "Todos", val: "" },
                       { label: "PF", val: "PF" },
                       { label: "PJ", val: "PJ" },
                     ].map((opt) => (
-                      <button
+                      <Button
                         key={opt.label}
+                        size="sm"
                         type="button"
+                        variant="ghost"
                         onClick={() => setTipo(opt.val)}
-                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] ${
+                        className={`h-7 rounded-md border-0 text-xs font-medium ${
                           tipo === opt.val
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {opt.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
 
-                {/* Origem - Segmented Control */}
+                {/* Origem */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Origem da Oportunidade</label>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Origem da Oportunidade
+                  </label>
                   <div className="grid grid-cols-3 rounded-lg bg-muted/50 p-0.5 border border-border/40">
                     {[
                       { label: "Todas", val: "" },
                       { label: "Manual", val: "manual" },
                       { label: "Webhook", val: "webhook" },
                     ].map((opt) => (
-                      <button
+                      <Button
                         key={opt.label}
+                        size="sm"
                         type="button"
+                        variant="ghost"
                         onClick={() => setOrigem(opt.val)}
-                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] ${
+                        className={`h-7 rounded-md border-0 text-xs font-medium ${
                           origem === opt.val
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {opt.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
 
+                {/* Campanhas Meta */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Campanhas Meta</label>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Campanhas Meta
+                  </label>
                   <AppSelect
                     aria-label="Campanhas Meta"
                     className="h-8.5"
@@ -282,7 +346,9 @@ export function LeadsFilters({
 
                 {/* Status / Etapa */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Etapa / Status</label>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Etapa / Status
+                  </label>
                   <AppSelect
                     aria-label="Status"
                     className="h-8.5"
@@ -306,7 +372,9 @@ export function LeadsFilters({
 
                 {/* Qualificação */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Status de Qualificação</label>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Status de Qualificação
+                  </label>
                   <AppSelect
                     aria-label="Qualificação"
                     className="h-8.5"
@@ -326,7 +394,9 @@ export function LeadsFilters({
                 {/* Filial */}
                 {branches.length > 0 && (
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Filial / Unidade</label>
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Filial / Unidade
+                    </label>
                     <AppSelect
                       aria-label="Filial"
                       className="h-8.5"
@@ -344,7 +414,9 @@ export function LeadsFilters({
                 {/* Corretor */}
                 {brokers.length > 0 && (
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Corretor Responsável</label>
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Corretor Responsável
+                    </label>
                     <AppSelect
                       aria-label="Corretor"
                       className="h-8.5"
@@ -359,23 +431,27 @@ export function LeadsFilters({
                   </div>
                 )}
 
-                {/* Itens por página - Segmented Control */}
+                {/* Itens por página */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Itens por Página</label>
+                  <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                    Itens por Página
+                  </label>
                   <div className="grid grid-cols-4 rounded-lg bg-muted/50 p-0.5 border border-border/40">
                     {["10", "20", "50", "100"].map((size) => (
-                      <button
+                      <Button
                         key={size}
+                        size="sm"
                         type="button"
+                        variant="ghost"
                         onClick={() => setPageSize(size)}
-                        className={`h-7 rounded-md text-xs font-medium transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] ${
+                        className={`h-7 rounded-md border-0 text-xs font-medium ${
                           pageSize === size
                             ? "bg-background text-foreground shadow-xs font-semibold"
                             : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {size}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -387,7 +463,6 @@ export function LeadsFilters({
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={isPending}
                 onClick={handleReset}
                 className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
               >
@@ -396,9 +471,8 @@ export function LeadsFilters({
               </Button>
 
               <StatefulButton
-                state={isPending ? "loading" : "idle"}
-                loadingText="Aplicando..."
-                onClick={applyFilters}
+                state="idle"
+                onClick={() => applyFilters()}
                 size="sm"
                 className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
                 icon={<SlidersHorizontal className="size-3.5" />}
@@ -406,74 +480,56 @@ export function LeadsFilters({
                 Aplicar
               </StatefulButton>
             </div>
-          </PopoverContent>
-        </Popover>
+          </>
+        }
+        hasActiveFilters={hasAnyFilter}
+        onClearFilters={handleReset}
+      />
 
-        {hasAnyFilter && (
-          <Button
-            size="sm"
-            type="button"
-            variant="ghost"
-            onClick={handleReset}
-            className="h-9 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground shrink-0"
-            title="Limpar todos os filtros"
-          >
-            <X className="size-3.5" />
-            Limpar
-          </Button>
-        )}
+      {/* Quick Filter Status Pills */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
+        {[
+          { id: "", label: "Todos os leads" },
+          { id: "new", label: "Novos", dot: "bg-info" },
+          { id: "in_contact", label: "Em Atendimento", dot: "bg-warning" },
+          { id: "quote_sent", label: "Cotação Enviada", dot: "bg-primary" },
+          { id: "negotiation", label: "Em Negociação", dot: "bg-warning" },
+          { id: "converted", label: "Convertidos", dot: "bg-success" },
+          { id: "lost", label: "Perdidos", dot: "bg-destructive" },
+        ].map((pill) => {
+          const isSelected = (optimisticStatus ?? status) === pill.id;
+          return (
+            <Button
+              key={pill.id}
+              size="sm"
+              type="button"
+              variant="ghost"
+              aria-pressed={isSelected}
+              onClick={() => {
+                setOptimisticStatus(pill.id);
+                setStatus(pill.id);
+                applyFilters({ ...currentPreferences(), status: pill.id });
+              }}
+              className={cn(
+                "h-7 shrink-0 gap-1.5 rounded-full px-3 text-xs font-medium",
+                isSelected
+                  ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                  : "bg-muted/40 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
+              )}
+            >
+              {pill.dot && <span className={cn("size-1.5 rounded-full shrink-0", pill.dot)} />}
+              <span>{pill.label}</span>
+            </Button>
+          );
+        })}
       </div>
 
-      {/* Active Filter Chips */}
-      {hasAnyFilter && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] font-medium text-muted-foreground mr-1">Filtros ativos:</span>
-          {search && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Busca: &quot;{search}&quot;
-            </Badge>
-          )}
-          {status && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Status: {statusLabels[status] ?? status}
-            </Badge>
-          )}
-          {tipo && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Tipo: {tipo === "PME" ? "PJ" : tipo}
-            </Badge>
-          )}
-          {origem && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Origem: {origem === "manual" ? "Manual" : "Webhook"}
-            </Badge>
-          )}
-          {eligibleCampaigns && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Meta: campanhas elegíveis
-            </Badge>
-          )}
-          {qualification && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Qualificação: {qualificationLabels[qualification] ?? qualification}
-            </Badge>
-          )}
-          {branch && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Filial: {branches.find((b) => b.id === branch)?.name ?? "Filial"}
-            </Badge>
-          )}
-          {corretor && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              Corretor: {brokers.find((b) => b.id === corretor)?.name ?? "Corretor"}
-            </Badge>
-          )}
-          {pageSize !== "20" && (
-            <Badge variant="secondary" className="gap-1 text-[11px] font-normal">
-              {pageSize} por pág.
-            </Badge>
-          )}
-        </div>
+      {chips.length > 0 && (
+        <ActiveFilterChips
+          chips={chips}
+          onRemoveChip={handleRemoveChip}
+          onClearAll={handleReset}
+        />
       )}
     </div>
   );

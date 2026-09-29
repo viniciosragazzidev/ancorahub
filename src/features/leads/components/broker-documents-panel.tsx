@@ -2,6 +2,7 @@
 
 import { CheckCircle, FileText, Pause, ArrowsClockwise, Trash, X, HelpCircle } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Document = {
   id: string;
@@ -32,16 +33,14 @@ export function BrokerDocumentsPanel({ documents, requirements }: BrokerDocument
           <h3 className="text-base font-medium text-foreground">Anexar documento</h3>
           <p className="text-[13px] text-muted-foreground mt-0.5">Adicione os documentos do lead! Mostre o seu melhor trabalho</p>
         </div>
-        <button className="text-muted-foreground hover:text-foreground transition-colors p-1">
+        <Button aria-label="Fechar" className="text-muted-foreground" size="icon-sm" variant="ghost">
           <X className="size-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="border border-dashed border-border/60 rounded-xl p-8 flex flex-col items-center justify-center bg-muted/20 gap-3">
         <div className="text-primary mb-1">
-          <svg width="32" height="40" viewBox="0 0 32 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19 2H5.5C4.57174 2 3.6815 2.36875 3.02513 3.02513C2.36875 3.6815 2 4.57174 2 5.5V33.5C2 34.4283 2.36875 35.3185 3.02513 35.9749C3.6815 36.6313 4.57174 37 5.5 37H26.5C27.4283 37 28.3185 36.6313 28.9749 35.9749C29.6313 35.3185 30 34.4283 30 33.5V13L19 2Z" fill="currentColor"/>
-          </svg>
+          <FileText className="size-9" aria-hidden="true" />
         </div>
         <div className="text-center">
           <p className="font-medium text-foreground text-sm">Arraste seus arquivos aqui</p>
@@ -65,8 +64,8 @@ export function BrokerDocumentsPanel({ documents, requirements }: BrokerDocument
                 <p className="text-xs text-muted-foreground truncate">1.2 MB / 4 MB - 2 minutos restando...</p>
                 <div className="flex items-center gap-3 pl-2">
                   <span className="text-xs font-medium text-muted-foreground">30%</span>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors"><Pause className="size-4"/></button>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors"><X className="size-4"/></button>
+                  <Button aria-label="Pausar upload" className="text-muted-foreground" size="icon-sm" variant="ghost"><Pause className="size-4"/></Button>
+                  <Button aria-label="Cancelar upload" className="text-muted-foreground" size="icon-sm" variant="ghost"><X className="size-4"/></Button>
                 </div>
               </div>
             </div>
@@ -87,8 +86,8 @@ export function BrokerDocumentsPanel({ documents, requirements }: BrokerDocument
                 <p className="text-xs text-red-400 truncate">819.2 KB / 8 MB - falhou</p>
                 <div className="flex items-center gap-3 pl-2">
                   <span className="text-xs font-medium text-red-400">20%</span>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors"><ArrowsClockwise className="size-4"/></button>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors"><X className="size-4"/></button>
+                  <Button aria-label="Tentar novamente" className="text-muted-foreground" size="icon-sm" variant="ghost"><ArrowsClockwise className="size-4"/></Button>
+                  <Button aria-label="Remover arquivo" className="text-muted-foreground" size="icon-sm" variant="ghost"><X className="size-4"/></Button>
                 </div>
               </div>
             </div>
@@ -110,7 +109,7 @@ export function BrokerDocumentsPanel({ documents, requirements }: BrokerDocument
                 <div className="flex items-center gap-3 pl-2">
                   <span className="text-xs font-medium text-green-500">100%</span>
                   <CheckCircle className="size-4 text-green-500"/>
-                  <button className="text-muted-foreground hover:text-foreground transition-colors"><Trash className="size-4"/></button>
+                  <Button aria-label="Excluir arquivo" className="text-muted-foreground" size="icon-sm" variant="ghost"><Trash className="size-4"/></Button>
                 </div>
               </div>
             </div>
@@ -127,14 +126,14 @@ export function BrokerDocumentsPanel({ documents, requirements }: BrokerDocument
 
       <div className="flex items-center border border-border rounded-md overflow-hidden bg-background focus-within:ring-1 focus-within:ring-primary/50 transition-all">
         <div className="bg-muted/30 px-3 py-2 text-sm text-muted-foreground border-r border-border">http://</div>
-        <input type="text" placeholder="Cole seu link aqui" className="flex-1 bg-transparent border-none outline-none px-3 text-sm text-foreground placeholder:text-muted-foreground" />
+        <Input type="url" placeholder="Cole seu link aqui" className="flex-1 rounded-none border-0 bg-transparent shadow-none focus-visible:ring-0" />
         <Button variant="ghost" size="sm" className="rounded-none px-4 hover:bg-secondary border-l border-border">Enviar</Button>
       </div>
 
       <div className="flex items-center justify-between mt-2">
-        <button className="text-sm text-muted-foreground flex items-center gap-1.5 hover:text-foreground transition-colors">
+        <Button className="text-muted-foreground" size="sm" variant="ghost">
           <HelpCircle className="size-4" /> Ajuda
-        </button>
+        </Button>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" className="bg-transparent border-border hover:bg-secondary">Descartar</Button>
           <Button variant="default" size="sm">Anexar arquivo</Button>

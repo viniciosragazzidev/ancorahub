@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAiRouter, DEFAULT_GROQ_MODEL, DEFAULT_OPENROUTER_MODEL } from "./model-router";
 
 function okJson(body: unknown) {
@@ -10,13 +10,20 @@ function errorResponse(status: number, message: string) {
 }
 
 describe("model-router", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+  // Isola o teste de qualquer configuração real de ambiente (ex.: .env.local),
+  // para que o roteador comece sem chaves e sem acesso ao banco em todos os casos.
+  beforeEach(() => {
     delete process.env.GROQ_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.GROQ_MODEL;
     delete process.env.OPENROUTER_MODEL;
     delete process.env.AI_PROVIDER_ORDER;
+    delete process.env.DATABASE_URL;
+    delete process.env.SUPABASE_DB_URL;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("returns no providers when no API key is configured", async () => {

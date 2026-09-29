@@ -1,27 +1,53 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { calculateBrokerRankingScore, defaultIntelligentDistributionPolicy, resolveDistributionCandidate, type IntelligentDistributionPolicy, type RankedBroker } from "./domain";
+import { pickDistinctHue, QUEUE_HUE_MAX, QUEUE_HUE_MIN } from "./queue-color";
+import { QUEUE_SINGLETON_SOURCE_IDS, QUEUE_SOURCE_OPTIONS } from "./routing-catalog";
+import { dutyFallbackPolicyValues, type DutyFallbackPolicy } from "./types";
+import { getLocalDutyParts } from "@/features/leads/assignment";
 
 const queueInput = z.object({
   id: z.string().uuid().optional(),
   branchId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   exclusiveDutyScheduleId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
+  exclusiveDutyScheduleIds: z.array(z.string().uuid()).max(30).default([]),
+  dutyFallbackPolicy: z.enum(dutyFallbackPolicyValues).default("unit_roster"),
+  dutyFallbackQueueId: z.preprocess((v) => (v === "" || v === undefined ? null : v), z.string().uuid().nullable().optional()),
   allowedBranchIds: z.array(z.string().uuid()).default([]),
   allowedBrokerIds: z.array(z.string().uuid()).default([]),
+  allowedSourceIds: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   name: z.string().trim().min(3).max(60),
   assignmentMode: z.enum(["automatic", "manual"]),
   assignmentStrategy: z.enum(["round_robin", "capacity"]),
   capacityEnabled: z.boolean(),
   capacityPerBroker: z.number().int().min(1).max(200).nullable(),
+  // Offer pacing (0 disables each rule). Omitted keeps the queue defaults.
+  offerIntervalMinutes: z.number().int().min(0).max(120).default(5),
+  maxPendingOffersPerBroker: z.number().int().min(0).max(20).default(1),
   aiQualificationEnabled: z.boolean().default(true),
+  /** Attendance flow (DEC-127). Omitted keeps the current one; null = today's intake. */
+  attendanceFlowId: z.string().uuid().nullable().optional(),
   status: z.enum(["active", "inactive"]),
+  // Omitted/null → the server assigns one automatically (create) or keeps the
+  // queue's current color untouched (update). See saveDistributionQueue.
+  colorHue: z.number().int().min(QUEUE_HUE_MIN).max(QUEUE_HUE_MAX).nullable().optional(),
+}).superRefine((input, refinement) => {
+  if (input.dutyFallbackPolicy === "fallback_queue" && !input.dutyFallbackQueueId) {
+    refinement.addIssue({ code: z.ZodIssueCode.custom, path: ["dutyFallbackQueueId"], message: "Selecione a fila de contingência." });
+  }
+  if (input.dutyFallbackPolicy !== "fallback_queue" && input.dutyFallbackQueueId) {
+    refinement.addIssue({ code: z.ZodIssueCode.custom, path: ["dutyFallbackQueueId"], message: "A fila de contingência só pode ser usada com essa política." });
+  }
+  if (input.id && input.dutyFallbackQueueId === input.id) {
+    refinement.addIssue({ code: z.ZodIssueCode.custom, path: ["dutyFallbackQueueId"], message: "A fila não pode apontar para ela mesma." });
+  }
 });
 
 const simulationInput = z.object({
@@ -52,8 +78,24 @@ const adQueueRouteInput = z.object({
 });
 
 function assertManager(context: TenantContext, branchId?: string | null) {
-  if (context.role !== "director" && context.role !== "manager") throw new AuthorizationError("Sem permissão para administrar filas.");
-  if (context.role === "manager" && branchId && context.branchId !== branchId) throw new AuthorizationError("Você só pode administrar filas da sua unidade.");
+  if (context.role !== "director" && context.role !== "manager") {
+    throw new AuthorizationError("Sem permissão para administrar filas.");
+  }
+  if (context.role === "manager") {
+    const authorizedUnitIds: readonly string[] =
+      "allowedUnitIds" in context && Array.isArray((context as { allowedUnitIds?: string[] }).allowedUnitIds)
+        ? (context as { allowedUnitIds: string[] }).allowedUnitIds
+        : context.branchId
+          ? [context.branchId]
+          : [];
+
+    if (!branchId) {
+      throw new AuthorizationError("Gestores não podem administrar filas globais do tenant.");
+    }
+    if (!authorizedUnitIds.includes(branchId)) {
+      throw new AuthorizationError("Você só pode administrar filas das suas unidades autorizadas.");
+    }
+  }
 }
 
 function slugify(text: string): string {
@@ -73,51 +115,230 @@ function readPolicy(value: unknown): IntelligentDistributionPolicy {
     excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }
 
+async function assertQueueSourceConflicts(
+  db: ReturnType<typeof getDatabase>,
+  context: TenantContext,
+  sourceIds: string[],
+  editingQueueId?: string,
+) {
+  const singletonSources = sourceIds.filter((sourceId) => QUEUE_SINGLETON_SOURCE_IDS.some((candidate) => candidate === sourceId));
+  if (!singletonSources.length) return;
+
+  const existing = await db
+    .select({ queueId: schema.leadQueues.id, queueName: schema.leadQueues.name, policy: schema.leadDistributionPolicies.policy })
+    .from(schema.leadQueues)
+    .innerJoin(schema.leadDistributionPolicies, and(
+      eq(schema.leadDistributionPolicies.tenantId, schema.leadQueues.tenantId),
+      eq(schema.leadDistributionPolicies.queueId, schema.leadQueues.id),
+      eq(schema.leadDistributionPolicies.enabled, true),
+    ))
+    .where(and(
+      eq(schema.leadQueues.tenantId, context.tenantId),
+      eq(schema.leadQueues.status, "active"),
+      isNull(schema.leadQueues.deletedAt),
+      editingQueueId ? ne(schema.leadQueues.id, editingQueueId) : undefined,
+    ));
+
+  for (const row of existing) {
+    const claimed = readPolicy(row.policy).allowedSourceIds ?? [];
+    const conflict = singletonSources.find((sourceId) => claimed.includes(sourceId));
+    if (conflict) {
+      const label = conflict === "manual" ? "Manual / importação" : "Webhook";
+      throw new AuthorizationError(`A fonte ${label} já está vinculada à fila "${row.queueName}". Uma fonte exclusiva só pode pertencer a uma fila ativa.`);
+    }
+  }
+}
+
+async function assertDutyFallbackQueue(
+  db: ReturnType<typeof getDatabase>,
+  context: TenantContext,
+  queueId: string | undefined,
+  fallbackQueueId: string | null | undefined,
+  policy: DutyFallbackPolicy,
+) {
+  if (policy !== "fallback_queue" || !fallbackQueueId) return;
+  const queues = await db
+    .select({
+      id: schema.leadQueues.id,
+      branchId: schema.leadQueues.branchId,
+      status: schema.leadQueues.status,
+      deletedAt: schema.leadQueues.deletedAt,
+      dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy,
+      dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId,
+    })
+    .from(schema.leadQueues)
+    .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, fallbackQueueId)))
+    .limit(1);
+  const fallbackQueue = queues[0];
+  if (!fallbackQueue || fallbackQueue.status !== "active" || fallbackQueue.deletedAt) {
+    throw new AuthorizationError("A fila de contingência precisa ser uma fila ativa desta corretora.");
+  }
+  if (queueId && fallbackQueue.id === queueId) {
+    throw new AuthorizationError("A fila não pode apontar para ela mesma.");
+  }
+  if (context.role === "manager") assertManager(context, fallbackQueue.branchId);
+
+  // Follow the configured chain with the edited queue overlaid in memory. A
+  // cycle would make a lead move forever without ever reaching a broker.
+  const visited = new Set<string>(queueId ? [queueId] : []);
+  let current: typeof fallbackQueue | undefined = fallbackQueue;
+  while (current?.dutyFallbackPolicy === "fallback_queue" && current.dutyFallbackQueueId) {
+    if (visited.has(current.dutyFallbackQueueId)) {
+      throw new AuthorizationError("As filas de contingência formam um ciclo. Escolha uma fila sem esse encadeamento.");
+    }
+    visited.add(current.dutyFallbackQueueId);
+    const [next] = await db
+      .select({
+        id: schema.leadQueues.id,
+        branchId: schema.leadQueues.branchId,
+        status: schema.leadQueues.status,
+        deletedAt: schema.leadQueues.deletedAt,
+        dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy,
+        dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId,
+      })
+      .from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, current.dutyFallbackQueueId)))
+      .limit(1);
+    if (!next || next.status !== "active" || next.deletedAt) {
+      throw new AuthorizationError("Todas as filas de contingência precisam permanecer ativas.");
+    }
+    current = next;
+  }
+}
+
+async function getDutyFallbackWarning(
+  db: ReturnType<typeof getDatabase>,
+  tenantId: string,
+  branchId: string | null,
+  scheduleIds: string[],
+  policy: DutyFallbackPolicy,
+) {
+  if (policy !== "wait_next_duty" || !scheduleIds.length) return undefined;
+  const local = getLocalDutyParts(new Date());
+  const schedules = await db
+    .select({ id: schema.unitDutySchedules.id })
+    .from(schema.unitDutySchedules)
+    .where(and(
+      eq(schema.unitDutySchedules.tenantId, tenantId),
+      inArray(schema.unitDutySchedules.id, scheduleIds),
+      branchId ? or(isNull(schema.unitDutySchedules.branchId), eq(schema.unitDutySchedules.branchId, branchId)) : undefined,
+      eq(schema.unitDutySchedules.status, "active"),
+      eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
+      lte(schema.unitDutySchedules.startsAt, local.time),
+      gt(schema.unitDutySchedules.endsAt, local.time),
+      lte(schema.unitDutySchedules.validFrom, new Date()),
+      or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, new Date())),
+    ));
+  return schedules.length
+    ? undefined
+    : "Nenhum plantão selecionado está ativo agora; os leads aguardarão o próximo plantão.";
+}
+
 export async function saveDistributionQueue(context: TenantContext, rawInput: unknown) {
   const input = queueInput.parse(rawInput);
+  const allowedSourceIds = Array.from(new Set(input.allowedSourceIds));
+  const invalidSource = allowedSourceIds.find((sourceId) => !QUEUE_SOURCE_OPTIONS.some((source) => source.id === sourceId));
+  if (invalidSource) throw new AuthorizationError("A fila contém uma fonte de entrada inválida.");
   if (input.branchId) {
     assertManager(context, input.branchId);
   }
   const db = getDatabase();
+  if (input.attendanceFlowId) {
+    const [flow] = await db.select({ id: schema.attendanceFlows.id }).from(schema.attendanceFlows)
+      .where(and(eq(schema.attendanceFlows.id, input.attendanceFlowId), eq(schema.attendanceFlows.tenantId, context.tenantId), eq(schema.attendanceFlows.status, "active"))).limit(1);
+    if (!flow) throw new AuthorizationError("Fluxo de atendimento não encontrado.");
+  }
   if (input.branchId) {
     const [branch] = await db.select({ id: schema.branches.id }).from(schema.branches)
       .where(and(eq(schema.branches.id, input.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
     if (!branch) throw new AuthorizationError("Unidade não encontrada no seu escopo.");
   }
-  if (input.exclusiveDutyScheduleId) {
-    const [schedule] = await db
+  const requestedDutyScheduleIds = Array.from(new Set([
+    ...(input.exclusiveDutyScheduleIds ?? []),
+    ...(input.exclusiveDutyScheduleId ? [input.exclusiveDutyScheduleId] : []),
+  ]));
+  // Ids the editor never showed as selected (a plantão deleted after the
+  // page loaded, from another tab, etc.) are dropped rather than blocking
+  // the whole save — self-healing instead of "um dos plantões selecionados
+  // não pertence a esta corretora" for a plantão nobody can see to uncheck.
+  let dutyScheduleIds: string[] = [];
+  if (requestedDutyScheduleIds.length) {
+    const schedules = await db
       .select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId })
       .from(schema.unitDutySchedules)
       .where(
         and(
-          eq(schema.unitDutySchedules.id, input.exclusiveDutyScheduleId),
           eq(schema.unitDutySchedules.tenantId, context.tenantId),
+          inArray(schema.unitDutySchedules.id, requestedDutyScheduleIds),
         ),
-      )
-      .limit(1);
+      );
 
-    if (!schedule) throw new AuthorizationError("Plantão não encontrado no escopo desta corretora.");
-    if (input.branchId && schedule.branchId !== input.branchId) {
-      throw new AuthorizationError("O plantão selecionado precisa pertencer à mesma unidade da fila.");
+    if (input.branchId && schedules.some((schedule) => schedule.branchId && schedule.branchId !== input.branchId)) {
+      throw new AuthorizationError("Todos os plantões selecionados precisam pertencer à mesma unidade da fila.");
     }
-    assertManager(context, schedule.branchId);
+    for (const schedule of schedules) {
+      if (schedule.branchId) assertManager(context, schedule.branchId);
+      else if (context.role !== "director" && !input.branchId) {
+        throw new AuthorizationError("Plantões globais precisam estar vinculados a uma fila da unidade.");
+      }
+    }
+    dutyScheduleIds = schedules.map((schedule) => schedule.id);
+  }
+
+  await assertDutyFallbackQueue(db, context, input.id, input.dutyFallbackQueueId ?? null, input.dutyFallbackPolicy);
+
+  // Inactive queues are not consumers and therefore must not block an active
+  // queue from claiming a singleton source while being edited or staged.
+  if (input.status === "active") {
+    await assertQueueSourceConflicts(db, context, allowedSourceIds, input.id);
+  }
+
+  // The UI always sends a concrete hue (auto-picked when the dialog opens, or
+  // chosen from the swatch grid / "Aleatória"). This is only a safety net for
+  // callers that omit it: assign a fresh one on create, keep the existing
+  // value untouched on update.
+  let colorHue = input.colorHue ?? null;
+  if (colorHue === null) {
+    if (input.id) {
+      const [existing] = await db
+        .select({ colorHue: schema.leadQueues.colorHue })
+        .from(schema.leadQueues)
+        .where(and(eq(schema.leadQueues.id, input.id), eq(schema.leadQueues.tenantId, context.tenantId)))
+        .limit(1);
+      colorHue = existing?.colorHue ?? null;
+    }
+    if (colorHue === null) {
+      const usedHueRows = await db
+        .select({ colorHue: schema.leadQueues.colorHue })
+        .from(schema.leadQueues)
+        .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt)));
+      colorHue = pickDistinctHue(usedHueRows.map((row) => row.colorHue));
+    }
   }
 
   const now = new Date();
   const values = {
     branchId: input.branchId || null,
-    exclusiveDutyScheduleId: input.exclusiveDutyScheduleId || null,
+    exclusiveDutyScheduleId: dutyScheduleIds[0] ?? null,
+    exclusiveDutyScheduleIds: dutyScheduleIds,
+    dutyFallbackPolicy: input.dutyFallbackPolicy,
+    dutyFallbackQueueId: input.dutyFallbackPolicy === "fallback_queue" ? input.dutyFallbackQueueId ?? null : null,
     name: input.name,
     assignmentMode: input.assignmentMode,
     assignmentStrategy: input.assignmentStrategy,
     capacityEnabled: input.capacityEnabled,
     capacityPerBroker: input.capacityEnabled ? input.capacityPerBroker : null,
+    offerIntervalMinutes: input.offerIntervalMinutes,
+    maxPendingOffersPerBroker: input.maxPendingOffersPerBroker,
     aiQualificationEnabled: input.aiQualificationEnabled,
+    ...(input.attendanceFlowId !== undefined ? { attendanceFlowId: input.attendanceFlowId } : {}),
     status: input.status,
+    colorHue,
     updatedAt: now,
   };
 
@@ -149,6 +370,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     ...currentPolicy,
     allowedBranchIds: input.allowedBranchIds,
     allowedBrokerIds: input.allowedBrokerIds,
+    allowedSourceIds,
   };
 
   if (existingPolicy) {
@@ -168,7 +390,47 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     });
   }
 
-  return { id: queueId, created };
+  const warning = await getDutyFallbackWarning(
+    db,
+    context.tenantId,
+    input.branchId ?? null,
+    dutyScheduleIds,
+    input.dutyFallbackPolicy,
+  );
+  return { id: queueId, created, warning };
+}
+
+/**
+ * Picking a "fila responsável" while creating a plantão is a shortcut for the
+ * same thing the queue editor's "Exclusividade de Plantão" checklist already
+ * does — it does NOT write `unit_duty_schedules.queue_id` (legacy, kept only
+ * for rows created before that model existed). One writer, one source of
+ * truth: `lead_queues.exclusive_duty_schedule_ids`.
+ */
+export async function syncDutySchedulesIntoQueue(context: TenantContext, queueId: string, scheduleIds: string[]) {
+  const ids = scheduleIds.filter(Boolean);
+  if (!ids.length) return;
+  const db = getDatabase();
+  const [queue] = await db
+    .select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds })
+    .from(schema.leadQueues)
+    .where(and(eq(schema.leadQueues.id, queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
+    .limit(1);
+  if (!queue) throw new AuthorizationError("Fila não encontrada no seu escopo.");
+  assertManager(context, queue.branchId);
+  const merged = Array.from(new Set([...(queue.exclusiveDutyScheduleIds ?? []), ...ids]));
+  await db.update(schema.leadQueues).set({
+    exclusiveDutyScheduleIds: merged,
+    exclusiveDutyScheduleId: merged[0] ?? null,
+    updatedAt: new Date(),
+  }).where(eq(schema.leadQueues.id, queue.id));
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId: context.userId,
+    entidade: "lead_queue",
+    entidadeId: queue.id,
+    acao: "queue.duty_schedules_synced",
+  });
 }
 
 export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInput: unknown) {
@@ -187,6 +449,19 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
   if (input.enabled && input.queueId && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
   if (input.enabled && queue) assertManager(context, queue.branchId);
   if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de uma campanha no CRM.");
+  if (input.enabled && input.queueId) {
+    const [existingRoute] = await db.select({ queueId: schema.metaCampaignQueueRoutes.queueId })
+      .from(schema.metaCampaignQueueRoutes)
+      .where(and(
+        eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId),
+        eq(schema.metaCampaignQueueRoutes.campaignId, campaign.campaignId),
+        eq(schema.metaCampaignQueueRoutes.enabled, true),
+      ))
+      .limit(1);
+    if (existingRoute?.queueId && existingRoute.queueId !== input.queueId) {
+      throw new AuthorizationError("Esta campanha já está vinculada a outra fila. Desative a rota atual antes de escolher um novo destino.");
+    }
+  }
   const now = new Date();
   await db.insert(schema.metaCampaignQueueRoutes).values({
     id: randomUUID(), tenantId: context.tenantId, campaignId: campaign.campaignId, queueId: queue?.id ?? null,
@@ -218,6 +493,19 @@ export async function saveMetaAdQueueRoute(context: TenantContext, rawInput: unk
   if (input.enabled && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
   if (input.enabled && queue) assertManager(context, queue.branchId);
   if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de um anúncio no CRM.");
+  if (input.enabled && input.queueId) {
+    const [existingRoute] = await db.select({ queueId: schema.metaAdQueueRoutes.queueId })
+      .from(schema.metaAdQueueRoutes)
+      .where(and(
+        eq(schema.metaAdQueueRoutes.tenantId, context.tenantId),
+        eq(schema.metaAdQueueRoutes.adId, ad.adId),
+        eq(schema.metaAdQueueRoutes.enabled, true),
+      ))
+      .limit(1);
+    if (existingRoute?.queueId && existingRoute.queueId !== input.queueId) {
+      throw new AuthorizationError("Este anúncio já está vinculado a outra fila. Desative a rota atual antes de escolher um novo destino.");
+    }
+  }
   const now = new Date();
   await db.insert(schema.metaAdQueueRoutes).values({
     id: randomUUID(), tenantId: context.tenantId, adId: ad.adId, queueId: queue?.id ?? null,
@@ -316,7 +604,7 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
     queue: effectiveQueue,
     eligible: decision.eligible.map((candidate) => ({ id: candidate.id, name: brokers.find((broker) => broker.id === candidate.id)?.name ?? "Corretor", activeLeads: candidate.activeLeads, capacity: candidate.capacity, score: candidate.rankingScore })),
     selected: decision.selected ? { id: decision.selected.id, name: brokers.find((broker) => broker.id === decision.selected?.id)?.name ?? "Corretor", activeLeads: decision.selected.activeLeads, capacity: decision.selected.capacity } : null,
-    reason: decision.selected ? "A simulação usa a mesma ordenação determinística da distribuição automática. Nenhum dado foi alterado." : "Todos os corretores elegíveis estão na capacidade da fila.",
+    reason: decision.selected ? "A simulação usa os mesmos critérios da distribuição automática (empates são sorteados). Nenhum dado foi alterado." : "Todos os corretores elegíveis estão na capacidade da fila.",
   };
 }
 
@@ -342,7 +630,7 @@ export async function getQueueDependencies(context: TenantContext, queueId: stri
       .leftJoin(schema.metaAds, and(eq(schema.metaAdQueueRoutes.adId, schema.metaAds.adId), eq(schema.metaAdQueueRoutes.tenantId, schema.metaAds.tenantId)))
       .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), eq(schema.metaAdQueueRoutes.queueId, queueId), eq(schema.metaAdQueueRoutes.enabled, true))),
     db.select({ count: count(schema.leads.id) }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.queueId, queueId), isNull(schema.leads.deletedAt), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"]))).limit(1),
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.queueId, queueId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"]))).limit(1),
   ]);
 
   return {

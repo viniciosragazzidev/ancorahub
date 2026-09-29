@@ -40,7 +40,7 @@ export function LeadsPagination({
       params.set("page", page.toString());
       const newUrl = `${pathname}?${params.toString()}`;
       startTransition(() => {
-        router.push(newUrl);
+        router.replace(newUrl, { scroll: false });
       });
     }
   }
@@ -62,7 +62,7 @@ export function LeadsPagination({
       }
       const newUrl = `${pathname}?${params.toString()}`;
       startTransition(() => {
-        router.push(newUrl);
+        router.replace(newUrl, { scroll: false });
       });
     }
   }

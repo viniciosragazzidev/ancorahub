@@ -8,7 +8,7 @@ import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, Dia
 import { Input } from "@/components/ui/input";
 import { AppSelect } from "@/components/ui/select";
 import type { ReportDefinition, ReportFormat } from "@/features/reports/report-registry";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 type RangePreset = "30" | "90" | "custom";
 

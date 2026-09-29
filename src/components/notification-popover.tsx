@@ -153,14 +153,16 @@ export function NotificationPopover() {
                   </Badge>
                 ) : null}
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="text-muted-foreground"
                 aria-label="Fechar notificações"
+                size="icon-sm"
+                variant="ghost"
               >
-                ×
-              </button>
+                <XCircle className="size-4" aria-hidden="true" />
+              </Button>
             </header>
             <Separator className="mx-4 w-[calc(100%-2rem)]" />
             <PushNotificationManager variant="compact" />
@@ -199,22 +201,24 @@ export function NotificationPopover() {
                           <p className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-muted-foreground">{item.message}</p>
                           <div className="mt-2 flex items-center gap-2">
                             {item.leadId ? (
-                              <button
+                              <Button
                                 type="button"
                                 onClick={() => { setOpen(false); router.push(`/leads/${item.leadId}`); }}
-                                className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline"
+                                className="h-auto gap-1 p-0 text-[10px]"
+                                variant="link"
                               >
                                 Ver lead <ArrowRight className="size-2.5" />
-                              </button>
+                              </Button>
                             ) : null}
                             {!item.readAt ? (
-                              <button
+                              <Button
                                 type="button"
                                 onClick={() => void markRead(item.id)}
-                                className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-foreground"
+                                className="h-auto gap-1 p-0 text-[10px] text-muted-foreground"
+                                variant="link"
                               >
                                 <CheckCircle className="size-2.5" /> Marcar lida
-                              </button>
+                              </Button>
                             ) : null}
                           </div>
                         </div>
@@ -243,7 +247,7 @@ export function NotificationPopover() {
 
   return (
     <div className="relative inline-flex items-center">
-      <button
+      <Button
         ref={triggerRef}
         type="button"
         onClick={() => {
@@ -257,10 +261,11 @@ export function NotificationPopover() {
           });
         }}
         className={cn(
-          "group/notif-trigger relative inline-flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-[background-color,color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
-          "hover:bg-muted hover:text-foreground",
+          "group/notif-trigger relative size-8 text-muted-foreground",
           open && "bg-muted text-foreground"
         )}
+        size="icon-sm"
+        variant="ghost"
         aria-label={unreadCount > 0 ? `${unreadCount} notificações não lidas` : "Notificações"}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -271,7 +276,7 @@ export function NotificationPopover() {
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         ) : null}
-      </button>
+      </Button>
 
       {mounted && createPortal(popoverContent, document.body)}
     </div>

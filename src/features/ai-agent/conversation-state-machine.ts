@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gt, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, ne, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
@@ -17,17 +17,22 @@ import {
 } from "./guardrails";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
+import { resolveCanonicalWhatsAppDestination } from "@/features/communication-channels/phone-resolution";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
-import { loadQuickReplyTemplates, resolveQuickReply, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
+import { loadQuickReplyTemplates, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
-import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
+import { shouldQueueLeadAfterTerminalReply } from "./quick-reply";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
 import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
+import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
+import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
+import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
 
 
 export type ConversationStatus =
@@ -169,7 +174,11 @@ export async function sendAiOutbound(input: {
 }) {
   const transport = input.transport ?? "meta";
   const db = getDatabase();
-  const last8Digits = input.phone.replace(/\D/g, "").slice(-8);
+  const deliveryPhone = await resolveCanonicalWhatsAppDestination({
+    tenantId: input.tenantId,
+    phone: input.phone,
+  });
+  const last9Digits = input.phone.replace(/\D/g, "").slice(-9);
   const [lastOutbound] = await db
     .select({ sentAt: schema.whatsappMessages.sentAt })
     .from(schema.whatsappMessages)
@@ -178,7 +187,7 @@ export async function sendAiOutbound(input: {
         eq(schema.whatsappMessages.tenantId, input.tenantId),
         or(
           eq(schema.whatsappMessages.phone, input.phone),
-          sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
+          sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 9) = ${last9Digits}`
         ),
         or(
           eq(schema.whatsappMessages.senderRole, "assistant"),
@@ -207,7 +216,7 @@ export async function sendAiOutbound(input: {
 
   if (input.transport === "openwa" && input.openWaSessionId) {
     try {
-      const sent = await sendOpenWaText(input.openWaSessionId, input.phone, input.body);
+      const sent = await sendOpenWaText(input.openWaSessionId, deliveryPhone ?? input.phone, input.body);
       if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
     } catch (err) {
       console.warn("[sendAiOutbound] openwa primary failed", err);
@@ -226,7 +235,7 @@ export async function sendAiOutbound(input: {
   const channel = await getPreferredMetaCloudChannel({ tenantId: input.tenantId });
   if (channel) {
     try {
-      const sent = await sendMetaCloudChannelText({ channel, to: input.phone, body: input.body });
+      const sent = await sendMetaCloudChannelText({ channel, to: deliveryPhone ?? input.phone, body: input.body });
       if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
     } catch (err) {
       console.warn("[sendAiOutbound] meta cloud failed", err);
@@ -241,7 +250,7 @@ export async function sendAiOutbound(input: {
     .limit(1);
   if (openWaConn?.sessionId) {
     try {
-      const sent = await sendOpenWaText(openWaConn.sessionId, input.phone, input.body);
+      const sent = await sendOpenWaText(openWaConn.sessionId, deliveryPhone ?? input.phone, input.body);
       if (sent.messageId) return { status: "sent" as const, messageId: sent.messageId };
     } catch (err) {
       console.warn("[sendAiOutbound] openwa fallback failed", err);
@@ -433,11 +442,23 @@ export async function getOrCreateAiConversation({
   return created;
 }
 
+/**
+ * Whether starting qualification resumes a conversation instead of opening a
+ * new one with the greeting. A conversation is created with its start time,
+ * so the start time alone never means "already talking" (it made every new
+ * lead skip the greeting).
+ */
+export function isExistingQualificationConversation(input: { hasMessages: boolean; status: string; lastProcessedMessageId?: string | null }) {
+  return input.hasMessages || input.status !== "NEW" || Boolean(input.lastProcessedMessageId);
+}
+
 export async function startQualificationConversationForLead(
   input: { tenantId: string; leadId: string; actorUserId: string },
-  force: boolean = false
+  force: boolean = false,
+  /** Started by a queue's attendance flow (DEC-126): the director chose the new engine for that queue. */
+  options: { fromFlow?: boolean } = {},
 ) {
-  if ((await getSystemSetting("feature_qualification_engine_enabled")) === "false") return { started: false as const, reason: "disabled" as const };
+  if (!options.fromFlow && (await getSystemSetting("feature_qualification_engine_enabled")) === "false") return { started: false as const, reason: "disabled" as const };
   const db = getDatabase();
   const [lead] = await db.select({
     id: schema.leads.id,
@@ -478,7 +499,10 @@ export async function startQualificationConversationForLead(
 
   const last8Digits = lead.telefone.replace(/\D/g, "").slice(-8);
 
-  // CHECK IF THE LEAD ALREADY HAS ANY MESSAGES IN WHATSAPP MESSAGES HISTORY OR EXISTING CONVERSATION STATE
+  // CHECK IF THE LEAD ALREADY HAS ANY MESSAGES IN WHATSAPP MESSAGES HISTORY OR EXISTING CONVERSATION STATE.
+  // By phone alone only what the customer wrote counts (they may write before
+  // the lead exists); messages sent to that phone for other purposes (team
+  // notices to a broker with the same number) are not this conversation.
   const [existingMsg] = await db
     .select({ id: schema.whatsappMessages.id })
     .from(schema.whatsappMessages)
@@ -488,16 +512,20 @@ export async function startQualificationConversationForLead(
         or(
           eq(schema.whatsappMessages.leadId, input.leadId),
           eq(schema.whatsappMessages.conversationId, conversation.id),
-          sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`
+          and(
+            sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${last8Digits}`,
+            inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+          ),
         )
       )
     )
     .limit(1);
 
-  const isExistingConversation = Boolean(existingMsg)
-    || conversation.status !== "NEW"
-    || Boolean(conversation.lastProcessedMessageId)
-    || Boolean(conversation.startedAt);
+  const isExistingConversation = isExistingQualificationConversation({
+    hasMessages: Boolean(existingMsg),
+    status: conversation.status,
+    lastProcessedMessageId: conversation.lastProcessedMessageId,
+  });
 
   if (isExistingConversation) {
     if (isAlreadyQualifiedOrInHumanState) {
@@ -619,175 +647,54 @@ export async function startQualificationConversationForLead(
     return { started: true as const, conversationId: conversation.id, deduped: true };
   }
 
-  // Attempt sending Meta Approved Template first for outbound 24h window
-  let dispatchedViaTemplate = false;
+  // The configured FIRST_CONTACT event owns channel eligibility and fallback.
   let finalBody = body;
   let finalMessageId = `ai_msg_start_${crypto.randomUUID()}`;
 
   try {
-    const { resolveMetaChannelCredentials } = await import("@/features/communication-channels/template-sync-service");
-    const { sendMetaCloudTemplateTest } = await import("@/features/communication-channels/meta-graph-templates-client");
-    const credentials = await resolveMetaChannelCredentials(input.tenantId);
-
-    if (credentials.phoneNumberId && credentials.accessToken) {
-      // 1. Check metaWhatsAppTemplateUsages for user-selected default FIRST_CONTACT template
-      const [userDefaultTemplate] = await db
-        .select({
-          id: schema.metaWhatsAppTemplates.id,
-          name: schema.metaWhatsAppTemplates.name,
-          language: schema.metaWhatsAppTemplates.language,
-          category: schema.metaWhatsAppTemplates.category,
-          status: schema.metaWhatsAppTemplates.status,
-          bodyText: schema.metaWhatsAppTemplates.bodyText,
-          componentsJson: schema.metaWhatsAppTemplates.componentsJson,
-        })
-        .from(schema.metaWhatsAppTemplateUsages)
-        .innerJoin(
-          schema.metaWhatsAppTemplates,
-          eq(schema.metaWhatsAppTemplateUsages.templateId, schema.metaWhatsAppTemplates.id)
-        )
-        .where(
-          and(
-            eq(schema.metaWhatsAppTemplateUsages.tenantId, input.tenantId),
-            eq(schema.metaWhatsAppTemplateUsages.eventKey, "FIRST_CONTACT"),
-            eq(schema.metaWhatsAppTemplateUsages.active, true),
-            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
-            isNull(schema.metaWhatsAppTemplates.deletedAt)
-          )
-        )
-        .limit(1);
-
-      // 2. Fall back to template named lead_first_contact
-      const [firstContactTemplate] = userDefaultTemplate ? [null] : await db
-        .select()
-        .from(schema.metaWhatsAppTemplates)
-        .where(
-          and(
-            eq(schema.metaWhatsAppTemplates.tenantId, input.tenantId),
-            eq(schema.metaWhatsAppTemplates.name, "lead_first_contact"),
-            eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
-            isNull(schema.metaWhatsAppTemplates.deletedAt)
-          )
-        )
-        .limit(1);
-
-      // 3. Fall back to any approved template
-      const template = userDefaultTemplate ?? firstContactTemplate ?? (
-        await db
-          .select()
-          .from(schema.metaWhatsAppTemplates)
-          .where(
-            and(
-              eq(schema.metaWhatsAppTemplates.tenantId, input.tenantId),
-              eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
-              isNull(schema.metaWhatsAppTemplates.deletedAt)
-            )
-          )
-          .limit(1)
-      )[0];
-
-      if (template) {
-        const { getQualificationTenantSettings } = await import("@/features/ai-qualification/tenant-settings-service");
-        const qualificationSettings = await getQualificationTenantSettings(input.tenantId);
-        const botName = qualificationSettings?.assistantName?.trim() || "Assistente Âncora Saúde";
-
-        const bodyComp = (template.componentsJson as any[])?.find((c: any) => c.type === "BODY" || c.type === "body");
-        const namedParams = bodyComp?.example?.body_text_named_params;
-        let parameters: any[] = [];
-        if (namedParams && namedParams.length > 0) {
-          parameters = namedParams.map((p: any) => {
-            const pName = p.param_name || p.parameter_name;
-            if (pName === "nome_bot" || pName === "bot_name") {
-              return { type: "text", parameter_name: pName, text: botName };
-            }
-            if (pName === "empresa" || pName === "company") {
-              return { type: "text", parameter_name: pName, text: "Âncora Saúde" };
-            }
-            return { type: "text", parameter_name: pName || "nome", text: lead.nome || "Cliente" };
-          });
-        } else {
-          parameters = [
-            { type: "text", text: lead.nome || "Cliente" },
-            { type: "text", text: botName },
-          ];
-        }
-
-        const components = [{ type: "body", parameters }];
-
-        const response = await sendMetaCloudTemplateTest(
-          credentials.phoneNumberId,
-          credentials.accessToken,
-          lead.telefone,
-          template.name,
-          template.language,
-          components
-        );
-
-        dispatchedViaTemplate = true;
-        const wamid = response.messages?.[0]?.id ?? null;
-        if (wamid) finalMessageId = wamid;
-
-        let rendered = template.bodyText || "";
-        if (rendered) {
-          rendered = rendered
-            .replace(/\{\{1\}\}/g, lead.nome || "Cliente")
-            .replace(/\{\{2\}\}/g, botName)
-            .replace(/\{\{nome\}\}/g, lead.nome || "Cliente")
-            .replace(/\{\{nome_bot\}\}/g, botName)
-            .replace(/\{\{empresa\}\}/g, "Âncora Saúde");
-        } else {
-          rendered = body;
-        }
-        finalBody = rendered;
-
-        await db.insert(schema.whatsappMessages).values({
-          id: finalMessageId,
-          tenantId: input.tenantId,
-          leadId: input.leadId,
-          conversationId: conversation.id,
-          senderRole: "assistant",
-          provider: "meta",
-          phone: lead.telefone,
-          direction: "outbound",
-          body: finalBody,
-          providerStatus: "sent",
-          messageId: wamid ?? undefined,
-          sentAt: new Date(),
-        }).onConflictDoNothing();
-      }
+    const { getQualificationTenantSettings } = await import("@/features/ai-qualification/tenant-settings-service");
+    const { enqueueAndProcessMetaEventMessage } = await import("@/features/communication-channels/outbound-service");
+    const qualificationSettings = await getQualificationTenantSettings(input.tenantId);
+    const botName = qualificationSettings?.assistantName?.trim() || "Assistente Âncora Saúde";
+    const delivery = await enqueueAndProcessMetaEventMessage({
+      tenantId: input.tenantId,
+      recipientType: "lead",
+      recipientId: input.leadId,
+      destinationPhone: lead.telefone,
+      purpose: "leadQualification",
+      variables: [lead.nome || "Cliente", botName, "Âncora Saúde"],
+      requestedBy: input.actorUserId,
+      idempotencyKey: `qualification-engine:${input.leadId}:start:${conversation.id}`,
+    });
+    if (!["sent", "delivered", "read"].includes(delivery.status)) {
+      throw new Error(delivery.providerErrorMessage || "A mensagem inicial não foi aceita pelo provedor.");
     }
-  } catch (templateError) {
-    console.warn("[startQualificationConversationForLead] Meta template dispatch skipped/failed:", templateError);
-  }
-
-  if (!dispatchedViaTemplate) {
+    finalMessageId = delivery.providerMessageId || finalMessageId;
+    finalBody = delivery.renderedBody ?? delivery.fallbackRenderedBody ?? body;
     await db.insert(schema.whatsappMessages).values({
       id: finalMessageId,
       tenantId: input.tenantId,
       leadId: input.leadId,
       conversationId: conversation.id,
+      communicationChannelId: delivery.channelId ?? undefined,
       senderRole: "assistant",
       provider: "meta",
       phone: lead.telefone,
       direction: "outbound",
       body: finalBody,
+      providerStatus: "sent",
+      messageId: delivery.providerMessageId ?? undefined,
       sentAt: new Date(),
     }).onConflictDoNothing();
-
-    const sent = await sendAiOutbound({ tenantId: input.tenantId, phone: lead.telefone, body: finalBody, transport: "meta", currentMessageId: finalMessageId }).catch(() => ({ status: "failed" as const, messageId: null }));
-
-    if (sent.status === "skipped_no_channel" || sent.status === "failed") {
-      await db.update(schema.whatsappMessages).set({ providerStatus: "failed" }).where(and(eq(schema.whatsappMessages.id, finalMessageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
-      await handleInitialMessageFailure({
-        tenantId: input.tenantId,
-        leadId: input.leadId,
-        conversationId: conversation.id,
-        reason: "initial_message_dispatch_failed",
-      });
-      return { started: false as const, reason: "initial_message_failed" as const, error: "Falha no envio da mensagem inicial. Atendimento encerrado e lead enviado para a fila de distribuição." };
-    }
-
-    await db.update(schema.whatsappMessages).set({ providerStatus: sent.status === "sent" ? "sent" : "failed", messageId: sent.messageId ?? undefined }).where(and(eq(schema.whatsappMessages.id, finalMessageId), eq(schema.whatsappMessages.tenantId, input.tenantId)));
+  } catch (templateError) {
+    console.warn("[startQualificationConversationForLead] configured first contact failed:", templateError);
+    await handleInitialMessageFailure({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      conversationId: conversation.id,
+      reason: "initial_message_dispatch_failed",
+    });
+    return { started: false as const, reason: "initial_message_failed" as const, error: "Falha no envio da mensagem inicial. Atendimento encerrado e lead enviado para a fila de distribuição." };
   }
 
   await db.update(schema.leads).set({ qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: new Date() }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
@@ -1069,11 +976,31 @@ export async function processInboundAiResponse({
   skipDebounce?: boolean;
 }) {
   const db = getDatabase();
+  // Media messages arrive without a text body. Give the qualification engine
+  // an explicit, truthful context marker so it can acknowledge the upload and
+  // continue with the next missing field instead of repeating the question
+  // that preceded the attachment. The file contents are never guessed here.
+  const inboundPlaceholderKind = userMessageBody.trim().match(/^\[(image|document|audio|video|sticker)\]$/i)?.[1]?.toLowerCase();
+  const effectiveMessageKind = (messageKind === "text" && inboundPlaceholderKind ? inboundPlaceholderKind : messageKind) as QuickReplyMessageKind;
+  const normalizedInboundMessage = (userMessageBody.trim() && !inboundPlaceholderKind ? userMessageBody.trim() : undefined) || (
+    effectiveMessageKind === "image"
+      ? "O cliente enviou uma imagem para análise (possivelmente uma carteirinha)."
+      : effectiveMessageKind === "document"
+        ? "O cliente enviou um documento para análise."
+        : effectiveMessageKind === "audio"
+          ? "O cliente enviou um áudio."
+          : effectiveMessageKind === "video"
+            ? "O cliente enviou um vídeo."
+            : effectiveMessageKind === "sticker"
+              ? "O cliente enviou uma figurinha."
+              : "O cliente enviou uma mensagem sem texto."
+  );
 
   console.info("[ai-wpp] inbound.received", {
     tenantId,
     leadId,
-    messageLength: userMessageBody.length,
+    messageLength: normalizedInboundMessage.length,
+    messageKind: effectiveMessageKind,
     providerMessageId,
   });
 
@@ -1257,7 +1184,7 @@ export async function processInboundAiResponse({
     resetMode: memoryResetMode,
     storedMemory: conversation.memory as ConversationMemory | null,
     formattedHistory,
-    currentMessage: userMessageBody,
+    currentMessage: normalizedInboundMessage,
     historyAlreadyContainsCurrentMessage,
   });
   const hasPriorMessages = pastMessages.some((message) => !sourceIdentifier || message.messageId !== sourceIdentifier);
@@ -1286,9 +1213,9 @@ export async function processInboundAiResponse({
       }
     : undefined;
 
-  const quickReply = quickReplyEnabled ? resolveQuickReply({
+  const resolvedQuickReply = quickReplyEnabled ? resolveQuickReply({
     body: userMessageBody,
-    messageKind,
+    messageKind: effectiveMessageKind,
     conversationState: automationState,
     isNewConversation: conversation.status === "NEW" && !hasPriorMessages,
     hasPriorMessages,
@@ -1296,6 +1223,13 @@ export async function processInboundAiResponse({
     cooldown: { lastTemplateKey: conversation.quickReplyLastTemplate, lastSentAt: conversation.quickReplyLastSentAt, waitWindowStartedAt: conversation.quickReplyWaitWindowStartedAt, waitResponseCount: conversation.quickReplyWaitResponseCount },
     cooldownConfig,
   }) : { resolved: false as const, intent: null, ruleKey: null, templateKey: null, notifyHuman: false };
+  const quickReply = shouldContinueQualificationAfterMedia({
+    messageKind: effectiveMessageKind,
+    hasPendingQuestion: Boolean(currentMemory.lastQuestionAsked),
+    conversationState: automationState,
+  }) && resolvedQuickReply.intent === "MEDIA_RECEIVED"
+    ? { resolved: false as const, intent: null, ruleKey: null, templateKey: null, notifyHuman: false }
+    : resolvedQuickReply;
   if (quickReply.resolved) {
     const templates = await loadQuickReplyTemplates(tenantId);
     const template = quickReply.templateKey ? templates[quickReply.templateKey] : undefined;
@@ -1329,12 +1263,10 @@ export async function processInboundAiResponse({
         newStatus: "WAITING_HUMAN",
         reason: "Solicitação explícita de atendimento humano",
       });
-      await db.update(schema.leads).set({
-        qualificationStatus: "waiting_human",
-        status: "distributed",
-        updatedAt: now,
-      }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
-      await enqueueLeadDistributionJob({ tenantId, leadId }).catch(() => undefined);
+      await db.update(schema.leads)
+        .set(buildHumanHandoffLeadUpdate(now))
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
+      await enqueueAndProcessLeadDistribution({ tenantId, leadId, source: "human_handoff" });
     } else if (quickReply.intent === "OPT_OUT" || quickReply.intent === "NO_LONGER_INTERESTED" || quickReply.intent === "WRONG_NUMBER") {
       await db.update(schema.leads).set({
         qualificationStatus: "cold",
@@ -1343,6 +1275,13 @@ export async function processInboundAiResponse({
         distributionStatus: "unassigned",
         updatedAt: now,
       }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
+      if (shouldQueueLeadAfterTerminalReply(quickReply.intent)) {
+        await enqueueAndProcessLeadDistribution({
+          tenantId,
+          leadId,
+          source: "qualification_completed",
+        });
+      }
     }
     const waitWindowMs = (cooldownConfig?.waitWindowMinutes ?? 30) * 60 * 1000;
     const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < waitWindowMs;
@@ -1365,7 +1304,10 @@ export async function processInboundAiResponse({
     .limit(1);
 
   // 6. Extrair campos estruturados da mensagem e atualizar memória
+  const expectedQuestionBeforeMessage = getNextQualificationQuestion(currentMemory, behavior.policy);
+  const fieldsBeforeMessage = new Set(currentMemory.collectedFields);
   let updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
+  const fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
 
   // 6a. Analisar nome do cadastro do lead se for um nome valido
   if (lead?.nome && !lead.nome.startsWith("Lead WhatsApp") && !lead.nome.toLowerCase().includes("cliente") && !updatedMemory.customerName?.value) {
@@ -1408,9 +1350,6 @@ export async function processInboundAiResponse({
     );
 
   const pastOutboundTexts = new Set(allOutboundMsgs.map((m) => m.body.trim().toLowerCase()));
-
-  const memoryContext = buildMemoryContext(updatedMemory);
-  let qualification = evaluateQualification(updatedMemory, behavior.policy);
 
   // 6d. Carregar config do tenant para usar mensagens configuráveis e checar flag enabled
   const tenantConfig = await loadTenantAiAgentConfig(tenantId);
@@ -1460,12 +1399,111 @@ export async function processInboundAiResponse({
     return { status: "ignored_ai_disabled" };
   }
 
-  const deterministicTurn = resolveDeterministicQualificationTurn({
+  // A resposta pode estar correta, mas fora do vocabulário das regras (por
+  // exemplo, "Famíliar" ou "é para a família"). Nesse caso a IA atua apenas
+  // como intérprete: ela propõe fatos estruturados e o motor determinístico
+  // continua responsável por validar a memória e escolher a próxima etapa.
+  let aiFallbackResult: Awaited<ReturnType<typeof generateAiResponse>> | undefined;
+  let fallbackAppliedCount = 0;
+  const pendingQuestionAfterExtraction = getNextQualificationQuestion(updatedMemory, behavior.policy, pastOutboundTexts);
+  const expectedWasAnswered = Boolean(expectedQuestionBeforeMessage && fieldsExtractedFromCurrentMessage.includes(expectedQuestionBeforeMessage.key));
+  const currentMessageAdvancedToAnotherField = Boolean(
+    expectedQuestionBeforeMessage
+      && pendingQuestionAfterExtraction
+      && pendingQuestionAfterExtraction.key !== expectedQuestionBeforeMessage.key
+      && fieldsExtractedFromCurrentMessage.length > 0,
+  );
+  if (pendingQuestionAfterExtraction && shouldUseQualificationFallback({
+    hasPendingQuestion: Boolean(pendingQuestionAfterExtraction),
+    expectedWasAnswered,
+    advancedToAnotherField: currentMessageAdvancedToAnotherField,
+    extractedFieldCount: fieldsExtractedFromCurrentMessage.length,
+    messageLength: normalizedInboundMessage.length,
+    messageKind: effectiveMessageKind,
+  })) {
+    const pendingField = pendingQuestionAfterExtraction.key as keyof ConversationMemory;
+    const pendingValue = pendingField === "age" && updatedMemory.planType?.value === "empresarial"
+      ? updatedMemory.averageAge?.value
+      : (updatedMemory[pendingField] as { value?: string } | undefined)?.value;
+
+    if (!pendingValue?.trim()) {
+      try {
+        aiFallbackResult = await generateAiResponse({
+          tenantId,
+          leadName: lead?.nome,
+          leadType: lead?.tipo,
+          messages: aiMessages,
+          customPrompt: buildQualificationFallbackPrompt(pendingQuestionAfterExtraction.key, pendingQuestionAfterExtraction.text),
+          preferredLanguage: "pt-BR",
+          memoryContext: buildMemoryContext({ ...updatedMemory, lastQuestionAsked: pendingQuestionAfterExtraction.text }),
+          tenantConfig,
+        });
+      } catch (error) {
+        console.warn("[qualification] ai_fallback_failed_open", {
+          tenantId,
+          leadId,
+          conversationId: conversation.id,
+          error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error",
+        });
+      }
+
+      const applied = applyAiMemoryUpdates(updatedMemory, aiFallbackResult?.structured?.memoryUpdates, sourceIdentifier ?? undefined, normalizedInboundMessage);
+      if (applied.applied.length > 0) {
+        updatedMemory = applied.memory;
+        fallbackAppliedCount = applied.applied.length;
+        console.info("[qualification] ai_fallback_memory_applied", {
+          tenantId,
+          leadId,
+          conversationId: conversation.id,
+          sourceMessageId: sourceIdentifier ?? null,
+          fields: applied.applied.map((item) => item.field),
+          model: aiFallbackResult?.modelUsed ?? "unavailable",
+          latencyMs: aiFallbackResult?.latencyMs ?? 0,
+        });
+      } else {
+        console.info("[qualification] ai_fallback_no_fact", {
+          tenantId,
+          leadId,
+          conversationId: conversation.id,
+          sourceMessageId: sourceIdentifier ?? null,
+          model: aiFallbackResult?.modelUsed ?? "unavailable",
+          success: aiFallbackResult?.success ?? false,
+        });
+      }
+
+      if (aiFallbackResult) await db.insert(schema.aiAttendanceLogs).values({
+        id: `log_qualification_fallback_${crypto.randomUUID()}`,
+        tenantId,
+        conversationId: conversation.id,
+        leadId,
+        provider: "qualification_fallback",
+        modelUsed: aiFallbackResult.modelUsed,
+        promptTokens: aiFallbackResult.promptTokens,
+        completionTokens: aiFallbackResult.completionTokens,
+        totalTokens: aiFallbackResult.totalTokens,
+        estimatedCost: aiFallbackResult.estimatedCost,
+        latencyMs: aiFallbackResult.latencyMs,
+        status: aiFallbackResult.success ? "success" : "failed",
+        errorMessage: aiFallbackResult.error?.slice(0, 240) ?? null,
+        sourceMessageId: sourceIdentifier ?? null,
+      }).onConflictDoNothing().catch((error) => console.warn("[qualification] fallback_attendance_log_failed", { conversationId: conversation.id, error: error instanceof Error ? error.message.slice(0, 160) : "unknown_error" }));
+    }
+  }
+
+  const answeredNow = fieldsExtractedFromCurrentMessage.length > 0 || fallbackAppliedCount > 0;
+  let deterministicTurn = resolveDeterministicQualificationTurn({
     memory: updatedMemory,
     policy: behavior.policy,
     handoffMessage: tenantConfig.handoffMessage,
     pastOutboundTexts,
+    answeredNow,
   });
+  // Lateral answer (fase 5): the customer asked something instead of answering.
+  // Answer briefly, then the script resumes; on any failure the scripted reply goes alone.
+  if (deterministicTurn.kind === "collecting" && !answeredNow && effectiveMessageKind === "text" && isCustomerQuestion(normalizedInboundMessage)) {
+    const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: updatedMemory.customerFirstName?.value ?? null });
+    if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };
+  }
   return completeDeterministicQualificationTurn({
     tenantId,
     leadId,
@@ -1894,6 +1932,11 @@ export async function processInboundAiResponse({
   }
 
   if (aiResult.shouldTransferToHuman && !qualificationCompleted) {
+    const handoffAt = new Date();
+    await db.update(schema.leads)
+      .set(buildHumanHandoffLeadUpdate(handoffAt))
+      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
+    await enqueueAndProcessLeadDistribution({ tenantId, leadId, source: "human_handoff" });
     await transitionConversationState({
       tenantId,
       conversationId: conversation.id,

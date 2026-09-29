@@ -68,3 +68,4 @@ public/downloads/
 # credenciais locais (segredo: nunca versionar; ver docs/agent/SECURITY_RULES.md)
 plans/credenciais-*.json
 plans/production-neon-backup-*.json
+.codex-remote-attachments/

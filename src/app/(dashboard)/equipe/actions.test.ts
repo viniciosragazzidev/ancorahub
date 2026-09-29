@@ -10,6 +10,8 @@ const state = vi.hoisted(() => {
     user: Symbol("user"),
     session: Symbol("session"),
     tenantMemberships: Symbol("tenantMemberships"),
+    customRoles: Symbol("customRoles"),
+    branches: Symbol("branches"),
     brokerProfiles: Symbol("brokerProfiles"),
     brokerInvitations: Symbol("brokerInvitations"),
     // Zod enum values — must match production schema shape
@@ -34,19 +36,11 @@ const state = vi.hoisted(() => {
     const whereResult = useLimit
       ? { limit: vi.fn(async () => rows) }
       : { then: vi.fn(async (cb: (value: unknown[]) => unknown) => cb(rows)) };
-    return {
-      from: vi.fn(() => ({
-        innerJoin: vi.fn(() => ({
-          leftJoin: vi.fn(() => ({
-            where: vi.fn(() => ({
-              limit: vi.fn(async () => rows),
-            })),
-          })),
-          where: vi.fn(() => whereResult),
-        })),
-        where: vi.fn(() => whereResult),
-      })),
-    };
+    const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+    chain.innerJoin = vi.fn(() => chain);
+    chain.leftJoin = vi.fn(() => chain);
+    chain.where = vi.fn(() => whereResult);
+    return { from: vi.fn(() => chain) };
   }
 
   const db = {
@@ -124,6 +118,7 @@ vi.mock("@/shared/auth/tenant-context", () => ({
 vi.mock("@/shared/auth/team-permissions", () => ({
   requireCanManageMember: vi.fn(),
   requireCanCreateRole: vi.fn(),
+  requireCanUpdateMemberAuthority: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({
@@ -134,9 +129,10 @@ vi.mock("next/cache", () => ({
 vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),
+  ne: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),
 }));
 
-import { deleteTeamMemberAction } from "./actions";
+import { deleteTeamMemberAction, updateTeamMemberAction } from "./actions";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 function inserted(table: symbol) {
@@ -156,6 +152,114 @@ function makeFormData(memberId = "00000000-0000-4000-8000-000000000001") {
   fd.append("memberId", memberId);
   return fd;
 }
+
+describe("updateTeamMemberAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.inserts.length = 0;
+    state.updates.length = 0;
+    state.deletes.length = 0;
+  });
+
+  it("persists authority changes and revokes the member sessions", async () => {
+    let callCount = 0;
+    state.db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return state.queryChain({
+          rows: [{
+            membershipId: "membership-test",
+            userId: "broker-test",
+            profileId: "profile-test",
+            role: "broker",
+            jobTitle: "broker",
+            customRoleScope: null,
+            branchId: "00000000-0000-4000-8000-000000000010",
+            status: "active",
+          }],
+          useLimit: true,
+        });
+      }
+      if (callCount === 2) {
+        return state.queryChain({
+          rows: [{ id: "00000000-0000-4000-8000-000000000020" }],
+          useLimit: true,
+        });
+      }
+      return state.queryChain({ rows: [], useLimit: true });
+    });
+
+    const formData = new FormData();
+    formData.set("memberId", "00000000-0000-4000-8000-000000000001");
+    formData.set("name", "Gestor Atualizado");
+    formData.set("email", "gestor@example.com");
+    formData.set("role", "manager");
+    formData.set("jobTitle", "manager");
+    formData.set("branchId", "00000000-0000-4000-8000-000000000020");
+
+    const result = await updateTeamMemberAction({}, formData);
+
+    expect(result).toEqual({ success: true });
+    expect(updated(state.schema.tenantMemberships)).toContainEqual(
+      expect.objectContaining({
+        role: "manager",
+        jobTitle: "manager",
+        branchId: "00000000-0000-4000-8000-000000000020",
+      }),
+    );
+    expect(deleted(state.schema.session)).toHaveLength(1);
+    expect(inserted(state.schema.auditLogs)).toContainEqual(
+      expect.objectContaining({
+        entidade: "tenant_membership",
+        acao: "revogou_sessoes_por_alteracao_de_autoridade",
+      }),
+    );
+  });
+
+  it("updates the broker profile when the member is rendered from broker_profiles", async () => {
+    let callCount = 0;
+    state.db.select.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) {
+        return state.queryChain({ rows: [], useLimit: true });
+      }
+      if (callCount === 2) {
+        return state.queryChain({
+          rows: [{
+            profileId: "00000000-0000-4000-8000-000000000030",
+            userId: null,
+            role: "broker",
+            jobTitle: "broker",
+            customRoleId: null,
+            customRoleScope: null,
+            branchId: "00000000-0000-4000-8000-000000000010",
+          }],
+          useLimit: true,
+        });
+      }
+      if (callCount === 3) {
+        return state.queryChain({ rows: [{ id: "00000000-0000-4000-8000-000000000010" }], useLimit: true });
+      }
+      return state.queryChain({ rows: [], useLimit: true });
+    });
+
+    const formData = new FormData();
+    formData.set("memberId", "00000000-0000-4000-8000-000000000030");
+    formData.set("name", "Corretora Atualizada");
+    formData.set("email", "corretora.atualizada@example.com");
+    formData.set("role", "broker");
+    formData.set("jobTitle", "broker");
+    formData.set("branchId", "00000000-0000-4000-8000-000000000010");
+
+    const result = await updateTeamMemberAction({}, formData);
+
+    expect(result).toEqual({ success: true });
+    expect(updated(state.schema.brokerProfiles)).toContainEqual(expect.objectContaining({
+      professionalName: "Corretora Atualizada",
+      invitedEmail: "corretora.atualizada@example.com",
+    }));
+  });
+});
 
 describe("deleteTeamMemberAction", () => {
   beforeEach(() => {

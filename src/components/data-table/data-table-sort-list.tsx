@@ -1,400 +1,100 @@
 "use client";
 
-import type { ColumnSort, SortDirection, Table } from "@tanstack/react-table";
-import {
-  ArrowDownUp,
-  ChevronsUpDown,
-  GripVertical,
-  Trash2,
-} from "lucide-react";
-import * as React from "react";
+import type { Table } from "@tanstack/react-table";
+import { ArrowDown, ArrowUp, ArrowUpDown, Trash2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sortable,
-  SortableContent,
-  SortableItem,
-  SortableItemHandle,
-  SortableOverlay,
-} from "@/components/ui/sortable";
-import { dataTableConfig } from "@/config/data-table";
-import { cn } from "@/lib/utils";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Badge } from "@/components/ui/badge";
 
-const SORT_SHORTCUT_KEY = "s";
-const REMOVE_SORT_SHORTCUTS = ["backspace", "delete"];
-
-interface DataTableSortListProps<TData>
-  extends React.ComponentProps<typeof PopoverContent> {
+interface DataTableSortListProps<TData> {
   table: Table<TData>;
-  disabled?: boolean;
 }
 
 export function DataTableSortList<TData>({
   table,
-  disabled,
-  className,
-  ...props
 }: DataTableSortListProps<TData>) {
-  const id = React.useId();
-  const labelId = React.useId();
-  const descriptionId = React.useId();
-  const [open, setOpen] = React.useState(false);
-  const addButtonRef = React.useRef<HTMLButtonElement>(null);
-
-  const sorting = table.getState().sorting;
-  const onSortingChange = table.setSorting;
-
-  const { columnLabels, columns } = React.useMemo(() => {
-    const labels = new Map<string, string>();
-    const sortingIds = new Set(sorting.map((s) => s.id));
-    const availableColumns: { id: string; label: string }[] = [];
-
-    for (const column of table.getAllColumns()) {
-      if (!column.getCanSort()) continue;
-
-      const label = column.columnDef.meta?.label ?? column.id;
-      labels.set(column.id, label);
-
-      if (!sortingIds.has(column.id)) {
-        availableColumns.push({ id: column.id, label });
-      }
-    }
-
-    return {
-      columnLabels: labels,
-      columns: availableColumns,
-    };
-  }, [sorting, table]);
-
-  const onSortAdd = React.useCallback(() => {
-    const firstColumn = columns[0];
-    if (!firstColumn) return;
-
-    onSortingChange((prevSorting) => [
-      ...prevSorting,
-      { id: firstColumn.id, desc: false },
-    ]);
-  }, [columns, onSortingChange]);
-
-  const onSortUpdate = React.useCallback(
-    (sortId: string, updates: Partial<ColumnSort>) => {
-      onSortingChange((prevSorting) => {
-        if (!prevSorting) return prevSorting;
-        return prevSorting.map((sort) =>
-          sort.id === sortId ? { ...sort, ...updates } : sort,
-        );
-      });
-    },
-    [onSortingChange],
-  );
-
-  const onSortRemove = React.useCallback(
-    (sortId: string) => {
-      onSortingChange((prevSorting) =>
-        prevSorting.filter((item) => item.id !== sortId),
-      );
-    },
-    [onSortingChange],
-  );
-
-  const onSortingReset = React.useCallback(
-    () => onSortingChange(table.initialState.sorting),
-    [onSortingChange, table.initialState.sorting],
-  );
-
-  React.useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        (event.target instanceof HTMLElement &&
-          event.target.contentEditable === "true")
-      ) {
-        return;
-      }
-
-      if (
-        event.key.toLowerCase() === SORT_SHORTCUT_KEY &&
-        (event.ctrlKey || event.metaKey) &&
-        event.shiftKey
-      ) {
-        event.preventDefault();
-        setOpen((prev) => !prev);
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  const onTriggerKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLButtonElement>) => {
-      if (
-        REMOVE_SORT_SHORTCUTS.includes(event.key.toLowerCase()) &&
-        sorting.length > 0
-      ) {
-        event.preventDefault();
-        onSortingReset();
-      }
-    },
-    [sorting.length, onSortingReset],
-  );
+  const sortingState = table.getState().sorting;
+  const sortableColumns = table
+    .getAllColumns()
+    .filter((col) => col.getCanSort());
 
   return (
-    <Sortable
-      value={sorting}
-      onValueChange={onSortingChange}
-      getItemValue={(item) => item.id}
-    >
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          render={
-            <Button
-              variant="outline"
-              className="font-normal"
-              onKeyDown={onTriggerKeyDown}
-              disabled={disabled}
-            />
-          }
-        >
-          <ArrowDownUp className="text-muted-foreground" />
-          Sort
-          {sorting.length > 0 && (
-            <Badge
-              variant="secondary"
-              className="h-[18.24px] rounded-[3.2px] px-[5.12px] font-mono font-normal text-[10.4px]"
-            >
-              {sorting.length}
-            </Badge>
-          )}
-        </PopoverTrigger>
-        <PopoverContent
-          aria-labelledby={labelId}
-          aria-describedby={descriptionId}
-          className={cn(
-            "flex w-full max-w-(--radix-popover-content-available-width) flex-col gap-3.5 p-4 sm:min-w-[380px]",
-            className,
-          )}
-          {...props}
-        >
-          <div className="flex flex-col gap-1">
-            <h4 id={labelId} className="font-medium leading-none">
-              {sorting.length > 0 ? "Sort by" : "No sorting applied"}
-            </h4>
-            <p
-              id={descriptionId}
-              className={cn(
-                "text-muted-foreground text-sm",
-                sorting.length > 0 && "sr-only",
-              )}
-            >
-              {sorting.length > 0
-                ? "Modify sorting to organize your rows."
-                : "Add sorting to organize your rows."}
-            </p>
-          </div>
-          {sorting.length > 0 && (
-            <SortableContent asChild>
-              <div
-                role="list"
-                className="flex max-h-[300px] flex-col gap-2 overflow-y-auto p-1"
-              >
-                {sorting.map((sort) => (
-                  <DataTableSortItem
-                    key={sort.id}
-                    sort={sort}
-                    sortItemId={`${id}-sort-${sort.id}`}
-                    columns={columns}
-                    columnLabels={columnLabels}
-                    onSortUpdate={onSortUpdate}
-                    onSortRemove={onSortRemove}
-                  />
-                ))}
-              </div>
-            </SortableContent>
-          )}
-          <div className="flex w-full items-center gap-2">
-            <Button
-              className="rounded"
-              ref={addButtonRef}
-              onClick={onSortAdd}
-              disabled={columns.length === 0}
-            >
-              Add sort
-            </Button>
-            {sorting.length > 0 && (
-              <Button
-                variant="outline"
-                className="rounded"
-                onClick={onSortingReset}
-              >
-                Reset sorting
-              </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+            <ArrowUpDown className="h-3.5 w-3.5" />
+            Ordenação
+            {sortingState.length > 0 && (
+              <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] tabular-nums">
+                {sortingState.length}
+              </Badge>
             )}
-          </div>
-        </PopoverContent>
-      </Popover>
-      <SortableOverlay>
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-[180px] rounded-sm bg-primary/10" />
-          <div className="h-8 w-24 rounded-sm bg-primary/10" />
-          <div className="size-8 shrink-0 rounded-sm bg-primary/10" />
-          <div className="size-8 shrink-0 rounded-sm bg-primary/10" />
-        </div>
-      </SortableOverlay>
-    </Sortable>
-  );
-}
-
-interface DataTableSortItemProps {
-  sort: ColumnSort;
-  sortItemId: string;
-  columns: { id: string; label: string }[];
-  columnLabels: Map<string, string>;
-  onSortUpdate: (sortId: string, updates: Partial<ColumnSort>) => void;
-  onSortRemove: (sortId: string) => void;
-}
-
-function DataTableSortItem({
-  sort,
-  sortItemId,
-  columns,
-  columnLabels,
-  onSortUpdate,
-  onSortRemove,
-}: DataTableSortItemProps) {
-  const fieldListboxId = `${sortItemId}-field-listbox`;
-  const fieldTriggerId = `${sortItemId}-field-trigger`;
-
-  const [showFieldSelector, setShowFieldSelector] = React.useState(false);
-
-  const onItemKeyDown = React.useCallback(
-    (event: React.KeyboardEvent<HTMLDivElement>) => {
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-
-      if (showFieldSelector) {
-        return;
-      }
-
-      if (REMOVE_SORT_SHORTCUTS.includes(event.key.toLowerCase())) {
-        event.preventDefault();
-        onSortRemove(sort.id);
-      }
-    },
-    [sort.id, showFieldSelector, onSortRemove],
-  );
-
-  return (
-    <SortableItem value={sort.id} asChild>
-      <div
-        role="listitem"
-        id={sortItemId}
-        tabIndex={-1}
-        className="flex items-center gap-2"
-        onKeyDown={onItemKeyDown}
-      >
-        <Popover open={showFieldSelector} onOpenChange={setShowFieldSelector}>
-          <PopoverTrigger
-            render={
-              <Button
-                id={fieldTriggerId}
-                aria-controls={fieldListboxId}
-                variant="outline"
-                className="w-44 justify-between rounded font-normal"
-              />
-            }
-          >
-            <span className="truncate">{columnLabels.get(sort.id)}</span>
-            <ChevronsUpDown className="opacity-50" />
-          </PopoverTrigger>
-          <PopoverContent
-            id={fieldListboxId}
-            className="w-(--radix-popover-trigger-width) p-0"
-          >
-            <Command>
-              <CommandInput placeholder="Search fields..." />
-              <CommandList>
-                <CommandEmpty>No fields found.</CommandEmpty>
-                <CommandGroup>
-                  {columns.map((column) => (
-                    <CommandItem
-                      key={column.id}
-                      value={column.id}
-                      onSelect={(value) => onSortUpdate(sort.id, { id: value })}
-                    >
-                      <span className="truncate">{column.label}</span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
-          </PopoverContent>
-        </Popover>
-        <Select
-          value={sort.desc ? "desc" : "asc"}
-          onValueChange={(value: SortDirection) =>
-            onSortUpdate(sort.id, { desc: value === "desc" })
-          }
-        >
-          <SelectTrigger className="w-24 rounded">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent className="min-w-(--radix-select-trigger-width)">
-            <SelectGroup>
-              {dataTableConfig.sortOrders.map((order) => (
-                <SelectItem key={order.value} value={order.value}>
-                  {order.label}
-                </SelectItem>
-              ))}
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <Button
-          aria-controls={sortItemId}
-          variant="outline"
-          size="icon"
-          className="size-8 shrink-0 rounded"
-          onClick={() => onSortRemove(sort.id)}
-        >
-          <Trash2 />
-        </Button>
-        <SortableItemHandle asChild>
-          <Button
-            variant="outline"
-            size="icon"
-            className="size-8 shrink-0 rounded"
-          >
-            <GripVertical />
           </Button>
-        </SortableItemHandle>
-      </div>
-    </SortableItem>
+        }
+      />
+      <DropdownMenuContent align="end" className="w-[220px] p-2 space-y-1">
+        <DropdownMenuLabel className="text-xs font-semibold">Ordenar Por</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {sortableColumns.map((column) => {
+          const isSorted = sortingState.find((s) => s.id === column.id);
+          const label = column.columnDef.meta?.label ?? column.id;
+
+          return (
+            <div
+              key={column.id}
+              className="flex items-center justify-between px-2 py-1 hover:bg-muted/50 rounded-md text-xs cursor-pointer"
+              onClick={() => {
+                if (!isSorted) {
+                  table.setSorting([{ id: column.id, desc: false }]);
+                } else if (!isSorted.desc) {
+                  table.setSorting([{ id: column.id, desc: true }]);
+                } else {
+                  table.setSorting([]);
+                }
+              }}
+            >
+              <span className="font-medium text-foreground">{label}</span>
+              <div className="flex items-center gap-1">
+                {isSorted ? (
+                  isSorted.desc ? (
+                    <Badge variant="outline" className="text-[10px] gap-1 bg-primary/10 text-primary">
+                      <ArrowDown className="h-3 w-3" /> Desc
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px] gap-1 bg-primary/10 text-primary">
+                      <ArrowUp className="h-3 w-3" /> Asc
+                    </Badge>
+                  )
+                ) : (
+                  <span className="text-[10px] text-muted-foreground">Inativo</span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {sortingState.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <Button
+              variant="ghost"
+              size="xs"
+              className="w-full text-xs text-rose-500 hover:text-rose-600 justify-start"
+              onClick={() => table.setSorting([])}
+            >
+              <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+              Limpar ordenação
+            </Button>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

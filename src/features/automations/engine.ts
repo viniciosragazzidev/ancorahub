@@ -5,10 +5,10 @@ import { and, eq, inArray, isNull, lt, lte } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
-import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
+import { enqueueMetaTextMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { phoneHash } from "@/features/waha-cadence/contract";
 
-const GLOBAL_KILL_SWITCH = "feature_waha_cadence_enabled"; // Reuse existing kill switch for all WAHA cadences/outbound
+const GLOBAL_KILL_SWITCH = "feature_waha_cadence_enabled"; // Legacy switch retained until automation settings receive their own key.
 
 /**
  * Scan all active automations for the tenant and enqueue leads/clients that match criteria.
@@ -331,47 +331,19 @@ export async function runAutomationProcessor(limit = 20) {
         continue;
       }
 
-      // Fetch active WAHA number for the tenant
-      const [wahaNumber] = await db
-        .select()
-        .from(schema.wahaNumbers)
-        .where(
-          and(
-            eq(schema.wahaNumbers.tenantId, log.tenantId),
-            eq(schema.wahaNumbers.status, "active")
-          )
-        )
-        .limit(1);
-
-      if (!wahaNumber || !wahaNumber.relaySessionId) {
-        throw new Error("Nenhum número WAHA ativo com sessão configurada.");
-      }
-
       // Format template body with lead name
       const body = automation.templateBody.replace(/\{\{\s*nome\s*\}\}/gi, lead.nome);
 
-      // Send the relay message
-      const result = await sendWahaRelayMessage({
-        idempotencyKey: `automation:${log.id}:${log.attemptCount}`,
-        sessionId: wahaNumber.relaySessionId,
-        destination: lead.telefone.replace(/\D/g, ""),
-        body,
-      });
-
-      // Insert sent message into history
-      await db.insert(schema.whatsappMessages).values({
-        id: randomUUID(),
+      const queued = await enqueueMetaTextMessage({
         tenantId: log.tenantId,
-        leadId: lead.id,
-        phone: lead.telefone,
-        direction: "outgoing",
+        recipientType: "lead",
+        recipientId: lead.id,
+        destinationPhone: lead.telefone,
         body,
-        provider: "waha",
-        providerStatus: "sent",
-        messageId: result.messageId,
-        senderRole: "assistant",
-        sentAt: new Date(),
+        idempotencyKey: `automation:${log.id}`,
       });
+      const delivery = await processMetaOutboundBatch(1, log.tenantId, queued.id);
+      if (delivery.sent !== 1) throw new Error("Mensagem oficial ainda aguarda processamento pela Meta.");
 
       // Mark execution as completed
       await db

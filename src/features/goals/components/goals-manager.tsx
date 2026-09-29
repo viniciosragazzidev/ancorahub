@@ -13,7 +13,7 @@ import {
   X,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

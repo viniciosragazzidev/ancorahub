@@ -12,7 +12,7 @@ export default async function IntegrationsPage() {
   return (
     <>
       <DashboardHeader breadcrumb="Administração" title="Integrações" />
-      <main className="flex flex-1 flex-col p-4 lg:p-6">
+      <main className="flex flex-1 flex-col p-(--mobile-page-padding) lg:p-6">
         <IntegrationsCatalog />
       </main>
     </>

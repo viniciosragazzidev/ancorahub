@@ -14,8 +14,10 @@ import { publishDomainInvalidation } from "@/features/notifications/realtime-syn
 import type { TenantContext } from "@/shared/auth/types";
 import {
   LEAD_STATUS_LABELS,
+  LEAD_STATUS_ORDER,
   MOTIVOS_PERDA,
   MOTIVO_PERDA_LABELS,
+  normalizeMotivoPerda,
   VALID_TRANSITIONS,
 } from "./lead-status-constants";
 import type { MotivoPerda } from "./lead-status-constants";
@@ -28,6 +30,7 @@ export type ChangeLeadStatusInput = {
   leadId: string;
   newStatus: string;
   motivoPerda?: string | null;
+  justificativaRegressao?: string | null;
   expectedVersion?: number;
 };
 
@@ -47,8 +50,56 @@ const changeStatusInput = z.object({
     { message: "Status inválido." },
   ),
   motivoPerda: z.string().optional().nullable(),
+  justificativaRegressao: z.string().optional().nullable(),
   expectedVersion: z.number().int().positive().optional(),
 });
+
+/**
+ * Avalia se o lead foi diagnosticado pela IA como uma possível venda / alta oportunidade.
+ */
+export function isAiPotentialSale(qualificationDetails: unknown): {
+  isPotentialSale: boolean;
+  reason?: string;
+} {
+  if (!qualificationDetails || typeof qualificationDetails !== "object") {
+    return { isPotentialSale: false };
+  }
+  const qual = qualificationDetails as Record<string, any>;
+  const ai = qual.aiIntelligence;
+  if (!ai || typeof ai !== "object") {
+    return { isPotentialSale: false };
+  }
+
+  // 1. Alta ou altíssima intenção de compra
+  if (ai.customerIntent === "VERY_HIGH" || ai.customerIntent === "HIGH") {
+    return {
+      isPotentialSale: true,
+      reason: `Intenção de compra avaliada pela IA como '${ai.customerIntent}'`,
+    };
+  }
+
+  // 2. Sinais de compra detectados
+  if (Array.isArray(ai.buyingSignals) && ai.buyingSignals.length > 0) {
+    return {
+      isPotentialSale: true,
+      reason: `Sinais de compra detectados pela IA: "${ai.buyingSignals.slice(0, 2).join(", ")}"`,
+    };
+  }
+
+  // 3. Estágio avançado de negociação ou fechamento
+  if (
+    ai.conversationStage === "NEGOTIATION" ||
+    ai.conversationStage === "DOCUMENT_COLLECTION" ||
+    ai.conversationStage === "CLOSING"
+  ) {
+    return {
+      isPotentialSale: true,
+      reason: `Estágio da conversa diagnosticado pela IA como '${ai.conversationStage}'`,
+    };
+  }
+
+  return { isPotentialSale: false };
+}
 
 // ─── Serviço principal ────────────────────────────────────────────────
 
@@ -111,6 +162,7 @@ export async function changeLeadStatus(
       branchId: schema.leads.branchId,
       status: schema.leads.status,
       qualificationStatus: schema.leads.qualificationStatus,
+      qualificationDetails: schema.leads.qualificationDetails,
       version: schema.leads.version,
       nome: schema.leads.nome,
     })
@@ -124,6 +176,7 @@ export async function changeLeadStatus(
 
   const previousStatus = lead.status;
   const newStatus = input.newStatus;
+  const canonicalMotivoPerda = normalizeMotivoPerda(input.motivoPerda);
   if (input.expectedVersion !== undefined && input.expectedVersion !== lead.version) {
     throw new Error("CONFLICT_VERSION");
   }
@@ -147,12 +200,29 @@ export async function changeLeadStatus(
 
   // 4. perdido: exige motivo
   if (newStatus === "lost") {
-    if (!input.motivoPerda || !(MOTIVOS_PERDA as readonly string[]).includes(input.motivoPerda)) {
+    if (!canonicalMotivoPerda || !(MOTIVOS_PERDA as readonly string[]).includes(canonicalMotivoPerda)) {
       throw new Error(
         "É obrigatório informar um motivo de perda válido para marcar o lead como perdido.",
       );
     }
     await assertCanChangeStatus(context, lead);
+  }
+
+  // 4.1. Proteção de Regressão da IA (bloqueia perda ou recuo de leads com alta intenção de compra sem justificativa)
+  const isLost = newStatus === "lost";
+  const prevRank = LEAD_STATUS_ORDER[previousStatus] ?? 0;
+  const newRank = LEAD_STATUS_ORDER[newStatus] ?? 0;
+  const isRegression = isLost || (previousStatus !== "lost" && newRank < prevRank);
+
+  const potentialSaleCheck = isAiPotentialSale(lead.qualificationDetails);
+
+  if (isRegression && potentialSaleCheck.isPotentialSale) {
+    const justification = (input.justificativaRegressao ?? "").trim();
+    if (justification.length < 15) {
+      throw new Error(
+        `PROTECAO_REGRESSAO_IA: A IA identificou este atendimento como uma possível venda (${potentialSaleCheck.reason}). Para regredir a etapa ou descartar o lead, é obrigatório fornecer uma justificativa detalhada com no mínimo 15 caracteres para a supervisão.`,
+      );
+    }
   }
 
   // 5. Reabertura (saindo de lost)
@@ -166,7 +236,7 @@ export async function changeLeadStatus(
 
   // ─── Executar mudança ───────────────────────────────────────────────
   const now = new Date();
-  const motivoPerda = newStatus === "lost" ? input.motivoPerda! : null;
+  const motivoPerda = newStatus === "lost" ? canonicalMotivoPerda! : null;
 
   await db.transaction(async (tx) => {
     // Atualizar lead
@@ -189,7 +259,7 @@ export async function changeLeadStatus(
     const interactionContent = isReopening
       ? `Lead reaberto (${previousStatus} → ${LEAD_STATUS_LABELS[newStatus] ?? newStatus}) por ${context.role === "director" ? "Diretor" : "Gestor"}.`
       : newStatus === "lost"
-        ? `Status alterado: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → Perdido. Motivo: ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}`
+        ? `Status alterado: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → Perdido. Motivo: ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}`
         : `Status alterado: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → ${LEAD_STATUS_LABELS[newStatus] ?? newStatus}.`;
 
     await tx.insert(schema.leadInteractions).values({
@@ -199,6 +269,34 @@ export async function changeLeadStatus(
       tipo: "status_change",
       conteudo: interactionContent,
     });
+
+    // Se houve regressão justificada em lead de alta intenção, registrar alerta e justificativa
+    if (isRegression && potentialSaleCheck.isPotentialSale && input.justificativaRegressao) {
+      await tx.insert(schema.leadInteractions).values({
+        id: randomUUID(),
+        leadId: lead.id,
+        userId: context.userId,
+        tipo: "system_alert",
+        conteudo: `[Proteção de Regressão IA] Justificativa do usuário para recuo de lead com alta intenção: "${input.justificativaRegressao.trim()}". (${potentialSaleCheck.reason})`,
+        metadata: {
+          source: "AI_REGRESSION_PROTECTION",
+          aiReason: potentialSaleCheck.reason,
+          justification: input.justificativaRegressao.trim(),
+          fromStatus: previousStatus,
+          toStatus: newStatus,
+        },
+        createdAt: now,
+      });
+
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "lead_regression_protection",
+        entidadeId: lead.id,
+        acao: `regression.overridden:${previousStatus}->${newStatus}`,
+        createdAt: now,
+      });
+    }
 
     // Criar auditoria
     const auditAction = isReopening
@@ -262,9 +360,9 @@ export async function changeLeadStatus(
             leadId: lead.id,
             type: "lead_lost",
             title: "Lead perdido",
-            message: `${lead.nome} foi marcado como perdido. Motivo: ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}`,
+            message: `${lead.nome} foi marcado como perdido. Motivo: ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}`,
             pushTitle: "Lead Perdido 💔",
-            pushBody: `${lead.nome} — ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}.`,
+            pushBody: `${lead.nome} — ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}.`,
             url: `/leads/${lead.id}`,
             tag: `lead-${lead.id}`,
           })]
@@ -278,9 +376,9 @@ export async function changeLeadStatus(
           leadId: lead.id,
           type: "lead_lost",
           title: "Lead perdido",
-          message: `${lead.nome} foi perdido. Motivo: ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}`,
+          message: `${lead.nome} foi perdido. Motivo: ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}`,
           pushTitle: "Lead Perdido! 📉",
-          pushBody: `${lead.nome} foi perdido — ${MOTIVO_PERDA_LABELS[input.motivoPerda as MotivoPerda] ?? input.motivoPerda}.`,
+          pushBody: `${lead.nome} foi perdido — ${MOTIVO_PERDA_LABELS[canonicalMotivoPerda as MotivoPerda] ?? canonicalMotivoPerda}.`,
           url: `/leads/${lead.id}`,
           tag: `lead-${lead.id}`,
         }),

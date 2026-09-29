@@ -2,6 +2,23 @@
 
 | Data | Registro | Estado | Resumo |
 | --- | --- | --- | --- |
+| 2026-09-21 | `active/2026-09-21-meta-control-consolidation-plan.md` | plano aprovado | Consolidar captura e fila da Meta em `/marketing/campanhas` (drawer por campanha/anúncio) e deixar `/integrations/meta` só com visualização, conexão e sincronização. |
+| 2026-09-21 | `active/2026-09-21-distribuicao-redesign-plan.md` | em validação | Plano de redesign da Central de Distribuição (5 áreas, drawer lateral, kit `ds-*` com movimento) e Lote 0 do kit. |
+| 2026-09-21 | `active/2026-09-21-dashboard-erp-composition.md` | em validação | Composição ERP premium do `/dashboard` com widgets shadcn reutilizáveis, gráficos, estados de carregamento e motion acessível. |
+| 2026-09-21 | `active/2026-09-21-waha-lite-connection-flow.md` | em validação | Conexão WhatsApp Lite: QR renovado em tempo real, sessão nunca recriada ao abrir o diálogo, status por fases e verificação contínua com feedback visual. |
+| 2026-09-22 | `active/2026-09-22-broker-bulk-recipient-visibility.md` | em validação | `/conversas?tab=corretores` lista membros ativos e convites pendentes mesmo sem histórico e revalida o lote no servidor. |
+| 2026-09-22 | `active/2026-09-22-team-member-edit-persistence.md` | em validação | Edição de equipe atualiza perfil e membership, cobre convites pendentes e evita fallback inválido no campo de e-mail. |
+| 2026-09-15 | `completed/2026-09-15-routing-rule-persistence-fix.md` | concluído | Migration idempotente da tabela `lead_routing_rules`, que faltava para salvar regras da Matriz de Roteamento. |
+| 2026-09-18 | `active/2026-09-18-team-member-recreation.md` | em validação | Recriação de membro excluído com o mesmo e-mail reutiliza somente uma identidade global ativa sem vínculo no tenant. |
+| 2026-09-15 | `completed/2026-09-15-distribution-surface-refinement.md` | concluído | Hierarquia visual, espaçamento, padding, textos e organização refinados na central `/distribuicao`, sem alterar regras de negócio. |
+| 2026-09-17 | `active/2026-09-17-distribution-visual-redesign.md` | em validação | Redesign da composição de `/distribuicao`, com abas compactas, campanhas visíveis nos cards de filas e menos duplicação visual. |
+| 2026-09-15 | `completed/2026-09-15-waha-qr-rotation-and-phone-reconciliation.md` | concluído | Rotação atômica do QR no WAHA e reconciliação de mensagens pelos 9 últimos dígitos para cobrir DDD divergente. |
+| 2026-09-15 | `completed/2026-09-15-waha-dialog-and-dashboard-header.md` | concluído | Rotação automática do QR ao abrir o diálogo, ação explícita de invalidação/reinício e cabeçalho compartilhado no dashboard. |
+| 2026-09-15 | `completed/2026-09-15-waha-qr-transient-failure-feedback.md` | concluído | Falhas transitórias do polling não interrompem o pareamento e erros de autenticação do WAHA ficam identificáveis. |
+| 2026-09-15 | `completed/2026-09-15-unassigned-leads-and-distribution-surface.md` | concluído | Dataset e paginação independentes para Sem atribuição em `/leads`, pageSize sincronizado pela URL e cards de `/leads/distribuicao` padronizados. |
+| 2026-09-15 | `completed/2026-09-15-waha-mobile-history-reconciliation.md` | concluído | Normalização de mensagens móveis, reconciliação autenticada de histórico e instruções do cron Coolify. |
+| 2026-09-15 | `completed/2026-09-15-leads-pagination-navigation-performance.md` | concluído | Paginação atômica e troca instantânea das categorias locais em `/leads`, sem RSC duplicado. |
+| 2026-09-14 | `completed/2026-09-14-coolify-separated-runtime.md` | concluído | Registro da produção atual no Coolify, com frontend e API em VPSs separadas e sem Vercel. |
 | 2026-08-26 | `active/2026-08-26-vps-performance-local-first.md` | ativo | Telemetria segura, redução de refresh duplicado e scheduler VPS desligado por padrão, aguardando corte controlado da Vercel Cron. |
 | 2026-08-19 | `completed/2026-08-19-dialogs-action-result-refresh.md` | concluído | Conexão do resultado de Server Actions à UI em dialogs (distribuição, feedback-templates, materiais, documentos, agent-triggers e automações): fim do F5 para refletir mudanças. |
 | 2026-08-17 | `completed/2026-08-17-leads-mobile-responsiveness.md` | concluído | Refino da responsividade mobile de /leads: header com menu "Mais ações" abaixo de lg, abas com rolagem e rótulos curtos, lista mobile com seleção em lote, campanha e data, e filtros compactos. |

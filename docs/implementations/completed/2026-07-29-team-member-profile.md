@@ -25,7 +25,8 @@ interações e redistribuições baseados em dados reais do CRM.
   ativa e o usuário tem papel administrativo.
 - A página prioriza identidade, saúde da carteira, resultado comercial,
   carteira recente e redistribuições, destacando quantas ocorreram antes do
-  primeiro atendimento. Informações sem fonte confiável são
+  primeiro atendimento. O resultado também apresenta ofertas efetivamente enviadas,
+  aceitas, pendentes e não aceitas a partir da outbox e do histórico de ofertas. Informações sem fonte confiável são
   omitidas, não simuladas.
 
 ## Decisões

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import {
   REALTIME_SYNC_BROWSER_EVENT,
@@ -34,14 +34,26 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { OwnershipContext } from "@/components/ownership-context";
 import {
   ArrowLeft,
   ArrowSquareOut,
   ChatCircleText,
+  Check,
+  CheckCircle,
   Clock,
   FileText,
+  Flame,
   LinkSimple,
   MagnifyingGlass,
   PanelLeftIcon,
@@ -51,6 +63,11 @@ import {
   PaperPlaneTilt,
   RotateCcw,
   Sparkle,
+  SunDim,
+  ThermometerCold,
+  WarningCircle,
+  Trash,
+  X,
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -74,6 +91,16 @@ import { sendLeadMessageAction } from "@/features/leads/actions/send-lead-messag
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { ManualQualificationDialog } from "../leads/_components/manual-qualification-dialog";
 import { QuickResponsesPopover } from "@/features/conversations/components/quick-responses-popover";
+import { deleteConversationHistoryAction } from "@/features/conversations/actions";
+import {
+  MediaBubble,
+  MediaUnavailable,
+  formatMediaSize,
+  isMediaKindSupported,
+  type MediaBubbleData,
+} from "@/features/conversations/components/media-bubble";
+import { MediaAttachButton } from "@/features/conversations/components/media-attach-button";
+import { mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
 
 export type ConversationMessage = {
   id: string;
@@ -82,7 +109,22 @@ export type ConversationMessage = {
   direction: string;
   sentAt: string;
   senderRole?: string | null;
+  /** Divider for a change of broker (direction "transition"), not a message. */
+  transition?: string | null;
   providerStatus?: string | null;
+  providerFailure?: {
+    code: string;
+    title: string;
+    message: string;
+  } | null;
+  /** DEC-098: official conversation media metadata; binaries stream via the authenticated route. */
+  media?: {
+    kind: string;
+    mimeType: string | null;
+    filename: string | null;
+    sizeBytes: number | null;
+    url: string | null;
+  } | null;
 };
 
 export type AiConversationData = {
@@ -112,6 +154,8 @@ export type ConversationItem = {
   stageEnteredAt: string;
   planName: string | null;
   carrierName: string | null;
+  /** Structured private context captured by the qualification assistant. */
+  privateNotes?: string | null;
   latestMessage: Pick<ConversationMessage, "body" | "direction" | "sentAt"> | null;
   messages: ConversationMessage[];
   documents: {
@@ -150,6 +194,9 @@ export function ConversationsWorkspace({
     initialLeadId && initialConversations.some((item) => item.id === initialLeadId)
       ? initialLeadId
       : initialConversations.find((item) => item.messages.length > 0)?.id ?? initialConversations[0]?.id ?? null,
+  );
+  const [mobileView, setMobileView] = useState<"list" | "chat">(
+    initialLeadId ? "chat" : "list",
   );
 
   // Server data becomes authoritative after the authenticated shell refreshes.
@@ -221,11 +268,13 @@ export function ConversationsWorkspace({
 
   function selectConversation(id: string) {
     setSelectedId(id);
+    setMobileView("chat");
     updateSelectedLeadInUrl(id);
   }
 
   function returnToList() {
     setSelectedId(null);
+    setMobileView("list");
     updateSelectedLeadInUrl(null);
   }
 
@@ -246,7 +295,8 @@ export function ConversationsWorkspace({
   return (
     <section
       aria-label="Central de conversas"
-      className="flex h-[calc(100dvh-var(--header-height,3.5rem))] max-[559px]:h-full w-full flex-col overflow-hidden bg-card"
+      data-mobile-conversation-active={mobileView === "chat" && selected ? "true" : undefined}
+      className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
       <FilterToolbar
         aria-label="Filtros dos atendimentos"
@@ -293,7 +343,7 @@ export function ConversationsWorkspace({
       >
         <section
           aria-label="Lista de atendimentos"
-          className={cn("flex min-h-0 flex-col border-r border-border bg-card", selected && "max-lg:hidden")}
+          className={cn("flex min-h-0 flex-col border-r border-border bg-card", mobileView === "chat" && selected && "max-lg:hidden")}
         >
           <div className="border-b border-border px-3 py-2.5">
             <div className="relative">
@@ -323,7 +373,7 @@ export function ConversationsWorkspace({
           </ScrollArea>
         </section>
 
-        <section aria-live="polite" className={cn("flex min-h-0 flex-col bg-muted/15", !selected && "max-lg:hidden")}>
+        <section aria-live="polite" className={cn("flex min-h-0 flex-col bg-muted/15", (mobileView !== "chat" || !selected) && "max-lg:hidden")}>
           {selected ? (
             <>
               <ConversationHeader
@@ -340,6 +390,19 @@ export function ConversationsWorkspace({
               <ConversationHistory client={selected} />
               <ChatInput
                 leadId={selected.id}
+                onMediaSent={(msg) => {
+                  setConversations((prev) =>
+                    prev.map((item) =>
+                      item.id === selected.id
+                        ? {
+                            ...item,
+                            latestMessage: { body: msg.body, direction: msg.direction, sentAt: msg.sentAt.toISOString() },
+                            messages: [...item.messages, { ...msg, sentAt: msg.sentAt.toISOString(), leadId: selected.id }],
+                          }
+                        : item,
+                    ),
+                  );
+                }}
                 onMessageSent={(msg) => {
                   setConversations((prev) =>
                     prev.map((item) =>
@@ -351,12 +414,11 @@ export function ConversationsWorkspace({
                           }
                         : item,
                     ),
-                  );
-                }}
-              />
-            </>
-          ) : (
-            <EmptyConversation />
+                  );                    }}
+                  />
+                </>
+              ) : (
+                <EmptyConversation />
           )}
         </section>
 
@@ -407,6 +469,7 @@ function ConversationHeader({
   role?: string;
 }) {
   const [isPending, setIsPending] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const router = useRouter();
 
   const aiStatus = client.aiConversation?.status ?? "NEW";
@@ -414,6 +477,28 @@ function ConversationHeader({
   const isWaitingHuman = aiStatus === "WAITING_HUMAN";
   const isAiActive = aiStatus === "AI_ACTIVE" || aiStatus === "WAITING_CUSTOMER";
   const isAssignedToMe = client.aiConversation?.assignedUserId === userId;
+  const canDeleteHistory =
+    role === "director" || (role === "manager" && client.id.startsWith("unassigned-"));
+
+  async function handleDeleteConversationHistory() {
+    setIsPending(true);
+    const toastId = toast.loading("Excluindo histórico da conversa...");
+    try {
+      const result = await deleteConversationHistoryAction(client.telefone);
+      if (!result.success) {
+        toast.error(result.error, { id: toastId });
+        return;
+      }
+      setDeleteDialogOpen(false);
+      toast.success("Conversa excluída da caixa de entrada.", { id: toastId });
+      router.replace("/conversas");
+      router.refresh();
+    } catch {
+      toast.error("Não foi possível excluir a conversa agora.", { id: toastId });
+    } finally {
+      setIsPending(false);
+    }
+  }
 
   async function handleTakeover() {
     if (!client.aiConversation?.id) return;
@@ -617,6 +702,24 @@ function ConversationHeader({
                   </DropdownMenuItem>
                 </>
               )}
+              {canDeleteHistory ? (
+                <>
+                  <DropdownMenuSeparator className="my-1" />
+                  <DropdownMenuItem
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={isPending}
+                    className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive focus:bg-destructive/10"
+                  >
+                    <Trash className="mt-0.5 size-4 shrink-0 text-destructive" />
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-destructive">Excluir conversa</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {role === "director" ? "Remove o histórico deste contato no CRM" : "Remove apenas este contato avulso do CRM"}
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                </>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
 
@@ -666,6 +769,28 @@ function ConversationHeader({
           </div>
         </div>
       </div>
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogPopup>
+          <DialogPanel>
+            <DialogHeader>
+              <DialogTitle>Excluir o histórico desta conversa?</DialogTitle>
+              <DialogDescription>
+                {role === "director"
+                  ? "Todas as mensagens desta conversa serão removidas do CRM. O cadastro do lead, cliente ou membro da equipe será preservado. Esta ação não pode ser desfeita."
+                  : "As mensagens serão removidas da caixa de entrada do CRM. Conversas vinculadas a leads, clientes ou integrantes da equipe continuam protegidas para Gestores."}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={isPending}>
+                Cancelar
+              </Button>
+              <Button type="button" variant="destructive" onClick={() => void handleDeleteConversationHistory()} disabled={isPending}>
+                {isPending ? "Excluindo..." : "Excluir conversa"}
+              </Button>
+            </DialogFooter>
+          </DialogPanel>
+        </DialogPopup>
+      </Dialog>
     </header>
   );
 }
@@ -687,7 +812,7 @@ function FilterChip({ active, count, label, onClick }: { active: boolean; count:
 }
 
 function ConversationHistory({ client }: { client: ConversationItem }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
   // Chronological order: oldest first, newest at bottom ("o mais recente no fim")
   const sortedMessages = useMemo(() => {
@@ -709,26 +834,28 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
   }, [sortedMessages]);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const viewport = viewportRef.current;
+    if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [sortedMessages.length, client.id]);
 
-  if (!sortedMessages.length) {
+  if (!sortedMessages.some((message) => !message.transition)) {
     return <HistoryEmptyState client={client} />;
   }
 
-  const getGroupKey = (dir: string) => {
-    return dir === "outgoing" || dir === "outbound" ? "system" : "client";
+  const getGroupKey = (message: ConversationMessage) => {
+    if (message.transition) return "transition";
+    return message.direction === "outgoing" || message.direction === "outbound" ? "system" : "client";
   };
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-5 sm:px-6">
         {messagesByDate.map(([dateLabel, msgs], dateIdx) => {
-          const grouped = msgs.reduce<{ type: "system" | "client"; messages: ConversationMessage[] }[]>(
+          const grouped = msgs.reduce<{ type: "system" | "client" | "transition"; messages: ConversationMessage[] }[]>(
             (acc, msg) => {
-              const type = getGroupKey(msg.direction);
+              const type = getGroupKey(msg);
               const last = acc[acc.length - 1];
-              if (last && last.type === type) {
+              if (last && last.type === type && type !== "transition") {
                 last.messages.push(msg);
               } else {
                 acc.push({ type, messages: [msg] });
@@ -749,7 +876,15 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
                 <div className="h-[1px] flex-1 bg-border/50" />
               </div>
 
-              {grouped.map((group, gi) => (
+              {grouped.map((group, gi) => group.type === "transition" ? (
+                <div key={gi} className="flex items-center justify-center gap-3" role="note">
+                  <div className="h-px flex-1 bg-border/50" />
+                  <span className="rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground">
+                    {group.messages[0].transition} · {formatTime(group.messages[0].sentAt)}
+                  </span>
+                  <div className="h-px flex-1 bg-border/50" />
+                </div>
+              ) : (
                 <MessageGroup key={gi}>
                   {group.messages.map((message, mi) => (
                     <MessageRow
@@ -765,7 +900,6 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
             </div>
           );
         })}
-        <div ref={bottomRef} />
       </div>
     </ScrollArea>
   );
@@ -774,9 +908,17 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
 function ChatInput({
   leadId,
   onMessageSent,
+  onMediaSent,
 }: {
   leadId: string;
   onMessageSent: (msg: ConversationMessage) => void;
+  onMediaSent?: (msg: {
+    id: string;
+    body: string;
+    direction: string;
+    sentAt: Date;
+    media: { kind: string; mimeType: string; filename: string | null; sizeBytes: number; url: string };
+  }) => void;
 }) {
   const [text, setText] = useState("");
   const [isPending, setIsPending] = useState(false);
@@ -817,6 +959,7 @@ function ChatInput({
   return (
     <div className="border-t border-border bg-card px-4 py-3 sm:px-5">
       <form onSubmit={handleSend} className="flex gap-2 items-center">
+        <MediaAttachButton leadId={leadId} onMediaSent={onMediaSent} />
         <QuickResponsesPopover onSelectResponse={handleAppendQuickResponse} />
         <div className="relative flex-1">
           <Input
@@ -881,9 +1024,11 @@ function MessageSenderBadge({
 function MessageStatusIndicator({
   status,
   direction,
+  failure,
 }: {
   status?: string | null;
   direction: string;
+  failure?: ConversationMessage["providerFailure"];
 }) {
   const isOutbound = direction === "outgoing" || direction === "outbound";
   if (!isOutbound) return null;
@@ -892,22 +1037,31 @@ function MessageStatusIndicator({
     case "read":
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-success" title="Mensagem lida pelo cliente (WhatsApp)">
-          <span aria-hidden="true" className="text-xs font-extrabold leading-none">✓✓</span>
+          <span aria-hidden="true" className="inline-flex -space-x-1">
+            <Check className="size-3" />
+            <Check className="size-3" />
+          </span>
           Lida
         </span>
       );
     case "delivered":
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Entregue no WhatsApp do cliente">
-          <span aria-hidden="true" className="text-xs font-bold leading-none">✓✓</span>
+          <span aria-hidden="true" className="inline-flex -space-x-1">
+            <Check className="size-3" />
+            <Check className="size-3" />
+          </span>
           Entregue
         </span>
       );
     case "failed":
       return (
-        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive" title="Falha ao entregar mensagem">
-          <span aria-hidden="true" className="grid size-3 shrink-0 place-items-center rounded-full bg-destructive/15 text-destructive text-[9px] font-bold">!</span>
-          Falha
+        <span
+          className="inline-flex items-center gap-1 text-[10px] font-semibold text-destructive"
+          title={failure ? `${failure.title} (${failure.code})` : "Falha ao entregar mensagem"}
+        >
+          <WarningCircle aria-hidden="true" className="size-3 shrink-0" />
+          {failure ? `Falha: ${failure.title}` : "Falha"}
         </span>
       );
     case "queued":
@@ -924,7 +1078,7 @@ function MessageStatusIndicator({
     default:
       return (
         <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground" title="Enviada ao servidor Meta">
-          <span aria-hidden="true" className="text-xs font-bold leading-none">✓</span>
+          <Check aria-hidden="true" className="size-3" />
           Enviada
         </span>
       );
@@ -943,6 +1097,8 @@ function MessageRow({
   showHeader: boolean;
 }) {
   const isOutbound = message.direction === "outgoing" || message.direction === "outbound";
+  const mediaData = message.media ?? null;
+  const [fullscreenMedia, setFullscreenMedia] = useState<MediaBubbleData | null>(null);
 
   return (
     <Message align={isOutbound ? "end" : "start"} className="ct-reveal-fast">
@@ -966,7 +1122,26 @@ function MessageRow({
               isOutbound ? "bg-primary text-primary-foreground" : "bg-card",
             )}
           >
-            <p className="whitespace-pre-wrap leading-5">{message.body}</p>
+            {mediaData && mediaData.url ? (
+              <MediaBubble
+                media={{
+                  kind: mediaData.kind,
+                  mimeType: mediaData.mimeType,
+                  filename: mediaData.filename,
+                  sizeBytes: mediaData.sizeBytes,
+                  url: mediaData.url,
+                  caption: message.body?.startsWith("[") && message.body?.endsWith("]") ? null : message.body,
+                }}
+                isOutbound={isOutbound}
+                onOpenFullscreen={setFullscreenMedia}
+              />
+            ) : mediaData && !mediaData.url ? (
+              <MediaUnavailable isOutbound={isOutbound} />
+            ) : mediaPlaceholderLabel(message.body) ? (
+              <p className="whitespace-pre-wrap leading-5 italic opacity-80">{mediaPlaceholderLabel(message.body)}</p>
+            ) : (
+              <p className="whitespace-pre-wrap leading-5">{message.body}</p>
+            )}
           </BubbleContent>
         </Bubble>
 
@@ -977,12 +1152,65 @@ function MessageRow({
           {isOutbound ? (
             <>
               <span aria-hidden="true" className="opacity-60">•</span>
-              <MessageStatusIndicator status={message.providerStatus} direction={message.direction} />
+              <MessageStatusIndicator
+                status={message.providerStatus}
+                direction={message.direction}
+                failure={message.providerFailure}
+              />
             </>
           ) : null}
         </MessageFooter>
+        {isOutbound && message.providerStatus === "failed" && message.providerFailure ? (
+          <p className="mt-1 max-w-80 text-right text-xs leading-5 text-destructive" role="status">
+            <span className="font-semibold">Motivo ({message.providerFailure.code}): </span>
+            {message.providerFailure.message}
+          </p>
+        ) : null}
       </MessageContent>
+      {fullscreenMedia ? (
+        <MediaLightbox media={fullscreenMedia} onClose={() => setFullscreenMedia(null)} />
+      ) : null}
     </Message>
+  );
+}
+
+function MediaLightbox({ media, onClose }: { media: MediaBubbleData; onClose: () => void }) {
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={media.caption || media.filename || "Visualização de mídia"}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4"
+      onClick={onClose}
+    >
+      <button
+        type="button"
+        aria-label="Fechar visualização"
+        className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        onClick={onClose}
+      >
+        <X className="size-5" />
+      </button>
+      <figure className="flex max-h-full max-w-4xl flex-col gap-2" onClick={(event) => event.stopPropagation()}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- authenticated one-off blob from private storage */}
+        <img
+          src={media.url}
+          alt={media.caption || media.filename || "Mídia da conversa"}
+          className="max-h-[80vh] w-auto rounded-lg object-contain"
+        />
+        <figcaption className="text-center text-xs text-white/80">
+          {media.caption || media.filename || ""} {formatMediaSize(media.sizeBytes)}
+        </figcaption>
+      </figure>
+    </div>
   );
 }
 
@@ -1134,22 +1362,25 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
     const targetStatus = qualStatus || leadStatus;
     if (targetStatus.includes("hot") || targetStatus.includes("quente")) {
       return (
-        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">
-          Quente 🔥
+        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">
+          <Flame aria-hidden="true" className="size-3 shrink-0" />
+          Quente
         </Badge>
       );
     }
     if (targetStatus.includes("warm") || targetStatus.includes("morno")) {
       return (
-        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
-          Morno ☀️
+        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
+          <SunDim aria-hidden="true" className="size-3 shrink-0" />
+          Morno
         </Badge>
       );
     }
     if (targetStatus.includes("cold") || targetStatus.includes("frio")) {
       return (
-        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
-          Frio ❄️
+        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium">
+          <ThermometerCold aria-hidden="true" className="size-3 shrink-0" />
+          Frio
         </Badge>
       );
     }
@@ -1161,8 +1392,9 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
       );
     }
     return (
-      <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
-        Qualificado ✓
+      <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold">
+        <CheckCircle aria-hidden="true" className="size-3 shrink-0" />
+        Qualificado
       </Badge>
     );
   }
@@ -1204,7 +1436,7 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
           {renderRowQualificationBadge(conversation)}
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <Clock aria-hidden="true" className="size-3" />
-            {hasHistory ? `${conversation.messages.length} mensagens` : "Aguardando histórico"}
+            {hasHistory ? `${conversation.messages.filter((message) => !message.transition).length} mensagens` : "Aguardando histórico"}
           </span>
         </span>
       </span>
@@ -1231,21 +1463,24 @@ function renderQualificationRatingBadge(status: string, qualStatus?: string | nu
   if (norm.includes("hot") || norm.includes("quente")) {
     return (
       <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-xs gap-1">
-        🔥 Quente (Alta Prioridade)
+        <Flame aria-hidden="true" className="size-3.5 shrink-0" />
+        Quente (Alta Prioridade)
       </Badge>
     );
   }
   if (norm.includes("warm") || norm.includes("morno")) {
     return (
       <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs gap-1">
-        ☀️ Morno (Interessado)
+        <SunDim aria-hidden="true" className="size-3.5 shrink-0" />
+        Morno (Interessado)
       </Badge>
     );
   }
   if (norm.includes("cold") || norm.includes("frio")) {
     return (
       <Badge variant="outline" className="border-sky-500/30 bg-sky-500/10 text-sky-600 dark:text-sky-400 font-medium text-xs gap-1">
-        ❄️ Frio / Sem Resposta
+        <ThermometerCold aria-hidden="true" className="size-3.5 shrink-0" />
+        Frio / Sem Resposta
       </Badge>
     );
   }
@@ -1258,7 +1493,8 @@ function renderQualificationRatingBadge(status: string, qualStatus?: string | nu
   }
   return (
     <Badge variant="outline" className="border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-semibold text-xs gap-1">
-      ✓ Lead Qualificado
+      <CheckCircle aria-hidden="true" className="size-3.5 shrink-0" />
+      Lead Qualificado
     </Badge>
   );
 }
@@ -1397,7 +1633,7 @@ function ClientProfile({
             leadName={client.nome}
           />
 
-          <LeadNotesSection leadId={client.id} />
+          <LeadNotesSection leadId={client.id} initialNote={client.privateNotes} />
 
           {client.aiConversation ? (
             <ProfileSection title="Atendimento Virtual">
@@ -1557,11 +1793,11 @@ function getWhatsAppUrl(phone: string) {
   return `https://wa.me/${phone.replace(/\D/g, "")}`;
 }
 
-function LeadNotesSection({ leadId }: { leadId: string }) {
+function LeadNotesSection({ leadId, initialNote }: { leadId: string; initialNote?: string | null }) {
   const storageKey = `ancora_lead_note_${leadId}`;
   const [note, setNote] = useState(() => {
     if (typeof window === "undefined") return "";
-    return localStorage.getItem(storageKey) ?? "";
+    return localStorage.getItem(storageKey) ?? initialNote ?? "";
   });
   const [saved, setSaved] = useState(false);
 
@@ -1574,7 +1810,12 @@ function LeadNotesSection({ leadId }: { leadId: string }) {
 
   return (
     <ProfileSection
-      action={saved ? <span className="text-[10px] text-emerald-500 font-semibold">Salvo ✓</span> : undefined}
+      action={saved ? (
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-500">
+          <CheckCircle aria-hidden="true" className="size-3" />
+          Salvo
+        </span>
+      ) : undefined}
       title="Anotações Privadas"
     >
       <textarea

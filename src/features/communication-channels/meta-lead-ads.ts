@@ -14,6 +14,9 @@ import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services
 import { MetaCloudApiError } from "./meta-cloud-client";
 import { getMetaLeadAdsWebhookConfig } from "./meta-cloud-config";
 import { isMetaLeadAdsTenantPilotEnabled } from "./meta-lead-ads-platform";
+import { resolveMetaCapturePolicy } from "@/features/meta-ads/meta-capture-policy";
+
+export { resolveMetaCapturePolicy as resolveMetaCampaignIntake } from "@/features/meta-ads/meta-capture-policy";
 
 export type MetaLeadAdsWebhookPayload = {
   object?: string;
@@ -24,7 +27,8 @@ export type MetaLeadAdsWebhookPayload = {
 };
 
 type MetaLeadField = { name?: string; values?: string[] };
-type MetaLeadAdRecord = { id?: string; created_time?: string; ad_id?: string; form_id?: string; campaign_id?: string; campaign_name?: string; field_data?: MetaLeadField[] };
+type MetaLeadAdRecord = { id?: string; created_time?: string; ad_id?: string; adset_id?: string; form_id?: string; campaign_id?: string; campaign_name?: string; page_id?: string; field_data?: MetaLeadField[] };
+type LeadType = "PF" | "PJ" | "PME";
 
 export const META_LEAD_ADS_SOURCE = "meta_lead_ads";
 
@@ -71,12 +75,43 @@ export function verifyMetaWebhookSignature(rawBody: string, signatureHeader: str
 }
 
 function normalizeFieldName(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+  return value.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
 }
 
 function firstField(fields: MetaLeadField[], names: string[]) {
   const match = fields.find((field) => field.name && names.includes(normalizeFieldName(field.name)));
-  return match?.values?.find((value) => value.trim())?.trim() ?? "";
+  return match?.values?.find((value) => typeof value === "string" && value.trim())?.trim() ?? "";
+}
+
+function normalizeLeadType(value: string): LeadType | undefined {
+  const normalized = normalizeFieldName(value);
+  if (["pf", "pessoa_fisica", "individual", "familiar", "plano_individual", "plano_familiar"].includes(normalized)) return "PF";
+  if (["pj", "pessoa_juridica", "plano_pj"].includes(normalized)) return "PJ";
+  if (["pme", "empresarial", "plano_pme", "plano_empresarial"].includes(normalized)) return "PME";
+  return undefined;
+}
+
+const CONTACT_FIELD_NAMES = ["full_name", "nome", "name", "first_name", "primeiro_nome", "last_name", "sobrenome", "phone_number", "telefone", "phone", "celular", "whatsapp", "email", "email_address", "e_mail"];
+const CNPJ_TYPE_FIELD_NAMES = ["tipo_de_cnpj", "tipo_cnpj", "cnpj_type"];
+const PLAN_TYPE_FIELD_NAMES = [
+  "tipo_de_plano", "tipo_plano", "plan_type", "tipo_de_produto", "tipo_produto",
+  "categoria_do_plano", "modalidade_do_plano", "modalidade", "plano_produto",
+  "plano_de_interesse", "plano_interesse", "produto_de_interesse", "plano", "produto",
+];
+const CARRIER_FIELD_NAMES = ["operadora", "operadora_de_preferencia", "operadora_preferida", "nome_da_operadora", "carrier", "health_insurance_company"];
+const MAPPED_FIELD_NAMES = new Set([...CONTACT_FIELD_NAMES, ...CNPJ_TYPE_FIELD_NAMES, ...PLAN_TYPE_FIELD_NAMES, ...CARRIER_FIELD_NAMES]);
+
+/**
+ * Names (never answers — a form can ask health questions) of the questions
+ * the mapping below doesn't recognize, so a renamed or new question shows up
+ * on the lead instead of being dropped without a trace.
+ */
+function collectUnmappedQuestionNames(fields: MetaLeadField[]) {
+  const names = fields
+    .map((field) => field.name?.trim())
+    .filter((name): name is string => Boolean(name) && !MAPPED_FIELD_NAMES.has(normalizeFieldName(name!)))
+    .map((name) => name.slice(0, 120));
+  return [...new Set(names)].slice(0, 40);
 }
 
 /** Deterministic field mapping; unknown form answers are never sent to logs. */
@@ -85,6 +120,13 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   let nome = firstField(fields, ["full_name", "nome", "name"]) || [firstField(fields, ["first_name", "primeiro_nome"]), firstField(fields, ["last_name", "sobrenome"])].filter(Boolean).join(" ");
   let telefone = firstField(fields, ["phone_number", "telefone", "phone", "celular", "whatsapp"]);
   let email = firstField(fields, ["email", "email_address", "e_mail"]);
+  const tipoCnpj = firstField(fields, CNPJ_TYPE_FIELD_NAMES).slice(0, 120);
+  const tipoPlano = firstField(fields, PLAN_TYPE_FIELD_NAMES).slice(0, 120);
+  const operadora = firstField(fields, CARRIER_FIELD_NAMES).slice(0, 120);
+  // A CNPJ type (MEI, ME, LTDA…) means a company plan even when the form has
+  // no explicit plan-type question.
+  const leadType = (tipoPlano ? normalizeLeadType(tipoPlano) : undefined) ?? (tipoCnpj ? "PME" : undefined);
+  const unmappedFormFields = collectUnmappedQuestionNames(fields);
 
   // Fallbacks amigáveis para ferramentas de testes da Meta (Lead Gen Testing Tool)
   if (nome.includes("<test lead:") || nome.includes("dummy data")) {
@@ -97,7 +139,7 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
     email = "teste.meta@ancorahub.com.br";
   }
 
-  return {
+  const normalized = {
     nome, telefone, email,
     externalId: record.id ?? "",
     campaignId: record.campaign_id ?? null,
@@ -107,11 +149,24 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
     /** ISO 8601 retornado pela Meta — quando o lead foi realmente capturado no anúncio. */
     createdTime: record.created_time ?? null,
   };
+  return {
+    ...normalized,
+    ...(tipoCnpj ? { tipoCnpj } : {}),
+    ...(tipoPlano ? { tipoPlano } : {}),
+    ...(operadora ? { operadora } : {}),
+    ...(leadType ? { leadType } : {}),
+    ...(unmappedFormFields.length ? { unmappedFormFields } : {}),
+    ...(record.adset_id ? { adSetId: record.adset_id } : {}),
+    ...(record.page_id ? { pageId: record.page_id } : {}),
+  };
 }
 
 export async function fetchMetaLead(leadgenId: string, tenantAccessToken: string): Promise<MetaLeadAdRecord> {
   const config = getMetaLeadAdsWebhookConfig();
-  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,form_id,campaign_id,campaign_name,field_data`, {
+  // Keep this request limited to fields supported by the Meta Lead object.
+  // The webhook entry already identifies the Page, so requesting page_id here
+  // is unnecessary and causes Meta to reject the whole lead lookup.
+  const response = await fetch(`https://graph.facebook.com/${config.graphVersion}/${encodeURIComponent(leadgenId)}?fields=id,created_time,ad_id,adset_id,form_id,campaign_id,campaign_name,field_data`, {
     headers: { Accept: "application/json", Authorization: `Bearer ${tenantAccessToken}` }, cache: "no-store",
   });
   const payload = await response.json().catch(() => ({})) as MetaLeadAdRecord & { error?: { message?: string; code?: number } };
@@ -199,57 +254,6 @@ export async function configureMetaLeadAdsSource(input: { tenantId: string; bran
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.actorUserId, entidade: "meta_lead_ads_source", entidadeId: sourceId, acao: existing ? "meta_lead_ads.source_updated" : "meta_lead_ads.source_created" });
   });
   return { sourceId };
-}
-
-export function resolveMetaCampaignIntake(input: {
-  adRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
-  campaignRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
-  formRoute?: { enabled: boolean; queueId: string | null; queueStatus: string | null } | undefined;
-  globalMode?: "all" | "selective" | "disabled";
-  hasTenantCampaignRules?: boolean;
-}) {
-  const mode = input.globalMode ?? (input.hasTenantCampaignRules ? "selective" : "all");
-
-  if (mode === "disabled") {
-    return { action: "ignore" as const, queueId: null };
-  }
-
-  const route = input.adRoute ?? input.formRoute ?? input.campaignRoute;
-
-  if (mode === "all") {
-    if (route && !route.enabled) return { action: "ignore" as const, queueId: null };
-    if (route?.queueId && route.queueStatus === "active") {
-      return { action: "capture" as const, queueId: route.queueId };
-    }
-    return { action: "capture" as const, queueId: null };
-  }
-
-  // A selected campaign is the baseline authorization for every attribution
-  // below it. Historical disabled ad/form rows must not discard its lead.
-  // An enabled child rule can still select its own active queue.
-  if (input.campaignRoute?.enabled) {
-    const enabledRoute = input.adRoute?.enabled
-      ? input.adRoute
-      : input.formRoute?.enabled
-        ? input.formRoute
-        : input.campaignRoute;
-    if (enabledRoute.queueId && enabledRoute.queueStatus === "active") {
-      return { action: "capture" as const, queueId: enabledRoute.queueId };
-    }
-    if (input.campaignRoute.queueId && input.campaignRoute.queueStatus === "active") {
-      return { action: "capture" as const, queueId: input.campaignRoute.queueId };
-    }
-    return { action: "capture" as const, queueId: null };
-  }
-
-  // Selective mode: require an explicitly enabled asset or campaign route.
-  if (!route || !route.enabled) {
-    return { action: "ignore" as const, queueId: null };
-  }
-  if (route.queueId && route.queueStatus === "active") {
-    return { action: "capture" as const, queueId: route.queueId };
-  }
-  return { action: "capture" as const, queueId: null };
 }
 
 export async function pauseMetaLeadAdsSource(input: { tenantId: string; sourceId: string; actorUserId: string }) {
@@ -358,7 +362,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           ? storedGlobalMode
           : (hasTenantRules ? "selective" : "all");
 
-        const campaignIntake = resolveMetaCampaignIntake({ adRoute, campaignRoute, formRoute, globalMode });
+        const campaignIntake = resolveMetaCapturePolicy({ adRoute, campaignRoute, formRoute, globalMode, hasTenantRules });
         if (campaignIntake.action === "ignore") {
           await db.insert(schema.auditLogs).values({
             id: randomUUID(), userId: credential.createdBy, entidade: adRoute ? "meta_ad_queue_route" : formRoute ? "meta_form_queue_route" : "meta_campaign_queue_route", entidadeId: lead.adId ?? lead.formId ?? lead.campaignId ?? lead.externalId,
@@ -373,7 +377,26 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
           requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
           bypassPlantao,
-          leadSource: { channel: META_LEAD_ADS_SOURCE, externalId: lead.externalId, campaign: lead.campaignId, ad: lead.adId, form: lead.formId, capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt, metadata: { pageId: entry.id, campaignName: lead.campaignName ?? null } },
+          leadSource: {
+            channel: META_LEAD_ADS_SOURCE,
+            externalId: lead.externalId,
+            campaign: lead.campaignId,
+            ad: lead.adId,
+            form: lead.formId,
+            adSet: lead.adSetId,
+            page: lead.pageId ?? entry.id,
+            capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt,
+            ...(lead.leadType ? { leadType: lead.leadType } : {}),
+            metadata: {
+              pageId: lead.pageId ?? entry.id,
+              campaignName: lead.campaignName ?? null,
+              tipoPlano: lead.tipoPlano ?? null,
+              tipoPlanoStatus: lead.tipoPlano ? "provided" : "not_provided",
+              tipoCnpj: lead.tipoCnpj ?? null,
+              operadora: lead.operadora ?? null,
+              unmappedFormFields: lead.unmappedFormFields ?? null,
+            },
+          },
         });
         console.log("[ingestMetaLeadAdsWebhook] createLeadFromWebhookSync result:", result);
         if (!result.success) throw new Error(result.code);

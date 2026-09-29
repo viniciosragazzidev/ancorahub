@@ -20,6 +20,8 @@ import { getLeadBeneficiaries } from "@/features/post-sale/queries";
 import { CustomerRenewalStatus } from "@/features/post-sale/components/customer-renewal-status";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 
+import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
+
 export const dynamic = "force-dynamic";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
@@ -48,12 +50,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     .where(
       and(
         eq(schema.clients.id, clientId),
-        eq(schema.clients.tenantId, context.tenantId),
-        context.role === "broker"
-          ? eq(schema.clients.corretorId, context.userId)
-          : context.role === "manager" && context.branchId
-            ? eq(schema.clients.branchId, context.branchId)
-            : undefined,
+        buildClientScopeWhere(context),
       ),
     )
     .limit(1);
@@ -160,7 +157,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
         breadcrumb="Pós-venda"
         title={client.name}
       />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
+      <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) sm:gap-6 lg:p-6">
         {/* Profile Cover & Header Card */}
         <div className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <div className="h-28 bg-gradient-to-r from-chart-2/10 via-chart-2/5 to-transparent border-b border-border/40" />
@@ -180,7 +177,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                   )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                  <span>Convertido em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(client.convertedAt)}</span>
+                  <span>Convertido em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(client.convertedAt)}</span>
                   {client.branchName && (
                     <>
                       <span>•</span>
@@ -377,18 +374,18 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
             <Tabs defaultValue="sales" className="min-h-0">
               <TabsList
                 aria-label="Seções do cliente"
-                className="w-full justify-start overflow-x-auto border-b border-border/40 pb-px"
+                className="w-full snap-x snap-mandatory flex-nowrap justify-start overflow-x-auto border-b border-border/40 pb-px"
                 variant="line"
               >
-                <TabsTrigger value="sales">
+                <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="sales">
                   <CurrencyCircleDollar className="size-3.5" />
                   Vendas ({sales.length})
                 </TabsTrigger>
-                <TabsTrigger value="documents">
+                <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="documents">
                   <FileText className="size-3.5" />
                   Documentos
                 </TabsTrigger>
-                <TabsTrigger value="timeline">
+                <TabsTrigger className="min-h-(--mobile-touch-target) shrink-0 snap-start" value="timeline">
                   Linha do Tempo
                 </TabsTrigger>
               </TabsList>
@@ -412,7 +409,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
                           </Badge>
                         </div>
                         <CardDescription className="text-xs">
-                          Registrada em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(sale.saleDate)}
+                          Registrada em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(sale.saleDate)}
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-2 text-xs">

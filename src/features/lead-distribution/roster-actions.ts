@@ -1,11 +1,12 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, lt, ne } from "drizzle-orm";
+import { and, eq, gt, lt, ne, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
+import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 
 export type RosterActionState = { success?: boolean; error?: string };
 
@@ -30,27 +31,43 @@ async function assertRosterScope(scheduleId: string, brokerId: string) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") throw new Error("Apenas Gestores e Diretores podem editar a escala.");
   const db = getDatabase();
-  const [schedule] = await db.select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId, validFrom: schema.unitDutySchedules.validFrom, validUntil: schema.unitDutySchedules.validUntil, status: schema.unitDutySchedules.status })
+  const [schedule] = await db.select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId, validFrom: schema.unitDutySchedules.validFrom, validUntil: schema.unitDutySchedules.validUntil, status: schema.unitDutySchedules.status, maximumBrokers: schema.unitDutySchedules.maximumBrokers })
     .from(schema.unitDutySchedules)
     .where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .limit(1);
   if (!schedule || schedule.status !== "active") throw new Error("O plantão selecionado não está ativo.");
-  if (context.role === "manager" && context.branchId !== schedule.branchId) throw new Error("Você só pode editar a escala da sua unidade.");
+  if (context.role === "manager" && schedule.branchId && context.branchId !== schedule.branchId) throw new Error("Você só pode editar a escala da sua unidade.");
+  if (!schedule.branchId && context.role === "manager" && !context.branchId) throw new Error("Unidade do corretor não identificada.");
   const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-    .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), eq(schema.tenantMemberships.branchId, schedule.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active")))
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      eq(schema.tenantMemberships.userId, brokerId),
+      schedule.branchId ? eq(schema.tenantMemberships.branchId, schedule.branchId) : undefined,
+      context.role === "manager" && context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : undefined,
+      eq(schema.tenantMemberships.role, "broker"),
+      eq(schema.tenantMemberships.jobTitle, "broker"),
+      eq(schema.tenantMemberships.status, "active"),
+      eq(schema.user.active, true),
+      eq(schema.user.status, "active"),
+    ))
     .limit(1);
   if (!broker) throw new Error("O corretor não pertence a uma unidade ativa elegível.");
-  return { context, db, schedule };
+  return { context, db, schedule, broker };
 }
 
-async function assertNoOverlap(db: ReturnType<typeof getDatabase>, tenantId: string, brokerId: string, dayOfWeek: number, startsAt: string, endsAt: string, excludedId?: string) {
+type Database = ReturnType<typeof getDatabase>;
+/** The caller's transaction: checks must run on its connection, not on a second pooled one. */
+type DatabaseOrTransaction = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
+
+async function assertNoOverlap(db: DatabaseOrTransaction, tenantId: string, brokerId: string, dayOfWeek: number, startsAt: string, endsAt: string, excludedId?: string) {
   const conditions = [
     eq(schema.dutyRosterAssignments.tenantId, tenantId),
     eq(schema.dutyRosterAssignments.brokerId, brokerId),
     eq(schema.dutyRosterAssignments.dayOfWeek, dayOfWeek),
     eq(schema.dutyRosterAssignments.status, "active"),
+    isNull(schema.dutyRosterAssignments.dutyDate),
     lt(schema.dutyRosterAssignments.startsAt, endsAt),
     gt(schema.dutyRosterAssignments.endsAt, startsAt),
   ];
@@ -62,14 +79,36 @@ async function assertNoOverlap(db: ReturnType<typeof getDatabase>, tenantId: str
   if (conflict) throw new Error("Este corretor já está escalado em um horário sobreposto.");
 }
 
+async function assertScheduleCapacity(db: DatabaseOrTransaction, tenantId: string, scheduleId: string, dayOfWeek: number, maximumBrokers: number | null, excludedId?: string) {
+  if (maximumBrokers === null) return;
+  const conditions = [
+    eq(schema.dutyRosterAssignments.tenantId, tenantId),
+    eq(schema.dutyRosterAssignments.scheduleId, scheduleId),
+    eq(schema.dutyRosterAssignments.dayOfWeek, dayOfWeek),
+    eq(schema.dutyRosterAssignments.status, "active"),
+    isNull(schema.dutyRosterAssignments.dutyDate),
+  ];
+  if (excludedId) conditions.push(ne(schema.dutyRosterAssignments.id, excludedId));
+  const occupied = await db.select({ id: schema.dutyRosterAssignments.id }).from(schema.dutyRosterAssignments).where(and(...conditions));
+  if (occupied.length >= maximumBrokers) throw new Error("Este plantão atingiu o máximo de corretores definido.");
+}
+
 export async function createRosterAssignmentAction(_previous: RosterActionState, formData: FormData): Promise<RosterActionState> {
   try {
     const input = parseInput(formData);
-    const { context, db, schedule } = await assertRosterScope(input.scheduleId, input.brokerId);
-    await assertNoOverlap(db, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt);
+    const { context, db, schedule, broker } = await assertRosterScope(input.scheduleId, input.brokerId);
     const now = new Date();
-    await db.insert(schema.dutyRosterAssignments).values({ id: randomUUID(), tenantId: context.tenantId, branchId: schedule.branchId, scheduleId: schedule.id, brokerId: input.brokerId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, validFrom: schedule.validFrom, validUntil: schedule.validUntil, status: "active", createdBy: context.userId, updatedBy: context.userId, createdAt: now, updatedAt: now });
-    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: input.brokerId, acao: "duty_roster_assignment.created" });
+    if (!broker.branchId) throw new Error("O corretor não está vinculado a uma unidade ativa.");
+    const brokerBranchId = broker.branchId;
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
+      await assertNoOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt);
+      await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers);
+      await tx.insert(schema.dutyRosterAssignments).values({ id: randomUUID(), tenantId: context.tenantId, branchId: brokerBranchId, scheduleId: schedule.id, brokerId: input.brokerId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, validFrom: schedule.validFrom, validUntil: schedule.validUntil, status: "active", createdBy: context.userId, updatedBy: context.userId, createdAt: now, updatedAt: now });
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: input.brokerId, acao: "duty_roster_assignment.created" });
+    });
+    await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível adicionar o corretor à escala." };
@@ -84,12 +123,17 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
     const { context, db, schedule } = await assertRosterScope(input.scheduleId, input.brokerId);
     const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id, brokerId: schema.dutyRosterAssignments.brokerId, tenantId: schema.dutyRosterAssignments.tenantId })
       .from(schema.dutyRosterAssignments)
-      .where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active")))
+      .where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), isNull(schema.dutyRosterAssignments.dutyDate)))
       .limit(1);
     if (!assignment || assignment.brokerId !== input.brokerId) throw new Error("A alocação não pertence a este corretor.");
-    await assertNoOverlap(db, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, assignment.id);
-    await db.update(schema.dutyRosterAssignments).set({ scheduleId: schedule.id, branchId: schedule.branchId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
-    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.moved" });
+    await db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
+      await assertNoOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, assignment.id);
+      await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers, assignment.id);
+      await tx.update(schema.dutyRosterAssignments).set({ scheduleId: schedule.id, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, updatedBy: context.userId, updatedAt: new Date() }).where(and(eq(schema.dutyRosterAssignments.id, assignment.id), eq(schema.dutyRosterAssignments.tenantId, context.tenantId)));
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.moved" });
+    });
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível mover a escala." };

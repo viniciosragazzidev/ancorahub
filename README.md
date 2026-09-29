@@ -14,8 +14,8 @@ foi instalada nesta preparação.
 | Decisões que precisam de aprovação | [docs/decision-log.md](docs/decision-log.md) |
 | Requisitos e contexto de negócio | [CorreTop_Documento_Requisitos.md](CorreTop_Documento_Requisitos.md) |
 | Arquitetura e processo | [CorreTop_Arquitetura_Desenvolvimento.md](CorreTop_Arquitetura_Desenvolvimento.md) |
-| Linguagem visual | [DESIGN.md](DESIGN.md) |
-| Fundação obrigatória de UI e motion | [docs/ui-foundation.md](docs/ui-foundation.md) |
+| Contrato visual e de UX | [docs/ux/UX_REDESIGN_CONTRACT.md](docs/ux/UX_REDESIGN_CONTRACT.md) |
+| Etapa atual de redesign | [docs/ux/UX_REDESIGN_CONTROL.md](docs/ux/UX_REDESIGN_CONTROL.md) |
 
 ## Estado atual
 

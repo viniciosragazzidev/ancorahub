@@ -3,6 +3,7 @@ import "server-only";
 import { eq, asc } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { ALL_ROUTING_SOURCES_ID, normalizeRoutingQualificationStatus, normalizeRoutingSource } from "./routing-catalog";
 
 export type RoutingRuleConditions = {
   planTypes?: string[];
@@ -13,7 +14,8 @@ export type RoutingRuleConditions = {
   qualificationStatuses?: string[];
 };
 
-export type TargetType = "queue" | "branch" | "broker_group" | "specific_broker";
+export type TargetType = "queue" | "branch" | "all_branches" | "broker_group" | "specific_broker";
+export type RoutingDistributionMode = "automatic" | "manual";
 
 export type LeadRoutingInput = {
   planType?: string | null;
@@ -30,6 +32,7 @@ export type RoutingRule = {
   name: string;
   priority: number;
   enabled: boolean;
+  distributionMode: RoutingDistributionMode;
   conditions: RoutingRuleConditions;
   targetType: TargetType;
   targetId: string;
@@ -39,14 +42,18 @@ export type RoutingRule = {
 };
 
 export async function fetchRoutingRules(tenantId: string): Promise<RoutingRule[]> {
-  const db = getDatabase();
-  const rows = await db
-    .select()
-    .from(schema.leadRoutingRules)
-    .where(eq(schema.leadRoutingRules.tenantId, tenantId))
-    .orderBy(asc(schema.leadRoutingRules.priority));
+  try {
+    const db = getDatabase();
+    const rows = await db
+      .select()
+      .from(schema.leadRoutingRules)
+      .where(eq(schema.leadRoutingRules.tenantId, tenantId))
+      .orderBy(asc(schema.leadRoutingRules.priority));
 
-  return rows as RoutingRule[];
+    return rows as RoutingRule[];
+  } catch {
+    return [];
+  }
 }
 
 export function evaluateLeadAgainstConditions(
@@ -70,8 +77,12 @@ export function evaluateLeadAgainstConditions(
 
   // 2. Origem / Canal
   if (conditions.sources && conditions.sources.length > 0) {
-    const leadSource = (lead.source ?? "").trim().toLowerCase();
-    const hasMatch = conditions.sources.some((s) => s.trim().toLowerCase() === leadSource || leadSource.includes(s.trim().toLowerCase()));
+    const leadSource = normalizeRoutingSource(lead.source);
+    const normalizedRuleSources = conditions.sources.map(normalizeRoutingSource);
+    const hasMatch = normalizedRuleSources.includes(ALL_ROUTING_SOURCES_ID) || normalizedRuleSources.some((normalizedRuleSource) => {
+      if (!normalizedRuleSource) return false;
+      return normalizedRuleSource === leadSource || leadSource.includes(normalizedRuleSource);
+    });
     if (!hasMatch) {
       matches = false;
       reasons.push(`Origem '${lead.source ?? "N/A"}' não está em [${conditions.sources.join(", ")}]`);
@@ -115,9 +126,16 @@ export function evaluateLeadAgainstConditions(
   }
 
   // 6. Status de Qualificação por IA
+  const leadQualificationStatus = normalizeRoutingQualificationStatus(lead.qualificationStatus);
+  const selectedQualificationStatuses = (conditions.qualificationStatuses ?? []).map(normalizeRoutingQualificationStatus);
+  // Desqualificado is terminal and must be explicitly opted into. This keeps
+  // legacy/global rules safe: an empty status filter no longer routes it.
+  if (leadQualificationStatus === "disqualified" && !selectedQualificationStatuses.includes("disqualified")) {
+    matches = false;
+    reasons.push("Lead desqualificado não entra nesta regra sem seleção explícita do status.");
+  }
   if (conditions.qualificationStatuses && conditions.qualificationStatuses.length > 0) {
-    const leadStatus = (lead.qualificationStatus ?? "unqualified").trim().toLowerCase();
-    const hasMatch = conditions.qualificationStatuses.some((st) => st.trim().toLowerCase() === leadStatus);
+    const hasMatch = selectedQualificationStatuses.includes(leadQualificationStatus);
     if (!hasMatch) {
       matches = false;
       reasons.push(`Status de IA '${lead.qualificationStatus ?? "N/A"}' não corresponde`);

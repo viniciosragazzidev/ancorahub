@@ -1,12 +1,67 @@
-import type { AssignmentStrategy } from "./types";
+import type { AssignmentStrategy, DutyFallbackPolicy } from "./types";
 
 export type EligibleBroker = { id: string; createdAt: Date; activeLeads: number; capacity: number | null };
+
+/**
+ * An offer accepted by the broker confirms ownership (BR-023). No automatic
+ * flow — worker, SLA sweep or exclusion — may move the lead away from them.
+ */
+export function isAcceptedOfferAssignment(assignmentSource: string | null) {
+  return assignmentSource === "whatsapp_offer_accepted";
+}
+
+/**
+ * The SLA sweep could not hand an unaccepted lead to another broker (duty
+ * closed, lead from an earlier occurrence, nobody eligible). Only when the
+ * broker's acceptance window ran out — their latest offer for this lead
+ * EXPIRED, never accepted, never contacted — does the provisional lead go
+ * back to "Aguardando distribuição" for manual assignment instead of sitting
+ * in their wallet indefinitely. Any other unworked lead is left as is.
+ */
+export function shouldReleaseUnacceptedProvisionalOwner(input: {
+  handoffStatus: string;
+  corretorId: string | null;
+  assignmentSource: string | null;
+  status: string;
+  firstContactAt: Date | null;
+  serviceStartedAt: Date | null;
+  /** Status of the broker's most recent offer for this lead, if any. */
+  latestOfferStatus: string | null;
+}) {
+  if (input.handoffStatus === "assigned" || input.handoffStatus === "offered") return false;
+  return Boolean(input.corretorId)
+    && input.assignmentSource === "automatic_offer"
+    && input.status === "distributed"
+    && !input.firstContactAt
+    && !input.serviceStartedAt
+    && input.latestOfferStatus === "EXPIRED";
+}
+
+export function canRotateProvisionalLeadOwner(input: {
+  corretorId: string | null;
+  assignmentSource: string | null;
+  excludeBrokerId?: string | null;
+  status: string;
+  firstContactAt: Date | string | null;
+  serviceStartedAt: Date | string | null;
+}) {
+  const serviceAlreadyStarted = Boolean(input.firstContactAt || input.serviceStartedAt)
+    || !["new", "distributed"].includes(input.status);
+
+  return Boolean(
+    input.corretorId
+      && !serviceAlreadyStarted
+      && !isAcceptedOfferAssignment(input.assignmentSource)
+      && (input.assignmentSource === "automatic_offer" || input.assignmentSource === "manual_offer" || input.corretorId === input.excludeBrokerId),
+  );
+}
 
 export type IntelligentDistributionPolicy = {
   excludedBrokerIds: string[];
   excludedBranchIds: string[];
   allowedBrokerIds?: string[];
   allowedBranchIds?: string[];
+  allowedSourceIds?: string[];
   ranking: { enabled: boolean; conversionWeight: number; slaWeight: number; manualPriorityWeight: number };
 };
 
@@ -22,7 +77,7 @@ export type RankedBroker = EligibleBroker & {
 };
 
 export const defaultIntelligentDistributionPolicy: IntelligentDistributionPolicy = {
-  excludedBrokerIds: [], excludedBranchIds: [], allowedBrokerIds: [], allowedBranchIds: [],
+  excludedBrokerIds: [], excludedBranchIds: [], allowedBrokerIds: [], allowedBranchIds: [], allowedSourceIds: [],
   ranking: { enabled: true, conversionWeight: 45, slaWeight: 35, manualPriorityWeight: 20 },
 };
 
@@ -34,15 +89,33 @@ export function readDistributionPolicy(value: unknown): IntelligentDistributionP
     excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
+    allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }
 
 const BROKER_COOLDOWN_MS = 5 * 60 * 1000;
 
-export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistributionPolicy, now = new Date()): RankedBroker[] {
+/**
+ * Fisher-Yates, with an injectable random source so callers (tests, mainly)
+ * can get a reproducible order. Array.prototype.sort is stable (guaranteed
+ * since ES2019), so shuffling first and then sorting by real criteria makes
+ * every tie resolve in this shuffled order instead of always the same
+ * winner — the standard way to get "random among ties" out of a stable sort
+ * without the well-known bugs of a `Math.random()` comparator.
+ */
+export function shuffle<T>(items: readonly T[], random: () => number = Math.random): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistributionPolicy, now = new Date(), random: () => number = Math.random): RankedBroker[] {
   const nowMs = now.getTime();
-  return brokers
+  return shuffle(brokers, random)
     .filter((broker) => !policy.excludedBrokerIds.includes(broker.id) && (broker.capacity === null || broker.activeLeads < broker.capacity))
     .sort((a, b) => {
       // 1. Plantão (On-Duty) ativo primeiro
@@ -69,7 +142,12 @@ export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistribu
       const bIdle = b.idleSince?.getTime() ?? 0;
       if (aIdle !== bIdle) return aIdle - bIdle;
 
-      return a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id);
+      // No real criterion left to break the tie on — every broker this far
+      // down is equally deserving, so leave them in shuffled order instead
+      // of always picking the oldest account (that used to starve every
+      // other branch/broker whenever load was still even, e.g. right after
+      // a queue goes live).
+      return 0;
     });
 }
 
@@ -78,10 +156,14 @@ export function calculateBrokerRankingScore(input: Pick<RankedBroker, "conversio
   return Math.round(input.conversionRate * weights.conversionWeight + input.slaRate * weights.slaWeight + input.manualPriority * weights.manualPriorityWeight);
 }
 
-export function chooseBroker(brokers: EligibleBroker[], strategy: AssignmentStrategy): EligibleBroker | null {
+export function chooseBroker(brokers: EligibleBroker[], strategy: AssignmentStrategy, random: () => number = Math.random): EligibleBroker | null {
   const eligible = brokers.filter((broker) => broker.capacity === null || broker.activeLeads < broker.capacity);
   if (!eligible.length) return null;
-  return [...eligible].sort((a, b) => strategy === "round_robin" ? a.createdAt.getTime() - b.createdAt.getTime() : a.activeLeads - b.activeLeads || a.createdAt.getTime() - b.createdAt.getTime())[0] ?? null;
+  // round_robin's whole point is "oldest account goes first" (deliberately,
+  // regardless of load) — that stays a real, deterministic criterion.
+  // capacity's tie-break (same active-lead count) has no such meaning, so it
+  // resolves from the pre-shuffled order instead of "oldest account wins".
+  return shuffle(eligible, random).sort((a, b) => strategy === "round_robin" ? a.createdAt.getTime() - b.createdAt.getTime() : a.activeLeads - b.activeLeads)[0] ?? null;
 }
 
 /** Shared final decision for automatic distribution and the dry-run simulator. */
@@ -89,11 +171,12 @@ export function resolveDistributionCandidate(
   brokers: RankedBroker[],
   policy: IntelligentDistributionPolicy,
   strategy: AssignmentStrategy,
+  random: () => number = Math.random,
 ) {
-  const eligible = rankBrokers(brokers, policy);
+  const eligible = rankBrokers(brokers, policy, new Date(), random);
   const selected = policy.ranking.enabled
     ? eligible[0] ?? null
-    : chooseBroker(eligible, strategy === "round_robin" ? "round_robin" : "capacity");
+    : chooseBroker(eligible, strategy === "round_robin" ? "round_robin" : "capacity", random);
   return { eligible, selected };
 }
 
@@ -107,20 +190,153 @@ export function getDutyCoverage(assignedBrokers: number, minimumBrokers: number)
   return { assigned, minimum, missing: Math.max(0, minimum - assigned), covered: assigned >= minimum };
 }
 
+export type DistributionBranchCandidate = { id: string; receivedLeads: number; createdAt: Date };
+
+/** Balance automatic intake across the currently eligible units. */
+export function selectDistributionBranch(
+  branches: DistributionBranchCandidate[],
+  random: () => number = Math.random,
+): DistributionBranchCandidate | null {
+  // Count received leads rather than only leads in active commercial statuses:
+  // closed and queued leads still contribute to the unit's share of intake.
+  // Shuffling first makes an equal-load tie fair without relying on insertion order.
+  return shuffle(branches, random).sort((a, b) => a.receivedLeads - b.receivedLeads)[0] ?? null;
+}
+
+/**
+ * Run branch selection and its durable reservation inside one caller-provided
+ * lock. Production uses a tenant-scoped PostgreSQL transaction lock; keeping
+ * the seam generic lets tests exercise the concurrent selection pattern.
+ */
+export async function reserveDistributionBranch<T>(input: {
+  withLock: <Result>(work: () => Promise<Result>) => Promise<Result>;
+  getCandidates: () => Promise<DistributionBranchCandidate[]>;
+  reserve: (branch: DistributionBranchCandidate) => Promise<T>;
+}): Promise<{ status: "empty" } | { status: "reserved"; branch: DistributionBranchCandidate; value: T }> {
+  return input.withLock(async () => {
+    const branch = selectDistributionBranch(await input.getCandidates());
+    if (!branch) return { status: "empty" } as const;
+    return { status: "reserved", branch, value: await input.reserve(branch) } as const;
+  });
+}
+
 export function isDeferredDistributionReason(reason: string) {
   const normalized = reason.toLocaleLowerCase("pt-BR");
   return (
     normalized.includes("nenhum corretor") ||
     normalized.includes("atingiram a capacity") ||
+    normalized.includes("limite de capacidade da fila") ||
     normalized.includes("modo manual") ||
+    normalized.includes("intervalo entre ofertas") ||
     normalized.includes("desativada") ||
     normalized.includes("pausada") ||
     normalized.includes("fila configurada pertence") ||
     normalized.includes("nenhuma unidade elegível") ||
     normalized.includes("fila geral não possui unidades") ||
+    normalized.includes("próximo ciclo automático") ||
     normalized.includes("qualificação por ia") ||
     normalized.includes("qualificação em andamento")
   );
+}
+
+/**
+ * Window during which a PENDING offer without a linked durable outbox row is
+ * treated as an in-flight delivery attempt. `createLeadOffersForBrokers` links
+ * the outbox row right after enqueueing, so a stale PENDING offer past this
+ * window is abnormal and must not block the cycle forever.
+ */
+export const OFFER_ENQUEUE_GRACE_MS = 2 * 60 * 1000;
+
+/**
+ * A pending offer gives the selected broker provisional ownership so the lead
+ * is immediately visible in the broker wallet and can be accepted there. The
+ * `automatic_offer` source distinguishes this reversible link from a confirmed
+ * attendance: decline or expiration may atomically rotate it to the next
+ * eligible broker.
+ */
+export function buildPendingLeadOfferLeadUpdate(input: {
+  targetBranchId: string;
+  brokerId: string;
+  now: Date;
+  assignmentSource?: "automatic_offer" | "manual_offer";
+}) {
+  return {
+    branchId: input.targetBranchId,
+    corretorId: input.brokerId,
+    status: "distributed" as const,
+    distributionStatus: "assigned" as const,
+    assignedAt: input.now,
+    assignmentSource: input.assignmentSource ?? "automatic_offer" as const,
+    assignmentStrategy: "whatsapp_offer" as const,
+    distributionUpdatedAt: input.now,
+    stageEnteredAt: input.now,
+    firstContactAt: null,
+    serviceStartedAt: null,
+    serviceStartedBy: null,
+    motivoPerda: null,
+    updatedAt: input.now,
+  };
+}
+
+/** Preserve a manually offered broker in the current cycle's attempt history when releasing its provisional owner. */
+export function buildManualOfferLeadReleaseUpdate(now: Date, cycleStartedAt: Date) {
+  return {
+    corretorId: null,
+    status: "distributed" as const,
+    distributionStatus: "queued" as const,
+    assignmentSource: "redistribution" as const,
+    distributionUpdatedAt: cycleStartedAt,
+    stageEnteredAt: now,
+    assignedAt: null,
+    updatedAt: now,
+  };
+}
+
+/**
+ * A short grace protects a broker who accepted at the deadline while the
+ * request was in flight. It only applies to the current provisional owner.
+ */
+export const LEAD_OFFER_ACCEPT_GRACE_MS = 60 * 1000;
+
+const ACTIVE_OFFER_STATUSES = new Set(["PENDING", "SENT", "DELIVERED", "READ"]);
+
+/**
+ * Whether an active offer must block the creation of a second offer for the
+ * same lead. An offer with a linked outbox row (or unknown/legacy linkage) is
+ * always blocking; a PENDING offer whose outbox row was not linked yet only
+ * blocks during the enqueue grace window.
+ */
+export function isBlockingActiveOffer(
+  offer: { status: string; offeredAt?: Date | null; expiresAt: Date; outboundMessageId?: string | null },
+  now: Date,
+) {
+  if (!ACTIVE_OFFER_STATUSES.has(offer.status) || offer.expiresAt <= now) return false;
+  // `undefined` means legacy/unknown linkage and keeps the historical blocking
+  // behavior; an explicit `null` means the enqueue has not linked the row yet.
+  if (offer.outboundMessageId !== null) return true;
+  if (offer.status !== "PENDING" || !offer.offeredAt) return false;
+  return now.getTime() - offer.offeredAt.getTime() <= OFFER_ENQUEUE_GRACE_MS;
+}
+
+export type LeadOfferAcceptanceDecision = {
+  isExpired: boolean;
+  isAlreadyAssigned: boolean;
+  withinGrace: boolean;
+  isAcceptable: boolean;
+};
+
+/** Pure accept-time decision shared by the offer webhook transaction. */
+export function resolveLeadOfferAcceptance(
+  input: { offerStatus: string; expiresAt: Date; leadCorretorId: string | null; brokerId: string },
+  now: Date,
+): LeadOfferAcceptanceDecision {
+  const overdueMs = now.getTime() - input.expiresAt.getTime();
+  const isProvisionalOwner = input.leadCorretorId === input.brokerId;
+  const withinGrace = overdueMs > 0 && overdueMs <= LEAD_OFFER_ACCEPT_GRACE_MS && isProvisionalOwner;
+  const isExpired = overdueMs > 0 && !withinGrace;
+  const isAlreadyAssigned = Boolean(input.leadCorretorId && input.leadCorretorId !== input.brokerId);
+  const isAcceptable = ACTIVE_OFFER_STATUSES.has(input.offerStatus) && !isExpired && !isAlreadyAssigned;
+  return { isExpired, isAlreadyAssigned, withinGrace, isAcceptable };
 }
 
 /**
@@ -135,10 +351,21 @@ export function resolveQueueCandidateBranchIds(input: {
 }) {
   if (input.queueBranchId) return [input.queueBranchId];
   const list = [...input.allowedBranchIds];
-  if (input.leadBranchId && !list.includes(input.leadBranchId)) {
+  // An unbound/general queue with no allow-list explicitly means all active
+  // units. In that mode the lead's current branch must not pin the rotation;
+  // the service resolves the eligible unit by current load. A lead branch is
+  // only a fallback when the policy already constrains the candidate set.
+  if (list.length > 0 && input.leadBranchId && !list.includes(input.leadBranchId)) {
     list.push(input.leadBranchId);
   }
   return Array.from(new Set(list));
+}
+
+export function resolveDistributionPolicyScope(
+  queueId: string | null,
+  profileKey: string | null,
+) {
+  return { queueId, profileKey };
 }
 
 /** A distribution hub (Matriz) receives leads for human redistribution only. */
@@ -151,6 +378,55 @@ export function isAutomaticDistributionBranch(branch: {
   return branch.status === "active" && branch.acceptingLeads && branch.autoDistribute && !branch.isDistributionHub;
 }
 
+export type DutyFallbackDecision = "use_selected_duty" | "use_unit_roster" | "wait_next_duty" | "fallback_queue";
+
+/**
+ * Resolves what a queue should do when an explicit plantão restriction has no
+ * active schedule at this instant. The queue policy is the authority; an
+ * inactive/archived schedule never silently broadens a strict queue.
+ */
+export function resolveDutyFallbackDecision(input: {
+  policy: DutyFallbackPolicy;
+  hasExplicitSchedule: boolean;
+  hasActiveSelectedSchedule: boolean;
+}): DutyFallbackDecision {
+  if (!input.hasExplicitSchedule || input.hasActiveSelectedSchedule) return "use_selected_duty";
+  if (input.policy === "unit_roster") return "use_unit_roster";
+  if (input.policy === "fallback_queue") return "fallback_queue";
+  return "wait_next_duty";
+}
+
 export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds: number) {
   return Math.min(baseSeconds * 1000 * (2 ** Math.max(attempt - 1, 0)), 30 * 60_000);
+}
+
+export function resolveLeadOfferCycle(input: {
+  eligibleBrokerIds: string[];
+  offers: Array<{ brokerId: string; status: string; offeredAt?: Date; expiresAt: Date; outboundMessageId?: string | null }>;
+  cycleStartedAt?: Date | null;
+  now?: Date;
+}) {
+  const now = input.now ?? new Date();
+  const offers = input.cycleStartedAt
+    ? input.offers.filter(
+        (offer) => !offer.offeredAt || offer.offeredAt >= input.cycleStartedAt!,
+      )
+    : input.offers;
+  const activeOffer = offers.find((offer) => isBlockingActiveOffer(offer, now));
+  const attemptedBrokerIds = new Set(offers.map((offer) => offer.brokerId));
+  const remainingBrokerIds = input.eligibleBrokerIds.filter(
+    (brokerId) => !attemptedBrokerIds.has(brokerId),
+  );
+
+  return {
+    activeBrokerId: activeOffer?.brokerId ?? null,
+    activeExpiresAt: activeOffer?.expiresAt ?? null,
+    attemptedBrokerIds,
+    remainingBrokerIds,
+    exhausted:
+      !activeOffer &&
+      input.eligibleBrokerIds.length > 0 &&
+      remainingBrokerIds.length === 0 &&
+      attemptedBrokerIds.size > 0,
+  };
 }

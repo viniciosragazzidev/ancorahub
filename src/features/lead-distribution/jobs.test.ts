@@ -15,4 +15,8 @@ describe("lead distribution jobs", () => {
     expect(isDeferredDistributionReason("O lead está em processo de qualificação por IA e aguarda a finalização ou tempo limite para ser distribuído.")).toBe(true);
     expect(isDeferredDistributionReason("Falha de conexão inesperada.")).toBe(false);
   });
+
+  it("keeps a restarted offer cycle recoverable by the recurring worker", () => {
+    expect(isDeferredDistributionReason("Lead aguardando o próximo ciclo automático de ofertas.")).toBe(true);
+  });
 });

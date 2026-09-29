@@ -1,15 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { CheckCircle, ShieldWarning } from "@/components/huge-icons";
+import Link from "next/link";
+import { CheckCircle } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { MetaCloudSetupCard } from "@/features/communication-channels/components/meta-cloud-setup-card";
 import { MetaEmbeddedSignupCard } from "@/features/communication-channels/components/meta-embedded-signup-card";
 import { WhatsAppTestMessageCard } from "@/features/communication-channels/components/whatsapp-test-message-card";
-import { TemplateListView } from "../integrations/whatsapp/_components/template-list-view";
-import { TemplateUsagesCard } from "../integrations/whatsapp/_components/template-usages-card";
+import { Button } from "@/components/ui/button";
+import { WhatsAppIntegrationHeading } from "../integrations/whatsapp/whatsapp-integration-heading";
 
 type Channel = {
   id: string;
@@ -30,6 +31,7 @@ type Channel = {
   activatedAt: Date | null;
   tokenExpiresAt: Date | null;
   isDefault: boolean;
+  hasCredentials: boolean;
 };
 
 type OfficialSetup = {
@@ -49,7 +51,8 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     official.enabled &&
     official.configured &&
     official.companyAccount?.status === "active" &&
-    official.companyAccount.registrationStatus === "registered";
+    official.companyAccount.registrationStatus === "registered" &&
+    official.companyAccount.hasCredentials;
 
   const canConnectNumber =
     official.canConfigure &&
@@ -57,41 +60,16 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
     official.configured &&
     official.appId &&
     official.embeddedSignupConfigId &&
-    official.companyAccount?.status !== "active";
+    (!official.companyAccount?.hasCredentials || official.companyAccount.status !== "active");
 
   return (
-    <main className="flex min-h-full flex-col gap-6 bg-background p-4 antialiased lg:p-6">
-      <header className="max-w-3xl">
-        <p className="text-xs font-medium text-primary">CANAIS DE ATENDIMENTO</p>
-        <h1 className="mt-1 text-balance text-2xl font-semibold tracking-tight">
-          Central WhatsApp da Operação
-        </h1>
-        <p className="mt-1 text-pretty text-sm leading-6 text-muted-foreground">
-          Conecte o número corporativo oficial da Meta e gerencie templates de mensagem com sincronização automática.
-        </p>
-      </header>
+    <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) antialiased sm:gap-6 lg:p-6">
+      <WhatsAppIntegrationHeading active="oficial" canViewDirector={official.canConfigure} />
 
-      <Tabs defaultValue="connection" variant="segment" className="w-full space-y-6">
-        <TabsList className="max-w-md">
-          <TabsTrigger value="connection">Número & Conexão</TabsTrigger>
-          <TabsTrigger value="templates">Templates Meta</TabsTrigger>
-          <TabsTrigger value="usages">Eventos & Usos</TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue="connection" className="w-full">
 
         {/* ABA 1: CONEXÃO */}
         <TabsContent value="connection" className="space-y-6">
-          <Card className="border-warning/30 bg-warning/5 shadow-none">
-            <CardContent className="flex items-start gap-3 p-4">
-              <ShieldWarning className="mt-0.5 size-5 shrink-0 text-warning" />
-              <div>
-                <p className="text-sm font-semibold">Proteção de dados</p>
-                <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                  Use apenas números autorizados. Conversas, grupos e contatos sem vínculo com um lead são descartados antes de entrar no CRM.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
           <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(20rem,0.8fr)]">
             <div className="space-y-4">
               <Card className="border-border bg-card shadow-none">
@@ -173,16 +151,21 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
           </section>
         </TabsContent>
 
-        {/* ABA 2: TEMPLATES META */}
-        <TabsContent value="templates">
-          <TemplateListView canManage={official.canConfigure} />
-        </TabsContent>
-
-        {/* ABA 3: MAPEAMENTO DE EVENTOS */}
-        <TabsContent value="usages">
-          <TemplateUsagesCard canManage={official.canConfigure} />
-        </TabsContent>
       </Tabs>
+
+      <Card className="border-border bg-card shadow-none">
+        <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <CardTitle>Mensagens automáticas</CardTitle>
+            <CardDescription className="mt-1">
+              Templates Meta, mensagens livres e situações do fluxo agora possuem uma única configuração na Qualificação.
+            </CardDescription>
+          </div>
+          <Button render={<Link href="/qualificacao?tab=meta_templates" />}>
+            Configurar mensagens
+          </Button>
+        </CardHeader>
+      </Card>
     </main>
   );
 }

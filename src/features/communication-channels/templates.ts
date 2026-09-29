@@ -1,20 +1,56 @@
 import "server-only";
 
+import {
+  CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE,
+  CANONICAL_BROKER_INVITATION_TEMPLATE_NAME,
+  CANONICAL_BROKER_LEAD_TEMPLATE_NAME,
+} from "./broker-lead-template-contract";
+
 export const META_WHATSAPP_TEMPLATE_PURPOSES = {
-  brokerInvitation: { name: "broker_first_access", language: "pt_BR" },
+  brokerInvitation: {
+    name: CANONICAL_BROKER_INVITATION_TEMPLATE_NAME,
+    language: CANONICAL_BROKER_INVITATION_TEMPLATE_LANGUAGE,
+  },
+  brokerAccountActivated: { name: "broker_account_activated", language: "pt_BR" },
+  dutyPresenceConfirmation: { name: "plantao_confirm_presence", language: "pt_BR" },
   taskReminder: { name: "ancora_lembrete_tarefa", language: "pt_BR" },
   clientNotice: { name: "ancora_aviso_cliente", language: "pt_BR" },
-  brokerLeadNotification: { name: "new_lead_broker", language: "pt_BR" },
+  brokerLeadNotification: { name: CANONICAL_BROKER_LEAD_TEMPLATE_NAME, language: "pt_BR" },
   leadQualification: { name: "lead_qualification_start", language: "pt_BR" },
   lead_qualification: { name: "lead_qualification_start", language: "pt_BR" },
-  newLeadAssignment: { name: "novo_lead_", language: "pt_BR" },
+  // The offer and the confirmed assignment use the same Meta-approved
+  // template. Keeping two different names here made pending offers resolve to
+  // the retired `novo_lead_` template and fail before reaching Meta.
+  newLeadAssignment: { name: CANONICAL_BROKER_LEAD_TEMPLATE_NAME, language: "pt_BR" },
   leadAssignmentConfirmed: { name: "lead_assignment_confirmed", language: "pt_BR" },
   leadAssignmentUnavailable: { name: "lead_assignment_unavailable", language: "pt_BR" },
   leadAssignmentExpired: { name: "lead_assignment_expired", language: "pt_BR" },
+  leadFeedbackReminder: { name: "registrar_feedback_lead", language: "pt_BR" },
   aiQualification: { name: "__text__", language: "pt_BR" },
 } as const;
 
 export type MetaWhatsAppTemplatePurpose = keyof typeof META_WHATSAPP_TEMPLATE_PURPOSES;
+
+/**
+ * Assignment and lifecycle notices are part of the official Meta channel.
+ * They must never be redirected to a tenant WAHA number, even when an older
+ * internal-notification policy still has a WAHA fallback configured.
+ */
+const META_ONLY_INTERNAL_PURPOSES = new Set([
+  "brokerInvitation",
+  "brokerAccountActivated",
+  "dutyPresenceConfirmation",
+  "brokerLeadNotification",
+  "newLeadAssignment",
+  "leadAssignmentConfirmed",
+  "leadAssignmentUnavailable",
+  "leadAssignmentExpired",
+  "leadFeedbackReminder",
+]);
+
+export function isMetaOnlyOutboundPurpose(purpose?: string) {
+  return Boolean(purpose && META_ONLY_INTERNAL_PURPOSES.has(purpose));
+}
 
 export function getMetaWhatsAppTemplate(purpose: string) {
   if (!(purpose in META_WHATSAPP_TEMPLATE_PURPOSES)) return null;
@@ -24,16 +60,19 @@ export function getMetaWhatsAppTemplate(purpose: string) {
 /**
  * Named variables must carry `parameter_name` in the Cloud API payload. The
  * broker invitation template is configured with {{nome}}, {{empresa}} and
- * {{cargo}}, rather than positional {{1}}, {{2}} and {{3}} placeholders.
+ * {{cargo}} and {{unidade}}, rather than positional placeholders.
  */
 export function getMetaWhatsAppTemplateVariableNames(purpose: string) {
-  if (purpose === "brokerInvitation") return ["nome", "empresa", "cargo"];
-  if (purpose === "brokerLeadNotification") {
+  if (purpose === "brokerInvitation") return ["nome", "empresa", "cargo", "unidade"];
+  if (purpose === "brokerAccountActivated") return ["nome", "empresa", "login_url"];
+  if (purpose === "dutyPresenceConfirmation") return ["nome", "hora"];
+  if (purpose === "brokerLeadNotification" || purpose === "newLeadAssignment") {
     return ["cargo", "corretor_nome", "lead_nome", "produto_interesse"];
   }
   if (purpose === "leadAssignmentConfirmed") {
     return ["nome_corretor", "nome_cliente", "telefone_cliente", "interesse", "tipo", "n_dependentes"];
   }
+
   return undefined;
 }
 
@@ -44,6 +83,7 @@ export function buildLeadAssignmentConfirmedVariables(input: {
   interesse: string;
   tipo: string;
   dependentes: string;
+  cidade: string;
   leadId: string;
 }) {
   return [
@@ -53,6 +93,23 @@ export function buildLeadAssignmentConfirmedVariables(input: {
     input.interesse,
     input.tipo,
     input.dependentes,
+    input.cidade,
+    input.leadId,
+  ];
+}
+
+export function buildLeadOfferVariables(input: {
+  cargo: string;
+  corretorNome: string;
+  leadNome: string;
+  produtoInteresse: string;
+  leadId: string;
+}) {
+  return [
+    input.cargo,
+    input.corretorNome,
+    input.leadNome,
+    input.produtoInteresse,
     input.leadId,
   ];
 }
@@ -62,7 +119,7 @@ export function buildLeadAssignmentConfirmedVariables(input: {
  * dynamic URL button. It is not a body parameter.
  */
 export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: string[]) {
-  if (purpose === "brokerLeadNotification") {
+  if (purpose === "brokerLeadNotification" || purpose === "newLeadAssignment") {
     const [cargo, corretorNome, leadNome, produtoInteresse, leadId] = variables;
     return {
       bodyVariables: [
@@ -76,7 +133,10 @@ export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: s
   }
 
   if (purpose === "leadAssignmentConfirmed") {
-    const [brokerName, leadNome, leadTelefone, interesse, leadTypeLabel, dependentes, leadId] = variables;
+    // The stored row keeps the city at index 6 for older readers, but the
+    // approved template has no {{cidade}}: sending it as a 7th parameter makes
+    // Meta reject the whole message.
+    const [brokerName, leadNome, leadTelefone, interesse, leadTypeLabel, dependentes, , leadId] = variables;
     return {
       bodyVariables: [
         brokerName?.trim() || "Corretor(a)",
@@ -90,11 +150,11 @@ export function splitMetaWhatsAppTemplateVariables(purpose: string, variables: s
     };
   }
 
-  if (purpose === "newLeadAssignment") {
-    const [brokerName, companyName, leadTypeLabel, branchName, timeoutMinutes, leadId] = variables;
+  if (purpose === "dutyPresenceConfirmation") {
+    const [name, hour, confirmationId] = variables;
     return {
-      bodyVariables: [brokerName ?? "", companyName ?? "", leadTypeLabel ?? "", branchName ?? "", timeoutMinutes ?? ""],
-      urlButtonParameter: leadId,
+      bodyVariables: [name?.trim() || "Corretor(a)", hour?.trim() || "—"],
+      urlButtonParameter: confirmationId || undefined,
     };
   }
 

@@ -1,24 +1,29 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getMetaCloudConfigurationState } from "@/features/communication-channels/meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
-import { getSystemSetting } from "@/features/system-settings/queries";
-import { listOwnWahaConnections } from "@/features/waha-cadence/connection-service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
-import { WahaConnectionsCard } from "../../settings/_components/waha-connections-card";
 import { WhatsAppPage } from "../../settings/whatsapp-page";
+import { DirectorWhatsAppView } from "./director-whatsapp-view";
 
 export const dynamic = "force-dynamic";
 
-export default async function WhatsAppIntegrationPage() {
+export default async function WhatsAppIntegrationPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role === "broker") redirect("/integrations");
+  const { visao } = await searchParams;
+  if (visao === "diretoria") {
+    if (context.role !== "director") redirect("/access-denied");
+    return <>
+      <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
+      <DirectorWhatsAppView context={context} />
+    </>;
+  }
 
   const db = getDatabase();
-  const wahaConnectionsEnabled = (await getSystemSetting("feature_waha_connections_enabled")) === "true";
-  const [metaEnabled, channels, branches, wahaConnections] = await Promise.all([
+  const [metaEnabled, channels, branches] = await Promise.all([
     isMetaCloudWhatsAppEnabled(),
     db.select({
       id: schema.communicationChannels.id,
@@ -39,6 +44,7 @@ export default async function WhatsAppIntegrationPage() {
       activatedAt: schema.communicationChannels.activatedAt,
       tokenExpiresAt: schema.communicationChannels.tokenExpiresAt,
       isDefault: schema.communicationChannels.isDefault,
+      hasCredentials: sql<boolean>`${schema.communicationChannels.accessTokenCiphertext} is not null`.as("has_credentials"),
     }).from(schema.communicationChannels)
       .leftJoin(schema.branches, eq(schema.communicationChannels.branchId, schema.branches.id))
       .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, "meta_cloud")))
@@ -46,7 +52,6 @@ export default async function WhatsAppIntegrationPage() {
     context.role === "director"
       ? db.select({ id: schema.branches.id, name: schema.branches.name }).from(schema.branches).where(and(eq(schema.branches.tenantId, context.tenantId), eq(schema.branches.status, "active"))).orderBy(asc(schema.branches.name))
       : Promise.resolve([] as { id: string; name: string }[]),
-    wahaConnectionsEnabled ? listOwnWahaConnections().catch(() => []) : Promise.resolve([]),
   ]);
 
   const companyAccount = channels.find((channel) => channel.branchId === null && channel.isDefault) ?? channels.find((channel) => channel.branchId === null) ?? null;
@@ -55,7 +60,7 @@ export default async function WhatsAppIntegrationPage() {
     <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
     <WhatsAppPage
       official={{ ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels, companyAccount }}
-      waha={(context.role === "director" || context.role === "manager") ? <WahaConnectionsCard connections={wahaConnections} enabled={wahaConnectionsEnabled} role={context.role} /> : null}
+      waha={null}
     />
   </>;
 }

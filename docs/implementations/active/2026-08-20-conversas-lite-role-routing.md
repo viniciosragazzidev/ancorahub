@@ -3,11 +3,17 @@
 **Data:** 2026-08-20
 **Estado:** implementado; validação final pendente
 
+> **Atualização 03/09:** este registro foi substituído em seus trechos de chat
+> pela DEC-091. `/conversas/broker` continua exclusivo do Corretor Lite, mas é
+> agora uma Central de insights somente leitura; respostas ocorrem no WhatsApp
+> externo e a conexão pessoal nunca envia pelo CRM.
+
 ## Objetivo
 
 Manter a central operacional completa em `/conversas` para Diretor e Gestor. O
 atendimento Lite conectado ao WAHA fica disponível somente ao Corretor cujo modo de
-experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
+experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`, como consulta
+de histórico e insights da carteira.
 
 ## Escopo
 
@@ -18,26 +24,26 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 
 ## Decisões e contrato
 
-- Confirmação do solicitante: Diretor e Gestor usam a experiência antiga; somente
-  Corretor Lite usa WAHA em `/conversas/broker`.
+- Diretor e Gestor usam a experiência operacional em `/conversas`; somente o
+  Corretor Lite usa `/conversas/broker` para visualizar a sincronização da própria
+  carteira.
 - A decisão usa `getExperienceMode(context)`, que deriva papel e preferência de um
   contexto autenticado no servidor; nenhum modo ou papel do navegador é autoridade.
 - Não há mudança de dados, schema, integração externa ou regra de negócio nova.
 
 ## Evolução do atendimento Lite
 
-- Ao abrir a conversa de um lead pelo atalho de WhatsApp, a aplicação usa
-  `?leadId=<id>&draft=broker_intro`. A rota valida no servidor que o lead pertence
-  ao corretor autenticado e preenche uma mensagem editável; ela nunca é enviada
-  automaticamente.
+- Ao abrir os insights de um lead, a aplicação usa `?leadId=<id>` e valida no
+  servidor que ele pertence ao corretor autenticado. A resposta é aberta no
+  WhatsApp, sem campo de envio no CRM.
 - Os atalhos da fila e do detalhe Lite apontam diretamente para
   `/conversas/broker`, mantendo `leadId` e `draft=broker_intro`.
 - O texto inicial vem de `broker_lite_opening_draft` quando configurado, aceita
   somente `{nome}` e usa uma saudação segura como fallback. O texto não é colocado
   na URL nem confiado ao navegador.
-- `/conversas/broker` segue o blueprint `CHAT_PAGE`: lista pesquisável de conversas,
-  conversa ativa, ação para abrir o lead e retorno responsivo para a lista em telas
-  estreitas.
+- `/conversas/broker` segue o blueprint `DASHBOARD_PAGE`: carteira pesquisável,
+  resumo operacional, sinais de IA e histórico somente leitura, com atalho explícito
+  para responder no WhatsApp.
 - A seleção fica em `?leadId=`, de forma que o corretor pode retornar à conversa
   correta sem usar estado implícito do navegador.
 - O diálogo de conexão do WhatsApp disponibiliza a ação explícita de **Desconectar** para a
@@ -55,16 +61,11 @@ experiência resolvido no servidor é `LIGHT`, em `/conversas/broker`.
 - O provedor não aparece em rótulos, botões ou erros voltados ao usuário: a
   superfície usa somente “WhatsApp”. Identificadores técnicos, logs e contratos
   internos foram preservados para não alterar a integração.
-- O contato oficial ativo do tenant, inclusive quando gerido pelo canal Meta, é
-  incluído na carteira Lite sem criar um lead sintético. Suas mensagens são lidas e
-  respondidas exclusivamente pela sessão autenticada do corretor; a ação valida
-  tenant, canal ativo e conexão pronta no servidor e registra auditoria sem corpo.
+- A carteira Lite contém somente leads e clientes já atribuídos ao corretor. O número
+  oficial, contatos internos e conversas pessoais nunca entram nela.
 - A tela Lite reage ao sinal de invalidação `conversations` e reconcilia a cada 30
   segundos enquanto estiver visível. Assim, uma mensagem persistida aparece sem
   recarregamento manual mesmo se o sinal em tempo real for perdido.
-- A consulta de mensagens não depende de existir lead na carteira: conversas do
-  número oficial continuam sendo carregadas para um corretor que ainda não recebeu
-  nenhum lead.
 - Mensagem desconhecida recebida na conexão pessoal do corretor não cria lead,
   não entra no intake do tenant e não aciona qualificação por IA. A criação
   sintética permanece exclusiva do relay oficial do tenant.

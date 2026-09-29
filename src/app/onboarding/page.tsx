@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
 import { getDatabase, schema } from "@/shared/db";
 import { normalizeInvitationToken } from "@/features/team/invitation-token";
 import { OnboardingWizard } from "../primeiro-acesso/onboarding-wizard";
@@ -32,10 +33,18 @@ export default async function OnboardingPage({
     .from(schema.brokerInvitations)
     .innerJoin(schema.tenants, eq(schema.brokerInvitations.tenantId, schema.tenants.id))
     .innerJoin(schema.branches, eq(schema.brokerInvitations.branchId, schema.branches.id))
-    .where(and(eq(schema.brokerInvitations.tokenHash, tokenHash), eq(schema.brokerInvitations.status, "PENDING")))
+    .where(eq(schema.brokerInvitations.tokenHash, tokenHash))
     .limit(1);
 
-  if (!invitation || new Date() > invitation.expiresAt) {
+  if (!invitation) {
+    redirect("/login");
+  }
+
+  if (invitation.status === "EXPIRED" || new Date() >= invitation.expiresAt) {
+    redirect("/login");
+  }
+
+  if (invitation.status !== "PENDING") {
     return <ErrorMessage title="Convite inválido ou expirado" message="Este link de ativação é de uso único, expirou ou foi revogado pelo gestor." />;
   }
 

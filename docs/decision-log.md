@@ -1,5 +1,249 @@
 # Registro de Decisões de Produto e Arquitetura
 
+## DEC-098 — Mídia oficial nas conversas (áudio, imagem, documento e vídeo)
+
+**Estado:** Aceita
+**Data:** 2026-09-14
+
+As conversas de `/conversas` passam a suportar mídia oficial nos dois sentidos pelo
+canal Meta Cloud: receber mídia inbound do cliente/corretor pelo webhook e permitir
+que gestão envie mídia outbound. A capacidade cobre a aba principal (leads/clientes)
+e a aba Corretores, incluindo a rota Lite `/conversas/broker` em modo somente leitura
+conforme DEC-091.
+
+Os binários são gravados no bucket privado Cloudflare R2 sob o prefixo
+`whatsapp-media/<tenantId>/`, seguindo a DEC-069: o banco mantém autoridade sobre
+metadados em `whatsapp_messages` (kind, mime, nome, tamanho, key e referência de
+id do provedor) e o download acontece somente pela rota autenticada e escopada por
+tenant, sem URL pública. Os limites seguem o padrão Meta (imagem 5 MB; áudio,
+vídeo e documento 16 MB). A rota valida papel/escopo, aplica auditoria de acesso a
+mídia e nunca depende de `tenant_id` do cliente. Uma mensagem de mídia sem objeto
+armazenado é exibida como indisponível com motivo, nunca quebra a conversa.
+
+A capacidade é governada pelo kill switch global
+`feature_conversation_media_enabled`, controlado e auditado pelo Super-admin;
+desativada, novas mídias deixam de ser baixadas/enviadas sem apagar histórico ou
+objetos, e a interface informa a indisponibilidade. Envio permanece restrito a
+diretor/gestor conforme DEC-091 para a conexão pessoal do corretor. Detalhes
+técnicos em ADR-0044.
+
+## DEC-092 — Políticas de mensagem por situação na Qualificação
+
+**Estado:** Aceita
+**Data:** 2026-09-06
+
+O catálogo de templates Meta, as mensagens livres e a associação com eventos passam
+a ter uma única superfície em `/qualificacao?tab=meta_templates`. A configuração do
+WhatsApp mantém somente conexão, saúde e o número corporativo. Cada evento registrado
+possui uma política versionada por tenant com mensagem principal, contingência e
+estado ativo, validada contra o contrato de variáveis do produtor.
+
+Meta continua prioritária. Sem uma mensagem inbound válida nas últimas 24 horas —
+inclusive no primeiro contato — somente um template Meta `APPROVED` da WABA ativa é
+elegível. Dentro da janela, uma mensagem livre pode ser principal ou contingência.
+Eventos internos ao corretor também podem usar texto livre pelo WAHA corporativo
+selecionado; conexão pessoal permanece somente leitura conforme DEC-091. Uma
+contingência só é executada após falha confirmada anterior ao aceite do provedor,
+nunca após um WAMID/ID WAHA aceito.
+
+A DEC-079 foi inicialmente emendada para tornar `new_lead_broker` um fallback
+configurável. A DEC-103 posteriormente restringiu `LEAD_OFFER` e `LEAD_ASSIGNMENT`
+ao contrato canônico `new_lead_broker`; os demais eventos continuam configuráveis.
+O catálogo de eventos é extensível em código, mas a UI não inventa eventos sem um
+produtor real. Detalhes técnicos e rollback estão no ADR-0041.
+
+## DEC-097 — Titularidade provisória e autoridade única da distribuição
+
+**Estado:** Aceita
+**Data:** 2026-09-10
+
+`src/features/lead-distribution` é a autoridade única para seleção automática de
+unidade, fila e corretor. Entradas manuais, CSV, Meta Ads, webhooks, IA e SLA apenas
+registram/enfileiram a intenção; não mantêm algoritmos próprios de escolha.
+
+Ao criar uma oferta válida, o corretor selecionado vira owner provisório na mesma
+transação do registro da oferta. Recusa, expiração e SLA mantêm o owner anterior
+até a troca atômica para o próximo elegível. Para leads sem unidade definida, o
+motor escolhe uma unidade ativa, receptiva, automática e não-Matriz pela menor
+carga ativa, com desempate estável. Dentro da unidade/fila, continuam obrigatórias
+as regras de tenant, disponibilidade, canal, plantão e política; capacidade é uma
+meta de balanceamento e não deixa um lead órfão quando todos os elegíveis a
+atingiram. Fila manual e qualificação por IA permanecem pausas explícitas.
+
+Uma unidade operacional já definida para um intake é reativada para distribuição
+automática quando estiver ativa, aceitando leads e não for Matriz; a mudança gera
+auditoria e continua editável. Filas inativas são removidas do lead com evento de
+reparo, permitindo que o motor volte à política global. Filas manuais permanecem
+pausas explícitas.
+
+As tasks re-semeiam tanto leads `queued`/`unassigned` sem owner quanto owners
+provisórios com oferta expirada. Campos de qualificação nulos são válidos para
+recuperação. O motor roda 24/7; a janela da Meta regula a entrega da mensagem, não
+a persistência do owner. Nunca há fallback para corretor pausado, outra unidade já
+definida ou outro tenant.
+
+## DEC-102 — Oferta não atribui owner antes do aceite
+
+**Estado:** Supersedida pela DEC-104
+**Data:** 2026-09-15
+
+O corretor escolhido pelo motor automático recebe uma oferta exclusiva, mas não se
+torna proprietário do lead enquanto a oferta estiver `PENDING`, `SENT`, `DELIVERED`
+ou `READ`. `leads.corretorId`, `assignedAt` e `distributionStatus=assigned` só são
+gravados pela transação de aceite com row lock. Unidade e fila podem ser resolvidas
+antes do aceite para manter a rotação e a recuperação determinísticas. Recusa,
+expiração, canal indisponível ou falha de enqueue mantêm o lead na fila e avançam a
+tentativa; registros antigos com owner provisório são tratados como legado pelo
+worker até sua conclusão segura.
+
+## DEC-103 — Template canônico para oferta de novo lead
+
+**Estado:** Aceita
+**Data:** 2026-09-15
+
+As situações `LEAD_OFFER` (oferta pendente) e `LEAD_ASSIGNMENT` (atribuição
+confirmada) usam o template Meta aprovado `new_lead_broker`, com o contrato nomeado
+`cargo`, `corretor_nome`, `lead_nome`, `produto_interesse` e o `lead_id` somente no
+botão de URL. Qualquer vínculo diferente de `new_lead_broker` nessas duas
+situações — inclusive `lead_first_contact`, `novo_lead_` e
+`new_lead_assignment` — é tratado como ausente e cai para o template canônico
+aprovado da WABA ativa. A escolha de outro template aprovado para eventos
+distintos continua editável e auditável; as situações de novo lead não podem
+publicar outro contrato.
+
+## DEC-104 — Oferta cria vínculo provisório visível na carteira
+
+**Estado:** Aceita e restaura a semântica de titularidade provisória da DEC-097
+**Data:** 2026-09-16
+
+Ao criar uma oferta válida, o motor vincula imediatamente o lead ao corretor
+selecionado com `assignmentSource=automatic_offer`. Esse vínculo provisório faz o
+lead aparecer na carteira do corretor e permite que ele aceite o atendimento pelo
+CRM. O aceite confirma a responsabilidade e muda a origem para
+`whatsapp_offer_accepted`; recusa, expiração ou falha ao criar a mensagem libera ou
+transfere o vínculo ao próximo corretor elegível, preservando histórico e auditoria.
+
+A oferta continua exclusiva e protegida por row lock. Um owner confirmado por ação
+manual ou aceite nunca é sobrescrito pela rotação. A mensagem atual é processada
+pelo próprio `outboundMessageId`; o processamento da oferta não drena mensagens
+antigas do tenant, e `LEAD_OFFER`/`LEAD_ASSIGNMENT` usam exclusivamente o contrato
+`new_lead_broker` da DEC-103.
+
+## DEC-090 — Catálogo canônico de métricas e Central de Relatórios em `/relatorios`
+
+**Estado:** Aceita
+**Data:** 2026-09-01
+
+O `/relatorios` passa a ser a camada de inteligência operacional da corretora, com
+famílias de relatórios (Visão geral, Comercial, Equipe, Unidades, Financeiro) sobre um
+catálogo canônico de métricas versionado em `src/features/reports/metrics`. O catálogo
+é a única fonte de cálculo: nenhuma superfície nova pode recalcular métricas
+localmente. Na primeira entrega migram para o catálogo o próprio `/relatorios` e os
+consumidores de maior risco de divergência (NOC, `/clientes`, broker-summary); os
+demais migram por telas com dívida registrada no roadmap.
+
+A taxa de conversão canônica (`commercial.conversion_rate`) é **coorte de entrada**:
+leads recebidos no período que alcançaram `converted` ÷ leads recebidos no período
+(excluídos duplicados/descartados), garantindo que numerador e denominador resolvem
+para a mesma população no drill-down. O relatório de funil exibe exatamente os 8
+estágios da máquina de estados do ADR-001, sem agrupamento paralelo. O período segue a
+DEC-059 (presets 7/14/30/90) com comparação derivada da janela anterior equivalente;
+diferenças de taxa são apresentadas em pontos percentuais.
+
+O acesso por papel é conservador: Diretor vê todas as famílias; Gestor vê Visão geral,
+Comercial, Equipe e Unidades restritas à própria unidade, sem comparativo entre
+unidades; Supervisor vê Comercial e Equipe apenas dos supervisionados, sem valores;
+Corretor vê somente Comercial com dados próprios. Abas fora do escopo não são
+renderizadas e o seletor de unidade nunca amplia o escopo da sessão. A seção "O que
+exige atenção" reutiliza os parâmetros existentes do tenant (`slaFirstContactMinutes`,
+`slaStagnantDays`) em vez de criar configuração paralela.
+
+A atribuição histórica usa a titularidade persistida no registro no momento do evento;
+snapshot por evento (`broker_at_sale`, `unit_at_event`) fica como dívida documentada
+para a fase 2/3. A capacidade global `feature_reporting_center_enabled`, controlada e
+auditada pelo Super-admin, alterna entre a nova central e o layout legado sem perda de
+dados (padrão DEC-070). Cohorts, relatórios salvos/programados, aba Atendimento,
+Conversation Intelligence e AI Analyst permanecem fases futuras. Plano completo em
+`docs/product/reporting-root-plan.md`; decisão técnica em ADR-0040.
+
+**Emenda UX-1D — 2026-09-04.** Por decisão de produto, o `/dashboard` dos
+papéis executivos passa a consumir as mesmas famílias canônicas como abas internas
+recuperáveis por URL. Isso não cria uma nova métrica, não remove `/relatorios` e não
+altera a matriz de acesso: a rota de relatórios continua disponível para compatibilidade
+e para seus documentos internos enquanto a paridade é validada. O carregamento deve
+ser por aba ativa e escopo derivado do servidor. Atendimento e Metas seguem fora do
+dashboard até possuírem definições versionadas, resolvedores e drill-downs aprovados.
+
+## DEC-091 — Conexão pessoal do Corretor como sincronização somente leitura
+
+**Estado:** Aceita
+**Data:** 2026-09-03
+
+A conexão pessoal do WhatsApp do Corretor passa a ter finalidade exclusiva de
+sincronização operacional. O CRM não envia mensagens, cadências, respostas rápidas
+nem mensagens de IA por essa sessão. O Corretor responde somente no aplicativo
+WhatsApp de sua escolha e o CRM recebe, por webhook assinado, as mensagens já
+trocadas com leads ou clientes de sua própria carteira.
+
+O filtro de entrada é estrito: somente conversas que resolvem para um lead ou
+cliente atribuído ao dono da sessão podem ser persistidas. Conversas pessoais,
+internas, com números oficiais do tenant ou de contatos sem vínculo não entram no
+CRM, não criam leads e não chegam à IA. A rota Lite `/conversas/broker` é uma
+Central de Insights em modo somente leitura: mostra saúde do atendimento, marcos,
+histórico sincronizado e análise de IA, com ação explícita para abrir o WhatsApp
+fora do CRM.
+
+Diretor e Gestor continuam consultando no histórico operacional do lead apenas o
+escopo que sua autorização já permite. A abertura de uma conversa por gestão gera
+auditoria sem texto, telefone ou conteúdo da conversa. A flag global existente
+`feature_waha_connections_enabled` desativa ou reativa a sincronização sem apagar
+as conexões ou o histórico; ela não reativa envio pela sessão pessoal.
+
+## DEC-089 — Número WAHA oficial para avisos internos ao corretor
+
+**Estado:** Aceita
+**Data:** 2026-09-01
+
+O Diretor pode selecionar um número WAHA ativo, pertencente ao escopo do próprio
+tenant, para avisos internos e conversas operacionais com corretores. A política possui dois
+modos reversíveis: `meta_then_waha`, que mantém a Meta como tentativa inicial e
+executa uma única contingência WAHA após falha confirmada, e `waha_direct`, que
+envia diretamente pelo número selecionado sem tentar a Meta.
+
+A política é restrita a eventos internos de atribuição, oferta e conversa
+Diretor/Gestor–Corretor. Em `waha_direct`, a outbox usa exclusivamente o número
+selecionado: número pausado ou indisponível bloqueia o registro com motivo claro,
+sem fallback para Meta ou outra sessão WAHA. Saídas pertencem somente à outbox e
+entradas internas assinadas pertencem somente ao ledger de mensagens, idempotente
+por tenant e identificador do provedor. Ela não altera atendimento de leads ou
+clientes, qualificação por IA, campanhas ou o canal oficial Meta. A configuração
+é auditada por tenant e um kill switch global do Super-admin suspende o uso WAHA
+preservando a outbox.
+
+## DEC-088 — Agenda pessoal opcional como critério de distribuição automática
+
+**Estado:** Aceita
+**Data:** 2026-08-31
+
+O Corretor pode declarar janelas semanais de disponibilidade, sem bloquear o
+acesso ou o recebimento de novos leads ao pular a configuração. A agenda é
+pessoal, auditável e editável em `/settings`; quando configurada, ela é um
+critério adicional à unidade, ao status imediato de disponibilidade, à carga e
+ao plantão aplicável. Sem agenda, a distribuição automática usa os demais
+critérios existentes; com agenda, respeita somente suas janelas ativas. A
+carteira existente permanece acessível em todos os casos.
+
+A agenda respeita o fuso operacional `America/Sao_Paulo` e não substitui a
+janela comercial global da DEC-083: ambos os critérios devem ser atendidos.
+Atribuições manuais seguem permitidas, pois dependem de decisão humana
+explícita. O Super-admin pode suspender a capacidade globalmente sem apagar
+agendas ou auditoria; enquanto suspensa, a distribuição volta a considerar os
+demais critérios existentes.
+
+O onboarding apresenta também a conexão do WhatsApp pessoal. Ambos os passos
+são recomendados e podem ser fechados para configuração posterior; o descarte
+é persistido e auditado, evitando interrupções repetidas.
+
 ## DEC-087 — Resposta de mutação local-first em operações de Leads
 
 **Estado:** Aceita
@@ -45,14 +289,13 @@ duplicação de saídas, notificações e redistribuições durante a migração
 
 ## DEC-084 — Cadência e diagnóstico seguro dos avisos de novo lead
 
-**Estado:** Aceita
+**Estado:** Parcialmente supersedida pela DEC-104; diagnóstico seguro permanece aceito
 **Data:** 2026-08-25
 
-O aviso oficial `new_lead_broker` mantém uma cadência mínima de dez minutos por
-corretor. Novas atribuições não são descartadas: entram na outbox na ordem recebida e
-são agendadas para a próxima posição disponível, sempre respeitando a janela da
-DEC-083. O processamento serializa esses avisos no lote para que itens já pendentes
-não sejam enviados juntos.
+O intervalo mínimo de dez minutos deixou de se aplicar ao aviso operacional
+`new_lead_broker`: a DEC-104 exige envio imediato do outbound exato da oferta atual,
+com alvo de até dois segundos. Itens antigos continuam duráveis para recuperação,
+mas não podem ocupar o lugar da mensagem atual.
 
 Falhas de entrega posteriores ao aceite da API são diferentes de erros de envio. O
 webhook da Meta persiste no ledger somente o código e o título seguro do primeiro erro
@@ -61,20 +304,14 @@ política ou qualidade de canal sem expor PII e sem reverter a atribuição do l
 
 ## DEC-083 — Janela comercial para distribuição automática e aviso de novo lead
 
-**Estado:** Aceita
+**Estado:** Supersedida pela DEC-097 para o motor e pela DEC-104 para `new_lead_broker`
 **Data:** 2026-08-25
 
 A distribuição automática, inclusive as retomadas por recusa, SLA e conclusão de
-qualificação, executa somente de segunda a sexta entre 08:00 (inclusivo) e 18:00
-(exclusivo), no fuso `America/Sao_Paulo`. Fora da janela, o lead continua
-persistido na fila e o job idempotente é reagendado para a próxima abertura; não há
-perda de lead nem consumo de tentativa.
-
-O template oficial `new_lead_broker` segue a mesma janela: a atribuição é durável
-imediatamente, mas a saída fica pendente até a abertura. Antes de enviar, a outbox
-revalida que o destinatário ainda é o corretor responsável e cancela o aviso se a
-atribuição foi substituída. Atribuições manuais continuam permitidas fora do horário;
-somente o efeito automático e o aviso são postergados.
+qualificação, agora roda 24/7 conforme a DEC-097. O template oficial
+`new_lead_broker` também é processado imediatamente pelo outbound exato da oferta,
+conforme a DEC-104. A outbox ainda revalida que o destinatário é o corretor
+responsável e cancela o aviso se a atribuição foi substituída.
 
 ## DEC-082 — Auto-login e passkey no primeiro acesso
 
@@ -130,10 +367,12 @@ consolidado. Detalhes e alternativas rejeitadas em ADR-0039.
 **Estado:** Aceita
 **Data:** 2026-08-17
 
-Ao exceder o tempo de resposta da qualificação, o lead é mantido na fila ativa
-configurada para sua campanha/tipo de entrada; se não houver regra ativa, preserva
-a fila já definida no intake. O job persistente é criado após o commit desta
-transição. Fila vinculada a uma unidade seleciona somente corretores daquela unidade;
+Ao exceder o tempo de resposta da qualificação, ou quando o contato solicita uma
+transferência humana, o lead é mantido na fila ativa configurada para sua
+campanha/tipo de entrada; se não houver regra ativa, preserva a fila já definida no
+intake. O job persistente é criado após o commit da transição e é tentado imediatamente
+durante o horário comercial; ele permanece como recuperação auditável caso não exista
+elegível ou ocorra falha transitória. Fila vinculada a uma unidade seleciona somente corretores daquela unidade;
 fila geral seleciona somente unidades explicitamente permitidas em sua política e
 nunca usa a Matriz como destino. A Matriz é ponto administrativo de entrada. Sem
 corretor ou unidade elegível, o lead permanece em fila e o trabalho é repetido com
@@ -291,6 +530,8 @@ capacidade global, da configuração do tenant e do registro individual da ferra
 | DEC-026 | O pós-venda distingue data de registro, início de vigência, valor aprovado e evidência da operadora; cancelamento nunca desconta valores automaticamente. A janela de chargeback é configurável por tenant, inicia em 90 dias e toda alteração é auditada. | Aprovada como política de segurança — 2026-07-16 | Simulação ponta a ponta e solução de beneficiários |
 | DEC-027 | No estouro do SLA de primeiro contato, o owner anterior é removido antes de qualquer nova atribuição. Leads originados pelo Diretor usam a fila central da corretora mãe: tentam outro corretor elegível na unidade e, se não houver, retornam à fila central para nova distribuição. Leads originados pelo Gestor permanecem na fila da unidade para distribuição manual. A origem é persistida, toda transição é auditada e o corretor que perdeu o SLA é excluído da tentativa imediata. | Aprovada — 2026-07-16 | Solicitação do usuário; implementação de `feedback-sla` e distribuição |
 | DEC-028 | Notificações operacionais devem ser publicadas por um serviço central com registro in-app/Realtime e push coordenados. Cada capacidade possui uma chave global reversível controlada pelo Super-admin; quando desativada, nenhum dos dois canais é emitido para o evento. O catálogo e a auditoria da configuração são obrigatórios. | Aprovada — 2026-07-16 | Solicitação do usuário; correção de toast junto com push |
+| DEC-027A | Emenda de 2026-09-08 à DEC-027: qualquer retomada automática por SLA usa o mesmo ciclo sequencial da DEC-049. O owner anterior é removido e passa a contar como tentativa consumida; Diretor e Gestor não desviam para distribuição manual enquanto existir corretor elegível ainda não tentado. A intervenção manual só ocorre após esgotamento do ciclo ou quando não há caminho automático utilizável. Esta emenda prevalece sobre o fallback manual descrito originalmente na DEC-027. | Aprovada — 2026-09-08 | Solicitação do usuário; unificação da redistribuição automática |
+| DEC-027B | Emenda de 2026-09-10 à DEC-027/027A: no estouro do SLA sem primeiro contato, o owner atual não é removido antes da escolha. O motor seleciona outro corretor ativo, disponível, escalado quando aplicável e com telefone utilizável, exclui o owner atual e persiste a troca diretamente de um corretor para o outro. Se não houver substituto elegível ou a escrita concorrente falhar, mantém o owner atual e alerta a gestão; `queued` e `unassigned` não são estados intermediários permitidos nesse handoff. A troca reinicia o SLA, incrementa a redistribuição, é auditada e dispara o aviso oficial de novo lead. O kill switch global de SLA do Super-admin permanece aplicável. | Aprovada — 2026-09-10 | Solicitação do usuário; nenhum lead órfão durante redistribuição por SLA |
 
 ## DEC-033 — WhatsApp Cloud API oficial com Embedded Signup
 
@@ -512,11 +753,13 @@ O plano executável e o inventário de capacidades estão em
 **Data:** 2026-07-22
 
 O CorreTop adota o fluxo de ofertas em duas etapas para distribuição de novos leads por WhatsApp:
-1. **Oferta Privada (`new_lead_assignment`):** Apenas metadados gerais (empresa, tipo de lead, unidade, tempo de resposta) são enviados no primeiro template com botões de resposta rápida ("Aceitar lead" / "Recusar"). Nenhum dado sensível do cliente é exposto antes do aceite.
+1. **Oferta Privada (`new_lead_broker`):** O nome do lead e o produto de interesse podem ser enviados no primeiro template com o botão de aceite. O telefone e os demais dados de contato do cliente não são expostos antes do aceite.
 2. **Confirmação Atômica com Row Locking:** O clique no botão aciona a transação no servidor (`SELECT FOR UPDATE`), que garante que apenas o primeiro corretor elegível assuma o lead.
 3. **Template de Confirmação (`lead_assignment_confirmed`):** Enviado somente após confirmação do aceite, com o link direto para o atendimento no CRM (`https://corretop.vercel.app/leads/{{lead_id}}`).
-4. **Resolução de Disputas e Expiração:** Corretores que perderem a disputa recebem o modelo `lead_assignment_unavailable`. Ofertas não respondidas dentro do SLA expiram (`lead_assignment_expired`) e o lead retorna para a fila de distribuição.
+4. **Rotação Sequencial até Aceite:** existe no máximo uma oferta ativa por lead. Recusa, expiração ou impossibilidade de enfileirar a oferta consome aquela tentativa e devolve o lead imediatamente ao mesmo motor, que escolhe o próximo corretor elegível ainda não tentado. O lead permanece sem `corretorId` durante todo esse ciclo e só ganha owner após aceite atômico. A distribuição manual é o fallback terminal somente quando todos os corretores elegíveis foram tentados sem aceite ou quando não existe caminho automático utilizável sob as regras canônicas da fila.
 5. **Resiliência e Fallbacks:** Todos os 4 modelos contam com geradores automáticos de mensagens de texto alternativas caso a entrega do modelo oficial falhe. Toda transição é registrada nos logs de auditoria.
+
+**Emenda aprovada em 2026-09-10:** a oferta em duas etapas continua sendo a regra para leads novos. Para um lead já atribuído cujo SLA de primeiro contato venceu, a DEC-027B prevalece: o owner atual é mantido até a confirmação transacional de outro corretor elegível, evitando qualquer estado intermediário sem responsável.
 ## DEC-050 - Qualificação inicial opcional por IA no canal oficial
 
 **Estado:** Aceita  
@@ -766,3 +1009,458 @@ sinal, o navegador consulta os detalhes pela API interna autenticada. Há reconc
 lenta quando a aba está visível e propagação local entre abas. A capacidade pode ser
 desativada globalmente pelo Super-admin; persistência de notificação e Web Push não
 falham se o Realtime estiver indisponível.
+## DEC-093 — Exclusão governada de históricos de conversa e acesso temporário a filas
+
+**Decisão aprovada em 2026-09-09 e ampliada em 2026-09-10.** O Diretor pode excluir o histórico de qualquer conversa do WhatsApp pertencente ao próprio tenant, independentemente de vínculo com lead, cliente ou integrante da equipe. O Gestor continua limitado a conversas sem esses vínculos. A exclusão remove somente as mensagens armazenadas no CRM; lead, cliente, perfil de equipe, convite e demais registros operacionais permanecem intactos. O servidor deriva tenant e papel da sessão, normaliza o telefone, revalida os vínculos e registra auditoria por identificador irreversível, sem telefone ou conteúdo. Uma chave global do Super-admin pode interromper novas exclusões sem alterar o histórico existente.
+
+A definição de filas fica temporariamente exclusiva do Diretor. Gestor não recebe a aba nem seu conteúdo e uma URL direta para `view=filas` retorna à matriz de roteamento; Supervisor continua sem acesso administrativo à Central de Distribuição. As demais operações autorizadas de acompanhamento não são ampliadas por esta decisão.
+
+Para `/vendas`, a navegação principal passa a antecipar o payload parcial, exibir estado imediato de carregamento e evitar a segunda consulta da mesma população usada apenas para somar receita. A otimização não altera escopo, filtros ou regra de cálculo.
+
+## DEC-094 — Importação de corretores reutiliza o onboarding e a outbox oficiais
+
+**Decisão aprovada em 2026-09-09.** A criação manual e a importação CSV de membros exigem somente nome e telefone; e-mail, CPF e unidade são opcionais quando o fluxo permitir unidade padrão. Cada cadastro válido cria um perfil `INVITED` e um convite de uso único, sem ativar usuário ou associação antes do aceite. Quando o e-mail não vier no cadastro, o próprio convidado deve defini-lo no primeiro acesso. Como a identidade Better Auth possui e-mail globalmente único, o onboarding não pode reutilizar uma identidade já existente nem substituir sua credencial; o e-mail escolhido precisa estar livre antes da ativação.
+
+O convite usa exclusivamente o propósito `brokerInvitation`, resolvido para o template Meta `broker_first_access`, com idempotência por convite e entrega gradual pela outbox oficial existente. O processamento nunca usa WhatsApp pessoal. Links de templates Meta legados podem conter placeholders codificados antes ou depois do token; a entrada pública remove somente os sufixos/prefixos conhecidos e mantém a validação pelo hash como autoridade. A entrega automática exige o token cifrado recuperável: o worker não pode usar `invitationId` como substituto do token nem enviar fallback sem um token válido.
+
+**Emenda aprovada em 2026-09-18.** A regra de identidade nova continua valendo
+para um e-mail que ainda possui vínculo no tenant. Quando um membro foi excluído,
+a exclusão remove somente o vínculo e preserva a identidade global; um novo convite
+no mesmo tenant pode reutilizar essa identidade sem vínculo local. Identidades
+ativas mantêm a credencial existente. Identidades desativadas entram como
+reativação pendente e só são ativadas, com a nova senha escolhida, quando o
+convidado conclui o onboarding. A reativação é registrada em auditoria.
+
+## DEC-095 — Autoridade de membro é derivada do vínculo ativo do tenant
+
+**Decisão aprovada em 2026-09-10.** A identidade global pode conservar vínculos
+históricos inativos, mas somente um vínculo ativo pode compor o contexto de
+autorização. Mais de um vínculo ativo continua sendo uma inconsistência negada
+até existir uma escolha explícita de tenant.
+
+Alterações de papel, cargo ou unidade atualizam o vínculo no servidor, geram
+auditoria e revogam as sessões do membro para impedir autoridade obsoleta.
+Exclusões removem o vínculo do tenant e revogam sessões, sem apagar a identidade
+global que possa ser usada por outro tenant.
+
+**Emenda aprovada em 2026-09-11.** Um Diretor vinculado a uma unidade pode editar
+os dados, o cargo e o perfil de acesso de outro Diretor vinculado à mesma unidade.
+A exceção não permite autoedição, alvo geral ou de outra unidade, mudança de unidade,
+desativação ou exclusão do outro Diretor.
+
+**Emenda aprovada em 2026-09-18.** Um Diretor pode editar, desativar e excluir
+outro Diretor do mesmo tenant, mesmo que estejam vinculados a unidades diferentes
+ou que o alvo tenha escopo geral. A autoedição permanece bloqueada. O servidor
+revalida o vínculo ativo dentro do tenant antes de aplicar a alteração; mudanças
+de autoridade continuam auditadas e revogam as sessões do alvo, enquanto a
+exclusão remove somente o vínculo do tenant e revoga as sessões.
+
+## DEC-096 — Importação de leads usa a fila e o motor canônico de ofertas
+
+**Decisão aprovada em 2026-09-10.** O seletor da importação CSV mostra filas ativas
+gerais do tenant e filas da unidade escolhida. Filas manuais permanecem visíveis para
+contexto, mas não podem ser selecionadas para distribuição automática. O servidor
+revalida a fila por tenant, estado, exclusão, modo e unidade; identificadores enviados
+pelo navegador nunca concedem escopo.
+
+Cada lead importado é gravado sem `corretorId`, preserva `queueId` e entra no job
+idempotente de distribuição. O fluxo não escolhe um corretor por atalho: cria no
+máximo uma oferta por vez pelo WhatsApp oficial, avança entre os elegíveis da fila em
+recusa, expiração ou canal indisponível e só grava o owner após aceite atômico. A
+execução imediata é limitada ao lote operacional do processador; o restante permanece
+persistido para recuperação, respeitando janela comercial, capacidade e controles do
+Super-admin já existentes.
+
+**Emenda aprovada em 2026-09-10.** O toggle da fila prevalece sobre a habilitação
+global para decidir a passagem pela IA. Quando `aiQualificationEnabled` estiver
+desativado na fila selecionada, o lead importado nasce `qualified` e com a etapa de
+qualificação `COMPLETED`; o job de distribuição é enfileirado e tentado imediatamente,
+sem criar sessão de IA nem permanecer em `pending`.
+
+**Emenda aprovada em 2026-09-10.** Uma importação para unidade operacional ativa
+liga `autoDistribute` e reativa a política de distribuição do escopo exato da fila,
+com auditoria. Unidade com recebimento pausado e Central de redistribuição são
+recusadas antes da criação de qualquer lead. O executor recorrente recupera estados
+`queued` e `unassigned`; ao esgotar todos os corretores sem aceite, abre novo ciclo
+automático após o intervalo do job, preservando as ofertas anteriores. A atribuição
+definitiva continua dependendo do aceite atômico e o kill switch global do
+Super-admin continua prevalecendo.
+
+**Emenda aprovada em 2026-09-10.** A área de leads sem atribuição oferece uma
+recuperação administrativa em lote. Diretor pode reenfileirar o tenant e Gestor
+somente a própria unidade. Leads em qualificação, perdidos, convertidos ou
+desqualificados não entram na ação. O comando não escolhe nem grava um corretor:
+ele reabre o trabalho idempotente e a atribuição continua ocorrendo somente após
+o aceite atômico de uma oferta válida. A solicitação gera auditoria e permanece
+sujeita à janela operacional, elegibilidade, canal corporativo e kill switch.
+## DEC-098 — Central de distribuição como autoridade operacional
+
+**Estado:** Aceita
+**Data:** 2026-09-11
+
+Recebimento da unidade, auto-distribuição, papel da unidade, filas, regras de
+roteamento, elegibilidade, plantões, SLA e recuperação pertencem à Central
+`/distribuicao`. Filiais e Configurações exibem somente o estado e apontam para
+essa central; não oferecem mutações concorrentes. Se a unidade primária não
+possuir corretor elegível, o motor tenta a próxima unidade ativa permitida pela
+política, mantendo a ordem e registrando o motivo.
+
+## DEC-099 — Produção Coolify com frontend e API em VPSs separadas
+
+**Decisão aprovada em 2026-09-14.** O AncoraHub não usa mais a Vercel em produção.
+O frontend Next.js é executado pelo Coolify em uma VPS própria e a API Fastify,
+incluindo integrações, webhooks, WAHA e workers, é executada pelo Coolify em uma
+VPS separada. A comunicação entre as camadas é HTTPS autenticado, com secrets
+configurados por serviço. Deploy, health check, observabilidade e rollback devem
+identificar cada serviço independentemente; referências anteriores à Vercel são
+históricas e não devem orientar novas implementações.
+
+## DEC-100 — WAHA restrito à conexão pessoal do corretor
+
+**Decisão aprovada em 2026-09-15.** O tenant oficial não usa WAHA para envio,
+fallback, cadências ou notificações internas. Templates, mensagens automáticas,
+convites, ofertas, atribuições e reatribuições passam exclusivamente pela
+outbox da API oficial Meta. O WAHA fica restrito à conexão pessoal do corretor
+e à sincronização autorizada de mensagens, sem transformar mensagens recebidas
+em leads ou iniciar distribuição.
+
+Registros antigos da outbox com rota WAHA são normalizados para `meta_only` no
+próximo processamento; nenhum envio corporativo é feito pelo relay. O endpoint
+de compatibilidade `/api/internal/cron/whatsapp` aponta para o worker oficial
+para que o scheduler do Coolify não produza 404 durante a migração. Cadências
+WAHA corporativas e configurações de fallback são recusadas no servidor e a
+recusa de uma oferta libera atomicamente o lead para a fila, sem manter o
+corretor como proprietário.
+
+## DEC-105 — Escopo explícito e opt-in para desqualificados no roteamento
+
+**Decisão aprovada em 2026-09-16.** A Matriz de roteamento passa a comunicar
+explicitamente que o destino é condicionado pelos filtros de entrada. Origem/canal,
+plano, cidade e status são filtros combináveis; quando um filtro está vazio, ele
+aceita qualquer valor. Campanha, anúncio e formulário Meta permanecem sob o
+resolvedor de entrada de Filas e campanhas, que é a fonte de verdade para a
+atribuição de mídia.
+
+Leads com `qualificationStatus=disqualified` (incluindo o alias legado
+`not_qualified`) exigem seleção explícita do status `disqualified` para corresponder
+a uma regra. Sem essa seleção, a regra não pode enviá-los para sua fila, unidade ou
+grupo de corretores. A mudança é aplicada no resolvedor determinístico e no
+simulador, preservando regras existentes para os demais status.
+
+## DEC-106 — Modo manual por regra de roteamento
+
+**Decisão aprovada em 2026-09-16.** Cada regra pode operar em modo de oferta
+automática ou ação manual. No modo manual, o lead ainda é encaminhado ao destino
+da regra — inclusive todas as unidades ativas — mas não recebe oferta nem corretor;
+fica sem proprietário aguardando uma ação explícita da gestão. O modo automático
+preserva o ciclo normal de elegibilidade, oferta, aceite e redistribuição por SLA.
+O modo é persistido na própria regra, auditável e deve ser consumido pelo ponto
+único de distribuição antes de ser liberado em produção.
+
+## DEC-107 — Plantão com múltiplos dias da semana
+
+**Decisão aprovada em 2026-09-16.** O formulário de criação de plantão pode
+selecionar um ou mais dias da semana. Cada combinação de unidade, fila e dia gera
+uma regra independente na mesma transação; `unit_duty_schedules` continua com um
+único `day_of_week` para preservar o resolver diário, a cobertura, a escala e a
+auditoria locais. A edição permanece por regra, sem alterar plantões de outros dias.
+A vigência continua sendo o intervalo de datas em que a recorrência semanal é válida.
+
+## DEC-101 — Proteção contra drenagem tardia da outbox
+
+**Decisão aprovada em 2026-09-15.** Mensagens oficiais que permanecerem em
+`queued` ou `pending` além do prazo configurado pelo Super-admin não podem ser
+enviadas retroativamente. O worker cancela esses registros com código seguro,
+registra auditoria e preserva o histórico. O padrão é 24 horas e o limite
+administrativo é de 1 a 168 horas. Ofertas de novo lead também são revalidadas
+no momento do envio: somente ofertas ainda ativas e não expiradas podem chegar
+ao corretor. Uma oferta recém-criada é processada pelo próprio identificador da
+outbox, sem esperar atrás de mensagens antigas; o cron continua como recuperação
+de falhas transitórias. O caminho de atribuição manual segue a mesma entrega
+exata. A limpeza de pendências antigas não roda durante uma entrega exata, para
+que a fila crítica não seja bloqueada por auditoria de um lote histórico.
+
+## DEC-108 — Retenção global de leads desqualificados
+
+**Decisão aprovada em 2026-09-16.** O Diretor pode ativar uma chave global por
+tenant para manter leads com `qualificationStatus=disqualified` em espera, sem
+oferta automática a corretor, independentemente da origem, unidade ou fila. A
+chave nasce desligada para preservar o comportamento atual. Uma regra de
+roteamento criada explicitamente em modo manual e com o status `Desqualificado`
+selecionado é a única exceção: ela pode encaminhar o lead para ação humana, sem
+transformar a retenção global em distribuição automática. A alteração da chave
+é auditada e o motor aplica a decisão antes de criar ofertas.
+
+## DEC-109 — Continuidade de distribuição fora do horário de plantão
+
+**Decisão aprovada em 2026-09-18.** Filas com plantões selecionados passam a
+declarar explicitamente o comportamento quando nenhuma dessas escalas está
+ativa: usar a disponibilidade normal da unidade (`unit_roster`), aguardar o
+próximo plantão (`wait_next_duty`) ou encaminhar para uma fila de contingência
+(`fallback_queue`). Filas novas usam `unit_roster` por padrão para evitar que a
+operação pare; filas legadas também recebem esse padrão contínuo. O modo
+`wait_next_duty` continua disponível quando a gestão quiser exclusividade
+estrita. Fila de contingência é validada no servidor dentro do mesmo tenant, não pode
+ser a própria fila nem formar ciclos e cada encaminhamento é auditado. O
+processador também acorda jobs adiados assim que detecta um plantão ativo, sem
+relaxar unidade, disponibilidade, capacidade ou elegibilidade do corretor.
+
+## DEC-111 — Confirmação de ativação no mesmo canal do convite
+
+**Decisão aprovada em 2026-09-21.** Depois que o primeiro acesso concluir a
+transação de ativação, o CRM enfileira uma confirmação idempotente com o link de
+login. O outbox reutiliza o canal e o número de destino registrados na mensagem
+de convite; se esse canal não estiver mais disponível, o aviso não troca
+silenciosamente para outro número e fica auditado como indisponível. A mensagem
+é configurável em `/qualificacao?tab=meta_templates`, com uma versão livre
+segura como padrão e template Meta aprovado como contingência quando a janela de
+atendimento não estiver aberta. O Super-admin pode desligar o comportamento pela
+flag `feature_broker_account_activation_notice_enabled`.
+
+## DEC-110 — Plantão global por corretora
+
+**Decisão aprovada em 2026-09-18.** Novos plantões são regras globais do tenant:
+não recebem unidade, fila ou prioridade na criação e abrangem corretores escalados
+em todas as unidades. As filas continuam sendo a autoridade para selecionar quais
+leads podem usar um plantão por origem, enquanto a escala mantém a unidade real de
+cada corretor para autorização e distribuição. Plantões legados com unidade/fila
+continuam compatíveis até serem editados. O arquivamento permanece reversível e a
+exclusão permanente é uma ação separada, confirmada e auditada.
+
+## DEC-112 — Destinatários completos para comunicação interna com corretores
+
+**Decisão aprovada em 2026-09-22.** A aba `/conversas?tab=corretores` deve
+listar todos os perfis de corretor elegíveis do tenant, mesmo quando ainda não
+existe uma mensagem no histórico. Isso inclui membros ativos e convites pendentes
+com telefone; perfis desativados, arquivados ou fora da filial do Gestor ficam
+fora da lista. O disparo em massa usa exatamente essa população, mas o servidor
+revalida os IDs, o tenant, a filial e o papel antes de enfileirar cada mensagem.
+O envio continua na outbox oficial Meta, com auditoria do lote e sem depender de
+um contato recebido anteriormente.
+
+## DEC-113 — Capacidade rígida por fila e remoção manual de atribuição
+
+**Decisão aprovada em 2026-09-23.** O limite configurado em uma fila é rígido e
+independente por fila: contam-se os leads operacionais ativos do corretor naquela
+fila, e a oferta deve reservar a vaga de forma serializada para impedir estouro
+sob concorrência. Se todos os corretores elegíveis estiverem no limite, o lead
+permanece aguardando na fila, sem atribuição acima da capacidade. Diretor e Gestor
+podem remover a atribuição de um lead ainda operacional mesmo após o início do
+atendimento; etapa, horários e histórico são preservados, ofertas/jobs pendentes
+são cancelados e a operação fica em `manual_hold`, sem reentrada automática. Só
+uma ação manual retoma a distribuição. Leads perdidos, convertidos, arquivados ou
+excluídos não podem ter a atribuição removida. A ação grava evento e auditoria;
+o controle operacional existente do Super-admin continua podendo pausar o motor.
+
+## DEC-114 — Comprimento mínimo da senha no primeiro acesso
+
+**Decisão aprovada em 2026-09-23.** No fluxo `/primeiro-acesso`, a senha definida
+pelo novo membro deve ter ao menos 3 e no máximo 128 caracteres. A regra é
+idêntica no formulário e na validação do servidor. Esta decisão não muda os
+limites de recuperação de senha, aceite de convites em fluxos distintos ou
+acessos administrativos. O mínimo menor facilita a ativação, mas reduz a
+resistência de senhas curtas; recomenda-se que o membro escolha uma senha mais
+longa e exclusiva.
+
+## DEC-115 — Destino de links de convite indisponíveis
+
+**Decisão aprovada em 2026-09-23.** Links de convite expirados, inclusive os
+marcados como `EXPIRED` pelo job de limpeza ou cujo registro já tenha sido
+removido, redirecionam para `/login`. Convites ainda pendentes e dentro da
+validade continuam no fluxo de primeiro acesso. Convites aceitos, revogados ou
+substituídos permanecem com a mensagem de link indisponível; token ausente ou
+inválido mantém a mensagem de acesso inválido.
+
+## DEC-116 — Reatribuição manual pelo plantão ativo da fila
+
+**Decisão aprovada em 2026-09-23.** Quando o lead pertence a uma fila com um ou
+mais plantões vinculados ativos no horário atual e correspondentes à origem do
+lead, o drawer não permite trocar a unidade e oferece todos os corretores com
+vínculo ativo no tenant e escala ativa nesses plantões, mesmo que sejam de outras
+unidades. A unidade e a fila do lead permanecem inalteradas; somente o corretor
+responsável muda. O servidor revalida tenant, acesso ao lead, fila, horário,
+origem e escala no momento da atribuição. Sem plantão correspondente ativo, a
+reatribuição permanece limitada à unidade atual do lead.
+
+## DEC-117 — Balanceamento automático entre unidades elegíveis
+
+**Decisão aprovada em 2026-09-23 por solicitação do Diretor.** Quando uma entrada
+automática puder ser atendida por mais de uma unidade ativa e permitida pela fila
+e pela política, o motor escolhe a unidade com menos leads não arquivados e não
+excluídos no tenant. A leitura de volume e a reserva da unidade acontecem sob
+lock transacional por tenant para impedir que workers concorrentes reutilizem o
+mesmo retrato de carga. O balanceamento é aplicado antes da escolha do corretor;
+regras com uma única unidade, campanhas explicitamente direcionadas e atribuições
+manuais continuam respeitando seu destino. O balanceamento não move leads já
+recebidos e não promete igualdade em períodos com conjuntos elegíveis diferentes.
+
+## DEC-118 — Escolha de aceite na atribuição manual individual
+
+**Decisão aprovada em 2026-09-23 pelo Diretor.** Ao atribuir individualmente um
+lead sem corretor, Diretor/Gestor escolhem entre vincular diretamente e enviar uma
+oferta de aceite. A opção direta confirma o owner sem WhatsApp de aceite, mas
+mantém a notificação interna/push. A opção de oferta cria uma oferta exclusiva
+para o corretor selecionado, com `new_lead_broker` e prazo igual ao valor
+`slaFirstContactMinutes` configurado para redistribuição. O prazo do SLA de
+primeiro contato após o aceite continua valendo normalmente; o toggle de
+redistribuição após falta de primeiro contato não desativa o retorno de uma oferta
+recusada, expirada ou definitivamente não entregue. Nesses casos, a oferta é
+encerrada de forma idempotente, o owner provisório só é liberado se ainda pertencer
+àquela tentativa e o lead volta ao motor normal. Falha transitória permanece na
+outbox até recuperação/expiração. O escopo é somente atribuição individual de lead
+sem owner; alterações de owner, lote e distribuição automática preservam seu
+comportamento. Um kill switch global do Super-admin controla a nova escolha e sua
+alteração é auditada.
+
+## DEC-119 — Confirmação de presença para elegibilidade no plantão
+
+**Decisão aprovada em 2026-09-23.** Quando o Super-admin habilita a feature
+global, cada corretor escalado recebe pelo template Meta aprovado
+`plantao_confirm_presence` um lembrete 30 minutos antes da ocorrência. O link
+abre uma tela pública de confirmação com token aleatório, e a confirmação fica
+presa ao tenant, ao vínculo individual da escala e à data local daquela
+ocorrência. Só corretores que confirmaram uma ocorrência ainda vigente entram
+na elegibilidade automática ou na lista de reatribuição manual desse plantão.
+Uma confirmação tardia vale imediatamente até o fim da mesma ocorrência; ela
+nunca libera semanas futuras. Sem elegíveis, o lead continua aguardando ou usa
+somente a contingência que a fila já configurou. A tela de detalhes do plantão
+exibe status individual e horário confirmado. A alteração do kill switch pelo
+Super-admin é auditada. A flag nasce desligada para preservar filas existentes
+até que a aprovação do template, a migration e a agenda sejam validadas.
+
+## DEC-120 — WAHA da empresa como canal da diretoria com os corretores
+
+**Decisão aprovada em 2026-09-25.** A DEC de 2026-09-15 (Meta como único canal
+oficial do tenant) continua valendo para toda notificação oficial — templates,
+ofertas, atribuições, convites e automações. Além dela, cada tenant pode ter
+**um** número próprio conectado por QR via WAHA, gerenciado só pelo Diretor em
+`/integrations/whats_alt`, com um único propósito: a conversa da diretoria com
+os corretores. A conexão usa as mesmas rotas do relay que a conexão pessoal do
+corretor (`/internal/waha/connections…`), sem compartilhar código ou registro
+com ela (`waha_numbers` com `scope = tenant`, sessão `tenant_<hash>`).
+Desconectar para e apaga a sessão no WAHA. Mensagens recebidas nesse número de
+quem não é corretor/equipe são ignoradas e nunca viram lead. A sessão
+`ancora-d47a4d41-38df8c71`, criada em 11/09 e nunca pareada, foi encerrada no
+WAHA e removida (~100 eventos de status por hora sem uso).
+
+Início da transição (mesma data): o Diretor pode escolher, por aviso ao
+corretor, que ele saia pelo número da empresa com uma mensagem livre de
+Qualificação (`tenant_channel_routing_<tenant>`). Avisos elegíveis: novo lead
+atribuído, lead atribuído (aceite), lead indisponível, oferta expirada,
+lembrete de feedback, lembrete de tarefa e conta ativada. Ficam na Meta a
+oferta de lead (aceite pelo botão do template), a confirmação de presença e o
+convite de primeiro acesso (links com token). A linha da outbox guarda também
+o recurso Meta: se o número da empresa estiver desconectado ou o WAHA falhar,
+o aviso segue pela Meta automaticamente.
+
+
+## DEC-121 - Reatribuição manual de atendimento iniciado
+
+Aprovada pelo usuário em 2026-09-25: permitir transferir manualmente um lead em atendimento para outro corretor elegível, reiniciando atendimento e SLA e preservando todo o histórico. A redistribuição automática continua protegida enquanto o atendimento está iniciado. Reutilizar o controle global feature_lead_management_actions_enabled, validado no servidor, e os parâmetros de SLA do tenant. Registrar os responsáveis anterior/novo e os marcadores anteriores de atendimento; encerrar tentativas abertas antigas na mesma transação.
+
+Complemento de 2026-09-25 (DEC-120): com o número da empresa conectado, todo
+texto livre para um corretor — digitado no chat da diretoria ou disparo de
+mensagem livre — sai por ele por padrão, com a Meta como fallback. Templates
+Meta só saem pelo número quando o aviso foi roteado explicitamente.
+
+## DEC-123 — Tipos configuráveis e escala mensal de plantões
+
+Decisão aprovada pelo usuário em 2026-09-26: os tipos de plantão são configurados
+por corretora e servem somente para classificar e exibir a escala; não alteram
+roteamento de leads nem elegibilidade de corretores. Plantões antigos podem ficar
+sem tipo. O teto de corretores por plantão é opcional e nulo significa ilimitado,
+preservando a operação existente. A escala mensal usa cotas por corretor e período
+explícito; a geração produz rascunho determinístico, revisável e ajustável, e não
+notifica nem entra em vigor até publicação explícita. Publicação precisa ser
+atômica, auditável e idempotente. Ocorrências datadas não serão confundidas com o
+roster semanal canônico; o runtime só as consumirá por integração explícita e
+validada. A capacidade fica atrás de controle global reversível pelo Super-admin.
+
+Atualização de implementação (2026-09-26): ocorrências publicadas ficam em
+`duty_roster_assignments` marcadas com `duty_date` e `monthly_plan_id` (migration
+0161), porque confirmação de presença e resolvedores dependem dessa tabela; a
+escala semanal e suas checagens ignoram linhas datadas. Num dia publicado, o
+plantão usa somente os corretores publicados em todas as unidades; plantão
+publicado sem ninguém mantém a escala semanal. Com a flag desligada o runtime
+ignora as linhas datadas. Plantão global gera uma ocorrência por data (não uma
+por unidade). Somente o Diretor gera, ajusta e publica; Gestor consulta a própria
+unidade. Uma publicação por corretora e mês (índice único parcial).
+
+Simplificação de uso (2026-09-26): a aba Plantões é guiada por um único mês. A
+lista mostra os plantões que acontecem nele, por dia da semana, e explica os de
+fora (terminou, começa depois, vigência vazia) com "Estender até o fim do mês".
+A escala mensal começa pela escolha dos plantões do mês (com "Novo plantão"
+pré-preenchido para o mês), depois cotas e proposta. O formulário fala em
+"Repete toda semana a partir de / até (opcional)" e o campo Tipo saiu da tela
+(o dado é preservado). Datas de vigência passam a ser dias de São Paulo: "até"
+inclui o dia informado; antes eram lidas como meia-noite UTC e o último dia
+terminava às 21h da véspera (e a data encolhia a cada salvar).
+
+Regra padrão (2026-09-26, decisão do usuário): um plantão dura um dia, o dia
+escolhido. "Novo plantão" cria por datas: um período vira vários plantões de um
+dia, cada um com a etiqueta da sua data; "Repetir toda semana" é opção
+secundária. Plantões de uma data só são editados por um único campo "Data" e não
+exibem histórico de outras ocorrências. A aba Plantões é um calendário do mês
+(passado apagado, hoje destacado, ↻ para regras semanais). O conflito de horário
+passou a considerar a vigência: um plantão já encerrado não bloqueia outro no
+mesmo dia da semana e horário.
+
+Contagem mensal (2026-09-27, decisão do usuário): o indicador da aba Plantões
+conta datas distintas com plantão no mês, incluindo datas encerradas. Regras
+semanais contribuem com cada data em que ocorrem; múltiplas regras na mesma data
+contam apenas um dia. A indicação de dias sem cobertura segue a mesma unidade.
+
+## DEC-124 — Histórico por ocorrência encerrada do plantão
+
+Aprovada pelo usuário em 2026-09-26: o fim de um turno encerra somente a ocorrência
+da data local, nunca a regra semanal que volta a operar no dia configurado. Cada
+ocorrência encerrada permanece consultável com os leads distribuídos e o corretor
+registrado no momento da atribuição. Eventos de ofertas futuras preservam a data e
+o identificador do plantão quando a correspondência é única; registros anteriores
+sem vínculo explícito podem ser reconstruídos pela fila e janela temporal, sempre
+marcados como estimados. A consulta é escopada por tenant/unidade e reversível pelo
+Super-admin, sem apagar os eventos.
+
+
+## DEC-122 - Renovar convite de ativação no reenvio manual
+
+Aprovada pelo usuário em 2026-09-25: o reenvio manual deve gerar e enviar novo convite quando não existir convite válido. Resolver o membro pelo vínculo ou perfil, preservando cargo e unidade; permitir convites vencidos ou revogados sem exigir novo cadastro. Contas já ativadas ou desabilitadas não são reativadas por esse fluxo. Tokens pendentes anteriores são substituídos; auditoria, prazo de 72h e controle do Super-admin são obrigatórios.
+
+## DEC-125 — WAHA oficial para os avisos operacionais da equipe, com reserva Meta
+
+**Decisão aprovada pelo usuário em 2026-09-27.** Amplia a DEC-120 e substitui,
+para os avisos à equipe, a regra "Meta como único canal" da DEC-100. Os avisos
+operacionais a membros da equipe (novo lead, lead prestes a expirar, lembretes,
+atribuição, expiração, tarefa) saem **por padrão pelo número WAHA da empresa**,
+com **reserva automática pelos templates aprovados da Meta**. Se o WAHA for
+desligado, o número for banido/desconectado ou o envio falhar, o aviso volta ao
+comportamento normal: template Meta aprovado. Cada aviso tem liga/desliga
+próprio, e "desligado" significa **não enviar** (registrado como pulado), nunca
+trocar de canal por baixo. Uma única função decide cada envio e devolve
+enviar/pular/bloquear com motivo. A oferta de lead por WAHA exige que o aceite
+funcione sem o botão do template (link seguro para o CRM); até isso existir ela
+permanece na Meta. Convite de primeiro acesso e confirmação de presença (links
+com token) permanecem só na Meta. A conexão pessoal WAHA do corretor não muda.
+
+## DEC-126 — Motor novo de qualificação como base do atendimento por IA
+
+**Decisão aprovada pelo usuário em 2026-09-27.** O motor novo (máquina de estados
+em `src/features/ai-agent`, com agente de IA, follow-ups e passagem para humano)
+passa a ser a base; o motor antigo de perguntas fixas (`ai-qualification/service`,
+ativo hoje porque `feature_qualification_engine_enabled = false`) sai depois de
+validação lado a lado. A troca é gradual e reversível pela mesma chave, com
+testes de caracterização antes e verificação contínua depois, para não causar
+erros no atendimento em produção.
+
+## DEC-127 — Fluxos de atendimento por fila, versionados, com editor visual
+
+**Decisão aprovada pelo usuário em 2026-09-27.** Cada fila escolhe um fluxo de
+atendimento (um por vez). Fluxos têm rascunho, simulador e versão publicada; a
+versão publicada roda até outra ser publicada. Cada lead pertence a uma única
+execução, registrada passo a passo, com chave de idempotência por etapa. Blocos:
+início, enviar mensagem, enviar e aguardar resposta (com tempo limite), condição
+(sempre com "senão"), agente de IA, aguardar, transferir, atualizar lead e
+encerrar. O editor visual usa `@xyflow/react` (MIT). O primeiro fluxo publicado
+reproduz o comportamento atual, para que ligar o motor não mude o atendimento.
+Plano e fases em `docs/implementations/active/2026-09-27-motor-atendimento.md`.
+

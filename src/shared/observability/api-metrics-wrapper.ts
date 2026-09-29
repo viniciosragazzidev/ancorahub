@@ -13,7 +13,7 @@
 
 import { NextResponse } from "next/server";
 import { recordApiMetric, logSlowRequest } from "@/shared/observability/metrics";
-import { getRequestTiming, getDurations } from "@/shared/observability/request-timing";
+import { getRequestTiming, getDurations, withRequestTiming } from "@/shared/observability/request-timing";
 
 type RouteHandler = (
   request: Request,
@@ -41,7 +41,11 @@ export function withApiMetrics(handler: RouteHandler): RouteHandler {
     let status = 200;
 
     try {
-      const response = await handler(request);
+      const { result: response } = await withRequestTiming(
+        route,
+        () => handler(request),
+        request.headers.get("x-request-id"),
+      );
 
       // Extract status from response object
       if (response && typeof response === "object" && "status" in response) {

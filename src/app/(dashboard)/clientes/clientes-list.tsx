@@ -1,8 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { ColumnDef } from "@tanstack/react-table";
-import { ArrowRight, UserList } from "@/components/huge-icons";
+import { ArrowRight, MagnifyingGlass, UserList } from "@/components/huge-icons";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,8 @@ import { UserAvatar } from "@/components/ui/user-avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { OwnershipContext } from "@/components/ownership-context";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
+import { MobileDataList, MobileDataListItem, MobileDataRow, ResponsiveDataView } from "@/components/ui/responsive-data-view";
 import { StatCard } from "@/components/dashboard/metric-card";
 
 /* ─── Types ─── */
@@ -135,6 +138,15 @@ export function ClientesList({
   metrics: ClientsMetrics;
   period: number;
 }) {
+  const [query, setQuery] = useState("");
+  const filteredClients = useMemo(() => {
+    const normalized = query.trim().toLocaleLowerCase("pt-BR");
+    if (!normalized) return clients;
+    return clients.filter((client) =>
+      [client.name, client.phone, client.email ?? "", client.brokerName ?? "", client.branchName ?? ""]
+        .some((value) => value.toLocaleLowerCase("pt-BR").includes(normalized)),
+    );
+  }, [clients, query]);
   const conversionTrend = clients.reduce<number[]>((acc, client) => {
     const convertedAt = new Date(client.convertedAt).getTime();
     const today = new Date();
@@ -153,7 +165,7 @@ export function ClientesList({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-4">
         <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos ${period} dias`} sparklineData={conversionTrend} sparklineColor="var(--chart-1)" />
         <StatCard label="Taxa de conversão" value={`${metrics.conversionRate}%`} sublabel="Clientes por lead" sparklineData={conversionTrend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" />
         <StatCard label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={conversionTrend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" />
@@ -176,29 +188,76 @@ export function ClientesList({
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <DataTable
-            columns={columns}
-            data={clients}
-            searchKey="name"
-            searchPlaceholder="Buscar cliente por nome..."
-            showColumnToggle={true}
-            showPagination={true}
-            pageSize={10}
-            emptyState={
-              <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
-                <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8 ring-1 ring-primary/15">
-                  <UserList className="size-6 text-primary" />
+          <div className="p-4 pb-3 sm:hidden">
+            <div className="relative">
+              <MagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input
+                aria-label="Buscar cliente"
+                className="h-(--mobile-touch-target) pl-9"
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar nome, contato ou responsável"
+                value={query}
+              />
+            </div>
+          </div>
+          <ResponsiveDataView
+            desktop={
+              <DataTable
+                columns={columns}
+                data={clients}
+                searchKey="name"
+                searchPlaceholder="Buscar cliente por nome..."
+                showColumnToggle={true}
+                showPagination={true}
+                pageSize={10}
+                emptyState={
+                  <div className="flex flex-col items-center gap-4 px-6 py-12 text-center">
+                    <div className="flex size-12 items-center justify-center rounded-xl bg-primary/8 ring-1 ring-primary/15">
+                      <UserList className="size-6 text-primary" />
+                    </div>
+                    <div className="max-w-sm space-y-1.5">
+                      <p className="text-sm font-semibold text-foreground">Nenhum cliente convertido ainda</p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">Aqui ficará o histórico de todos os seus clientes convertidos. Para adicionar um, feche um lead como vendido.</p>
+                    </div>
+                    <Button render={<Link href="/leads" />} variant="outline"><ArrowRight className="size-3.5" /> Ir para Leads</Button>
+                  </div>
+                }
+              />
+            }
+            mobile={
+              filteredClients.length ? (
+                <MobileDataList className="rounded-none border-x-0 border-b-0">
+                  {filteredClients.map((client) => (
+                    <MobileDataListItem key={client.id}>
+                      <div className="flex items-start gap-3">
+                        <UserAvatar seed={client.email || client.name} name={client.name} size="sm" className="size-9" />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <h3 className="truncate text-sm font-semibold text-foreground">{client.name}</h3>
+                              <p className="truncate font-mono text-xs text-muted-foreground">{client.phone}</p>
+                            </div>
+                            <Badge variant="success">Ativo</Badge>
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            <MobileDataRow label="Responsável" value={client.brokerName ?? "Sem responsável"} />
+                            <MobileDataRow label="Unidade" value={client.branchName ?? "Geral da empresa"} />
+                            <MobileDataRow label="Conversão" value={new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(client.convertedAt))} />
+                          </div>
+                          <Button className="mt-3 w-full min-h-(--mobile-touch-target)" render={<Link href={`/clientes/${client.id}`} />} variant="outline">
+                            Ver perfil <ArrowRight className="size-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </MobileDataListItem>
+                  ))}
+                </MobileDataList>
+              ) : (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-sm font-semibold text-foreground">Nenhum cliente encontrado</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Ajuste a busca para ver outros resultados.</p>
                 </div>
-                <div className="max-w-sm space-y-1.5">
-                  <p className="text-sm font-semibold text-foreground">Nenhum cliente convertido ainda</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Aqui ficará o histórico de todos os seus clientes convertidos. Para adicionar um, feche um lead como vendido.
-                  </p>
-                </div>
-                <a href="/leads" className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background px-4 py-2 text-xs font-medium text-foreground hover:bg-muted/50 transition-colors">
-                  <ArrowRight className="size-3.5" /> Ir para Leads
-                </a>
-              </div>
+              )
             }
           />
         </CardContent>

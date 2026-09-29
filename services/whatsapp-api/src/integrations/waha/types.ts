@@ -7,11 +7,15 @@ export type WahaErrorCode =
   | "WAHA_TIMEOUT"
   | "WAHA_UNAUTHORIZED"
   | "WAHA_BAD_RESPONSE"
+  | "WAHA_RECIPIENT_NOT_FOUND"
   | "WAHA_INTERNAL_ERROR"
   | "SESSION_NOT_FOUND"
   | "SESSION_EXISTS"
   | "QR_NOT_READY"
-  | "QR_EXPIRED";
+  | "QR_EXPIRED"
+  | "WAHA_MEDIA_INVALID_PATH"
+  | "WAHA_MEDIA_NOT_FOUND"
+  | "WAHA_MEDIA_TOO_LARGE";
 
 /**
  * Status normalizados internamente.
@@ -41,6 +45,12 @@ export type WahaHealthResult = {
 export type WahaSession = {
   name: string;
   status: WahaSessionStatus;
+  /**
+   * Status bruto do WAHA (STOPPED, STARTING, SCAN_QR_CODE, WORKING, FAILED).
+   * `status` colapsa STARTING e SCAN_QR_CODE em WAITING_QR; só o bruto
+   * diferencia "QR disponível" de "ainda iniciando/pareando".
+   */
+  providerStatus: string;
   displayPhoneNumber: string | null;
   qrCode: string | null;
 };
@@ -69,7 +79,12 @@ export function normalizeWahaStatus(raw: string): WahaSessionStatus {
   const s = raw.trim().toUpperCase();
   if (["WORKING", "CONNECTED", "READY", "AUTHENTICATED", "OPEN", "ONLINE"].includes(s)) return "CONNECTED";
   if (["FAILED", "ERROR", "INVALID", "UNAVAILABLE"].includes(s)) return "ERROR";
-  if (["SCAN_QR_CODE", "STARTING", "WAITING_QR", "WAITING_FOR_QR", "QR", "QR_READY", "CREATED", "INITIALIZING", "CONNECTING", "LOADING"].includes(s)) return "WAITING_QR";
+  // AUTHENTICATING/OPENING são a janela pós-scan (5–30s). Mapear para
+  // WAITING_QR (e nunca DISCONNECTED): o relay trata WAITING_QR como
+  // "sessão viva — reutilizar, não reiniciar", evitando que um start
+  // concorrente destrua o pareamento em andamento. O QR já não é válido
+  // nessa janela, então getQr retorna null e a UI mostra "Gerando QR".
+  if (["SCAN_QR_CODE", "STARTING", "WAITING_QR", "WAITING_FOR_QR", "QR", "QR_READY", "CREATED", "INITIALIZING", "CONNECTING", "LOADING", "AUTHENTICATING", "OPENING"].includes(s)) return "WAITING_QR";
   if (["STOPPED", "DISCONNECTED", "CLOSED", "LOGGED_OUT", "LOGOUT", "OFFLINE"].includes(s)) return "DISCONNECTED";
   return "DISCONNECTED";
 }

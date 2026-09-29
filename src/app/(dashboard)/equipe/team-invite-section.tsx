@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { UserPlus, WhatsappLogo } from "@/components/huge-icons";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -12,7 +12,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createTeamUserAction, importBrokersAction } from "./actions";
 
-type Props = { branches: { id: string; name: string }[]; canInviteManager: boolean; canInviteDirector?: boolean };
+type CustomRoleOption = { id: string; name: string; scope: "none" | "own" | "branch" | "tenant" };
+type Props = { branches: { id: string; name: string }[]; canInviteManager: boolean; canInviteDirector?: boolean; customRoles?: CustomRoleOption[] };
 
 const jobTitles = [
   { value: "director", label: "Diretor" },
@@ -24,7 +25,7 @@ const jobTitles = [
   { value: "support", label: "Suporte" },
 ] as const;
 
-export function TeamInviteSection({ branches, canInviteManager, canInviteDirector }: Props) {
+export function TeamInviteSection({ branches, canInviteManager, canInviteDirector, customRoles = [] }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [createdLink, setCreatedLink] = useState<string | null>(null);
@@ -32,7 +33,8 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
   const [whatsappStatus, setWhatsappStatus] = useState<"queued" | "not_available" | "failed" | "sent" | null>(null);
   const [activeTab, setActiveTab] = useState<'manual' | 'csv'>('manual');
   const [jobTitle, setJobTitle] = useState("broker");
-  const [role, setRole] = useState(canInviteDirector ? "director" : canInviteManager ? "manager" : "broker");
+  const [role, setRole] = useState("broker");
+  const [customRoleId, setCustomRoleId] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const csvFormRef = useRef<HTMLFormElement>(null);
   const router = useRouter();
@@ -78,6 +80,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
     setOpen(false);
     setCreatedLink(null);
     setActiveTab('manual');
+    setCustomRoleId("");
   }
 
   return (
@@ -97,7 +100,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Mensagem pronta para WhatsApp:</label>
               <div className="rounded-lg border border-border bg-muted/60 p-3 text-xs whitespace-pre-wrap select-all font-sans leading-relaxed text-foreground">
-                {`Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`}
+              {`Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe.\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`}
               </div>
             </div>
 
@@ -105,7 +108,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
               <Button
                 className="w-full gap-2"
                 onClick={async () => {
-                  const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
+    const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe.\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
                   await navigator.clipboard.writeText(msg);
                   toast.success("Mensagem completa de convite copiada!");
                 }}
@@ -129,7 +132,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                   variant="secondary"
                   className="flex-1 gap-2 text-xs"
                   onClick={() => {
-                    const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe. 🚀\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n👉 ${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
+    const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe.\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
                     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
                   }}
                 >
@@ -169,7 +172,11 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
             {activeTab === 'manual' ? (
               <form ref={formRef} action={handleSubmit} className="grid gap-4">
                 <Field><FieldLabel htmlFor="user-name">Nome</FieldLabel><Input id="user-name" name="name" required disabled={pending} /></Field>
-                <Field><FieldLabel htmlFor="user-email">E-mail</FieldLabel><Input id="user-email" name="email" type="email" required disabled={pending} /></Field>
+                <Field>
+                  <FieldLabel htmlFor="user-email">E-mail <span className="text-muted-foreground">(opcional)</span></FieldLabel>
+                  <Input id="user-email" name="email" type="email" autoComplete="email" disabled={pending} />
+                  <p className="text-xs text-muted-foreground">Se ficar vazio, o membro definirá o e-mail de acesso ao abrir o convite.</p>
+                </Field>
                 <Field><FieldLabel htmlFor="user-phone">Telefone</FieldLabel><Input id="user-phone" name="phone" placeholder="(21) 99999-9999" required disabled={pending} /></Field>
                 <Field><FieldLabel htmlFor="user-cpf">CPF <span className="text-muted-foreground">(opcional)</span></FieldLabel><Input id="user-cpf" name="cpf" placeholder="000.000.000-00" disabled={pending} /></Field>
                 <Field>
@@ -180,6 +187,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                     if (val === "director") setRole("director");
                     else if (val === "manager") setRole("manager");
                     else if (val === "supervisor") setRole("supervisor");
+                    else if (val === "broker") setRole("broker");
                   }} disabled={pending} labels={Object.fromEntries(jobTitles.map((t) => [t.value, t.label]))}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o cargo" /></SelectTrigger>
                     <SelectContent>
@@ -196,7 +204,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                     setRole(val);
                     if (val === "director") setJobTitle("director");
                     else if (val === "manager" && (jobTitle === "director" || jobTitle === "broker")) setJobTitle("manager");
-                  }} disabled={pending || jobTitle === "manager" || jobTitle === "director"} labels={{ director: "Acesso Global (Direção)", manager: "Gestão da unidade", broker: "Operação individual" }}>
+                  }} disabled={pending || jobTitle === "manager" || jobTitle === "director" || jobTitle === "broker"} labels={{ director: "Acesso Global (Direção)", manager: "Gestão da unidade", broker: "Operação individual" }}>
                     <SelectTrigger className="w-full"><SelectValue placeholder="Selecione o perfil" /></SelectTrigger>
                     <SelectContent>
                       {canInviteDirector ? <SelectItem value="director">Acesso Global (Direção)</SelectItem> : null}
@@ -204,7 +212,28 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                       {jobTitle !== "manager" && jobTitle !== "director" ? <SelectItem value="broker">Operação individual</SelectItem> : null}
                     </SelectContent>
                   </Select>
+                  {jobTitle === "broker" ? <p className="text-xs text-muted-foreground">Corretor usa Operação individual automaticamente.</p> : null}
                 </Field>
+                {jobTitle === "broker" ? (
+                  <Field>
+                    <FieldLabel htmlFor="user-broker-code">Código do corretor <span className="text-muted-foreground">(opcional)</span></FieldLabel>
+                    <Input id="user-broker-code" name="brokerCode" placeholder="Ex.: COR-001" autoComplete="off" disabled={pending} />
+                    <p className="text-xs text-muted-foreground">Se ficar vazio, o sistema gera um código automaticamente. O código deve ser único nesta corretora.</p>
+                  </Field>
+                ) : null}
+                {customRoles.length > 0 && jobTitle !== "director" ? (
+                  <Field>
+                    <FieldLabel>Cargo personalizado <span className="text-muted-foreground">(opcional)</span></FieldLabel>
+                    <Select name="customRoleId" value={customRoleId || "__none__"} onValueChange={(value) => setCustomRoleId(value === "__none__" ? "" : value ?? "")} disabled={pending} labels={Object.fromEntries(customRoles.map((item) => [item.id, item.name]))}>
+                      <SelectTrigger className="w-full"><SelectValue placeholder="Nenhum cargo personalizado" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">Nenhum cargo personalizado</SelectItem>
+                        {customRoles.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">O cargo define permissões e rotas visíveis; o perfil continua sendo o papel operacional.</p>
+                  </Field>
+                ) : null}
                 <Field>
                   <FieldLabel>Unidade</FieldLabel>
                   <Select name="branchId" required disabled={pending}>
@@ -224,9 +253,9 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                 </Field>
                 <div className="rounded-lg border border-border bg-muted/40 p-3 text-xs text-muted-foreground space-y-1.5">
                   <p className="font-semibold text-foreground">Instruções para o CSV:</p>
-                  <p>1. O cabeçalho deve conter: <strong>nome, email, telefone, cpf</strong>.</p>
-                  <p>2. Adicionalmente, pode conter a coluna opcional <strong>unidade</strong> (nome ou ID da filial).</p>
-                  <p>3. Os corretores importados serão criados como Rascunho (DRAFT) na unidade correspondente.</p>
+                  <p>1. O cabeçalho obrigatório é: <strong>nome, telefone</strong>.</p>
+                  <p>2. <strong>email, cpf e unidade</strong> são opcionais. Sem e-mail, o corretor o define no primeiro acesso.</p>
+                  <p>3. Cada corretor entra como pendente e recebe o convite <strong>broker_first_access</strong> pela fila do WhatsApp oficial.</p>
                 </div>
                 <div className="sticky bottom-0 -mx-1 border-t border-border bg-card px-1 pt-3">
                   <Button className="w-full" type="submit" disabled={pending}>{pending ? "Importando..." : "Importar Corretores"}</Button>

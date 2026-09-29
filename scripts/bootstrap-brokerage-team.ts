@@ -5,6 +5,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 
 import { getDatabase, schema } from "../src/shared/db/client";
+import { buildCredentialAccount, buildCredentialAccountPasswordUpdate } from "../src/shared/auth/credential-account";
 
 loadEnvConfig(process.cwd());
 
@@ -42,8 +43,8 @@ async function ensureUser(db: ReturnType<typeof getDatabase>, name: string, emai
 
   const password = await hashPassword(defaultPassword);
   const [account] = await db.select({ id: schema.account.id }).from(schema.account).where(and(eq(schema.account.userId, user.id), eq(schema.account.providerId, "credential"))).limit(1);
-  if (account) await db.update(schema.account).set({ password, updatedAt: new Date() }).where(eq(schema.account.id, account.id));
-  else await db.insert(schema.account).values({ id: randomUUID(), userId: user.id, providerId: "credential", accountId: user.id, password });
+  if (account) await db.update(schema.account).set(buildCredentialAccountPasswordUpdate(user.id, password)).where(eq(schema.account.id, account.id));
+  else await db.insert(schema.account).values(buildCredentialAccount({ id: randomUUID(), userId: user.id, password }));
   return user;
 }
 

@@ -9,6 +9,7 @@ import {
   markAuthEnd,
   withTimeout,
   getRequestTiming,
+  withPerfSpan,
 } from "@/shared/observability/request-timing";
 
 const SESSION_TIMEOUT_MS = 15_000;
@@ -17,14 +18,14 @@ async function resolveRequiredSession() {
   markAuthStart();
 
   try {
-    const session = await withTimeout(
+    const session = await withPerfSpan("auth.session", async () => withTimeout(
       getAuth().api.getSession({
         headers: await headers(),
         query: { disableCookieCache: true },
       }),
       SESSION_TIMEOUT_MS,
       "getRequiredSession",
-    );
+    ));
 
     markAuthEnd();
 

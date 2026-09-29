@@ -44,9 +44,10 @@ export async function createBrokerInvitation(
   tenantId: string,
   branchId: string,
   brokerProfileId: string,
-  email: string,
+  email: string | null,
   role: CreatableTeamRole = "broker",
   jobTitle: string = role,
+  customRoleId: string | null = null,
 ) {
   // Set all previous invitations for this broker to REPLACED
   await tx
@@ -54,6 +55,7 @@ export async function createBrokerInvitation(
     .set({ status: "REPLACED", revokedAt: new Date() })
     .where(
       and(
+        eq(schema.brokerInvitations.tenantId, tenantId),
         eq(schema.brokerInvitations.brokerProfileId, brokerProfileId),
         eq(schema.brokerInvitations.status, "PENDING")
       )
@@ -74,6 +76,7 @@ export async function createBrokerInvitation(
     email,
     role,
     jobTitle,
+    customRoleId,
     tokenHash,
     tokenCiphertext,
     status: "PENDING",

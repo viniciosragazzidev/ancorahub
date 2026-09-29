@@ -1,23 +1,28 @@
 "use server";
 
-import { randomUUID, createHash } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
+import { buildCredentialAccount } from "@/shared/auth/credential-account";
+import { classifyExistingTeamIdentity } from "@/features/team/identity-reuse-policy";
+import { enqueueBrokerAccountActivationNotice, type BrokerAccountActivationNoticeStatus } from "@/features/team/broker-account-activation-delivery";
+import { isOnboardingPasswordLongEnough } from "@/features/team/onboarding-password-policy";
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
   name: z.string().trim().min(2).max(120),
   phone: z.string().trim().min(8).max(30),
   cpf: z.string().trim().max(20).optional().or(z.literal("")),
   birthDate: z.string().trim().min(10).max(10), // YYYY-MM-DD
-  password: z.string().min(10).max(128),
+  password: z.string().refine(isOnboardingPasswordLongEnough, "A senha deve ter no mínimo 3 caracteres.").max(128),
   termsAccepted: z.literal("on"),
 });
 
-export type OnboardingResult = { success?: boolean; error?: string };
+export type OnboardingResult = { success?: boolean; error?: string; email?: string; activationNoticeStatus?: BrokerAccountActivationNoticeStatus };
 
 export async function completeOnboardingAction(
   _prev: OnboardingResult,
@@ -46,12 +51,29 @@ export async function completeOnboardingAction(
     const [profile] = await db
       .select()
       .from(schema.brokerProfiles)
-      .where(eq(schema.brokerProfiles.id, invitation.brokerProfileId))
+      .where(and(
+        eq(schema.brokerProfiles.id, invitation.brokerProfileId),
+        eq(schema.brokerProfiles.tenantId, invitation.tenantId),
+      ))
       .limit(1);
 
     if (!profile) {
       throw new Error("Perfil de corretor correspondente não encontrado.");
     }
+    const accessEmail = invitation.email?.trim().toLowerCase() || input.email;
+    if (invitation.email && invitation.email.toLowerCase() !== input.email) {
+      throw new Error("O e-mail informado não corresponde ao convite.");
+    }
+    const [emailInTenant] = await db
+      .select({ id: schema.brokerProfiles.id })
+      .from(schema.brokerProfiles)
+      .where(and(
+        eq(schema.brokerProfiles.tenantId, invitation.tenantId),
+        eq(schema.brokerProfiles.invitedEmail, accessEmail),
+        ne(schema.brokerProfiles.id, profile.id),
+      ))
+      .limit(1);
+    if (emailInTenant) throw new Error("Este e-mail já pertence a outro membro desta corretora.");
 
     // 3. Clean and validate CPF matches the profile one
     const cleanInputCpf = input.cpf?.replace(/\D/g, "") || "";
@@ -64,65 +86,78 @@ export async function completeOnboardingAction(
     const [existingUser] = await db
       .select({ id: schema.user.id })
       .from(schema.user)
-      .where(eq(schema.user.email, invitation.email))
+      .where(eq(schema.user.email, accessEmail))
       .limit(1);
 
-    let userId: string;
-    let isNewUser = false;
-
-    if (existingUser) {
-      const [activeMembership] = await db
-        .select({ id: schema.tenantMemberships.id })
-        .from(schema.tenantMemberships)
-        .where(
-          and(
-            eq(schema.tenantMemberships.userId, existingUser.id),
-            eq(schema.tenantMemberships.tenantId, invitation.tenantId),
-          ),
-        )
-        .limit(1);
-      if (activeMembership) {
-        throw new Error("Já existe uma conta de acesso ativa com este e-mail.");
-      }
-      userId = existingUser.id;
-    } else {
-      userId = randomUUID();
-      isNewUser = true;
+    const [identity] = existingUser ? await db
+      .select({ id: schema.user.id, active: schema.user.active, status: schema.user.status })
+      .from(schema.user)
+      .where(eq(schema.user.id, existingUser.id))
+      .limit(1) : [];
+    const [membershipForIdentity] = existingUser ? await db
+      .select({ id: schema.tenantMemberships.id })
+      .from(schema.tenantMemberships)
+      .where(and(
+        eq(schema.tenantMemberships.tenantId, invitation.tenantId),
+        eq(schema.tenantMemberships.userId, existingUser.id),
+      ))
+      .limit(1) : [];
+    const identityDecision = classifyExistingTeamIdentity(identity ?? null, membershipForIdentity ?? null, profile.userId);
+    if (identityDecision.kind === "tenant-conflict") {
+      throw new Error("Este e-mail já pertence a outro membro desta corretora.");
     }
+    const userId = identityDecision.kind === "reuse" || identityDecision.kind === "reactivate"
+      ? identityDecision.userId
+      : randomUUID();
 
     const hashedPassword = await hashPassword(input.password);
 
     // 5. Run transactional activation
     await db.transaction(async (tx) => {
-      if (isNewUser) {
-        // Create user
+      if (!existingUser) {
         await tx.insert(schema.user).values({
           id: userId,
           name: input.name,
-          email: invitation.email,
+          email: accessEmail,
           emailVerified: true,
           active: true,
           status: "active",
         });
-      } else {
-        // Update user
+      } else if (identityDecision.kind === "reactivate") {
         await tx.update(schema.user).set({
           name: input.name,
+          email: accessEmail,
           emailVerified: true,
           active: true,
           status: "active",
+          updatedAt: new Date(),
         }).where(eq(schema.user.id, userId));
-        await tx.delete(schema.account).where(eq(schema.account.userId, userId));
       }
 
-      // Create credential account
-      await tx.insert(schema.account).values({
-        id: randomUUID(),
-        userId,
-        providerId: "credential",
-        accountId: userId,
-        password: hashedPassword,
-      });
+      // A deleted tenant member may still have a valid global credential.
+      // Preserve that credential so re-adding the member does not change
+      // access in another tenant. Only brand-new identities receive a
+      // password account here.
+      const [credentialAccount] = await tx
+        .select({ id: schema.account.id })
+        .from(schema.account)
+        .where(eq(schema.account.userId, userId))
+        .limit(1);
+      if (!credentialAccount) {
+        await tx.insert(schema.account).values(buildCredentialAccount({
+          id: randomUUID(),
+          userId,
+          password: hashedPassword,
+        }));
+      } else if (identityDecision.kind === "reactivate") {
+        await tx
+          .update(schema.account)
+          .set({ password: hashedPassword, updatedAt: new Date() })
+          .where(and(
+            eq(schema.account.userId, userId),
+            eq(schema.account.providerId, "credential"),
+          ));
+      }
 
       // Upsert tenant membership
       const [existingMembership] = await tx
@@ -143,6 +178,7 @@ export async function completeOnboardingAction(
             branchId: invitation.branchId,
             role: invitation.role,
             jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
+            customRoleId: invitation.customRoleId,
             status: "active",
             updatedAt: new Date(),
           })
@@ -156,6 +192,7 @@ export async function completeOnboardingAction(
           branchId: invitation.branchId,
           role: invitation.role,
           jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
+          customRoleId: invitation.customRoleId,
           status: "active",
         });
       }
@@ -169,19 +206,21 @@ export async function completeOnboardingAction(
           activatedAt: new Date(),
           professionalName: input.name,
           phone: input.phone,
+          invitedEmail: accessEmail,
           cpf: cleanInputCpf || profile.cpf,
           updatedAt: new Date(),
         })
-        .where(eq(schema.brokerProfiles.id, profile.id));
+        .where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, invitation.tenantId)));
 
       // Accept invitation
       await tx
         .update(schema.brokerInvitations)
         .set({
+          email: accessEmail,
           status: "ACCEPTED",
           acceptedAt: new Date(),
         })
-        .where(eq(schema.brokerInvitations.id, invitation.id));
+        .where(and(eq(schema.brokerInvitations.id, invitation.id), eq(schema.brokerInvitations.tenantId, invitation.tenantId)));
 
       // Set onboarding complete
       const onboardingId = randomUUID();
@@ -222,9 +261,34 @@ export async function completeOnboardingAction(
         entidadeId: onboardingId,
         acao: "concluiu_onboarding",
       });
+
+      if (identityDecision.kind === "reactivate") {
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId,
+          entidade: "user",
+          entidadeId: userId,
+          acao: "reativou_identidade_em_reconvite",
+        });
+      }
     });
 
-    return { success: true };
+    // Activation is already committed at this point. The notification is a
+    // durable, idempotent follow-up and can never roll back a valid account.
+    let activationNoticeStatus: BrokerAccountActivationNoticeStatus = "failed";
+    try {
+      activationNoticeStatus = await enqueueBrokerAccountActivationNotice({
+        tenantId: invitation.tenantId,
+        invitationId: invitation.id,
+        memberName: input.name,
+        requestedBy: userId,
+      });
+    } catch {
+      // Keep onboarding successful if the optional communication follow-up is
+      // unavailable; the audit/outbox path records the operational failure.
+    }
+
+    return { success: true, email: accessEmail, activationNoticeStatus };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao concluir o onboarding.";
     return { success: false, error: message };

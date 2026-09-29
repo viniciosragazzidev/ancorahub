@@ -16,6 +16,7 @@ import {
 } from "@/components/huge-icons";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 
 import {
@@ -28,19 +29,22 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { signOut } from "@/shared/auth/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
 import { hasCapability, type PermissionKey } from "@/shared/auth/permissions";
 import { getPendingFeedbackCountAction } from "@/features/leads/feedback-queries";
 import { Badge } from "@/components/ui/badge";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
+import { routePermissionForPath } from "@/features/custom-roles/routes";
 
 type BrokerSidebarItem = { label: string; icon: typeof ListChecks; url: string; permission: PermissionKey; requiresFeature?: boolean };
 
 const allBrokerItems: BrokerSidebarItem[] = [
+  { label: "Dashboard", icon: House, url: "/dashboard", permission: "acessar_dashboard" },
   { label: "Conversas & WhatsApp", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
   { label: "Meus Leads", icon: ListChecks, url: "/leads", permission: "acessar_leads" },
   { label: "Minha Fila", icon: ListChecks, url: "/minha-fila", permission: "acessar_leads" },
+  { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
   { label: "Meu Perfil", icon: UserCircle, url: "/settings?tab=conta", permission: "acessar_configuracoes_pessoais" },
 ];
 
@@ -110,6 +114,10 @@ export function CorretorSidebar() {
     ) {
       return false;
     }
+    const permissions = user?.permissions ?? [];
+    const routePermission = routePermissionForPath(item.url);
+    const explicitRoutes = permissions.filter((permission) => permission.startsWith("route:"));
+    if (routePermission && explicitRoutes.length > 0) return permissions.includes(routePermission);
     return hasCapability(role, item.permission, jobTitle);
   });
 
@@ -162,7 +170,7 @@ export function CorretorSidebar() {
       <SidebarFooter className="border-t border-sidebar-border/50 p-2">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<button type="button" onClick={handleLogout} />} tooltip={userName} className="group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
+            <SidebarMenuButton size="lg" render={<Button type="button" variant="ghost" onClick={handleLogout} />} tooltip={userName} className="group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto">
               <span className="grid size-7 place-items-center rounded-full bg-secondary text-foreground border border-border/80 text-xs font-semibold shrink-0">{initials}</span>
               <span className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
                 <span className="truncate font-medium">{userName}</span>

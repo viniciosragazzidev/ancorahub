@@ -2,10 +2,10 @@
 
 Este serviço fica em uma VPS separada. Ele não recebe conexão com o banco, tokens da
 Meta nem tráfego público direto. Exponha-o somente atrás de proxy HTTPS com allowlist
-da Vercel ou rede privada.
+do CRM (Coolify) ou rede privada.
 
 Configure `WAHA_RELAY_SHARED_SECRET` com uma chave aleatória longa e igual no relay e
-na Vercel. Configure `WAHA_API_KEY` somente na VPS. O CRM chama `POST /v1/messages`
+no CRM (Coolify). Configure `WAHA_API_KEY` somente na VPS. O CRM chama `POST /v1/messages`
 com assinatura HMAC; o relay deduplica por `idempotencyKey` antes de enviar ao WAHA.
 
 Antes de ativar a feature, valide uma sessão sintética, persistência do volume

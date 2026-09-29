@@ -54,6 +54,30 @@ export const FEATURE_FLAGS = {
     description: "Habilita o agente de IA integrado ao WAHA.",
   },
 
+  WAHA_INTERNAL_BROKER_NOTIFICATIONS: {
+    key: "feature_waha_internal_broker_notifications_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o WAHA para avisos internos de distribuição destinados a corretores.",
+  },
+
+  MESSAGE_EVENT_POLICIES: {
+    key: "feature_message_event_policies_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita as políticas versionadas de mensagens por situação; desativar restaura os templates homologados legados.",
+  },
+
+  BROKER_ACCOUNT_ACTIVATION_NOTICE: {
+    key: "feature_broker_account_activation_notice_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Envia ao membro a confirmação de conta ativa e o link de acesso após concluir o primeiro acesso.",
+  },
+
   // ── IA / Qualificação ─────────────────────────────────────────────────────
   AI_ENABLED: {
     key: "ai_enabled",
@@ -93,6 +117,14 @@ export const FEATURE_FLAGS = {
     defaultValue: "0",
     description:
       "Segundos de debounce antes do agente processar uma mensagem. 0 = desabilitado. Máximo: 2 (limitado internamente).",
+  },
+
+  CONVERSATION_INTELLIGENCE: {
+    key: "feature_conversation_intelligence_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o motor de análise contínua de conversas e auto-feedback com IA.",
   },
 
   AI_MEMORY_RESET_MODE: {
@@ -136,6 +168,23 @@ export const FEATURE_FLAGS = {
     description: "Habilita a extensão de navegador para captura de leads.",
   },
 
+  UNLINKED_CONVERSATION_DELETION: {
+    key: "feature_unlinked_conversation_deletion_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Permite que Diretores excluam qualquer histórico do WhatsApp e Gestores excluam somente conversas sem vínculo.",
+  },
+
+  CONVERSATION_MEDIA: {
+    key: "feature_conversation_media_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Habilita mídia oficial nas conversas (DEC-098): receber e enviar imagem, áudio, documento e vídeo pelo canal Meta, com armazenamento privado e acesso autenticado. Desativar interrompe novos downloads e envios sem apagar histórico.",
+  },
+
   AGENT_TRAINING_CENTER: {
     key: "feature_agent_training_center_enabled",
     scope: "global",
@@ -158,6 +207,54 @@ export const FEATURE_FLAGS = {
     defaultValue: "",
     description:
       "Rascunho de abertura padrão para o modo corretor lite no chat.",
+  },
+
+  REPORTING_CENTER: {
+    key: "feature_reporting_center_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Habilita a Central de Relatórios (Reporting 1): catálogo canônico de métricas, abas por papel, funil de 8 estágios, seção de atenção e drill-down explicável. Desativa = layout legado anterior.",
+  },
+
+  BROKER_AVAILABILITY_ONBOARDING: {
+    key: "feature_broker_availability_onboarding_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description:
+      "Exige que corretores declarem sua agenda semanal e aplica essa agenda à distribuição automática de leads.",
+  },
+
+  DUTY_PRESENCE_CONFIRMATION: {
+    key: "feature_duty_presence_confirmation_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Exige confirmação do corretor antes de torná-lo elegível aos leads do plantão vigente.",
+  },
+  ATTENDANCE_FLOWS: {
+    key: "feature_attendance_flows_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Liga os fluxos de atendimento por fila (DEC-127). Desligado, toda fila segue o atendimento atual.",
+  },
+
+  DUTY_MONTHLY_SCHEDULING: {
+    key: "feature_duty_monthly_scheduling_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Permite configurar cotas mensais, gerar propostas automáticas e publicar escalas de plantão.",
+  },
+  DUTY_OCCURRENCE_HISTORY: {
+    key: "feature_duty_occurrence_history_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Mostra ocorrências encerradas e o histórico de leads distribuídos por plantão.",
   },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 

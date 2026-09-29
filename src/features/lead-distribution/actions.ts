@@ -1,21 +1,31 @@
 "use server";
 
-import { aliasedTable, and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { aliasedTable, and, desc, eq, gte, inArray, isNull, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { resolveAccessContext } from "@/shared/auth/access-context";
+import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import {
   routeLeadToBranch,
   assignLeadToBroker,
+  offerLeadToBrokerManually,
   routeLeadToBranchAndAssignBroker,
 } from "./service";
-import { enqueueLeadDistributionJob, runLeadDistributionProcessor } from "./jobs";
-import { isWithinBusinessHours } from "@/shared/time/business-hours";
+import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob, runLeadDistributionProcessor, wakeLeadDistributionJob } from "./jobs";
 import { getDatabase, schema } from "@/shared/db";
 import { randomUUID } from "node:crypto";
 import { retryLeadEffectForTenant, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
-import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution } from "./control-service";
+import { revalidatePath } from "next/cache";
+import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
+import { deleteDistributionQueue, deleteMetaAdQueueRoute, deleteMetaCampaignQueueRoute, forceDeleteQueue, getQueueDependencies, saveDistributionQueue, saveMetaAdQueueRoute, saveMetaCampaignQueueRoute, simulateDistribution, syncDutySchedulesIntoQueue } from "./control-service";
+import { selectBulkDistributionCandidateIds } from "./bulk-recovery";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { AuthorizationService } from "@/shared/auth/authorization-service";
+import { buildOfferOutcomeHistory } from "./assignment-history";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -26,7 +36,7 @@ export type DistributionActionState = {
     leadId: string;
     branchId?: string;
     corretorId: string | null;
-    distributionStatus: "queued" | "unassigned" | "assigned";
+    distributionStatus: "queued" | "unassigned" | "assigned" | "manual_hold";
   };
   processed?: number;
   processedLeadIds?: string[];
@@ -47,18 +57,39 @@ function continueLeadDistributionAfterResponse(input: {
   actorId: string;
   branchId?: string;
 }) {
+  // Confirma a mutação do commit na UI imediatamente (o commit já aconteceu).
   void publishLeadInvalidation({
     tenantId: input.tenantId,
     actorId: input.actorId,
     branchIds: input.branchId ? [input.branchId] : undefined,
   }).catch(() => {});
 
-  scheduleAfterResponse("lead-distribution-processor", () =>
-    runLeadDistributionProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
-  );
-  scheduleAfterResponse("lead-assignment-effects", () =>
-    runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 1 }),
-  );
+  scheduleAfterResponse("lead-distribution-processor", async () => {
+    const result = await runLeadDistributionProcessor({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      limit: 1,
+    });
+    // Revalida com o estado PÓS-processamento para que todas as superfícies
+    // vejam a oferta/atribuição real, não o estado do commit.
+    void publishLeadInvalidation({
+      tenantId: input.tenantId,
+      actorId: input.actorId,
+      branchIds: input.branchId ? [input.branchId] : undefined,
+    }).catch(() => {});
+    console.info("[lead-distribution] after_response_processed", {
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      assigned: result.assigned,
+      offered: result.offered,
+      deferred: result.deferred,
+      failed: result.failed,
+      skipped: result.skipped,
+    });
+  });
+  scheduleAfterResponse("lead-assignment-effects", async () => {
+    await runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 5 });
+  });
 }
 
 const distributionPolicySchema = z.object({
@@ -85,7 +116,22 @@ export async function saveDistributionPolicyAction(
     return { success: false, error: "Os pesos do ranking não podem ultrapassar 100." };
   try {
     const context = await getRequiredTenantContext();
-    if (context.role !== "director")
+    // Resolve the complete server-side capability set (including custom roles)
+    // before evaluating distribution-settings authorization. The legacy adapter
+    // intentionally exposes only `acessar_leads` and would make this specific
+    // capability appear missing even for an authorized actor.
+    const accessContext = await resolveAccessContext(context);
+    const legacyAllowed = context.role === "director";
+
+    await evaluateShadowAuthorization({
+      operationKey: "lead_distribution.policy_update",
+      legacyAllowed,
+      context: accessContext,
+      capability: "distribution_settings_manage",
+      resource: { tenantId: context.tenantId, unitId: null, teamId: null, ownerUserId: null },
+    });
+
+    if (context.role !== "director" && !accessContext.canAccessAllUnits)
       return { success: false, error: "Apenas o Diretor pode alterar a política de distribuição." };
     const db = getDatabase();
     const now = new Date();
@@ -142,9 +188,23 @@ export async function saveDistributionPolicyAction(
 export async function saveDistributionQueueAction(input: unknown) {
   try {
     const result = await saveDistributionQueue(await getRequiredTenantContext(), input);
-    return { success: true, id: result.id, message: result.created ? "Fila criada e pronta para receber regras." : "Fila atualizada." };
+    return {
+      success: true,
+      id: result.id,
+      warning: result.warning,
+      message: result.created ? "Fila criada e pronta para receber regras." : "Fila atualizada.",
+    };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a fila." };
+  }
+}
+
+export async function syncDutySchedulesIntoQueueAction(input: { queueId: string; scheduleIds: string[] }) {
+  try {
+    await syncDutySchedulesIntoQueue(await getRequiredTenantContext(), input.queueId, input.scheduleIds);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível vincular o plantão à fila." };
   }
 }
 
@@ -293,7 +353,7 @@ export async function routeLeadToBranchAction(
         mutationId,
         error:
           result.status === "conflict"
-            ? "Este lead já foi atribuído."
+            ? result.code === "LEAD_ALREADY_IN_SERVICE" ? "Este lead já está em atendimento e não pode mudar de unidade." : "Este lead não está disponível para reatribuição."
             : "A unidade não pode receber leads agora.",
       };
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId });
@@ -329,22 +389,57 @@ export async function assignLeadToBrokerAction(
 ): Promise<DistributionActionState> {
   const mutationId = randomUUID();
   const parsed = z
-    .object({ leadId, brokerId, reason: z.string().trim().min(3).max(200).optional() })
+    .object({ leadId, brokerId, reason: z.string().trim().min(3).max(200).optional(), assignmentMode: z.enum(["direct", "offer"]).optional() })
     .safeParse({
       leadId: formData.get("leadId"),
       brokerId: formData.get("brokerId"),
       reason: String(formData.get("reason") ?? "") || undefined,
+      assignmentMode: formData.get("assignmentMode") || undefined,
     });
   if (!parsed.success)
     return { mutationId, error: parsed.error.issues[0]?.message ?? "Selecione um corretor válido." };
   try {
     const context = await getRequiredTenantContext();
+    if (parsed.data.assignmentMode) {
+      const enabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
+      if (!enabled) return { mutationId, error: "A escolha de oferta foi desativada pelo Super-admin. Atualize a página e tente novamente." };
+
+      if (parsed.data.assignmentMode === "offer") {
+        const offered = await offerLeadToBrokerManually(context, parsed.data.leadId, parsed.data.brokerId);
+        if (offered.status === "conflict") return { mutationId, error: offered.reason };
+        if (offered.status === "fallback") {
+          const fallback = await enqueueAndProcessLeadDistribution({
+            tenantId: context.tenantId,
+            leadId: parsed.data.leadId,
+            source: "manual_offer_delivery_failed",
+          });
+          continueLeadDistributionAfterResponse({ tenantId: context.tenantId, leadId: parsed.data.leadId, actorId: context.userId });
+          return {
+            success: true,
+            mutationId,
+            message: `${offered.reason}${fallback?.offered ? " A distribuição normal já iniciou outra oferta." : ""}`,
+            entity: { leadId: parsed.data.leadId, corretorId: null, distributionStatus: "queued" },
+          };
+        }
+        await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data.leadId, runAfter: offered.expiresAt });
+        void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId, branchIds: undefined }).catch(() => {});
+        return {
+          success: true,
+          mutationId,
+          message: "Oferta enviada ao corretor. O lead volta à distribuição normal se não houver aceite no prazo configurado.",
+          entity: { leadId: parsed.data.leadId, corretorId: parsed.data.brokerId, distributionStatus: "assigned" },
+        };
+      }
+    }
     const result = await assignLeadToBroker(
       context,
       parsed.data.leadId,
       parsed.data.brokerId,
       undefined,
       parsed.data.reason,
+      undefined,
+      undefined,
+      parsed.data.assignmentMode === "direct" ? { skipBrokerWhatsApp: true, requireUnassigned: true } : undefined,
     );
     if (result.status !== "assigned") return { mutationId, error: result.reason };
     continueLeadDistributionAfterResponse({
@@ -417,9 +512,7 @@ export async function routeAndAssignLeadAction(
       error: error instanceof Error ? error.message : "Não foi possível processar a operação.",
     };
   }
-}
-
-export async function distributeLeadAutomaticallyAction(
+}export async function distributeLeadAutomaticallyAction(
   _previous: DistributionActionState,
   formData: FormData,
 ): Promise<DistributionActionState> {
@@ -428,14 +521,44 @@ export async function distributeLeadAutomaticallyAction(
   if (!parsed.success) return { mutationId, error: "Lead inválido." };
   try {
     const context = await getRequiredTenantContext();
+    // Um job ativo com runAfter futuro (ex.: AWAITING_BROKER_ACCEPTANCE) faz o
+    // insert com onConflictDoNothing ser ignorado; sem o wake, o "Auto" não
+    // tem efeito nenhum. O processador roda logo após a resposta.
     await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: parsed.data });
-    continueLeadDistributionAfterResponse({ tenantId: context.tenantId, leadId: parsed.data, actorId: context.userId });
+    await wakeLeadDistributionJob(context.tenantId, parsed.data);
+    // Confirma o enfileiramento na UI imediatamente; a reconciliação de dados
+    // revalida depois que o processador alterar o estado real do lead.
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+    }).catch(() => {});
+    scheduleAfterResponse("lead-distribution-auto", async () => {
+      const result = await runLeadDistributionProcessor({
+        tenantId: context.tenantId,
+        leadId: parsed.data,
+        limit: 1,
+      });
+      // Revalida com o estado PÓS-processamento (oferta criada, atribuído ou
+      // motivo de fila), não com o estado do commit.
+      void publishLeadInvalidation({
+        tenantId: context.tenantId,
+        actorId: context.userId,
+      }).catch(() => {});
+      console.info("[lead-distribution] auto_action_processed", {
+        tenantId: context.tenantId,
+        leadId: parsed.data,
+        actorId: context.userId,
+        assigned: result.assigned,
+        offered: result.offered,
+        deferred: result.deferred,
+        failed: result.failed,
+        skipped: result.skipped,
+      });
+    });
     return {
       success: true,
       mutationId,
-      message: isWithinBusinessHours()
-        ? "Distribuição automática iniciada em segundo plano."
-        : "Distribuição automática agendada para o próximo horário comercial.",
+      message: "Distribuição automática iniciada. A lista se atualiza ao concluir.",
       entity: {
         leadId: parsed.data,
         corretorId: null,
@@ -446,6 +569,281 @@ export async function distributeLeadAutomaticallyAction(
     return {
       mutationId,
       error: error instanceof Error ? error.message : "Não foi possível distribuir o lead.",
+    };
+  }
+}
+
+export async function distributeAllUnassignedLeadsAction(): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
+
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director" && context.role !== "manager") {
+      return { mutationId, error: "Você não pode iniciar a distribuição de todos os leads." };
+    }
+
+    const db = getDatabase();
+    const unassignedLeads = await db
+      .select({
+        id: schema.leads.id,
+        status: schema.leads.status,
+        distributionStatus: schema.leads.distributionStatus,
+        qualificationState: schema.leads.qualificationState,
+        qualificationStatus: schema.leads.qualificationStatus,
+      })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        isNull(schema.leads.corretorId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
+        context.role === "manager" && context.branchId
+          ? eq(schema.leads.branchId, context.branchId)
+          : undefined,
+      ));
+
+    const candidateIds = selectBulkDistributionCandidateIds(unassignedLeads);
+    if (!candidateIds.length) {
+      return {
+        success: true,
+        mutationId,
+        processed: 0,
+        message: "Não há leads operacionais prontos para distribuição.",
+      };
+    }
+
+    const now = new Date();
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schema.leads)
+        .set({
+          distributionStatus: "queued",
+          assignmentSource: "system_recovery",
+          distributionUpdatedAt: now,
+          updatedAt: now,
+        })
+        .where(and(
+          eq(schema.leads.tenantId, context.tenantId),
+          inArray(schema.leads.id, candidateIds),
+          isNull(schema.leads.corretorId),
+          isNull(schema.leads.archivedAt),
+        ));
+
+      // A manual recovery starts a new generation of work. Supersede only
+      // queued/retrying jobs for these leads; a live processing lease is left
+      // untouched so two workers can never own the same lead concurrently.
+      await tx
+        .update(schema.leadDistributionJobs)
+        .set({
+          status: "superseded",
+          completedAt: now,
+          lockedAt: null,
+          lockedBy: null,
+          leaseExpiresAt: null,
+          lastErrorCode: "SUPERSEDED_BY_RECOVERY",
+          lastErrorMessage: "Processo antigo encerrado para iniciar uma recuperação idempotente.",
+          updatedAt: now,
+        })
+        .where(and(
+          eq(schema.leadDistributionJobs.tenantId, context.tenantId),
+          inArray(schema.leadDistributionJobs.leadId, candidateIds),
+          inArray(schema.leadDistributionJobs.status, ["pending", "retrying"]),
+        ));
+
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "lead_distribution",
+        entidadeId: context.tenantId,
+        acao: "lead.bulk_distribution_requested",
+      });
+    });
+
+    await runWithConcurrency(candidateIds, 10, async (id) => {
+      await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: id });
+    });
+
+    void publishLeadInvalidation({
+      tenantId: context.tenantId,
+      actorId: context.userId,
+      branchIds: context.role === "manager" && context.branchId ? [context.branchId] : undefined,
+    }).catch(() => {});
+
+    // Ownership recovery is a 24/7 operation. The Meta outbox applies its own
+    // policy/window; the lead must never remain unassigned because of a clock.
+    const initialDistribution = await runLeadDistributionProcessor({
+      tenantId: context.tenantId,
+      limit: Math.min(candidateIds.length, 25),
+    });
+    const initialDelivery = { processed: 0, sent: 0, failed: 0, retried: 0 };
+    if (initialDistribution?.outboundMessageIds.length) {
+      await runWithConcurrency(initialDistribution.outboundMessageIds, 5, async (outboundMessageId) => {
+        const delivery = await processMetaOutboundBatch(1, context.tenantId, outboundMessageId);
+        initialDelivery.processed += delivery.processed;
+        initialDelivery.sent += delivery.sent;
+        initialDelivery.failed += delivery.failed;
+        initialDelivery.retried += delivery.retried;
+      });
+    }
+
+    scheduleAfterResponse("lead-distribution-bulk-recovery", async () => {
+      const maxPasses = Math.min(Math.ceil(candidateIds.length / 25), 8);
+      for (let pass = 0; pass < maxPasses; pass += 1) {
+        const result = await runLeadDistributionProcessor({
+          tenantId: context.tenantId,
+          limit: 100,
+        });
+        if (result.claimed === 0) break;
+      }
+    });
+
+    return {
+      success: true,
+      mutationId,
+      processed: candidateIds.length,
+      processedLeadIds: candidateIds,
+      message: initialDelivery?.sent
+          ? `${initialDelivery.sent} oferta${initialDelivery.sent === 1 ? " foi enviada" : "s foram enviadas"} agora. Os demais leads continuam na fila automática.`
+          : initialDistribution?.offered
+            ? `${initialDistribution.offered} oferta${initialDistribution.offered === 1 ? " foi criada" : "s foram criadas"}, mas o canal ainda não confirmou o envio. O sistema continuará tentando.`
+            : `Nenhuma oferta foi enviada agora. Os ${candidateIds.length} leads continuam na fila automática para nova tentativa.`,
+    };
+  } catch (error) {
+    return {
+      mutationId,
+      error: error instanceof Error
+        ? error.message
+        : "Não foi possível iniciar a distribuição dos leads.",
+    };
+  }
+}
+
+/**
+ * Removes stale operational items from the distribution surface without
+ * deleting their customer data. The server re-queries the complete tenant
+ * scope so a client cannot narrow or expand the operation with forged IDs.
+ */
+export async function archiveUnassignedLeadsAction(
+  _previous: DistributionActionState,
+  formData: FormData,
+): Promise<DistributionActionState> {
+  const mutationId = randomUUID();
+
+  try {
+    const context = await getRequiredTenantContext();
+    if (context.role !== "director") {
+      return { mutationId, error: "Apenas o Diretor pode arquivar leads sem distribuição." };
+    }
+
+    const archiveScope = z.enum(["all", "period", "status"]).catch("all").parse(
+      String(formData.get("archiveScope") ?? "all"),
+    );
+    const periodDays = z.coerce.number().int().min(1).max(3650).catch(30).parse(
+      formData.get("archivePeriodDays") ?? 30,
+    );
+    const archiveStatus = z.enum(["all", "operational", "lost", "disqualified"]).catch("all").parse(
+      String(formData.get("archiveStatus") ?? "all"),
+    );
+    const db = getDatabase();
+    const archiveConditions = [
+      eq(schema.leads.tenantId, context.tenantId),
+      isNull(schema.leads.corretorId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+    ];
+    if (archiveScope === "period") {
+      archiveConditions.push(gte(schema.leads.createdAt, new Date(Date.now() - periodDays * 24 * 60 * 60 * 1000)));
+    }
+    if (archiveScope === "status" && archiveStatus === "operational") {
+      archiveConditions.push(ne(schema.leads.status, "lost"));
+      archiveConditions.push(or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified"))!);
+    } else if (archiveScope === "status" && archiveStatus === "lost") {
+      archiveConditions.push(eq(schema.leads.status, "lost"));
+    } else if (archiveScope === "status" && archiveStatus === "disqualified") {
+      archiveConditions.push(eq(schema.leads.qualificationStatus, "disqualified"));
+    }
+    const candidates = await db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(and(...archiveConditions));
+
+    if (!candidates.length) {
+      return {
+        success: true,
+        mutationId,
+        processed: 0,
+        message: "Não há leads sem distribuição para arquivar.",
+      };
+    }
+
+    const candidateIds = candidates.map((candidate) => candidate.id);
+    const now = new Date();
+    const archivedIds = await db.transaction(async (tx) => {
+      const archived = await tx
+        .update(schema.leads)
+        .set({ archivedAt: now, archivedBy: context.userId, updatedAt: now })
+        .where(and(
+          eq(schema.leads.tenantId, context.tenantId),
+          inArray(schema.leads.id, candidateIds),
+          isNull(schema.leads.corretorId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
+        )).returning({ id: schema.leads.id });
+
+      const ids = archived.map((lead) => lead.id);
+      if (!ids.length) return ids;
+
+      await tx
+        .update(schema.leadDistributionJobs)
+        .set({
+          status: "superseded",
+          completedAt: now,
+          lockedAt: null,
+          lockedBy: null,
+          leaseExpiresAt: null,
+          lastErrorCode: "LEAD_ARCHIVED",
+          lastErrorMessage: "Lead arquivado pelo Diretor; removido da distribuição.",
+          updatedAt: now,
+        })
+        .where(and(
+          eq(schema.leadDistributionJobs.tenantId, context.tenantId),
+          inArray(schema.leadDistributionJobs.leadId, ids),
+          inArray(schema.leadDistributionJobs.status, ["pending", "retrying"]),
+        ));
+
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "lead_distribution",
+        entidadeId: context.tenantId,
+        acao: `lead.bulk_archived:${ids.length}`,
+      });
+      return ids;
+    });
+
+    if (!archivedIds.length) {
+      return {
+        success: true,
+        mutationId,
+        processed: 0,
+        message: "Os leads foram atualizados por outra operação; nada novo foi arquivado.",
+      };
+    }
+
+    revalidatePath("/leads/distribuicao");
+    void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId }).catch(() => {});
+
+    return {
+      success: true,
+      mutationId,
+      processed: archivedIds.length,
+      processedLeadIds: archivedIds,
+      message: `${archivedIds.length} lead${archivedIds.length === 1 ? " foi arquivado" : "s foram arquivados"} e removido${archivedIds.length === 1 ? "" : "s"} da distribuição.`,
+    };
+  } catch (error) {
+    return {
+      mutationId,
+      error: error instanceof Error ? error.message : "Não foi possível arquivar os leads.",
     };
   }
 }
@@ -592,6 +990,35 @@ export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promi
     const context = await getRequiredTenantContext();
     const db = getDatabase();
 
+    const [lead] = await db
+      .select({
+        id: schema.leads.id,
+        tenantId: schema.leads.tenantId,
+        branchId: schema.leads.branchId,
+        corretorId: schema.leads.corretorId,
+        status: schema.leads.status,
+        firstContactAt: schema.leads.firstContactAt,
+        serviceStartedAt: schema.leads.serviceStartedAt,
+      })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, parsed.data), eq(schema.leads.tenantId, context.tenantId)))
+      .limit(1);
+    if (!lead) return [];
+
+    const accessContext = await resolveAccessContext(context);
+    const resource = buildLeadResourceScope(lead);
+    const legacyAllowed = context.role === "director"
+      || (context.role === "broker" && lead.corretorId === context.userId)
+      || (context.role === "manager" && Boolean(context.branchId) && lead.branchId === context.branchId);
+    await evaluateShadowAuthorization({
+      operationKey: "lead.assignment_history.read",
+      legacyAllowed,
+      context: accessContext,
+      capability: "acessar_leads",
+      resource,
+    });
+    if (!AuthorizationService.can(accessContext, "acessar_leads", resource)) return [];
+
     const previousOwner = aliasedTable(schema.user, "previous_owner");
     const newOwner = aliasedTable(schema.user, "new_owner");
     const actor = aliasedTable(schema.user, "actor");
@@ -603,6 +1030,7 @@ export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promi
         id: schema.leadDistributionEvents.id,
         createdAt: schema.leadDistributionEvents.createdAt,
         action: schema.leadDistributionEvents.action,
+        newOwnerId: schema.leadDistributionEvents.newOwnerId,
         source: schema.leadDistributionEvents.source,
         strategy: schema.leadDistributionEvents.strategy,
         reason: schema.leadDistributionEvents.reason,
@@ -627,19 +1055,57 @@ export async function getLeadAssignmentHistoryAction(inputLeadId: string): Promi
       .orderBy(desc(schema.leadDistributionEvents.createdAt))
       .limit(30);
 
-    return events.map((e) => ({
-      id: e.id,
-      createdAt: e.createdAt.toISOString(),
-      action: e.action,
-      source: e.source,
-      strategy: e.strategy ?? null,
-      reason: e.reason ?? null,
-      previousOwnerName: e.previousOwnerName ?? null,
-      newOwnerName: e.newOwnerName ?? null,
-      fromBranchName: e.fromBranchName ?? null,
-      toBranchName: e.toBranchName ?? null,
-      actorName: e.actorName ?? null,
-    }));
+    const offers = await db
+      .select({
+        id: schema.leadOffers.id,
+        brokerId: schema.leadOffers.brokerId,
+        brokerName: schema.user.name,
+        status: schema.leadOffers.status,
+        offeredAt: schema.leadOffers.offeredAt,
+        expiresAt: schema.leadOffers.expiresAt,
+        acceptedAt: schema.leadOffers.acceptedAt,
+        declinedAt: schema.leadOffers.declinedAt,
+      })
+      .from(schema.leadOffers)
+      .leftJoin(schema.user, eq(schema.leadOffers.brokerId, schema.user.id))
+      .where(and(
+        eq(schema.leadOffers.tenantId, context.tenantId),
+        eq(schema.leadOffers.leadId, parsed.data),
+      ))
+      .orderBy(desc(schema.leadOffers.offeredAt))
+      .limit(30);
+
+    const offerHistory = buildOfferOutcomeHistory(offers, {
+      corretorId: lead.corretorId,
+      status: lead.status,
+      firstContactAt: lead.firstContactAt,
+      serviceStartedAt: lead.serviceStartedAt,
+    });
+    const existingEventKeys = new Set(events.map((event) =>
+      `${event.action}:${event.newOwnerId ?? ""}:${event.createdAt.getTime()}`,
+    ));
+    const combined = [
+      ...events.map((event) => ({
+        id: event.id,
+        createdAt: event.createdAt.toISOString(),
+        action: event.action,
+        source: event.source,
+        strategy: event.strategy ?? null,
+        reason: event.reason ?? null,
+        previousOwnerName: event.previousOwnerName ?? null,
+        newOwnerName: event.newOwnerName ?? null,
+        fromBranchName: event.fromBranchName ?? null,
+        toBranchName: event.toBranchName ?? null,
+        actorName: event.actorName ?? null,
+      })),
+      ...offerHistory
+        .filter((item) => !existingEventKeys.has(`${item.action}:${item.brokerId}:${Date.parse(item.createdAt)}`))
+        .map(({ brokerId: _brokerId, ...item }) => item),
+    ];
+
+    return combined
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
+      .slice(0, 30);
   } catch (error) {
     console.error("[getLeadAssignmentHistoryAction] Error:", error);
     return [];

@@ -22,12 +22,12 @@ export default async function SalesPage({
 
   const canFilterBranch = context.role === "director" || context.role === "manager";
 
-  const branches = canFilterBranch
-    ? await db
+  const branchesPromise = canFilterBranch
+    ? db
         .select({ id: schema.branches.id, name: schema.branches.name })
         .from(schema.branches)
         .where(eq(schema.branches.tenantId, context.tenantId))
-    : [];
+    : Promise.resolve([] as { id: string; name: string }[]);
 
   // Build conditions with scope filtering
   const conditions = [
@@ -43,7 +43,7 @@ export default async function SalesPage({
     conditions.push(eq(schema.leads.branchId, context.branchId));
   }
 
-  const sales = await db
+  const salesPromise = db
     .select({
       id: schema.sales.id,
       leadId: schema.sales.leadId,
@@ -69,14 +69,8 @@ export default async function SalesPage({
     .where(and(...conditions))
     .orderBy(desc(schema.sales.createdAt));
 
-  // Get total revenue
-  const allValues = await db
-    .select({ totalValue: schema.sales.saleValue })
-    .from(schema.sales)
-    .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
-    .where(and(...conditions));
-
-  const totalRevenue = allValues.reduce((sum, row) => sum + Number(row.totalValue), 0);
+  const [branches, sales] = await Promise.all([branchesPromise, salesPromise]);
+  const totalRevenue = sales.reduce((sum, row) => sum + Number(row.saleValue), 0);
 
   return (
     <>
@@ -110,7 +104,7 @@ export default async function SalesPage({
             { label: "Ver Base de Clientes", href: "/clientes", description: "Gestão da carteira de contratos ativos" },
             { label: "Tabela de Comissões", href: "/settings?tab=comissoes", description: "Regras de comissionamento por produto" },
             { label: "Anexar Documentos de Propostas", href: "/documentos", description: "Conferência de documentos e apólices" },
-            { label: "Relatório de Desempenho", href: "/relatorios", description: "Métricas de fechamento por corretor" },
+            { label: "Relatório de Desempenho", href: "/dashboard?tab=commercial", description: "Métricas de fechamento por corretor" },
           ]}
         />
       </main>

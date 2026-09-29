@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { submitLeadFeedbackAction, type LeadFeedbackState } from "@/features/leads/feedback-actions";
 import { getActiveChecklistTemplatesAction, type ChecklistTemplateWithItems } from "@/features/leads/checklist-actions";
+import { CheckCircle } from "@/components/huge-icons";
 
 const feedbackTypes = [
   ["contacted", "Contato realizado"],
@@ -126,7 +127,7 @@ export function LeadFeedbackForm({ leadId }: { leadId: string }) {
                         {item.required && <span className="ml-0.5 text-destructive">*</span>}
                       </Label>
                       {answers[item.id] !== undefined && (
-                        <span className="text-[9px] text-success">✓</span>
+                        <CheckCircle className="size-3 text-success" aria-hidden="true" />
                       )}
                     </div>
 

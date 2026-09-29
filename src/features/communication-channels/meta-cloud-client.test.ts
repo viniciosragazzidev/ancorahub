@@ -7,6 +7,11 @@ vi.mock("./meta-cloud-config", () => ({
 }));
 
 import { buildMetaCloudTemplatePayload, discoverMetaLeadAdsAssets, formatE164Phone, registerMetaPhoneNumber, resolvePageAccessToken, sendMetaCloudTemplate, subscribePageToLeadgen } from "./meta-cloud-client";
+import {
+  buildAutomaticMetaVariableMappings,
+  buildMetaProviderVariables,
+  getMessageEventByKey,
+} from "./message-event-catalog";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -92,6 +97,41 @@ describe("Meta Cloud template payload", () => {
         ],
       },
       { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: "dfdb965c-f480-4009-affb-c67057412dc9" }] },
+    ]);
+  });
+
+  it("builds the synchronized two-parameter broker template without a 132000 mismatch", () => {
+    const event = getMessageEventByKey("LEAD_ASSIGNMENT");
+    expect(event).not.toBeNull();
+    const templateVariables = ["corretor", "nome_lead"];
+    const mappings = buildAutomaticMetaVariableMappings(event!, templateVariables);
+    expect(mappings.valid).toBe(true);
+    if (!mappings.valid) return;
+
+    const providerVariables = buildMetaProviderVariables(
+      event!,
+      ["Corretor(a)", "Edvania", "Seu Romário", "Plano de saúde", "lead-1"],
+      templateVariables,
+      mappings.mappings,
+    );
+    const payload = buildMetaCloudTemplatePayload({
+      to: "+55 21 99999-9999",
+      templateName: "new_lead_broker",
+      languageCode: "pt_BR",
+      variables: providerVariables,
+      variableNames: templateVariables,
+      urlButtonParameter: "lead-1",
+    });
+
+    expect(payload.template.components).toEqual([
+      {
+        type: "body",
+        parameters: [
+          { type: "text", parameter_name: "corretor", text: "Edvania" },
+          { type: "text", parameter_name: "nome_lead", text: "Seu Romário" },
+        ],
+      },
+      { type: "button", sub_type: "url", index: "0", parameters: [{ type: "text", text: "lead-1" }] },
     ]);
   });
 

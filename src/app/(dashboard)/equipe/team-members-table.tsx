@@ -3,15 +3,16 @@
 import { useActionState, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { Search } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
-import { CheckCircle, MagnifyingGlass, UsersThree, XCircle } from "@/components/huge-icons";
+import { CheckCircle, MagnifyingGlass, Pause, Play, UsersThree, XCircle } from "@/components/huge-icons";
 
 import { EmptyState } from "@/components/empty-state";
 import { MemberStatusBadge, RoleBadge } from "@/components/status-badges";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,23 +20,30 @@ import { SelectionToolbar } from "@/components/ui/selection-toolbar";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { useMultiSelect } from "@/hooks/use-multi-select";
+import { setBrokersAvailabilityAction } from "@/features/branches/actions";
 import { bulkToggleTeamMemberStatusAction } from "./actions";
 import { TeamMemberActions } from "./member-actions";
 
 import type { TenantRole } from "@/shared/db/schema";
 
 type BranchOption = { id: string; name: string };
+type CustomRoleOption = { id: string; name: string; scope: "none" | "own" | "branch" | "tenant" };
 type TeamMember = {
   id: string;
   userId: string | null;
   name: string | null;
   email: string;
+  phone: string | null;
   role: TenantRole;
   jobTitle: string;
   status: "pending" | "active" | "disabled";
   branchId: string | null;
   branchName: string | null;
   customRoleScope: "none" | "own" | "branch" | "tenant" | null;
+  customRoleId: string | null;
+  customRoleName: string | null;
+  canEditAuthority: boolean;
+  canManage: boolean;
 };
 
 type Props = {
@@ -44,10 +52,11 @@ type Props = {
   currentRole: TenantRole;
   currentBranchId: string | null;
   currentUserId: string;
+  customRoles: CustomRoleOption[];
   canViewProfile: boolean;
 };
 
-export function TeamMembersTable({ members, branches, currentRole, currentBranchId, currentUserId, canViewProfile }: Props) {
+export function TeamMembersTable({ members, branches, currentRole, currentBranchId, currentUserId, customRoles, canViewProfile }: Props) {
   const router = useRouter();
   const [branchFilter, setBranchFilter] = useState("all");
   const [mobileQuery, setMobileQuery] = useState("");
@@ -57,6 +66,12 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
   const clearSelection = multiSelect.clear;
   const [bulkState, bulkFormAction, bulkPending] = useActionState(
     bulkToggleTeamMemberStatusAction,
+    {},
+  );
+  // Pausar/retomar o recebimento de leads dos corretores selecionados. Só
+  // corretores ativos são afetados; os demais selecionados são ignorados.
+  const [availabilityState, availabilityAction, availabilityPending] = useActionState(
+    setBrokersAvailabilityAction,
     {},
   );
   const [statusOverrides, setStatusOverrides] = useState<Record<string, TeamMember["status"]>>({});
@@ -97,7 +112,8 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
     return visibleMembers.filter(
       (member) =>
         (member.name ?? "").toLowerCase().includes(query) ||
-        member.email.toLowerCase().includes(query),
+        member.email.toLowerCase().includes(query) ||
+        (member.phone ?? "").includes(query.replace(/\D/g, "")),
     );
   }, [mobileQuery, visibleMembers]);
 
@@ -120,6 +136,31 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
       toast.error(bulkState.error);
     }
   }, [bulkState, clearSelection, router]);
+
+  const selectedBrokerIds = useMemo(
+    () =>
+      displayedMembers
+        .filter(
+          (member) =>
+            multiSelect.isSelected(member.id) &&
+            member.role === "broker" &&
+            member.status === "active" &&
+            member.userId,
+        )
+        .map((member) => member.userId as string),
+    [displayedMembers, multiSelect],
+  );
+
+  useEffect(() => {
+    if (availabilityState.success) {
+      toast.success(availabilityState.message ?? "Recebimento de leads atualizado.");
+      clearSelection();
+      router.refresh();
+    }
+    if (availabilityState.error) {
+      toast.error(availabilityState.error);
+    }
+  }, [availabilityState, clearSelection, router]);
 
   const activeCount = displayedMembers.filter((member) => member.status === "active").length;
 
@@ -171,7 +212,16 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
         <DataTableColumnHeader column={column} title="E-mail" />
       ),
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-muted-foreground">{row.original.email}</span>
+        <span className="font-mono text-xs text-muted-foreground">{row.original.email || "E-mail será definido no cadastro"}</span>
+      ),
+    },
+    {
+      accessorKey: "phone",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="WhatsApp" />
+      ),
+      cell: ({ row }) => (
+        <span className="font-mono text-xs text-muted-foreground">{row.original.phone ?? "Não informado"}</span>
       ),
     },
     {
@@ -202,6 +252,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
             currentBranchId={currentBranchId}
             currentRole={currentRole}
             currentUserId={currentUserId}
+            customRoles={customRoles}
             member={row.original}
             allMembers={members}
             onStatusChange={handleStatusChange}
@@ -212,35 +263,29 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
   ];
 
   return (
-    <Card className="border-transparent bg-transparent shadow-none">
-      <CardHeader className="border-b border-border/50 p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <UsersThree size={17} />
-              Acessos vinculados
-            </CardTitle>
-            <CardDescription className="text-xs mt-1">
-              {activeCount} acesso(s) ativo(s) · convites pendentes ficam sinalizados até o primeiro login.
-            </CardDescription>
-          </div>
-          {currentRole === "director" ? (
-            <Select value={branchFilter} onValueChange={(value) => setBranchFilter(value ?? "all")}>
-              <SelectTrigger aria-label="Filtrar por unidade" className="w-full sm:w-52 h-9 text-xs">
-                <SelectValue placeholder="Todas as unidades" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as unidades</SelectItem>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id}>
-                    {branch.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-        </div>
-      </CardHeader>
+    <Card variant="overview">
+      <SectionCardHeader
+        icon={<UsersThree />}
+        title="Acessos vinculados"
+        description={`${activeCount} acesso(s) ativo(s) · convites pendentes ficam sinalizados até o primeiro login.`}
+        actions={
+          currentRole === "director" ? (
+                <Select value={branchFilter} onValueChange={(value) => setBranchFilter(value ?? "all")}>
+                  <SelectTrigger aria-label="Filtrar por unidade" className="w-full sm:w-52">
+                    <SelectValue placeholder="Todas as unidades" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas as unidades</SelectItem>
+                    {branches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+          ) : null
+        }
+      />
       <CardContent className="p-0">
         <div className="hidden sm:block">
           <div className="px-4 pt-3 pb-0">
@@ -280,19 +325,52 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
                   </Button>
                 </form>
               )}
+              {(currentRole === "director" || currentRole === "manager") && (
+                <form action={availabilityAction} className="flex items-center gap-2">
+                  <input name="brokerIds" type="hidden" value={selectedBrokerIds.join(",")} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={availabilityPending || selectedBrokerIds.length === 0}
+                    name="target"
+                    value="paused"
+                    type="submit"
+                    title={
+                      selectedBrokerIds.length === 0
+                        ? "Selecione corretores ativos para pausar o recebimento de leads"
+                        : "Pausa o recebimento de novos leads. Leads já atribuídos continuam na carteira."
+                    }
+                  >
+                    <Pause className="size-4" />
+                    Pausar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={availabilityPending || selectedBrokerIds.length === 0}
+                    name="target"
+                    value="available"
+                    type="submit"
+                    title="Retoma o recebimento de novos leads"
+                  >
+                    <Play className="size-4" />
+                    Retomar
+                  </Button>
+                </form>
+              )}
             </SelectionToolbar>
           </div>
         </div>
 
         <div className="sm:hidden">
-          <div className="relative px-4 pt-3">
-            <Search className="pointer-events-none absolute left-7 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <div className="relative px-4 pt-4">
+            <Search className="pointer-events-none absolute left-6.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               aria-label="Buscar colaborador"
-              placeholder="Buscar colaborador por nome ou email..."
+              placeholder="Buscar por nome, e-mail ou WhatsApp..."
               value={mobileQuery}
               onChange={(event) => setMobileQuery(event.target.value)}
-              className="h-9 rounded-xl border-border/70 bg-card pl-9 text-xs placeholder:font-mono placeholder:text-muted-foreground/60 focus-visible:ring-1 focus-visible:ring-foreground"
+              className="bg-card pl-8"
             />
           </div>
           <div className="mt-2 divide-y divide-border">
@@ -310,6 +388,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
                       {member.userId === currentUserId ? <span className="shrink-0 font-mono text-[11px] text-muted-foreground">Você</span> : null}
                     </div>
                     <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{member.email}</p>
+                    {member.phone ? <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{member.phone}</p> : null}
                     <div className="mt-2 flex flex-wrap items-center gap-1.5">
                       <RoleBadge role={member.role} jobTitle={member.jobTitle} />
                       <MemberStatusBadge status={member.status} />
@@ -323,6 +402,7 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
                   currentBranchId={currentBranchId}
                   currentRole={currentRole}
                   currentUserId={currentUserId}
+                  customRoles={customRoles}
                   member={member}
                   allMembers={members}
                   onStatusChange={handleStatusChange}
@@ -353,12 +433,12 @@ export function TeamMembersTable({ members, branches, currentRole, currentBranch
           )}
         </div>
 
-        <div className="max-sm:hidden">
+        <div className="p-4 max-sm:hidden">
           <DataTable
             columns={columns}
             data={visibleMembers}
             searchKey="name"
-            searchPlaceholder="Buscar colaborador por nome ou email..."
+            searchPlaceholder="Buscar colaborador por nome, e-mail ou WhatsApp..."
             showColumnToggle={true}
             showPagination={true}
             pageSize={10}

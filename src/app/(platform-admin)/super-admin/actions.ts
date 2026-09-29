@@ -26,11 +26,13 @@ import { provisionDefaultMarketingRole } from "@/features/custom-roles/service";
 import { notificationCapabilities, notificationCapabilitySettingKey } from "@/features/notifications/catalog";
 import { resetPlatformUserRouteOnboarding } from "@/features/onboarding/route-onboarding-service";
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { META_LEAD_ADS_PLATFORM_SETTINGS } from "@/features/communication-channels/meta-lead-ads-platform";
 import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/clean-ui/feature";
 import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
 import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
+import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -145,6 +147,38 @@ export async function updateBrokerWorkspaceSettingsAction(formData: FormData) {
   });
 }
 
+export async function updateConversationMediaSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("conversationMediaEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_conversation_media_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "conversation_media.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "conversation_media",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
+export async function updateBrokerAvailabilityOnboardingSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("brokerAvailabilityOnboardingEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_broker_availability_onboarding_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_availability_onboarding.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "broker_availability_onboarding",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
 export async function updateWorkflowAutomationSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("workflowAutomationEnabled") === "true" ? "true" : "false";
@@ -158,6 +192,17 @@ export async function updateWorkflowAutomationSettingsAction(formData: FormData)
     targetId: "workflow_automation",
     metadata: { enabled },
     createdAt: now,
+  });
+}
+
+export async function updateReportingCenterSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("reportingCenterEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_reporting_center_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId, action: "reporting_center.global_feature_updated",
+    targetType: "system_settings", targetId: "reporting_center", metadata: { enabled }, createdAt: now,
   });
 }
 
@@ -326,12 +371,14 @@ export async function updateLeadEffectOutboxSettingsAction(formData: FormData) {
     maxAttempts: boundedDistributionSetting(formData.get("maxAttempts"), 8, 1, 20),
     retryBaseSeconds: boundedDistributionSetting(formData.get("retryBaseSeconds"), 60, 15, 3600),
     leaseSeconds: boundedDistributionSetting(formData.get("leaseSeconds"), 120, 30, 900),
+    staleAfterHours: boundedDistributionSetting(formData.get("staleAfterHours"), DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, 1, 168),
   };
   await Promise.all([
     setSystemSetting("feature_lead_intake_outbox_enabled", values.enabled, now),
     setSystemSetting("lead_intake_outbox_max_attempts", values.maxAttempts, now),
     setSystemSetting("lead_intake_outbox_retry_base_seconds", values.retryBaseSeconds, now),
     setSystemSetting("lead_intake_outbox_lease_seconds", values.leaseSeconds, now),
+    setSystemSetting(META_OUTBOUND_STALE_AFTER_HOURS_SETTING, values.staleAfterHours, now),
   ]);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "lead_effect_outbox.settings_updated", targetType: "system_settings", targetId: "lead_effect_outbox", metadata: values, createdAt: now });
 }
@@ -348,6 +395,7 @@ export async function updateWahaCadenceSettingsAction(formData: FormData) {
   const values = {
     enabled: formData.get("enabled") === "true" ? "true" : "false",
     aiEnabled: formData.get("aiEnabled") === "true" ? "true" : "false",
+    internalBrokerNotificationsEnabled: formData.get("internalBrokerNotificationsEnabled") === "true" ? "true" : "false",
     maxAttempts: boundedDistributionSetting(formData.get("maxAttempts"), 5, 1, 10),
     retryBaseSeconds: boundedDistributionSetting(formData.get("retryBaseSeconds"), 60, 15, 3600),
     leaseSeconds: boundedDistributionSetting(formData.get("leaseSeconds"), 120, 30, 900),
@@ -355,6 +403,7 @@ export async function updateWahaCadenceSettingsAction(formData: FormData) {
   await Promise.all([
     setSystemSetting("feature_waha_cadence_enabled", values.enabled, now),
     setSystemSetting("feature_waha_ai_enabled", values.aiEnabled, now),
+    setSystemSetting("feature_waha_internal_broker_notifications_enabled", values.internalBrokerNotificationsEnabled, now),
     setSystemSetting("waha_cadence_max_attempts", values.maxAttempts, now),
     setSystemSetting("waha_cadence_retry_base_seconds", values.retryBaseSeconds, now),
     setSystemSetting("waha_cadence_lease_seconds", values.leaseSeconds, now),
@@ -653,6 +702,22 @@ export async function updateTeamMemberProfileSettingsAction(formData: FormData) 
   });
 }
 
+export async function updateTeamInvitationResendSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("teamInvitationResendEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_team_invitation_resend_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "team_invitation_resend.global_feature_updated",
+    targetType: "system_settings",
+    targetId: "team_invitation_resend",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
 export async function updateUserProfileSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("userProfileEnabled") === "true" ? "true" : "false";
@@ -729,6 +794,95 @@ export async function updateLeadManagementActionsSettingsAction(formData: FormDa
     createdAt: now,
   });
 
+}
+
+export async function updateManualLeadAssignmentOfferChoiceSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("manualLeadAssignmentOfferChoiceEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  await setSystemSetting("feature_manual_lead_assignment_offer_choice_enabled", enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "manual_lead_assignment_offer_choice.settings_updated",
+    targetType: "system_settings",
+    targetId: "feature_manual_lead_assignment_offer_choice_enabled",
+    metadata: { enabled },
+    createdAt: now,
+  });
+}
+
+export async function updateDutyPresenceConfirmationSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("dutyPresenceConfirmationEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_presence_confirmation.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+}
+
+export async function updateAttendanceFlowsSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("attendanceFlowsEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.ATTENDANCE_FLOWS.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "attendance_flows.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+}
+
+export async function updateDutyMonthlySchedulingSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("dutyMonthlySchedulingEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_monthly_scheduling.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+}
+
+export async function updateDutyOccurrenceHistorySettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("dutyOccurrenceHistoryEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_occurrence_history.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+}
+
+export async function updateUnlinkedConversationDeletionSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("unlinkedConversationDeletionEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+
+  await setSystemSetting(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "unlinked_conversation_deletion.settings_updated",
+    targetType: "system_settings",
+    targetId: FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
+    metadata: { enabled },
+    createdAt: now,
+  });
 }
 
 export async function updateMetaShowPausedCampaignsWithActiveLeadsAction(formData: FormData) {

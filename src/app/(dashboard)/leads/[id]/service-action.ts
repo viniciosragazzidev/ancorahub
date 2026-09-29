@@ -1,11 +1,12 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { and, eq, or } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
 
 export type StartLeadServiceState = { success?: boolean; error?: string; whatsappUrl?: string };
 
@@ -48,8 +49,6 @@ export async function startLeadServiceAction(_prev: StartLeadServiceState, formD
       };
     }
 
-    const now = new Date();
-
     const recipientScope = lead.branchId
       ? or(eq(schema.tenantMemberships.role, "director"), eq(schema.tenantMemberships.branchId, lead.branchId))
       : eq(schema.tenantMemberships.role, "director");
@@ -59,60 +58,19 @@ export async function startLeadServiceAction(_prev: StartLeadServiceState, formD
       .from(schema.tenantMemberships)
       .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.status, "active"), recipientScope));
 
-    // Fast DB transaction (under 5ms)
-    const updated = await db.transaction(async (tx) => {
-      const result = await tx
-        .update(schema.leads)
-        .set({
-          status: "in_contact",
-          stageEnteredAt: now,
-          firstContactAt: now,
-          serviceStartedAt: now,
-          serviceStartedBy: context.userId,
-        })
-        .where(
-          and(
-            eq(schema.leads.id, lead.id),
-            eq(schema.leads.tenantId, context.tenantId),
-            eq(schema.leads.corretorId, context.userId),
-            eq(schema.leads.status, "distributed")
-          )
-        )
-        .returning({ id: schema.leads.id });
-
-      if (!result.length) return false;
-
-      await tx
-        .update(schema.leadAssignmentAttempts)
-        .set({ status: "submitted", firstContactAt: now })
-        .where(
-          and(
-            eq(schema.leadAssignmentAttempts.leadId, lead.id),
-            eq(schema.leadAssignmentAttempts.brokerId, context.userId),
-            eq(schema.leadAssignmentAttempts.status, "open")
-          )
-        );
-
-      await tx.insert(schema.leadInteractions).values({
-        id: randomUUID(),
-        leadId: lead.id,
-        userId: context.userId,
-        tipo: "service_started",
-        conteudo: "Corretor iniciou o atendimento e os dados pessoais foram liberados.",
-      });
-
-      await tx.insert(schema.auditLogs).values({
-        id: randomUUID(),
-        userId: context.userId,
-        entidade: "lead",
-        entidadeId: lead.id,
-        acao: "iniciou_atendimento_whatsapp",
-      });
-
-      return true;
+    const updated = await startServiceOnFirstMessage({
+      tenantId: context.tenantId,
+      leadId: lead.id,
+      brokerId: context.userId,
+      branchId: lead.branchId,
+      trigger: "button",
     });
 
     if (!updated) return { error: "Este lead já foi assumido ou não está mais disponível." };
+
+    revalidatePath("/leads");
+    revalidatePath("/leads/distribuicao");
+    revalidatePath("/minha-fila");
 
     // Fire notifications asynchronously OUTSIDE database transaction
     void (async () => {

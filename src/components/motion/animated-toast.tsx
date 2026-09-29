@@ -3,6 +3,7 @@
 import React, { ReactNode } from "react";
 import { X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import {
   AnimatedBadge,
   type AnimatedBadgeStatus,
@@ -19,17 +20,21 @@ export interface AnimatedToastProps {
     label: string;
     onClick: () => void;
   };
+  cancel?: {
+    label: string;
+    onClick: () => void;
+  };
   onClose?: () => void;
   className?: string;
 }
 
-const STATUS_BORDER: Record<AnimatedBadgeStatus, string> = {
+const STATUS_ACCENTS: Record<AnimatedBadgeStatus, string> = {
   neutral: "border-border/80",
-  info: "border-primary/30",
-  success: "border-emerald-500/30",
-  warning: "border-amber-500/30",
-  danger: "border-destructive/30",
-  loading: "border-primary/30",
+  info: "border-blue-500/35 dark:border-blue-400/35 ring-1 ring-blue-500/10",
+  success: "border-emerald-500/35 dark:border-emerald-400/35 ring-1 ring-emerald-500/10",
+  warning: "border-amber-500/35 dark:border-amber-400/35 ring-1 ring-amber-500/10",
+  danger: "border-red-500/35 dark:border-red-400/35 ring-1 ring-red-500/10",
+  loading: "border-blue-500/35 dark:border-blue-400/35 ring-1 ring-blue-500/10",
 };
 
 export function AnimatedToast({
@@ -38,10 +43,12 @@ export function AnimatedToast({
   description,
   badgeLabel,
   action,
+  cancel,
   onClose,
   className,
 }: AnimatedToastProps) {
   const reduce = useReducedMotion();
+  const motionEnabled = useInterfaceMotionEnabled() && !reduce;
 
   const label =
     badgeLabel ??
@@ -59,53 +66,75 @@ export function AnimatedToast({
 
   return (
     <motion.div
-      initial={reduce ? { opacity: 0 } : { opacity: 0, y: -12, scale: 0.95, filter: "blur(4px)" }}
-      animate={reduce ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      exit={reduce ? { opacity: 0 } : { opacity: 0, y: -8, scale: 0.95, filter: "blur(4px)" }}
-      transition={{ type: "spring", stiffness: 420, damping: 28, mass: 0.8 }}
+      data-slot="animated-toast"
+      initial={motionEnabled ? { opacity: 0, y: -12, scale: 0.96, filter: "blur(4px)" } : false}
+      animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+      exit={motionEnabled ? { opacity: 0, y: -8, scale: 0.96, filter: "blur(4px)" } : undefined}
+      transition={motionEnabled ? { type: "spring", stiffness: 420, damping: 28, mass: 0.8 } : { duration: 0 }}
       className={cn(
-        "group relative flex w-full max-w-sm items-start gap-3 rounded-xl border bg-card/95 p-3.5 shadow-lg backdrop-blur-md transition-all select-none dark:bg-card/90",
-        STATUS_BORDER[status],
+        "group pointer-events-auto relative flex w-[380px] sm:w-[420px] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border bg-popover/95 p-4 text-popover-foreground shadow-2xl backdrop-blur-xl select-none",
+        motionEnabled && "transition-all",
+        "shadow-[0_12px_36px_-4px_rgba(0,0,0,0.16),0_4px_12px_-2px_rgba(0,0,0,0.08)] dark:shadow-[0_16px_40px_-6px_rgba(0,0,0,0.55)]",
+        STATUS_ACCENTS[status],
         className
       )}
     >
-      <div className="shrink-0 pt-0.5">
-        <AnimatedBadge status={status} size="sm" pulse={status === "loading"}>
+      {/* Top row: Status Badge + Close Button */}
+      <div className="flex items-center justify-between gap-2">
+        <AnimatedBadge status={status} size="sm" pulse={motionEnabled && status === "loading"}>
           {label}
         </AnimatedBadge>
+
+        {onClose ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            className="flex size-6 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pointer-events-auto"
+            aria-label="Fechar notificação"
+          >
+            <X className="size-3.5" />
+          </button>
+        ) : null}
       </div>
 
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="text-xs font-semibold leading-relaxed text-foreground">
+      {/* Main Content: Title & Description */}
+      <div className="space-y-1">
+        <div className="text-xs font-semibold leading-snug text-foreground">
           {title}
         </div>
         {description ? (
-          <div className="text-[11px] leading-normal text-muted-foreground">
+          <div className="text-[11px] leading-relaxed text-muted-foreground">
             {description}
-          </div>
-        ) : null}
-        {action ? (
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={action.onClick}
-              className="inline-flex items-center rounded-md bg-primary px-2.5 py-1 text-[11px] font-semibold text-primary-foreground transition-all hover:bg-primary/90 focus-visible:outline-none cursor-pointer"
-            >
-              {action.label}
-            </button>
           </div>
         ) : null}
       </div>
 
-      {onClose ? (
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-md p-1 text-muted-foreground opacity-70 transition-opacity hover:bg-muted hover:text-foreground hover:opacity-100 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
-          aria-label="Fechar notificação"
-        >
-          <X className="h-3.5 w-3.5" />
-        </button>
+      {/* Action Buttons Row */}
+      {(action || cancel) ? (
+        <div className="flex items-center gap-2 pt-1">
+          {action ? (
+            <button
+              type="button"
+              onClick={action.onClick}
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
+            >
+              {action.label}
+            </button>
+          ) : null}
+          {cancel ? (
+            <button
+              type="button"
+              onClick={cancel.onClick}
+              className="inline-flex items-center justify-center rounded-lg border border-border/80 bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:bg-muted hover:text-foreground active:scale-[0.98] focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
+            >
+              {cancel.label}
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </motion.div>
   );

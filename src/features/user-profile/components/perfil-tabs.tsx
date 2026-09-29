@@ -14,6 +14,7 @@ import { PersonalDataSection } from "./personal-data-section";
 import { SecuritySummarySection } from "./security-summary-section";
 import { SessionsSection } from "./sessions-section";
 import { ActivityLogSection } from "./activity-log-section";
+import { Button } from "@/components/ui/button";
 
 export type PerfilData = {
   currentUserId: string;
@@ -64,11 +65,12 @@ export function PerfilTabs({ data }: { data: PerfilData }) {
     <div className="flex flex-col gap-5">
       <nav className="flex gap-1 overflow-x-auto" aria-label="Seções do perfil">
         {tabs.map((tab) => (
-          <button
+          <Button
             key={tab.id}
             type="button"
+            variant="ghost"
             onClick={() => setActive(tab.id)}
-            className={`flex shrink-0 items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors ${
+            className={`h-auto shrink-0 gap-2.5 px-3 py-2.5 text-sm ${
               active === tab.id
                 ? "border border-border/80 bg-secondary font-semibold text-foreground shadow-2xs"
                 : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
@@ -76,7 +78,7 @@ export function PerfilTabs({ data }: { data: PerfilData }) {
           >
             <HugeiconsIcon icon={tab.icon} size={16} />
             {tab.label}
-          </button>
+          </Button>
         ))}
       </nav>
 

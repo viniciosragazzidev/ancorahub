@@ -4,6 +4,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { transitionConversationState } from "./conversation-state-machine";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { INITIAL_AGENT_TRIGGERS } from "./trigger-registry";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
+import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
 
 /**
  * Verifica se uma ação/gatilho já foi executada para o lead fornecido
@@ -50,6 +52,7 @@ export async function executeAgentTrigger(params: {
 
   let newQualStatus: "waiting_human" | "hot" | "warm" | "cold" | "qualifying" = "warm";
   const isIntake = triggerDef.category === "intake";
+  const isHumanHandoff = triggerDef.actionType === "TRANSFER_HUMAN";
 
   switch (triggerDef.actionType) {
     case "TRANSFER_HUMAN":
@@ -72,14 +75,18 @@ export async function executeAgentTrigger(params: {
   }
 
   // Atualizar Lead no banco de dados
-  await db.update(schema.leads).set({
-    qualificationStatus: isIntake ? "qualifying" : newQualStatus,
-    qualificationState: isIntake ? "IN_PROGRESS" : "QUALIFIED",
-    status: isIntake ? "new" : "distributed",
-    distributionStatus: isIntake ? "unassigned" : "queued",
-    qualificationCompletedAt: isIntake ? null : now,
-    updatedAt: now,
-  }).where(and(eq(schema.leads.id, params.leadId), eq(schema.leads.tenantId, params.tenantId)));
+  await db.update(schema.leads).set(
+    isHumanHandoff
+      ? buildHumanHandoffLeadUpdate(now)
+      : {
+          qualificationStatus: isIntake ? "qualifying" : newQualStatus,
+          qualificationState: isIntake ? "IN_PROGRESS" : "QUALIFIED",
+          status: isIntake ? "new" : "distributed",
+          distributionStatus: isIntake ? "unassigned" : "queued",
+          qualificationCompletedAt: isIntake ? null : now,
+          updatedAt: now,
+        },
+  ).where(and(eq(schema.leads.id, params.leadId), eq(schema.leads.tenantId, params.tenantId)));
 
   // Atualizar conversa se houver
   if (params.conversationId) {
@@ -111,6 +118,14 @@ export async function executeAgentTrigger(params: {
     entidadeId: params.leadId,
     acao: `agent_trigger.${triggerDef.key.toLowerCase()}`,
   }).catch(() => undefined);
+
+  if (triggerDef.actionType === "TRANSFER_HUMAN") {
+    await enqueueAndProcessLeadDistribution({
+      tenantId: params.tenantId,
+      leadId: params.leadId,
+      source: "agent_trigger",
+    });
+  }
 
   return { success: true, trigger: triggerDef };
 }

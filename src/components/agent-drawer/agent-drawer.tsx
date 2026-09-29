@@ -19,6 +19,7 @@ import {
 import { Sheet, SheetContent, SheetHeader } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
 import { AgentShortcutChips } from "./agent-shortcut-chips";
 import { useAgentDrawer } from "./agent-drawer-provider";
 import {
@@ -77,7 +78,7 @@ export function AgentDrawer() {
           isExpanded ? "w-full sm:max-w-4xl" : "w-full sm:max-w-lg"
         }`}
       >
-        {/* Vercel-style Header with Dotted Canvas Background */}
+        {/* Header with dotted canvas background */}
         <div className="relative border-b border-border/80 bg-muted/20 overflow-hidden shrink-0">
           {/* Dotted Canvas Background */}
           <div
@@ -222,10 +223,10 @@ export function AgentDrawer() {
           )}
         </div>
 
-        {/* Input Box Footer (Vercel Style) */}
+        {/* Input box footer */}
         <div className="p-4 border-t border-border/80 bg-background space-y-2 shrink-0">
           <form onSubmit={handleSubmit} className="relative rounded-2xl border border-border/80 bg-card p-3 shadow-sm focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-            <textarea
+            <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
@@ -236,7 +237,7 @@ export function AgentDrawer() {
               }}
               placeholder="Ask anything..."
               rows={2}
-              className="w-full resize-none bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-hidden"
+              className="min-h-12 w-full resize-none border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
             />
 
             <div className="flex items-center justify-between pt-2 border-t border-border/40">

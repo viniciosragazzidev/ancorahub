@@ -4,7 +4,11 @@ import { headers } from "next/headers";
 import { completePasswordReset } from "@/features/team/password-recovery";
 import { getAuth } from "@/shared/auth";
 
-export type ResetPasswordState = { success?: boolean; error?: string };
+export type ResetPasswordState = {
+  success?: boolean;
+  authenticated?: boolean;
+  error?: string;
+};
 
 export async function completePasswordResetAction(
   _prev: ResetPasswordState,
@@ -22,6 +26,7 @@ export async function completePasswordResetAction(
     const { userEmail } = await completePasswordReset(token, password);
 
     // Efetuar login automático imediatamente no servidor
+    let authenticated = false;
     try {
       const auth = getAuth();
       await auth.api.signInEmail({
@@ -31,13 +36,14 @@ export async function completePasswordResetAction(
         },
         headers: await headers(),
       });
+      authenticated = true;
     } catch {
-      // Ignorar falha secundária de login se já tiver redefinido a senha
+      // A senha já foi redefinida. A interface oferece o login manual sem
+      // afirmar que uma sessão foi criada.
     }
 
-    return { success: true };
+    return { success: true, authenticated };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao redefinir senha." };
   }
 }
-

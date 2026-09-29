@@ -31,21 +31,24 @@ export function DataTableColumnHeader<TData, TValue>({
   return (
     <div className={cn("flex items-center space-x-1.5", className)}>
       <DropdownMenu>
-        <DropdownMenuTrigger>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="-ml-2 h-7 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground data-[state=open]:bg-accent"
-          >
-            <span>{title}</span>
-            {column.getIsSorted() === "desc" ? (
-              <ArrowDown className="ml-1.5 size-3" />
-            ) : column.getIsSorted() === "asc" ? (
-              <ArrowUp className="ml-1.5 size-3" />
-            ) : (
-              <ChevronsUpDown className="ml-1.5 size-3 opacity-50" />
-            )}
-          </Button>
+        {/* render= makes the Button the trigger itself (no <button> inside <button>). */}
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="sm"
+              className="-ml-2 h-7 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground data-[popup-open]:bg-accent"
+            />
+          }
+        >
+          <span>{title}</span>
+          {column.getIsSorted() === "desc" ? (
+            <ArrowDown className="ml-1.5 size-3" />
+          ) : column.getIsSorted() === "asc" ? (
+            <ArrowUp className="ml-1.5 size-3" />
+          ) : (
+            <ChevronsUpDown className="ml-1.5 size-3 opacity-50" />
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-40">
           <DropdownMenuItem onClick={() => column.toggleSorting(false)}>

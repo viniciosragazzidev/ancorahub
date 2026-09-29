@@ -4,28 +4,22 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { resendTeamInvitation } from "@/features/team/resend-invitation";
 import { createTeamUser } from "@/features/team/create-user";
 import { generatePasswordResetLinkForMember } from "@/features/team/password-recovery";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { requireCanCreateRole, requireCanManageMember } from "@/shared/auth/team-permissions";
+import {
+  requireCanManageMember,
+  canManageMember,
+  requireCanUpdateMemberAuthority,
+} from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "@/features/team/onboarding-helpers";
-import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
-import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
-
-// Pending invitations don't have a userId, they use brokerProfileId
-type PendingInvite = {
-  id: string;
-  brokerProfileId: string;
-  email: string;
-  createdAt: Date;
-  expiresAt: Date;
-  deliveryStatus: string | null;
-  phone: string | null;
-  name: string | null;
-};
+import { enqueueBrokerInvitation } from "@/features/team/broker-invitation-delivery";
+import { parseCsv } from "@/shared/utils/csv";
 
 export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
 
@@ -35,12 +29,19 @@ const memberJobTitle = z.enum(schema.teamJobTitleValues);
 const updateMemberInput = z.object({
   memberId: z.string().uuid(),
   name: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  email: z.string().trim().max(254).refine(
+    (value) => value === "" || z.string().email().safeParse(value).success,
+    "Informe um e-mail válido.",
+  ).transform((value) => value.toLowerCase()),
   role: memberRole,
   jobTitle: memberJobTitle,
   branchId: z.preprocess(
     (value) => value === "__tenant__" ? "" : value,
     z.string().uuid().optional().or(z.literal("")),
+  ),
+  customRoleId: z.preprocess(
+    (value) => typeof value === "string" && (value.trim() === "" || value === "__none__") ? null : value,
+    z.string().uuid().nullable().optional(),
   ),
 });
 
@@ -77,12 +78,18 @@ export async function updateTeamMemberAction(
         userId: schema.user.id,
         role: schema.tenantMemberships.role,
         jobTitle: schema.tenantMemberships.jobTitle,
+        customRoleId: schema.tenantMemberships.customRoleId,
         customRoleScope: schema.customRoles.scope,
         branchId: schema.tenantMemberships.branchId,
         status: schema.user.status,
+        profileId: schema.brokerProfiles.id,
       })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+      .leftJoin(schema.brokerProfiles, and(
+        eq(schema.brokerProfiles.userId, schema.user.id),
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+      ))
       .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
       .where(
         and(
@@ -93,29 +100,192 @@ export async function updateTeamMemberAction(
       .limit(1);
 
     if (!member) {
-      throw new Error("Membro nao encontrado.");
+      const [pendingProfile] = await db
+        .select({
+          profileId: schema.brokerProfiles.id,
+          userId: schema.brokerProfiles.userId,
+          role: schema.brokerInvitations.role,
+          jobTitle: schema.brokerInvitations.jobTitle,
+          customRoleId: schema.brokerInvitations.customRoleId,
+          customRoleScope: schema.customRoles.scope,
+          branchId: schema.brokerProfiles.branchId,
+        })
+        .from(schema.brokerProfiles)
+        .leftJoin(schema.brokerInvitations, and(
+          eq(schema.brokerInvitations.brokerProfileId, schema.brokerProfiles.id),
+          eq(schema.brokerInvitations.tenantId, context.tenantId),
+          eq(schema.brokerInvitations.status, "PENDING"),
+        ))
+        .leftJoin(schema.customRoles, eq(schema.brokerInvitations.customRoleId, schema.customRoles.id))
+        .where(and(
+          eq(schema.brokerProfiles.id, input.memberId),
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+        ))
+        .limit(1);
+
+      if (!pendingProfile || !pendingProfile.role || !pendingProfile.jobTitle) {
+        throw new Error("Membro nao encontrado.");
+      }
+
+      const normalizedBranchId = input.branchId || null;
+      if (!normalizedBranchId) {
+        throw new Error("Convites pendentes precisam de uma unidade vinculada.");
+      }
+
+      let customRoleScope: "none" | "own" | "branch" | "tenant" | null = null;
+      if (input.customRoleId) {
+        if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
+        const [customRole] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope })
+          .from(schema.customRoles)
+          .where(and(
+            eq(schema.customRoles.id, input.customRoleId),
+            eq(schema.customRoles.tenantId, context.tenantId),
+            eq(schema.customRoles.status, "active"),
+          ))
+          .limit(1);
+        if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
+        customRoleScope = customRole.scope;
+      }
+
+      requireCanUpdateMemberAuthority({
+        actorContext: context,
+        targetMember: {
+          role: pendingProfile.role,
+          branchId: pendingProfile.branchId,
+          userId: pendingProfile.userId ?? pendingProfile.profileId,
+        },
+        proposed: { role: input.role, branchId: normalizedBranchId, customRoleScope },
+      });
+
+      const branch = await db
+        .select({ id: schema.branches.id })
+        .from(schema.branches)
+        .where(and(
+          eq(schema.branches.id, normalizedBranchId),
+          eq(schema.branches.tenantId, context.tenantId),
+          eq(schema.branches.status, "active"),
+        ))
+        .limit(1);
+      if (!branch[0]) throw new Error("A filial selecionada nao pertence ao tenant ativo ou esta inativa.");
+
+      if (input.email) {
+        const [emailOwner] = await db
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(and(
+            eq(schema.user.email, input.email),
+            pendingProfile.userId ? ne(schema.user.id, pendingProfile.userId) : undefined,
+          ))
+          .limit(1);
+        if (emailOwner) throw new Error("Ja existe uma identidade com este e-mail.");
+
+        const [profileEmailOwner] = await db
+          .select({ id: schema.brokerProfiles.id })
+          .from(schema.brokerProfiles)
+          .where(and(
+            eq(schema.brokerProfiles.tenantId, context.tenantId),
+            eq(schema.brokerProfiles.invitedEmail, input.email),
+            ne(schema.brokerProfiles.id, pendingProfile.profileId),
+          ))
+          .limit(1);
+        if (profileEmailOwner) throw new Error("Ja existe um convite com este e-mail nesta corretora.");
+      }
+
+      const authorityChanged =
+        pendingProfile.role !== input.role ||
+        pendingProfile.jobTitle !== input.jobTitle ||
+        pendingProfile.branchId !== normalizedBranchId ||
+        pendingProfile.customRoleId !== (input.customRoleId ?? null);
+
+      await db.transaction(async (tx) => {
+        await tx.update(schema.brokerProfiles).set({
+          professionalName: input.name,
+          invitedEmail: input.email || null,
+          branchId: normalizedBranchId,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(schema.brokerProfiles.id, pendingProfile.profileId),
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+        ));
+
+        if (pendingProfile.userId) {
+          await tx.update(schema.user).set({
+            name: input.name,
+            ...(input.email ? { email: input.email } : {}),
+            updatedAt: new Date(),
+          }).where(eq(schema.user.id, pendingProfile.userId));
+        }
+
+        await tx.update(schema.brokerInvitations).set({
+          email: input.email || null,
+          role: input.role,
+          jobTitle: input.jobTitle,
+          branchId: normalizedBranchId,
+          customRoleId: input.customRoleId ?? null,
+        }).where(and(
+          eq(schema.brokerInvitations.brokerProfileId, pendingProfile.profileId),
+          eq(schema.brokerInvitations.tenantId, context.tenantId),
+          eq(schema.brokerInvitations.status, "PENDING"),
+        ));
+
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "broker_profile",
+          entidadeId: pendingProfile.profileId,
+          acao: "atualizou_membro",
+        });
+
+        if (authorityChanged && pendingProfile.userId) {
+          await tx.delete(schema.session).where(eq(schema.session.userId, pendingProfile.userId));
+          await tx.insert(schema.auditLogs).values({
+            id: randomUUID(),
+            userId: context.userId,
+            entidade: "broker_profile",
+            entidadeId: pendingProfile.profileId,
+            acao: "revogou_sessoes_por_alteracao_de_autoridade",
+          });
+        }
+      });
+
+      return { success: true };
     }
 
-    requireCanManageMember(context, {
-      role: member.role,
-      branchId: member.branchId,
-      userId: member.userId,
+    const normalizedBranchId = input.branchId || null;
+    if (!input.email) {
+      throw new Error("Membros com acesso ativo precisam de um e-mail.");
+    }
+    let customRoleScope: "none" | "own" | "branch" | "tenant" | null = null;
+    if (input.customRoleId) {
+      if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
+      const [customRole] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope })
+        .from(schema.customRoles)
+        .where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active")))
+        .limit(1);
+      if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
+      customRoleScope = customRole.scope;
+    }
+    requireCanUpdateMemberAuthority({
+      actorContext: context,
+      targetMember: {
+        role: member.role,
+        branchId: member.branchId,
+        userId: member.userId,
+      },
+      proposed: {
+        role: input.role,
+        branchId: normalizedBranchId,
+        customRoleScope,
+      },
     });
 
-    const normalizedBranchId = input.branchId || null;
     const requiresBranch = requiresMemberBranch({
       jobTitle: input.jobTitle,
-      customRoleScope: member.customRoleScope,
+      customRoleScope,
     });
     if (requiresBranch && !normalizedBranchId) {
       throw new Error("Gestor e Corretor, ou cargos limitados a uma unidade, precisam de uma unidade vinculada.");
     }
-
-    if (context.role === "manager" && context.branchId && normalizedBranchId !== context.branchId) {
-      throw new Error("Gestores so podem manter corretores na propria filial.");
-    }
-
-    requireCanCreateRole(context, input.role);
 
     const branchRows = normalizedBranchId
       ? await db
@@ -146,6 +316,21 @@ export async function updateTeamMemberAction(
       throw new Error("Ja existe uma identidade com este e-mail.");
     }
 
+    if (member.profileId) {
+      const [profileEmailOwner] = await db
+        .select({ id: schema.brokerProfiles.id })
+        .from(schema.brokerProfiles)
+        .where(and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          eq(schema.brokerProfiles.invitedEmail, input.email),
+          ne(schema.brokerProfiles.id, member.profileId),
+        ))
+        .limit(1);
+      if (profileEmailOwner) {
+        throw new Error("Ja existe um convite com este e-mail nesta corretora.");
+      }
+    }
+
     await db.transaction(async (tx) => {
       await tx.update(schema.user).set({
         name: input.name,
@@ -153,13 +338,42 @@ export async function updateTeamMemberAction(
         updatedAt: new Date(),
       }).where(eq(schema.user.id, member.userId));
 
+      if (member.profileId) {
+        await tx.update(schema.brokerProfiles).set({
+          professionalName: input.name,
+          invitedEmail: input.email || null,
+          updatedAt: new Date(),
+        }).where(and(
+          eq(schema.brokerProfiles.id, member.profileId),
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+        ));
+      }
+
       await tx.update(schema.tenantMemberships).set({
         role: input.role,
         jobTitle: input.jobTitle,
         branchId: normalizedBranchId,
+        customRoleId: input.customRoleId ?? null,
         updatedAt: new Date(),
       }).where(eq(schema.tenantMemberships.id, member.membershipId));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "tenant_membership", entidadeId: member.membershipId, acao: "atualizou_membro" });
+
+      const authorityChanged =
+        member.role !== input.role ||
+        member.jobTitle !== input.jobTitle ||
+        member.branchId !== normalizedBranchId ||
+        member.customRoleId !== (input.customRoleId ?? null);
+
+      if (authorityChanged) {
+        await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "tenant_membership",
+          entidadeId: member.membershipId,
+          acao: "revogou_sessoes_por_alteracao_de_autoridade",
+        });
+      }
     });
 
     return { success: true };
@@ -186,87 +400,73 @@ export async function bulkToggleTeamMemberStatusAction(
     const db = getDatabase();
 
     const nextActive = targetStatus === "active";
-    let updatedCount = 0;
-    const errorMessages: string[] = [];
 
+    // 1. ATOMIC_DENY Pre-Validation: Verifica se todos os membros pertencem ao tenant e se o ator tem autoridade sobre cada um
+    const memberRecords = [];
     for (const memberId of memberIds) {
-      try {
-        const [member] = await db
-          .select({
-            membershipId: schema.tenantMemberships.id,
-            userId: schema.user.id,
-            role: schema.tenantMemberships.role,
-            branchId: schema.tenantMemberships.branchId,
-            status: schema.user.status,
-          })
-          .from(schema.tenantMemberships)
-          .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-          .where(
-            and(
-              eq(schema.tenantMemberships.id, memberId),
-              eq(schema.tenantMemberships.tenantId, context.tenantId),
-            ),
-          )
-          .limit(1);
+      const [member] = await db
+        .select({
+          membershipId: schema.tenantMemberships.id,
+          userId: schema.user.id,
+          role: schema.tenantMemberships.role,
+          branchId: schema.tenantMemberships.branchId,
+          status: schema.user.status,
+        })
+        .from(schema.tenantMemberships)
+        .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+        .where(
+          and(
+            eq(schema.tenantMemberships.id, memberId),
+            eq(schema.tenantMemberships.tenantId, context.tenantId),
+          ),
+        )
+        .limit(1);
 
-        if (!member) {
-          errorMessages.push(`Membro ${memberId} não encontrado.`);
-          continue;
-        }
-
-        requireCanManageMember(context, {
-          role: member.role,
-          branchId: member.branchId,
-          userId: member.userId,
-        });
-
-        await db.transaction(async (tx) => {
-          await tx.update(schema.user).set({
-            active: nextActive,
-            status: nextActive ? "active" : "disabled",
-            updatedAt: new Date(),
-          }).where(eq(schema.user.id, member.userId));
-
-          await tx.update(schema.tenantMemberships).set({
-            status: nextActive ? "active" : "inactive",
-            updatedAt: new Date(),
-          }).where(eq(schema.tenantMemberships.id, member.membershipId));
-
-          await tx.insert(schema.auditLogs).values({
-            id: randomUUID(),
-            userId: context.userId,
-            entidade: "tenant_membership",
-            entidadeId: member.membershipId,
-            acao: nextActive ? "reativou_membro" : "desativou_membro",
-          });
-
-          if (!nextActive) {
-            await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
-          }
-        });
-
-        updatedCount++;
-      } catch (error) {
-        errorMessages.push(error instanceof Error ? error.message : "Erro desconhecido");
+      if (!member) {
+        return { error: `Membro ${memberId} não encontrado ou não pertence a este tenant.` };
       }
+
+      if (!canManageMember(context, { role: member.role, branchId: member.branchId, userId: member.userId })) {
+        return { error: `Você não tem permissão para alterar o status do membro ${memberId}.` };
+      }
+
+      memberRecords.push(member);
+    }
+
+    let updatedCount = 0;
+    for (const member of memberRecords) {
+      await db.transaction(async (tx) => {
+        await tx.update(schema.user).set({
+          active: nextActive,
+          status: nextActive ? "active" : "disabled",
+          updatedAt: new Date(),
+        }).where(eq(schema.user.id, member.userId));
+
+        await tx.update(schema.tenantMemberships).set({
+          status: nextActive ? "active" : "inactive",
+          updatedAt: new Date(),
+        }).where(eq(schema.tenantMemberships.id, member.membershipId));
+
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: context.userId,
+          entidade: "tenant_membership",
+          entidadeId: member.membershipId,
+          acao: nextActive ? "reativou_membro" : "desativou_membro",
+        });
+
+        if (!nextActive) {
+          await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        }
+      });
+      updatedCount++;
     }
 
 
-    if (errorMessages.length === 0) {
-      return {
-        success: true,
-        message: `${updatedCount} membro${updatedCount === 1 ? "" : "s"} ${nextActive ? "ativado" : "desativado"}${updatedCount === 1 ? "" : "s"} com sucesso.`,
-      };
-    }
-
-    if (updatedCount > 0) {
-      return {
-        success: true,
-        message: `${updatedCount} atualizado${updatedCount === 1 ? "" : "s"}, ${errorMessages.length} erro${errorMessages.length === 1 ? "" : "s"}. ${errorMessages[0]}`,
-      };
-    }
-
-    return { error: `Nenhum membro atualizado. ${errorMessages[0] ?? ""}` };
+    return {
+      success: true,
+      message: `${updatedCount} membro${updatedCount === 1 ? "" : "s"} ${nextActive ? "ativado" : "desativado"}${updatedCount === 1 ? "" : "s"} com sucesso.`,
+    };
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : "Erro ao atualizar membros em lote.",
@@ -506,8 +706,18 @@ export async function transferLeadsAction(
     if (!source || !target || source.role !== "broker" || target.role !== "broker" || target.status !== "active" || source.branchId !== target.branchId) {
       throw new Error("A transferência só pode ocorrer entre corretores ativos da mesma unidade.");
     }
-    if (context.role === "manager" && source.branchId !== context.branchId) {
-      throw new Error("Gestores só podem transferir leads dentro da própria unidade.");
+
+    const isDirector = context.role === "director";
+    const authorizedUnitIds = isDirector
+      ? []
+      : ("allowedUnitIds" in context && Array.isArray(context.allowedUnitIds))
+        ? context.allowedUnitIds
+        : context.branchId
+          ? [context.branchId]
+          : [];
+
+    if (!isDirector && (!source.branchId || !authorizedUnitIds.includes(source.branchId))) {
+      throw new Error("Gestores só podem transferir leads dentro das unidades autorizadas.");
     }
 
     await db
@@ -516,8 +726,9 @@ export async function transferLeadsAction(
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
-          eq(schema.leads.corretorId, input.fromUserId)
-        )
+          eq(schema.leads.corretorId, input.fromUserId),
+          source.branchId ? eq(schema.leads.branchId, source.branchId) : sql`true`,
+        ),
       );
 
     return { success: true };
@@ -531,7 +742,6 @@ export async function transferLeadsAction(
 export async function getPendingInvitesAction() {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const now = new Date();
   return db.select({
     id: schema.brokerInvitations.id,
     brokerProfileId: schema.brokerInvitations.brokerProfileId,
@@ -556,74 +766,10 @@ export async function getPendingInvitesAction() {
 
 export async function resendInviteAction(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
-    const invitationId = String(formData.get("invitationId") ?? "").trim();
-    const context = await getRequiredTenantContext();
-    const db = getDatabase();
-
-    const [invitation] = await db
-      .select()
-      .from(schema.brokerInvitations)
-      .where(and(or(eq(schema.brokerInvitations.id, invitationId), eq(schema.brokerInvitations.brokerProfileId, invitationId)), eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.status, "PENDING")))
-      .limit(1);
-
-    if (!invitation) throw new Error("Convite não encontrado.");
-    if (invitation.status !== "PENDING") throw new Error("Este convite não está mais pendente.");
-    if (invitation.expiresAt < new Date()) throw new Error("Convite expirado. Crie um novo acesso.");
-
-    // Criar novo convite (substitui o anterior)
-    const newInvite = await db.transaction(async (tx) => {
-      const result = await createBrokerInvitation(
-        tx,
-        context.tenantId,
-        invitation.branchId,
-        invitation.brokerProfileId,
-        invitation.email,
-        invitation.role as "director" | "manager" | "supervisor" | "broker",
-        invitation.jobTitle,
-      );
-      // Re-enfileirar envio WhatsApp
-      const [profile] = await tx
-        .select({ phone: schema.brokerProfiles.phone, name: schema.brokerProfiles.professionalName })
-        .from(schema.brokerProfiles)
-        .where(eq(schema.brokerProfiles.id, invitation.brokerProfileId))
-        .limit(1);
-      return { ...result, phone: profile?.phone ?? null, name: profile?.name ?? null };
-    });
-
-    // Tentar enfileirar WhatsApp
-    let whatsappStatus: TeamActionState["whatsappStatus"] = "not_available";
-    if (newInvite.phone) {
-      try {
-        const [company] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
-        const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
-          eq(schema.communicationChannels.tenantId, context.tenantId),
-          inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-          eq(schema.communicationChannels.status, "active"),
-        )).orderBy(sql`CASE WHEN ${schema.communicationChannels.isDefault} = true THEN 0 ELSE 1 END`).limit(1);
-        const queued = await enqueueMetaTemplateMessage({
-          tenantId: context.tenantId,
-          channelId: channel?.id,
-          recipientType: "user",
-          recipientId: newInvite.id,
-          destinationPhone: newInvite.phone,
-          purpose: "brokerInvitation",
-          variables: [newInvite.name ?? newInvite.id, company?.name ?? "sua corretora", invitation.role === "director" ? "Diretor" : invitation.role === "manager" ? "Gestor" : "Corretor"],
-          requestedBy: context.userId,
-          idempotencyKey: `team-invitation:${newInvite.id}`,
-        });
-        whatsappStatus = queued.duplicate || queued.status === "queued" ? "queued" : "failed";
-        // The message was stored in the transactional outbox. Do not wait for
-        // provider delivery before releasing the dialog state to the user.
-        scheduleAfterResponse("team-invitation-resend-outbound", () => processMetaOutboundBatch(3, context.tenantId));
-      } catch {
-        whatsappStatus = "failed";
-      }
-    }
-
-    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_invitation", entidadeId: newInvite.id, acao: "reenviou_convite" });
-    return { success: true, token: newInvite.token, invitationId: newInvite.id, whatsappStatus };
-  } catch (e) {
-    return { success: false, error: e instanceof Error ? e.message : "Erro ao reenviar convite." };
+    const result = await resendTeamInvitation(formData.get("memberId") ?? formData.get("invitationId"));
+    return { success: true, ...result };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Erro ao reenviar convite." };
   }
 }
 
@@ -667,48 +813,85 @@ export async function importBrokersAction(
       throw new Error("Arquivo CSV inválido ou vazio.");
     }
     const text = await file.text();
-    const lines = text.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
-    if (lines.length <= 1) {
-      throw new Error("O arquivo CSV deve conter um cabeçalho e pelo menos uma linha de dados.");
-    }
-
-    const headers = lines[0].toLowerCase().split(/[,;]/).map(h => h.trim());
-    const nameIdx = headers.indexOf("nome");
-    const emailIdx = headers.indexOf("email");
-    const phoneIdx = headers.indexOf("telefone");
-    const cpfIdx = headers.indexOf("cpf");
-    const branchIdx = headers.indexOf("unidade");
-
-    if (nameIdx === -1 || emailIdx === -1 || phoneIdx === -1) {
-      throw new Error("O cabeçalho do CSV deve conter as colunas: nome, email, telefone, cpf.");
+    const headerLine = text.split(/\r?\n/, 1)[0]?.toLowerCase() ?? "";
+    const delimiter = headerLine.includes(";") ? ";" : ",";
+    const rows = parseCsv(text, delimiter).map((row) => Object.fromEntries(
+      Object.entries(row).map(([key, value]) => [key.replace(/^\uFEFF/, "").trim().toLowerCase(), value]),
+    ));
+    if (rows.length === 0) throw new Error("O arquivo CSV deve conter um cabeçalho e pelo menos uma linha de dados.");
+    const headers = Object.keys(rows[0]);
+    if (!headers.includes("nome") || !headers.includes("telefone")) {
+      throw new Error("O cabeçalho do CSV deve conter nome e telefone. E-mail, CPF e unidade são opcionais.");
     }
 
     const db = getDatabase();
     let imported = 0;
+    let queued = 0;
     const errors: string[] = [];
+    const createdInvitations: Array<{
+      invitationId: string;
+      branchId: string;
+      phone: string;
+      name: string;
+    }> = [];
+    const phonesInFile = new Set<string>();
+    const emailsInFile = new Set<string>();
 
     await db.transaction(async (tx) => {
-      for (let i = 1; i < lines.length; i++) {
-        const row = lines[i].split(/[,;]/).map(val => val.trim());
-        if (row.length < 4) continue;
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const lineNumber = i + 2;
+        const name = String(row.nome ?? "").trim();
+        const email = String(row.email ?? "").trim().toLowerCase() || null;
+        const phone = String(row.telefone ?? "").replace(/\D/g, "");
+        const cpf = String(row.cpf ?? "").replace(/\D/g, "") || null;
 
-        const name = row[nameIdx];
-        const email = row[emailIdx]?.toLowerCase();
-        const phone = row[phoneIdx];
-        const cpf = cpfIdx >= 0 ? row[cpfIdx]?.replace(/\D/g, "") || null : null;
-
-        if (!name || !email || !phone) {
-          errors.push(`Linha ${i + 1}: Dados incompletos.`);
+        if (!name || phone.length < 10 || phone.length > 15) {
+          errors.push(`Linha ${lineNumber}: informe nome e um telefone internacional válido.`);
           continue;
         }
+        if (email && !z.string().email().safeParse(email).success) {
+          errors.push(`Linha ${lineNumber}: e-mail inválido.`);
+          continue;
+        }
+        if (phonesInFile.has(phone)) {
+          errors.push(`Linha ${lineNumber}: telefone repetido no arquivo.`);
+          continue;
+        }
+        if (email && emailsInFile.has(email)) {
+          errors.push(`Linha ${lineNumber}: e-mail repetido no arquivo.`);
+          continue;
+        }
+        phonesInFile.add(phone);
+        if (email) emailsInFile.add(email);
 
-        const [existingEmail] = await tx
+        const [existingEmail] = email ? await tx
           .select({ id: schema.brokerProfiles.id })
           .from(schema.brokerProfiles)
           .where(and(eq(schema.brokerProfiles.invitedEmail, email), eq(schema.brokerProfiles.tenantId, context.tenantId)))
-          .limit(1);
+          .limit(1) : [];
         if (existingEmail) {
-          errors.push(`Linha ${i + 1}: E-mail ${email} já cadastrado.`);
+          errors.push(`Linha ${lineNumber}: e-mail ${email} já cadastrado.`);
+          continue;
+        }
+
+        const [existingIdentity] = email ? await tx
+          .select({ id: schema.user.id })
+          .from(schema.user)
+          .where(eq(schema.user.email, email))
+          .limit(1) : [];
+        if (existingIdentity) {
+          errors.push(`Linha ${lineNumber}: o e-mail ${email} já pertence a uma conta existente.`);
+          continue;
+        }
+
+        const [existingPhone] = await tx
+          .select({ id: schema.brokerProfiles.id })
+          .from(schema.brokerProfiles)
+          .where(and(eq(schema.brokerProfiles.phone, phone), eq(schema.brokerProfiles.tenantId, context.tenantId)))
+          .limit(1);
+        if (existingPhone) {
+          errors.push(`Linha ${lineNumber}: telefone já cadastrado.`);
           continue;
         }
 
@@ -718,13 +901,13 @@ export async function importBrokersAction(
           .where(and(eq(schema.brokerProfiles.cpf, cpf), eq(schema.brokerProfiles.tenantId, context.tenantId)))
           .limit(1) : [];
         if (existingCpf) {
-          errors.push(`Linha ${i + 1}: CPF ${cpf} já cadastrado.`);
+          errors.push(`Linha ${lineNumber}: CPF ${cpf} já cadastrado.`);
           continue;
         }
 
         let targetBranchId = context.branchId;
         if (context.role === "director") {
-          const branchVal = row[branchIdx];
+          const branchVal = String(row.unidade ?? "").trim();
           if (branchVal) {
             const [matchedBranch] = await tx
               .select({ id: schema.branches.id })
@@ -740,7 +923,7 @@ export async function importBrokersAction(
             if (matchedBranch) {
               targetBranchId = matchedBranch.id;
             } else {
-              errors.push(`Linha ${i + 1}: Unidade "${branchVal}" não encontrada.`);
+              errors.push(`Linha ${lineNumber}: Unidade "${branchVal}" não encontrada.`);
               continue;
             }
           } else {
@@ -752,14 +935,14 @@ export async function importBrokersAction(
             if (firstBranch) {
               targetBranchId = firstBranch.id;
             } else {
-              errors.push(`Linha ${i + 1}: Nenhuma filial ativa cadastrada.`);
+              errors.push(`Linha ${lineNumber}: Nenhuma filial ativa cadastrada.`);
               continue;
             }
           }
         }
 
         if (!targetBranchId) {
-          errors.push(`Linha ${i + 1}: Unidade não especificada.`);
+          errors.push(`Linha ${lineNumber}: Unidade não especificada.`);
           continue;
         }
 
@@ -776,26 +959,55 @@ export async function importBrokersAction(
           phone,
           invitedEmail: email,
           cpf,
-          lifecycleStatus: "DRAFT",
+          lifecycleStatus: "INVITED",
           managerId: context.userId,
+          invitedAt: new Date(),
           createdAt: new Date(),
           updatedAt: new Date(),
         });
+
+        const invitation = await createBrokerInvitation(
+          tx,
+          context.tenantId,
+          targetBranchId,
+          brokerProfileId,
+          email,
+          "broker",
+          "broker",
+        );
+        createdInvitations.push({ invitationId: invitation.id, branchId: targetBranchId, phone, name });
 
         await tx.insert(schema.auditLogs).values({
           id: randomUUID(),
           userId: context.userId,
           entidade: "broker_profile",
           entidadeId: brokerProfileId,
-          acao: "importou_corretor_draft",
+          acao: "importou_corretor_pendente",
         });
 
         imported++;
       }
     });
 
+    for (const invitation of createdInvitations) {
+      const status = await enqueueBrokerInvitation({
+        tenantId: context.tenantId,
+        branchId: invitation.branchId,
+        invitationId: invitation.invitationId,
+        destinationPhone: invitation.phone,
+        name: invitation.name,
+        jobTitle: "broker",
+        role: "broker",
+        requestedBy: context.userId,
+        scheduleDelivery: false,
+      });
+      if (status === "queued") queued += 1;
+    }
+    if (queued > 0) {
+      scheduleAfterResponse("team-csv-invitation-outbound", () => processMetaOutboundBatch(3, context.tenantId));
+    }
 
-    let reportMessage = `Importação concluída. ${imported} corretores importados com sucesso como Rascunho (DRAFT).`;
+    let reportMessage = `Importação concluída. ${imported} corretores ficaram pendentes de ativação; ${queued} convites foram enfileirados no WhatsApp oficial.`;
     if (errors.length > 0) {
       reportMessage += ` Erros encontrados:\n${errors.join("\n")}`;
     }

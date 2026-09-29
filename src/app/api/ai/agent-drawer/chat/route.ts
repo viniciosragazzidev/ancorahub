@@ -29,7 +29,7 @@ export async function POST(req: Request) {
 
     const roleTools = getMcpToolsForRole(context.role);
 
-    // Convert MCP tools to Vercel AI SDK tool format
+    // Convert MCP tools to the AI SDK (`ai` package) tool format
     const mcpToolsRecord: Record<string, any> = {};
     for (const mcpTool of roleTools) {
       mcpToolsRecord[mcpTool.name] = (tool as any)({

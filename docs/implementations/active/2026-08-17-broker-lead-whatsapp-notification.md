@@ -8,7 +8,11 @@ continua sendo uma operação distinta da notificação de uma atribuição já 
 
 ## Contrato
 
-- Corpo nomeado: `cargo`, `corretor_nome`, `lead_nome`, `produto_interesse`.
+- O produtor disponibiliza `cargo`, `corretor_nome`, `lead_nome` e
+  `produto_interesse`; o template aprovado e sincronizado da WABA ativa define
+  quais desses valores entram no corpo e em qual ordem.
+- `corretor`, `corretor_nome` e `nome_corretor` são aliases do mesmo valor
+  canônico. `nome_lead` é alias de `lead_nome`.
 - Botão URL dinâmico: somente o identificador do lead, fora das variáveis do corpo.
 - A chave de idempotência inclui a versão `assigned_at`; outra atribuição do mesmo
   lead ao mesmo corretor gera nova mensagem, e retries da mesma atribuição não.

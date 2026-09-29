@@ -40,7 +40,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
   });
 
   y -= 20;
-  page.drawText(`Data: ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(quote.createdAt)}`, {
+  page.drawText(`Data: ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(quote.createdAt)}`, {
     x: 50,
     y,
     size: 10,

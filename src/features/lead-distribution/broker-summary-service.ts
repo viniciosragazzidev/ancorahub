@@ -1,8 +1,9 @@
 import "server-only";
 
-import { and, eq, gte, lte, inArray, isNull, count, avg } from "drizzle-orm";
+import { and, eq, gte, lte, inArray, isNull, isNotNull, count, avg, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { percentage } from "@/features/reports/metrics/metrics-math";
 
 export type BrokerDailySummaryItem = {
   brokerId: string;
@@ -18,6 +19,12 @@ export type BrokerDailySummaryItem = {
   convertedLeads: number;
   conversionRate: number;
   avgFirstContactMinutes: number | null;
+  offersReceived: number;
+  offersAccepted: number;
+  offersExpired: number;
+  redistributedLeads: number;
+  redistributionRate: number;
+  avgOfferResponseMinutes: number | null;
 };
 
 export type BrokerDailySummaryAggregate = {
@@ -107,9 +114,14 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
-        gte(schema.leads.createdAt, options.startDate),
-        lte(schema.leads.createdAt, options.endDate),
+        // “Recebidos” is based on the moment the lead was assigned to the
+        // broker, not when the lead record was originally created/imported.
+        // A lead created yesterday and distributed today must count today.
+        isNotNull(schema.leads.assignedAt),
+        gte(schema.leads.assignedAt, options.startDate),
+        lte(schema.leads.assignedAt, options.endDate),
       ),
     )
     .groupBy(schema.leads.corretorId);
@@ -125,6 +137,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         inArray(schema.leads.status, activeStatuses),
       ),
@@ -142,6 +155,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         inArray(schema.leads.status, activeStatuses),
         isNull(schema.leads.firstContactAt),
@@ -160,6 +174,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         eq(schema.leads.status, "lost"),
         gte(schema.leads.updatedAt, options.startDate),
@@ -179,6 +194,7 @@ export async function fetchBrokerDailySummary(
       and(
         eq(schema.leads.tenantId, tenantId),
         isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         inArray(schema.leads.corretorId, brokerIds),
         eq(schema.leads.status, "converted"),
         gte(schema.leads.updatedAt, options.startDate),
@@ -187,12 +203,32 @@ export async function fetchBrokerDailySummary(
     )
     .groupBy(schema.leads.corretorId);
 
+  const offerStats = await db
+    .select({
+      brokerId: schema.leadOffers.brokerId,
+      offersReceived: count(schema.leadOffers.id),
+      offersAccepted: sql<number>`count(*) filter (where ${schema.leadOffers.acceptedAt} is not null)`,
+      offersExpired: sql<number>`count(*) filter (where ${schema.leadOffers.status} = 'EXPIRED')`,
+      avgResponseSeconds: sql<number>`avg(extract(epoch from (${schema.leadOffers.acceptedAt} - ${schema.leadOffers.offeredAt}))) filter (where ${schema.leadOffers.acceptedAt} is not null)`,
+    })
+    .from(schema.leadOffers)
+    .where(and(eq(schema.leadOffers.tenantId, tenantId), inArray(schema.leadOffers.brokerId, brokerIds), gte(schema.leadOffers.offeredAt, options.startDate), lte(schema.leadOffers.offeredAt, options.endDate)))
+    .groupBy(schema.leadOffers.brokerId);
+
+  const redistributionStats = await db
+    .select({ brokerId: schema.leadDistributionEvents.previousOwnerId, count: count(schema.leadDistributionEvents.id) })
+    .from(schema.leadDistributionEvents)
+    .where(and(eq(schema.leadDistributionEvents.tenantId, tenantId), inArray(schema.leadDistributionEvents.previousOwnerId, brokerIds), eq(schema.leadDistributionEvents.source, "redistribution"), gte(schema.leadDistributionEvents.createdAt, options.startDate), lte(schema.leadDistributionEvents.createdAt, options.endDate)))
+    .groupBy(schema.leadDistributionEvents.previousOwnerId);
+
   // Maps for fast aggregation
   const receivedMap = new Map(receivedLeads.map((r) => [r.corretorId!, { count: Number(r.count), avgLatency: r.avgLatency ? Number(r.avgLatency) : null }]));
   const activeMap = new Map(activeLeads.map((a) => [a.corretorId!, Number(a.count)]));
   const unstartedMap = new Map(unstartedLeads.map((u) => [u.corretorId!, Number(u.count)]));
   const lostMap = new Map(lostLeads.map((l) => [l.corretorId!, Number(l.count)]));
   const convertedMap = new Map(convertedLeads.map((c) => [c.corretorId!, Number(c.count)]));
+  const offerMap = new Map(offerStats.map((o) => [o.brokerId, { offersReceived: Number(o.offersReceived), offersAccepted: Number(o.offersAccepted), offersExpired: Number(o.offersExpired), avgResponseMinutes: o.avgResponseSeconds ? Math.round(Number(o.avgResponseSeconds) / 60) : null }]));
+  const redistributionMap = new Map(redistributionStats.map((r) => [r.brokerId!, Number(r.count)]));
 
   let totalReceived = 0;
   let totalActive = 0;
@@ -221,8 +257,10 @@ export async function fetchBrokerDailySummary(
       latencyCount += recCount;
     }
 
-    const conversionRate = recCount > 0 ? Math.round((convCount / recCount) * 1000) / 10 : 0;
+    const conversionRate = percentage(convCount, recCount);
     const avgFirstContactMinutes = rec?.avgLatency ? Math.round(rec.avgLatency / 60) : null;
+    const offers = offerMap.get(broker.id) ?? { offersReceived: 0, offersAccepted: 0, offersExpired: 0, avgResponseMinutes: null };
+    const redistributedLeads = redistributionMap.get(broker.id) ?? 0;
 
     return {
       brokerId: broker.id,
@@ -238,6 +276,12 @@ export async function fetchBrokerDailySummary(
       convertedLeads: convCount,
       conversionRate,
       avgFirstContactMinutes,
+      offersReceived: offers.offersReceived,
+      offersAccepted: offers.offersAccepted,
+      offersExpired: offers.offersExpired,
+      redistributedLeads,
+      redistributionRate: percentage(redistributedLeads, recCount),
+      avgOfferResponseMinutes: offers.avgResponseMinutes,
     };
   });
 
@@ -258,4 +302,96 @@ export async function fetchBrokerDailySummary(
     avgTeamResponseMinutes,
     items,
   };
+}
+
+export type DistributionLogRow = {
+  brokerCode: string;
+  brokerName: string;
+  queueName: string;
+  fonteLabel: string;
+  leadName: string;
+  leadPhone: string;
+  assignedAt: Date;
+};
+
+/** Short, print-friendly label per sourceChannel — the fine-grained channel
+ * catalog in routing-catalog.ts is meant for the routing UI and already
+ * carries its own parenthetical (e.g. "Meta Ads (Facebook/Instagram)"),
+ * which would double up once the campaign/reference is appended here. */
+const SOURCE_CHANNEL_LABELS: Record<string, string> = {
+  meta_ads: "Meta Ads",
+  meta_lead_ads: "Meta Ads",
+  bulk_import: "Importação Manual",
+  webhook: "Webhook",
+  whatsapp: "WhatsApp Direto",
+  whatsapp_direct: "WhatsApp Direto",
+  google_ads: "Google Ads",
+  indicacao: "Indicação",
+  referral: "Indicação",
+  landing_page: "Site / Orgânico",
+};
+
+function buildFonteLabel(sourceChannel: string | null, sourceCampaign: string | null, origem: string) {
+  const channel = sourceChannel?.trim().toLowerCase() || null;
+  const base = (channel && SOURCE_CHANNEL_LABELS[channel]) ?? (origem === "manual" ? "Cadastro Manual" : "Outra origem");
+  const detail = sourceCampaign?.trim();
+  return detail ? `${base} (${detail})` : base;
+}
+
+/**
+ * One row per lead actually handed to a broker in the period — the raw log
+ * behind the aggregate summary above, for a printable "quem recebeu o quê"
+ * export. Same distribution-window semantics as `fetchBrokerDailySummary`:
+ * "recebido" means assignedAt inside the range, not when the lead was
+ * created/imported. Grouped and sorted by fonte (channel + campaign/reference)
+ * so consecutive rows share the same source section in the PDF.
+ */
+export async function fetchDistributionLog(
+  tenantId: string,
+  options: { startDate: Date; endDate: Date; branchId?: string | null },
+): Promise<DistributionLogRow[]> {
+  const db = getDatabase();
+  const rows = await db
+    .select({
+      brokerCode: schema.brokerProfiles.internalCode,
+      brokerName: schema.user.name,
+      queueName: schema.leadQueues.name,
+      origem: schema.leads.origem,
+      sourceChannel: schema.leads.sourceChannel,
+      sourceCampaign: schema.leads.sourceCampaign,
+      leadName: schema.leads.nome,
+      leadPhone: schema.leads.telefone,
+      assignedAt: schema.leads.assignedAt,
+    })
+    .from(schema.leads)
+    .innerJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
+    .leftJoin(
+      schema.brokerProfiles,
+      and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, tenantId)),
+    )
+    .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
+    .where(
+      and(
+        eq(schema.leads.tenantId, tenantId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
+        isNotNull(schema.leads.corretorId),
+        isNotNull(schema.leads.assignedAt),
+        gte(schema.leads.assignedAt, options.startDate),
+        lte(schema.leads.assignedAt, options.endDate),
+        options.branchId ? eq(schema.leads.branchId, options.branchId) : undefined,
+      ),
+    );
+
+  return rows
+    .map((row) => ({
+      brokerCode: row.brokerCode ?? "—",
+      brokerName: row.brokerName,
+      queueName: row.queueName ?? "Sem fila",
+      fonteLabel: buildFonteLabel(row.sourceChannel, row.sourceCampaign, row.origem),
+      leadName: row.leadName,
+      leadPhone: row.leadPhone,
+      assignedAt: row.assignedAt as Date,
+    }))
+    .sort((a, b) => a.fonteLabel.localeCompare(b.fonteLabel, "pt-BR") || a.assignedAt.getTime() - b.assignedAt.getTime());
 }

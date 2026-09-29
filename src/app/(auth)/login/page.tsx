@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, type FormEvent } from "react";
 import Link from "next/link";
 import { Eye, EyeSlash, LockKey } from "@/components/huge-icons";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { authClient, signIn } from "@/shared/auth/client";
 import { requestPasswordResetDirectAction } from "@/shared/auth/password-recovery-client";

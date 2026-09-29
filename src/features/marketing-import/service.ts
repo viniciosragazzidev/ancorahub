@@ -7,7 +7,8 @@ import * as XLSX from "xlsx";
 
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/tenant-context";
-import { chooseAvailableBroker } from "@/features/leads/assignment";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
+import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024; // 10 MB
 const BATCH_SIZE = 200;
@@ -96,10 +97,8 @@ function validateHeaders(headers: string[], type: ImportType): Map<string, numbe
   return headerMap;
 }
 
-function normalizePhone(raw: string): string {
-  const digits = raw.replace(/[\s()\-+]/g, "");
-  return digits.startsWith("55") ? digits : `55${digits}`;
-}
+import { ensureBrazilPhone } from "@/shared/utils/phone";
+// normalizePhone agora é ensureBrazilPhone — ambos garantem prefixo 55
 
 function parseDate(raw: string): Date | null {
   if (!raw || raw.trim() === "") return null;
@@ -119,7 +118,7 @@ function parseDate(raw: string): Date | null {
 function validateRow(row: RawRow, index: number, type: ImportType): { normalized: NormalizedRow; errors: string[] } {
   const errors: string[] = [];
   const nome = row.nome.trim();
-  const telefone = normalizePhone(row.telefone);
+  const telefone = ensureBrazilPhone(row.telefone);
   const email = row.email.trim().toLowerCase() || null;
   const operadora = (row.operadora || "").trim();
   const campanha = (row.campanha || "").trim();
@@ -316,9 +315,10 @@ export async function importMetaLeads(
     let imported = 0;
     let duplicates = 0;
     const invalid: Array<{ row: number; message: string }> = [];
-    let insertBuffer: Array<{ normalized: NormalizedRow; leadId: string; brokerId: string | null }> = [];
+    let insertBuffer: Array<{ normalized: NormalizedRow; leadId: string }> = [];
+    const importedLeadIds: string[] = [];
 
-    async function flushBuffer(b: Array<{ normalized: NormalizedRow; leadId: string; brokerId: string | null }>) {
+    async function flushBuffer(b: Array<{ normalized: NormalizedRow; leadId: string }>) {
       if (b.length === 0) return;
       await db.transaction(async (tx) => {
         for (const item of b) {
@@ -339,7 +339,7 @@ export async function importMetaLeads(
             id: item.leadId,
             tenantId: context.tenantId,
             branchId,
-            corretorId: item.brokerId,
+            corretorId: null,
             nome: item.normalized.nome,
             telefone: item.normalized.telefone,
             email: item.normalized.email,
@@ -351,12 +351,12 @@ export async function importMetaLeads(
             sourceMetadata,
             externalId: item.normalized.externalId || null,
             capturedAt,
-            status: item.brokerId ? "distributed" : "new",
-            distributionStatus: item.brokerId ? "assigned" : "queued",
-            assignmentSource: item.brokerId ? "automatic" : null,
-            assignmentStrategy: item.brokerId ? "capacity" : null,
+            status: "new",
+            distributionStatus: "queued",
+            assignmentSource: null,
+            assignmentStrategy: null,
             distributionUpdatedAt: new Date(),
-            assignedAt: item.brokerId ? new Date() : null,
+            assignedAt: null,
             consentimentoLgpd: true,
           });
 
@@ -417,8 +417,8 @@ export async function importMetaLeads(
 
       // New lead - add to buffer
       const leadId = randomUUID();
-      const brokerId = branchId ? await chooseAvailableBroker(context.tenantId, branchId) : null;
-      insertBuffer.push({ normalized, leadId, brokerId });
+      insertBuffer.push({ normalized, leadId });
+      importedLeadIds.push(leadId);
       imported++;
 
       // Flush buffer when full
@@ -431,6 +431,10 @@ export async function importMetaLeads(
     // Flush remaining
     await flushBuffer(insertBuffer);
     insertBuffer = [];
+
+    await runWithConcurrency(importedLeadIds, 5, async (leadId) => {
+      await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId, source: "intake" });
+    });
 
     // Update import record
     const durationMs = Date.now() - startTime;

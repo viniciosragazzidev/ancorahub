@@ -1,12 +1,10 @@
 import "server-only";
 
-import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
-import { scheduleBrokerLeadNotification } from "./broker-lead-cadence";
-import { checkBrokerNotificationCoalesceWindow, enqueueBrokerBatchSummaryNotification } from "./broker-notification-coalescer";
 
 const FALLBACK_PRODUCT_INTEREST = "Plano de saúde";
 
@@ -96,50 +94,10 @@ export async function enqueueBrokerLeadNotification(input: {
     ? `${input.idempotencyKey}:broker-whatsapp:${input.brokerId}`
     : `lead-assignment:${input.leadId}:${input.brokerId}:${assignmentVersion}:broker-whatsapp`;
   const requestedBy = await resolveSystemUserId(input.tenantId);
-  const now = new Date();
 
-  // Check if we should coalesce/batch notifications to prevent WhatsApp spam
-  const coalesceCheck = await checkBrokerNotificationCoalesceWindow({
-    tenantId: input.tenantId,
-    brokerId: input.brokerId,
-    now,
-  });
-
-  if (coalesceCheck.shouldCoalesce) {
-    const summaryOutbound = await enqueueBrokerBatchSummaryNotification({
-      tenantId: input.tenantId,
-      brokerId: input.brokerId,
-      destinationPhone,
-    });
-    return {
-      queued: true as const,
-      outboundId: summaryOutbound.id,
-      duplicate: summaryOutbound.duplicate,
-      coalesced: true as const,
-    };
-  }
-  const [previousNotification] = await db.select({
-    scheduledAt: schema.whatsappOutboundMessages.scheduledAt,
-    sentAt: schema.whatsappOutboundMessages.sentAt,
-    queuedAt: schema.whatsappOutboundMessages.queuedAt,
-    createdAt: schema.whatsappOutboundMessages.createdAt,
-  }).from(schema.whatsappOutboundMessages).where(and(
-    eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
-    eq(schema.whatsappOutboundMessages.recipientId, input.brokerId),
-    eq(schema.whatsappOutboundMessages.purpose, "brokerLeadNotification"),
-    inArray(schema.whatsappOutboundMessages.status, ["pending", "queued", "processing", "sent", "delivered", "read"]),
-    or(isNotNull(schema.whatsappOutboundMessages.scheduledAt), isNotNull(schema.whatsappOutboundMessages.queuedAt)),
-  )).orderBy(
-    desc(schema.whatsappOutboundMessages.scheduledAt),
-    desc(schema.whatsappOutboundMessages.sentAt),
-    desc(schema.whatsappOutboundMessages.queuedAt),
-    desc(schema.whatsappOutboundMessages.createdAt),
-  ).limit(1);
-  const previousAt = previousNotification?.scheduledAt
-    ?? previousNotification?.sentAt
-    ?? previousNotification?.queuedAt
-    ?? previousNotification?.createdAt
-    ?? null;
+  // A lead notification is operational, not a marketing cadence. Persist it
+  // ready for immediate exact-id dispatch so another queued message can never
+  // take its place when the assignment action finishes.
   const outbound = await enqueueMetaTemplateMessage({
     tenantId: input.tenantId,
     recipientType: "user",
@@ -155,7 +113,6 @@ export async function enqueueBrokerLeadNotification(input: {
     }),
     requestedBy,
     idempotencyKey,
-    scheduledAt: scheduleBrokerLeadNotification({ now, lastScheduledAt: previousAt }),
   });
 
   return { queued: true as const, outboundId: outbound.id, duplicate: outbound.duplicate };

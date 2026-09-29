@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { CheckCircle, Copy, Trash, WhatsappLogo } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";

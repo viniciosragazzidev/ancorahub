@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTransition } from "react";
 
 import {
   DEFAULT_PERIOD,
@@ -19,7 +20,7 @@ import {
  * Seletor de período 7/14/30/90 persistido em `?period=N`.
  *
  * Espelha o comportamento do LeadsFilters: preserva os demais query params e
- * apenas sobrescreve `period`, fazendo `router.push`. Requer estar num Client
+ * apenas sobrescreve `period`, fazendo `router.replace`. Requer estar num Client
  * Component sob `<Suspense>` (uso de `useSearchParams`), conforme o padrão das
  * páginas / leia o guia de linking/navigating.
  */
@@ -27,14 +28,18 @@ export function PeriodSelect({
   value,
   includeAll = false,
   label = "Período",
+  triggerClassName,
 }: {
   value: PeriodValue | "all";
   includeAll?: boolean;
   label?: string;
+  /** Additive visual override — leave unset for the existing default look. */
+  triggerClassName?: string;
 }) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
 
   function select(period: PeriodValue | "all") {
     const params = new URLSearchParams(searchParams.toString());
@@ -43,7 +48,7 @@ export function PeriodSelect({
     } else {
       params.set("period", String(period));
     }
-    if (pathname) router.push(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`);
+    if (pathname) startTransition(() => router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ""}`, { scroll: false }));
   }
 
   return (
@@ -61,7 +66,11 @@ export function PeriodSelect({
         }
       }}
     >
-      <SelectTrigger className="w-32 text-xs bg-card" aria-label={label}>
+      <SelectTrigger
+        className={triggerClassName ?? "w-32 bg-card text-xs max-[559px]:h-(--mobile-touch-target)"}
+        aria-label={label}
+        disabled={isPending}
+      >
         <SelectValue placeholder="Selecione o período" />
       </SelectTrigger>
       <SelectContent>

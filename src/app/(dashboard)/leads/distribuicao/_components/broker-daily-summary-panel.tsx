@@ -4,28 +4,41 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   Calendar,
-  Users,
   Download,
   Search,
-  TrendingUp,
-  Clock,
-  UserCheck,
-  UserX,
-  Flame,
-  CheckCircle2,
   Filter,
   ArrowUpRight,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "@/components/ui/sonner";
+import { StatCard } from "@/components/dashboard/metric-card";
+import { AvailabilityToggle } from "@/components/availability-toggle";
+import { DataTableFrame, dataTableStyles } from "@/components/ui/data-table/data-table-frame";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { getBrokerDailySummaryAction } from "@/features/lead-distribution/broker-summary-actions";
-import type { BrokerDailySummaryAggregate, BrokerDailySummaryItem } from "@/features/lead-distribution/broker-summary-service";
+import type {
+  BrokerDailySummaryAggregate,
+  BrokerDailySummaryItem,
+} from "@/features/lead-distribution/broker-summary-service";
 
 type BranchOption = { id: string; name: string };
 
@@ -45,6 +58,7 @@ export function BrokerDailySummaryPanel({
   const [selectedBranchId, setSelectedBranchId] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
 
   const fetchSummary = async (
     newPeriod = period,
@@ -106,6 +120,12 @@ export function BrokerDailySummaryPanel({
       "Vendas Fechadas",
       "Taxa Conversao (%)",
       "Tempo Medio Resposta (min)",
+      "Ofertas Recebidas",
+      "Ofertas Aceitas",
+      "Ofertas Expiradas",
+      "Redistribuídos",
+      "Taxa Redistribuição (%)",
+      "Tempo Médio para Aceitar (min)",
     ];
 
     const rows = data.items.map((item) => [
@@ -120,9 +140,17 @@ export function BrokerDailySummaryPanel({
       item.convertedLeads,
       `${item.conversionRate}%`,
       item.avgFirstContactMinutes !== null ? item.avgFirstContactMinutes : "N/A",
+      item.offersReceived,
+      item.offersAccepted,
+      item.offersExpired,
+      item.redistributedLeads,
+      `${item.redistributionRate}%`,
+      item.avgOfferResponseMinutes !== null ? item.avgOfferResponseMinutes : "N/A",
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
+    const csvContent =
+      "data:text/csv;charset=utf-8," +
+      [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -131,6 +159,55 @@ export function BrokerDailySummaryPanel({
     link.click();
     document.body.removeChild(link);
     toast.success("Relatório CSV baixado com sucesso!");
+  };
+
+  const handleExportPDF = async () => {
+    setIsExportingPdf(true);
+    try {
+      const end = new Date();
+      const start = new Date(end);
+      if (period === "week") start.setDate(start.getDate() - 6);
+      if (period === "month") start.setDate(1);
+      if (period === "custom" && startDate) {
+        const customStart = new Date(`${startDate}T00:00:00`);
+        if (!Number.isNaN(customStart.getTime())) start.setTime(customStart.getTime());
+        if (endDate) {
+          const customEnd = new Date(`${endDate}T23:59:59`);
+          if (!Number.isNaN(customEnd.getTime())) end.setTime(customEnd.getTime());
+        }
+      }
+      const formatDate = (value: Date) => {
+        const offset = value.getTimezoneOffset() * 60_000;
+        return new Date(value.getTime() - offset).toISOString().slice(0, 10);
+      };
+      const query = new URLSearchParams({
+        start: `${formatDate(start)}T00:00:00.000Z`,
+        end: `${formatDate(end)}T23:59:59.999Z`,
+        format: "pdf",
+      });
+      if (selectedBranchId !== "all") query.set("branchId", selectedBranchId);
+      const response = await fetch(`/api/reports/distribution-summary?${query.toString()}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new Error(payload?.error ?? "Não foi possível gerar o PDF.");
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `distribuicao-${formatDate(start)}-a-${formatDate(end)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("PDF da distribuição baixado com sucesso!");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível gerar o PDF.");
+    } finally {
+      setIsExportingPdf(false);
+    }
   };
 
   const filteredItems = data.items.filter((item) => {
@@ -147,20 +224,27 @@ export function BrokerDailySummaryPanel({
     if (status === "available") return <Badge variant="success">Disponível</Badge>;
     if (status === "busy") return <Badge variant="warning">Em Atendimento</Badge>;
     if (status === "break") return <Badge variant="outline">Pausa</Badge>;
-    return <Badge variant="outline" className="opacity-60">Offline</Badge>;
+    return (
+      <Badge variant="outline" className="opacity-60">
+        Offline
+      </Badge>
+    );
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* FILTER BAR & PERIOD SELECTOR */}
-      <Card variant="overview" className="p-4 sm:p-6 space-y-4">
+      <Card variant="overview" className="space-y-4 p-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary" />
+          <div className="min-w-0">
             <div>
-              <h3 className="font-semibold text-base">Resumo de Desempenho dos Corretores</h3>
-              <p className="text-xs text-muted-foreground">
-                Acompanhe o volume de leads recebidos, perdas, atendimento ativo e conversão por período.
+              <h3 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+                <Calendar className="size-4 shrink-0" />
+                Resumo de desempenho dos corretores
+              </h3>
+              <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+                Acompanhe o volume de leads recebidos, perdas, atendimento ativo e conversão por
+                período.
               </p>
             </div>
           </div>
@@ -207,6 +291,16 @@ export function BrokerDailySummaryPanel({
               <Download className="h-3.5 w-3.5" />
               Exportar CSV
             </Button>
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={handleExportPDF}
+              disabled={isExportingPdf}
+              className="gap-1.5"
+            >
+              <Download className="h-3.5 w-3.5" />
+              {isExportingPdf ? "Gerando PDF..." : "Exportar PDF"}
+            </Button>
           </div>
         </div>
 
@@ -240,12 +334,12 @@ export function BrokerDailySummaryPanel({
         {/* BRANCH & SEARCH BAR */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-2">
           <div className="relative max-w-sm w-full">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar corretor por nome ou e-mail..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 text-xs h-9"
+              className="pl-8"
             />
           </div>
 
@@ -253,7 +347,7 @@ export function BrokerDailySummaryPanel({
             <div className="flex items-center gap-2">
               <Filter className="h-3.5 w-3.5 text-muted-foreground" />
               <Select value={selectedBranchId} onValueChange={handleBranchChange}>
-                <SelectTrigger className="w-[200px] h-9 text-xs">
+                <SelectTrigger className="w-[200px]">
                   <SelectValue placeholder="Todas as Unidades" />
                 </SelectTrigger>
                 <SelectContent>
@@ -270,120 +364,112 @@ export function BrokerDailySummaryPanel({
         </div>
       </Card>
 
-      {/* KPI METRIC CARDS */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Users className="h-3.5 w-3.5 text-primary" /> Corretores Ativos
-          </p>
-          <p className="text-xl font-bold tabular-nums">{data.totalBrokers}</p>
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <Flame className="h-3.5 w-3.5 text-blue-500" /> Leads Recebidos
-          </p>
-          <p className="text-xl font-bold tabular-nums">{data.totalReceived}</p>
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <UserCheck className="h-3.5 w-3.5 text-emerald-500" /> Em Atendimento
-          </p>
-          <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{data.totalActive}</p>
-          {data.totalUnstarted > 0 && (
-            <p className="text-[10px] text-amber-500 font-semibold">{data.totalUnstarted} sem 1º contato</p>
-          )}
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <UserX className="h-3.5 w-3.5 text-rose-500" /> Leads Perdidos
-          </p>
-          <p className="text-xl font-bold tabular-nums text-rose-600 dark:text-rose-400">{data.totalLost}</p>
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Vendas Concluídas
-          </p>
-          <p className="text-xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{data.totalConverted}</p>
-        </Card>
-
-        <Card variant="overview" className="p-4 space-y-1">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-            <TrendingUp className="h-3.5 w-3.5 text-amber-500" /> Taxa de Conversão
-          </p>
-          <p className="text-xl font-bold tabular-nums">{data.teamConversionRate}%</p>
-          {data.avgTeamResponseMinutes !== null && (
-            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" /> ~{data.avgTeamResponseMinutes} min resposta
-            </p>
-          )}
-        </Card>
+      {/* KPI METRIC CARDS — same StatCard as /equipe */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-3 xl:grid-cols-6">
+        <StatCard label="Corretores ativos" value={data.totalBrokers} sublabel="no período" />
+        <StatCard label="Leads recebidos" value={data.totalReceived} sublabel="no período" />
+        <StatCard
+          label="Em atendimento"
+          value={data.totalActive}
+          sublabel={data.totalUnstarted > 0 ? `${data.totalUnstarted} sem 1º contato` : "todos com 1º contato"}
+        />
+        <StatCard label="Leads perdidos" value={data.totalLost} sublabel="no período" />
+        <StatCard label="Vendas concluídas" value={data.totalConverted} sublabel="no período" />
+        <StatCard
+          label="Taxa de conversão"
+          value={`${data.teamConversionRate}%`}
+          sublabel={data.avgTeamResponseMinutes !== null ? `~${data.avgTeamResponseMinutes} min de resposta` : "sem tempo de resposta"}
+        />
       </div>
 
       {/* BROKER SUMMARY TABLE */}
-      <Card variant="overview" className="p-0 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-muted/40 border-b border-border text-muted-foreground font-semibold">
-              <tr>
-                <th className="py-3 px-4">Corretor</th>
-                <th className="py-3 px-3">Filial</th>
-                <th className="py-3 px-3 text-center">Status</th>
-                <th className="py-3 px-3 text-right">Leads Recebidos</th>
-                <th className="py-3 px-3 text-right">Em Atendimento</th>
-                <th className="py-3 px-3 text-right">Não Iniciados</th>
-                <th className="py-3 px-3 text-right">Leads Perdidos</th>
-                <th className="py-3 px-3 text-right">Vendas</th>
-                <th className="py-3 px-3 text-right">Conversão (%)</th>
-                <th className="py-3 px-3 text-right">Tempo Resp.</th>
-                <th className="py-3 px-4 text-center">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border/60">
+      <Card variant="overview" className="border-0 p-0">
+        <DataTableFrame>
+          <Table className={dataTableStyles.native}>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Corretor</TableHead>
+                <TableHead>Filial</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Leads Recebidos</TableHead>
+                <TableHead className="text-right">Em Atendimento</TableHead>
+                <TableHead className="text-right">Não Iniciados</TableHead>
+                <TableHead className="text-right">Leads Perdidos</TableHead>
+                <TableHead className="text-right">Vendas</TableHead>
+                <TableHead className="text-right">Conversão (%)</TableHead>
+                <TableHead className="text-right">Tempo Resp.</TableHead>
+                <TableHead className="text-right">Redistribuição</TableHead>
+                <TableHead className="text-center">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {filteredItems.length === 0 ? (
-                <tr>
-                  <td colSpan={11} className="py-8 text-center text-muted-foreground">
+                <TableRow>
+                  <TableCell colSpan={12} className="py-8 text-center text-muted-foreground">
                     Nenhum corretor encontrado com os filtros selecionados.
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               ) : (
                 filteredItems.map((item) => (
-                  <tr key={item.brokerId} className="hover:bg-muted/20 transition-colors">
-                    <td className="py-3 px-4 font-medium">
+                  <TableRow key={item.brokerId}>
+                    <TableCell className="font-medium">
                       <div className="flex flex-col">
-                        <span className="font-semibold text-foreground text-sm">{item.brokerName}</span>
-                        <span className="text-[11px] text-muted-foreground">{item.brokerEmail}</span>
+                        <span className="font-semibold text-foreground text-sm">
+                          {item.brokerName}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {item.brokerEmail}
+                        </span>
                       </div>
-                    </td>
-                    <td className="py-3 px-3 text-muted-foreground">{item.branchName || "Matriz"}</td>
-                    <td className="py-3 px-3 text-center">{getStatusBadge(item.availabilityStatus)}</td>
-                    <td className="py-3 px-3 text-right font-semibold tabular-nums text-sm">{item.leadsReceived}</td>
-                    <td className="py-3 px-3 text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-medium">
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {item.branchName || "Matriz"}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {canFilterBranch ? (
+                        <AvailabilityToggle
+                          initialStatus={
+                            item.availabilityStatus as "available" | "paused" | "offline"
+                          }
+                        />
+                      ) : (
+                        getStatusBadge(item.availabilityStatus)
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
+                      {item.leadsReceived}
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums text-success">
                       {item.activeAttending}
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums text-amber-500 font-medium">
+                    </TableCell>
+                    <TableCell className="text-right font-medium tabular-nums text-warning">
                       {item.unstartedLeads > 0 ? item.unstartedLeads : "-"}
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums text-rose-600 dark:text-rose-400">
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-destructive">
                       {item.lostLeads}
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums font-bold text-emerald-600 dark:text-emerald-400">
+                    </TableCell>
+                    <TableCell className="text-right font-bold tabular-nums text-success">
                       {item.convertedLeads}
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums font-semibold">
+                    </TableCell>
+                    <TableCell className="text-right font-semibold tabular-nums">
                       {item.conversionRate}%
-                    </td>
-                    <td className="py-3 px-3 text-right tabular-nums text-muted-foreground">
-                      {item.avgFirstContactMinutes !== null ? `${item.avgFirstContactMinutes} min` : "N/A"}
-                    </td>
-                    <td className="py-3 px-4 text-center">
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {item.avgFirstContactMinutes !== null
+                        ? `${item.avgFirstContactMinutes} min`
+                        : "N/A"}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      <span className="font-semibold">{item.redistributionRate}%</span>
+                      <span className="ml-1 text-xs text-muted-foreground">
+                        ({item.redistributedLeads})
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center">
                       <Button
                         render={
                           <Link
-                            href={`/leads?corretorId=${item.brokerId}`}
+                            href={`/leads?corretor=${item.brokerId}`}
                             className="inline-flex items-center gap-1"
                           />
                         }
@@ -393,13 +479,13 @@ export function BrokerDailySummaryPanel({
                         Leads
                         <ArrowUpRight className="h-3 w-3" />
                       </Button>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </DataTableFrame>
       </Card>
     </div>
   );

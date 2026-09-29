@@ -4,6 +4,8 @@ import { randomUUID } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 
 import { startAiQualificationForLead } from "@/features/ai-qualification/service";
+import { flowEffectHandlers } from "@/features/attendance-flows/handlers";
+import { attendanceFlowsEnabled, startAttendanceRun } from "@/features/attendance-flows/runtime";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -29,12 +31,16 @@ export type CreateLeadFromWebhookSyncInput = {
   leadSource?: {
     channel: string;
     externalId: string;
+    leadType?: "PF" | "PJ" | "PME";
     campaign?: string | null;
     ad?: string | null;
+    adSet?: string | null;
     form?: string | null;
+    page?: string | null;
     /** Hora real de captura no anúncio (ex.: created_time da Meta). Fallback: receivedAt. */
     capturedAt?: Date;
-    metadata?: Record<string, string | number | boolean | null>;
+    /** `unmappedFormFields` lists Meta form question names the mapping did not recognize. */
+    metadata?: Record<string, string | number | boolean | null | string[]>;
   };
 };
 
@@ -55,19 +61,22 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   }
 
   const data = parsed.data;
+  const metaLeadType = input.leadSource?.channel === "meta_lead_ads" ? input.leadSource.leadType : undefined;
   if (data.website && data.website.trim().length > 0) return { success: true, leadId: "honeypot-discarded", duplicate: false };
 
   let branchId: string | null = input.branchId;
   let queueId: string | null = null;
+  let queueFlowId: string | null = null;
   try {
     if (input.queueId) {
-      const [queue] = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId })
+      const [queue] = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, attendanceFlowId: schema.leadQueues.attendanceFlowId })
         .from(schema.leadQueues)
         .where(and(eq(schema.leadQueues.id, input.queueId), eq(schema.leadQueues.tenantId, tenantId), eq(schema.leadQueues.status, "active")))
         .limit(1);
       if (!queue) throw new WebhookBranchNotFoundError();
       queueId = queue.id;
       branchId = queue.branchId;
+      queueFlowId = queue.attendanceFlowId;
     }
     const resolved = branchId ?? await resolveWebhookBranch(tenantId, null);
     if (!resolved) throw new WebhookBranchNotFoundError();
@@ -93,6 +102,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   const normalizedEmail = normalizeLeadEmail(data.email);
   const qualificationEngineEnabled = await getSystemSetting("feature_qualification_engine_enabled").then((value) => value === "true").catch(() => false);
   const bypassPlantao = input.bypassPlantao ?? (await getSystemSetting(`feature_${input.leadSource?.channel ?? "webhook"}_bypass_plantao`).then((v) => v === "true").catch(() => false));
+  // DEC-127: a queue with an attendance flow (switch on) is attended by the flow; otherwise today's intake.
+  const flowManaged = Boolean(queueFlowId) && !bypassPlantao && await attendanceFlowsEnabled().catch(() => false);
   const distStatus = bypassPlantao ? "unassigned" : "queued";
   const leadId = randomUUID();
   const now = new Date();
@@ -112,7 +123,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
       return { conflict: true as const };
     }
     const existingLeads = await tx
-      .select({ id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone })
+      .select({ id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone, sourceMetadata: schema.leads.sourceMetadata })
       .from(schema.leads)
       .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt)));
 
@@ -124,13 +135,26 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         .set({
           nome: normalizedName || undefined,
           email: normalizedEmail || undefined,
+          ...(metaLeadType ? { tipo: metaLeadType } : {}),
           ...(input.leadSource ? {
             sourceChannel: input.leadSource.channel,
             sourceCampaign: input.leadSource.campaign ?? null,
             metaCampaignId: input.leadSource.campaign ?? null,
             sourceAd: input.leadSource.ad ?? null,
             sourceForm: input.leadSource.form ?? null,
+            metaAdId: input.leadSource.ad ?? null,
+            metaAdSetId: input.leadSource.adSet ?? null,
+            metaFormId: input.leadSource.form ?? null,
+            metaPageId: input.leadSource.page ?? null,
             capturedAt: input.leadSource.capturedAt ?? receivedAt,
+            ...(input.leadSource.metadata ? {
+              sourceMetadata: {
+                ...(existingLead.sourceMetadata && typeof existingLead.sourceMetadata === "object" && !Array.isArray(existingLead.sourceMetadata) ? existingLead.sourceMetadata as Record<string, unknown> : {}),
+                ...Object.fromEntries(Object.entries(input.leadSource.metadata).filter(([key, value]) =>
+                  value !== null && !(key === "tipoPlanoStatus" && typeof input.leadSource?.metadata?.tipoPlano !== "string"),
+                )),
+              },
+            } : {}),
           } : {}),
           updatedAt: now,
         })
@@ -142,6 +166,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
 
     await tx.insert(schema.leads).values({
       id: leadId, tenantId, branchId, queueId, corretorId: null, nome: normalizedName, telefone: normalizedPhone, email: normalizedEmail,
+      ...(metaLeadType ? { tipo: metaLeadType } : {}),
       origem: "webhook", distributionOrigin: "landing-page", status: "new", distributionStatus: distStatus,
       consentimentoLgpd: false, webhookCredentialId: credentialId, createdAt: now,
       ...(input.leadSource ? {
@@ -151,7 +176,16 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
         metaCampaignId: input.leadSource.campaign ?? null,
         sourceAd: input.leadSource.ad ?? null,
         sourceForm: input.leadSource.form ?? null,
-        sourceMetadata: input.leadSource.metadata ?? null,
+        metaAdId: input.leadSource.ad ?? null,
+        metaAdSetId: input.leadSource.adSet ?? null,
+        metaFormId: input.leadSource.form ?? null,
+        metaPageId: input.leadSource.page ?? null,
+        sourceMetadata: input.leadSource.channel === "meta_lead_ads"
+          ? {
+            ...(input.leadSource.metadata ?? {}),
+            tipoPlanoStatus: typeof input.leadSource.metadata?.tipoPlano === "string" ? "provided" : "not_provided",
+          }
+          : input.leadSource.metadata ?? null,
         capturedAt: input.leadSource.capturedAt ?? receivedAt,
       } : {}),
     });
@@ -166,10 +200,10 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     });
     await tx.update(schema.webhookDeliveries).set({ status: "processed", leadId, processedAt: now }).where(eq(schema.webhookDeliveries.id, deliveryId));
     await enqueueLeadEffectTx(tx, { tenantId, leadId, webhookDeliveryId: deliveryId, type: "NOTIFY_LEAD_ARRIVED", idempotencyKey: `lead-intake:${deliveryId}:arrival`, payload: { branchId, leadName: normalizedName } });
-    if (!qualificationEngineEnabled && !bypassPlantao) {
+    if (!qualificationEngineEnabled && !bypassPlantao && !flowManaged) {
       await enqueueLeadEffectTx(tx, { tenantId, leadId, webhookDeliveryId: deliveryId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${deliveryId}:distribution`, payload: { branchId, leadName: normalizedName } });
     }
-    return { duplicate: false as const, leadId };
+    return { duplicate: false as const, leadId, deliveryId };
   });
 
   if ("conflict" in committed) return { success: false, code: "IDEMPOTENCY_CONFLICT" };
@@ -177,14 +211,28 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
 
   void notifyLeadArrived(leadId, tenantId, branchId, normalizedName, `lead-arrived:${leadId}`).catch((err) => console.error("[createLeadFromWebhookSync] notifyLeadArrived error:", err));
 
-  let qualificationStart: { started: boolean } | null = null;
-  try {
-    qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId });
-  } catch {
-    qualificationStart = { started: false };
-  }
-  if (qualificationStart && !qualificationStart.started && !bypassPlantao) {
-    await enqueueLeadEffect({ tenantId, leadId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${leadId}:distribution-fallback`, payload: { branchId, leadName: normalizedName } }).catch(() => undefined);
+  // Today's intake after the lead is saved. A flow's "Atendimento atual" block runs exactly this.
+  const legacyIntake = async () => {
+    if (flowManaged && !qualificationEngineEnabled && !bypassPlantao) {
+      await enqueueLeadEffect({ tenantId, leadId, webhookDeliveryId: committed.deliveryId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${committed.deliveryId}:distribution`, payload: { branchId, leadName: normalizedName } });
+    }
+    let qualificationStart: { started: boolean } | null = null;
+    try {
+      qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId });
+    } catch {
+      qualificationStart = { started: false };
+    }
+    if (qualificationStart && !qualificationStart.started && !bypassPlantao) {
+      await enqueueLeadEffect({ tenantId, leadId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${leadId}:distribution-fallback`, payload: { branchId, leadName: normalizedName } }).catch(() => undefined);
+    }
+  };
+  if (flowManaged) {
+    const run = await startAttendanceRun({ tenantId, leadId, queueId }, flowEffectHandlers({ tenantId, leadId, actorUserId: createdByUserId, legacyIntake }))
+      .catch(() => ({ started: false as const }));
+    // The flow could not start (race, invalid version): the lead is never left without attendance.
+    if (!run.started) await legacyIntake();
+  } else {
+    await legacyIntake();
   }
   return { success: true, leadId, duplicate: false };
 }

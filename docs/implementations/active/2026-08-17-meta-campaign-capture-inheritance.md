@@ -13,6 +13,11 @@ ao lead.
 - No modo seletivo, uma campanha ativa é a autorização base para o anúncio e o
   formulário presentes na atribuição do webhook. Uma regra filha habilitada ainda pode
   definir uma fila mais específica; uma regra filha desativada não descarta o lead.
+- A projeção de `/integrations/meta` aplica a mesma herança aos anúncios vinculados
+  à campanha, mesmo quando não existe uma regra filha persistida. Formulários que já
+  tiveram a cadeia campanha → formulário confirmada por leads do próprio tenant são
+  exibidos como **Herdado da campanha**; isso evita marcar todos os formulários da
+  Página como pertencentes à campanha.
 - A associação de formulário é confirmada pela atribuição imutável retornada no
   webhook. O catálogo de formulários da Meta é de Página, não de Campanha, portanto o
   CRM não habilita preventivamente formulários de outras campanhas da mesma Página.
@@ -28,6 +33,8 @@ reversível e auditado.
 - `src/features/communication-channels/meta-lead-ads.test.ts`
 - `src/features/leads/lead-filter-preferences.test.ts`
 - `src/features/meta-ads/components/meta-integration-view.test.tsx`
+- `src/features/meta-ads/actions.ts` (projeção de herança por atribuição persistida)
+- `src/features/meta-ads/meta-capture-inheritance.test.ts`
 - `tsc --noEmit`
 
 ## Controle de acesso de Gestor

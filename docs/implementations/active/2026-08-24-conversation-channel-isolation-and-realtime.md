@@ -3,6 +3,10 @@
 **Data:** 2026-08-24  
 **Estado:** implementado; liberação de ambiente pendente
 
+> **Atualização 03/09:** a DEC-091 substitui o envio Lite por sincronização somente
+> leitura. A conexão pessoal não autoriza mais contato oficial, cadência ou IA
+> automática; apenas leads e clientes já atribuídos ao corretor podem ser persistidos.
+
 ## Objetivo
 
 Separar a conversa oficial do tenant da conexão pessoal do corretor, mantendo a
@@ -14,9 +18,9 @@ assim que a VPS persistir um evento WAHA.
 - `/conversas` continua sendo a visão operacional do Diretor. Ela só recebe
   mensagens que pertencem a um lead do tenant; uma mensagem de conexão pessoal
   sem lead/cliente atribuído não é persistida.
-- `/conversas/broker` é a superfície da conexão do corretor. Um evento da
-  sessão é autorizado somente quando o contato é o número oficial do tenant ou
-  um lead/cliente cujo `corretorId` é o usuário da sessão.
+- `/conversas/broker` é a central de insights da conexão do corretor. Um evento da
+  sessão é autorizado somente quando o contato é um lead/cliente cujo `corretorId`
+  é exatamente o usuário da sessão.
 - Uma conversa corretor ↔ lead é gravada com o `leadId` já usado pela
   qualificação. Por isso, o Diretor a lê no mesmo chat, sem uma segunda thread
   e sem acesso às conversas pessoais do corretor.
@@ -26,8 +30,8 @@ assim que a VPS persistir um evento WAHA.
   escopo autenticado.
 - A central completa escuta o mesmo evento que a tela Lite. O provider global
   não adia mais atualizações porque há um campo de texto em foco.
-- No modo Lite, o envio de um corretor para seu lead usa a sessão WAHA; o canal
-  Meta oficial permanece o transporte da operação do tenant e da gestão.
+- No modo Lite, não existe envio pelo CRM. O corretor responde pelo seu WhatsApp;
+  o canal Meta oficial permanece o transporte da operação do tenant e da gestão.
 - O encaminhador Fastify da VPS assina o corpo encaminhado com
   `WAHA_RELAY_SHARED_SECRET` e os cabeçalhos `x-ancora-*` aceitos pelo webhook
   do CRM. Um Bearer interno isolado não satisfaz esse contrato e não é usado

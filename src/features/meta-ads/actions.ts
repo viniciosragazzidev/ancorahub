@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken, encryptMetaToken } from "./meta-oauth";
@@ -10,6 +10,8 @@ import { startMetaMarketingConnection } from "./meta-marketing-connection-servic
 import { runMetaTenantSync } from "./meta-sync-service";
 import { configureMetaLeadAdsSource } from "@/features/communication-channels/meta-lead-ads";
 import { resolvePageAccessToken, subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
+import { resolveMetaCapturePolicy } from "./meta-capture-policy";
+import { indexInheritedCampaignIdsByForm } from "./meta-capture-inheritance";
 import type { MetaConnectionAssets, MetaConnectionInfo, MetaDiscoveredAssets, MetaSyncLogItem, MetaSyncWarning } from "./types";
 
 /** Obter estado atual da conexão Meta do tenant */
@@ -41,7 +43,7 @@ export async function getMetaConnectionState(): Promise<{
   const { getSystemSetting } = await import("@/features/system-settings/queries");
   const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`).catch(() => null);
 
-  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes, adRoutes, formRoutes] = await Promise.all([
+  const [pages, adAccounts, pixels, datasets, leadForms, campaigns, adSets, ads, logs, campaignRoutes, adRoutes, formRoutes, leadAttributions] = await Promise.all([
     db.select({ id: schema.metaPages.pageId, name: schema.metaPages.name, status: schema.metaPages.status }).from(schema.metaPages).where(and(eq(schema.metaPages.tenantId, context.tenantId), eq(schema.metaPages.status, "active"))).orderBy(schema.metaPages.name),
     db.select({ id: schema.metaAdAccounts.adAccountId, name: schema.metaAdAccounts.name, currency: schema.metaAdAccounts.currency, status: schema.metaAdAccounts.status }).from(schema.metaAdAccounts).where(and(eq(schema.metaAdAccounts.tenantId, context.tenantId), eq(schema.metaAdAccounts.status, "active"))).orderBy(schema.metaAdAccounts.name),
     db.select({ id: schema.metaPixels.pixelId, name: schema.metaPixels.name, status: schema.metaPixels.status }).from(schema.metaPixels).where(and(eq(schema.metaPixels.tenantId, context.tenantId), eq(schema.metaPixels.status, "active"))).orderBy(schema.metaPixels.name),
@@ -54,6 +56,19 @@ export async function getMetaConnectionState(): Promise<{
     db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, enabled: schema.metaCampaignQueueRoutes.enabled }).from(schema.metaCampaignQueueRoutes).where(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId)).catch(() => []),
     db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled }).from(schema.metaAdQueueRoutes).where(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId)).catch(() => []),
     db.select({ formId: schema.metaFormQueueRoutes.formId, enabled: schema.metaFormQueueRoutes.enabled }).from(schema.metaFormQueueRoutes).where(eq(schema.metaFormQueueRoutes.tenantId, context.tenantId)).catch(() => []),
+    db.selectDistinct({ formId: schema.leads.metaFormId, campaignId: schema.leads.metaCampaignId })
+      .from(schema.leads)
+      .innerJoin(schema.metaCampaignQueueRoutes, and(
+        eq(schema.metaCampaignQueueRoutes.tenantId, schema.leads.tenantId),
+        eq(schema.metaCampaignQueueRoutes.campaignId, schema.leads.metaCampaignId),
+        eq(schema.metaCampaignQueueRoutes.enabled, true),
+      ))
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        isNotNull(schema.leads.metaFormId),
+        isNotNull(schema.leads.metaCampaignId),
+      ))
+      .catch(() => []),
   ]);
 
   const activeAccountIds = new Set(adAccounts.map((account) => account.id));
@@ -62,35 +77,76 @@ export async function getMetaConnectionState(): Promise<{
   const campaignRouteMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
   const adRouteMap = new Map(adRoutes.map((r) => [r.adId, r.enabled]));
   const formRouteMap = new Map(formRoutes.map((r) => [r.formId, r.enabled]));
+  const inheritedCampaignIdsByForm = indexInheritedCampaignIdsByForm(
+    leadAttributions,
+    new Set(campaignRoutes.filter((route) => route.enabled).map((route) => route.campaignId)),
+  );
 
   const hasTenantRules = campaignRoutes.length > 0 || adRoutes.length > 0 || formRoutes.length > 0;
   const globalCaptureMode: "all" | "selective" | "disabled" = storedGlobalMode === "disabled" || storedGlobalMode === "all" || storedGlobalMode === "selective"
     ? storedGlobalMode
     : (hasTenantRules ? "selective" : "all");
 
-  const activeCampaigns = campaigns
-    .filter((campaign) => activeAccountIds.has(campaign.adAccountId))
-    .map((c) => ({
-      ...c,
-      isEligibleForCapture: globalCaptureMode === "disabled" ? false : campaignRouteMap.has(c.id) ? Boolean(campaignRouteMap.get(c.id)) : globalCaptureMode === "all",
-    }));
+  const activeCampaignCandidates = campaigns.filter((campaign) => activeAccountIds.has(campaign.adAccountId));
+  const activeCampaignCandidateIds = new Set(activeCampaignCandidates.map((campaign) => campaign.id));
+  const activeAdSets = adSets.filter((adSet) => activeCampaignCandidateIds.has(adSet.campaignId));
+  const activeAdSetIds = new Set(activeAdSets.map((adSet) => adSet.id));
+  const adSetCampaignMap = new Map(activeAdSets.map((adSet) => [adSet.id, adSet.campaignId]));
+  const enabledAdCampaignIds = new Set(ads
+    .filter((ad) => activeAdSetIds.has(ad.adSetId) && adRouteMap.get(ad.id) === true)
+    .map((ad) => adSetCampaignMap.get(ad.adSetId))
+    .filter((campaignId): campaignId is string => Boolean(campaignId)));
 
-  const activeCampaignIds = new Set(activeCampaigns.map((campaign) => campaign.id));
-  const activeAdSetIds = new Set(adSets.filter((adSet) => activeCampaignIds.has(adSet.campaignId)).map((adSet) => adSet.id));
+  const activeCampaigns = activeCampaignCandidates.map((c) => ({
+    ...c,
+    isEligibleForCapture: enabledAdCampaignIds.has(c.id) || resolveMetaCapturePolicy({
+      campaignRoute: campaignRouteMap.has(c.id) ? { enabled: Boolean(campaignRouteMap.get(c.id)), queueId: null, queueStatus: null } : undefined,
+      globalMode: globalCaptureMode,
+      hasTenantRules,
+    }).action === "capture",
+  }));
 
   const filteredAds = ads
     .filter((ad) => activeAdSetIds.has(ad.adSetId))
-    .map((ad) => ({
-      ...ad,
-      isEligibleForCapture: globalCaptureMode === "disabled" ? false : adRouteMap.has(ad.id) ? Boolean(adRouteMap.get(ad.id)) : globalCaptureMode === "all",
-    }));
+    .map((ad) => {
+      const campaignId = adSetCampaignMap.get(ad.adSetId) ?? null;
+      const campaignRoute = campaignId && campaignRouteMap.has(campaignId)
+        ? { enabled: Boolean(campaignRouteMap.get(campaignId)), queueId: null, queueStatus: null }
+        : undefined;
+      const adRoute = adRouteMap.has(ad.id)
+        ? { enabled: Boolean(adRouteMap.get(ad.id)), queueId: null, queueStatus: null }
+        : undefined;
+      return {
+        ...ad,
+        campaignId,
+        isEligibleForCapture: resolveMetaCapturePolicy({
+          adRoute,
+          campaignRoute,
+          globalMode: globalCaptureMode,
+          hasTenantRules,
+        }).action === "capture",
+        inheritedFromCampaignId: campaignRoute?.enabled && !adRoute ? campaignId : null,
+      };
+    });
 
   const filteredLeadForms = leadForms
     .filter((form) => activePageIds.has(form.pageId))
-    .map((form) => ({
-      ...form,
-      isEligibleForCapture: globalCaptureMode === "disabled" ? false : formRouteMap.has(form.id) ? Boolean(formRouteMap.get(form.id)) : globalCaptureMode === "all",
-    }));
+    .map((form) => {
+      const inheritedCampaignIds = inheritedCampaignIdsByForm.get(form.id) ?? [];
+      const explicitFormRoute = formRouteMap.has(form.id)
+        ? { enabled: Boolean(formRouteMap.get(form.id)), queueId: null, queueStatus: null }
+        : undefined;
+      const explicitEligibility = resolveMetaCapturePolicy({
+        formRoute: explicitFormRoute,
+        globalMode: globalCaptureMode,
+        hasTenantRules,
+      }).action === "capture";
+      return {
+        ...form,
+        isEligibleForCapture: explicitEligibility || inheritedCampaignIds.length > 0,
+        inheritedFromCampaignIds: inheritedCampaignIds,
+      };
+    });
 
   const assets: MetaConnectionAssets = {
     pages,
@@ -539,6 +595,95 @@ export async function setMetaGlobalCaptureModeAction(input: {
     const context = await getRequiredTenantContext();
     const { setSystemSetting } = await import("@/features/system-settings/queries");
     await setSystemSetting(`meta_lead_capture_mode_${context.tenantId}`, input.mode);
+    if (input.mode === "all") {
+      const db = getDatabase();
+      const now = new Date();
+      // Keep existing queue mappings intact while materializing an explicit
+      // eligible record for every currently active asset. This makes the
+      // master action observable in the per-asset lists without changing
+      // routing destinations configured in Filas.
+      await db.transaction(async (tx) => {
+        // Match the same parent-scope used by the UI projection: an asset is
+        // only materialized when its account/page and its parent hierarchy are
+        // active. This avoids reactivating stale children left by a partial
+        // Meta sync.
+        const [activeAccounts, activePages] = await Promise.all([
+          tx.select({ id: schema.metaAdAccounts.adAccountId })
+            .from(schema.metaAdAccounts)
+            .where(and(eq(schema.metaAdAccounts.tenantId, context.tenantId), eq(schema.metaAdAccounts.status, "active"))),
+          tx.select({ id: schema.metaPages.pageId })
+            .from(schema.metaPages)
+            .where(and(eq(schema.metaPages.tenantId, context.tenantId), eq(schema.metaPages.status, "active"))),
+        ]);
+        const activeAccountIds = activeAccounts.map((asset) => asset.id);
+        const activePageIds = activePages.map((asset) => asset.id);
+        const campaigns = activeAccountIds.length
+          ? await tx.select({ campaignId: schema.metaCampaigns.campaignId })
+            .from(schema.metaCampaigns)
+            .where(and(
+              eq(schema.metaCampaigns.tenantId, context.tenantId),
+              eq(schema.metaCampaigns.status, "ACTIVE"),
+              inArray(schema.metaCampaigns.adAccountId, activeAccountIds),
+            ))
+          : [];
+        const activeCampaignIds = campaigns.map((asset) => asset.campaignId);
+        const adSets = activeCampaignIds.length
+          ? await tx.select({ adSetId: schema.metaAdSets.adSetId })
+            .from(schema.metaAdSets)
+            .where(and(eq(schema.metaAdSets.tenantId, context.tenantId), inArray(schema.metaAdSets.campaignId, activeCampaignIds)))
+          : [];
+        const activeAdSetIds = adSets.map((asset) => asset.adSetId);
+        const ads = activeAdSetIds.length
+          ? await tx.select({ adId: schema.metaAds.adId })
+            .from(schema.metaAds)
+            .where(and(
+              eq(schema.metaAds.tenantId, context.tenantId),
+              eq(schema.metaAds.status, "ACTIVE"),
+              inArray(schema.metaAds.adSetId, activeAdSetIds),
+            ))
+          : [];
+        const forms = activePageIds.length
+          ? await tx.select({ formId: schema.metaLeadForms.formId })
+            .from(schema.metaLeadForms)
+            .where(and(
+              eq(schema.metaLeadForms.tenantId, context.tenantId),
+              inArray(schema.metaLeadForms.pageId, activePageIds),
+              or(eq(schema.metaLeadForms.status, "ACTIVE"), eq(schema.metaLeadForms.status, "active")),
+            ))
+          : [];
+        if (campaigns.length) {
+          await tx.insert(schema.metaCampaignQueueRoutes).values(campaigns.map((asset) => ({
+            id: randomUUID(), tenantId: context.tenantId, campaignId: asset.campaignId, queueId: null,
+            enabled: true, createdBy: context.userId, createdAt: now, updatedAt: now,
+          }))).onConflictDoUpdate({
+            target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId],
+            set: { enabled: true, updatedAt: now },
+          });
+        }
+        if (ads.length) {
+          await tx.insert(schema.metaAdQueueRoutes).values(ads.map((asset) => ({
+            id: randomUUID(), tenantId: context.tenantId, adId: asset.adId, queueId: null,
+            enabled: true, createdBy: context.userId, createdAt: now, updatedAt: now,
+          }))).onConflictDoUpdate({
+            target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId],
+            set: { enabled: true, updatedAt: now },
+          });
+        }
+        if (forms.length) {
+          await tx.insert(schema.metaFormQueueRoutes).values(forms.map((asset) => ({
+            id: randomUUID(), tenantId: context.tenantId, formId: asset.formId, queueId: null,
+            enabled: true, createdBy: context.userId, createdAt: now, updatedAt: now,
+          }))).onConflictDoUpdate({
+            target: [schema.metaFormQueueRoutes.tenantId, schema.metaFormQueueRoutes.formId],
+            set: { enabled: true, updatedAt: now },
+          });
+        }
+        await tx.insert(schema.auditLogs).values({
+          id: randomUUID(), userId: context.userId, entidade: "meta_capture", entidadeId: context.tenantId,
+          acao: "meta_capture.all_assets_enabled", createdAt: now,
+        });
+      });
+    }
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao alterar modo de captura mestre." };

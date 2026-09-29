@@ -1,22 +1,28 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCanCreateRole } from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { generateNextInternalCode, createBrokerInvitation } from "./onboarding-helpers";
-import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
-import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
-import { scheduleAfterResponse } from "@/shared/async/after-response";
+import { enqueueBrokerInvitation } from "./broker-invitation-delivery";
+import { classifyExistingTeamIdentity } from "./identity-reuse-policy";
 
-const createUserInput = z.object({
+export const createUserInput = z.object({
   name: z.string().trim().min(2).max(120),
-  email: z.string().trim().email().max(254).transform((v) => v.toLowerCase()),
+  email: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? null : value,
+    z.string().trim().email().max(254).transform((value) => value.toLowerCase()).nullable(),
+  ),
   phone: z.string().trim().min(8).max(30),
   cpf: z.string().trim().max(20).optional().or(z.literal("")),
+  brokerCode: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
+    z.string().trim().min(1).max(40).regex(/^[A-Za-z0-9._-]+$/, "Use apenas letras, números, ponto, hífen ou sublinhado no código.").optional(),
+  ),
   // The UI sends the job title and profile separately. Older clients could
   // accidentally send the title (e.g. "marketing") as role; normalize that
   // value server-side so only the two supported access profiles reach the
@@ -24,6 +30,10 @@ const createUserInput = z.object({
   role: z.preprocess((value) => value === "director" ? "director" : value === "manager" ? "manager" : value === "supervisor" ? "supervisor" : "broker", z.enum(["director", "manager", "supervisor", "broker"])),
   jobTitle: z.enum(["director", "manager", "supervisor", "broker", "marketing", "finance", "operations", "support"]).default("broker"),
   branchId: z.string().uuid(),
+  customRoleId: z.preprocess(
+    (value) => typeof value === "string" && (value.trim() === "" || value === "__none__") ? null : value,
+    z.string().uuid().nullable().optional(),
+  ),
 });
 
 export async function createTeamUser(rawInput: unknown) {
@@ -34,6 +44,19 @@ export async function createTeamUser(rawInput: unknown) {
   }
 
   const db = getDatabase();
+
+  if (input.customRoleId) {
+    if (input.role === "director") throw new Error("Cargos personalizados não podem ser vinculados a um acesso de Diretor.");
+    const [customRole] = await db.select({ id: schema.customRoles.id, scope: schema.customRoles.scope })
+      .from(schema.customRoles)
+      .where(and(eq(schema.customRoles.id, input.customRoleId), eq(schema.customRoles.tenantId, context.tenantId), eq(schema.customRoles.status, "active")))
+      .limit(1);
+    if (!customRole) throw new Error("Escolha um cargo personalizado ativo da própria empresa.");
+  }
+
+  if (input.brokerCode && (input.role !== "broker" || input.jobTitle !== "broker")) {
+    throw new Error("O código do corretor só pode ser informado para membros com cargo de corretor.");
+  }
 
   const [branch] = await db
     .select()
@@ -48,11 +71,11 @@ export async function createTeamUser(rawInput: unknown) {
     .limit(1);
   if (!branch) throw new Error("A filial selecionada não pertence ao tenant ativo ou está inativa.");
 
-  const [existingEmail] = await db
+  const [existingEmail] = input.email ? await db
     .select({ id: schema.brokerProfiles.id })
     .from(schema.brokerProfiles)
     .where(and(eq(schema.brokerProfiles.invitedEmail, input.email), eq(schema.brokerProfiles.tenantId, context.tenantId)))
-    .limit(1);
+    .limit(1) : [];
   if (existingEmail) throw new Error("Já existe um corretor com este e-mail.");
 
   const normalizedCpf = input.cpf?.replace(/\D/g, "") || null;
@@ -71,26 +94,33 @@ export async function createTeamUser(rawInput: unknown) {
   if (existingPhone) throw new Error("Já existe um acesso com este telefone nesta corretora.");
   if (existingCpf) throw new Error("Já existe um corretor com este CPF.");
 
-  const [existingUser] = await db
+  const [existingUser] = input.email ? await db
     .select({ id: schema.user.id })
     .from(schema.user)
     .where(eq(schema.user.email, input.email))
-    .limit(1);
+    .limit(1) : [];
 
+  let reusableUserId: string | null = null;
   if (existingUser) {
-    const [membershipInTenant] = await db
+    const [identity] = await db
+      .select({ id: schema.user.id, active: schema.user.active, status: schema.user.status })
+      .from(schema.user)
+      .where(eq(schema.user.id, existingUser.id))
+      .limit(1);
+    const [tenantMembership] = await db
       .select({ id: schema.tenantMemberships.id })
       .from(schema.tenantMemberships)
-      .where(
-        and(
-          eq(schema.tenantMemberships.userId, existingUser.id),
-          eq(schema.tenantMemberships.tenantId, context.tenantId),
-        ),
-      )
+      .where(and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.userId, existingUser.id),
+      ))
       .limit(1);
-
-    if (membershipInTenant) {
-      throw new Error("Já existe um membro da equipe cadastrado com este e-mail nesta corretora.");
+    const identityDecision = classifyExistingTeamIdentity(identity ?? null, tenantMembership ?? null);
+    if (identityDecision.kind === "tenant-conflict") {
+      throw new Error("Este e-mail já pertence a um membro desta corretora. Reative o acesso existente ou use outro e-mail.");
+    }
+    if (identityDecision.kind === "reuse" || identityDecision.kind === "reactivate") {
+      reusableUserId = identityDecision.userId;
     }
   }
 
@@ -99,13 +129,29 @@ export async function createTeamUser(rawInput: unknown) {
   let invitationId = "";
 
   await db.transaction(async (tx) => {
-    const internalCode = await generateNextInternalCode(tx, context.tenantId);
+    let internalCode = input.brokerCode ?? null;
+    if (internalCode) {
+      const [existingCode] = await tx
+        .select({ id: schema.brokerProfiles.id })
+        .from(schema.brokerProfiles)
+        .where(and(
+          eq(schema.brokerProfiles.tenantId, context.tenantId),
+          eq(schema.brokerProfiles.internalCode, internalCode),
+        ))
+        .limit(1);
+      if (existingCode) throw new Error("Já existe um corretor com este código nesta corretora.");
+    } else {
+      internalCode = await generateNextInternalCode(tx, context.tenantId);
+    }
 
     await tx.insert(schema.brokerProfiles).values({
       id: brokerProfileId,
       tenantId: context.tenantId,
       branchId: input.branchId,
-      userId: null,
+      // A identidade pode ter sido preservada após uma exclusão. Vinculá-la
+      // ao novo perfil permite que o aceite do convite conclua o onboarding
+      // sem tentar criar uma segunda identidade global com o mesmo e-mail.
+      userId: reusableUserId,
       internalCode,
       professionalName: input.name,
       phone: normalizedPhone,
@@ -118,7 +164,7 @@ export async function createTeamUser(rawInput: unknown) {
       updatedAt: new Date(),
     });
 
-    const invitation = await createBrokerInvitation(tx, context.tenantId, input.branchId, brokerProfileId, input.email, input.role, input.jobTitle);
+    const invitation = await createBrokerInvitation(tx, context.tenantId, input.branchId, brokerProfileId, input.email, input.role, input.jobTitle, input.customRoleId ?? null);
     const { token } = invitation;
     inviteToken = token;
     invitationId = invitation.id;
@@ -128,43 +174,29 @@ export async function createTeamUser(rawInput: unknown) {
       userId: context.userId,
       entidade: "broker_profile",
       entidadeId: brokerProfileId,
-      acao: "criou_corretor_onboarding",
+      acao: reusableUserId ? "recriou_corretor_onboarding" : "criou_corretor_onboarding",
     });
+    if (reusableUserId) {
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "user",
+        entidadeId: reusableUserId,
+        acao: "reutilizou_identidade_global_em_reconvite",
+      });
+    }
   });
 
-  let whatsappStatus: "queued" | "not_available" | "failed" | "sent" = "not_available";
-  try {
-    const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels).where(and(
-      eq(schema.communicationChannels.tenantId, context.tenantId),
-      inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
-      eq(schema.communicationChannels.status, "active"),
-    )).orderBy(sql`CASE WHEN ${schema.communicationChannels.isDefault} = true THEN 0 ELSE 1 END`).limit(1);
-    if (channel) {
-      const company = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
-      const roleLabel = input.jobTitle === "director" || input.role === "director" ? "Diretor" : input.jobTitle === "manager" ? "Gestor" : input.jobTitle === "broker" ? "Corretor" : input.jobTitle;
-      const queued = await enqueueMetaTemplateMessage({
-        tenantId: context.tenantId,
-        channelId: channel.id,
-        recipientType: "user",
-        recipientId: invitationId,
-        destinationPhone: input.phone,
-        purpose: "brokerInvitation",
-        variables: [input.name, company[0]?.name ?? "sua corretora", roleLabel],
-        requestedBy: context.userId,
-        idempotencyKey: `team-invitation:${invitationId}`,
-      });
-      whatsappStatus = queued.duplicate || queued.status === "queued" ? "queued" : "failed";
-      await db.update(schema.brokerInvitations).set({ deliveryStatus: whatsappStatus === "queued" ? "queued" : "failed" }).where(eq(schema.brokerInvitations.id, invitationId));
-      // Delivery is durable but intentionally asynchronous. The UI can finish
-      // onboarding immediately; the VPS worker handles delivery and retries.
-      scheduleAfterResponse("team-invitation-outbound", () => processMetaOutboundBatch(3, context.tenantId));
-    } else {
-      await db.update(schema.brokerInvitations).set({ deliveryStatus: "not_available" }).where(eq(schema.brokerInvitations.id, invitationId));
-    }
-  } catch {
-    await db.update(schema.brokerInvitations).set({ deliveryStatus: "failed", deliveryError: "Não foi possível enfileirar o convite." }).where(eq(schema.brokerInvitations.id, invitationId));
-    whatsappStatus = "failed";
-  }
+  const whatsappStatus = await enqueueBrokerInvitation({
+    tenantId: context.tenantId,
+    branchId: input.branchId,
+    invitationId,
+    destinationPhone: normalizedPhone,
+    name: input.name,
+    jobTitle: input.jobTitle,
+    role: input.role,
+    requestedBy: context.userId,
+  });
 
   return { token: inviteToken, invitationId, whatsappStatus };
 }

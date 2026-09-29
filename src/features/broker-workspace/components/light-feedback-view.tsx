@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 import { ArrowRight, CheckCircle, WhatsappLogo } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,7 +22,7 @@ const FEEDBACK_OPTIONS = [
   { label: "Cotação enviada", status: "quote_sent" },
   { label: "Em negociação", status: "negotiation" },
   { label: "Venda realizada", status: "converted" },
-  { label: "Sem interesse", status: "lost", lossReason: "Sem interesse" },
+  { label: "Sem interesse", status: "lost", lossReason: "sem_interesse" },
 ];
 
 export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: FeedbackViewProps) {

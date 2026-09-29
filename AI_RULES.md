@@ -11,7 +11,8 @@ prioridade.
 3. `docs/business-rules.md` para comportamento do domínio e rastreabilidade.
 4. `CorreTop_Documento_Requisitos.md` para requisitos funcionais e não funcionais.
 5. `CorreTop_Arquitetura_Desenvolvimento.md` para arquitetura e processo.
-6. `DESIGN.md` para linguagem visual e acessibilidade.
+6. `docs/ux/UX_REDESIGN_CONTRACT.md` e `docs/ux/UX_REDESIGN_CONTROL.md` para
+   linguagem visual e a próxima etapa autorizada.
 
 Não invente requisito de negócio. Se uma decisão alterar escopo, segurança, cobrança,
 retenção ou integração externa, registre-a antes de implementar.
@@ -82,8 +83,8 @@ retenção ou integração externa, registre-a antes de implementar.
 
 As referências Nexus são apenas direção de composição. Preserve a identidade CorreTop, dados reais e o comportamento completo em light/dark. Use shell lateral, toolbar, cards compactos, gráficos em camadas e tabelas operacionais sem copiar conteúdo fictício da referência.
 
-- `DESIGN.md` é a fonte visual. Preserve a aparência clara, calma e profissional; a
-  interface deve priorizar leitura, contexto e urgência operacional, não decoração.
+- O Contrato de Redesign é a fonte visual. A interface prioriza leitura, contexto,
+  urgência operacional e disclosure progressivo, não decoração.
 - **Padronização é obrigatória:** use componentes reutilizáveis de `src/components/ui/`
   (shadcn) e `src/components/unlumen-ui/` (Unlumen) e
   tokens centralizados para tipografia, espaço, raio, cor, elevação e estados. Antes de
@@ -93,11 +94,8 @@ As referências Nexus são apenas direção de composição. Preserve a identida
   exclusivos daquela página. Valores arbitrários para tamanhos de fonte, paddings,
   alturas, bordas, cores e botões repetidos são proibidos quando houver token ou
   componente correspondente.
-- A fundação obrigatória de UI está em `docs/ui-foundation.md`: use o MCP do shadcn
-  antes de implementar UI e comece dashboards a partir de `dashboard-01`, adaptando os
-  dados e tokens sem copiar o template genérico. Consulte a documentação do Unlumen e
-  use seus componentes para estados animados e feedback. Componentes são adicionados
-  sob demanda, nunca em lote.
+- Consulte o Controle de Execução antes de implementar UI. Componentes são adicionados
+  sob demanda, nunca em lote, e devem respeitar a sequência de redesign vigente.
 - Para qualquer motion novo, use a skill local `transitions-dev`; aplique seus tokens
   e o guard de `prefers-reduced-motion`. Escolha o efeito de menor complexidade que
   comunique a mudança de estado e não adicione uma biblioteca de animação sem aprovação.

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, asc, eq, inArray } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import type { TenantContext } from "@/shared/auth/types";
@@ -32,25 +33,7 @@ export async function listAvailableCatalogPlans(
   ]);
 
   const globalRows = globalEnabled
-    ? await db
-        .select({
-          planId: schema.globalPlans.id,
-          carrierId: schema.globalCarriers.id,
-          carrierName: schema.globalCarriers.name,
-          planName: schema.globalPlans.name,
-          planType: schema.globalPlans.type,
-          coverage: schema.globalPlans.coverage,
-          maxEntryAge: schema.globalPlans.maxEntryAge,
-        })
-        .from(schema.globalPlans)
-        .innerJoin(schema.globalCarriers, eq(schema.globalPlans.carrierId, schema.globalCarriers.id))
-        .where(
-          and(
-            eq(schema.globalPlans.status, "published"),
-            eq(schema.globalCarriers.status, "published"),
-          ),
-        )
-        .orderBy(asc(schema.globalCarriers.name), asc(schema.globalPlans.name))
+    ? await getPublishedGlobalPlans()
     : [];
 
   const availabilityOverrides = globalRows.length > 0
@@ -86,7 +69,56 @@ export async function listAvailableCatalogPlans(
   }
 
   const privateRows = privateEnabled
-    ? await db
+    ? await getTenantPrivatePlans(resolvedContext.tenantId)
+    : [];
+
+  return [
+    ...allowedGlobalRows.map((row) => ({ ...row, source: "global" as const })),
+    ...privateRows.map((row) => ({ ...row, source: "tenant_private" as const })),
+  ];
+}
+
+type PublishedGlobalPlan = {
+  planId: string;
+  carrierId: string;
+  carrierName: string;
+  planName: string;
+  planType: "individual" | "empresarial" | "familiar" | "pme";
+  coverage: string | null;
+  maxEntryAge: number | null;
+};
+
+const getPublishedGlobalPlans = unstable_cache(
+  async (): Promise<PublishedGlobalPlan[]> => {
+    const db = getDatabase();
+    return db
+        .select({
+          planId: schema.globalPlans.id,
+          carrierId: schema.globalCarriers.id,
+          carrierName: schema.globalCarriers.name,
+          planName: schema.globalPlans.name,
+          planType: schema.globalPlans.type,
+          coverage: schema.globalPlans.coverage,
+          maxEntryAge: schema.globalPlans.maxEntryAge,
+        })
+        .from(schema.globalPlans)
+        .innerJoin(schema.globalCarriers, eq(schema.globalPlans.carrierId, schema.globalCarriers.id))
+        .where(
+          and(
+            eq(schema.globalPlans.status, "published"),
+            eq(schema.globalCarriers.status, "published"),
+          ),
+        )
+        .orderBy(asc(schema.globalCarriers.name), asc(schema.globalPlans.name))
+  },
+  ["global-catalog-published-plans"],
+  { revalidate: 60 },
+);
+
+const getTenantPrivatePlans = (tenantId: string) => unstable_cache(
+  async () => {
+    const db = getDatabase();
+    return db
         .select({
           planId: schema.tenantPrivatePlans.id,
           carrierId: schema.tenantPrivateCarriers.id,
@@ -100,19 +132,16 @@ export async function listAvailableCatalogPlans(
         .innerJoin(schema.tenantPrivateCarriers, eq(schema.tenantPrivatePlans.carrierId, schema.tenantPrivateCarriers.id))
         .where(
           and(
-            eq(schema.tenantPrivatePlans.tenantId, resolvedContext.tenantId),
+            eq(schema.tenantPrivatePlans.tenantId, tenantId),
             eq(schema.tenantPrivatePlans.active, true),
             eq(schema.tenantPrivateCarriers.active, true),
           ),
         )
         .orderBy(asc(schema.tenantPrivateCarriers.name), asc(schema.tenantPrivatePlans.name))
-    : [];
-
-  return [
-    ...allowedGlobalRows.map((row) => ({ ...row, source: "global" as const })),
-    ...privateRows.map((row) => ({ ...row, source: "tenant_private" as const })),
-  ];
-}
+  },
+  ["tenant-catalog-private-plans", tenantId],
+  { revalidate: 30 },
+)();
 
 export async function getGlobalCatalogAdminData() {
   const db = getDatabase();

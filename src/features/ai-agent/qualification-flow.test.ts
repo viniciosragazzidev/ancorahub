@@ -186,6 +186,30 @@ describe("Qualification Flow Unit Tests", () => {
   });
 
   describe("deterministic WhatsApp progression", () => {
+    it("uses a contextual clarification instead of repeating an unanswered city question verbatim", () => {
+      const memory: ConversationMemory = {
+        ...createEmptyMemory(),
+        customerName: { value: "Zuleika Crespo", confidence: 1 },
+        customerFirstName: { value: "Zuleika", confidence: 1 },
+        planType: { value: "individual", confidence: 1 },
+        numberOfLives: { value: "1", confidence: 1 },
+        age: { value: "73", confidence: 1 },
+        collectedFields: ["customerName", "planType", "numberOfLives", "age"],
+      };
+      const cityQuestion = "Em qual cidade você pretende utilizar o plano de saúde?";
+
+      const turn = resolveDeterministicQualificationTurn({
+        memory,
+        policy,
+        pastOutboundTexts: new Set([`Perfeito, Zuleika. ${cityQuestion}`.toLowerCase()]),
+      });
+
+      expect(turn.kind).toBe("collecting");
+      expect(turn.nextQuestion?.key).toBe("city");
+      expect(turn.reply).toContain("Para eu registrar corretamente");
+      expect(turn.reply).not.toBe(`Perfeito, Zuleika. ${cityQuestion}`);
+    });
+
     it("never repeats lives and hands off exactly after the email in the reported family-plan flow", () => {
       let memory: ConversationMemory = {
         ...createEmptyMemory(),

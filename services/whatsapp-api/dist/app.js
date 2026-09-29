@@ -1,11 +1,13 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import Fastify from "fastify";
-import { getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
+import { getInternalApiToken, getWhatsAppReviewConfig, getWahaConfig } from "./config.js";
 import { MetaGraphError, MetaGraphTimeoutError } from "./integrations/whatsapp/client.js";
 import { sendTestMessage } from "./integrations/whatsapp/service.js";
-import { WahaClient } from "./integrations/waha/client.js";
+import { WahaClient, resolveWebhookUrl } from "./integrations/waha/client.js";
 import { WahaClientError } from "./integrations/waha/types.js";
+import { attachLidPhoneNumbers } from "./integrations/waha/lid.js";
 const failedSessionRecoveries = new Map();
+const forcedSessionReconnects = new Map();
 function recoverFailedSessionOnce(client, sessionName) {
     const existing = failedSessionRecoveries.get(sessionName);
     if (existing)
@@ -16,6 +18,17 @@ function recoverFailedSessionOnce(client, sessionName) {
     });
     failedSessionRecoveries.set(sessionName, recovery);
     return recovery;
+}
+function reconnectSessionOnce(client, sessionName) {
+    const existing = forcedSessionReconnects.get(sessionName);
+    if (existing)
+        return existing;
+    const reconnect = client.reconnectSession(sessionName).finally(() => {
+        if (forcedSessionReconnects.get(sessionName) === reconnect)
+            forcedSessionReconnects.delete(sessionName);
+    });
+    forcedSessionReconnects.set(sessionName, reconnect);
+    return reconnect;
 }
 function logRecoveryCleanup(request, session, sessionStatus, cleanup) {
     for (const item of cleanup) {
@@ -56,6 +69,13 @@ function requireInternalAuth(request, reply, token) {
         return false;
     }
     return true;
+}
+/**
+ * Quanto tempo o "digitando…" fica visível: cresce com o texto, entre 2s e
+ * 6s, com até 1s de variação para que dois envios nunca tenham o mesmo ritmo.
+ */
+export function humanTypingMs(text, random = Math.random()) {
+    return Math.min(2_000 + text.length * 25, 6_000) + Math.floor(random * 1_000);
 }
 export function buildApp() {
     const app = Fastify({
@@ -120,7 +140,7 @@ export function buildApp() {
                 error: "WAHA_INTERNAL_ERROR",
             });
         }
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         const client = new WahaClient(wahaConfig);
         const result = await client.health();
@@ -146,9 +166,43 @@ export function buildApp() {
             timestamp: new Date().toISOString(),
         });
     });
+    // ── WAHA Diagnostics ───────────────────────────────────────────────────
+    // Retrato do servidor WAHA (versão/engine, uptime, sessões) para investigar
+    // falhas de pareamento sem acesso ao container. Sem segredos nem telefones.
+    app.get("/internal/waha/diagnostics", async (request, reply) => {
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+        }
+        const client = new WahaClient(wahaConfig);
+        const [health, diagnostics] = await Promise.all([client.health(), client.getDiagnostics()]);
+        request.log.info({
+            operation: "waha.diagnostics",
+            health: health.status,
+            sessions: diagnostics.sessions?.length ?? null,
+            errors: diagnostics.errors,
+        });
+        return reply.code(200).send({
+            ok: true,
+            health: { status: health.status, durationMs: health.durationMs, ...(health.error ? { error: health.error } : {}) },
+            webhookUrl: (() => { try {
+                return new URL(resolveWebhookUrl()).origin;
+            }
+            catch {
+                return "invalid";
+            } })(),
+            ...diagnostics,
+            timestamp: new Date().toISOString(),
+        });
+    });
     // ── WAHA Test Session: Start ────────────────────────────────────────
     app.post("/internal/waha/test-session/start", async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -200,7 +254,7 @@ export function buildApp() {
     });
     // ── WAHA Test Session: Status ────────────────────────────────────────
     app.get("/internal/waha/test-session/status", async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -233,7 +287,7 @@ export function buildApp() {
     });
     // ── WAHA Test Session: QR Code ───────────────────────────────────────
     app.get("/internal/waha/test-session/qr", async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -282,7 +336,7 @@ export function buildApp() {
     });
     // ── WAHA Test Session: Reset ─────────────────────────────────────────
     app.post("/internal/waha/test-session/reset", async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -328,7 +382,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -470,6 +524,69 @@ export function buildApp() {
             return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
         }
     });
+    // ── WAHA Connection: Force QR rotation ───────────────────────────────
+    app.post("/internal/waha/connections/:id/reconnect", {
+        schema: {
+            params: {
+                type: "object",
+                required: ["id"],
+                properties: { id: { type: "string", minLength: 1, maxLength: 120 } },
+            },
+        },
+    }, async (request, reply) => {
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+        }
+        const { id: sessionName } = request.params;
+        const client = new WahaClient(wahaConfig);
+        const startedAt = Date.now();
+        try {
+            const reconnected = await reconnectSessionOnce(client, sessionName);
+            const status = reconnected.session.status;
+            const providerStatus = reconnected.session.providerStatus;
+            let qr = null;
+            if (providerStatus === "SCAN_QR_CODE") {
+                try {
+                    qr = await client.getQr(sessionName, reconnected.session);
+                }
+                catch (error) {
+                    // Sessão recém-criada: o QR costuma levar alguns segundos. O
+                    // polling do CRM busca o QR assim que ele existir.
+                    request.log.info({
+                        operation: "waha.connection.reconnect.qr_pending",
+                        session: sessionName,
+                        normalizedError: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR",
+                    });
+                }
+            }
+            logRecoveryCleanup(request, sessionName, status, reconnected.cleanup);
+            request.log.info({
+                operation: "waha.connection.reconnect",
+                session: sessionName,
+                status,
+                providerStatus,
+                hasQr: qr !== null,
+                durationMs: Date.now() - startedAt,
+            });
+            return reply.code(200).send({ ok: true, sessionName, status, providerStatus, qr, reused: false, timestamp: new Date().toISOString() });
+        }
+        catch (error) {
+            request.log.warn({
+                operation: "waha.connection.reconnect",
+                session: sessionName,
+                normalizedError: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR",
+                providerStatusCode: error instanceof WahaClientError ? error.providerStatusCode : undefined,
+                durationMs: Date.now() - startedAt,
+            });
+            return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR" });
+        }
+    });
     // ── WAHA Connection: Recover failed session ──────────────────────────
     app.post("/internal/waha/connections/:id/recover", {
         schema: {
@@ -480,7 +597,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -540,7 +657,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -559,6 +676,7 @@ export function buildApp() {
                 ok: true,
                 sessionName,
                 status,
+                providerStatus: session?.providerStatus ?? "STOPPED",
                 phoneNumber: session?.displayPhoneNumber ?? null,
                 timestamp: new Date().toISOString(),
             });
@@ -569,7 +687,142 @@ export function buildApp() {
                 session: sessionName,
                 errorCode: error instanceof Error ? error.message : "unknown",
             });
+            return reply.code(502).send({
+                ok: false,
+                service: "waha",
+                status: "unavailable",
+                // Preserve the normalized provider error so the CRM can distinguish
+                // network instability from an invalid WAHA API key.
+                error: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+            });
+        }
+    });
+    // ── WAHA Connection: State (status + QR em uma leitura) ───────────────
+    // Rota usada pelo polling do pareamento. Substitui o par status + qr, que
+    // repetia a leitura da sessão no WAHA e dobrava a latência de cada ciclo.
+    app.get("/internal/waha/connections/:id/state", {
+        schema: {
+            params: {
+                type: "object",
+                required: ["id"],
+                properties: { id: { type: "string", minLength: 1, maxLength: 120 } },
+            },
+        },
+    }, async (request, reply) => {
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+        }
+        const { id: sessionName } = request.params;
+        const startedAt = Date.now();
+        try {
+            const state = await new WahaClient(wahaConfig).getConnectionState(sessionName);
+            request.log.info({
+                operation: "waha.connection.state",
+                session: sessionName,
+                status: state.status,
+                providerStatus: state.providerStatus,
+                hasQr: state.qr !== null,
+                durationMs: Date.now() - startedAt,
+            });
+            // Nunca logar o QR em si.
+            return reply.code(200).send({
+                ok: true,
+                sessionName,
+                exists: state.exists,
+                status: state.status,
+                providerStatus: state.providerStatus,
+                phoneNumber: state.phoneNumber,
+                qr: state.qr,
+                timestamp: new Date().toISOString(),
+            });
+        }
+        catch (error) {
+            request.log.warn({
+                operation: "waha.connection.state",
+                session: sessionName,
+                normalizedError: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+                durationMs: Date.now() - startedAt,
+            });
+            return reply.code(502).send({
+                ok: false,
+                service: "waha",
+                status: "unavailable",
+                error: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+            });
+        }
+    });
+    // ── WAHA Connection: Chats (bounded history reconciliation) ──────────
+    app.get("/internal/waha/connections/:id/chats", {
+        schema: {
+            params: {
+                type: "object",
+                required: ["id"],
+                properties: { id: { type: "string", minLength: 1, maxLength: 120 } },
+            },
+            querystring: {
+                type: "object",
+                additionalProperties: false,
+                properties: { limit: { type: "string", pattern: "^[1-9][0-9]{0,2}$" } },
+            },
+        },
+    }, async (request, reply) => {
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+        }
+        const { id: sessionName } = request.params;
+        const limit = Math.min(Math.max(Number(request.query.limit ?? "500"), 1), 500);
+        try {
+            const chats = await new WahaClient(wahaConfig).getChats(sessionName, limit);
+            request.log.info({ operation: "waha.connection.chats", session: sessionName, chats: chats.length });
+            return reply.code(200).send({ ok: true, sessionName, chats });
+        }
+        catch (error) {
+            request.log.warn({ operation: "waha.connection.chats", session: sessionName, errorCode: error instanceof Error ? error.message : "unknown" });
             return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+        }
+    });
+    // ── WAHA Media: file download for the CRM (webhook `media.url`) ──────
+    app.get("/internal/waha/media", {
+        schema: {
+            querystring: {
+                type: "object",
+                additionalProperties: false,
+                required: ["url"],
+                properties: { url: { type: "string", minLength: 1, maxLength: 2000 } },
+            },
+        },
+    }, async (request, reply) => {
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+        }
+        try {
+            const file = await new WahaClient(wahaConfig).downloadMediaFile(request.query.url ?? "");
+            request.log.info({ operation: "waha.media.download", bytes: file.body.byteLength, contentType: file.contentType });
+            return reply.code(200).header("content-type", file.contentType).header("cache-control", "no-store").send(file.body);
+        }
+        catch (error) {
+            const code = error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE";
+            const status = error instanceof WahaClientError ? error.statusCode : 502;
+            request.log.warn({ operation: "waha.media.download", errorCode: code });
+            return reply.code(status).send({ ok: false, error: code });
         }
     });
     // ── WAHA Connection: QR Code ─────────────────────────────────────────
@@ -582,7 +835,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -597,9 +850,9 @@ export function buildApp() {
             const session = await client.getSession(sessionName);
             const status = session?.status ?? "DISCONNECTED";
             let qr = null;
-            if (status === "WAITING_QR") {
+            if (session?.providerStatus === "SCAN_QR_CODE") {
                 try {
-                    qr = await client.getQr(sessionName);
+                    qr = await client.getQr(sessionName, session);
                 }
                 catch (qrError) {
                     request.log.info({
@@ -624,7 +877,12 @@ export function buildApp() {
                 session: sessionName,
                 errorCode: error instanceof Error ? error.message : "unknown",
             });
-            return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+            return reply.code(502).send({
+                ok: false,
+                service: "waha",
+                status: "unavailable",
+                error: error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE",
+            });
         }
     });
     // ── WAHA Connection: Disconnect ──────────────────────────────────────
@@ -637,7 +895,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -660,12 +918,14 @@ export function buildApp() {
             });
         }
         catch (error) {
+            const normalizedError = error instanceof WahaClientError ? error.code : "WAHA_INTERNAL_ERROR";
             request.log.warn({
                 operation: "waha.connection.disconnect",
                 session: sessionName,
-                errorCode: error instanceof Error ? error.message : "unknown",
+                normalizedError,
+                providerStatusCode: error instanceof WahaClientError ? error.providerStatusCode : undefined,
             });
-            return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+            return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: normalizedError });
         }
     });
     // ────────────────────────────────────────────────────────────────────────
@@ -689,6 +949,29 @@ export function buildApp() {
                 error: !CRM_WEBHOOK_URL ? "CRM_WEBHOOK_URL not configured" : "WAHA_RELAY_SHARED_SECRET not configured",
             });
             return reply.code(503).send({ accepted: false, error: "CRM webhook not configured" });
+        }
+        // Linha do tempo do pareamento nos logs do Fastify (só metadados — nunca
+        // conteúdo de mensagem): sem ela não dá para saber se o WAHA está
+        // entregando os eventos de status.
+        const envelope = request.body;
+        if (envelope?.event === "session.status") {
+            request.log.info({
+                operation: "waha.webhook.session_status",
+                session: typeof envelope.session === "string" ? envelope.session : undefined,
+                status: typeof envelope.payload?.status === "string" ? envelope.payload.status : undefined,
+            });
+        }
+        // Contacts addressed by @lid carry no phone: attach the real one so the
+        // CRM can match the message to the broker's lead (see lid.ts).
+        try {
+            const lidClient = new WahaClient(getWahaConfig());
+            const resolved = await attachLidPhoneNumbers(request.body, (session, lid) => lidClient.getPhoneForLid(session, lid));
+            if (resolved.from || resolved.to) {
+                request.log.info({ operation: "waha.webhook.lid_resolved", from: resolved.from, to: resolved.to });
+            }
+        }
+        catch {
+            // WAHA config missing: forward unchanged; the CRM flags unresolved LIDs.
         }
         const rawBody = JSON.stringify(request.body);
         const timestamp = String(Date.now());
@@ -726,6 +1009,68 @@ export function buildApp() {
         }
     });
     // ────────────────────────────────────────────────────────────────────────
+    // POST /internal/waha/messages/history — bounded history recovery
+    // ────────────────────────────────────────────────────────────────────────
+    app.post("/internal/waha/messages/history", {
+        schema: {
+            body: {
+                type: "object",
+                required: ["sessionName", "chatIds"],
+                additionalProperties: false,
+                properties: {
+                    sessionName: { type: "string", minLength: 1, maxLength: 120 },
+                    chatIds: { type: "array", minItems: 1, maxItems: 50, items: { type: "string", minLength: 10, maxLength: 40 } },
+                    limit: { type: "integer", minimum: 1, maximum: 100 },
+                },
+            },
+        },
+    }, async (request, reply) => {
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
+            return;
+        let wahaConfig;
+        try {
+            wahaConfig = getWahaConfig();
+        }
+        catch {
+            return reply.code(503).send({ ok: false, error: "WAHA_INTERNAL_ERROR" });
+        }
+        const { sessionName, chatIds, limit } = request.body;
+        const normalizedChatIds = [...new Set(chatIds)]
+            .map((chatId) => chatId.includes("@") ? chatId : `${chatId.replace(/\D/g, "")}@c.us`)
+            .filter((chatId) => /^\d{10,15}@(c\.us|lid)$/.test(chatId));
+        if (!normalizedChatIds.length)
+            return reply.code(400).send({ ok: false, error: "INVALID_CHAT_IDS" });
+        const client = new WahaClient(wahaConfig);
+        try {
+            const session = await client.getSession(sessionName);
+            if (!session || session.status !== "CONNECTED") {
+                return reply.code(400).send({ ok: false, error: session ? `SESSION_${session.status}` : "SESSION_NOT_FOUND" });
+            }
+            const chats = [];
+            let failedChats = 0;
+            for (const chatId of normalizedChatIds) {
+                try {
+                    const messages = await client.getMessages(sessionName, chatId, limit);
+                    chats.push({ chatId, messages });
+                }
+                catch (error) {
+                    failedChats += 1;
+                    request.log.warn({
+                        operation: "waha.message.history_chat_failed",
+                        session: sessionName,
+                        errorCode: error instanceof Error ? error.message : "unknown",
+                    });
+                }
+            }
+            request.log.info({ operation: "waha.message.history_sync", session: sessionName, chats: chats.length, failedChats, messages: chats.reduce((sum, chat) => sum + chat.messages.length, 0) });
+            return reply.code(200).send({ ok: true, chats, failedChats });
+        }
+        catch (error) {
+            request.log.warn({ operation: "waha.message.history_sync", session: sessionName, errorCode: error instanceof Error ? error.message : "unknown" });
+            return reply.code(502).send({ ok: false, error: "WAHA_HISTORY_FAILED" });
+        }
+    });
+    // ────────────────────────────────────────────────────────────────────────
     // POST /internal/waha/messages/text — Send text message via WAHA
     // ────────────────────────────────────────────────────────────────────────
     app.post("/internal/waha/messages/text", {
@@ -738,6 +1083,7 @@ export function buildApp() {
                     chatId: { type: "string", minLength: 10, maxLength: 20 },
                     text: { type: "string", minLength: 1, maxLength: 4000 },
                     idempotencyKey: { type: "string", minLength: 16, maxLength: 160 },
+                    humanize: { type: "boolean" },
                 },
             },
             response: {
@@ -754,7 +1100,7 @@ export function buildApp() {
             },
         },
     }, async (request, reply) => {
-        if (!requireInternalAuth(request, reply, process.env.WHATSAPP_API_INTERNAL_TOKEN ?? ""))
+        if (!requireInternalAuth(request, reply, getInternalApiToken()))
             return;
         let wahaConfig;
         try {
@@ -763,7 +1109,7 @@ export function buildApp() {
         catch {
             return reply.code(503).send({ ok: false, error: "WAHA_INTERNAL_ERROR" });
         }
-        const { sessionName, chatId, text, idempotencyKey } = request.body;
+        const { sessionName, chatId, text, idempotencyKey, humanize } = request.body;
         // Validate chatId format (digits only, 10-15 chars)
         if (!/^\d{10,15}$/.test(chatId)) {
             return reply.code(400).send({ ok: false, error: "INVALID_CHAT_ID" });
@@ -784,7 +1130,12 @@ export function buildApp() {
                     error: session ? `SESSION_${session.status}` : "SESSION_NOT_FOUND",
                 });
             }
-            const result = await client.sendText(sessionName, `${chatId}@c.us`, text);
+            // O client resolve o telefone para o chatId canônico do WAHA (inclusive
+            // @lid) antes de enviar. Não force @c.us aqui: algumas contas WebJS
+            // recusam esse formato com "No LID for user".
+            // Envios automáticos do número da empresa mostram "digitando…" antes,
+            // como uma pessoa. Envios manuais do corretor não pedem (humanize ausente).
+            const result = await client.sendText(sessionName, chatId, text, humanize ? { typingMs: humanTypingMs(text) } : {});
             const durationMs = Date.now() - startedAt;
             request.log.info({
                 operation: "waha.message.send",

@@ -5,8 +5,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getAuth } from "@/shared/auth";
 import { headers } from "next/headers";
 import type { TenantRole } from "@/shared/db/schema";
-import { listEffectiveCapabilities } from "@/features/custom-roles/service";
-import type { PermissionKey } from "@/shared/auth/permissions";
+import { listEffectiveCapabilities, listEffectiveRoutes } from "@/features/custom-roles/service";
 import { isUserProfileEnabled } from "@/features/user-profile/feature";
 
 const ROLE_REDIRECT: Record<TenantRole, string> = {
@@ -29,7 +28,7 @@ export type UserDisplayInfo = {
   roleKey: TenantRole | null;
   jobTitle: string | null;
   branchId?: string | null;
-  permissions?: PermissionKey[];
+  permissions?: string[];
   redirectLogout: string;
   isPlatformAdmin?: boolean;
   activeRoleOverride?: string | null;
@@ -143,7 +142,10 @@ export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
 
   const redirectLogout = role ? ROLE_REDIRECT[role] ?? "/login" : "/login";
   const permissions = membership
-    ? await listEffectiveCapabilities({ tenantId: membership.tenantId, role: role ?? membership.role, jobTitle: jobTitle, customRoleId: membership.customRoleId })
+    ? [
+      ...(await listEffectiveCapabilities({ tenantId: membership.tenantId, role: role ?? membership.role, jobTitle, customRoleId: membership.customRoleId })),
+      ...(await listEffectiveRoutes({ tenantId: membership.tenantId, customRoleId: membership.customRoleId })),
+    ]
     : [];
   const userProfileEnabled = await isUserProfileEnabled();
 

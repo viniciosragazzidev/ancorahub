@@ -31,7 +31,7 @@ type Aggregate = { count: number; oldestAt: string | null };
 import type { TenantRole } from "@/shared/db/schema";
 
 function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string) {
-  const conditions = [eq(schema.leads.tenantId, tenantId)];
+  const conditions = [eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)];
   if ((role === "manager" || role === "supervisor") && branchId) conditions.push(eq(schema.leads.branchId, branchId));
   if (role === "broker") conditions.push(eq(schema.leads.corretorId, userId));
   return and(...conditions);

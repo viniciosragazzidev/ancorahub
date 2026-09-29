@@ -1,7 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { evaluateLeadAgainstConditions } from "./routing-engine";
+import { ALL_ROUTING_SOURCES_ID, normalizeQueueSource } from "./routing-catalog";
 
 describe("Routing Engine - evaluateLeadAgainstConditions", () => {
+  it("normalizes manual and webhook queue sources without losing Meta specificity", () => {
+    expect(normalizeQueueSource("bulk_import", "manual")).toBe("manual");
+    expect(normalizeQueueSource(null, "manual")).toBe("manual");
+    expect(normalizeQueueSource("landing_page", "manual")).toBe("manual");
+    expect(normalizeQueueSource("landing_page", null, true)).toBe("webhook");
+    expect(normalizeQueueSource(null, "webhook")).toBe("webhook");
+    expect(normalizeQueueSource("meta_lead_ads", null, true)).toBe("meta_lead_ads");
+  });
+
   it("returns match when lead matches planType and minLives conditions", () => {
     const conditions = {
       planTypes: ["pme", "empresarial"],
@@ -41,6 +51,32 @@ describe("Routing Engine - evaluateLeadAgainstConditions", () => {
     };
 
     const result = evaluateLeadAgainstConditions(conditions, lead);
+    expect(result.matches).toBe(true);
+  });
+
+  it("does not route a disqualified lead through a global rule", () => {
+    const result = evaluateLeadAgainstConditions({}, { qualificationStatus: "disqualified" });
+    expect(result.matches).toBe(false);
+    expect(result.reasons.some((reason) => reason.includes("desqualificado"))).toBe(true);
+  });
+
+  it("routes a disqualified lead only when explicitly selected", () => {
+    const result = evaluateLeadAgainstConditions({ qualificationStatuses: ["disqualified"] }, { qualificationStatus: "disqualified" });
+    expect(result.matches).toBe(true);
+  });
+
+  it("normalizes the canonical Meta Lead Ads source and legacy alias", () => {
+    const canonical = evaluateLeadAgainstConditions({ sources: ["meta_lead_ads"] }, { source: "meta_ads" });
+    const legacy = evaluateLeadAgainstConditions({ sources: ["meta_ads"] }, { source: "meta_lead_ads" });
+    expect(canonical.matches).toBe(true);
+    expect(legacy.matches).toBe(true);
+  });
+
+  it("matches every source when Todas as origens is selected", () => {
+    const result = evaluateLeadAgainstConditions(
+      { sources: [ALL_ROUTING_SOURCES_ID] },
+      { source: "whatsapp" },
+    );
     expect(result.matches).toBe(true);
   });
 });

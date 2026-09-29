@@ -10,7 +10,7 @@ function assertAdminRole(role: string) {
   }
 }
 
-export const brokerSummaryQuerySchema = z.object({
+const brokerSummaryQuerySchema = z.object({
   period: z.enum(["today", "week", "month", "custom"]).default("today"),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
@@ -40,8 +40,10 @@ export async function getBrokerDailySummaryAction(
     startDate = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
   } else if (parsed.period === "custom" && parsed.startDate) {
     startDate = new Date(parsed.startDate);
+    startDate.setHours(0, 0, 0, 0);
     if (parsed.endDate) {
       endDate = new Date(parsed.endDate);
+      endDate.setHours(23, 59, 59, 999);
     }
   }
 

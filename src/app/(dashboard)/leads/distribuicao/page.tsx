@@ -1,17 +1,21 @@
-import { count, desc, eq, and, inArray, isNull } from "drizzle-orm";
+import { count, desc, eq, and, inArray, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
-import { DashboardHeader } from "@/components/dashboard-header";
-import { DistributionMetrics, DistributionPanel } from "./_components/distribution-dashboard";
+import { Activity, History, Workflow, Inbox as InboxIcon } from "lucide-react";
+import { DistributionMetrics } from "./_components/distribution-dashboard";
 import { DistributionInbox } from "./_components/distribution-inbox";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { cn } from "@/lib/utils";
+import { DashboardHeader } from "@/components/dashboard-header";
+import { DsStatusBadge } from "@/components/ui/ds-status-badge";
+import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/dashboard/metric-card";
+import { SectionCardHeader } from "@/components/ui/section-card-header";
+import { DsEmptyState } from "@/components/ui/ds-empty-state";
+import { DsOutlinedActionButton } from "@/components/ui/ds-outlined-action-button";
+import { dsButtonVariants } from "@/components/ui/ds-button-variants";
 import {
   getDistributionJobConfig,
   getLeadDistributionJobHealth,
@@ -23,15 +27,21 @@ import { DistributionTabsContainer } from "./_components/distribution-tabs-conta
 import { DistributionPolicyPanel } from "@/app/(dashboard)/settings/_components/distribution-policy-panel";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { RoutingMatrixPanel } from "./_components/routing-matrix-panel";
-import { RoutingSimulatorPanel } from "./_components/routing-simulator-panel";
+import { DddRoutingPanel } from "./_components/ddd-routing-panel";
 import { fetchRoutingRules } from "@/features/lead-distribution/routing-engine";
 import { BrokerDailySummaryPanel } from "./_components/broker-daily-summary-panel";
 import { fetchBrokerDailySummary } from "@/features/lead-distribution/broker-summary-service";
+import { DutyOperationsWorkspace } from "./plantao/_components/duty-operations-workspace";
+import { getDutyRosterSnapshot } from "@/features/lead-distribution/roster-queries";
+import { BrokerAcceptanceSlaPanel } from "./_components/broker-acceptance-sla-panel";
+import { resolveDistributionView } from "@/features/lead-distribution/distribution-view-access";
+import { getHoldDisqualifiedLeads } from "@/features/lead-distribution/disqualified-routing-settings";
+import { getDddRoutingSettings } from "@/features/lead-distribution/ddd-routing-settings";
+import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-routing-panel";
 
 export const dynamic = "force-dynamic";
 
-type DistributionView = "roteamento" | "resumo_dia" | "filas" | "operar" | "plantao" | "saude_historico";
-type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue";
+type QueueFilter = "all" | "unassigned" | "queued" | "returned_to_queue" | "manual_hold";
 
 const activeStatuses = [
   "new",
@@ -43,34 +53,68 @@ const activeStatuses = [
   "under_analysis",
 ] as const;
 
+// Static reference content, opened from the Filas "⋯" menu (only the queue
+// table stays on screen).
+function DistributionStages() {
+  const stages = [
+    { title: "Entrada", text: "Manual, integração ou webhook cria uma intenção rastreável." },
+    { title: "Unidade", text: "A regra da fila escolhe a unidade elegível com menor carga." },
+    { title: "Fila", text: "Capacidade, ordem e restrições definem quem pode receber." },
+    { title: "Corretor", text: "Apenas ativos, disponíveis e compatíveis com o plantão." },
+    { title: "Oferta + SLA", text: "Recusa, expiração ou atraso avança para o próximo elegível." },
+  ];
+  return (
+    <ol className="grid gap-2">
+      {stages.map((stage, index) => (
+        <li key={stage.title} className="flex min-w-0 gap-3 rounded-lg border border-border/70 p-3">
+          <span
+            className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary"
+            aria-hidden="true"
+          >
+            {index + 1}
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground">{stage.title}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{stage.text}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default async function LeadDistributionPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; status?: string }>;
+  searchParams: Promise<{ view?: string; status?: string; escalaMes?: string }>;
 }) {
   const params = await searchParams;
-  const view: DistributionView =
-    params.view === "resumo_dia" || params.view === "resumo" || params.view === "filas" || params.view === "operar" || params.view === "plantao" || params.view === "saude_historico" || params.view === "saude" || params.view === "historico"
-      ? (params.view === "saude" || params.view === "historico" ? "saude_historico" : (params.view === "resumo" ? "resumo_dia" : (params.view as DistributionView)))
-      : "roteamento";
-
   const queueFilter: QueueFilter =
-    params.status === "unassigned" || params.status === "queued" || params.status === "returned_to_queue"
+    params.status === "unassigned" ||
+    params.status === "queued" ||
+    params.status === "returned_to_queue" ||
+    params.status === "manual_hold"
       ? params.status
       : "all";
 
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
+  const view = resolveDistributionView(context.role, params.view);
+  const monthlyDutySchedulingEnabled = view === "plantao"
+    ? (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true"
+    : false;
 
   if (context.role === "manager" && !context.branchId) {
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
-        <main className="flex min-h-full flex-col items-center justify-center gap-4 bg-background p-12 text-center">
-          <p className="text-sm font-semibold text-foreground">Unidade não definida</p>
-          <p className="text-xs text-muted-foreground">
-            Seu acesso como gestor não está vinculado a nenhuma unidade. Fale com o diretor para ajustar seu cadastro.
-          </p>
+        <main className="flex min-h-full flex-col items-center justify-center bg-ds-canvas-white p-ds-48">
+          <DsEmptyState
+            icon={<InboxIcon size={20} />}
+            title="Unidade não definida"
+            description="Seu acesso como gestor não está vinculado a nenhuma unidade. Fale com o diretor para ajustar seu cadastro."
+            bordered={false}
+          />
         </main>
       </>
     );
@@ -93,6 +137,7 @@ export default async function LeadDistributionPage({
       status: schema.branches.status,
       acceptingLeads: schema.branches.acceptingLeads,
       autoDistribute: schema.branches.autoDistribute,
+      isDistributionHub: schema.branches.isDistributionHub,
     })
     .from(schema.branches)
     .where(branchScope);
@@ -102,14 +147,18 @@ export default async function LeadDistributionPage({
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
-        <main className="flex min-h-full flex-col items-center justify-center gap-4 bg-background p-12 text-center">
-          <p className="text-sm font-semibold text-foreground">Nenhuma filial cadastrada</p>
-          <p className="text-xs text-muted-foreground mb-2">
-            Crie filiais para poder configurar as regras de distribuição de leads.
-          </p>
-          <Button render={<Link href="/filiais" />} size="sm" variant="outline">
-            Ir para Filiais
-          </Button>
+        <main className="flex min-h-full flex-col items-center justify-center bg-ds-canvas-white p-ds-48">
+          <DsEmptyState
+            icon={<InboxIcon size={20} />}
+            title="Nenhuma filial cadastrada"
+            description="Crie filiais para poder configurar as regras de distribuição de leads."
+            bordered={false}
+            action={
+              <Link href="/equipe?visao=unidades" className={dsButtonVariants({ dsVariant: "outlined-action" })}>
+                Ir para Filiais
+              </Link>
+            }
+          />
         </main>
       </>
     );
@@ -119,6 +168,7 @@ export default async function LeadDistributionPage({
   const [
     brokers,
     unassignedLeads,
+    unassignedArchiveCount,
     activeBrokerLeads,
     brokerStatsByBranch,
     leadStatsByBranch,
@@ -137,6 +187,10 @@ export default async function LeadDistributionPage({
     dutySchedules,
     routingRules,
     brokerSummary,
+    dutyRoster,
+    tenantSlaSettings,
+    holdDisqualifiedLeads,
+    dddRoutingSettings,
   ] = await Promise.all([
     db
       .select({
@@ -167,6 +221,8 @@ export default async function LeadDistributionPage({
         phone: schema.leads.telefone,
         branchId: schema.leads.branchId,
         distributionStatus: schema.leads.distributionStatus,
+        status: schema.leads.status,
+        qualificationStatus: schema.leads.qualificationStatus,
         createdAt: schema.leads.createdAt,
         sourceCampaign: schema.leads.sourceCampaign,
         sourceAd: schema.leads.sourceAd,
@@ -178,14 +234,26 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
-          inArray(schema.leads.distributionStatus, ["unassigned", "queued", "returned_to_queue"]),
+          isNull(schema.leads.archivedAt),
+          isNull(schema.leads.corretorId),
+          isNull(schema.leads.distributionRemovedAt),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
             : undefined,
         ),
       )
-      .orderBy(schema.leads.createdAt)
-      .limit(100),
+      .orderBy(schema.leads.createdAt),
+    db
+      .select({ count: count(schema.leads.id) })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
+          isNull(schema.leads.corretorId),
+        ),
+      ),
     db
       .select({ brokerId: schema.leads.corretorId, count: count(schema.leads.id) })
       .from(schema.leads)
@@ -193,6 +261,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           inArray(schema.leads.branchId, branchIds),
           inArray(schema.leads.status, activeStatuses),
         ),
@@ -226,6 +295,7 @@ export default async function LeadDistributionPage({
         and(
           eq(schema.leads.tenantId, context.tenantId),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           inArray(schema.leads.branchId, branchIds),
         ),
       )
@@ -251,6 +321,7 @@ export default async function LeadDistributionPage({
           eq(schema.leadEffectOutbox.tenantId, context.tenantId),
           eq(schema.leadEffectOutbox.status, "failed"),
           isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
           context.role === "manager" && context.branchId
             ? eq(schema.leads.branchId, context.branchId)
             : undefined,
@@ -258,75 +329,204 @@ export default async function LeadDistributionPage({
       )
       .orderBy(schema.leadEffectOutbox.updatedAt)
       .limit(20),
-    db.select({
-      id: schema.leadQueues.id,
-      name: schema.leadQueues.name,
-      branchId: schema.leadQueues.branchId,
-      exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId,
-      branchName: schema.branches.name,
-      status: schema.leadQueues.status,
-      assignmentMode: schema.leadQueues.assignmentMode,
-      assignmentStrategy: schema.leadQueues.assignmentStrategy,
-      capacityEnabled: schema.leadQueues.capacityEnabled,
-      capacityPerBroker: schema.leadQueues.capacityPerBroker,
-      aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled,
-    }).from(schema.leadQueues).leftJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
-      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt)))
+    db
+      .select({
+        id: schema.leadQueues.id,
+        name: schema.leadQueues.name,
+        branchId: schema.leadQueues.branchId,
+        exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId,
+        exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds,
+        dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy,
+        dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId,
+        branchName: schema.branches.name,
+        status: schema.leadQueues.status,
+        assignmentMode: schema.leadQueues.assignmentMode,
+        assignmentStrategy: schema.leadQueues.assignmentStrategy,
+        capacityEnabled: schema.leadQueues.capacityEnabled,
+        capacityPerBroker: schema.leadQueues.capacityPerBroker,
+        offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes,
+        maxPendingOffersPerBroker: schema.leadQueues.maxPendingOffersPerBroker,
+        aiQualificationEnabled: schema.leadQueues.aiQualificationEnabled,
+        attendanceFlowId: schema.leadQueues.attendanceFlowId,
+        colorHue: schema.leadQueues.colorHue,
+      })
+      .from(schema.leadQueues)
+      .leftJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
+      .where(
+        and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt)),
+      )
       .orderBy(schema.leadQueues.name),
-    db.select({ queueId: schema.leads.queueId, waiting: count(schema.leads.id) }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), inArray(schema.leads.branchId, branchIds), inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"])))
+    db
+      .select({ queueId: schema.leads.queueId, waiting: count(schema.leads.id) })
+      .from(schema.leads)
+      .where(
+        and(
+          eq(schema.leads.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
+          inArray(schema.leads.branchId, branchIds),
+          inArray(schema.leads.distributionStatus, ["queued", "returned_to_queue"]),
+        ),
+      )
       .groupBy(schema.leads.queueId),
-    db.select({ id: schema.leadDistributionEvents.id, action: schema.leadDistributionEvents.action, reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt, leadName: schema.leads.nome, queueName: schema.leadQueues.name, brokerName: schema.user.name })
-      .from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id))
-      .leftJoin(schema.leadQueues, eq(schema.leadDistributionEvents.toQueueId, schema.leadQueues.id))
+    db
+      .select({
+        id: schema.leadDistributionEvents.id,
+        action: schema.leadDistributionEvents.action,
+        reason: schema.leadDistributionEvents.reason,
+        createdAt: schema.leadDistributionEvents.createdAt,
+        leadName: schema.leads.nome,
+        queueName: schema.leadQueues.name,
+        brokerName: schema.user.name,
+      })
+      .from(schema.leadDistributionEvents)
+      .innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id))
+      .leftJoin(
+        schema.leadQueues,
+        eq(schema.leadDistributionEvents.toQueueId, schema.leadQueues.id),
+      )
       .leftJoin(schema.user, eq(schema.leadDistributionEvents.newOwnerId, schema.user.id))
-      .where(and(eq(schema.leadDistributionEvents.tenantId, context.tenantId), isNull(schema.leads.deletedAt), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
-      .orderBy(desc(schema.leadDistributionEvents.createdAt)).limit(40),
-    db.select({ queueId: schema.leadDistributionPolicies.queueId, policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
-      .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.enabled, true))),
-    db.select({ campaignId: schema.metaCampaigns.campaignId, name: schema.metaCampaigns.name, status: schema.metaCampaigns.status })
+      .where(
+        and(
+          eq(schema.leadDistributionEvents.tenantId, context.tenantId),
+          isNull(schema.leads.deletedAt),
+          isNull(schema.leads.archivedAt),
+          context.role === "manager" && context.branchId
+            ? eq(schema.leads.branchId, context.branchId)
+            : undefined,
+        ),
+      )
+      .orderBy(desc(schema.leadDistributionEvents.createdAt))
+      .limit(40),
+    db
+      .select({
+        queueId: schema.leadDistributionPolicies.queueId,
+        policy: schema.leadDistributionPolicies.policy,
+      })
+      .from(schema.leadDistributionPolicies)
+      .where(
+        and(
+          eq(schema.leadDistributionPolicies.tenantId, context.tenantId),
+          eq(schema.leadDistributionPolicies.enabled, true),
+        ),
+      ),
+    db
+      .select({
+        campaignId: schema.metaCampaigns.campaignId,
+        name: schema.metaCampaigns.name,
+        status: schema.metaCampaigns.status,
+      })
       .from(schema.metaCampaigns)
       .where(eq(schema.metaCampaigns.tenantId, context.tenantId))
       .orderBy(schema.metaCampaigns.name),
-    db.select({ adId: schema.metaAds.adId, name: schema.metaAds.name, status: schema.metaAds.status })
+    db
+      .select({
+        adId: schema.metaAds.adId,
+        name: schema.metaAds.name,
+        status: schema.metaAds.status,
+        campaignId: schema.metaAdSets.campaignId,
+      })
       .from(schema.metaAds)
+      .leftJoin(
+        schema.metaAdSets,
+        and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)),
+      )
       .where(eq(schema.metaAds.tenantId, context.tenantId))
       .orderBy(schema.metaAds.name),
-    db.select({ campaignId: schema.metaCampaignQueueRoutes.campaignId, queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaCampaignQueueRoutes.enabled })
-      .from(schema.metaCampaignQueueRoutes).leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
-      .where(and(
-        eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId),
-        context.role === "manager" && context.branchId
-          ? eq(schema.leadQueues.branchId, context.branchId)
-          : undefined,
-      )).orderBy(schema.leadQueues.name),
-    db.select({ adId: schema.metaAdQueueRoutes.adId, queueId: schema.metaAdQueueRoutes.queueId, queueName: schema.leadQueues.name, enabled: schema.metaAdQueueRoutes.enabled })
-      .from(schema.metaAdQueueRoutes).leftJoin(schema.leadQueues, eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id))
-      .where(and(
-        eq(schema.metaAdQueueRoutes.tenantId, context.tenantId),
-        context.role === "manager" && context.branchId
-          ? eq(schema.leadQueues.branchId, context.branchId)
-          : undefined,
-      )).orderBy(schema.leadQueues.name),
-    db.select({
-      id: schema.unitDutySchedules.id,
-      name: schema.unitDutySchedules.name,
-      startsAt: schema.unitDutySchedules.startsAt,
-      endsAt: schema.unitDutySchedules.endsAt,
-      dayOfWeek: schema.unitDutySchedules.dayOfWeek,
-      status: schema.unitDutySchedules.status,
-      branchName: schema.branches.name,
-    })
+    db
+      .select({
+        campaignId: schema.metaCampaignQueueRoutes.campaignId,
+        queueId: schema.metaCampaignQueueRoutes.queueId,
+        queueName: schema.leadQueues.name,
+        enabled: schema.metaCampaignQueueRoutes.enabled,
+      })
+      .from(schema.metaCampaignQueueRoutes)
+      .leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
+      .where(
+        and(
+          eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId),
+          context.role === "manager" && context.branchId
+            ? eq(schema.leadQueues.branchId, context.branchId)
+            : undefined,
+        ),
+      )
+      .orderBy(schema.leadQueues.name),
+    db
+      .select({
+        adId: schema.metaAdQueueRoutes.adId,
+        queueId: schema.metaAdQueueRoutes.queueId,
+        queueName: schema.leadQueues.name,
+        enabled: schema.metaAdQueueRoutes.enabled,
+      })
+      .from(schema.metaAdQueueRoutes)
+      .leftJoin(schema.leadQueues, eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id))
+      .where(
+        and(
+          eq(schema.metaAdQueueRoutes.tenantId, context.tenantId),
+          context.role === "manager" && context.branchId
+            ? eq(schema.leadQueues.branchId, context.branchId)
+            : undefined,
+        ),
+      )
+      .orderBy(schema.leadQueues.name),
+    db
+      .select({
+        id: schema.unitDutySchedules.id,
+        name: schema.unitDutySchedules.name,
+        startsAt: schema.unitDutySchedules.startsAt,
+        endsAt: schema.unitDutySchedules.endsAt,
+        dayOfWeek: schema.unitDutySchedules.dayOfWeek,
+        status: schema.unitDutySchedules.status,
+        branchName: schema.branches.name,
+      })
       .from(schema.unitDutySchedules)
       .leftJoin(schema.branches, eq(schema.unitDutySchedules.branchId, schema.branches.id))
-      .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), eq(schema.unitDutySchedules.status, "active")))
+      .where(
+        and(
+          eq(schema.unitDutySchedules.tenantId, context.tenantId),
+          eq(schema.unitDutySchedules.status, "active"),
+          context.role === "manager" && context.branchId
+            ? or(isNull(schema.unitDutySchedules.branchId), eq(schema.unitDutySchedules.branchId, context.branchId))
+            : undefined,
+        ),
+      )
       .orderBy(schema.unitDutySchedules.name),
     fetchRoutingRules(context.tenantId),
     fetchBrokerDailySummary(context.tenantId, {
-      startDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 0, 0, 0, 0),
-      endDate: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate(), 23, 59, 59, 999),
+      startDate: new Date(
+        new Date().getFullYear(),
+        new Date().getMonth(),
+        new Date().getDate(),
+        0,
+        0,
+        0,
+        0,
+      ),
+      endDate: new Date(
+        new Date().getFullYear(),
+        new Date().getMonth(),
+        new Date().getDate(),
+        23,
+        59,
+        59,
+        999,
+      ),
       branchId: context.role === "manager" && context.branchId ? context.branchId : undefined,
     }),
+    getDutyRosterSnapshot(context),
+    db
+      .select({
+        slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
+        autoRedistributeOnFeedbackTimeout: schema.tenants.autoRedistributeOnFeedbackTimeout,
+      })
+      .from(schema.tenants)
+      .where(eq(schema.tenants.id, context.tenantId))
+      .limit(1)
+      .then(
+        (r) => r[0] ?? { slaFirstContactMinutes: "15", autoRedistributeOnFeedbackTimeout: true },
+      ),
+    getHoldDisqualifiedLeads(context.tenantId),
+    getDddRoutingSettings(context.tenantId),
   ]);
 
   const activeBrokerLeadsMap = new Map(
@@ -361,18 +561,6 @@ export default async function LeadDistributionPage({
     }
   });
 
-  const enrichedBranches = branches.map((branch) => ({
-    id: branch.id,
-    name: branch.name,
-    status: branch.status,
-    acceptingLeads: branch.acceptingLeads,
-    autoDistribute: branch.autoDistribute,
-    memberCount: countsByBranch.get(branch.id) ?? 0,
-    availableBrokers: availableByBranch.get(branch.id) ?? 0,
-    activeLeads: leadsByBranch.get(branch.id) ?? 0,
-    newLeads: newByBranch.get(branch.id) ?? 0,
-  }));
-
   const totalBranches = branches.length;
   const acceptingBranches = branches.filter((b) => b.acceptingLeads).length;
   const autoDistributeBranches = branches.filter((b) => b.autoDistribute).length;
@@ -380,21 +568,7 @@ export default async function LeadDistributionPage({
   const totalAvailable = [...availableByBranch.values()].reduce((a, b) => a + b, 0);
   const totalNewLeads = [...newByBranch.values()].reduce((a, b) => a + b, 0);
 
-  const queueCards = ([
-    ...(context.role === "director"
-      ? [{ status: "unassigned" as const, title: "Sem unidade", description: "Aguardando encaminhamento do Diretor." }]
-      : []),
-    { status: "queued" as const, title: "Sem corretor", description: "Aguardando atribuição ou distribuição automática." },
-    { status: "returned_to_queue" as const, title: "Devolvidos à fila", description: "Precisam de revisão antes de uma nova atribuição." },
-  ]).map((queue) => {
-    const leads = unassignedLeads.filter((lead) => lead.distributionStatus === queue.status);
-    const oldest = leads[0]?.createdAt;
-    return {
-      ...queue,
-      count: leads.length,
-      oldestLabel: !oldest ? "Fila em dia" : `Item mais antigo desde ${oldest.toLocaleDateString("pt-BR")}`,
-    };
-  });
+  const totalUnassignedForArchive = Number(unassignedArchiveCount[0]?.count ?? 0);
 
   const queueWaiting = new Map(queueLeadCounts.map((item) => [item.queueId, Number(item.waiting)]));
   const queuePoliciesMap = new Map(
@@ -403,12 +577,22 @@ export default async function LeadDistributionPage({
       .map((p) => [p.queueId!, readDistributionPolicy(p.policy)]),
   );
 
+  // DEC-127: the queue's attendance flow, offered only while the switch is on.
+  const attendanceFlowOptions = await (async () => {
+    const { attendanceFlowsEnabled, ensureBuiltinFlows } = await import("@/features/attendance-flows/runtime");
+    if (!(await attendanceFlowsEnabled().catch(() => false))) return null;
+    await ensureBuiltinFlows(context.tenantId);
+    return getDatabase().select({ id: schema.attendanceFlows.id, name: schema.attendanceFlows.name, description: schema.attendanceFlows.description })
+      .from(schema.attendanceFlows)
+      .where(and(eq(schema.attendanceFlows.tenantId, context.tenantId), eq(schema.attendanceFlows.status, "active")));
+  })();
   const queuesForControl = queues.map((queue) => {
     const queuePolicy = queuePoliciesMap.get(queue.id);
     return {
       ...queue,
       allowedBranchIds: queuePolicy?.allowedBranchIds ?? [],
       allowedBrokerIds: queuePolicy?.allowedBrokerIds ?? [],
+      allowedSourceIds: queuePolicy?.allowedSourceIds ?? [],
       waiting: queueWaiting.get(queue.id) ?? 0,
       members: queue.branchId ? (countsByBranch.get(queue.branchId) ?? 0) : totalBrokers,
       activeLeads: queue.branchId ? (leadsByBranch.get(queue.branchId) ?? 0) : totalNewLeads,
@@ -417,288 +601,317 @@ export default async function LeadDistributionPage({
 
   return (
     <>
-      <DashboardHeader breadcrumb="Operação comercial" title="Central de Distribuição de Leads" />
-      <main className="flex min-h-full flex-col gap-6 bg-background p-4 lg:p-6">
-        <DistributionTabsContainer
-          initialView={view}
-          roteamentoContent={
-            <div className="space-y-6">
-              <RoutingMatrixPanel
-                rules={routingRules}
-                queues={queues.map((q) => ({ id: q.id, name: q.name }))}
-                branches={branches.map((b) => ({ id: b.id, name: b.name }))}
-                brokers={brokers.map((b) => ({ id: b.id, name: b.name }))}
-                canEdit={context.role === "director" || context.role === "manager"}
-              />
-              <RoutingSimulatorPanel
-                queues={queues.map((q) => ({ id: q.id, name: q.name }))}
-                branches={branches.map((b) => ({ id: b.id, name: b.name }))}
-                brokers={brokers.map((b) => ({ id: b.id, name: b.name }))}
-              />
-            </div>
-          }
-          resumoDiaContent={
-            <BrokerDailySummaryPanel
-              initialData={brokerSummary}
-              branches={branches.map((b) => ({ id: b.id, name: b.name }))}
-              canFilterBranch={context.role === "director"}
-            />
-          }
-          filasContent={
-            <>
-              <QueueControlCenter
-                queues={queuesForControl}
-                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
-                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, branchId: broker.branchId ?? "", branchName: broker.branchName ?? "" }))}
-                dutySchedules={dutySchedules}
-                campaigns={metaCampaigns}
-                ads={metaAds}
-                campaignRoutes={metaCampaignRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
-                adRoutes={metaAdRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
-                canEdit
-              />
-              <DistributionPolicyPanel
-                canEdit={context.role === "director"}
-                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
-                policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
-              />
-            </>
-          }
-          operarContent={
-            <>
-              <DistributionMetrics
-                metrics={{
-                  totalBranches,
-                  acceptingBranches,
-                  autoDistributeBranches,
-                  totalBrokers,
-                  totalAvailable,
-                  totalNewLeads,
-                }}
-              />
-              <section aria-labelledby="filas-de-acao" className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <div className="md:col-span-2 xl:col-span-3">
-                  <h2 id="filas-de-acao" className="text-base font-semibold">Filas de ação rápida</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">Comece pela fila mais antiga que está sob sua responsabilidade.</p>
-                </div>
-                {queueCards.map((queue) => (
-                  <Card key={queue.status} variant="overview" className="gap-0">
-                    <CardHeader className="p-4 pb-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <CardTitle className="text-base">{queue.title}</CardTitle>
-                          <CardDescription className="mt-1">{queue.description}</CardDescription>
-                        </div>
-                        <Badge variant={queue.count > 0 ? "warning" : "success"}>{queue.count}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-between gap-3 border-t border-border/60 p-4 pt-3">
-                      <span className="text-xs text-muted-foreground">{queue.oldestLabel}</span>
-                      <Button render={<Link href={`/leads/distribuicao?view=operar&status=${queue.status}#inbox-distribuicao`} />} size="xs" variant="outline">
-                        Abrir fila
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </section>
-              <div id="inbox-distribuicao">
-                <DistributionInbox
-                  key={queueFilter}
-                  role={context.role}
-                  initialStatusFilter={queueFilter}
-                  branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
-                  brokers={brokers.map((broker) => ({
-                    id: broker.id,
-                    name: broker.name,
-                    branchId: broker.branchId,
-                    availabilityStatus: broker.availabilityStatus,
-                    activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-                  }))}
-                  leads={unassignedLeads.map((lead) => ({
-                    ...lead,
-                    createdAt: lead.createdAt.toISOString(),
-                  }))}
+      <DashboardHeader
+        breadcrumb="Operação comercial"
+        title="Distribuição"
+        rightSlot={
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-ds-vivid-green" aria-hidden="true" />
+              <span>
+                <strong className="font-semibold text-foreground">{totalAvailable}</strong> disponíveis
+              </span>
+            </span>
+            <span className="h-3.5 w-px bg-border" aria-hidden="true" />
+            <span>
+              <strong className="font-semibold text-foreground">{totalNewLeads}</strong> aguardando
+            </span>
+          </div>
+        }
+      />
+      <main className="min-h-full px-4 py-5 lg:px-6 lg:py-7">
+        <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-6">
+          <DistributionTabsContainer
+            initialView={view}
+            showQueueDefinition={context.role === "director"}
+            roteamentoContent={
+              <div className="space-y-5">
+                <DisqualifiedLeadsRoutingPanel
+                  initialHoldDisqualifiedLeads={holdDisqualifiedLeads}
+                  canEdit={context.role === "director"}
+                />
+                <DddRoutingPanel
+                  initialSettings={dddRoutingSettings}
+                  queues={queues.map((q) => ({ id: q.id, name: q.name }))}
+                  canEdit={context.role === "director"}
+                />
+                <RoutingMatrixPanel
+                  rules={routingRules}
+                  queues={queues.map((q) => ({ id: q.id, name: q.name }))}
+                  branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+                  brokers={brokers.map((b) => ({ id: b.id, name: b.name }))}
+                  canEdit={context.role === "director" || context.role === "manager"}
                 />
               </div>
-            </>
-          }
-          plantaoContent={
-            <DistributionPanel
-              branches={enrichedBranches}
-              brokers={brokers.map((broker) => ({
-                id: broker.id,
-                name: broker.name,
-                email: broker.email,
-                branchId: broker.branchId,
-                branchName: broker.branchName,
-                availabilityStatus: broker.availabilityStatus,
-                activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
-              }))}
-              canManageAcceptingLeads={context.role === "director"}
-            />
-          }
-          saudeHistoricoContent={
-            <div className="grid gap-6 lg:grid-cols-2">
-              <Card variant="overview">
-                <CardHeader>
-                  <CardTitle>Histórico auditável de decisões</CardTitle>
-                  <CardDescription>Registro de atribuições, redistribuições e intervenções manuais.</CardDescription>
-                </CardHeader>
-                <CardContent className="p-0 max-h-[500px] overflow-y-auto">
-                  {recentEvents.length ? (
-                    <div className="divide-y divide-border">
-                      {recentEvents.map((event) => (
-                        <div key={event.id} className="flex flex-col gap-1 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="font-medium text-foreground">
-                              {event.leadName} <span className="font-normal text-muted-foreground">→</span> {event.brokerName ?? "Aguardando corretor"}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground">
-                              {event.queueName ?? "Inbox geral"} · {event.action.replaceAll("_", " ")}{event.reason ? ` · ${event.reason}` : ""}
-                            </p>
+            }
+            resumoDiaContent={
+              <BrokerDailySummaryPanel
+                initialData={brokerSummary}
+                branches={branches.map((b) => ({ id: b.id, name: b.name }))}
+                canFilterBranch={context.role === "director"}
+              />
+            }
+            filasContent={
+              context.role === "director" ? (
+                  <QueueControlCenter
+                    queues={queuesForControl}
+                    branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                    brokers={brokers.map((broker) => ({
+                      id: broker.id,
+                      name: broker.name,
+                      branchId: broker.branchId ?? "",
+                      branchName: broker.branchName ?? "",
+                    }))}
+                    dutySchedules={dutySchedules}
+                    campaigns={metaCampaigns}
+                    ads={metaAds}
+                    campaignRoutes={metaCampaignRoutes.map((r) => ({
+                      ...r,
+                      queueId: r.queueId ?? "",
+                    }))}
+                    adRoutes={metaAdRoutes.map((r) => ({ ...r, queueId: r.queueId ?? "" }))}
+                    attendanceFlows={attendanceFlowOptions}
+                    canEdit
+                    settingsPanels={[
+                      {
+                        id: "sla",
+                        label: "SLA de aceite e atendimento",
+                        description: "Quanto tempo o corretor tem para aceitar e iniciar o atendimento.",
+                        content: (
+                          <BrokerAcceptanceSlaPanel
+                            initialMinutes={Number(tenantSlaSettings?.slaFirstContactMinutes) || 15}
+                            initialAutoRedistribute={
+                              tenantSlaSettings?.autoRedistributeOnFeedbackTimeout ?? true
+                            }
+                            canEdit={context.role === "director" || context.role === "manager"}
+                          />
+                        ),
+                      },
+                      {
+                        id: "policy",
+                        label: "Distribuição inteligente",
+                        description: "Como o ranking escolhe o corretor depois do plantão.",
+                        content: (
+                          <DistributionPolicyPanel
+                            canEdit={context.role === "director"}
+                            brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+                            policy={globalPolicy.find((p) => !p.queueId)?.policy ?? {}}
+                          />
+                        ),
+                      },
+                      {
+                        id: "how",
+                        label: "Como funciona a distribuição",
+                        description: "Um único fluxo para qualquer origem: entrada, unidade, fila, corretor e redistribuição.",
+                        content: <DistributionStages />,
+                      },
+                    ]}
+                  />
+              ) : null
+            }
+            operarContent={
+              <>
+                <DistributionMetrics
+                  metrics={{
+                    totalBranches,
+                    acceptingBranches,
+                    autoDistributeBranches,
+                    totalBrokers,
+                    totalAvailable,
+                    totalNewLeads,
+                  }}
+                />
+                <div id="inbox-distribuicao">
+                  <DistributionInbox
+                    key={queueFilter}
+                    role={context.role}
+                    manualAssignmentChoiceEnabled={(await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"}
+                    totalUnassigned={totalUnassignedForArchive}
+                    initialStatusFilter={queueFilter}
+                    branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                    brokers={brokers.map((broker) => ({
+                      id: broker.id,
+                      name: broker.name,
+                      branchId: broker.branchId,
+                      availabilityStatus: broker.availabilityStatus,
+                      activeLeads: activeBrokerLeadsMap.get(broker.id) ?? 0,
+                    }))}
+                    leads={unassignedLeads.map((lead) => ({
+                      ...lead,
+                      createdAt: lead.createdAt.toISOString(),
+                    }))}
+                  />
+                </div>
+              </>
+            }
+            plantaoContent={
+              <DutyOperationsWorkspace
+                snapshot={dutyRoster}
+                monthlySchedulingEnabled={monthlyDutySchedulingEnabled}
+                canPlanMonthlySchedule={context.role === "director"}
+                initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}
+                queues={queuesForControl
+                  .filter((queue) => queue.status === "active")
+                  .map((queue) => ({ id: queue.id, name: queue.name }))}
+              />
+            }
+            saudeHistoricoContent={
+              <div className="grid gap-ds-24 xl:grid-cols-[1.15fr_0.85fr]">
+                <Card variant="overview">
+                  <SectionCardHeader
+                    icon={<History />}
+                    title="Histórico auditável de decisões"
+                    description="Atribuições, redistribuições e intervenções deste escopo."
+                  />
+                  <div className="max-h-[500px] overflow-y-auto">
+                    {recentEvents.length ? (
+                      <div className="divide-y divide-border/50">
+                        {recentEvents.map((event) => (
+                          <div
+                            key={event.id}
+                            className="flex flex-col gap-ds-4 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                          >
+                            <div className="min-w-0">
+                              <p className="font-ds-inter text-ds-body font-medium text-ds-charcoal">
+                                {event.leadName}{" "}
+                                <span className="font-normal text-ds-fog">→</span>{" "}
+                                {event.brokerName ?? "Aguardando corretor"}
+                              </p>
+                              <p className="font-ds-inter text-ds-caption text-ds-fog">
+                                {event.queueName ?? "Inbox geral"} ·{" "}
+                                {event.action.replaceAll("_", " ")}
+                                {event.reason ? ` · ${event.reason}` : ""}
+                              </p>
+                            </div>
+                            <time className="shrink-0 font-ds-inter text-ds-caption text-ds-fog">
+                              {new Intl.DateTimeFormat("pt-BR", {
+                                dateStyle: "short",
+                                timeStyle: "short",
+                                timeZone: "America/Sao_Paulo",
+                              }).format(event.createdAt)}
+                            </time>
                           </div>
-                          <time className="shrink-0 text-[10px] text-muted-foreground">
-                            {event.createdAt.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}
-                          </time>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="px-5 py-12 text-center">
-                      <p className="text-sm font-medium">Ainda não há eventos neste escopo</p>
-                      <p className="mt-1 text-xs text-muted-foreground">Quando a equipe rotear ou atribuir leads, a explicação aparecerá aqui.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-                    <div>
-                      <CardTitle>Automação da fila</CardTitle>
-                      <CardDescription>Estado real do processamento assíncrono desta corretora.</CardDescription>
-                    </div>
-                    <Badge
-                      variant={
-                        !jobHealth.available
-                          ? "outline"
-                          : !jobConfig.enabled
-                            ? "outline"
-                            : jobHealth.failed > 0
-                              ? "warning"
-                              : "success"
-                      }
-                    >
-                      {!jobHealth.available
-                        ? "Aguardando migration"
-                        : !jobConfig.enabled
-                          ? "Pausada globalmente"
-                          : jobHealth.failed > 0
-                            ? "Requer atenção"
-                            : "Ativa"}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 sm:grid-cols-2">
-                    <Stat label="Aguardando" value={jobHealth.pending + jobHealth.retrying} />
-                    <Stat label="Em processamento" value={jobHealth.processing} />
-                    <Stat
-                      label="Exceções"
-                      value={jobHealth.failed}
-                      tone={jobHealth.failed > 0 ? "warning" : undefined}
-                    />
-                    <Stat
-                      label="Próximo passo"
-                      hint={
-                        jobHealth.failed > 0
-                          ? "Revisar exceções com o Diretor"
-                          : jobHealth.pending + jobHealth.retrying > 0
-                            ? "O motor tentará distribuir"
-                            : "Nenhuma pendência automática"
-                      }
-                    />
-                  </CardContent>
+                        ))}
+                      </div>
+                    ) : (
+                      <DsEmptyState
+                        icon={<InboxIcon size={20} />}
+                        title="Ainda não há eventos neste escopo"
+                        description="Quando a equipe rotear ou atribuir leads, a explicação aparecerá aqui."
+                        bordered={false}
+                      />
+                    )}
+                  </div>
                 </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-                    <div>
-                      <CardTitle>Efeitos pendentes do intake</CardTitle>
-                      <CardDescription>Distribuição e notificações confirmadas após o recebimento do lead.</CardDescription>
+                <div className="flex flex-col gap-ds-24">
+                  <Card variant="overview">
+                    <SectionCardHeader
+                      icon={<Workflow />}
+                      title="Automação da fila"
+                      description="Estado atual do processamento automático."
+                      actions={
+                            <DsStatusBadge
+                              status={
+                                !jobHealth.available
+                                  ? "secondary"
+                                  : !jobConfig.enabled
+                                    ? "secondary"
+                                    : jobHealth.failed > 0
+                                      ? "warning"
+                                      : "success"
+                              }
+                              label={
+                                !jobHealth.available
+                                  ? "Aguardando migration"
+                                  : !jobConfig.enabled
+                                    ? "Pausada globalmente"
+                                    : jobHealth.failed > 0
+                                      ? "Requer atenção"
+                                      : "Ativa"
+                              }
+                            />
+                      }
+                    />
+                    <div className="grid grid-cols-2 gap-2 p-4 sm:gap-3">
+                      <StatCard label="Aguardando" value={jobHealth.pending + jobHealth.retrying} sublabel="na fila automática" />
+                      <StatCard label="Em processamento" value={jobHealth.processing} sublabel="agora" />
+                      <StatCard
+                        className="col-span-2"
+                        label="Exceções"
+                        value={jobHealth.failed}
+                        valueClassName={jobHealth.failed > 0 ? "text-destructive" : undefined}
+                        sublabel={
+                          jobHealth.failed > 0
+                            ? "Revisar exceções com o Diretor"
+                            : jobHealth.pending + jobHealth.retrying > 0
+                              ? "O motor tentará distribuir"
+                              : "Nenhuma pendência automática"
+                        }
+                      />
                     </div>
-                    <Badge variant={effectHealth.failed > 0 ? "warning" : "success"}>
-                      {effectHealth.failed > 0 ? "Requer revisão" : "Íntegro"}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Stat label="Aguardando" value={effectHealth.pending + effectHealth.retrying} />
-                      <Stat label="Processando" value={effectHealth.processing} />
-                      <Stat
+                  </Card>
+
+                  <Card variant="overview">
+                    <SectionCardHeader
+                      icon={<Activity />}
+                      title="Efeitos pendentes do intake"
+                      description="Distribuição e notificações após a entrada do lead."
+                      actions={
+                            <DsStatusBadge
+                              status={effectHealth.failed > 0 ? "warning" : "success"}
+                              label={effectHealth.failed > 0 ? "Requer revisão" : "Íntegro"}
+                            />
+                      }
+                    />
+                    <div className="grid grid-cols-2 gap-2 p-4 sm:gap-3">
+                      <StatCard label="Aguardando" value={effectHealth.pending + effectHealth.retrying} sublabel="na fila de efeitos" />
+                      <StatCard label="Processando" value={effectHealth.processing} sublabel="agora" />
+                      <StatCard
                         label="Exceções"
                         value={effectHealth.failed}
-                        tone={effectHealth.failed > 0 ? "warning" : undefined}
+                        valueClassName={effectHealth.failed > 0 ? "text-destructive" : undefined}
+                        sublabel="aguardando revisão"
                       />
-                      <Stat label="Concluídos" value={effectHealth.completed} />
+                      <StatCard label="Concluídos" value={effectHealth.completed} sublabel="processados" />
                     </div>
                     {failedEffects.length > 0 ? (
-                      <div className="space-y-2 border-t border-border pt-4">
+                      <div className="flex flex-col gap-ds-8 border-t border-border/50 p-4">
                         {failedEffects.map((effect) => (
                           <div
                             key={effect.id}
-                            className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 sm:flex-row sm:items-center sm:justify-between text-xs"
+                            className="flex flex-col gap-ds-8 rounded-ds-cards border border-ds-ash bg-ds-paper-mist p-ds-12 text-ds-caption sm:flex-row sm:items-center sm:justify-between"
                           >
                             <div className="min-w-0">
-                              <p className="font-medium">
+                              <p className="font-ds-inter font-medium text-ds-charcoal">
                                 {effect.leadName} · {effect.type}
                               </p>
-                              <p className="mt-1 text-[11px] text-muted-foreground">
+                              <p className="mt-ds-4 font-ds-inter text-ds-fog">
                                 {effect.lastErrorCode ?? "Falha de processamento"} · tentativa{" "}
                                 {effect.attemptCount} · {effect.lastErrorMessage ?? "Sem detalhe adicional"}
                               </p>
                             </div>
                             <form action={retryLeadEffectAction}>
                               <input type="hidden" name="effectId" value={effect.id} />
-                              <Button type="submit" size="xs" variant="outline">
+                              <DsOutlinedActionButton type="submit" className="!py-ds-4 !px-ds-12 text-ds-caption">
                                 Reprocessar
-                              </Button>
+                              </DsOutlinedActionButton>
                             </form>
                           </div>
                         ))}
                       </div>
                     ) : (
-                      <p className="border-t border-border pt-4 text-xs text-muted-foreground">
+                      <p className="border-t border-border/50 p-4 font-ds-inter text-ds-caption text-ds-fog">
                         Nenhuma exceção pendente.
                       </p>
                     )}
-                  </CardContent>
-                </Card>
+                  </Card>
+                </div>
               </div>
-            </div>
-          }
-        />
+            }
+          />
+        </div>
       </main>
     </>
-  );
-}
-
-function Stat(props: { label: string; tone?: "warning" } & ({ value: number } | { hint: string })) {
-  const { label, tone } = props;
-  return (
-    <div className="rounded-lg border border-border/60 bg-muted/20 p-3">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      {"value" in props ? (
-        <p
-          className={cn(
-            "mt-1 text-lg font-semibold tabular-nums",
-            tone === "warning" && "text-amber-600 dark:text-amber-400",
-          )}
-        >
-          {props.value}
-        </p>
-      ) : (
-        <p className="mt-1 text-sm font-medium text-foreground">{props.hint}</p>
-      )}
-    </div>
   );
 }

@@ -7,6 +7,8 @@ import { KeyboardShortcutsProvider } from "@/components/keyboard-shortcuts-provi
 import { useRegisterDefaultShortcuts } from "@/components/keyboard-shortcuts";
 import { PerformanceMonitor } from "@/components/providers/performance-monitor";
 
+import { NuqsAdapter } from "nuqs/adapters/next/app";
+
 function ShortcutRegistrar() {
   useRegisterDefaultShortcuts();
   return null;
@@ -26,11 +28,15 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <ThemeProvider>
-      <KeyboardShortcutsProvider>
-        <ShortcutRegistrar />
-        {children}
-      </KeyboardShortcutsProvider>      <PerformanceMonitor />
-      <PwaInstallPrompt />
-    </ThemeProvider>);
+    <NuqsAdapter>
+      <ThemeProvider>
+        <KeyboardShortcutsProvider>
+          <ShortcutRegistrar />
+          {children}
+        </KeyboardShortcutsProvider>
+        <PerformanceMonitor />
+        <PwaInstallPrompt />
+      </ThemeProvider>
+    </NuqsAdapter>
+  );
 }

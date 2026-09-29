@@ -1,13 +1,18 @@
 import "server-only";
 
-import { and, eq, gte, inArray, lt, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 
 import { getDatabase, schema } from "@/shared/db";
-import { chooseAvailableBroker } from "./assignment";
-import { notifyLeadReassigned, notifyNewLead, publishNotification, sendNotificationToUser } from "@/features/notifications/send-push-helper";
+import { notifyLeadReassigned, sendNotificationToUser } from "@/features/notifications/send-push-helper";
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
+import { processQueuedLead } from "@/features/lead-distribution/service";
+import { isAcceptedOfferAssignment, shouldReleaseUnacceptedProvisionalOwner } from "@/features/lead-distribution/domain";
+import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
+import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 
 const activeStatuses = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 type SlaKind = "lead_unworked" | "lead_warning_10m" | "lead_stalled";
@@ -17,7 +22,11 @@ export type SlaSweepResult = { tenants: number; unworked: number; warnings: numb
 export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
   if (!(await isNotificationCapabilityEnabled("lead_sla"))) return { tenants: 0, unworked: 0, warnings: 0, stalled: 0, notifications: 0 };
   const db = getDatabase();
-  const tenants = await db.select({ id: schema.tenants.id, firstContactMinutes: schema.tenants.slaFirstContactMinutes, stagnantDays: schema.tenants.slaStagnantDays })
+  const tenants = await db.select({
+    id: schema.tenants.id,
+    firstContactMinutes: schema.tenants.slaFirstContactMinutes,
+    stagnantDays: schema.tenants.slaStagnantDays,
+  })
     .from(schema.tenants).where(tenantId ? eq(schema.tenants.id, tenantId) : eq(schema.tenants.status, "active"));
   let unworked = 0;
   let warnings = 0;
@@ -38,6 +47,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       branchId: schema.leads.branchId,
       status: schema.leads.status,
       corretorId: schema.leads.corretorId,
+      assignmentSource: schema.leads.assignmentSource,
       assignedAt: schema.leads.assignedAt,
       firstContactAt: schema.leads.firstContactAt,
       serviceStartedAt: schema.leads.serviceStartedAt,
@@ -48,6 +58,7 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       .from(schema.leads).where(
         and(
           eq(schema.leads.tenantId, tenant.id),
+          isNull(schema.leads.deletedAt),
           or(
             and(eq(schema.leads.status, "distributed"), lt(schema.leads.assignedAt, warningCutoff)),
             and(inArray(schema.leads.status, activeStatuses), lt(schema.leads.stageEnteredAt, stagnantCutoff))
@@ -60,13 +71,6 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     const recipients = await db.select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId })
       .from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.status, "active"), inArray(schema.tenantMemberships.role, ["manager", "director"])));
     
-    const [anyActiveMember] = await db
-      .select({ userId: schema.tenantMemberships.userId })
-      .from(schema.tenantMemberships)
-      .where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.status, "active")))
-      .limit(1);
-    const systemUserId = anyActiveMember?.userId;
-
     const leadIds = leads.map((lead) => lead.id);
     const existing = await db.select({ recipientUserId: schema.notifications.recipientUserId, leadId: schema.notifications.leadId, type: schema.notifications.type })
       .from(schema.notifications).where(and(eq(schema.notifications.tenantId, tenant.id), inArray(schema.notifications.leadId, leadIds), gte(schema.notifications.createdAt, new Date(now - 24 * 60 * 60 * 1000))));
@@ -75,8 +79,11 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     
     for (const lead of leads) {
       let kind: SlaKind = "lead_stalled";
-      const isAcceptedOrStarted = Boolean(lead.firstContactAt || lead.serviceStartedAt || lead.status !== "distributed");
-      if (lead.status === "distributed" && lead.assignedAt && !isAcceptedOrStarted) {
+      const isStarted = Boolean(lead.firstContactAt || lead.serviceStartedAt || lead.status !== "distributed");
+      // An accepted offer is confirmed ownership: the sweep still alerts about the
+      // missing first contact, but never moves the lead to another broker.
+      const isAccepted = isAcceptedOfferAssignment(lead.assignmentSource);
+      if (lead.status === "distributed" && lead.assignedAt && !isStarted) {
         if (lead.assignedAt < unworkedCutoff) {
           kind = "lead_unworked";
         } else if (lead.assignedAt <= warningCutoff) {
@@ -87,115 +94,86 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
       if (kind === "lead_unworked") {
         unworked += 1;
 
-        // Save previous owner to notify them later
+        // Keep the current owner until the replacement is committed. This avoids
+        // exposing an intermediate queued/unassigned state if selection or
+        // notification fails during the SLA handoff.
         const previousOwnerId = lead.corretorId;
-        const currentRedistributions = lead.redistributionCount ?? 0;
-        const MAX_REDISTRIBUTIONS = 2;
-        const updateTime = new Date();
-
-        if (currentRedistributions >= MAX_REDISTRIBUTIONS) {
-          // Bateu o limite máximo de 2 redistribuições: o lead fica sem corretor aguardando atribuição manual
-          await db.transaction(async (tx) => {
-            await tx.update(schema.leads)
-              .set({
-                corretorId: null,
-                status: "new",
-                distributionStatus: "unassigned",
-                assignedAt: null,
-                assignmentSource: "manual_pending",
-                stageEnteredAt: updateTime,
-                distributionUpdatedAt: updateTime,
-                firstContactAt: null,
-                serviceStartedAt: null,
-                serviceStartedBy: null,
-              })
-              .where(eq(schema.leads.id, lead.id));
-
-            if (systemUserId) {
-              await tx.insert(schema.leadInteractions).values({
-                id: randomUUID(),
-                leadId: lead.id,
-                userId: systemUserId,
-                tipo: "system_alert",
-                conteudo: `Limite máximo de ${MAX_REDISTRIBUTIONS} redistribuições automáticas atingido. Lead retornado para atribuição manual.`,
-              });
-
-              await tx.insert(schema.auditLogs).values({
-                id: randomUUID(),
-                userId: systemUserId,
-                entidade: "lead",
-                entidadeId: lead.id,
-                acao: "lead.redistribution_limit_reached",
-              });
-            }
-          });
-
-          // Notificar gestores/diretores sobre a necessidade de atribuição manual
-          for (const recipient of recipients) {
-            await publishNotification({
-              capability: "lead_assignment",
+        const automationActor = recipients.find((recipient) => recipient.role === "director");
+        if (previousOwnerId && automationActor && !isAccepted) {
+          const reassigned = await processQueuedLead(
+            {
               tenantId: tenant.id,
-              recipientUserId: recipient.userId,
-              leadId: lead.id,
-              type: "lead_reassigned",
-              title: "Lead aguardando atribuição manual ⚠️",
-              message: `O lead "${lead.nome}" atingiu o limite de 2 redistribuições por inatividade e aguarda atribuição manual.`,
-              pushTitle: "Lead Aguarda Atribuição Manual ⚠️",
-              pushBody: `"${lead.nome}" atingiu 2 redistribuições automáticas e precisa de intervenção manual.`,
-              url: `/leads/${lead.id}`,
-              tag: "corretop-leads",
-            }).catch(console.error);
-          }
+              userId: automationActor.userId,
+              role: "director",
+              jobTitle: "director",
+              branchId: null,
+            },
+            lead.id,
+            previousOwnerId,
+          );
 
-          if (previousOwnerId) {
-            void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
-          }
-        } else {
-          // Dentro do limite: efetua a redistribuição e incrementa o contador
-          const nextBrokerId = await chooseAvailableBroker(tenant.id, lead.branchId, lead.corretorId, lead.webhookCredentialId);
-          
-          await db.transaction(async (tx) => {
-            await tx.update(schema.leads)
-              .set({
-                corretorId: nextBrokerId,
-                status: nextBrokerId ? "distributed" : "new",
-                distributionStatus: nextBrokerId ? "assigned" : "queued",
-                redistributionCount: currentRedistributions + 1,
-                assignedAt: nextBrokerId ? updateTime : null,
-                stageEnteredAt: updateTime,
-                distributionUpdatedAt: updateTime,
-                firstContactAt: null,
-                serviceStartedAt: null,
-                serviceStartedBy: null,
-              })
-              .where(eq(schema.leads.id, lead.id));
+          if (reassigned.status === "assigned" || reassigned.status === "offered") {
+            const nextBrokerId = reassigned.brokerId;
+            await db.update(schema.leads)
+              .set({ redistributionCount: (lead.redistributionCount ?? 0) + 1 })
+              .where(and(
+                eq(schema.leads.id, lead.id),
+                eq(schema.leads.tenantId, tenant.id),
+                eq(schema.leads.corretorId, nextBrokerId),
+              ));
 
-            if (systemUserId) {
-              await tx.insert(schema.leadInteractions).values({
-                id: randomUUID(),
-                leadId: lead.id,
-                userId: systemUserId,
-                tipo: "system_alert",
-                conteudo: nextBrokerId
-                  ? `Lead redistribuído automaticamente por estouro de SLA (tentativa ${currentRedistributions + 1} de ${MAX_REDISTRIBUTIONS}).`
-                  : `Lead retornado para a fila da unidade por estouro de SLA (sem outro corretor disponível).`,
-              });
-
-              await tx.insert(schema.auditLogs).values({
-                id: randomUUID(),
-                userId: systemUserId,
-                entidade: "lead",
-                entidadeId: lead.id,
-                acao: "lead.redistributed_sla",
-              });
+            await runLeadEffectOutboxProcessor({ tenantId: tenant.id, leadId: lead.id, limit: 5 });
+            if (reassigned.status === "offered" && reassigned.outboundMessageId) {
+              await processMetaOutboundBatch(1, tenant.id, reassigned.outboundMessageId);
             }
-          });
-
-          // Disparar notificações de redistribuição
-          await notifyNewLead(lead.id, tenant.id, lead.branchId, nextBrokerId, lead.nome, undefined, { isRedistribution: true }).catch(console.error);
-
-          if (previousOwnerId && previousOwnerId !== nextBrokerId) {
             void notifyLeadReassigned(lead.id, tenant.id, previousOwnerId, lead.nome).catch(console.error);
+            void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
+            void publishLeadInvalidation({ tenantId: tenant.id, actorId: nextBrokerId }).catch(() => {});
+          } else {
+            // Only an offer whose acceptance time ran out releases the lead.
+            const [latestOffer] = await db.select({ status: schema.leadOffers.status }).from(schema.leadOffers).where(and(
+              eq(schema.leadOffers.tenantId, tenant.id),
+              eq(schema.leadOffers.leadId, lead.id),
+              eq(schema.leadOffers.brokerId, previousOwnerId),
+            )).orderBy(desc(schema.leadOffers.offeredAt)).limit(1);
+            if (shouldReleaseUnacceptedProvisionalOwner({
+              handoffStatus: reassigned.status,
+              corretorId: previousOwnerId,
+              assignmentSource: lead.assignmentSource,
+              status: lead.status,
+              firstContactAt: lead.firstContactAt,
+              serviceStartedAt: lead.serviceStartedAt,
+              latestOfferStatus: latestOffer?.status ?? null,
+            })) {
+              // Guarded on the same unaccepted state, so a broker who accepts or
+              // starts service concurrently keeps the lead.
+              const now = new Date();
+              const [released] = await db.update(schema.leads)
+                .set(buildDeclinedLeadReleaseUpdate(now))
+                .where(and(
+                  eq(schema.leads.id, lead.id),
+                  eq(schema.leads.tenantId, tenant.id),
+                  eq(schema.leads.corretorId, previousOwnerId),
+                  eq(schema.leads.assignmentSource, "automatic_offer"),
+                  eq(schema.leads.status, "distributed"),
+                  isNull(schema.leads.firstContactAt),
+                  isNull(schema.leads.serviceStartedAt),
+                  isNull(schema.leads.deletedAt),
+                ))
+                .returning({ id: schema.leads.id });
+              if (released) {
+                // The lead is back in the queue (distributionStatus "queued") and the
+                // distribution offers it again as soon as a broker is eligible. It is
+                // not a manual task, so directors are not asked to assign it.
+                const reason = "Tempo para aceite esgotado e nenhum corretor livre agora: o lead voltou para a fila e será reofertado automaticamente.";
+                await db.insert(schema.leadDistributionEvents).values({
+                  id: randomUUID(), tenantId: tenant.id, leadId: lead.id, fromBranchId: lead.branchId, toBranchId: lead.branchId,
+                  previousOwnerId, action: "returned_to_queue", source: "sla", strategy: "automatic",
+                  reason, actorId: automationActor.userId, createdAt: now,
+                });
+                void publishLeadInvalidation({ tenantId: tenant.id, actorId: previousOwnerId }).catch(() => {});
+              }
+            }
           }
         }
 
@@ -212,13 +190,17 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
               leadId: lead.id,
               type: "lead_warning_10m",
               title: "Atenção: Atendimento Pendente ⚠️",
-              message: `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos e ainda não iniciou o atendimento. Inicie o contato imediatamente para evitar a redistribuição automática do lead!`,
+              message: isAccepted
+                ? `Você aceitou o lead "${lead.nome}" há ${warningMinutes} minutos e ainda não iniciou o atendimento. Inicie o contato imediatamente!`
+                : `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos e ainda não iniciou o atendimento. Inicie o contato imediatamente para evitar a redistribuição automática do lead!`,
               createdAt: new Date(),
             });
 
             void sendNotificationToUser(lead.corretorId, {
               title: "Atenção: Atendimento Pendente ⚠️",
-              body: `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos. Inicie o contato agora para evitar que ele seja redistribuído!`,
+              body: isAccepted
+                ? `Você aceitou o lead "${lead.nome}" há ${warningMinutes} minutos. Inicie o contato agora!`
+                : `Você recebeu o lead "${lead.nome}" há ${warningMinutes} minutos. Inicie o contato agora para evitar que ele seja redistribuído!`,
               url: `/leads/${lead.id}`,
               tag: `corretop-warning-${lead.id}`,
             }).catch(console.error);

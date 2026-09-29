@@ -139,7 +139,7 @@ export function BrokerGoalView({ goal }: BrokerGoalViewProps) {
               <div className="mt-3 flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
                   {pct >= 100
-                    ? "✓ Meta atingida! Parabéns!"
+            ? "Meta atingida. Parabéns!"
                     : pct >= 60
                     ? (() => {
                         const target = parseFloat(goal.targetValue);
@@ -176,7 +176,7 @@ export function BrokerGoalView({ goal }: BrokerGoalViewProps) {
             {/* 100% celebration banner — Peak-End Rule */}
             {pct >= 100 && (
               <div className="mt-6 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-4 py-3 text-center">
-                <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-400">🎉 Meta atingida! Você faz parte dos melhores corretores do período.</p>
+            <p className="text-sm font-semibold text-success">Meta atingida. Você faz parte dos melhores corretores do período.</p>
               </div>
             )}
           </CardContent>
@@ -221,7 +221,7 @@ export function BrokerGoalView({ goal }: BrokerGoalViewProps) {
                 })()}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {pct >= 100 ? "✓ Meta atingida" : "para atingir a meta"}
+                    {pct >= 100 ? "Meta atingida" : "para atingir a meta"}
               </p>
             </CardContent>
           </Card>

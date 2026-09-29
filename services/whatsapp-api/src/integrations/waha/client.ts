@@ -160,7 +160,8 @@ export class WahaClient {
 
     const obj = data as Record<string, unknown> | null;
     if (obj && typeof obj === "object") {
-      const qrData = typeof obj.data === "string" ? obj.data : null;
+      const qrCandidate = obj.data ?? obj.qr ?? obj.base64;
+      const qrData = typeof qrCandidate === "string" ? qrCandidate : null;
       const sessionStatus = typeof obj.status === "string" ? obj.status : null;
       return { base64: qrData, status: sessionStatus };
     }
@@ -229,6 +230,7 @@ export class WahaClient {
       return {
         name: raw?.name ?? name,
         status,
+        providerStatus: rawStatus || "UNKNOWN",
         displayPhoneNumber,
         qrCode: null,
       };
@@ -248,13 +250,26 @@ export class WahaClient {
    */
   async createSession(name: string): Promise<WahaSession> {
     try {
+      const webhookUrl = resolveWebhookUrl();
+
       await this.request(`/api/sessions/`, {
         method: "POST",
         timeoutMs: 8_000,
-        body: { name },
+        body: {
+          name,
+          config: {
+            webhooks: [
+              {
+                url: webhookUrl,
+                events: ["message", "message.any", "session.status", "message.ack"],
+              },
+            ],
+          },
+        },
         headers: { "content-type": "application/json" },
       });
     } catch (error) {
+
       // 409 = sessão já existe — resolver existente e retornar
       if (error instanceof WahaClientError && error.providerStatusCode === 409) {
         const existing = await this.getSession(name);
@@ -274,6 +289,7 @@ export class WahaClient {
     return session ?? {
       name,
       status: "DISCONNECTED",
+      providerStatus: "STOPPED",
       displayPhoneNumber: null,
       qrCode: null,
     };
@@ -302,9 +318,10 @@ export class WahaClient {
    * - WAHA_TIMEOUT / WAHA_UNAVAILABLE: problemas de conexão
    * - SESSION_NOT_FOUND: sessão não existe
    */
-  async getQr(name: string): Promise<string> {
-    // Verificar status da sessão antes de buscar QR
-    const session = await this.getSession(name);
+  async getQr(name: string, known?: WahaSession | null): Promise<string> {
+    // Verificar status da sessão antes de buscar QR. Quem já leu a sessão
+    // passa `known` para não repetir a chamada a cada ciclo de polling.
+    const session = known === undefined ? await this.getSession(name) : known;
     if (!session) {
       throw new WahaClientError("SESSION_NOT_FOUND", 502, `Sessão '${name}' não encontrada.`);
     }
@@ -332,6 +349,46 @@ export class WahaClient {
   }
 
   /**
+   * Leitura única do estado de pareamento: status da sessão + QR atual quando
+   * o WAHA está em SCAN_QR_CODE. É o que o polling do CRM usa — uma ida ao
+   * WAHA para o status e, só se houver QR a mostrar, uma para a imagem.
+   *
+   * O QR rotaciona no provider (60s no primeiro, 20s nos seguintes), então
+   * ele nunca é cacheado aqui. Falha ao buscar o QR não invalida o status.
+   */
+  async getConnectionState(name: string): Promise<{
+    exists: boolean;
+    status: WahaSessionStatus;
+    providerStatus: string;
+    phoneNumber: string | null;
+    qr: string | null;
+  }> {
+    const session = await this.getSession(name);
+    if (!session) {
+      return { exists: false, status: "DISCONNECTED", providerStatus: "STOPPED", phoneNumber: null, qr: null };
+    }
+
+    let qr: string | null = null;
+    if (session.providerStatus === "SCAN_QR_CODE") {
+      try {
+        qr = await this.getQr(name, session);
+      } catch (error) {
+        // Sem QR agora (rotação em andamento). O cliente mantém o estado
+        // "gerando" e tenta no próximo ciclo; auth/rede são tratados pelo status.
+        if (error instanceof WahaClientError && error.code === "WAHA_UNAUTHORIZED") throw error;
+      }
+    }
+
+    return {
+      exists: true,
+      status: session.status,
+      providerStatus: session.providerStatus,
+      phoneNumber: session.displayPhoneNumber,
+      qr,
+    };
+  }
+
+  /**
    * Para uma sessão (pause/stop).
    */
   async stopSession(name: string): Promise<WahaRecoveryCleanup> {
@@ -343,7 +400,7 @@ export class WahaClient {
       });
       return { operation: "stop", outcome: "completed" };
     } catch (error) {
-      if (isExpectedCleanupError(error)) {
+      if (isExpectedCleanupError(error, "stop")) {
         return cleanupIgnored("stop", error);
       }
       throw error;
@@ -353,19 +410,23 @@ export class WahaClient {
   /**
    * Deleta uma sessão.
    */
-  async deleteSession(name: string): Promise<WahaRecoveryCleanup[]> {
+  async deleteSession(name: string, options: { logout?: boolean } = {}): Promise<WahaRecoveryCleanup[]> {
     const cleanup: WahaRecoveryCleanup[] = [];
-    try {
-      // Primeiro fazer logout (como o relay faz)
-      await this.request(`/api/sessions/${encodeURIComponent(name)}/logout`, {
-        method: "POST",
-        timeoutMs: 5_000,
-        headers: { "content-type": "application/json" },
-      });
-      cleanup.push({ operation: "logout", outcome: "completed" });
-    } catch (error) {
-      if (!isExpectedCleanupError(error)) throw error;
-      cleanup.push(cleanupIgnored("logout", error));
+    // logout desvincula o aparelho no celular. Só faz sentido quando há um
+    // vínculo a desfazer; para sessões em pareamento é uma ida ao WAHA
+    // inútil que apenas retorna 422.
+    if (options.logout ?? true) {
+      try {
+        await this.request(`/api/sessions/${encodeURIComponent(name)}/logout`, {
+          method: "POST",
+          timeoutMs: 5_000,
+          headers: { "content-type": "application/json" },
+        });
+        cleanup.push({ operation: "logout", outcome: "completed" });
+      } catch (error) {
+        if (!isExpectedCleanupError(error, "logout")) throw error;
+        cleanup.push(cleanupIgnored("logout", error));
+      }
     }
 
     try {
@@ -375,7 +436,7 @@ export class WahaClient {
       });
       cleanup.push({ operation: "delete", outcome: "completed" });
     } catch (error) {
-      if (!isExpectedCleanupError(error)) throw error;
+      if (!isExpectedCleanupError(error, "delete")) throw error;
       cleanup.push(cleanupIgnored("delete", error));
     }
     return cleanup;
@@ -395,7 +456,8 @@ export class WahaClient {
       return { session: (await this.getSession(name)) ?? created, cleanup: [] };
     }
 
-    const cleanup = [await this.stopSession(name), ...(await this.deleteSession(name))];
+    // Sessão FAILED não tem vínculo ativo: não há o que desvincular no celular.
+    const cleanup = [await this.stopSession(name), ...(await this.deleteSession(name, { logout: false }))];
     const remaining = await this.getSession(name);
     if (remaining) {
       throw new WahaClientError("SESSION_EXISTS", 502, "A sessão falhada não foi removida com segurança.");
@@ -403,6 +465,33 @@ export class WahaClient {
 
     const created = await this.createSession(name);
     if (created.status !== "CONNECTED" && created.status !== "WAITING_QR") await this.startSession(name);
+    return { session: (await this.getSession(name)) ?? created, cleanup };
+  }
+
+  /**
+   * Rotaciona uma sessão de forma atômica para gerar um QR novo.
+   * A sessão antiga é parada, desconectada e removida; a criação só acontece
+   * depois de confirmar que o nome deixou de existir no WAHA.
+   */
+  async reconnectSession(name: string): Promise<{ session: WahaSession; cleanup: WahaRecoveryCleanup[] }> {
+    const cleanup: WahaRecoveryCleanup[] = [];
+    const current = await this.getSession(name);
+
+    if (current) {
+      cleanup.push(await this.stopSession(name));
+      // Só desvincula o aparelho (logout) se havia um vínculo ativo.
+      cleanup.push(...(await this.deleteSession(name, { logout: current.status === "CONNECTED" })));
+
+      const remaining = await this.getSession(name);
+      if (remaining) {
+        throw new WahaClientError("SESSION_EXISTS", 502, "A sessão anterior não foi removida com segurança.");
+      }
+    }
+
+    const created = await this.createSession(name);
+    if (created.status !== "CONNECTED" && created.status !== "WAITING_QR") {
+      await this.startSession(name);
+    }
     return { session: (await this.getSession(name)) ?? created, cleanup };
   }
 
@@ -419,14 +508,25 @@ export class WahaClient {
   /**
    * Envia uma mensagem de texto via WAHA.
    * Retorna o providerMessageId se sucesso.
+   *
+   * `typingMs` mostra "digitando…" por esse tempo antes do envio, como uma
+   * pessoa faria. Falha ao mostrar o "digitando" nunca impede o envio.
    */
-  async sendText(sessionName: string, chatId: string, text: string): Promise<{ messageId: string }> {
+  async sendText(sessionName: string, chatId: string, text: string, options: { typingMs?: number } = {}): Promise<{ messageId: string }> {
+    const resolvedChatId = await this.resolveChatId(sessionName, chatId);
+    if (options.typingMs && options.typingMs > 0) {
+      const presence = { session: sessionName, chatId: resolvedChatId };
+      const headers = { "content-type": "application/json" };
+      await this.request("/api/startTyping", { method: "POST", timeoutMs: 3_000, body: presence, headers }).catch(() => undefined);
+      await new Promise((resolve) => setTimeout(resolve, options.typingMs));
+      await this.request("/api/stopTyping", { method: "POST", timeoutMs: 3_000, body: presence, headers }).catch(() => undefined);
+    }
     const result = await this.request<{ id?: string | { _serialized?: string }; messageId?: string }>(
       "/api/sendText",
       {
         method: "POST",
         timeoutMs: 10_000,
-        body: { session: sessionName, chatId, text },
+        body: { session: sessionName, chatId: resolvedChatId, text },
         headers: { "content-type": "application/json" },
       },
     );
@@ -447,6 +547,215 @@ export class WahaClient {
 
     return { messageId };
   }
+
+  /**
+   * Lê uma janela limitada do histórico de uma conversa. É usado apenas pelo
+   * sincronizador interno como recuperação quando o webhook do WAHA não chega
+   * (por exemplo, mensagens enviadas pelo aplicativo móvel).
+   */
+  async getMessages(sessionName: string, chatId: string, limit = 100): Promise<unknown[]> {
+    const normalizedChatId = chatId.includes("@") ? chatId : `${chatId.replace(/\D/g, "")}@c.us`;
+    const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 100);
+    const query = new URLSearchParams({ limit: String(safeLimit) });
+    const result = await this.request<unknown>(
+      `/api/${encodeURIComponent(sessionName)}/chats/${encodeURIComponent(normalizedChatId)}/messages?${query.toString()}`,
+      { timeoutMs: 10_000 },
+    );
+    if (Array.isArray(result)) return result;
+    if (result && typeof result === "object" && Array.isArray((result as { messages?: unknown[] }).messages)) {
+      return (result as { messages: unknown[] }).messages;
+    }
+    return [];
+  }
+
+  /**
+   * Retrato do servidor WAHA para diagnóstico de pareamento: versão/engine
+   * (WhatsApp Web desatualizado é causa clássica de "Não foi possível conectar
+   * o dispositivo"), uptime (reinícios frequentes derrubam QR e sessões) e as
+   * sessões existentes. Cada consulta é independente: uma indisponível não
+   * esconde as demais. Nunca devolve o número por inteiro.
+   */
+  async getDiagnostics(): Promise<{
+    version: Record<string, unknown> | null;
+    server: Record<string, unknown> | null;
+    sessions: Array<{ name: string; status: string; phoneSuffix: string | null }> | null;
+    errors: string[];
+  }> {
+    const errors: string[] = [];
+    const attempt = async <T>(label: string, run: () => Promise<T>): Promise<T | null> => {
+      try {
+        return await run();
+      } catch (error) {
+        errors.push(`${label}: ${error instanceof WahaClientError ? error.code : "WAHA_UNAVAILABLE"}${error instanceof WahaClientError && error.providerStatusCode ? ` (${error.providerStatusCode})` : ""}`);
+        return null;
+      }
+    };
+    const pick = (raw: unknown, keys: string[]) => {
+      if (!raw || typeof raw !== "object") return null;
+      const source = raw as Record<string, unknown>;
+      return Object.fromEntries(keys.filter((key) => key in source).map((key) => [key, source[key]]));
+    };
+
+    const [version, server, sessions] = await Promise.all([
+      attempt("version", () => this.request<unknown>("/api/server/version", { timeoutMs: 5_000 })),
+      attempt("status", () => this.request<unknown>("/api/server/status", { timeoutMs: 5_000 })),
+      attempt("sessions", () => this.request<unknown>("/api/sessions?all=true", { timeoutMs: 8_000 })),
+    ]);
+
+    return {
+      version: pick(version, ["version", "engine", "tier", "browser"]),
+      server: pick(server, ["startTime", "uptime", "worker"]),
+      sessions: Array.isArray(sessions)
+        ? sessions.map((raw) => {
+            const item = raw as { name?: unknown; status?: unknown; me?: { id?: unknown } };
+            const id = typeof item.me?.id === "string" ? item.me.id.replace(/@.+$/, "") : null;
+            return {
+              name: String(item.name ?? ""),
+              status: String(item.status ?? "UNKNOWN"),
+              phoneSuffix: id ? id.slice(-4) : null,
+            };
+          })
+        : null,
+      errors,
+    };
+  }
+
+  /** Lista conversas para reconciliar números cujo DDD cadastrado está desatualizado. */
+  async getChats(sessionName: string, limit = 500): Promise<unknown[]> {
+    const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);
+    const query = new URLSearchParams({ limit: String(safeLimit) });
+    const result = await this.request<unknown>(
+      `/api/${encodeURIComponent(sessionName)}/chats?${query.toString()}`,
+      { timeoutMs: 10_000 },
+    );
+    if (Array.isArray(result)) return result;
+    if (result && typeof result === "object" && Array.isArray((result as { chats?: unknown[] }).chats)) {
+      return (result as { chats: unknown[] }).chats;
+    }
+    return [];
+  }
+
+  /**
+   * Baixa um arquivo de mídia que o WAHA guardou (link `media.url` do
+   * webhook). Só aceita caminhos `/api/files/…` deste WAHA — o host do link é
+   * ignorado, para o relay nunca buscar URLs arbitrárias vindas do payload.
+   */
+  async downloadMediaFile(mediaUrl: string, maxBytes = WAHA_MEDIA_MAX_BYTES): Promise<{ body: Buffer; contentType: string }> {
+    const path = wahaMediaFilePath(mediaUrl);
+    if (!path) throw new WahaClientError("WAHA_MEDIA_INVALID_PATH", 400, "Caminho de mídia WAHA inválido.");
+    let response: Response;
+    try {
+      response = await this.fetchFn(`${this.baseUrl}${path}`, {
+        headers: { "x-api-key": this.apiKey },
+        signal: AbortSignal.timeout(20_000),
+      });
+    } catch (error) {
+      if (isTimeoutError(error)) throw new WahaClientError("WAHA_TIMEOUT", 504, "WAHA não respondeu dentro do timeout.");
+      throw new WahaClientError("WAHA_UNAVAILABLE", 502, "WAHA indisponível.");
+    }
+    if (response.status === 404) throw new WahaClientError("WAHA_MEDIA_NOT_FOUND", 404, "Mídia não encontrada no WAHA.", 404);
+    if (!response.ok) throw new WahaClientError("WAHA_INTERNAL_ERROR", 502, `WAHA retornou status ${response.status}.`, response.status);
+    const declared = Number(response.headers.get("content-length") ?? "0");
+    if (declared > maxBytes) throw new WahaClientError("WAHA_MEDIA_TOO_LARGE", 413, "Mídia acima do limite.");
+    const body = Buffer.from(await response.arrayBuffer());
+    if (body.byteLength > maxBytes) throw new WahaClientError("WAHA_MEDIA_TOO_LARGE", 413, "Mídia acima do limite.");
+    return { body, contentType: response.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream" };
+  }
+
+  /**
+   * Telefone (`<número>@c.us`) por trás de um identificador `@lid`, ou null
+   * quando o WAHA não conhece o mapeamento. Nunca lança: um webhook não deve
+   * falhar por causa dessa consulta.
+   */
+  async getPhoneForLid(sessionName: string, lid: string): Promise<string | null> {
+    try {
+      const result = await this.request<{ lid?: string; pn?: string | null }>(
+        `/api/${encodeURIComponent(sessionName)}/lids/${encodeURIComponent(lid)}`,
+        { timeoutMs: 5_000 },
+      );
+      return typeof result?.pn === "string" && result.pn.trim() ? result.pn.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Resolve um telefone para o identificador de conversa que o WAHA/WebJS
+   * reconhece. Em algumas contas o WhatsApp usa @lid, não <telefone>@c.us;
+   * enviar diretamente para o telefone causa "No LID for user".
+   *
+   * Não há fallback para o telefone quando a resolução falha: isso apenas
+   * repetiria o envio inválido e esconderia a causa do erro.
+   */
+  private async resolveChatId(sessionName: string, chatId: string): Promise<string> {
+    if (chatId.includes("@")) return chatId;
+
+    const phone = chatId.replace(/\D/g, "");
+    if (!/^\d{10,15}$/.test(phone)) {
+      throw new WahaClientError("WAHA_RECIPIENT_NOT_FOUND", 400, "Destinatário WAHA inválido.");
+    }
+
+    const query = new URLSearchParams({ session: sessionName, phone });
+    const result = await this.request<{
+      exists?: boolean;
+      numberExists?: boolean;
+      chatId?: string;
+    }>(`/api/contacts/check-exists?${query.toString()}`, { timeoutMs: 5_000 });
+
+    const recipientExists = result.exists ?? result.numberExists;
+    const resolvedChatId = typeof result.chatId === "string" ? result.chatId.trim() : "";
+    if (recipientExists === false || !resolvedChatId.includes("@")) {
+      throw new WahaClientError(
+        "WAHA_RECIPIENT_NOT_FOUND",
+        422,
+        "Destinatário não encontrado ou sem conversa WAHA válida.",
+      );
+    }
+
+    return resolvedChatId;
+  }
+}
+
+/** WhatsApp's own ceiling for documents; audio/image/video are far smaller. */
+export const WAHA_MEDIA_MAX_BYTES = 100 * 1024 * 1024;
+
+/** `/api/files/<session>/<file>` from a WAHA media link, or null for anything else. */
+export function wahaMediaFilePath(mediaUrl: string): string | null {
+  let pathname: string;
+  try {
+    pathname = new URL(mediaUrl, "http://waha.local").pathname;
+  } catch {
+    return null;
+  }
+  if (!pathname.startsWith("/api/files/") || pathname.includes("..") || pathname.includes("//")) return null;
+  return pathname;
+}
+
+const DEFAULT_WEBHOOK_URL = "http://api:3000/internal/webhooks/waha";
+let warnedDefaultWebhook = false;
+
+/**
+ * URL para a qual o WAHA envia eventos de sessão/mensagem desta sessão.
+ *
+ * O fallback `http://api:3000` só resolve quando WAHA e Fastify compartilham a
+ * mesma rede Docker. Com serviços em VPS/aplicações separadas no Coolify ele
+ * não resolve: o WAHA descarta o webhook, o CRM nunca recebe o status
+ * "conectado" e só o polling mantém a interface atualizada. Por isso o uso do
+ * fallback é sinalizado explicitamente.
+ */
+export function resolveWebhookUrl(env: NodeJS.ProcessEnv = process.env): string {
+  const explicit = env.WHATSAPP_HOOK_URL?.trim();
+  if (explicit) return explicit;
+  const internalBase = env.INTERNAL_API_URL?.trim().replace(/\/+$/, "");
+  if (internalBase) return `${internalBase}/internal/webhooks/waha`;
+  if (!warnedDefaultWebhook) {
+    warnedDefaultWebhook = true;
+    console.warn(
+      "[waha] WHATSAPP_HOOK_URL/INTERNAL_API_URL não configuradas; usando o fallback " +
+        `${DEFAULT_WEBHOOK_URL}. Fora da rede Docker do Fastify o WAHA não entregará webhooks de status.`,
+    );
+  }
+  return DEFAULT_WEBHOOK_URL;
 }
 
 /**
@@ -456,8 +765,18 @@ function isTimeoutError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "TimeoutError";
 }
 
-function isExpectedCleanupError(error: unknown): error is WahaClientError {
-  return error instanceof WahaClientError && (error.providerStatusCode === 400 || error.providerStatusCode === 404);
+function isExpectedCleanupError(
+  error: unknown,
+  operation: WahaRecoveryCleanup["operation"],
+): error is WahaClientError {
+  if (!(error instanceof WahaClientError)) return false;
+
+  // WAHA pode sinalizar que stop/logout já não se aplicam à sessão com 400,
+  // 404, 422 ou 425 (not in valid state — ex.: logout em sessão que não está
+  // WORKING). Isso é seguro para o cleanup: a remoção ainda é tentada.
+  // Não toleramos 422/425 no DELETE, pois a sessão pode continuar ativa.
+  if (operation === "delete") return error.providerStatusCode === 404;
+  return [400, 404, 422, 425].includes(error.providerStatusCode ?? 0);
 }
 
 function cleanupIgnored(operation: WahaRecoveryCleanup["operation"], error: WahaClientError): WahaRecoveryCleanup {

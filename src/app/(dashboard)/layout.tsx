@@ -1,6 +1,6 @@
-import { redirect } from "next/navigation";
+﻿import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
@@ -12,15 +12,18 @@ import { NotificationCountProvider } from "@/components/providers/notification-c
 import { FeedbackToastHandler } from "@/features/leads/components/feedback-toast-handler";
 import { PasskeyToastHandler } from "@/components/passkey-toast-handler";
 import { RouteOnboardingLoader } from "@/features/onboarding/components/route-onboarding-loader";
+import { BrokerAvailabilityOnboardingLoader } from "@/features/broker-availability/components/broker-availability-onboarding-loader";
 import { CommandPalette } from "@/components/command-palette";
 import { SystemFeedbackDrawer } from "@/components/system-feedback-drawer";
 import { AgentDrawerProvider } from "@/components/agent-drawer/agent-drawer-provider";
 import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
-import { getRealtimeSyncTopic } from "@/features/notifications/realtime-sync";
+import { getRealtimeSyncTopic, isRealtimeSyncEnabled } from "@/features/notifications/realtime-sync";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
-import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
+import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
+import { getRouteDefinition } from "@/features/custom-roles/routes";
+import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -36,11 +39,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   // is resolved. Starting them together keeps client-side route transitions from
   // serializing the shell, preference, branding and pathname lookups.
   const experienceModePromise = getExperienceMode(context);
+  const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   const headersPromise = headers();
-  const wahaConnectionsEnabledPromise =
-    context.role === "broker"
-      ? getSystemSetting("feature_waha_connections_enabled")
-      : Promise.resolve("true");
   const tenantPromise = getDatabase()
     .select({
       name: schema.tenants.name,
@@ -51,16 +51,45 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     .where(eq(schema.tenants.id, context.tenantId))
     .limit(1);
 
-  const [experienceMode, headersList, tenantRows, wahaConnectionsEnabled] = await Promise.all([
+  const userPromise = getDatabase()
+    .select({
+      name: schema.user.name,
+      email: schema.user.email,
+    })
+    .from(schema.user)
+    .where(eq(schema.user.id, context.userId))
+    .limit(1);
+
+  const membershipPromise = getDatabase()
+    .select({
+      availabilityStatus: schema.tenantMemberships.availabilityStatus,
+    })
+    .from(schema.tenantMemberships)
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.userId, context.userId),
+      ),
+    )
+    .limit(1);
+
+  const [
+    experienceMode,
+    headersList,
+    tenantRows,
+    userRows,
+    membershipRows,
+    cleanUiEnabled,
+  ] = await Promise.all([
     experienceModePromise,
     headersPromise,
     tenantPromise,
-    wahaConnectionsEnabledPromise,
+    userPromise,
+    membershipPromise,
+    cleanUiPromise,
   ]);
+
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
-  const showLightConversations =
-    !isLightBroker ||
-    wahaConnectionsEnabled !== "false";
 
   const pathname = headersList.get("x-pathname") || "";
 
@@ -86,23 +115,50 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     }
   }
 
+  const routeDefinition = getRouteDefinition(pathname.split("?")[0]);
+  if (routeDefinition && pathname !== "") {
+    const canAccessRoute = await hasEffectiveRouteAccess({
+      tenantId: context.tenantId,
+      role: context.role,
+      jobTitle: context.jobTitle,
+      customRoleId: context.customRoleId ?? null,
+      routeKey: routeDefinition.key,
+      fallbackPermission: routeDefinition.fallbackPermission,
+    });
+    if (!canAccessRoute) redirect("/access-denied");
+  }
+
   const [tenant] = tenantRows;
-  const syncTopic = getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId });
+  const [currentUser] = userRows;
+  const [membership] = membershipRows;
+  // With realtime switched off the server sends no signals; a null topic makes
+  // the client fall back to periodic reconciliation instead of trusting a silent channel.
+  const syncTopic = (await isRealtimeSyncEnabled())
+    ? getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId })
+    : null;
 
   return (
     <AgentDrawerProvider>
       <AppShell
+        cleanUiEnabled={cleanUiEnabled}
         isLightBroker={isLightBroker}
-        showLightConversations={showLightConversations}
         branding={{
           tenantName: tenant?.name ?? null,
           brandColor: tenant?.brandColor ?? null,
           logoUrl: tenant?.logoUrl ?? null,
         }}
+        user={{
+          name: currentUser?.name ?? null,
+          email: currentUser?.email ?? null,
+          role: context.role,
+          jobTitle: context.jobTitle,
+        }}
+        initialAvailability={(membership?.availabilityStatus as "available" | "paused" | "offline") ?? "available"}
       >
         <TenantOnboardingDialogLoader />
         <DirectorWizardLoader />
         <RouteOnboardingLoader />
+        <BrokerAvailabilityOnboardingLoader />
         <RealtimeSyncProvider
           tenantId={context.tenantId}
           userId={context.userId}
@@ -113,8 +169,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
             <FeedbackToastHandler userId={context.userId} />
             <PasskeyToastHandler userId={context.userId} />
             <CommandPalette />
-            <SystemFeedbackDrawer />
-            <AgentDrawer />
+            {!isLightBroker && <SystemFeedbackDrawer />}
+            {!isLightBroker && <AgentDrawer />}
             {children}
           </NotificationCountProvider>
         </RealtimeSyncProvider>

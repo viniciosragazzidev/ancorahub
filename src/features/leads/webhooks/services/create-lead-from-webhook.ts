@@ -6,8 +6,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
 
 import type { NormalizedLeadData } from "../types/lead-webhook.types";
-import { chooseAvailableBroker } from "@/features/leads/assignment";
-import { notifyNewLead, notifyLeadArrived } from "@/features/notifications/send-push-helper";
+import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
+import { notifyLeadArrived } from "@/features/notifications/send-push-helper";
 
 export type CreateLeadFromWebhookInput = {
   tenantId: string;
@@ -49,7 +49,7 @@ export async function createLeadFromWebhook(
 
   // ── Step 2: Everything else runs in background (fire-and-forget) ───
   // Distribution, audit, interaction, push — none of these block the response.
-  void backgroundTasks({
+  await backgroundTasks({
     leadId,
     tenantId,
     branchId,
@@ -57,8 +57,6 @@ export async function createLeadFromWebhook(
     createdByUserId,
     deliveryId,
     normalized,
-  }).catch((error) => {
-    console.error("[webhook] background task error:", error);
   });
 
   return { leadId };
@@ -73,26 +71,10 @@ async function backgroundTasks(input: {
   deliveryId: string;
   normalized: NormalizedLeadData;
 }) {
-  const { leadId, tenantId, branchId, credentialId, createdByUserId, deliveryId, normalized } = input;
+  const { leadId, tenantId, branchId, createdByUserId, deliveryId, normalized } = input;
   const db = getDatabase();
 
-  // ── Distribute to available broker ──────────────────────────────────
-  const corretorId = await chooseAvailableBroker(tenantId, branchId, undefined, credentialId);
-  const assigned = Boolean(corretorId);
-
-  // ── Update lead with distribution result ────────────────────────────
-  await db
-    .update(schema.leads)
-    .set({
-      corretorId,
-      status: assigned ? "distributed" : "new",
-      distributionStatus: assigned ? "assigned" : "queued",
-      assignmentSource: assigned ? "automatic" : null,
-      assignmentStrategy: assigned ? "capacity" : null,
-      distributionUpdatedAt: new Date(),
-      assignedAt: assigned ? new Date() : null,
-    })
-    .where(eq(schema.leads.id, leadId));
+  const distribution = await enqueueAndProcessLeadDistribution({ tenantId, leadId, source: "intake" });
 
   // ── Audit + interaction + delivery status ───────────────────────────
   await db.transaction(async (tx) => {
@@ -101,9 +83,9 @@ async function backgroundTasks(input: {
       leadId,
       userId: createdByUserId,
       tipo: "note",
-      conteudo: assigned
-        ? "Lead recebido por webhook e distribuído automaticamente para um corretor disponível."
-        : "Lead recebido por webhook; aguardando corretor disponível.",
+      conteudo: distribution?.assigned || distribution?.offered
+        ? "Lead recebido por webhook e encaminhado pelo motor central de distribuição."
+        : "Lead recebido por webhook; distribuição persistida para recuperação automática.",
     });
 
     await tx.insert(schema.auditLogs).values({
@@ -121,8 +103,5 @@ async function backgroundTasks(input: {
   });
 
   // ── Push notifications ──────────────────────────────────────────────
-  await Promise.all([
-    notifyLeadArrived(leadId, tenantId, branchId, normalized.name),
-    notifyNewLead(leadId, tenantId, branchId, corretorId, normalized.name),
-  ]);
+  await notifyLeadArrived(leadId, tenantId, branchId, normalized.name);
 }

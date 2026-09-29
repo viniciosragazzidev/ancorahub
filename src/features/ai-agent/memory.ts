@@ -73,7 +73,12 @@ const NAME_PATTERNS = [
 ];
 
 const CITY_PATTERNS = [
-  /(?:moro em|sou de|de|na cidade de|em)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)/i,
+  // Covers neighbourhoods and multi-word locations such as
+  // "moramos no Recreio dos Bandeirantes" without swallowing the rest of
+  // the sentence. The explicit location introducers make this safe for long
+  // free-text answers.
+  /(?:moro|moramos|resido|residimos)\s+(?:em|no|na)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+(?:d[aeo]s?|[A-ZÀ-Ú][a-zà-ú]+)){0,5})/i,
+  /(?:moro em|sou de|na cidade de|localizado em|fica em)\s+([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)/i,
   /cidade\s*(?:é|:)?\s*([A-ZÀ-Ú][a-zà-ú]+(?:\s+[A-ZÀ-Ú][a-zà-ú]+)?)/i,
 ];
 
@@ -82,7 +87,7 @@ const PLAN_TYPE_PATTERNS = [
   /\bpessoa\s+j(?:urídica|uridica)\b/i,
   /\b(?:individual|PF|para mim|sou eu|só para mim)\b/i,
   /\b(?:familiar|para família|para minha família)\b/i,
-  /\b(?:empresarial|PME|PJ|para empresa|para minha empresa|coletivo)\b/i,
+  /\b(?:empresarial|PME|PJ|MEI|para empresa|para minha empresa|coletivo)\b/i,
 ];
 
 const NUMBER_OF_LIVES_PATTERNS = [
@@ -90,6 +95,37 @@ const NUMBER_OF_LIVES_PATTERNS = [
   /(?:somos|sou|minha família tem|seria para|apenas|para)\s*(\d+)/i,
   /para\s*(\d+)\s*(?:pessoas?|vidas?)/i,
 ];
+
+const NUMBER_WORD_VALUES: Record<string, number> = {
+  um: 1,
+  uma: 1,
+  dois: 2,
+  duas: 2,
+  tres: 3,
+  três: 3,
+  quatro: 4,
+  cinco: 5,
+  seis: 6,
+  sete: 7,
+  oito: 8,
+  nove: 9,
+  dez: 10,
+  onze: 11,
+  doze: 12,
+  treze: 13,
+  quatorze: 14,
+  catorze: 14,
+  quinze: 15,
+  dezesseis: 16,
+  dezasseis: 16,
+  dezessete: 17,
+  dezassete: 17,
+  dezoito: 18,
+  dezenove: 19,
+  dezanove: 19,
+  vinte: 20,
+};
+const NUMBER_WORD_PATTERN = Object.keys(NUMBER_WORD_VALUES).join("|");
 
 const AGE_PATTERNS = [
   /(\d+)\s*(?:anos|anos de idade)/i,
@@ -107,6 +143,7 @@ const CNPJ_PATTERNS = [
 ];
 
 const INTENT_PATTERNS = [
+  /(?:gostaria|gostaríamos|queremos|quero|busco|procuro)\s+(?:de\s+)?(?:ver|conhecer|receber|encontrar)\s+([^.!?\n]+)/i,
   /(?:quero|gostaria|preciso de|estou atrás de|busco|procuro)\s+(?:um|uma|de|contratar|saber)\s+([^,.!?]+)/i,
   /(?:cotação|preço|valor|quanto custa|orçamento)/i,
 ];
@@ -166,7 +203,13 @@ export function extractFieldsFromMessage(
       const match = trimmed.match(pattern);
       if (match?.[1]) {
         const name = match[1].trim();
-        if ((index < 2 || isNameQuestion) && name.length >= 5 && name.includes(" ")) {
+        const firstNameToken = normalizeForMatching(name.split(/\s+/)[0] ?? "");
+        if (
+          (index < 2 || isNameQuestion)
+          && name.length >= 5
+          && name.includes(" ")
+          && !NON_NAME_PREFIXES.has(firstNameToken)
+        ) {
           memory.customerName = { value: name, confidence: 1, sourceMessageId };
           memory.customerFirstName = {
             value: name.split(" ")[0],
@@ -201,7 +244,7 @@ export function extractFieldsFromMessage(
       const match = trimmed.match(pattern);
       if (match?.[1]) {
         const city = match[1].trim();
-        if (city.length >= 3 && !commonWords.has(city.toLowerCase())) {
+        if (isLikelyCityAnswer(city)) {
           memory.city = { value: city, confidence: 1, sourceMessageId };
           addCollectedField(memory, "city");
           break;
@@ -210,8 +253,10 @@ export function extractFieldsFromMessage(
     }
 
     const asksForCity = normalizeForMatching(memory.lastQuestionAsked ?? "").includes("cidade");
-    const bareCity = trimmed.replace(/,\s*[A-Za-z]{2}\s*$/, "").trim();
-    if (!memory.city && asksForCity && /^[\p{L}][\p{L} .'-]{2,59}$/u.test(bareCity) && !commonWords.has(normalizeForMatching(bareCity))) {
+    // A city answer may include a neighbourhood/region after a comma
+    // ("Rio de Janeiro, centro"). Keep the city segment only.
+    const bareCity = trimmed.split(",")[0]?.trim() ?? "";
+    if (!memory.city && asksForCity && isLikelyCityAnswer(bareCity)) {
       memory.city = { value: bareCity, confidence: 1, sourceMessageId };
       addCollectedField(memory, "city");
     }
@@ -219,18 +264,19 @@ export function extractFieldsFromMessage(
 
   // Plan type extraction
   if (!memory.planType) {
+    const normalizedPlanMessage = normalizeForMatching(trimmed);
     for (const pattern of PLAN_TYPE_PATTERNS) {
-      if (pattern.test(trimmed)) {
+      if (pattern.test(trimmed) || pattern.test(normalizedPlanMessage) || /\b(?:individual|familiar|familia|empresarial|empresa|mei|pme|pf|pj)\b/i.test(normalizedPlanMessage)) {
         const value =
-          /pessoa\s+f(?:ísica|fisica)/i.test(trimmed)
+          /pessoa\s+f(?:isica)/i.test(normalizedPlanMessage)
             ? "individual"
-            : /pessoa\s+j(?:urídica|uridica)/i.test(trimmed)
+            : /pessoa\s+j(?:uridica)/i.test(normalizedPlanMessage)
               ? "empresarial"
-              : /individual|PF|para mim|sou eu|só para mim/i.test(trimmed)
+              : /individual|\bpf\b|para mim|sou eu|so para mim/i.test(normalizedPlanMessage)
                 ? "individual"
-            : /familiar|para família|para minha família/i.test(trimmed)
-              ? "familiar"
-              : "empresarial";
+              : /familiar|familia|para minha familia/i.test(normalizedPlanMessage)
+                ? "familiar"
+                : "empresarial";
         memory.planType = { value, confidence: 1, sourceMessageId };
         addCollectedField(memory, "planType");
         break;
@@ -240,11 +286,68 @@ export function extractFieldsFromMessage(
 
   // Number of lives
   if (!memory.numberOfLives) {
+    const normalizedMessage = normalizeForMatching(trimmed).replace(/\s+/g, " ").trim();
+    const numberToken = (token: string) => {
+      const numeric = Number(token);
+      if (Number.isInteger(numeric) && numeric > 0 && numeric < 100) return numeric;
+      return NUMBER_WORD_VALUES[normalizeForMatching(token)];
+    };
+    const composition = normalizedMessage.match(/\b(\d+|[a-z]+)\s+adultos?\s*(?:e|,|mais)\s*(\d+|[a-z]+)\s+criancas?\b/i);
+    const compositionValue = composition ? (numberToken(composition[1]) ?? 0) + (numberToken(composition[2]) ?? 0) : 0;
+    if (compositionValue > 0 && compositionValue < 100) {
+      memory.numberOfLives = { value: String(compositionValue), confidence: 1, sourceMessageId };
+      addCollectedField(memory, "numberOfLives");
+    }
+
     const bareNumber = trimmed.match(/^([1-9]\d?)$/);
-    if (bareNumber && /quantas vidas|quantas pessoas|quantidade de pessoas|n[úu]mero de vidas/i.test(memory.lastQuestionAsked ?? "")) {
+    if (!memory.numberOfLives && bareNumber && /quantas vidas|quantas pessoas|quantidade de pessoas|n[úu]mero de vidas/i.test(memory.lastQuestionAsked ?? "")) {
       memory.numberOfLives = { value: bareNumber[1], confidence: 1, sourceMessageId };
       addCollectedField(memory, "numberOfLives");
     }
+
+    // Short answers frequently use Portuguese number words ("só uma",
+    // "uma pessoa", "duas vidas"). Resolve them only in the context of a
+    // lives question so ordinary prose is not mistaken for a quantity.
+    if (!memory.numberOfLives) {
+      const normalizedQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
+      const asksForLives = /quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizedQuestion);
+      const livesWordPattern = new RegExp(
+        `^(?:e\\s+)?(?:(?:so|apenas|somente)\\s+)?(${NUMBER_WORD_PATTERN})(?:\\s+(?:pessoas?|vidas?|familiares?|dependentes?|pessoal|integrantes?))?$`,
+        "i",
+      );
+      const livesPhrasePattern = new RegExp(
+        `^(?:somos|seria para|sou|temos|tenho|para|minha familia tem)\\s+(?:(?:so|apenas|somente)\\s+)?(${NUMBER_WORD_PATTERN})(?:\\s+(?:pessoas?|vidas?|familiares?|dependentes?|pessoal|integrantes?))?$`,
+        "i",
+      );
+      const wordMatch = (asksForLives ? normalizedMessage.match(livesWordPattern) : null)
+        ?? normalizedMessage.match(livesPhrasePattern);
+      const parsedWordValue = wordMatch?.[1] ? NUMBER_WORD_VALUES[normalizeForMatching(wordMatch[1])] : undefined;
+      if (parsedWordValue && parsedWordValue > 0 && parsedWordValue < 100) {
+        memory.numberOfLives = { value: String(parsedWordValue), confidence: 1, sourceMessageId };
+        addCollectedField(memory, "numberOfLives");
+      }
+    }
+
+    // A quantity next to "vida(s)/pessoa(s)" anywhere in the sentence ("plano
+    // pra uma vida no MEI", "quero ta uma vida"), and short replies to the
+    // lives question with the word after the number ("uma só") or meaning one
+    // person ("só eu", "sozinha").
+    if (!memory.numberOfLives) {
+      const normalizedQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
+      const asksForLives = /quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizedQuestion);
+      const inSentence = normalizedMessage.match(new RegExp(`\\b(\\d{1,2}|${NUMBER_WORD_PATTERN})\\s+(?:pessoas?|vidas?|beneficiari[oa]s?)\\b`, "i"));
+      const shortReply = asksForLives
+        ? normalizedMessage.match(new RegExp(`^(?:e\\s+)?(\\d{1,2}|${NUMBER_WORD_PATTERN})\\s+(?:so|apenas|somente)$`, "i"))
+        : null;
+      const onlyMe = asksForLives && /^(?:(?:e\s+)?(?:so|apenas|somente)\s+(?:eu|pra mim|para mim)|eu mesm[oa]|sozinh[oa]|so minha pessoa)$/.test(normalizedMessage);
+      const token = inSentence?.[1] ?? shortReply?.[1];
+      const value = onlyMe ? 1 : token ? numberToken(token) : undefined;
+      if (value && value > 0 && value < 100) {
+        memory.numberOfLives = { value: String(value), confidence: 1, sourceMessageId };
+        addCollectedField(memory, "numberOfLives");
+      }
+    }
+
     for (const pattern of NUMBER_OF_LIVES_PATTERNS) {
       if (memory.numberOfLives) break;
       const match = trimmed.match(pattern);
@@ -259,16 +362,39 @@ export function extractFieldsFromMessage(
     }
   }
 
-  // Age extraction
+  // Age extraction. Long answers commonly include several ages (and, for a
+  // PME, those ages are the requested average-age signal). Restrict the
+  // unrestricted scan to an age question so numbers such as "2 vidas" are
+  // never mistaken for ages.
+  // Migrate memories created before PME ages were stored as averageAge. This
+  // keeps an in-flight conversation from asking the same age question again
+  // after a restart or an attachment.
+  if (memory.planType?.value === "empresarial" && !memory.averageAge?.value && memory.age?.value) {
+    const previousAges = memory.age.value.split(/[,\s]+/).map(Number).filter((age) => age > 0 && age < 150);
+    if (previousAges.length > 0) {
+      memory.averageAge = {
+        value: String(Math.round(previousAges.reduce((sum, age) => sum + age, 0) / previousAges.length)),
+        confidence: memory.age.confidence,
+        sourceMessageId: memory.age.sourceMessageId,
+      };
+    }
+  }
   if (!memory.age) {
     const previousQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
     const asksForAge = previousQuestion.includes("idade") || previousQuestion.includes("quantos anos");
-    const asksForAverageAge = (previousQuestion.includes("media") && previousQuestion.includes("idade")) || previousQuestion.includes("faixa etaria");
-    const ageValues = trimmed.match(/\d{1,3}/g)?.map(Number).filter((age) => age > 0 && age < 150) ?? [];
-    if (asksForAge && ageValues.length > 0) {
-      if (memory.planType?.value === "empresarial" && asksForAverageAge) {
-        memory.averageAge = { value: String(ageValues[0]), confidence: 1, sourceMessageId };
-      } else {
+    const explicitAgeValues = Array.from(trimmed.matchAll(/\b([1-9]\d?|1[0-4]\d)\s*a?\s*nos?\b/gi))
+      .map((match) => Number(match[1]))
+      .filter((age) => age > 0 && age < 150);
+    const ageValues = explicitAgeValues.length > 0
+      ? explicitAgeValues
+      : asksForAge
+        ? trimmed.match(/\d{1,3}/g)?.map(Number).filter((age) => age > 0 && age < 150) ?? []
+        : [];
+    if (ageValues.length > 0) {
+      if (memory.planType?.value === "empresarial") {
+        const average = Math.round(ageValues.reduce((sum, age) => sum + age, 0) / ageValues.length);
+        memory.averageAge = { value: String(average), confidence: 1, sourceMessageId };
+      } else if (asksForAge || explicitAgeValues.length > 0) {
         memory.age = { value: ageValues.join(", "), confidence: 1, sourceMessageId };
       }
       addCollectedField(memory, "age");
@@ -301,7 +427,9 @@ export function extractFieldsFromMessage(
 
   // CNPJ detection
   if (!memory.companyHasCnpj) {
-    if (CNPJ_PATTERNS.some((p) => p.test(trimmed))) {
+    // Mentioning a company/MEI is not proof that a CNPJ was provided. Only
+    // advance this field when the message explicitly contains the CNPJ term.
+    if (/\bcnpj\b/i.test(trimmed) && CNPJ_PATTERNS.some((p) => p.test(trimmed))) {
       memory.companyHasCnpj = { value: "true", confidence: 1, sourceMessageId };
       addCollectedField(memory, "companyHasCnpj");
     }
@@ -312,8 +440,14 @@ export function extractFieldsFromMessage(
     for (const pattern of INTENT_PATTERNS) {
       const match = trimmed.match(pattern);
       if (match?.[1]) {
-        const intent = match[1].trim().slice(0, 60);
-        memory.intent = { value: intent, confidence: 0, sourceMessageId };
+        const intent = match[1]
+          .split(/\b(?:pois|porque|já que|ja que|moro|moramos|resido|residimos)\b/i)[0]
+          .trim()
+          .replace(/[,:;]+$/, "")
+          .trim()
+          .slice(0, 120);
+        if (!intent) continue;
+        memory.intent = { value: intent, confidence: 1, sourceMessageId };
         addCollectedField(memory, "intent");
         break;
       }
@@ -333,6 +467,37 @@ function addCollectedField(memory: ConversationMemory, key: string) {
 const commonWords = new Set([
   "bom", "dia", "tarde", "noite", "sim", "não", "nao", "oi", "ola", "olá",
   "obrigado", "obrigada", "ok", "tudo", "bem", "aqui", "ali", "la", "lá",
+]);
+
+/**
+ * A bare answer to the city question is intentionally conservative. Long
+ * answers can contain a sentence such as "Estou saindo p dar aulas"; treating
+ * that sentence as a city makes the engine believe the qualification is
+ * complete and can trigger a premature handoff. Explicit location phrases
+ * ("moro em ...") are handled above, while this guard is used for short,
+ * context-only answers such as "Cabo Frio, RJ".
+ */
+function isLikelyCityAnswer(value: string): boolean {
+  const normalized = normalizeForMatching(value).trim();
+  if (!/^[\p{L}][\p{L} .'-]{2,59}$/u.test(value.trim())) return false;
+  if (commonWords.has(normalized)) return false;
+
+  const nonCityWords = new Set([
+    "aulas", "aqui", "anos", "bem", "busco", "cidade", "cnpj", "com",
+    "acima", "aulas", "como", "empresa", "estou", "eu", "familiar", "gostaria", "idade",
+    "individual", "leia", "ler", "logo", "mei", "nao", "não", "obgda", "obrigada", "obrigado",
+    "pessoas", "pf", "pj", "plano", "por", "porem", "porque", "procuro", "quero", "saindo",
+    "sem", "seria", "sim", "tenho", "vidas", "vou", "voltarei",
+  ]);
+  const words = normalized.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 5) return false;
+  if (words.some((word) => nonCityWords.has(word))) return false;
+  return true;
+}
+
+const NON_NAME_PREFIXES = new Set([
+  "empresa", "plano", "caso", "nosso", "nossa", "seriam", "tenho",
+  "gostaria", "gostariamos", "queremos", "recebemos", "cliente",
 ]);
 
 // ─── Question similarity detection ───────────────────────────────────────────

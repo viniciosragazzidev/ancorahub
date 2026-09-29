@@ -153,21 +153,6 @@ function Sidebar({
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
 
-  if (collapsible === "none") {
-    return (
-      <div
-        data-slot="sidebar"
-        className={cn(
-          "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground",
-          className
-        )}
-        {...props}
-      >
-        {children}
-      </div>
-    )
-  }
-
   if (isMobile) {
     return (
       <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
@@ -176,7 +161,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+          className="!inset-y-0 !h-dvh !max-h-dvh !w-[min(86vw,18rem)] !rounded-none !border-y-0 bg-sidebar p-0 text-sidebar-foreground data-[side=left]:!left-0 data-[side=left]:!border-l-0 data-[side=left]:data-ending-style:-translate-x-full data-[side=left]:data-starting-style:-translate-x-full data-[side=right]:!right-0 data-[side=right]:!border-r-0 data-[side=right]:data-ending-style:translate-x-full data-[side=right]:data-starting-style:translate-x-full"
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
@@ -185,12 +170,27 @@ function Sidebar({
           side={side}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>Sidebar</SheetTitle>
-            <SheetDescription>Displays the mobile sidebar.</SheetDescription>
+            <SheetTitle>Menu principal</SheetTitle>
+            <SheetDescription>Navegação do sistema.</SheetDescription>
           </SheetHeader>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
       </Sheet>
+    )
+  }
+
+  if (collapsible === "none") {
+    return (
+      <div
+        data-slot="sidebar"
+        className={cn(
+          "flex h-full w-(--sidebar-width) flex-col bg-sidebar text-sidebar-foreground max-md:hidden",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
     )
   }
 
@@ -327,7 +327,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-header"
       data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-2 p-2 shrink-0", className)}
       {...props}
     />
   )
@@ -338,7 +338,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sidebar-footer"
       data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2", className)}
+      className={cn("flex flex-col gap-2 p-2 shrink-0", className)}
       {...props}
     />
   )
@@ -364,12 +364,18 @@ function SidebarContent({ className, children, ...props }: React.ComponentProps<
       data-slot="sidebar-content"
       data-sidebar="content"
       className={cn(
-        "flex min-h-0 flex-1 flex-col gap-0 overflow-visible",
+        "flex min-h-0 flex-1 flex-col gap-0 overflow-hidden",
         className
       )}
       {...props}
     >
-      <ScrollArea className="h-full [&>[data-slot=scroll-area-viewport]>div]:pr-2 group-data-[collapsible=icon]:[&>[data-slot=scroll-area-viewport]>div]:pr-0">
+      {/* Radix's own viewport child defaults to `display: table; min-width: 100%`,
+          so it grows to fit its widest descendant instead of staying clamped to
+          the rail's width — collapsed to icon width, that pushed every nav icon
+          past the sidebar's right edge, where `overflow-hidden` clipped it off
+          the visible rail entirely. Forcing `block` (over Radix's inline style,
+          hence `!`) keeps it exactly as wide as this ScrollArea. */}
+      <ScrollArea className="h-full w-full [&>[data-slot=scroll-area-viewport]>div]:block! [&>[data-slot=scroll-area-viewport]>div]:min-w-0! [&>[data-slot=scroll-area-viewport]>div]:pr-1 group-data-[collapsible=icon]:[&>[data-slot=scroll-area-viewport]>div]:pr-0">
         {children}
       </ScrollArea>
     </div>
@@ -509,36 +515,8 @@ function SidebarMenuButton({
   const { isMobile, state } = useSidebar()
   const showTooltip = Boolean(tooltip && state === "collapsed" && !isMobile)
 
-  if (React.isValidElement(render)) {
-    const renderElement = render as React.ReactElement<Record<string, unknown>>;
-    const linkButton = React.cloneElement(renderElement, {
-      className: cn(sidebarMenuButtonVariants({ variant, size }), className, renderElement.props.className as string),
-      "data-slot": "sidebar-menu-button",
-      "data-sidebar": "menu-button",
-      "data-size": size,
-      "data-active": isActive,
-      ...props,
-    });
-
-    if (!showTooltip) {
-      return linkButton;
-    }
-
-    const tooltipProps = typeof tooltip === "string" ? { children: tooltip } : tooltip;
-
-    return (
-      <Tooltip>
-        <TooltipTrigger render={linkButton} />
-        <TooltipContent
-          side="right"
-          align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltipProps}
-        />
-      </Tooltip>
-    );
-  }
-
+  // useRender sempre chamado (mesma ordem em todo render); ele mescla className
+  // e data-* via state no render element/component quando informado.
   const comp = useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(
@@ -547,7 +525,7 @@ function SidebarMenuButton({
       },
       props
     ),
-    render: !showTooltip ? render : <TooltipTrigger render={render} />,
+    render,
     state: {
       slot: "sidebar-menu-button",
       sidebar: "menu-button",
@@ -565,7 +543,7 @@ function SidebarMenuButton({
 
   return (
     <Tooltip>
-      {comp}
+      <TooltipTrigger render={comp} />
       <TooltipContent
         side="right"
         align="center"
@@ -700,22 +678,8 @@ function SidebarMenuSubButton({
     size?: "sm" | "md"
     isActive?: boolean
   }) {
-  if (React.isValidElement(render)) {
-    const renderElement = render as React.ReactElement<Record<string, unknown>>;
-    return React.cloneElement(renderElement, {
-      className: cn(
-        "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-xl px-2 text-sidebar-foreground ring-sidebar-ring outline-hidden group-data-[collapsible=icon]:hidden hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[size=md]:text-sm data-[size=sm]:text-xs data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
-        className,
-        renderElement.props.className as string
-      ),
-      "data-slot": "sidebar-menu-sub-button",
-      "data-sidebar": "menu-sub-button",
-      "data-size": size,
-      "data-active": isActive,
-      ...props,
-    });
-  }
-
+  // useRender sempre chamado (mesma ordem em todo render); ele mescla className
+  // e state no elemento render, seja element, componente ou tag padrão.
   return useRender({
     defaultTagName: "a",
     props: mergeProps<"a">(

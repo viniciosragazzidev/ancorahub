@@ -8,6 +8,8 @@ import {
   parseThanks,
   parseWrongNumber,
   resolveQuickReply,
+  shouldContinueQualificationAfterMedia,
+  shouldQueueLeadAfterTerminalReply,
 } from "./quick-reply";
 
 describe("QuickReplyResolver", () => {
@@ -34,6 +36,13 @@ describe("QuickReplyResolver", () => {
     expect(resolveQuickReply({ body: "atendente", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: false })).toMatchObject({ intent: "REQUEST_HUMAN", nextState: "WAITING_HUMAN" });
   });
 
+  it("keeps a terminal lead eligible for internal distribution", () => {
+    expect(shouldQueueLeadAfterTerminalReply("OPT_OUT")).toBe(true);
+    expect(shouldQueueLeadAfterTerminalReply("NO_LONGER_INTERESTED")).toBe(true);
+    expect(shouldQueueLeadAfterTerminalReply("WRONG_NUMBER")).toBe(true);
+    expect(shouldQueueLeadAfterTerminalReply("GREETING")).toBe(false);
+  });
+
   it("does not interrupt a pending qualification question with a greeting", () => {
     const result = resolveQuickReply({ body: "Oi", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: true });
     expect(result).toMatchObject({ resolved: false, templateKey: null });
@@ -48,6 +57,19 @@ describe("QuickReplyResolver", () => {
     expect(resolveQuickReply({ body: "", messageKind: "audio", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: false })).toMatchObject({ intent: "MEDIA_RECEIVED", templateKey: "media.received" });
     const now = new Date("2026-07-27T12:00:00Z");
     expect(resolveQuickReply({ body: "ainda aguardando", conversationState: "WAITING_HUMAN", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: false, now, cooldown: { waitWindowStartedAt: now, waitResponseCount: 2 }, })).toMatchObject({ resolved: true, suppressReason: "wait_limit" });
+  });
+
+  it("lets an attachment continue the pending qualification instead of short-circuiting it", () => {
+    expect(shouldContinueQualificationAfterMedia({
+      messageKind: "image",
+      hasPendingQuestion: true,
+      conversationState: "AI_ACTIVE",
+    })).toBe(true);
+    expect(shouldContinueQualificationAfterMedia({
+      messageKind: "image",
+      hasPendingQuestion: false,
+      conversationState: "AI_ACTIVE",
+    })).toBe(false);
   });
 
   it("does not classify an ambiguous sentence as a quick intent", () => {

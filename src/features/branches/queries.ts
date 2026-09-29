@@ -1,12 +1,13 @@
 import "server-only";
 
-import { and, count, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { brazilDayKey } from "@/shared/trends";
 import { DEFAULT_PERIOD, periodStart, type PeriodValue } from "@/shared/period";
+import { aggregateBranchDistributionStats, type BranchDistributionStats } from "./distribution-stats";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,23 +57,38 @@ export type BranchProfileData = {
   topBrokers: BranchTopBroker[] | null; // null = caller has no permission
 };
 
+import { resolveAccessContext } from "@/shared/auth/access-context";
+import { AuthorizationService } from "@/shared/auth/authorization-service";
+import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
+
 // ─── Authorization helper ─────────────────────────────────────────────────────
 
 async function assertBranchProfileAccess(branchId: string) {
-  const context = await getRequiredTenantContext();
+  const accessContext = await resolveAccessContext();
 
-  // Director: any branch in the same tenant.
-  // Manager & Broker: only their own branch.
-  if (context.role !== "director") {
-    if (!context.branchId || context.branchId !== branchId) {
-      throw new AuthorizationError(
-        "Você não tem permissão para acessar o perfil desta unidade.",
-      );
-    }
-  }
+  const legacyAllowed =
+    accessContext.role === "director" ||
+    (Boolean(accessContext.branchId) && accessContext.branchId === branchId);
 
-  return context;
+  await evaluateShadowAuthorization({
+    operationKey: "branches.getBranchProfileData",
+    legacyAllowed,
+    context: accessContext,
+    capability: "ver_perfil_unidade",
+    resource: {
+      tenantId: accessContext.tenantId,
+      unitId: branchId,
+    },
+  });
+
+  AuthorizationService.require(accessContext, "ver_perfil_unidade", {
+    tenantId: accessContext.tenantId,
+    unitId: branchId,
+  });
+
+  return accessContext;
 }
+
 
 // ─── Main query ───────────────────────────────────────────────────────────────
 
@@ -126,6 +142,8 @@ export async function getBranchProfileData(
       and(
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.leads.branchId, branchId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, start),
         lt(schema.leads.createdAt, end),
       ),
@@ -147,6 +165,8 @@ export async function getBranchProfileData(
       and(
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.leads.branchId, branchId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, trendStart),
       ),
     )
@@ -217,6 +237,8 @@ export async function getBranchProfileData(
           and(
             eq(schema.leads.tenantId, context.tenantId),
             eq(schema.leads.branchId, branchId),
+            isNull(schema.leads.deletedAt),
+            isNull(schema.leads.archivedAt),
             inArray(schema.leads.status, [...activeStatuses]),
             inArray(schema.leads.corretorId, brokerIds),
           ),
@@ -248,6 +270,8 @@ export async function getBranchProfileData(
           and(
             eq(schema.leads.tenantId, context.tenantId),
             eq(schema.leads.branchId, branchId),
+            isNull(schema.leads.deletedAt),
+            isNull(schema.leads.archivedAt),
             gte(schema.leads.createdAt, start),
             lt(schema.leads.createdAt, end),
             inArray(schema.leads.corretorId, brokerIds),
@@ -274,4 +298,40 @@ export async function getBranchProfileData(
   }
 
   return { branch, metrics, members, topBrokers };
+}
+
+// ─── Distribuição por filial ─────────────────────────────────────────────
+
+/** Corretores disponíveis, leads ativos e novos por filial (para a tabela de /filiais). */
+export async function getBranchDistributionStats(
+  tenantId: string,
+  branchIds: string[],
+): Promise<Map<string, BranchDistributionStats>> {
+  if (!branchIds.length) return new Map();
+  const db = getDatabase();
+  const [brokerRows, leadRows] = await Promise.all([
+    db
+      .select({
+        branchId: schema.tenantMemberships.branchId,
+        availabilityStatus: schema.tenantMemberships.availabilityStatus,
+        count: count(schema.tenantMemberships.id),
+      })
+      .from(schema.tenantMemberships)
+      .where(
+        and(
+          eq(schema.tenantMemberships.tenantId, tenantId),
+          eq(schema.tenantMemberships.role, "broker"),
+          eq(schema.tenantMemberships.jobTitle, "broker"),
+          eq(schema.tenantMemberships.status, "active"),
+          inArray(schema.tenantMemberships.branchId, branchIds),
+        ),
+      )
+      .groupBy(schema.tenantMemberships.branchId, schema.tenantMemberships.availabilityStatus),
+    db
+      .select({ branchId: schema.leads.branchId, status: schema.leads.status, count: count(schema.leads.id) })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), inArray(schema.leads.branchId, branchIds)))
+      .groupBy(schema.leads.branchId, schema.leads.status),
+  ]);
+  return aggregateBranchDistributionStats(brokerRows, leadRows);
 }

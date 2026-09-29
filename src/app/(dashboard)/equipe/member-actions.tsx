@@ -1,9 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { startTransition, useActionState, useEffect, useRef, useState } from "react";
 import { CheckCircle, DotsThreeVertical, LockKey, PencilSimple, Power, Trash, UserSwitch } from "@/components/huge-icons";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { deleteTeamMemberAction, toggleTeamMemberStatusAction, updateTeamMemberA
 import type { TenantRole } from "@/shared/db/schema";
 
 type BranchOption = { id: string; name: string };
+type CustomRoleOption = { id: string; name: string; scope: "none" | "own" | "branch" | "tenant" };
 type TeamMember = {
   id: string;
   userId: string | null;
@@ -29,6 +30,10 @@ type TeamMember = {
   branchId: string | null;
   branchName: string | null;
   customRoleScope?: "none" | "own" | "branch" | "tenant" | null;
+  customRoleId?: string | null;
+  customRoleName?: string | null;
+  canEditAuthority: boolean;
+  canManage: boolean;
 };
 
 type Props = {
@@ -39,6 +44,7 @@ type Props = {
   currentUserId: string;
   allMembers?: TeamMember[];
   onStatusChange?: (memberId: string, status: TeamMember["status"] | null) => void;
+  customRoles?: CustomRoleOption[];
 };
 
 const roleLabel: Record<TeamMember["role"], string> = {
@@ -57,6 +63,7 @@ const statusLabel: Record<TeamMember["status"], string> = {
 const jobTitleLabel: Record<string, string> = {
   director: "Diretor",
   manager: "Gestor",
+  supervisor: "Supervisor",
   broker: "Corretor",
   marketing: "Marketing",
   finance: "Financeiro",
@@ -73,6 +80,7 @@ function EditMemberDialog({
   branches,
   currentRole,
   currentBranchId,
+  customRoles = [],
 }: Props & {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -90,7 +98,9 @@ function EditMemberDialog({
 
   const [jobTitle, setJobTitle] = useState<string>(member.jobTitle);
   const [role, setRole] = useState<string>(member.role);
-  const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || member.customRoleScope === "branch";
+  const [customRoleId, setCustomRoleId] = useState(member.customRoleId ?? "");
+  const selectedCustomRole = customRoles.find((item) => item.id === customRoleId);
+  const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || selectedCustomRole?.scope === "branch";
 
   useEffect(() => {
     if (state.success) {
@@ -109,8 +119,9 @@ function EditMemberDialog({
       formRef.current?.reset();
       setJobTitle(member.jobTitle);
       setRole(member.role);
+      setCustomRoleId(member.customRoleId ?? "");
     }
-  }, [open, member.jobTitle, member.role]);
+  }, [open, member.customRoleId, member.jobTitle, member.role]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -136,9 +147,9 @@ function EditMemberDialog({
             <Input
               id={`member-email-${member.id}`}
               name="email"
-              defaultValue={member.email}
+              defaultValue={member.email || ""}
               disabled={pending}
-              required
+              required={member.userId !== null}
               type="email"
             />
           </Field>
@@ -170,7 +181,7 @@ function EditMemberDialog({
                 if (val === "director") setJobTitle("director");
                 else if (val === "manager") setJobTitle("manager");
               }}
-              disabled={pending || currentRole !== "director"}
+              disabled={pending || currentRole !== "director" || jobTitle === "broker"}
               name="role"
             >
               <SelectTrigger className="w-full">
@@ -189,7 +200,20 @@ function EditMemberDialog({
                 )}
               </SelectContent>
             </Select>
+            {jobTitle === "broker" ? <p className="text-xs text-muted-foreground">Corretor usa Operação individual automaticamente.</p> : null}
           </Field>
+          {customRoles.length > 0 && jobTitle !== "director" ? (
+            <Field>
+              <FieldLabel>Cargo personalizado <span className="text-muted-foreground">(opcional)</span></FieldLabel>
+              <Select name="customRoleId" value={customRoleId || "__none__"} onValueChange={(value) => setCustomRoleId(value === "__none__" ? "" : value ?? "")} disabled={pending} labels={Object.fromEntries(customRoles.map((item) => [item.id, item.name]))}>
+                <SelectTrigger className="w-full"><SelectValue placeholder="Nenhum cargo personalizado" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Nenhum cargo personalizado</SelectItem>
+                  {customRoles.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </Field>
+          ) : null}
           <Field>
             <FieldLabel>{requiresBranch ? "Unidade" : "Unidade (opcional)"}</FieldLabel>
             <Select
@@ -328,6 +352,7 @@ export function TeamMemberActions({
   currentUserId,
   allMembers = [],
   onStatusChange,
+  customRoles = [],
 }: Props) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -379,21 +404,34 @@ export function TeamMemberActions({
       const message = resendState.whatsappStatus === "sent"
         ? "A mensagem foi enviada pelo WhatsApp corporativo."
         : resendState.whatsappStatus === "failed"
-          ? "O convite foi recriado, mas a Meta recusou o envio. Use o link gerado no perfil do membro."
+          ? "O convite foi recriado, mas não foi possível enfileirar o envio. Copie o link para compartilhar."
           : resendState.whatsappStatus === "queued"
             ? "O convite foi colocado na fila de envio do WhatsApp."
             : "O convite foi recriado. Envie o link manualmente se necessário.";
-      toast.success("Convite processado.", { description: message });
+      toast.success("Convite processado.", {
+        description: message,
+        action: resendState.token ? {
+          label: "Copiar link",
+          onClick: () => {
+            const url = new URL("/primeiro-acesso", window.location.origin);
+            url.searchParams.set("token", resendState.token!);
+            void navigator.clipboard.writeText(url.toString()).then(
+              () => toast.success("Link de ativação copiado."),
+              () => toast.error("Não foi possível copiar o link."),
+            );
+          },
+        } : undefined,
+      });
       router.refresh();
     }
     if (resendState.error) toast.error(resendState.error);
   }, [resendState, router]);
 
-  const canEdit = currentUserId !== member.userId && member.role !== "director";
-  const canDelete = canEdit;
-  const canToggle = canEdit && member.userId !== null;
+  const canEdit = member.canEditAuthority;
+  const canDelete = member.canManage;
+  const canToggle = member.canManage && member.userId !== null;
   const toggleLabel = displayStatus === "active" ? "Desativar" : "Ativar";
-  const canManageInvite = canEdit && (member.role === "broker" || member.role === "manager");
+  const canManageInvite = member.canManage;
   const canResetPassword = member.userId !== null && (currentRole === "director" || currentRole === "manager");
 
   return (
@@ -444,8 +482,8 @@ export function TeamMemberActions({
               <>
                 <DropdownMenuItem onClick={() => {
                   const fd = new FormData();
-                  fd.set("invitationId", member.id);
-                  resendAction(fd);
+                  fd.set("memberId", member.id);
+                  startTransition(() => resendAction(fd));
                 }} disabled={resendPending}>
                   <UserSwitch size={15} />
                   Reenviar convite
@@ -497,6 +535,7 @@ export function TeamMemberActions({
         key={member.id}
         branches={branches}
         currentBranchId={currentBranchId}
+        customRoles={customRoles}
         currentRole={currentRole}
         currentUserId={currentUserId}
         member={member}
@@ -513,7 +552,6 @@ export function TeamMemberActions({
         key={`${member.id}-transfer`}
         member={member}
         allMembers={allMembers}
-        currentUserId={currentUserId}
         open={transferOpen}
         onOpenChange={setTransferOpen}
       />
@@ -676,13 +714,11 @@ function TransferLeadsDialog({
   open,
   onOpenChange,
   allMembers,
-  currentUserId,
 }: {
   member: TeamMember;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   allMembers: TeamMember[];
-  currentUserId: string;
 }) {
   const [state, action, pending] = useActionState<TeamActionState, FormData>(
     transferLeadsAction,

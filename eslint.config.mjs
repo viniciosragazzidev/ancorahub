@@ -35,6 +35,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Artefatos locais de ferramentas de agente (fora do produto).
+    ".ua/**",
+    ".dbprobe.cjs",
   ]),
 ]);
 

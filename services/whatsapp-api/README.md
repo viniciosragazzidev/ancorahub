@@ -27,5 +27,5 @@ npm run dev
 
 Mantenha `WHATSAPP_REVIEW_ENABLED=false` ate o Super-admin habilitar a capacidade no
 CRM e as credenciais de teste da Meta estarem configuradas. Para producao, publique
-esta pasta como um servico Node/Docker separado da Vercel e configure as mesmas
+esta pasta como um servico Node/Docker separado do CRM no Coolify e configure as mesmas
 variaveis como segredos do provedor.

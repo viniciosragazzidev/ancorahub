@@ -3,6 +3,12 @@
 @import "shadcn/tailwind.css";
 @import "../styles/theme.css";
 @import "../styles/typography.css";
+@import "../styles/operational-ui.css";
+/* Foundation-only design system (docs/design-system.md). Namespaced `ds`,
+   not yet consumed by any existing route — see src/components/ui/ds-*.tsx
+   and /dev/component-preview. */
+@import "../styles/design-system/tokens.css";
+@import "../styles/design-system/motion.css";
 
 
 @custom-variant dark (&:is(.dark *));
@@ -57,7 +63,7 @@
   /* Lvl 0: Base Canvas (#f5f5f3) */
   --surface-card: oklch(1 0 0);
   /* Lvl 1: Card Surface (#fafaf9) */
-  --surface-secondary: #f7fafc;
+  --surface-secondary: #f7f8f9;
   /* Lvl 2: Recessed / Input (#eeeee9) */
   --surface-elevated: oklch(1.000 0 0);
   /* Lvl 3: Elevated Popover (#ffffff) */
@@ -102,15 +108,15 @@
   --input: #ffffff;
   --ring: #0098f2;
 
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.220 0.012 260);
-  --sidebar-primary: #0d111b;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #eef6fb;
-  --sidebar-accent-foreground: #1e1e1e;
+  --sidebar: var(--card);
+  --sidebar-foreground: var(--card-foreground);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.965 0.012 260);
+  --sidebar-accent-foreground: oklch(0.230 0.018 260);
   --sidebar-warning: oklch(0.965 0.003 260);
   --sidebar-warning-foreground: oklch(0.220 0.012 260);
-  --sidebar-border: oklch(0.890 0.004 260);
+  --sidebar-border: oklch(0.900 0.012 260);
   --sidebar-ring: #0098f2;
 
   --ct-blue: #0098f2;
@@ -202,6 +208,17 @@
   --size-spacing-11: 96px;
   --size-spacing-12: 160px;
 
+  /* UX-M1 — shared mobile geometry. Components consume these tokens instead
+   * of introducing route-specific viewport, safe-area or touch constants. */
+  --mobile-page-padding: 1rem;
+  --mobile-section-gap: 1rem;
+  --mobile-touch-target: 2.75rem;
+  --mobile-header-height: 3.5rem;
+  --mobile-safe-top: env(safe-area-inset-top, 0px);
+  --mobile-safe-right: env(safe-area-inset-right, 0px);
+  --mobile-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --mobile-safe-left: env(safe-area-inset-left, 0px);
+
   --text-xxl-font-size: 36px;
   --text-xl-font-size: 28px;
   --text-lg-font-size: 20px;
@@ -271,74 +288,71 @@
 
 .dark {
   color-scheme: dark;
-  /* ── Camada 1: Fundação Neutra Dark (Contraste Dobrado) ───────────────── */
-  --surface-base: oklch(0.150 0.008 260);
-  /* Lvl 0: Base Canvas (#0d0f12) */
-  --surface-card: oklch(0.190 0.009 260);
-  /* Lvl 1: Card Surface (#16191d) */
-  --surface-secondary: oklch(0.230 0.011 260);
-  /* Lvl 2: Recessed / Active (#20242a) */
-  --surface-elevated: oklch(0.255 0.012 260);
-  /* Lvl 3: Elevated Popover (#292e36) */
-  --surface-overlay: oklch(0.280 0.010 260);
+  /* Dark palette taken from the reference admin panel (jubayer910/Admin-panel,
+     MIT): a neutral #151515 ground, #1C1C1C cards, #1E1E1E controls and an
+     indigo primary. Recorded in docs/design-system.md § Dark Mode. */
+  /* ── Surfaces ─────────────────────────────────────────────────────────── */
+  --surface-base: #151515;
+  --surface-card: #1c1c1c;
+  --surface-secondary: #1a1a1a;
+  --surface-elevated: #1e1e1e;
+  --surface-overlay: #232323;
 
-  --background: oklch(0.150 0.008 260);
-  --foreground: oklch(100% 0.00011 271.152);
+  --background: #151515;
+  --foreground: #f3f3f3;
 
-  --card: oklch(0.190 0.009 260);
-  --card-foreground: oklch(0.940 0.006 260);
+  --card: #1c1c1c;
+  --card-foreground: #e6e6e6;
 
-  --popover: oklch(0.220 0.011 260);
-  --popover-foreground: oklch(0.940 0.006 260);
+  --popover: #1e1e1e;
+  --popover-foreground: #e6e6e6;
 
-  /* ── Camada 2: Acentos Funcionais & Ações da Marca Dark ───────────────── */
-  --primary: #f2f5f7;
-  --primary-foreground: #0d111b;
+  /* ── Action ───────────────────────────────────────────────────────────── */
+  --primary: #3b1fe5;
+  --primary-foreground: #ffffff;
 
-  --secondary: oklch(0.240 0.008 260);
-  --secondary-foreground: oklch(0.960 0.003 260);
+  --secondary: #1e1e1e;
+  --secondary-foreground: #e6e6e6;
 
-  --accent: oklch(0.280 0.055 255);
-  /* Ramp Esmeralda da Marca Dark (#47D18C) */
-  --accent-foreground: oklch(0.760 0.130 255);
+  --accent: #262626;
+  --accent-foreground: #f3f3f3;
 
-  --muted: oklch(0.240 0.008 260);
-  --muted-foreground: oklch(0.720 0.008 260);
-  --muted-text: oklch(0.580 0.010 260);
+  --muted: #252525;
+  --muted-foreground: #8a8a8a;
+  --muted-text: #6b6b6b;
 
-  /* ── Camada 3: Comunicação Semântica Dark (Uniformidade OKLCH L ≈ 0.70-0.76) */
-  --warning: oklch(0.760 0.160 75);
-  --warning-foreground: oklch(0.120 0.005 260);
-  --success: oklch(0.740 0.175 145);
-  --success-foreground: oklch(0.120 0.005 260);
-  --destructive: oklch(0.700 0.210 25);
+  /* ── Status (ink over a deep wash, same pairs as the Ds tokens) ─────────── */
+  --warning: #e8b98f;
+  --warning-foreground: #151515;
+  --success: #7fd1a0;
+  --success-foreground: #151515;
+  --destructive: #f4a3a9;
 
-  --border: oklch(0.290 0.008 260);
-  /* Bordas nítidas sem empastamento */
-  --border-strong: oklch(0.380 0.010 260);
-  --input: oklch(0.290 0.008 260);
-  --ring: #0098f2;
+  --border: #2a2a2a;
+  --border-strong: #353535;
+  --input: #2a2a2a;
+  --ring: #6350ff;
 
-  --sidebar: oklch(0.170 0.009 260);
-  --sidebar-foreground: oklch(0.910 0.006 260);
-  --sidebar-primary: #f2f5f7;
-  --sidebar-primary-foreground: #0d111b;
-  --sidebar-accent: oklch(0.280 0.018 260);
-  --sidebar-accent-foreground: oklch(0.940 0.006 260);
-  --sidebar-warning: oklch(0.230 0.011 260);
-  --sidebar-warning-foreground: oklch(0.910 0.006 260);
-  --sidebar-border: oklch(0.290 0.010 260);
-  --sidebar-ring: #0098f2;
+  --sidebar: #111111;
+  --sidebar-foreground: #c7c7c7;
+  --sidebar-primary: #3b1fe5;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #262626;
+  --sidebar-accent-foreground: #f3f3f3;
+  --sidebar-warning: #1a1a1a;
+  --sidebar-warning-foreground: #c7c7c7;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #6350ff;
 
-  --ct-blue: oklch(0.960 0.003 260);
-  --ct-blue-strong: oklch(0.960 0.003 260);
+  --ct-blue: #c0d4f2;
+  --ct-blue-strong: #c0d4f2;
 
-  /* ── Camada 4: Paleta de Gráficos Dark em OKLCH (L = 0.74, C = 0.15) ───── */
-  --chart-1: oklch(0.740 0.150 260);
-  --chart-2: oklch(0.740 0.150 150);
-  --chart-3: oklch(0.740 0.150 230);
-  --chart-4: oklch(0.740 0.150 300);
-  --chart-5: oklch(0.740 0.150 65);
+  /* ── Charts: the reference's tag inks, one hue each ───────────────────── */
+  --chart-1: #c0d4f2;
+  --chart-2: #7fd1a0;
+  --chart-3: #b5e4ec;
+  --chart-4: #b6aede;
+  --chart-5: #dfb099;
   --radius: var(--radius-card);
 }
 
@@ -366,6 +380,7 @@ html {
      elementos position:fixed/sticky, ao contrário do zoom.       */
   font-size: 97%;
   min-height: 100%;
+
 }
 
 body {
@@ -800,7 +815,23 @@ body {
 
 /* Status badge smooth transition */
 .ct-status-badge {
-  transition: all 300ms var(--ease-smooth-out);
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 150ms;
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+/* Legacy utility hardening: keep existing screens responsive without allowing
+ * transition-all to animate layout or unrelated properties. New components
+ * should still name their properties explicitly. */
+.transition-all {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform, width;
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transition-all {
+    transition-duration: 0ms !important;
+  }
 }
 
 /* Lock icon gentle breathing while waiting */
@@ -882,10 +913,14 @@ body {
   }
 }
 
-/* Sonner: feedback compacto, adaptado para light e dark theme de acordo com DESIGN.md */
+/* Sonner: feedback compacto, adaptado aos temas claro e escuro pelo Contrato de Redesign. */
 .ct-toaster {
   --ct-toast-warning: var(--success);
   pointer-events: none;
+}
+
+.ct-toaster [data-sonner-toast] {
+  pointer-events: auto !important;
 }
 
 /* Elevated notification surface: keep the popover opaque and distinct from the canvas. */
@@ -907,210 +942,42 @@ body {
 }
 
 .ct-toaster [data-sonner-toast].ct-toast {
-  width: min(20rem, calc(100vw - 2rem));
+  width: auto;
+  max-width: none;
   min-height: 0;
   align-items: flex-start;
-  gap: 0.75rem;
-  padding: 1.25rem;
+  gap: 0;
+  padding: 0;
   color: var(--popover-foreground);
-  background: color-mix(in srgb, var(--popover) 92%, transparent);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 1rem 3rem rgb(0 0 0 / 0.08);
-  backdrop-filter: blur(0.75rem);
-  -webkit-backdrop-filter: blur(0.75rem);
-  transition:
-    transform var(--duration-medium) var(--ease-smooth-out),
-    opacity var(--duration-medium) var(--ease-smooth-out),
-    height var(--duration-medium) var(--ease-smooth-out),
-    box-shadow var(--duration-quick) var(--ease-smooth-out);
-  will-change: transform, opacity, height;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   pointer-events: auto;
 }
 
-.dark .ct-toaster [data-sonner-toast].ct-toast {
-  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 0.42);
-}
-
-.ct-toaster [data-sonner-toast].ct-toast[data-mounted="true"][data-y-position="top"] {
-  animation: ct-toast-enter-right var(--duration-fast) var(--ease-smooth-out) both;
-}
-
-.ct-toaster [data-sonner-toast].ct-toast[data-mounted="true"][data-y-position="bottom"] {
-  animation: ct-toast-enter-bottom var(--duration-fast) var(--ease-smooth-out) both;
-}
-
-.ct-toaster .ct-toast__icon {
-  width: 0.875rem;
-  height: 0.875rem;
-  margin-top: 0.125rem;
-  color: var(--muted-foreground);
-}
-
-.ct-toaster .ct-toast__content {
-  min-width: 0;
-  gap: 0.375rem;
-}
-
-.ct-toaster .ct-toast__content::before {
-  display: flex;
-  align-items: center;
-  width: fit-content;
-  padding: 0.1875rem 0.375rem;
-  color: var(--muted-foreground);
-  background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
-  border-radius: 999px;
-  font-size: 0.5625rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  line-height: 1;
-  text-transform: uppercase;
-  content: "Notificação";
-}
-
-.ct-toaster .ct-toast__title {
-  padding-right: 1.25rem;
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  line-height: 1.35;
-  text-transform: uppercase;
-}
-
-.ct-toaster .ct-toast__description {
-  color: var(--muted-foreground);
-  font-size: 0.75rem;
-  line-height: 1.5;
-}
-
-.ct-toaster .ct-toast__close {
-  top: 0.875rem;
-  right: 0.875rem;
-  left: auto;
-  width: 1.25rem;
-  height: 1.25rem;
-  padding: 0;
-  color: var(--muted-foreground);
-  background: transparent;
-  border: 0;
-  border-radius: 0.375rem;
-  transform: none;
-}
-
-.ct-toaster .ct-toast__close:hover {
-  color: var(--foreground);
-  background: color-mix(in srgb, var(--muted-foreground) 15%, transparent);
-}
-
-.ct-toaster .ct-toast__close:focus-visible,
-.ct-toaster [data-sonner-toast].ct-toast:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.ct-toaster .ct-toast__action,
-.ct-toaster .ct-toast__cancel {
-  flex-basis: 100%;
+.ct-toaster [data-sonner-toast].ct-toast [data-content] {
   width: 100%;
-  height: 2rem;
-  margin: 0.25rem 0 0;
-  border: 1px solid var(--border);
-  border-radius: 0.625rem;
-  color: var(--primary-foreground);
-  background: var(--primary);
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.ct-toaster .ct-toast__cancel {
-  color: var(--muted-foreground);
-  background: color-mix(in srgb, var(--muted-foreground) 10%, transparent);
+.ct-toaster [data-sonner-toast].ct-toast [data-title] {
+  width: 100%;
+  padding-right: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  letter-spacing: normal;
+  line-height: inherit;
+  text-transform: none;
 }
 
-.ct-toaster [data-sonner-toast].ct-toast--success .ct-toast__icon,
-.ct-toaster [data-sonner-toast].ct-toast--success .ct-toast__content::before {
-  color: var(--success);
-}
+/* NOTE: CSS entrance animations removed — AnimatedToast uses motion/react */
 
-.ct-toaster [data-sonner-toast].ct-toast--success .ct-toast__content::before {
-  background: color-mix(in srgb, var(--success) 12%, transparent);
-  content: "Sucesso";
-}
 
-.ct-toaster [data-sonner-toast].ct-toast--error .ct-toast__icon,
-.ct-toaster [data-sonner-toast].ct-toast--error .ct-toast__content::before {
-  color: var(--destructive);
-}
 
-.ct-toaster [data-sonner-toast].ct-toast--error .ct-toast__content::before {
-  background: color-mix(in srgb, var(--destructive) 12%, transparent);
-  content: "Erro";
-}
-
-.ct-toaster [data-sonner-toast].ct-toast--warning .ct-toast__icon,
-.ct-toaster [data-sonner-toast].ct-toast--warning .ct-toast__content::before {
-  color: var(--warning);
-}
-
-.ct-toaster [data-sonner-toast].ct-toast--warning .ct-toast__content::before {
-  background: color-mix(in srgb, var(--warning) 12%, transparent);
-  content: "Atenção";
-}
-
-.ct-toaster [data-sonner-toast].ct-toast--info .ct-toast__icon,
-.ct-toaster [data-sonner-toast].ct-toast--info .ct-toast__content::before {
-  color: var(--ct-blue, var(--muted-foreground));
-}
-
-.ct-toaster [data-sonner-toast].ct-toast--info .ct-toast__content::before {
-  background: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
-  content: "Info";
-}
-
-.ct-toaster [data-sonner-toast].ct-toast--loading .ct-toast__icon,
-.ct-toaster [data-sonner-toast].ct-toast--loading .ct-toast__content::before {
-  color: var(--muted-foreground);
-}
-
-.ct-toaster [data-sonner-toast].ct-toast--loading .ct-toast__content::before {
-  background: color-mix(in srgb, var(--muted-foreground) 12%, transparent);
-  content: "Carregando";
-}
-
-.ct-toaster [data-sonner-toast].ct-toast--default .ct-toast__content::before {
-  content: "Atualização";
-}
-
-@keyframes ct-toast-enter-right {
-  from {
-    opacity: 0;
-    transform: translateX(1.875rem);
-  }
-
-  to {
-    opacity: 1;
-    transform: var(--y);
-  }
-}
-
-@keyframes ct-toast-enter-bottom {
-  from {
-    opacity: 0;
-    transform: translateY(1.875rem);
-  }
-
-  to {
-    opacity: 1;
-    transform: var(--y);
-  }
-}
+/* NOTE: ct-toast-enter-right/bottom keyframes removed — AnimatedToast uses motion/react */
 
 @media (prefers-reduced-motion: reduce) {
   .ct-toaster [data-sonner-toast].ct-toast {
@@ -1317,18 +1184,12 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
   transition: outline-offset var(--duration-quick) var(--ease-smooth-out);
 }
 
-/* ── 3. Card hover lift ─────────────────────────────────────────────────── */
+/* ── 3. Cards: no hover lift ───────────────────────────────────────────────
+   Borders define containers (design system): cards do not gain a shadow or
+   move on hover in any route or tab. Only border color may transition. */
 
 [data-slot="card"] {
-  transition:
-    box-shadow var(--duration-fast) var(--ease-smooth-out),
-    border-color var(--duration-fast) var(--ease-smooth-out),
-    transform var(--duration-fast) var(--ease-smooth-out);
-}
-
-[data-slot="card"]:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-1px);
+  transition: border-color var(--duration-fast) var(--ease-smooth-out);
 }
 
 /* ── 4. Skeleton shimmer animation ─────────────────────────────────────── */
@@ -1459,27 +1320,9 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 
 /* ── 7. Toast / Sonner slide-in ─────────────────────────────────────────── */
 
-[data-sonner-toast] {
-  animation: ct-toast-in var(--duration-medium) var(--ease-smooth-out) both;
-}
-
-[data-sonner-toast][data-removed="true"] {
-  animation: ct-toast-out var(--duration-fast) var(--ease-smooth-out) both;
-}
-
-@keyframes ct-toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.96);
-    filter: blur(2px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    filter: blur(0);
-  }
-}
+/* NOTE: Generic [data-sonner-toast] animations were removed.
+   All toasts now use AnimatedToast (motion/react) for entrance/exit.
+   See src/components/motion/animated-toast.tsx. */
 
 @keyframes ct-toast-out {
   from {
@@ -1659,7 +1502,6 @@ html[data-magicui-theme-vt="active"]::view-transition-new(ct-shell-header) {
 @media (prefers-reduced-motion: reduce) {
 
   [data-slot="button"]:active,
-  [data-slot="card"]:hover,
   [data-slot="button"],
   [data-slot="input"],
   [data-slot="textarea"],

@@ -44,7 +44,7 @@ Resposta esperada:
 
 ### Verificar Logs de Performance
 
-Procure no log do Vercel por:
+Procure nos logs do CRM no Coolify por:
 - `{"type":"request_timing",...}` — requests lentos
 - `{"type":"slow_request",...}` — requests acima do threshold
 - `{"type":"middleware_timing",...}` — middleware lento

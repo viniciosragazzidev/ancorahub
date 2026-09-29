@@ -2,20 +2,25 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { MobileBottomNav } from "@/components/mobile-bottom-nav";
-import { LightBottomNav } from "@/components/light-bottom-nav";
+import { LightTopNavBar } from "@/components/light-top-nav";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
-import { cn } from "@/lib/utils";
 
 type Branding = {
   brandColor: string | null;
   logoUrl: string | null;
   tenantName: string | null;
+};
+
+type UserInfo = {
+  name: string | null;
+  email: string | null;
+  role?: string;
+  jobTitle?: string | null;
 };
 
 function getReadableForeground(hex: string) {
@@ -31,15 +36,20 @@ function getReadableForeground(hex: string) {
 export function AppShell({
   children,
   branding,
+  user,
   isLightBroker = false,
-  showLightConversations = true,
+  initialAvailability = "available",
+  cleanUiEnabled = false,
 }: {
   children: ReactNode;
   branding?: Branding;
+  user?: UserInfo;
   isLightBroker?: boolean;
-  showLightConversations?: boolean;
+  initialAvailability?: "available" | "paused" | "offline";
+  cleanUiEnabled?: boolean;
 }) {
   const pathname = usePathname();
+  const canvasRef = useRef<HTMLDivElement>(null);
   const isFinanceiro = pathname === "/financeiro" || pathname.startsWith("/financeiro/");
   const readableBrandForeground = branding?.brandColor
     ? getReadableForeground(branding.brandColor)
@@ -72,13 +82,63 @@ export function AppShell({
     };
   }, [branding?.brandColor, readableBrandForeground]);
 
+  // The authenticated shell owns vertical scrolling. Route changes must start at
+  // its top, while query-only navigation (for example choosing a conversation)
+  // keeps the current position intact.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      canvasRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [pathname]);
+
+  if (isLightBroker) {
+    return (
+      <SidebarProvider
+        data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
+        defaultOpen={false}
+        open={false}
+        className="min-h-dvh flex-col overflow-x-hidden"
+        style={
+          {
+            "--sidebar-width": "0px",
+            "--header-height": "3.5rem",
+            ...(branding?.brandColor
+              ? {
+                  "--primary": branding.brandColor,
+                  "--primary-foreground": readableBrandForeground,
+                  "--ring": branding.brandColor,
+                  "--sidebar-primary": branding.brandColor,
+                  "--sidebar-primary-foreground": readableBrandForeground,
+                  "--sidebar-ring": branding.brandColor,
+                }
+              : {}),
+          } as CSSProperties
+        }
+      >
+        <div className="flex h-dvh w-full flex-col bg-background selection:bg-primary/20 overflow-hidden">
+          <LightTopNavBar
+            branding={branding}
+            user={user}
+            initialAvailability={initialAvailability}
+          />
+          <main ref={canvasRef} className="flex-1 min-h-0 w-full overflow-y-auto">
+            {children}
+          </main>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
   return (
     <OnboardingProvider>
       <SidebarProvider
+        data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
         className="min-h-dvh overflow-hidden"
         style={
           {
-            "--sidebar-width": isLightBroker ? "0px" : "16rem",
+            "--sidebar-width": isFinanceiro ? "16rem" : "17rem",
+            "--sidebar-width-icon": isFinanceiro ? "3.5rem" : "4.5rem",
             "--header-height": "4rem",
             ...(branding?.brandColor
               ? {
@@ -93,25 +153,23 @@ export function AppShell({
           } as CSSProperties
         }
       >
-        {isLightBroker ? null : isFinanceiro ? (
+        {isFinanceiro ? (
           <CorreTopFinanceiroSidebar />
         ) : (
           <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
         )}
         <SidebarInset
-          className={cn(
-            "app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]",
-            isLightBroker ? "pb-24 max-w-full" : "max-[559px]:pb-[calc(7rem+env(safe-area-inset-bottom))]"
-          )}
+          ref={canvasRef}
+          data-slot="app-scroll-frame"
+          className="app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]"
           style={{
             scrollPaddingTop: "var(--header-height)",
-            scrollPaddingBottom: isLightBroker ? "6rem" : "calc(7rem + env(safe-area-inset-bottom))",
+            scrollPaddingBottom: "var(--mobile-safe-bottom)",
           }}
         >
           <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
         </SidebarInset>
-        {isLightBroker ? <LightBottomNav showConversations={showLightConversations} /> : <MobileBottomNav />}
-        {!isLightBroker ? <OnboardingWelcomeDialog /> : null}
+        <OnboardingWelcomeDialog />
       </SidebarProvider>
     </OnboardingProvider>
   );
