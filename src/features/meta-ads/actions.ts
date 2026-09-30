@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken, encryptMetaToken } from "./meta-oauth";
@@ -539,8 +539,12 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
           set: { enabled: input.enabled, updatedAt: now },
         });
 
-      if (input.enabled) {
-        const relatedAds = await tx
+      // The campaign rule covers all its ads: no per-ad copies. Pausing also
+      // removes the copies an older version created ("capturar, sem fila"),
+      // which kept those ads capturing after the campaign was paused. An ad
+      // sent on purpose to a specific queue, or marked "não registrar", stays.
+      if (!input.enabled) {
+        const campaignAdIds = tx
           .select({ adId: schema.metaAds.adId })
           .from(schema.metaAds)
           .innerJoin(schema.metaAdSets, and(
@@ -551,25 +555,12 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
             eq(schema.metaAds.tenantId, context.tenantId),
             eq(schema.metaAdSets.campaignId, campaign.campaignId),
           ));
-
-        if (relatedAds.length) {
-          await tx
-            .insert(schema.metaAdQueueRoutes)
-            .values(relatedAds.map((ad) => ({
-              id: randomUUID(),
-              tenantId: context.tenantId,
-              adId: ad.adId,
-              queueId: null,
-              enabled: true,
-              createdBy: context.userId,
-              createdAt: now,
-              updatedAt: now,
-            })))
-            .onConflictDoUpdate({
-              target: [schema.metaAdQueueRoutes.tenantId, schema.metaAdQueueRoutes.adId],
-              set: { enabled: true, updatedAt: now },
-            });
-        }
+        await tx.delete(schema.metaAdQueueRoutes).where(and(
+          eq(schema.metaAdQueueRoutes.tenantId, context.tenantId),
+          eq(schema.metaAdQueueRoutes.enabled, true),
+          isNull(schema.metaAdQueueRoutes.queueId),
+          inArray(schema.metaAdQueueRoutes.adId, campaignAdIds),
+        ));
       }
 
       await tx.insert(schema.auditLogs).values({
@@ -577,7 +568,7 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
         userId: context.userId,
         entidade: "meta_campaign_queue_route",
         entidadeId: campaign.campaignId,
-        acao: input.enabled ? "meta_campaign.capture_enabled_with_ads" : "meta_campaign.capture_disabled",
+        acao: input.enabled ? "meta_campaign.capture_enabled" : "meta_campaign.capture_disabled",
       });
     });
 

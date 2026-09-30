@@ -118,13 +118,14 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
       enabled: schema.metaCampaignQueueRoutes.enabled,
       queueId: schema.metaCampaignQueueRoutes.queueId,
       queueName: schema.leadQueues.name,
+      queueStatus: schema.leadQueues.status,
     })
     .from(schema.metaCampaignQueueRoutes)
     .leftJoin(schema.leadQueues, and(eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id), eq(schema.metaCampaignQueueRoutes.tenantId, schema.leadQueues.tenantId)))
     .where(eq(schema.metaCampaignQueueRoutes.tenantId, tenantId));
   const campaignRouteMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
   const [adRoutes, formRoutes, storedGlobalMode] = await Promise.all([
-    db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled, queueId: schema.metaAdQueueRoutes.queueId, queueName: schema.leadQueues.name })
+    db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled, queueId: schema.metaAdQueueRoutes.queueId, queueName: schema.leadQueues.name, queueStatus: schema.leadQueues.status })
       .from(schema.metaAdQueueRoutes)
       .leftJoin(schema.leadQueues, and(eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id), eq(schema.metaAdQueueRoutes.tenantId, schema.leadQueues.tenantId)))
       .where(eq(schema.metaAdQueueRoutes.tenantId, tenantId)),
@@ -261,7 +262,11 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
           ? "campaign"
           : "global";
     const distributionQueueId = adRouteDetail?.queueId ?? campaignRouteDetail?.queueId ?? null;
-    const distributionQueueName = adRouteDetail?.queueName ?? campaignRouteDetail?.queueName ?? null;
+    // A deactivated queue receives nothing (the lead goes to the general distribution): say so.
+    const queueDetail = adRouteDetail?.queueName ? adRouteDetail : campaignRouteDetail;
+    const distributionQueueName = queueDetail?.queueName
+      ? `${queueDetail.queueName}${queueDetail.queueStatus && queueDetail.queueStatus !== "active" ? " (fila desativada · vai para a distribuição geral)" : ""}`
+      : null;
 
     return [{
       id: c.id,
