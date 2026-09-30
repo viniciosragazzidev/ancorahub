@@ -200,6 +200,7 @@ export function LeadsWorkspace({
   pagination,
   unassignedLeads = [],
   unassignedPagination,
+  queueTabs,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -228,6 +229,8 @@ export function LeadsWorkspace({
     totalItems: number;
     totalPages: number;
   };
+  /** Queue tabs, shown right under the view tabs in the same area. */
+  queueTabs?: React.ReactNode;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -550,7 +553,8 @@ export function LeadsWorkspace({
     <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-4">
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs value={activeTab} onValueChange={handleViewChange} className="flex min-h-0 flex-1 flex-col">
-        <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+        <div className="grid gap-2 border-b border-border/60 pb-2">
+        <div className="flex items-center gap-2">
           <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
             <TabsTrigger value="list" className="text-xs gap-1.5">
               <UserList className="size-4" />
@@ -625,6 +629,8 @@ export function LeadsWorkspace({
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+        </div>
+        {queueTabs}
         </div>
 
         {/* ─── TAB 1: LISTA PRINCIPAL (TABELA) ─── */}

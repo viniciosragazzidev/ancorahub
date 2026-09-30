@@ -666,6 +666,13 @@ async function LeadsPageContent({
   const slaStagnantDays = Number(slaSettings.slaStagnantDays);
   const leadManagementActionsEnabled = systemSettings.get("feature_lead_management_actions_enabled") !== "false";
   // RCD: detect if any filter is active to switch empty state copy
+  // Queue tabs: in the workspace, right under the view tabs (and above the empty state).
+  const queueTabs = (
+    <LeadsQueueTabs
+      tabs={buildQueueTabs({ activeQueues, counts: queueCounts.map((row) => ({ ...row, total: Number(row.total) })) })}
+      current={queueTab?.kind === "none" ? "sem-fila" : queueTab?.kind === "queue" ? queueTab.queueId : ""}
+    />
+  );
   const isFiltered = !!(
     filters.search ||
     filters.status ||
@@ -741,12 +748,6 @@ async function LeadsPageContent({
           storageKey={`ancorahub:leads-filters:${context.tenantId}:${context.userId}`}
         />
 
-        {/* Queue tabs */}
-        <LeadsQueueTabs
-          tabs={buildQueueTabs({ activeQueues, counts: queueCounts.map((row) => ({ ...row, total: Number(row.total) })) })}
-          current={queueTab?.kind === "none" ? "sem-fila" : queueTab?.kind === "queue" ? queueTab.queueId : ""}
-        />
-
         {/* Workspace or RCD Directional Empty State */}
         {leads.length || qualifyingLeads.length || unassignedRows.length ? (
           <div className="space-y-4">
@@ -805,10 +806,13 @@ async function LeadsPageContent({
                 totalItems: unassignedTotalItems,
                 totalPages: unassignedTotalPages,
               }}
+              queueTabs={queueTabs}
             />
           </div>
         ) : (
           /* RCD: Directional empty state — eliminates cognitive void, guides to next action */
+          <div className="space-y-4">
+          {queueTabs}
           <div className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-border px-6 py-14 text-center">
             {!isFiltered && (
               <div className="flex size-14 items-center justify-center rounded-2xl bg-primary/8 ring-1 ring-primary/15">
@@ -844,6 +848,7 @@ async function LeadsPageContent({
                 branchId={context.branchId}
               />
             </div>
+          </div>
           </div>
         )}
 
