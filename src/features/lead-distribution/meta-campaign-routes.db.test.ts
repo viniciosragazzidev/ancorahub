@@ -4,7 +4,7 @@
  * Opt-in only (never part of the normal suite):
  *   RUN_META_ROUTES_DB_E2E=1 npx vitest run src/features/lead-distribution/meta-campaign-routes.db.test.ts
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { randomUUID } from "node:crypto";
@@ -66,6 +66,16 @@ describe.skipIf(!enabled)("campaign route with its ads (rolled back)", () => {
       const brought = await saveMetaCampaignQueueRoute(context, { campaignId: pick.campaignId, queueId: queue.id, enabled: true, includeAds: true });
       expect(brought.adsBrought).toBeGreaterThan(0);
       expect(await ownRules()).toBe(0);
+
+      // Choosing another queue moves the campaign (it used to be refused) and the move is audited.
+      const [other] = await tx.select({ id: s.leadQueues.id }).from(s.leadQueues)
+        .where(and(eq(s.leadQueues.tenantId, pick.tenantId), eq(s.leadQueues.status, "active"), ne(s.leadQueues.id, queue.id))).limit(1);
+      expect(other).toBeTruthy();
+      const moved = await saveMetaCampaignQueueRoute(context, { campaignId: pick.campaignId, queueId: other.id, enabled: true });
+      expect(moved.queueId).toBe(other.id);
+      const [audit] = await tx.select({ acao: s.auditLogs.acao }).from(s.auditLogs)
+        .where(and(eq(s.auditLogs.entidadeId, pick.campaignId), eq(s.auditLogs.acao, `meta_campaign_queue_route.moved_from:${queue.id}`)));
+      expect(audit).toBeTruthy();
 
       tx.rollback();
     }).catch((error) => {

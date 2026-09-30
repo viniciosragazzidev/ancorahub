@@ -451,9 +451,14 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
   if (input.enabled && input.queueId && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
   if (input.enabled && queue) assertManager(context, queue.branchId);
   if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de uma campanha no CRM.");
+  // Choosing a new queue for a campaign that already has one moves it (both
+  // screens make that choice explicit; the queues screen also confirms). A
+  // manager can only take it from a queue of their own unit; the move is audited.
+  let movedFromQueueId: string | null = null;
   if (input.enabled && input.queueId) {
-    const [existingRoute] = await db.select({ queueId: schema.metaCampaignQueueRoutes.queueId })
+    const [existingRoute] = await db.select({ queueId: schema.metaCampaignQueueRoutes.queueId, queueBranchId: schema.leadQueues.branchId })
       .from(schema.metaCampaignQueueRoutes)
+      .leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
       .where(and(
         eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId),
         eq(schema.metaCampaignQueueRoutes.campaignId, campaign.campaignId),
@@ -461,7 +466,8 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
       ))
       .limit(1);
     if (existingRoute?.queueId && existingRoute.queueId !== input.queueId) {
-      throw new AuthorizationError("Esta campanha já está vinculada a outra fila. Desative a rota atual antes de escolher um novo destino.");
+      if (context.role !== "director") assertManager(context, existingRoute.queueBranchId ?? null);
+      movedFromQueueId = existingRoute.queueId;
     }
   }
   const now = new Date();
@@ -474,7 +480,9 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
   });
   await db.insert(schema.auditLogs).values({
     id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaign.campaignId,
-    acao: input.enabled ? "meta_campaign_queue_route.saved" : "meta_campaign_queue_route.paused",
+    acao: movedFromQueueId
+      ? `meta_campaign_queue_route.moved_from:${movedFromQueueId}`
+      : input.enabled ? "meta_campaign_queue_route.saved" : "meta_campaign_queue_route.paused",
   });
   // An ad rule wins over the campaign rule. "Bring the ads" removes the rules of
   // this campaign's ads, so each of them follows the campaign again.
