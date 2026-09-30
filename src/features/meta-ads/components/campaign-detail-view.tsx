@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { ArrowRight, CheckCircle, Clock, Lightning, MagicWand, Phone, Target, UserList, Users } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ export function CampaignDetailView({
   queues?: Array<{ id: string; name: string; branchName?: string | null }>;
   initialQueueId?: string | null;
 }) {
+  const router = useRouter();
   const [selectedQueueId, setSelectedQueueId] = useState<string>(initialQueueId ?? "");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -64,6 +66,7 @@ export function CampaignDetailView({
       });
       if (res.success) {
         toast.success(res.message || "Fila de distribuição salva com sucesso!");
+        router.refresh();
       } else {
         toast.error(res.error || "Erro ao salvar fila.");
       }

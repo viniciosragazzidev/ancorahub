@@ -266,9 +266,16 @@ export async function simulateDistributionAction(input: unknown) {
   }
 }
 
+/** Screens that show where a campaign's leads go: they must not keep the old destination after a change. */
+function revalidateCampaignDestinations() {
+  revalidatePath("/marketing/campanhas", "layout");
+  revalidatePath("/leads/distribuicao");
+}
+
 export async function saveMetaCampaignQueueRouteAction(input: unknown) {
   try {
     const route = await saveMetaCampaignQueueRoute(await getRequiredTenantContext(), input);
+    revalidateCampaignDestinations();
     return { success: true, route, message: "Fila de distribuição da campanha atualizada." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a regra da campanha." };
@@ -278,6 +285,7 @@ export async function saveMetaCampaignQueueRouteAction(input: unknown) {
 export async function saveMetaAdQueueRouteAction(input: unknown) {
   try {
     const route = await saveMetaAdQueueRoute(await getRequiredTenantContext(), input);
+    revalidateCampaignDestinations();
     return { success: true, route, message: "Regra de anúncio atualizada." };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível salvar a regra do anúncio." };

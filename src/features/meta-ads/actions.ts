@@ -572,6 +572,9 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
       });
     });
 
+    const { revalidatePath } = await import("next/cache");
+    revalidatePath("/marketing/campanhas", "layout");
+    revalidatePath("/leads/distribuicao");
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar a elegibilidade da campanha." };
