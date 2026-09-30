@@ -20,6 +20,8 @@ import {
 } from "./conversation-media";
 import { META_CLOUD_PROVIDER } from "./types";
 import { readCtwaAdReferral } from "./meta-ctwa-referral";
+import { channelLeadIntakeKey, parseChannelLeadIntake } from "./channel-lead-intake";
+import { getSystemSetting } from "@/features/system-settings/queries";
 import { COEXISTENCE_WEBHOOK_FIELDS } from "./meta-coexistence-events";
 import type { MetaWebhookPayload } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
@@ -330,8 +332,18 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         // creation is restricted to the governed intake/integration flow;
         // this prevents internal or unsolicited WhatsApp messages from being
         // distributed as synthetic leads. The one governed exception is a
-        // first message from a click-to-WhatsApp ad (see meta-ctwa-intake).
-        const ctwaReferral = !lead && !matchedClient ? readCtwaAdReferral(message.referral) : null;
+        // first message from a click-to-WhatsApp ad (see meta-ctwa-intake), and
+        // a new contact on a number the director dedicated to ads.
+        const unknownContact = !lead && !matchedClient;
+        const ctwaReferral = unknownContact ? readCtwaAdReferral(message.referral) : null;
+        const coexistence = channel.onboardingMode === "coexistence";
+        const channelIntake = unknownContact || coexistence
+          ? parseChannelLeadIntake(await getSystemSetting(channelLeadIntakeKey(channel.id)).catch(() => null))
+          : null;
+        // A number kept in the WhatsApp Business app (coexistence) has its own
+        // automation there: its leads and messages are only received, the AI
+        // never talks to them, unless the director turned the AI on for it.
+        const skipAiQualification = coexistence && !channelIntake?.aiQualification;
 
         await db.insert(schema.whatsappMessages).values({
           id: randomUUID(),
@@ -353,16 +365,13 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           participantUserIds: [lead?.corretorId],
         }).catch(() => undefined);
 
-        if (ctwaReferral) {
+        if (ctwaReferral || (unknownContact && channelIntake?.enabled)) {
           const profileName = change.value?.contacts?.find((contact) => contact.wa_id === message.from)?.profile?.name ?? change.value?.contacts?.[0]?.profile?.name;
-          const ctwaPromise = import("./meta-ctwa-intake").then(({ ingestCtwaLead }) => ingestCtwaLead({
-            tenantId: channel.tenantId,
-            phone,
-            profileName,
-            referral: ctwaReferral,
-            providerMessageId: message.id,
-            receivedAt: message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date(),
-          })).then(async (result) => {
+          const receivedAt = message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date();
+          const ctwaPromise = import("./meta-ctwa-intake").then(({ ingestCtwaLead, ingestChannelLead }) => ctwaReferral
+            ? ingestCtwaLead({ tenantId: channel.tenantId, phone, profileName, referral: ctwaReferral, providerMessageId: message.id, receivedAt, channelIntake, skipAiQualification })
+            : ingestChannelLead({ tenantId: channel.tenantId, channelId: channel.id, channelActivatedAt: channel.activatedAt, phone, profileName, providerMessageId: message.id, receivedAt, intake: channelIntake!, skipAiQualification }),
+          ).then(async (result) => {
             if (result.status !== "ignored") {
               await db.update(schema.whatsappMessages).set({ leadId: result.leadId })
                 .where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, message.id), isNull(schema.whatsappMessages.leadId)));
@@ -379,7 +388,9 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           }
         }
 
-        if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
+        if (skipAiQualification && activeLeadId) {
+          console.info("[ai-wpp] inbound.ignored_coexistence_number", { tenantId: channel.tenantId, leadId: activeLeadId });
+        } else if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
           const aiPromise = processInboundAiResponse({
             tenantId: channel.tenantId,

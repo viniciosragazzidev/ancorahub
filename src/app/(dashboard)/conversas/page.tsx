@@ -186,7 +186,20 @@ export default async function ConversationsPage({
               mediaStorageKey: schema.whatsappMessages.mediaStorageKey,
             })
             .from(schema.whatsappMessages)
-            .where(eq(schema.whatsappMessages.tenantId, context.tenantId))
+            .where(and(
+              eq(schema.whatsappMessages.tenantId, context.tenantId),
+              // The WhatsApp Business app history imported when a number was
+              // connected in coexistence (sent before the connection) belongs
+              // to the team's old chats: it only shows for a lead or a client,
+              // never as a new conversation nor crowding out real messages.
+              sql`not (${schema.whatsappMessages.leadId} is null and ${schema.whatsappMessages.clientId} is null and exists (
+                select 1 from communication_channels history_channel
+                where history_channel.id = ${schema.whatsappMessages.communicationChannelId}
+                  and history_channel.onboarding_mode = 'coexistence'
+                  and history_channel.activated_at is not null
+                  and ${schema.whatsappMessages.sentAt} < history_channel.activated_at
+              ))`,
+            ))
             .orderBy(desc(schema.whatsappMessages.sentAt))
             .limit(2000),
           db

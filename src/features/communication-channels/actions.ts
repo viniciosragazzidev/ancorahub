@@ -22,6 +22,7 @@ import {
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "./service";
 import { getMetaCloudChannelActivationError } from "./channel-lifecycle";
+import { channelLeadIntakeKey } from "./channel-lead-intake";
 import { META_CLOUD_PROVIDER, type MetaEmbeddedSignupPayload } from "./types";
 
 const signupInput = z.object({
@@ -192,6 +193,31 @@ async function requestCoexistenceSync(input: { channelId: string; tenantId: stri
 }
 
 /** Retries the coexistence sync while Meta's 24h window is open. */
+/**
+ * Lead intake of a number dedicated to ads: a new contact that writes to it
+ * becomes a lead with this origin, in this queue (director only).
+ */
+export async function saveChannelLeadIntakeAction(input: { channelId: string; enabled: boolean; queueId: string | null; label: string | null; aiQualification: boolean }) {
+  const context = await getRequiredTenantContext();
+  if (context.role !== "director") throw new Error("Somente o Diretor pode configurar a entrada de leads do número.");
+  const db = getDatabase();
+  const [channel] = await db.select({ id: schema.communicationChannels.id }).from(schema.communicationChannels)
+    .where(and(eq(schema.communicationChannels.id, input.channelId), eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER))).limit(1);
+  if (!channel) throw new Error("Número não encontrado.");
+  if (input.queueId) {
+    const [queue] = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.id, input.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1);
+    if (!queue) throw new Error("Escolha uma fila ativa.");
+  }
+  if (input.enabled && !input.queueId) throw new Error("Escolha a fila para onde vão os leads deste número.");
+  if (input.enabled && !input.label?.trim()) throw new Error("Escolha a conta de anúncios que aparece como origem do lead.");
+  const label = input.label?.replace(/\s+/g, " ").trim().slice(0, 80) || null;
+  const { setSystemSetting } = await import("@/features/system-settings/queries");
+  await setSystemSetting(channelLeadIntakeKey(channel.id), JSON.stringify({ enabled: input.enabled, queueId: input.queueId, label, aiQualification: input.aiQualification === true }));
+  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "communication_channel", entidadeId: channel.id, acao: input.enabled ? "channel_lead_intake.enabled" : "channel_lead_intake.disabled" });
+  return { success: true };
+}
+
 export async function retryCoexistenceSyncAction(channelId: string) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director") throw new Error("Somente o Diretor pode sincronizar o canal oficial.");

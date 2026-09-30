@@ -1,6 +1,8 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getMetaCloudConfigurationState } from "@/features/communication-channels/meta-cloud-config";
 import { isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
+import { channelLeadIntakeKey, parseChannelLeadIntake } from "@/features/communication-channels/channel-lead-intake";
+import { getSystemSettings } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { and, asc, eq, sql } from "drizzle-orm";
@@ -59,11 +61,19 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
   ]);
 
   const companyAccount = channels.find((channel) => channel.branchId === null && channel.isDefault) ?? channels.find((channel) => channel.branchId === null) ?? null;
+  // Lead intake of the numbers dedicated to ads (the coexistence numbers), with the queues and ad accounts to pick from.
+  const [intakeRows, queues, adAccounts] = context.role === "director" ? await Promise.all([
+    getSystemSettings(channels.map((channel) => channelLeadIntakeKey(channel.id))).catch(() => []),
+    db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name }).from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).orderBy(asc(schema.leadQueues.name)),
+    db.select({ name: schema.metaAdAccounts.name }).from(schema.metaAdAccounts).where(eq(schema.metaAdAccounts.tenantId, context.tenantId)).orderBy(asc(schema.metaAdAccounts.name)),
+  ]) : [[], [], []];
+  const intakeByKey = new Map(intakeRows.map((row) => [row.key, row.value]));
+  const channelsWithIntake = channels.map((channel) => ({ ...channel, leadIntake: parseChannelLeadIntake(intakeByKey.get(channelLeadIntakeKey(channel.id))) }));
 
   return <>
     <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
     <WhatsAppPage
-      official={{ ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels, companyAccount }}
+      official={{ ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels: channelsWithIntake, companyAccount, queues, adAccountNames: adAccounts.map((account) => account.name) }}
       waha={null}
     />
   </>;

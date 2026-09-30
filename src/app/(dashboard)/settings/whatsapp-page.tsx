@@ -9,6 +9,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { MetaCloudSetupCard } from "@/features/communication-channels/components/meta-cloud-setup-card";
 import { MetaEmbeddedSignupCard } from "@/features/communication-channels/components/meta-embedded-signup-card";
 import { CoexistenceNumbersCard } from "@/features/communication-channels/components/coexistence-numbers-card";
+import type { ChannelLeadIntake } from "@/features/communication-channels/channel-lead-intake";
 import { WhatsAppTestMessageCard } from "@/features/communication-channels/components/whatsapp-test-message-card";
 import { Button } from "@/components/ui/button";
 import { WhatsAppIntegrationHeading } from "../integrations/whatsapp/whatsapp-integration-heading";
@@ -37,6 +38,7 @@ type Channel = {
   syncRequestedAt: Date | null;
   syncError: string | null;
   hasCredentials: boolean;
+  leadIntake?: ChannelLeadIntake;
 };
 
 type OfficialSetup = {
@@ -49,6 +51,8 @@ type OfficialSetup = {
   branches: { id: string; name: string }[];
   channels: Channel[];
   companyAccount: Channel | null;
+  queues?: { id: string; name: string }[];
+  adAccountNames?: string[];
 };
 
 export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha: ReactNode }) {
@@ -120,7 +124,7 @@ export function WhatsAppPage({ official, waha }: { official: OfficialSetup; waha
                 </CardContent>
               </Card>
               {official.canConfigure || coexistenceChannels.length ? (
-                <CoexistenceNumbersCard channels={coexistenceChannels} appId={official.appId} configId={official.embeddedSignupConfigId} canConnect={canConnectCoexistence} />
+                <CoexistenceNumbersCard channels={coexistenceChannels} appId={official.appId} configId={official.embeddedSignupConfigId} canConnect={canConnectCoexistence} queues={official.queues ?? []} adAccountNames={official.adAccountNames ?? []} />
               ) : null}
               <WhatsAppTestMessageCard />
               {waha}

@@ -28,6 +28,11 @@ export type CreateLeadFromWebhookSyncInput = {
   idempotencyKey: string | null;
   requestMetadata: { requestId: string; userAgent: string | null; receivedAt: Date };
   bypassPlantao?: boolean;
+  /**
+   * The lead is only received and distributed: the AI never talks to it
+   * (e.g. a WhatsApp number with its own automation in the Business app).
+   */
+  skipAiQualification?: boolean;
   leadSource?: {
     channel: string;
     externalId: string;
@@ -103,7 +108,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
   const qualificationEngineEnabled = await getSystemSetting("feature_qualification_engine_enabled").then((value) => value === "true").catch(() => false);
   const bypassPlantao = input.bypassPlantao ?? (await getSystemSetting(`feature_${input.leadSource?.channel ?? "webhook"}_bypass_plantao`).then((v) => v === "true").catch(() => false));
   // DEC-127: a queue with an attendance flow (switch on) is attended by the flow; otherwise today's intake.
-  const flowManaged = Boolean(queueFlowId) && !bypassPlantao && await attendanceFlowsEnabled().catch(() => false);
+  const skipAi = input.skipAiQualification === true;
+  const flowManaged = !skipAi && Boolean(queueFlowId) && !bypassPlantao && await attendanceFlowsEnabled().catch(() => false);
   const distStatus = bypassPlantao ? "unassigned" : "queued";
   const leadId = randomUUID();
   const now = new Date();
@@ -167,6 +173,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     await tx.insert(schema.leads).values({
       id: leadId, tenantId, branchId, queueId, corretorId: null, nome: normalizedName, telefone: normalizedPhone, email: normalizedEmail,
       ...(metaLeadType ? { tipo: metaLeadType } : {}),
+      // "IA Desativada": the AI neither starts nor answers this lead's messages.
+      ...(skipAi ? { qualificationStatus: "ia_disabled" } : {}),
       origem: "webhook", distributionOrigin: "landing-page", status: "new", distributionStatus: distStatus,
       consentimentoLgpd: false, webhookCredentialId: credentialId, createdAt: now,
       ...(input.leadSource ? {
@@ -200,7 +208,7 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     });
     await tx.update(schema.webhookDeliveries).set({ status: "processed", leadId, processedAt: now }).where(eq(schema.webhookDeliveries.id, deliveryId));
     await enqueueLeadEffectTx(tx, { tenantId, leadId, webhookDeliveryId: deliveryId, type: "NOTIFY_LEAD_ARRIVED", idempotencyKey: `lead-intake:${deliveryId}:arrival`, payload: { branchId, leadName: normalizedName } });
-    if (!qualificationEngineEnabled && !bypassPlantao && !flowManaged) {
+    if ((skipAi || !qualificationEngineEnabled) && !bypassPlantao && !flowManaged) {
       await enqueueLeadEffectTx(tx, { tenantId, leadId, webhookDeliveryId: deliveryId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${deliveryId}:distribution`, payload: { branchId, leadName: normalizedName } });
     }
     return { duplicate: false as const, leadId, deliveryId };
@@ -216,6 +224,8 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
     if (flowManaged && !qualificationEngineEnabled && !bypassPlantao) {
       await enqueueLeadEffect({ tenantId, leadId, webhookDeliveryId: committed.deliveryId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${committed.deliveryId}:distribution`, payload: { branchId, leadName: normalizedName } });
     }
+    // Only received: already queued for distribution above, nothing to start.
+    if (skipAi) return;
     let qualificationStart: { started: boolean } | null = null;
     try {
       qualificationStart = await startAiQualificationForLead({ tenantId, leadId, actorUserId: createdByUserId });

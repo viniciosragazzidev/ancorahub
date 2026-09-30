@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt, sql } from "drizzle-orm";
 
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
 import { resolveMetaCapturePolicy, type MetaCaptureMode } from "@/features/meta-ads/meta-capture-policy";
@@ -9,6 +9,7 @@ import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
+import type { ChannelLeadIntake } from "./channel-lead-intake";
 import { getMetaLeadAdsWebhookConfig } from "./meta-cloud-config";
 import { META_CTWA_ENTRY, ctwaLeadName, type readCtwaAdReferral } from "./meta-ctwa-referral";
 
@@ -79,6 +80,19 @@ export type CtwaIntakeResult =
  * message must already be stored: the qualification then answers what the
  * customer wrote instead of sending a cold opening template.
  */
+/** The tenant's Meta Lead Ads source: it carries the intake credential and its owner. */
+async function tenantIntakeSource(tenantId: string) {
+  const db = getDatabase();
+  const [source] = await db.select({ id: schema.metaLeadAdSources.id, branchId: schema.metaLeadAdSources.branchId, credentialId: schema.metaLeadAdSources.leadWebhookCredentialId, createdBy: schema.metaLeadAdSources.createdBy, pageId: schema.metaLeadAdSources.pageId })
+    .from(schema.metaLeadAdSources)
+    .where(and(eq(schema.metaLeadAdSources.tenantId, tenantId), eq(schema.metaLeadAdSources.status, "active")))
+    .orderBy(desc(schema.metaLeadAdSources.lastLeadAt))
+    .limit(1);
+  const [credential] = source ? await db.select({ createdBy: schema.leadWebhookCredentials.createdBy }).from(schema.leadWebhookCredentials).where(eq(schema.leadWebhookCredentials.id, source.credentialId)).limit(1) : [];
+  const actorUserId = source?.createdBy ?? credential?.createdBy;
+  return source && actorUserId ? { ...source, actorUserId } : null;
+}
+
 export async function ingestCtwaLead(input: {
   tenantId: string;
   phone: string;
@@ -86,20 +100,25 @@ export async function ingestCtwaLead(input: {
   referral: NonNullable<ReturnType<typeof readCtwaAdReferral>>;
   providerMessageId: string;
   receivedAt: Date;
+  /** The number's own intake: used when the ad's campaign has no rule (or is not synced yet). */
+  channelIntake?: ChannelLeadIntake | null;
+  /** The lead is only received: the AI never talks to it. */
+  skipAiQualification?: boolean;
 }): Promise<CtwaIntakeResult> {
   const db = getDatabase();
-  // The tenant's Meta Lead Ads source carries the intake credential and owner.
-  const [source] = await db.select({ id: schema.metaLeadAdSources.id, branchId: schema.metaLeadAdSources.branchId, credentialId: schema.metaLeadAdSources.leadWebhookCredentialId, createdBy: schema.metaLeadAdSources.createdBy, pageId: schema.metaLeadAdSources.pageId })
-    .from(schema.metaLeadAdSources)
-    .where(and(eq(schema.metaLeadAdSources.tenantId, input.tenantId), eq(schema.metaLeadAdSources.status, "active")))
-    .orderBy(desc(schema.metaLeadAdSources.lastLeadAt))
-    .limit(1);
-  const [credential] = source ? await db.select({ createdBy: schema.leadWebhookCredentials.createdBy }).from(schema.leadWebhookCredentials).where(eq(schema.leadWebhookCredentials.id, source.credentialId)).limit(1) : [];
-  const actorUserId = source?.createdBy ?? credential?.createdBy;
-  if (!source || !actorUserId) return { status: "ignored", reason: "no_source" };
+  const source = await tenantIntakeSource(input.tenantId);
+  if (!source) return { status: "ignored", reason: "no_source" };
+  const actorUserId = source.actorUserId;
 
   const hierarchy = await resolveAdHierarchy(input.tenantId, input.referral.adId);
-  const { decision, adRoute } = await resolveCapture(input.tenantId, hierarchy.campaignId, input.referral.adId);
+  const capture = await resolveCapture(input.tenantId, hierarchy.campaignId, input.referral.adId);
+  const { adRoute } = capture;
+  let decision = capture.decision;
+  // No rule at all for this ad or its campaign (a "não registrar" rule is
+  // kept): a number dedicated to ads takes the lead into its own queue.
+  if (decision.action === "ignore" && !capture.adRoute && !capture.campaignRoute && input.channelIntake?.enabled) {
+    decision = { action: "capture", queueId: input.channelIntake.queueId };
+  }
   if (decision.action === "ignore") {
     await db.insert(schema.auditLogs).values({
       id: randomUUID(), userId: actorUserId, entidade: adRoute ? "meta_ad_queue_route" : "meta_campaign_queue_route",
@@ -112,6 +131,7 @@ export async function ingestCtwaLead(input: {
     tenantId: input.tenantId, branchId: source.branchId ?? null, queueId: decision.queueId, credentialId: source.credentialId, createdByUserId: actorUserId,
     payload: { nome: ctwaLeadName(input.profileName, input.phone), telefone: input.phone, email: "", website: "" },
     idempotencyKey: `meta-ctwa-${input.providerMessageId}`,
+    skipAiQualification: input.skipAiQualification,
     requestMetadata: { requestId: `meta-ctwa-${input.providerMessageId}`, userAgent: "meta-cloud-webhook", receivedAt: input.receivedAt },
     leadSource: {
       channel: "meta_lead_ads",
@@ -124,6 +144,7 @@ export async function ingestCtwaLead(input: {
       capturedAt: input.receivedAt,
       metadata: {
         entry: META_CTWA_ENTRY,
+        adsLabel: input.channelIntake?.enabled ? input.channelIntake.label : null,
         campaignName: hierarchy.campaignName,
         adHeadline: input.referral.headline,
         adUrl: input.referral.sourceUrl,
@@ -136,5 +157,62 @@ export async function ingestCtwaLead(input: {
     return { status: "ignored", reason: "rejected" };
   }
   await db.update(schema.metaLeadAdSources).set({ lastLeadAt: input.receivedAt, updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
+  return { status: result.duplicate ? "existing" : "created", leadId: result.leadId };
+}
+
+/**
+ * A new contact that writes to a number dedicated to ads without the ad's
+ * referral (Meta only sends it on the first message after the click): the
+ * lead is created with the number's origin and queue. A contact that already
+ * talked to this number before it was connected (the WhatsApp Business app
+ * history: old customers, brokers, personal contacts) is not a new lead.
+ */
+export async function ingestChannelLead(input: {
+  tenantId: string;
+  channelId: string;
+  channelActivatedAt: Date | null;
+  phone: string;
+  profileName?: string;
+  providerMessageId: string;
+  receivedAt: Date;
+  intake: ChannelLeadIntake;
+  /** The lead is only received: the AI never talks to it. */
+  skipAiQualification?: boolean;
+}): Promise<CtwaIntakeResult> {
+  if (!input.intake.enabled) return { status: "ignored", reason: "policy" };
+  const db = getDatabase();
+  const suffix = input.phone.replace(/\D/g, "").slice(-8);
+  if (input.channelActivatedAt && suffix.length === 8) {
+    const [previous] = await db.select({ id: schema.whatsappMessages.id }).from(schema.whatsappMessages).where(and(
+      eq(schema.whatsappMessages.tenantId, input.tenantId),
+      eq(schema.whatsappMessages.communicationChannelId, input.channelId),
+      lt(schema.whatsappMessages.sentAt, input.channelActivatedAt),
+      sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${suffix}`,
+    )).limit(1);
+    if (previous) return { status: "ignored", reason: "policy" };
+  }
+  const source = await tenantIntakeSource(input.tenantId);
+  if (!source) return { status: "ignored", reason: "no_source" };
+  const result = await createLeadFromWebhookSync({
+    tenantId: input.tenantId, branchId: source.branchId ?? null, queueId: input.intake.queueId, credentialId: source.credentialId, createdByUserId: source.actorUserId,
+    payload: { nome: ctwaLeadName(input.profileName, input.phone), telefone: input.phone, email: "", website: "" },
+    idempotencyKey: `meta-wa-${input.providerMessageId}`,
+    skipAiQualification: input.skipAiQualification,
+    requestMetadata: { requestId: `meta-wa-${input.providerMessageId}`, userAgent: "meta-cloud-webhook", receivedAt: input.receivedAt },
+    leadSource: {
+      channel: "meta_lead_ads",
+      externalId: `wa:${input.providerMessageId}`,
+      campaign: null,
+      ad: null,
+      form: null,
+      page: null,
+      capturedAt: input.receivedAt,
+      metadata: { entry: META_CTWA_ENTRY, adsLabel: input.intake.label, withoutReferral: true },
+    },
+  });
+  if (!result.success) {
+    console.error("[meta-channel-intake] lead.rejected", { tenantId: input.tenantId, code: result.code });
+    return { status: "ignored", reason: "rejected" };
+  }
   return { status: result.duplicate ? "existing" : "created", leadId: result.leadId };
 }
