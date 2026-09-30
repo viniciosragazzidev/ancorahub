@@ -209,6 +209,7 @@ export default async function SuperAdminSettingsPage() {
   const aiPrimaryModel = settingMap.get("ai_primary_model") ?? "";
   const aiFallbackProvider = settingMap.get("ai_fallback_provider") ?? "none";
   const aiFallbackModel = settingMap.get("ai_fallback_model") ?? "";
+  const aiLearningModel = settingMap.get("ai_learning_model") ?? "";
   const aiTemperature = settingMap.get("ai_temperature") ?? "0.7";
   const aiMaxTokens = settingMap.get("ai_max_tokens") ?? "1024";
   const aiSystemPrompt =
@@ -1357,6 +1358,19 @@ export default async function SuperAdminSettingsPage() {
                       />
                       <p className="text-xs text-muted-foreground">
                         Deixe em branco para usar o modelo padrão do fallback.
+                      </p>
+                    </div>
+
+                    {/* Modelo das sugestões de situações (aprendizado) */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-semibold">Modelo das sugestões de situações</label>
+                      <Input
+                        name="learningModel"
+                        placeholder="Ex: anthropic/claude-haiku-4.5"
+                        defaultValue={aiLearningModel}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Modelo do OpenRouter usado para agrupar as perguntas dos clientes e sugerir situações. Deixe em branco para usar os modelos padrão.
                       </p>
                     </div>
 

@@ -50,13 +50,16 @@ const DEFAULT_CONTEXT = "Corretora especializada em planos de saúde individuais
 const LATERAL_TIMEOUT_MS = 8_000;
 
 /** Short answer to the customer's question, or null (then the scripted reply goes alone). */
-export async function generateLateralAnswer(input: { tenantId: string; question: string; customerFirstName?: string | null }) {
+export async function generateLateralAnswer(input: { tenantId: string; question: string; customerFirstName?: string | null; conversationId?: string | null; leadId?: string | null }) {
+  const startedAt = Date.now();
+  let model = "";
   try {
-    const [{ getQualificationTenantSettings }, { getTenantPlaybooks }, { buildSituationalPromptSection }, { createAiRouter }] = await Promise.all([
+    const [{ getQualificationTenantSettings }, { getTenantPlaybooks }, { buildSituationalPromptSection }, { createAiRouter }, { logAiUsage }] = await Promise.all([
       import("@/features/ai-qualification/tenant-settings-service"),
       import("@/features/ai-qualification/playbooks-storage"),
       import("@/features/ai-qualification/situational-response-engine"),
       import("./model-router"),
+      import("./ai-usage-log"),
     ]);
     const [settings, playbooks] = await Promise.all([
       getQualificationTenantSettings(input.tenantId).catch(() => null),
@@ -74,10 +77,17 @@ export async function generateLateralAnswer(input: { tenantId: string; question:
     if (!router.providers.length) return null;
     const call = router.call({ messages: [{ role: "system", content: system }, { role: "user", content: input.question }], temperature: 0.3, maxTokens: 140 });
     const result = await Promise.race([call, new Promise<null>((resolve) => setTimeout(() => resolve(null), LATERAL_TIMEOUT_MS))]);
-    if (!result) return null;
-    const data = await result.response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return sanitizeLateralAnswer(data.choices?.[0]?.message?.content);
+    if (!result) {
+      void logAiUsage({ tenantId: input.tenantId, purpose: "lateral_answer", model: "timeout", startedAt, success: false, error: "timeout", conversationId: input.conversationId, leadId: input.leadId });
+      return null;
+    }
+    model = result.model;
+    const data = await result.response.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number } };
+    const answer = sanitizeLateralAnswer(data.choices?.[0]?.message?.content);
+    void logAiUsage({ tenantId: input.tenantId, purpose: "lateral_answer", model, startedAt, usage: data.usage, success: Boolean(answer), error: answer ? null : "refused_or_empty", conversationId: input.conversationId, leadId: input.leadId });
+    return answer;
   } catch (error) {
+    void import("./ai-usage-log").then(({ logAiUsage }) => logAiUsage({ tenantId: input.tenantId, purpose: "lateral_answer", model: model || "unknown", startedAt, success: false, error: error instanceof Error ? error.message : String((error as { errText?: string } | null)?.errText ?? "unknown_error"), conversationId: input.conversationId, leadId: input.leadId })).catch(() => undefined);
     console.warn("[qualification] lateral_answer_failed_open", { tenantId: input.tenantId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown_error" });
     return null;
   }

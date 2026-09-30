@@ -23,6 +23,7 @@ import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { detectLateralSituation, quickReplyTuning } from "@/features/attendance-situations/catalog";
 import { loadTenantSituations } from "@/features/attendance-situations/service";
+import { recordLearningEvent } from "@/features/situation-learning/service";
 import { loadQuickReplyTemplates, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -1541,14 +1542,23 @@ export async function processInboundAiResponse({
   // failure the scripted reply goes alone.
   if (deterministicTurn.kind === "collecting" && !answeredNow && effectiveMessageKind === "text") {
     const situation = detectLateralSituation(normalizedInboundMessage, tenantSituations);
+    // Learning (Atendimento → Situações): every question asked here is recorded
+    // with the situation that covered it; the uncovered ones become suggestions.
+    const learn = (matchedSituationKey: string | null, aiAnswer: string | null) => void recordLearningEvent({
+      tenantId, conversationId: conversation.id, leadId, question: normalizedInboundMessage,
+      matchedSituationKey, aiAnswer, channel: transport, communicationChannelId: communicationChannelId ?? null,
+    });
     if (situation?.kind === "custom" && situation.action === "transfer") {
+      learn(situation.key, null);
       return transferToHuman(renderConversationVariables(situation.response, updatedMemory, lead?.nome), `Situação: ${situation.label}`);
     }
     if (situation) {
+      learn(situation.key, null);
       const situationText = situation.kind === "custom" ? situation.response : (await loadQuickReplyTemplates(tenantId))[situation.key]?.body;
       if (situationText) deterministicTurn = { ...deterministicTurn, reply: `${renderConversationVariables(situationText, updatedMemory, lead?.nome)}\n\n${deterministicTurn.reply}` };
     } else if (isCustomerQuestion(normalizedInboundMessage)) {
-      const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: updatedMemory.customerFirstName?.value ?? null });
+      const lateral = await generateLateralAnswer({ tenantId, question: normalizedInboundMessage, customerFirstName: updatedMemory.customerFirstName?.value ?? null, conversationId: conversation.id, leadId });
+      learn(null, lateral);
       if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };
     }
   }

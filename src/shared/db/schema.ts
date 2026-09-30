@@ -2445,11 +2445,73 @@ export const attendanceSituations = pgTable(
     response: text("response"),
     action: text("action", { enum: ["continue", "transfer"] }),
     enabled: boolean("enabled").notNull().default(true),
+    /** "manual", "suggestion" (approved from an AI suggestion) or "auto" (activated by the AI). */
+    origin: text("origin").notNull().default("manual"),
     updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,
   },
   (table) => [uniqueIndex("attendance_situations_tenant_key_unique").on(table.tenantId, table.situationKey)],
+);
+
+/**
+ * Every question asked in the middle of the qualification (personal data
+ * removed), with the situation that covered it (null = none did): the
+ * source of the AI's situation suggestions and of the coverage indicator.
+ */
+export const situationLearningEvents = pgTable(
+  "situation_learning_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id"),
+    leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    question: text("question").notNull(),
+    normalizedQuestion: text("normalized_question").notNull(),
+    matchedSituationKey: text("matched_situation_key"),
+    aiAnswer: text("ai_answer"),
+    brokerAnswer: text("broker_answer"),
+    brokerAnsweredAt: timestamp("broker_answered_at", { withTimezone: true }),
+    channel: text("channel"),
+    communicationChannelId: text("communication_channel_id"),
+    suggestionId: text("suggestion_id"),
+    clusteredAt: timestamp("clustered_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    index("situation_learning_events_tenant_created_idx").on(table.tenantId, table.createdAt),
+    index("situation_learning_events_uncovered_idx").on(table.tenantId, table.clusteredAt).where(sql`${table.matchedSituationKey} IS NULL`),
+  ],
+);
+
+/** A situation the AI proposes from questions no situation covered, for a director to review. */
+export const situationSuggestions = pgTable(
+  "situation_suggestions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    status: text("status", { enum: ["pending", "approved", "merged", "dismissed", "auto_activated"] }).notNull().default("pending"),
+    /** "new": a new situation; "merge": teach these phrases to an existing one. */
+    kind: text("kind", { enum: ["new", "merge"] }).notNull(),
+    targetSituationKey: text("target_situation_key"),
+    title: text("title").notNull(),
+    phrases: jsonb("phrases").$type<string[]>().notNull().default([]),
+    responses: jsonb("responses").$type<string[]>().notNull().default([]),
+    action: text("action", { enum: ["continue", "transfer"] }).notNull().default("continue"),
+    occurrences: integer("occurrences").notNull().default(0),
+    examples: jsonb("examples").$type<string[]>().notNull().default([]),
+    firstAskedAt: timestamp("first_asked_at", { withTimezone: true }),
+    lastAskedAt: timestamp("last_asked_at", { withTimezone: true }),
+    fromBroker: boolean("from_broker").notNull().default(false),
+    modelUsed: text("model_used"),
+    resolvedSituationKey: text("resolved_situation_key"),
+    resolvedBy: text("resolved_by").references(() => user.id, { onDelete: "set null" }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [index("situation_suggestions_tenant_status_idx").on(table.tenantId, table.status)],
 );
 
 export const aiQuickReplyTemplates = pgTable(

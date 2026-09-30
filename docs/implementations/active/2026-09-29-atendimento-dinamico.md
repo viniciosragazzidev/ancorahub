@@ -45,6 +45,18 @@ Mensagem de conclusão: os textos padrão antigos salvos nas empresas ("Vou enca
 - Verificação: testes da detecção (prioridade, frases ensinadas, críticas travadas, situação própria continuar/transferir); 142 testes das áreas afetadas; tela e "Teste uma frase" conferidos no servidor local (preço, pedido de atendente, pergunta sem situação).
 - Pendente: remover `situational-playbooks-panel.tsx`, sem uso.
 
+## Aprendizado de situações (L1–L5, entregue em 2026-09-30)
+
+Branch `feat/aprendizado-situacoes`. Migrações 0173 (tabelas `situation_learning_events` e `situation_suggestions`, coluna `attendance_situations.origin`), 0174 e 0175 (correção de `ai_attendance_logs`: faltava `provider` e a coluna antiga `ai_conversation_id` era obrigatória, então nenhum uso de IA era gravado).
+
+- **L1 captura:** cada pergunta no meio da qualificação é gravada com a situação que a cobriu (ou nenhuma) e a resposta da IA; e-mail, telefone, CPF/CNPJ, CEP e links saem antes de salvar; apagadas após 90 dias.
+- **L2 sugestões:** tarefa `/api/internal/jobs/situation-learning` a cada 30 min (runbook do Coolify). A IA agrupa as perguntas sem situação e cria: situação nova (nome, frases, 3 respostas sem preço/carência/promessa, ação) ou "ensinar frases" a uma situação existente. Chama a IA só com 3+ perguntas novas ou uma esperando 6 h; no máximo 12 chamadas por empresa por dia. Modelo: Super-admin → IA → "Modelo das sugestões de situações" (OpenRouter; vazio = modelos padrão).
+- **L3 revisão:** filtro "Sugestões da IA (N)" em Situações; painel com aprovar, editar e aprovar, juntar a uma situação existente e descartar. Aviso ao diretor (in-app e push) quando a sugestão chega a 3 perguntas.
+- **L4 corretor:** a primeira mensagem de uma pessoa ao lead até 24 h depois da pergunta entra como candidata, marcada "Resposta do corretor".
+- **L5 automático:** desligado por padrão ("Configurações ▾" → "Ativar sugestões automaticamente", só o Diretor). Ativa só situação nova que responde e segue, 5+ perguntas e resposta segura; selo "Ativada pela IA" e "Desfazer" no painel. Indicador "% das perguntas cobertas (30 dias)" na tela.
+- Uso de IA registrado em `ai_attendance_logs` (modelo, tokens, tempo, custo quando o provedor informa) para as respostas pelos Roteiros e para as sugestões.
+- Verificação: testes do núcleo (limpeza de dados, segurança da resposta, leitura do JSON da IA, ativação automática); teste de ponta a ponta com banco real em transação desfeita (captura → sugestão → aviso → uso gravado → ativação automática → resposta do corretor); tela conferida no servidor local.
+
 ## Próximas fases (plano aprovado em 2026-09-29)
 
 Menu **Atendimento** com 5 seções, no padrão de densidade (tabela + painel lateral, busca + "+", um CTA por tela). Em tudo que envia, o canal é visível e escolhível: Meta oficial, WhatsApp da empresa (reserva Meta) ou mesmo canal da conversa, com validação por canal ao salvar e publicar.

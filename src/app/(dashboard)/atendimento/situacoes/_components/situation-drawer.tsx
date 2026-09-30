@@ -2,7 +2,7 @@
 
 import { useRef, useState, useTransition, type ReactNode } from "react";
 
-import { Plus, Trash, XIcon } from "@/components/huge-icons";
+import { Plus, RotateCcw, Trash, XIcon } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import { toast } from "@/components/ui/sonner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { deleteCustomSituationAction, saveBuiltinSituationAction, saveCustomSituationAction, saveGuidedSituationAction } from "@/features/attendance-situations/actions";
+import { undoAutoActivationAction } from "@/features/situation-learning/actions";
 import { cleanPhrases, MAX_SITUATION_PHRASES, SITUATION_ACTION_LABEL, type SituationAction } from "@/features/attendance-situations/catalog";
 import type { SituationRow } from "@/features/attendance-situations/service";
 import { QUICK_REPLY_VARIABLES } from "@/features/message-library/catalog";
@@ -19,11 +20,11 @@ import { saveQuickReplyTextAction } from "@/features/message-library/actions";
 import { renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { Preview, PREVIEW_MEMORY, Suggestions } from "../../mensagens/_components/message-drawer";
 
-export type SituationTarget = { mode: "view"; situation: SituationRow } | { mode: "new" } | null;
+export type SituationTarget = { mode: "view"; situation: SituationRow & { aiActivated?: boolean } } | { mode: "new" } | null;
 
 export const CHANNEL_NOTE = "A resposta sai pelo mesmo canal em que o cliente escreveu (Meta oficial ou WhatsApp da empresa). Responder por outro número no meio da conversa confundiria o cliente.";
 
-function Section({ title, description, action, children }: { title: string; description?: string; action?: ReactNode; children: ReactNode }) {
+export function Section({ title, description, action, children }: { title: string; description?: string; action?: ReactNode; children: ReactNode }) {
   return (
     <SheetSection>
       <SheetSectionHeader>
@@ -39,7 +40,7 @@ function Section({ title, description, action, children }: { title: string; desc
 }
 
 /** Phrases as removable chips, added one by one. */
-function PhraseEditor({ phrases, onChange, placeholder }: { phrases: string[]; onChange: (phrases: string[]) => void; placeholder: string }) {
+export function PhraseEditor({ phrases, onChange, placeholder }: { phrases: string[]; onChange: (phrases: string[]) => void; placeholder: string }) {
   const [draft, setDraft] = useState("");
   const add = () => {
     const next = cleanPhrases([...phrases, draft]);
@@ -68,7 +69,7 @@ function PhraseEditor({ phrases, onChange, placeholder }: { phrases: string[]; o
 }
 
 /** Reply text with the {{nome}} / {{resumo}} buttons and the example preview. */
-function ReplyEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+export function ReplyEditor({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const textarea = useRef<HTMLTextAreaElement>(null);
   const insert = (variable: string) => {
     const token = `{{${variable}}}`;
@@ -95,7 +96,7 @@ function ReplyEditor({ value, onChange }: { value: string; onChange: (value: str
   );
 }
 
-function ChannelSection() {
+export function ChannelSection() {
   return (
     <Section title="Canal">
       <div className="flex items-center gap-2"><Badge variant="outline">Mesmo canal da conversa</Badge></div>
@@ -143,7 +144,7 @@ function BuiltinBody({ situation, onDone }: { situation: SituationRow; onDone: (
   );
 }
 
-function CustomBody({ situation, onDone, onClose }: { situation: SituationRow | null; onDone: () => void; onClose: () => void }) {
+function CustomBody({ situation, onDone, onClose }: { situation: (SituationRow & { aiActivated?: boolean }) | null; onDone: () => void; onClose: () => void }) {
   const [title, setTitle] = useState(situation?.title ?? "");
   const [phrases, setPhrases] = useState(situation?.phrases ?? []);
   const [response, setResponse] = useState(situation?.response ?? "");
@@ -165,8 +166,22 @@ function CustomBody({ situation, onDone, onClose }: { situation: SituationRow | 
     onDone();
     onClose();
   });
+  const undo = () => startTransition(async () => {
+    if (!situation) return;
+    const result = await undoAutoActivationAction(situation.key);
+    if (!result.success) { toast.error(result.error); return; }
+    toast.success("Ativação desfeita. A sugestão voltou para revisão.");
+    onDone();
+    onClose();
+  });
   return (
     <>
+      {situation?.aiActivated ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+          <p className="text-xs leading-5 text-muted-foreground">Ativada pela IA: clientes perguntaram isto várias vezes e a resposta passou na verificação de segurança.</p>
+          <Button type="button" size="sm" variant="outline" disabled={pending} onClick={undo}><RotateCcw className="size-3.5" /> Desfazer</Button>
+        </div>
+      ) : null}
       <Section title="Nome">
         <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: Atendem em Niterói?" />
       </Section>

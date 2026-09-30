@@ -575,6 +575,7 @@ export async function updateAiSettingsAction(formData: FormData) {
   const primaryModel = String(formData.get("primaryModel") ?? "").trim();
   const fallbackProvider = String(formData.get("fallbackProvider") ?? "none").trim();
   const fallbackModel = String(formData.get("fallbackModel") ?? "").trim();
+  const learningModel = String(formData.get("learningModel") ?? "").trim().slice(0, 120);
   const temperature = String(formData.get("temperature") ?? "0.7").trim();
   const maxTokens = String(formData.get("maxTokens") ?? "1024").trim();
   const systemPrompt = String(formData.get("systemPrompt") ?? "").trim();
@@ -588,6 +589,7 @@ export async function updateAiSettingsAction(formData: FormData) {
   await setSystemSetting("ai_primary_model", primaryModel, now);
   await setSystemSetting("ai_fallback_provider", fallbackProvider, now);
   await setSystemSetting("ai_fallback_model", fallbackModel, now);
+  await setSystemSetting("ai_learning_model", learningModel, now);
   await setSystemSetting("ai_temperature", temperature, now);
   await setSystemSetting("ai_max_tokens", maxTokens, now);
   await setSystemSetting("ai_system_prompt", systemPrompt, now);

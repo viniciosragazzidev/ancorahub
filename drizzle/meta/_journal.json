@@ -841,6 +841,27 @@
                         "when":  1790830800000,
                         "tag":  "0172_channel_coexistence",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  120,
+                        "version":  "7",
+                        "when":  1790917200000,
+                        "tag":  "0173_situation_learning",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  121,
+                        "version":  "7",
+                        "when":  1790920800000,
+                        "tag":  "0174_ai_attendance_logs_provider",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  122,
+                        "version":  "7",
+                        "when":  1790924400000,
+                        "tag":  "0175_ai_attendance_logs_legacy_conversation",
+                        "breakpoints":  true
                     }
                 ]
 }

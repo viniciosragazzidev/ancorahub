@@ -4,11 +4,12 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
 
-import { Plus } from "@/components/huge-icons";
+import { ChevronDownIcon, Gear, Plus } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { DataTable, DataTableColumnHeader } from "@/components/ui/data-table";
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { Input } from "@/components/ui/input";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
@@ -17,9 +18,14 @@ import { testPhraseAction } from "@/features/attendance-situations/actions";
 import { SITUATION_ACTION_LABEL, type SituationAction } from "@/features/attendance-situations/catalog";
 import type { PhraseExplanation } from "@/features/attendance-situations/explain";
 import type { SituationRow } from "@/features/attendance-situations/service";
+import { setAutoActivateAction } from "@/features/situation-learning/actions";
+import { AUTO_ACTIVATE_MIN_OCCURRENCES } from "@/features/situation-learning/learning";
+import type { SuggestionRow } from "@/features/situation-learning/service";
 import { SituationDrawer, type SituationTarget } from "./situation-drawer";
+import { formatAskedAt, SuggestionDrawer } from "./suggestion-drawer";
 
-type KindFilter = "all" | SituationRow["kind"];
+type KindFilter = "all" | SituationRow["kind"] | "suggestions";
+type Row = SituationRow & { aiActivated?: boolean };
 
 const KIND_BADGE: Record<SituationRow["kind"], { label: string; variant: "info" | "secondary" | "outline" }> = {
   builtin: { label: "Do sistema", variant: "outline" },
@@ -31,7 +37,7 @@ function actionLabel(row: SituationRow) {
   return row.action === "guide" ? "IA responde com base no roteiro" : SITUATION_ACTION_LABEL[row.action as SituationAction];
 }
 
-const columns: ColumnDef<SituationRow>[] = [
+const columns: ColumnDef<Row>[] = [
   {
     accessorKey: "title",
     header: ({ column }) => <DataTableColumnHeader column={column} title="Situação" />,
@@ -46,7 +52,12 @@ const columns: ColumnDef<SituationRow>[] = [
     id: "kind",
     accessorFn: (row) => KIND_BADGE[row.kind].label,
     header: ({ column }) => <DataTableColumnHeader column={column} title="Tipo" />,
-    cell: ({ row }) => <Badge variant={KIND_BADGE[row.original.kind].variant}>{KIND_BADGE[row.original.kind].label}</Badge>,
+    cell: ({ row }) => (
+      <span className="flex flex-wrap gap-1">
+        <Badge variant={KIND_BADGE[row.original.kind].variant}>{KIND_BADGE[row.original.kind].label}</Badge>
+        {row.original.aiActivated ? <Badge variant="outline">Ativada pela IA</Badge> : null}
+      </span>
+    ),
   },
   {
     id: "phrases",
@@ -114,23 +125,77 @@ function PhraseTester() {
   );
 }
 
+const suggestionColumns: ColumnDef<SuggestionRow>[] = [
+  {
+    accessorKey: "title",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Dúvida dos clientes" />,
+    cell: ({ row }) => (
+      <span className="grid min-w-0 max-w-md gap-0.5">
+        <span className="truncate text-sm font-medium">{row.original.kind === "merge" ? `Parece "${row.original.targetTitle ?? row.original.title}"` : row.original.title}</span>
+        <span className="truncate text-xs text-muted-foreground">{row.original.examples.slice(0, 2).join(" · ")}</span>
+      </span>
+    ),
+  },
+  {
+    id: "kind",
+    header: "Sugestão",
+    cell: ({ row }) => <Badge variant={row.original.kind === "merge" ? "outline" : "info"}>{row.original.kind === "merge" ? "Ensinar frases" : "Situação nova"}</Badge>,
+  },
+  {
+    accessorKey: "occurrences",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Vezes" />,
+    cell: ({ row }) => <span className="text-sm tabular-nums">{row.original.occurrences}</span>,
+  },
+  {
+    id: "lastAskedAt",
+    accessorFn: (row) => row.lastAskedAt ?? "",
+    header: ({ column }) => <DataTableColumnHeader column={column} title="Última vez" />,
+    cell: ({ row }) => <span className="text-xs text-muted-foreground">{formatAskedAt(row.original.lastAskedAt)}</span>,
+  },
+  {
+    id: "source",
+    header: "Resposta",
+    cell: ({ row }) => <span className="text-xs text-muted-foreground">{row.original.kind === "merge" ? "A da situação" : row.original.fromBroker ? "Do corretor + IA" : "Sugerida pela IA"}</span>,
+  },
+];
+
+export type LearningOverview = {
+  suggestions: SuggestionRow[];
+  coverage: { percent: number | null; covered: number; total: number };
+  autoActivate: boolean;
+};
+
 /**
- * Atendimento → Situações: one table for every "when the customer says X".
+ * Atendimento → Situações: one table for every "when the customer says X",
+ * plus the AI's suggestions from the questions no situation covered.
  * A row opens its drawer; "Nova situação" is the screen's single primary action.
  */
-export function SituationsWorkspace({ situations }: { situations: SituationRow[] }) {
+export function SituationsWorkspace({ situations, learning, autoActivatedKeys, initialView, canConfigure }: { situations: SituationRow[]; learning: LearningOverview; autoActivatedKeys: string[]; initialView?: string; canConfigure: boolean }) {
   const router = useRouter();
-  const [filter, setFilter] = useState<KindFilter>("all");
+  const [filter, setFilter] = useState<KindFilter>(initialView === "sugestoes" ? "suggestions" : "all");
   const [target, setTarget] = useState<SituationTarget>(null);
+  const [suggestionId, setSuggestionId] = useState<string | null>(null);
+  const [savingAuto, startAuto] = useTransition();
+  const rowsAll = useMemo<Row[]>(() => situations.map((row) => ({ ...row, aiActivated: autoActivatedKeys.includes(row.key) })), [situations, autoActivatedKeys]);
   const counts = useMemo(() => ({
-    all: situations.length,
-    builtin: situations.filter((row) => row.kind === "builtin").length,
-    custom: situations.filter((row) => row.kind === "custom").length,
-    guided: situations.filter((row) => row.kind === "guided").length,
-  }), [situations]);
-  const rows = filter === "all" ? situations : situations.filter((row) => row.kind === filter);
-  const current = target?.mode === "view" ? situations.find((row) => row.id === target.situation.id) : null;
+    all: rowsAll.length,
+    builtin: rowsAll.filter((row) => row.kind === "builtin").length,
+    custom: rowsAll.filter((row) => row.kind === "custom").length,
+    guided: rowsAll.filter((row) => row.kind === "guided").length,
+  }), [rowsAll]);
+  const rows = filter === "all" || filter === "suggestions" ? rowsAll : rowsAll.filter((row) => row.kind === filter);
+  const current = target?.mode === "view" ? rowsAll.find((row) => row.id === target.situation.id) : null;
   const drawerTarget: SituationTarget = target?.mode === "view" ? (current ? { mode: "view", situation: current } : null) : target;
+  const suggestion = learning.suggestions.find((item) => item.id === suggestionId) ?? null;
+  const toggleAuto = (enabled: boolean) => startAuto(async () => {
+    const result = await setAutoActivateAction(enabled);
+    if (!result.success) { toast.error(result.error); return; }
+    toast.success(enabled ? "Ativação automática ligada." : "Ativação automática desligada: toda sugestão passa pela sua aprovação.");
+    router.refresh();
+  });
+  const coverage = learning.coverage.percent === null
+    ? "Sem perguntas nos últimos 30 dias"
+    : `${learning.coverage.percent}% das perguntas cobertas (30 dias)`;
 
   return (
     <Card variant="overview">
@@ -138,25 +203,57 @@ export function SituationsWorkspace({ situations }: { situations: SituationRow[]
         title="Situações"
         badge={<Badge variant="secondary">{situations.length} situações</Badge>}
         description="O que acontece quando o cliente diz algo fora da pergunta: respostas prontas (do sistema e da empresa) e os roteiros que orientam a IA quando nenhuma situação cobre."
-        actions={<Button size="sm" onClick={() => setTarget({ mode: "new" })}><Plus className="size-3.5" /> Nova situação</Button>}
+        actions={
+          <>
+            <DropdownMenu>
+              <DropdownMenuTrigger render={<Button size="sm" variant="outline" />}>
+                <Gear className="size-3.5" /> Configurações <ChevronDownIcon className="size-3 opacity-60" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-72">
+                <DropdownMenuLabel className="text-xs font-normal leading-5 text-muted-foreground">Aprendizado</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem checked={learning.autoActivate} disabled={!canConfigure || savingAuto} onCheckedChange={(checked) => toggleAuto(checked === true)}>
+                  <span className="grid gap-0.5">
+                    <span>Ativar sugestões automaticamente</span>
+                    <span className="text-xs leading-4 text-muted-foreground">Só situações que respondem e seguem, perguntadas {AUTO_ACTIVATE_MIN_OCCURRENCES}+ vezes e com resposta segura.{canConfigure ? "" : " Só o Diretor altera."}</span>
+                  </span>
+                </DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button size="sm" onClick={() => setTarget({ mode: "new" })}><Plus className="size-3.5" /> Nova situação</Button>
+          </>
+        }
       />
       <div className="grid gap-3 p-4">
         <PhraseTester />
-        <DsSegmentedControl<KindFilter>
-          aria-label="Filtrar por tipo"
-          value={filter}
-          onValueChange={setFilter}
-          options={[
-            { value: "all", label: `Todas (${counts.all})` },
-            { value: "builtin", label: `Do sistema (${counts.builtin})` },
-            { value: "custom", label: `Da empresa (${counts.custom})` },
-            { value: "guided", label: `Roteiros da IA (${counts.guided})` },
-          ]}
-          className="max-w-full overflow-x-auto"
-        />
-        <DataTable columns={columns} data={rows} searchKey="title" searchPlaceholder="Buscar situação" pageSize={15} onRowClick={(row) => setTarget({ mode: "view", situation: row })} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <DsSegmentedControl<KindFilter>
+            aria-label="Filtrar por tipo"
+            value={filter}
+            onValueChange={setFilter}
+            options={[
+              { value: "all", label: `Todas (${counts.all})` },
+              { value: "builtin", label: `Do sistema (${counts.builtin})` },
+              { value: "custom", label: `Da empresa (${counts.custom})` },
+              { value: "guided", label: `Roteiros da IA (${counts.guided})` },
+              { value: "suggestions", label: `Sugestões da IA (${learning.suggestions.length})` },
+            ]}
+            className="max-w-full overflow-x-auto"
+          />
+          <span className="text-xs text-muted-foreground" title={`${learning.coverage.covered} de ${learning.coverage.total} perguntas feitas no meio da qualificação tiveram uma situação`}>{coverage}</span>
+        </div>
+        {filter === "suggestions" ? (
+          <>
+            <p className="text-xs leading-5 text-muted-foreground">
+              Perguntas que nenhuma situação cobriu, agrupadas pela IA a cada 30 minutos. Nada entra em uso sem a sua aprovação{learning.autoActivate ? ", exceto o que a ativação automática permitir" : ""}.
+            </p>
+            <DataTable columns={suggestionColumns} data={learning.suggestions} searchKey="title" searchPlaceholder="Buscar sugestão" pageSize={15} onRowClick={(row) => setSuggestionId(row.id)} />
+          </>
+        ) : (
+          <DataTable columns={columns} data={rows} searchKey="title" searchPlaceholder="Buscar situação" pageSize={15} onRowClick={(row) => setTarget({ mode: "view", situation: row })} />
+        )}
       </div>
       <SituationDrawer target={drawerTarget} onClose={() => setTarget(null)} onDone={() => router.refresh()} />
+      <SuggestionDrawer suggestion={suggestion} situations={situations} onClose={() => setSuggestionId(null)} onDone={() => router.refresh()} />
     </Card>
   );
 }

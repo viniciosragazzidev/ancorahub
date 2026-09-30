@@ -38,6 +38,8 @@ export type AiRouterCall = {
    * primeiro (mantém a continuidade de retries de correção no mesmo modelo).
    */
   prefer?: { provider: AiProviderId; model: string };
+  /** Per-attempt timeout (default 12s); background jobs may allow more. */
+  timeoutMs?: number;
 };
 
 export type AiRouterResult = {
@@ -162,6 +164,10 @@ export async function createAiRouter(tenantId: string): Promise<AiRouter> {
       if (index > 0) {
         const [preferred] = pairs.splice(index, 1);
         pairs.unshift(preferred);
+      } else if (index === -1) {
+        // A model outside the default list (e.g. the one chosen for a job): try it first on its provider.
+        const config = configs.find((item) => item.id === input.prefer?.provider);
+        if (config) pairs.unshift({ provider: config.id, endpoint: config.endpoint, apiKey: config.apiKey, model: input.prefer.model, extraHeaders: config.extraHeaders });
       }
     }
 
@@ -171,7 +177,7 @@ export async function createAiRouter(tenantId: string): Promise<AiRouter> {
       try {
         const response = await fetch(pair.endpoint, {
           method: "POST",
-          signal: AbortSignal.timeout(12000),
+          signal: AbortSignal.timeout(input.timeoutMs ?? 12000),
           headers: {
             "Authorization": `Bearer ${pair.apiKey}`,
             "Content-Type": "application/json",
