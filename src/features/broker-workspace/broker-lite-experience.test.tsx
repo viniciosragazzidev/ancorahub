@@ -23,7 +23,7 @@ describe("Corretor Lite experience contract", () => {
 
     const modeLookup = source.indexOf("getExperienceMode(context)");
     const lightDashboard = source.indexOf("<LightDashboard");
-    const reportingLookup = source.indexOf("getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER)");
+    const reportingLookup = source.indexOf("getDashboardViewModel(context, period)");
 
     expect(modeLookup).toBeGreaterThan(-1);
     expect(lightDashboard).toBeGreaterThan(modeLookup);
@@ -35,6 +35,7 @@ describe("Corretor Lite experience contract", () => {
       <LightTopNavBar
         branding={{ tenantName: "Corretora", brandColor: null, logoUrl: null }}
         user={{ name: "Corretor Teste", email: "corretor@example.test", role: "broker" }}
+        showDutyCalendar
       />,
     );
 
@@ -42,11 +43,11 @@ describe("Corretor Lite experience contract", () => {
 
     const mobileMenu = screen.getByRole("navigation", { name: "Menu mobile" });
 
-    for (const href of ["/dashboard", "/minha-fila", "/conversas/broker", "/clientes"]) {
+    for (const href of ["/dashboard", "/minha-fila", "/plantoes", "/conversas/broker", "/clientes"]) {
       expect(mobileMenu.querySelector(`a[href="${href}"]`)).not.toBeNull();
     }
 
-    expect(within(mobileMenu).getAllByRole("link")).toHaveLength(5);
+    expect(within(mobileMenu).getAllByRole("link")).toHaveLength(6);
   });
 
   it("uses one overlay sidebar instead of a duplicate mobile bottom bar", () => {

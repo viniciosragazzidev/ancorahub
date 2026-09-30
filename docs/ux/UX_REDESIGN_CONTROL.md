@@ -1,11 +1,34 @@
 # Controle de Execução do Redesign
 
+## 2026-09-30 — Agenda de plantões do Corretor Lite
+
+Nova rota `/plantoes`, mantendo o papel de corretor e a identidade visual Lite
+protegida pela DEC-015. A ação principal é consultar a escala própria: calendário
+mensal com dias escalados e agenda filtrada pela data; no desktop os painéis ficam
+lado a lado e, no mobile, em fluxo vertical. Um plantão em foco recebe destaque
+leve; detalhes são somente leitura em Sheet compartilhado. Estados: escala ativa,
+plantão atual/em andamento, pausado, data sem escala e período vazio. Reutiliza
+Calendar, Card, Badge, Button e Sheet; não cria primitiva, variante ou token global.
+A transição local da agenda segue `transitions-dev/07-panel-reveal`, com movimento
+reduzido. Sem nova regra de domínio; consulta limitada ao corretor autenticado e à
+escala publicada. Controle global e horizonte configurável pelo Super-admin.
+Registro: `docs/implementations/completed/2026-09-30-broker-lite-duty-calendar.md`.
+O QA visual autenticado nas larguras UX-M1.10 permanece pendente.
+
 ## 2026-09-29 — Exportação estruturada do plantão
 
 Refinamento pontual da operação de distribuição: Diretor/Gestor exportam a lista
 do plantão em `.xlsx` usando a estrutura da planilha de referência. A ação fica
 ao lado do PDF, preserva o escopo e registra auditoria. Registro:
 `docs/implementations/completed/2026-09-29-plantao-export-spreadsheet.md`.
+
+## 2026-09-29 — Anotações privadas por conversa
+
+Correção de sincronização no painel contextual de `/conversas`: ao trocar o lead
+selecionado, o campo recarrega a anotação daquele lead. Papel: operador de
+atendimento; ação principal: consultar/editar contexto privado; estados: anotação
+existente ou vazio. Sem alteração visual, de persistência ou de etapa UX. Registro:
+`docs/implementations/completed/2026-09-29-conversation-private-notes-selection-sync.md`.
 
 ## 2026-09-29 — Linha inteira da lista de leads abre o sheet
 
@@ -30,6 +53,15 @@ operação, a ação principal é interpretar o fluxo de leads e os estados são
 dados, vazio e saída terminal. A área de funil agora usa o componente
 compartilhado `src/components/dashboard/funnel-chart.tsx`, sem novo token ou
 mudança de etapa. Registro: `docs/implementations/completed/2026-09-29-dashboard-funnel-chart.md`.
+
+## 2026-09-30 — Observação de investigação no sheet do lead
+
+Refinamento pontual do detalhe compartilhado de `/leads` e do plantão: Diretor e
+Gestor podem consultar, no resumo operacional, o motivo já registrado ao assumir
+um lead para investigação. A leitura é sob demanda, restrita ao tenant e
+auditada; corretores não recebem esse dado. Reutiliza o componente e tokens
+existentes, sem nova primitive ou campo de persistência. QA mobile UX-M1.10
+permanece pendente.
 
 **Atualizado em:** 2026-09-25
 **Fonte de verdade:** este documento e `UX_REDESIGN_CONTRACT.md`.

@@ -584,7 +584,7 @@ Após validar que a Página foi compartilhada e ainda está visível à credenci
 | DEC-003 | Definir SLAs: duração, fuso, dias úteis/corridos, pausa e política de notificação/redistribuição. | Jobs, alertas e fila. | Operação |
 | DEC-004 | Definir comissão: moeda, percentual/base, vigência de regra, estorno/cancelamento e arredondamento. | Motor financeiro e relatórios. | Financeiro/Produto |
 | DEC-005 | Definir matriz LGPD: base legal, texto/versionamento de consentimento, retenção, exclusão/anonimização e responsáveis. | Segurança e conformidade. | Jurídico/Produto |
-| DEC-006 | Definir reengajamento: canal permitido, opt-out, prazo, templates aprovados e exceções. | Comunicação e LGPD. | Produto/Jurídico |
+| DEC-006 | Resolvido pela DEC-128: reengajamento pontual de lead frio não atribuído via template oficial FIRST_CONTACT, com opt-out, janela de envio e bloqueios definidos. | Comunicação e LGPD. | DEC-128 |
 | DEC-011 | Definir planos comerciais, limites, cobrança, tolerância e provedor de pagamento. | Billing e bloqueio. | Negócio |
 | DEC-012 | Definir política de filial: gestores multi-filial, fallback de distribuição e visibilidade consolidada. | Permissões e relatórios. | Produto |
 
@@ -1464,3 +1464,26 @@ encerrar. O editor visual usa `@xyflow/react` (MIT). O primeiro fluxo publicado
 reproduz o comportamento atual, para que ligar o motor não mude o atendimento.
 Plano e fases em `docs/implementations/active/2026-09-27-motor-atendimento.md`.
 
+## DEC-128 — Reativação única de lead frio ainda não atribuído
+
+**Decisão aprovada pelo usuário em 2026-09-30.** O sistema pode reabrir a conversa
+de qualificação de leads frios que concluíram a qualificação e continuam sem
+corretor. O envio ocorre uma única vez por lead, duas horas após
+`qualificationCompletedAt`, somente de segunda a sexta, entre 08:00 e 18:00 no
+fuso `America/Sao_Paulo`; se o prazo cair fora da janela, aguarda o próximo
+horário permitido. A automação nasce ativa, pode ser desligada pelo Super-admin
+(chave global auditada) e por tenant.
+
+O envio usa exclusivamente um template Meta aprovado vinculado ao evento
+`FIRST_CONTACT`, sem texto livre ou fallback; se não houver recurso aprovado na
+WABA ativa, o envio é bloqueado e auditado. Lead atribuído, desqualificado,
+encerrado, removido manualmente da distribuição, arquivado/excluído ou com
+opt-out não recebe follow-up. Resposta com lead ainda sem corretor reabre a
+qualificação; ofertas pendentes são canceladas antes da retomada. Resposta após
+atribuição não volta à IA e recebe no máximo uma confirmação de que um corretor
+entrará em contato. Opt-out interrompe automações futuras.
+
+O detalhe compartilhado do lead para Diretor/Gestor também mostra o motivo
+registrado quando a gestão assumiu o lead para investigação, lendo a interação
+existente e auditando o acesso; nenhuma coluna redundante é criada. Execução em
+`docs/implementations/active/2026-09-30-cold-lead-reactivation.md`.

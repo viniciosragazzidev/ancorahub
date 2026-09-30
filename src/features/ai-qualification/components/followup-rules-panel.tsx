@@ -21,7 +21,6 @@ const followUpTriggerValues = [
   "waiting_broker",
   "quote_without_response",
   "scheduled_return",
-  "cold_lead_reactivation",
   "custom",
 ] as const;
 
@@ -153,7 +152,7 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
             Regras Operacionais de Follow-up Automático
           </CardTitle>
           <CardDescription className="text-xs">
-            Parâmetros de régua de cobrança e reagendamento para leads que pararam de responder.
+            Regras operacionais por tenant. A reativação de leads frios usa somente o template oficial aprovado.
           </CardDescription>
         </div>
         {canEdit && !editingRule && (
@@ -272,9 +271,12 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
                     </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Gatilho: <span className="font-medium text-foreground">{triggerLabels[rule.trigger] ?? rule.trigger}</span> · Aguarda {rule.delayMinutes}m · Max {rule.maxAttempts}x
+                    Gatilho: <span className="font-medium text-foreground">{triggerLabels[rule.trigger] ?? rule.trigger}</span>
+                    {rule.trigger === "cold_lead_reactivation"
+                      ? " · Template FIRST_CONTACT · uma tentativa · dias úteis, 08h–18h"
+                      : ` · Aguarda ${rule.delayMinutes}m · Max ${rule.maxAttempts}x`}
                   </p>
-                  {rule.fixedMessage && (
+                  {rule.trigger !== "cold_lead_reactivation" && rule.fixedMessage && (
                     <p className="text-xs italic text-muted-foreground truncate max-w-lg">
                       &quot;{rule.fixedMessage}&quot;
                     </p>
@@ -286,23 +288,29 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
                     <Switch
                       checked={rule.enabled}
                       onCheckedChange={() => handleToggleEnabled(rule)}
+                      aria-label={`${rule.enabled ? "Pausar" : "Ativar"} ${rule.name}`}
                     />
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setEditingRule(rule)}
-                      className="text-xs h-8"
-                    >
-                      <Sliders className="size-3.5" /> Editar
-                    </Button>
-                    <Button
-                      size="icon-sm"
-                      variant="ghost"
-                      onClick={() => handleDelete(rule.id)}
-                      className="text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </Button>
+                    {rule.trigger !== "cold_lead_reactivation" ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setEditingRule(rule)}
+                          className="text-xs h-8"
+                        >
+                          <Sliders className="size-3.5" /> Editar
+                        </Button>
+                        <Button
+                          size="icon-sm"
+                          variant="ghost"
+                          onClick={() => handleDelete(rule.id)}
+                          className="text-destructive hover:bg-destructive/10"
+                          aria-label={`Excluir ${rule.name}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </>
+                    ) : null}
                   </div>
                 )}
               </div>

@@ -20,6 +20,8 @@ import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 import { getRealtimeSyncTopic, isRealtimeSyncEnabled } from "@/features/notifications/realtime-sync";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { getFeatureFlag } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRouteDefinition } from "@/features/custom-roles/routes";
@@ -39,6 +41,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   // is resolved. Starting them together keeps client-side route transitions from
   // serializing the shell, preference, branding and pathname lookups.
   const experienceModePromise = getExperienceMode(context);
+  const brokerDutyCalendarFlagPromise = context.role === "broker"
+    ? getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR)
+    : Promise.resolve("false");
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   const headersPromise = headers();
   const tenantPromise = getDatabase()
@@ -80,6 +85,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     userRows,
     membershipRows,
     cleanUiEnabled,
+    brokerDutyCalendarFlag,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -87,6 +93,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     userPromise,
     membershipPromise,
     cleanUiPromise,
+    brokerDutyCalendarFlagPromise,
   ]);
 
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
@@ -94,7 +101,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const pathname = headersList.get("x-pathname") || "";
 
   if (isLightBroker) {
-    const allowedLightPrefixes = ["/dashboard", "/minha-fila", "/leads", "/clientes", "/conversas", "/l/", "/settings", "/notificacoes", "/primeiro-acesso"];
+    const allowedLightPrefixes = ["/dashboard", "/minha-fila", "/plantoes", "/leads", "/clientes", "/conversas", "/l/", "/settings", "/notificacoes", "/primeiro-acesso"];
     const isAllowed = allowedLightPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix));
     if (!isAllowed && pathname !== "") {
       redirect("/dashboard");
@@ -142,6 +149,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       <AppShell
         cleanUiEnabled={cleanUiEnabled}
         isLightBroker={isLightBroker}
+        showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         branding={{
           tenantName: tenant?.name ?? null,
           brandColor: tenant?.brandColor ?? null,

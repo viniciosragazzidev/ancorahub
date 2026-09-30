@@ -390,6 +390,34 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
 
         if (skipAiQualification && activeLeadId) {
           console.info("[ai-wpp] inbound.ignored_coexistence_number", { tenantId: channel.tenantId, leadId: activeLeadId });
+        } else if (activeLeadId && lead?.qualificationStatus === "cold") {
+          const coldLeadPromise = import("@/features/ai-qualification/service").then(({ handleColdLeadInbound }) => handleColdLeadInbound({
+            tenantId: channel.tenantId,
+            leadId: activeLeadId,
+            phone: message.from,
+            text,
+            messageKind,
+            communicationChannelId: channel.id,
+            providerMessageId: message.id,
+          })).then((result) => {
+            console.info("[cold-lead-reactivation] inbound.completed", {
+              tenantId: channel.tenantId,
+              leadId: activeLeadId,
+              action: result.action,
+              handled: result.handled,
+            });
+          }).catch((error) => {
+            console.error("[cold-lead-reactivation] inbound.failed", {
+              tenantId: channel.tenantId,
+              leadId: activeLeadId,
+              error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error",
+            });
+          });
+          try {
+            after(() => coldLeadPromise);
+          } catch {
+            // Fallback: non-blocking execution outside a Next.js request context.
+          }
         } else if (activeLeadId && shouldStartOrResumeAiQualification(lead?.qualificationStatus ?? "pending")) {
           const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
           const aiPromise = processInboundAiResponse({

@@ -870,6 +870,62 @@ export async function updateDutyOccurrenceHistorySettingsAction(formData: FormDa
   });
 }
 
+export async function updateBrokerDutyCalendarEnabledSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("brokerDutyCalendarEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_lite_duty_calendar.enabled_updated",
+    targetType: "system_settings",
+    targetId: key,
+    metadata: { enabled: enabled === "true" },
+    createdAt: now,
+  });
+}
+
+export async function updateBrokerDutyCalendarHorizonSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const key = FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key;
+  const horizon = String(formData.get("brokerDutyCalendarHorizonMonths") ?? "").trim();
+  const allowedValues = FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.allowedValues;
+  if (!allowedValues.includes(horizon as (typeof allowedValues)[number])) {
+    throw new Error("Escolha um horizonte válido para a agenda de plantões.");
+  }
+
+  const now = new Date();
+  await setSystemSetting(key, horizon, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "broker_lite_duty_calendar.horizon_updated",
+    targetType: "system_settings",
+    targetId: key,
+    metadata: { horizonMonths: Number(horizon) },
+    createdAt: now,
+  });
+}
+
+export async function updateColdLeadReactivationSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = formData.get("coldLeadReactivationEnabled") === "true" ? "true" : "false";
+  const now = new Date();
+  const key = FEATURE_FLAGS.COLD_LEAD_REACTIVATION.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "cold_lead_reactivation.settings_updated",
+    targetType: "system_settings",
+    targetId: key,
+    metadata: { enabled: enabled === "true" },
+    createdAt: now,
+  });
+}
+
 export async function updateUnlinkedConversationDeletionSettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("unlinkedConversationDeletionEnabled") === "true" ? "true" : "false";
@@ -949,4 +1005,3 @@ export async function getPurgeJobStatusAction(jobId: string) {
     completedAt: job.completedAt,
   };
 }
-

@@ -35,6 +35,8 @@ import {
   updateAttendanceFlowsSettingsAction,
   updateDutyMonthlySchedulingSettingsAction,
   updateDutyOccurrenceHistorySettingsAction,
+  updateBrokerDutyCalendarEnabledSettingsAction,
+  updateBrokerDutyCalendarHorizonSettingsAction,
   updateCustomRolesGlobalSettingsAction,
   updatePerformanceRankingSettingsAction,
   updateTeamMemberProfileSettingsAction,
@@ -43,6 +45,7 @@ import {
   updateReportingCenterSettingsAction,
   updateUnlinkedConversationDeletionSettingsAction,
   updateConversationMediaSettingsAction,
+  updateColdLeadReactivationSettingsAction,
 } from "@/app/(platform-admin)/super-admin/actions";
 import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
 import { CLEAN_UI_FEATURE } from "@/features/clean-ui/feature";
@@ -105,11 +108,14 @@ export default async function SuperAdminSettingsPage() {
     "feature_manual_lead_assignment_offer_choice_enabled",
     FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key,
     FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key,
+    FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key,
+    FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key,
     FEATURE_FLAGS.ATTENDANCE_FLOWS.key,
     FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key,
     FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key,
     "ai_enabled",
     "feature_ai_whatsapp_qualification_enabled",
+    FEATURE_FLAGS.COLD_LEAD_REACTIVATION.key,
     "feature_ai_quick_reply_enabled",
     "ai_memory_reset_mode",
     "feature_browser_extension_enabled",
@@ -166,6 +172,11 @@ export default async function SuperAdminSettingsPage() {
   const dutyMonthlySchedulingEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key) ?? FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue) === "true";
   const attendanceFlowsEnabled = (settingMap.get(FEATURE_FLAGS.ATTENDANCE_FLOWS.key) ?? FEATURE_FLAGS.ATTENDANCE_FLOWS.defaultValue) === "true";
   const dutyOccurrenceHistoryEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key) ?? FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.defaultValue) === "true";
+  const brokerDutyCalendarEnabled = (settingMap.get(FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key) ?? FEATURE_FLAGS.BROKER_DUTY_CALENDAR.defaultValue) === "true";
+  const savedBrokerDutyCalendarHorizon = settingMap.get(FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key) ?? FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.defaultValue;
+  const brokerDutyCalendarHorizonMonths = FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.allowedValues.includes(savedBrokerDutyCalendarHorizon as (typeof FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.allowedValues)[number])
+    ? savedBrokerDutyCalendarHorizon
+    : FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.defaultValue;
   const unlinkedConversationDeletionEnabled =
     settingMap.get(FEATURE_FLAGS.UNLINKED_CONVERSATION_DELETION.key) !== "false";
   const distributionBatchSize = settingMap.get("lead_distribution_jobs_batch_size") ?? "25";
@@ -193,6 +204,8 @@ export default async function SuperAdminSettingsPage() {
   const aiEnabled = settingMap.get("ai_enabled") === "true";
   const aiWhatsAppQualificationEnabled =
     settingMap.get("feature_ai_whatsapp_qualification_enabled") !== "false";
+  const coldLeadReactivationEnabled = (settingMap.get(FEATURE_FLAGS.COLD_LEAD_REACTIVATION.key)
+    ?? FEATURE_FLAGS.COLD_LEAD_REACTIVATION.defaultValue) === "true";
   const aiQuickReplyEnabled = settingMap.get("feature_ai_quick_reply_enabled") !== "false";
   const aiMemoryResetMode = settingMap.get("ai_memory_reset_mode") ?? "before_each_session";
   const browserExtensionEnabled = settingMap.get("feature_browser_extension_enabled") !== "false";
@@ -1215,6 +1228,47 @@ export default async function SuperAdminSettingsPage() {
 
             <Card className="border-border bg-card shadow-none">
               <CardHeader>
+                <CardTitle>Agenda de plantões do Corretor Lite</CardTitle>
+                <CardDescription>
+                  Controla a visualização da escala própria do corretor, sem permitir edição. A consulta registra auditoria e respeita as escalas publicadas.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5">
+                <form action={updateBrokerDutyCalendarEnabledSettingsAction} className="flex flex-wrap items-center justify-between gap-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input type="checkbox" name="brokerDutyCalendarEnabled" value="true" defaultChecked={brokerDutyCalendarEnabled} className="size-4 accent-primary" />
+                    <span>
+                      <span className="font-medium">Área Plantões habilitada no Lite</span>
+                      <span className="block text-xs text-muted-foreground">Desativar oculta o menu e bloqueia a rota sem apagar os dados da escala.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant={brokerDutyCalendarEnabled ? "outline" : "default"}>
+                    {brokerDutyCalendarEnabled ? "Salvar controle" : "Ativar agenda"}
+                  </Button>
+                </form>
+                <form action={updateBrokerDutyCalendarHorizonSettingsAction} className="flex flex-wrap items-end justify-between gap-4 border-t border-border pt-4">
+                  <label className="grid min-w-48 gap-1.5 text-sm">
+                    <span className="font-medium">Horizonte da agenda</span>
+                    <span className="text-xs text-muted-foreground">Quantidade de meses futuros exibidos para o corretor.</span>
+                    <AppSelect
+                      name="brokerDutyCalendarHorizonMonths"
+                      defaultValue={brokerDutyCalendarHorizonMonths}
+                      options={[
+                        { value: "1", label: "1 mês" },
+                        { value: "3", label: "3 meses" },
+                        { value: "6", label: "6 meses" },
+                        { value: "12", label: "12 meses" },
+                      ]}
+                      className="mt-1 max-w-56"
+                    />
+                  </label>
+                  <Button type="submit" variant="outline">Salvar horizonte</Button>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
                 <CardTitle>Escolha de oferta na atribuição manual</CardTitle>
                 <CardDescription>
                   Permite que Gestores e Diretores escolham entre atribuição direta com aviso interno ou oferta exclusiva com aceite por WhatsApp.
@@ -1812,6 +1866,40 @@ export default async function SuperAdminSettingsPage() {
                   </label>
                   <Button type="submit" variant="outline">
                     Salvar qualificação
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+            <Card className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Reativação de leads frios sem distribuição</CardTitle>
+                <CardDescription>
+                  Permite um único lembrete após duas horas da qualificação, em dias úteis entre 08h e 18h,
+                  usando exclusivamente o template FIRST_CONTACT aprovado na WABA ativa do tenant.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  action={updateColdLeadReactivationSettingsAction}
+                  className="flex flex-wrap items-center justify-between gap-4"
+                >
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      name="coldLeadReactivationEnabled"
+                      value="true"
+                      defaultChecked={coldLeadReactivationEnabled}
+                      className="size-4"
+                    />
+                    <span>
+                      <span className="font-medium">Reativação global habilitada</span>
+                      <span className="block text-xs text-muted-foreground">
+                        Desative aqui para interromper novos envios em todos os tenants.
+                      </span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">
+                    Salvar reativação
                   </Button>
                 </form>
               </CardContent>

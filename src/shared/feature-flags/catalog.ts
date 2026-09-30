@@ -103,6 +103,14 @@ export const FEATURE_FLAGS = {
     description: "Habilita o motor de qualificação de leads.",
   },
 
+  COLD_LEAD_REACTIVATION: {
+    key: "feature_cold_lead_reactivation_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita a reativação única de leads frios não distribuídos por WhatsApp oficial.",
+  },
+
   AI_QUICK_REPLY: {
     key: "feature_ai_quick_reply_enabled",
     scope: "global",
@@ -255,6 +263,20 @@ export const FEATURE_FLAGS = {
     defaultValue: "true",
     allowedValues: ["true", "false"] as const,
     description: "Mostra ocorrências encerradas e o histórico de leads distribuídos por plantão.",
+  },
+  BROKER_DUTY_CALENDAR: {
+    key: "feature_broker_lite_duty_calendar_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Exibe a agenda de plantões próprios no Corretor Lite.",
+  },
+  BROKER_DUTY_CALENDAR_HORIZON_MONTHS: {
+    key: "feature_broker_lite_duty_calendar_horizon_months",
+    scope: "global",
+    defaultValue: "3",
+    allowedValues: ["1", "3", "6", "12"] as const,
+    description: "Define por quantos meses a agenda de plantões do Corretor Lite exibe ocorrências futuras.",
   },
 } as const satisfies Record<string, FeatureFlagDefinition<string>>;
 

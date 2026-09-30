@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { aiComplete } from "@/features/ai/engine";
@@ -11,9 +11,14 @@ import {
   processMetaOutboundBatch,
 } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
-import { getSystemSetting } from "@/features/system-settings/queries";
+import { getFeatureFlag } from "@/features/system-settings/queries";
 import { startQualificationConversationForLead } from "@/features/ai-agent/conversation-state-machine";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { getColdLeadInboundAction, isEligibleColdLeadForReactivation } from "./cold-lead-reactivation-policy";
+import { reopenColdLeadForQualification } from "@/features/qualification-engine/cold-lead-reopen";
+import { parseOptOut, parseWrongNumber, type QuickReplyMessageKind } from "@/features/ai-agent/quick-reply";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { resolveSystemUserId } from "@/shared/tenant/system-user";
 
 const questions = [
   { key: "city", prompt: "Para começar, em qual cidade você pretende contratar o plano?" },
@@ -34,9 +39,6 @@ function parseData(value: unknown): QualificationData {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
-
-import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
-import { getFeatureFlag } from "@/features/system-settings/queries";
 
 async function qualificationEnabled() {
   const [feature, engine] = await Promise.all([
@@ -72,7 +74,7 @@ export async function startAiQualificationForLead(input: { tenantId: string; lea
       .limit(1);
     if (queue && queue.aiQualificationEnabled === false) return { started: false as const, reason: "queue_disabled" as const };
   }
-  if ((await getSystemSetting("feature_qualification_engine_enabled")) !== "false") {
+  if ((await getFeatureFlag(FEATURE_FLAGS.QUALIFICATION_ENGINE)) !== "false") {
     return await startQualificationConversationForLead(input, input.force).catch(() => ({ started: false as const, reason: "failed" as const }));
   }
   const db = getDatabase();
@@ -213,6 +215,232 @@ export async function processAiQualificationMessage(input: { tenantId: string; l
   const reply = `${message ? `${message}\n\n` : ""}${next.prompt}`;
   await queueReply(input, session.id, reply, session.version);
   return { processed: true, completed: false, reply };
+}
+
+/** Resumes the legacy questionnaire from its stored question without resending FIRST_CONTACT. */
+export async function resumeColdLeadAiQualificationForLead(input: {
+  tenantId: string;
+  leadId: string;
+  phone: string;
+  text: string;
+  actorUserId: string;
+}) {
+  if (!await qualificationEnabled()) return { processed: false as const, reason: "disabled" as const };
+  const db = getDatabase();
+  const config = await getOrCreateConfig(input.tenantId);
+  if (!config?.enabled) return { processed: false as const, reason: "tenant_disabled" as const };
+  const [session] = await db.select().from(schema.aiQualificationSessions).where(and(
+    eq(schema.aiQualificationSessions.tenantId, input.tenantId),
+    eq(schema.aiQualificationSessions.leadId, input.leadId),
+  )).limit(1);
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + config.timeoutMinutes * 60_000);
+
+  if (!session) {
+    await db.insert(schema.aiQualificationSessions).values({
+      id: randomUUID(),
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      status: "waiting_customer",
+      currentQuestionKey: questions[0].key,
+      collectedData: {},
+      missingFields: questions.map((question) => question.key),
+      expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    }).onConflictDoNothing();
+  } else {
+    if (session.status === "processing") return { processed: false as const, reason: "busy" as const };
+    const currentQuestionKey = questions.some((question) => question.key === session.currentQuestionKey)
+      ? session.currentQuestionKey
+      : questions[0].key;
+    await db.update(schema.aiQualificationSessions).set({
+      status: "waiting_customer",
+      currentQuestionKey,
+      expiresAt,
+      failureReason: null,
+      lastInteractionAt: now,
+      updatedAt: now,
+    }).where(and(
+      eq(schema.aiQualificationSessions.id, session.id),
+      eq(schema.aiQualificationSessions.tenantId, input.tenantId),
+      eq(schema.aiQualificationSessions.status, session.status),
+    ));
+  }
+
+  return processAiQualificationMessage(input);
+}
+
+/** Handles only cold-lead replies; the normal webhook pipeline owns every other lead state. */
+export async function handleColdLeadInbound(input: {
+  tenantId: string;
+  leadId: string;
+  phone: string;
+  text: string;
+  messageKind?: QuickReplyMessageKind;
+  communicationChannelId: string;
+  providerMessageId: string;
+}) {
+  const db = getDatabase();
+  const [lead] = await db.select({
+    id: schema.leads.id,
+    nome: schema.leads.nome,
+    telefone: schema.leads.telefone,
+    qualificationStatus: schema.leads.qualificationStatus,
+    qualificationState: schema.leads.qualificationState,
+    qualificationCompletedAt: schema.leads.qualificationCompletedAt,
+    corretorId: schema.leads.corretorId,
+    status: schema.leads.status,
+    distributionStatus: schema.leads.distributionStatus,
+    distributionRemovedAt: schema.leads.distributionRemovedAt,
+    archivedAt: schema.leads.archivedAt,
+    deletedAt: schema.leads.deletedAt,
+  }).from(schema.leads).where(and(
+    eq(schema.leads.id, input.leadId),
+    eq(schema.leads.tenantId, input.tenantId),
+  )).limit(1);
+  if (!lead || lead.qualificationStatus !== "cold") return { handled: false as const };
+
+  const now = new Date();
+  const [conversation] = await db.select({ id: schema.aiConversations.id, optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt })
+    .from(schema.aiConversations).where(and(
+      eq(schema.aiConversations.tenantId, input.tenantId),
+      eq(schema.aiConversations.leadId, input.leadId),
+    )).orderBy(desc(schema.aiConversations.updatedAt)).limit(1);
+
+  if (parseOptOut(input.text) || parseWrongNumber(input.text)) {
+    const wrongNumber = parseWrongNumber(input.text);
+    let conversationId = conversation?.id;
+    if (!conversationId) {
+      const { getOrCreateAiConversation } = await import("@/features/ai-agent/conversation-state-machine");
+      const created = await getOrCreateAiConversation({ tenantId: input.tenantId, leadId: input.leadId, communicationChannelId: input.communicationChannelId });
+      conversationId = created.id;
+    }
+    await db.update(schema.aiConversations).set({
+      ...(wrongNumber ? { wrongNumberAt: conversation?.wrongNumberAt ?? now } : { optOutAt: conversation?.optOutAt ?? now }),
+      lastProcessedMessageId: input.providerMessageId,
+      lastActivityAt: now,
+      updatedAt: now,
+    }).where(and(eq(schema.aiConversations.id, conversationId), eq(schema.aiConversations.tenantId, input.tenantId)));
+    await db.update(schema.whatsappOutboundMessages).set({
+      status: "cancelled",
+      providerErrorCode: "LEAD_OPTED_OUT",
+      providerErrorMessage: "O lead solicitou interrupção; follow-up cancelado.",
+      updatedAt: now,
+    }).where(and(
+      eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
+      eq(schema.whatsappOutboundMessages.idempotencyKey, `cold-lead-reactivation:${input.leadId}`),
+      inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
+    ));
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: await resolveSystemUserId(input.tenantId),
+      entidade: "lead",
+      entidadeId: input.leadId,
+      acao: wrongNumber ? "cold_lead_reactivation.wrong_number_recorded" : "cold_lead_reactivation.opt_out_recorded",
+      createdAt: now,
+    });
+    return { handled: true as const, action: wrongNumber ? "wrong_number" as const : "opt_out" as const };
+  }
+
+  if (lead.deletedAt || lead.archivedAt || ["lost", "converted"].includes(lead.status)) {
+    return { handled: true as const, action: "ignore" as const };
+  }
+
+  const featureEnabled = await getFeatureFlag(FEATURE_FLAGS.COLD_LEAD_REACTIVATION) === "true";
+  const [owner] = lead.corretorId
+    ? await db.select({ role: schema.tenantMemberships.role })
+        .from(schema.tenantMemberships).where(and(
+          eq(schema.tenantMemberships.tenantId, input.tenantId),
+          eq(schema.tenantMemberships.userId, lead.corretorId),
+          eq(schema.tenantMemberships.status, "active"),
+        )).limit(1)
+    : [];
+  const action = getColdLeadInboundAction({
+    qualificationStatus: lead.qualificationStatus,
+    corretorRole: owner?.role ?? null,
+    featureEnabled,
+    optedOut: Boolean(conversation?.optOutAt || conversation?.wrongNumberAt),
+  });
+
+  if (action === "acknowledge_broker") {
+    const idempotencyKey = `cold-lead-reactivation-ack:${input.leadId}`;
+    const text = "Obrigado por retornar! Um dos corretores que recebeu seu atendimento entrará em contato com você em breve.";
+    const queued = await enqueueMetaTextMessage({
+      tenantId: input.tenantId,
+      channelId: input.communicationChannelId,
+      recipientType: "lead",
+      recipientId: input.leadId,
+      destinationPhone: lead.telefone,
+      body: text,
+      purpose: "coldLeadReactivationAcknowledgement",
+      requestedBy: await resolveSystemUserId(input.tenantId),
+      idempotencyKey,
+    });
+    await processMetaOutboundBatch(1, input.tenantId, queued.id);
+    const [delivery] = await db.select({
+      id: schema.whatsappOutboundMessages.id,
+      channelId: schema.whatsappOutboundMessages.channelId,
+      providerMessageId: schema.whatsappOutboundMessages.providerMessageId,
+      status: schema.whatsappOutboundMessages.status,
+    }).from(schema.whatsappOutboundMessages).where(and(
+      eq(schema.whatsappOutboundMessages.id, queued.id),
+      eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
+    )).limit(1);
+    if (!queued.duplicate && delivery && ["sent", "delivered", "read"].includes(delivery.status)) {
+      await db.insert(schema.whatsappMessages).values({
+        id: delivery.providerMessageId || `cold_reactivation_ack_${randomUUID()}`,
+        tenantId: input.tenantId,
+        leadId: input.leadId,
+        communicationChannelId: delivery.channelId ?? input.communicationChannelId,
+        senderRole: "assistant",
+        provider: META_CLOUD_PROVIDER,
+        phone: lead.telefone,
+        direction: "outbound",
+        body: text,
+        providerStatus: "sent",
+        messageId: delivery.providerMessageId ?? undefined,
+        sentAt: now,
+      }).onConflictDoNothing();
+    }
+    return { handled: true as const, action };
+  }
+
+  if (action !== "resume_qualification" || !isEligibleColdLeadForReactivation(lead)) {
+    return { handled: true as const, action: "ignore" as const };
+  }
+  const useLegacyEngine = await getFeatureFlag(FEATURE_FLAGS.QUALIFICATION_ENGINE) === "false";
+  if (useLegacyEngine) {
+    if (!await qualificationEnabled()) return { handled: true as const, action: "ignore" as const };
+    const legacyConfig = await getOrCreateConfig(input.tenantId);
+    if (!legacyConfig?.enabled) return { handled: true as const, action: "ignore" as const };
+  }
+  const reopened = await reopenColdLeadForQualification({ tenantId: input.tenantId, leadId: input.leadId });
+  if (!reopened) return { handled: true as const, action: "ignore" as const };
+
+  const actorUserId = await resolveSystemUserId(input.tenantId);
+  if (useLegacyEngine) {
+    await resumeColdLeadAiQualificationForLead({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      phone: input.phone,
+      text: input.text,
+      actorUserId,
+    });
+  } else {
+    const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
+    await processInboundAiResponse({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      phone: input.phone,
+      userMessageBody: input.text,
+      messageKind: input.messageKind,
+      communicationChannelId: input.communicationChannelId,
+      providerMessageId: input.providerMessageId,
+      skipDebounce: true,
+    });
+  }
+  return { handled: true as const, action };
 }
 
 async function queueReply(input: { tenantId: string; leadId: string; phone: string; actorUserId: string }, sessionId: string, body: string, version: number) {

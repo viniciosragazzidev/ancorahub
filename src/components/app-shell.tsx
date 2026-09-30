@@ -38,6 +38,7 @@ export function AppShell({
   branding,
   user,
   isLightBroker = false,
+  showDutyCalendar = false,
   initialAvailability = "available",
   cleanUiEnabled = false,
 }: {
@@ -45,6 +46,7 @@ export function AppShell({
   branding?: Branding;
   user?: UserInfo;
   isLightBroker?: boolean;
+  showDutyCalendar?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
   cleanUiEnabled?: boolean;
 }) {
@@ -120,6 +122,7 @@ export function AppShell({
           <LightTopNavBar
             branding={branding}
             user={user}
+            showDutyCalendar={showDutyCalendar}
             initialAvailability={initialAvailability}
           />
           <main ref={canvasRef} className="flex-1 min-h-0 w-full overflow-y-auto">

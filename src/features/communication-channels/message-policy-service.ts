@@ -563,3 +563,50 @@ export async function resolveEventMessagePlan(input: {
     serviceWindowOpen,
   };
 }
+
+/** Resolves an approved Meta template for a governed event, never free text. */
+export async function resolveApprovedMetaEventTemplate(input: {
+  tenantId: string;
+  purpose: string;
+  variables: string[];
+}): Promise<ResolvedEventMessagePlan | null> {
+  const event = getMessageEventByPurpose(input.purpose);
+  if (!event) return null;
+
+  const policiesEnabled = await getFeatureFlag(FEATURE_FLAGS.MESSAGE_EVENT_POLICIES)
+    .then((value) => value !== "false")
+    .catch(() => true);
+  let policy: typeof schema.communicationEventMessagePolicies.$inferSelect | null = null;
+  if (policiesEnabled) {
+    try {
+      [policy] = await getDatabase().select().from(schema.communicationEventMessagePolicies).where(and(
+        eq(schema.communicationEventMessagePolicies.tenantId, input.tenantId),
+        eq(schema.communicationEventMessagePolicies.eventKey, event.key),
+        eq(schema.communicationEventMessagePolicies.active, true),
+      )).limit(1);
+    } catch (error) {
+      if (!isMissingMessagePolicyTable(error)) throw error;
+    }
+  }
+
+  let resource: MetaResource | null = null;
+  if (policy?.primaryKind === "meta_template" || policy?.fallbackKind === "meta_template") {
+    resource = await loadMetaResource(input.tenantId, policy.metaTemplateId);
+  }
+  resource ??= await resolveLegacyMetaResource(input.tenantId, event.key, input.purpose);
+  if (!resource || resource.status !== "APPROVED") return null;
+
+  const automatic = buildAutomaticMetaVariableMappings(event, resource.variables);
+  const configuredMappings = policy?.metaTemplateId === resource.id
+    ? asStringRecord(policy.metaVariableMappingsJson)
+    : automatic.valid ? automatic.mappings : {};
+  return {
+    eventKey: event.key,
+    policyId: policy?.id ?? null,
+    policyVersion: policy?.version ?? null,
+    primary: makeMetaMessage(event, resource, configuredMappings, input.variables),
+    fallback: null,
+    preferWahaDirect: false,
+    serviceWindowOpen: false,
+  };
+}

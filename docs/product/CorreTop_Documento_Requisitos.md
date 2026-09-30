@@ -590,6 +590,7 @@ Fuga de leads (corretor atender/fechar venda por fora do sistema, sem repassar c
 |---|---|
 | RF199 | Deve existir um painel central de Integridade/Auditoria, visível para Gestor e Diretor, consolidando: corretores com taxa de perda anormal, leads estagnados, exportações de dados recentes e acessos/logins fora do padrão (ex: IP incomum, múltiplos dispositivos). |
 | RF200 | O painel deve permitir navegar diretamente do alerta para a ação correspondente (ex: clicar no alerta de taxa de perda anormal leva à lista filtrada de leads perdidos daquele corretor). |
+| RF201 | Lead frio que concluiu a qualificação e continua sem corretor deve receber, uma única vez, após 2h, o template Meta aprovado de FIRST_CONTACT em dias úteis entre 08:00 e 18:00 (America/Sao_Paulo). Resposta antes da atribuição retoma a qualificação, cancelando ofertas pendentes; resposta após atribuição recebe uma confirmação única sem retomar a IA. Opt-out, desqualificação, encerramento, remoção manual, arquivo/exclusão e ausência de template aprovado bloqueiam o envio. A automação é configurável por tenant e desligável globalmente pelo Super-admin, com auditoria. |
 
 **Fora de Escopo (confirmado nesta rodada)**
 
@@ -673,6 +674,7 @@ Captação → Distribuição → Atendimento/Cotação → Documentação → V
 **Corretor**
 - Home: dashboard pessoal (conversão, progresso da meta, leads pendentes)
 - Fila de leads (lista ordenável/filtrável, com filtros salváveis)
+- Agenda Plantões no Corretor Lite: calendário mensal e agenda dos próximos plantões próprios, respeitando a escala semanal e as datas mensais publicadas; consulta somente leitura.
 - Tela de detalhe do lead: dados + ações (mudar status, gerar cotação, upload de documento) + aba de chat WhatsApp
 - Tela de Clientes Ativos (pós-venda, interações de renovação)
 - Busca global (atalho de teclado)

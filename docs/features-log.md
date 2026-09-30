@@ -2,6 +2,20 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 30/09/2026 - Plantões no Corretor Lite
+
+- Nova área `/plantoes` no menu do corretor, com calendário mensal que marca os dias
+  escalados e agenda que acompanha a data selecionada; em telas largas, calendário e
+  agenda ficam lado a lado, e em telas compactas seguem em coluna.
+- A agenda reúne regras semanais ativas e atribuições de escalas mensais publicadas,
+  preservando a substituição de uma regra semanal quando a escala daquele plantão e
+  data foi publicada. O corretor vê somente os próprios horários e consulta detalhes
+  em Sheet, sem alterar a escala.
+- Ativação global e horizonte de 1, 3, 6 ou 12 meses ficam configuráveis pelo
+  Super-admin; controles e consultas são auditados. A interação respeita movimento
+  reduzido e utiliza componentes compartilhados.
+- Implementação: `docs/implementations/completed/2026-09-30-broker-lite-duty-calendar.md`.
+
 ## 24/09/2026 - Sincronização em tempo real da carteira e "Marcar em atendimento" do diretor
 
 - Oferta criada, aceite (WhatsApp ou CRM), recusa, expiração, atribuição direta e início

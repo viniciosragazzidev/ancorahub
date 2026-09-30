@@ -1643,7 +1643,7 @@ function ClientProfile({
             leadName={client.nome}
           />
 
-          <LeadNotesSection leadId={client.id} initialNote={client.privateNotes} />
+          <LeadNotesSection key={client.id} leadId={client.id} initialNote={client.privateNotes} />
 
           {client.aiConversation ? (
             <ProfileSection title="Atendimento Virtual">

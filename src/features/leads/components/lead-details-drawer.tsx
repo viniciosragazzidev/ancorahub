@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ChatCircleText, FileText, ListChecks, Phone, WhatsappLogo } from "@/components/huge-icons";
 import { DetailDrawer } from "@/components/foundations/detail-drawer";
@@ -21,6 +22,7 @@ import { canDirectorMarkLeadInService } from "@/features/leads/director-service-
 import { formatDate, maskName, maskPhone } from "@/features/quotes/utils";
 import type { LeadWorkspaceItem } from "./lead-workspace-types";
 import { QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
+import { getLeadInvestigationObservationAction } from "@/features/leads/investigation-observation-action";
 
 type BrokerOption = { id: string; name: string; branchId: string | null };
 type BranchOption = { id: string; name: string };
@@ -58,8 +60,8 @@ function DetailRow({ label, value }: { label: string; value: string | React.Reac
   return <div className="flex min-w-0 items-center justify-between gap-4"><span className="shrink-0 text-muted-foreground">{label}</span><div className="min-w-0 break-words text-right font-medium">{value}</div></div>;
 }
 
-function OperationalDetail({ label, value }: { label: string; value: string }) {
-  return <div className="min-w-0 border-b border-border/70 px-4 py-3 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(odd)]:border-border/70"><dt className="text-xs font-medium text-muted-foreground">{label}</dt><dd className="mt-1 truncate text-sm font-medium text-foreground" title={value}>{value}</dd></div>;
+function OperationalDetail({ label, value, multiline = false }: { label: string; value: string; multiline?: boolean }) {
+  return <div className="min-w-0 border-b border-border/70 px-4 py-3 last:border-b-0 sm:[&:nth-last-child(-n+2)]:border-b-0 sm:[&:nth-child(odd)]:border-r sm:[&:nth-child(odd)]:border-border/70"><dt className="text-xs font-medium text-muted-foreground">{label}</dt><dd className={`${multiline ? "mt-1 whitespace-pre-wrap break-words text-sm font-normal text-foreground" : "mt-1 truncate text-sm font-medium text-foreground"}`} title={value}>{value}</dd></div>;
 }
 
 export function LeadDetailsDrawer({
@@ -83,6 +85,30 @@ export function LeadDetailsDrawer({
   const selectedMetaDetails = readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
   const filteredBrokers = brokers.filter((broker) => broker.branchId === lead.branchId);
   const managementRole = contextRole === "manager" || contextRole === "director";
+  const [investigationObservation, setInvestigationObservation] = useState<{
+    leadId: string;
+    status: "loading" | "loaded" | "error";
+    reason: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!managementRole || !lead.isManagementInvestigation) {
+      setInvestigationObservation(null);
+      return;
+    }
+
+    let current = true;
+    setInvestigationObservation({ leadId: lead.id, status: "loading", reason: null });
+    void getLeadInvestigationObservationAction(lead.id)
+      .then(({ reason }) => {
+        if (current) setInvestigationObservation({ leadId: lead.id, status: "loaded", reason });
+      })
+      .catch(() => {
+        if (current) setInvestigationObservation({ leadId: lead.id, status: "error", reason: null });
+      });
+
+    return () => { current = false; };
+  }, [lead.id, lead.isManagementInvestigation, managementRole]);
 
   return (
     <DetailDrawer
@@ -98,7 +124,7 @@ export function LeadDetailsDrawer({
         {managementRole ? (
           <>
             {!lead.corretorId && lead.distributionStatus === "returned_to_queue" ? <div className="rounded-lg border border-warning/20 bg-warning/5 px-4 py-3"><p className="text-xs font-semibold text-warning">Lead aguardando reatribuição</p><p className="mt-1 text-xs leading-relaxed text-muted-foreground">O corretor responsável foi excluído. O lead voltou para a fila e precisa ser reatribuído manualmente.</p></div> : null}
-            <SheetSection><SheetSectionHeader><div className="min-w-0"><p className="text-sm font-semibold">Resumo operacional</p><p className="mt-1 text-xs text-muted-foreground">O que aconteceu e o que precisa de decisão.</p></div></SheetSectionHeader><dl className="grid overflow-hidden rounded-b-xl sm:grid-cols-2"><OperationalDetail label="Responsável" value={lead.corretorNome ?? "Aguardando distribuição"} /><OperationalDetail label="Unidade" value={lead.branchName ?? "Sem unidade"} /><OperationalDetail label="Recebeu o lead" value={formatDate(lead.assignedAt, { dateStyle: "short", timeStyle: "short" })} /><OperationalDetail label="Primeiro contato" value={formatDate(lead.firstContactAt, { dateStyle: "short", timeStyle: "short" })} /><OperationalDetail label="Atendimento iniciado" value={formatDate(lead.serviceStartedAt, { dateStyle: "short", timeStyle: "short" })} /><OperationalDetail label="Etapa atual desde" value={formatDate(lead.stageEnteredAt, { dateStyle: "short", timeStyle: "short" })} /></dl></SheetSection>
+            <SheetSection><SheetSectionHeader><div className="min-w-0"><p className="text-sm font-semibold">Resumo operacional</p><p className="mt-1 text-xs text-muted-foreground">O que aconteceu e o que precisa de decisão.</p></div></SheetSectionHeader><dl className="grid overflow-hidden rounded-b-xl sm:grid-cols-2"><OperationalDetail label="Responsável" value={lead.corretorNome ?? "Aguardando distribuição"} />{lead.isManagementInvestigation ? <OperationalDetail label="Motivo da investigação" multiline value={investigationObservation?.leadId === lead.id ? investigationObservation.status === "loading" ? "Carregando motivo registrado…" : investigationObservation.status === "error" ? "Não foi possível carregar o motivo agora." : investigationObservation.reason ?? "Motivo não localizado no histórico." : "Carregando motivo registrado…"} /> : null}<OperationalDetail label="Unidade" value={lead.branchName ?? "Sem unidade"} /><OperationalDetail label="Recebeu o lead" value={formatDate(lead.assignedAt, { dateStyle: "short", timeStyle: "short" })} /><OperationalDetail label="Primeiro contato" value={formatDate(lead.firstContactAt, { dateStyle: "short", timeStyle: "short" })} /><OperationalDetail label="Atendimento iniciado" value={formatDate(lead.serviceStartedAt, { dateStyle: "short", timeStyle: "short" })} /><OperationalDetail label="Etapa atual desde" value={formatDate(lead.stageEnteredAt, { dateStyle: "short", timeStyle: "short" })} /></dl></SheetSection>
             <SheetSection><SheetSectionHeader><div><p className="text-sm font-semibold">Ações rápidas</p><p className="mt-1 text-xs text-muted-foreground">Acesse o atendimento ou o cadastro completo.</p></div></SheetSectionHeader><div className="grid gap-2 p-4 sm:grid-cols-2"><Button className="w-full" render={<Link href={`/conversas?leadId=${lead.id}`} />}><ChatCircleText />Abrir conversa</Button><Button className="w-full" render={<Link href={`/leads/${lead.id}`} />} variant="outline">Ver cadastro<ArrowUpRight /></Button></div></SheetSection>
             <SheetSection><SheetSectionHeader><div><p className="text-sm font-semibold">Intervir na operação</p><p className="mt-1 text-xs text-muted-foreground">Reatribua, investigue ou encaminhe o lead sem perder o contexto.</p></div></SheetSectionHeader><div className="p-4"><LeadDrawerManagementActions leadId={lead.id} leadName={lead.nome} brokers={filteredBrokers} branches={branches} manualAssignmentChoiceEnabled={manualAssignmentChoiceEnabled} leadQueueId={lead.queueId} contextRole={contextRole} currentStatus={lead.status} currentDistributionStatus={lead.distributionStatus} qualificationStatus={lead.qualificationStatus} qualificationState={lead.qualificationState} currentOwner={lead.corretorNome} distributionRemovalReason={lead.distributionRemovalReason} distributionRemovalNote={lead.distributionRemovalNote} onSuccess={onManagementCommitted} onReassignOptimistic={onReassignOptimistic} onReassignRollback={onReassignRollback} /></div></SheetSection>
             <LeadAssignmentHistory leadId={lead.id} assignedAt={lead.assignedAt} corretorNome={lead.corretorNome} />

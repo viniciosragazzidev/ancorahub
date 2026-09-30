@@ -13,11 +13,14 @@ import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMet
 import { META_CLOUD_PROVIDER } from "./types";
 import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { WhatsAppTemplateResolver } from "./template-sync-service";
-import { isCustomerServiceWindowOpen, resolveEventMessagePlan } from "./message-policy-service";
+import { isCustomerServiceWindowOpen, resolveApprovedMetaEventTemplate, resolveEventMessagePlan } from "./message-policy-service";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { getFeatureFlag } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
+import { getColdLeadReactivationAt, isEligibleColdLeadForReactivation } from "@/features/ai-qualification/cold-lead-reactivation-policy";
 import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
@@ -66,6 +69,7 @@ async function cancelStaleMetaOutboundRows(tenantId: string | undefined, now: Da
       tenantId ? eq(schema.whatsappOutboundMessages.tenantId, tenantId) : undefined,
       inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
       lt(schema.whatsappOutboundMessages.createdAt, cutoff),
+      or(isNull(schema.whatsappOutboundMessages.scheduledAt), lte(schema.whatsappOutboundMessages.scheduledAt, cutoff)),
     ))
     .orderBy(asc(schema.whatsappOutboundMessages.createdAt))
     .limit(200);
@@ -239,6 +243,94 @@ async function isCurrentLeadOffer(row: {
   );
 }
 
+async function isCurrentColdLeadReactivation(row: OutboundRow) {
+  if (!row.idempotencyKey.startsWith("cold-lead-reactivation:") || row.purpose !== "leadQualification") return true;
+  if (await getFeatureFlag(FEATURE_FLAGS.COLD_LEAD_REACTIVATION) !== "true") return false;
+  const leadId = row.recipientId;
+  if (!leadId) return false;
+  const db = getDatabase();
+  const [lead] = await db.select({
+    qualificationStatus: schema.leads.qualificationStatus,
+    qualificationState: schema.leads.qualificationState,
+    qualificationCompletedAt: schema.leads.qualificationCompletedAt,
+    corretorId: schema.leads.corretorId,
+    status: schema.leads.status,
+    distributionStatus: schema.leads.distributionStatus,
+    distributionRemovedAt: schema.leads.distributionRemovedAt,
+    archivedAt: schema.leads.archivedAt,
+    deletedAt: schema.leads.deletedAt,
+  }).from(schema.leads).where(and(
+    eq(schema.leads.id, leadId),
+    eq(schema.leads.tenantId, row.tenantId),
+  )).limit(1);
+  if (!lead || !isEligibleColdLeadForReactivation(lead)) return false;
+  const [rule] = await db.select({ enabled: schema.aiQualificationFollowUpRules.enabled })
+    .from(schema.aiQualificationFollowUpRules).where(and(
+      eq(schema.aiQualificationFollowUpRules.id, `cold-lead-reactivation:${row.tenantId}`),
+      eq(schema.aiQualificationFollowUpRules.tenantId, row.tenantId),
+      eq(schema.aiQualificationFollowUpRules.trigger, "cold_lead_reactivation"),
+    )).limit(1);
+  if (!rule?.enabled) return false;
+  const [conversation] = await db.select({ optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt })
+    .from(schema.aiConversations).where(and(
+      eq(schema.aiConversations.tenantId, row.tenantId),
+      eq(schema.aiConversations.leadId, leadId),
+    )).limit(1);
+  return !conversation?.optOutAt && !conversation?.wrongNumberAt;
+}
+
+async function isCurrentColdLeadAcknowledgement(row: OutboundRow) {
+  if (!row.idempotencyKey.startsWith("cold-lead-reactivation-ack:") || row.purpose !== "coldLeadReactivationAcknowledgement") return true;
+  if (await getFeatureFlag(FEATURE_FLAGS.COLD_LEAD_REACTIVATION) !== "true" || !row.recipientId) return false;
+  const db = getDatabase();
+  const [lead] = await db.select({
+    qualificationStatus: schema.leads.qualificationStatus,
+    corretorId: schema.leads.corretorId,
+    deletedAt: schema.leads.deletedAt,
+    archivedAt: schema.leads.archivedAt,
+  }).from(schema.leads).where(and(
+    eq(schema.leads.id, row.recipientId),
+    eq(schema.leads.tenantId, row.tenantId),
+  )).limit(1);
+  if (!lead || lead.qualificationStatus !== "cold" || !lead.corretorId || lead.deletedAt || lead.archivedAt) return false;
+  const [membership] = await db.select({ role: schema.tenantMemberships.role })
+    .from(schema.tenantMemberships).where(and(
+      eq(schema.tenantMemberships.tenantId, row.tenantId),
+      eq(schema.tenantMemberships.userId, lead.corretorId),
+      eq(schema.tenantMemberships.status, "active"),
+    )).limit(1);
+  if (membership?.role !== "broker") return false;
+  const [conversation] = await db.select({ optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt })
+    .from(schema.aiConversations).where(and(
+      eq(schema.aiConversations.tenantId, row.tenantId),
+      eq(schema.aiConversations.leadId, row.recipientId),
+    )).limit(1);
+  return !conversation?.optOutAt && !conversation?.wrongNumberAt;
+}
+
+async function deferColdLeadReactivationOutsideWindow(row: OutboundRow, now: Date) {
+  if (!row.idempotencyKey.startsWith("cold-lead-reactivation:") || row.purpose !== "leadQualification" || !row.recipientId) return false;
+  const [lead] = await getDatabase().select({ qualificationCompletedAt: schema.leads.qualificationCompletedAt })
+    .from(schema.leads).where(and(
+      eq(schema.leads.id, row.recipientId),
+      eq(schema.leads.tenantId, row.tenantId),
+    )).limit(1);
+  if (!lead?.qualificationCompletedAt) return false;
+  const scheduledAt = getColdLeadReactivationAt(lead.qualificationCompletedAt, now);
+  if (scheduledAt <= now) return false;
+  await getDatabase().update(schema.whatsappOutboundMessages).set({
+    status: "pending",
+    scheduledAt,
+    holdReason: "cold_lead_business_window",
+    updatedAt: now,
+  }).where(and(
+    eq(schema.whatsappOutboundMessages.id, row.id),
+    eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
+    eq(schema.whatsappOutboundMessages.status, "processing"),
+  ));
+  return true;
+}
+
 export async function enqueueMetaTemplateMessage(input: {
   tenantId: string;
   channelId?: string;
@@ -250,6 +342,8 @@ export async function enqueueMetaTemplateMessage(input: {
   requestedBy?: string | null;
   idempotencyKey: string;
   scheduledAt?: Date;
+  /** Never use text or an unapproved legacy name for this governed event. */
+  requireApprovedMetaTemplate?: boolean;
 }) {
   const requestedDestinationPhone = phoneSchema.parse(input.destinationPhone);
   const destinationPhone = await resolveCanonicalWhatsAppDestination({
@@ -265,27 +359,36 @@ export async function enqueueMetaTemplateMessage(input: {
     eq(schema.communicationChannels.tenantId, input.tenantId),
     inArray(schema.communicationChannels.provider, [META_CLOUD_PROVIDER, "meta_cloud_api", "meta_cloud"]),
     eq(schema.communicationChannels.status, "active"),
+    input.requireApprovedMetaTemplate ? isNull(schema.communicationChannels.branchId) : undefined,
   );
   const [channel] = await getDatabase().select({ id: schema.communicationChannels.id, wabaId: schema.communicationChannels.wabaId })
     .from(schema.communicationChannels)
     .where(channelQuery)
     .orderBy(desc(schema.communicationChannels.isDefault), desc(schema.communicationChannels.createdAt))
     .limit(1);
-  const messagePlan = input.purpose === "dutyPresenceConfirmation" ? null : await resolveEventMessagePlan({
-    tenantId: input.tenantId,
-    recipientType: input.recipientType,
-    recipientId: input.recipientId,
-    destinationPhone,
-    purpose: input.purpose,
-    variables,
-  });
+  if (input.requireApprovedMetaTemplate && !channel) {
+    throw outboundChannelError("META_CHANNEL_UNAVAILABLE", "Não existe um canal oficial da Meta ativo para este tenant.");
+  }
+  const messagePlan = input.requireApprovedMetaTemplate
+    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables })
+    : input.purpose === "dutyPresenceConfirmation" ? null : await resolveEventMessagePlan({
+      tenantId: input.tenantId,
+      recipientType: input.recipientType,
+      recipientId: input.recipientId,
+      destinationPhone,
+      purpose: input.purpose,
+      variables,
+    });
+  if (input.requireApprovedMetaTemplate && messagePlan?.primary.type !== "template") {
+    throw outboundChannelError("FIRST_CONTACT_TEMPLATE_UNAVAILABLE", "Não existe template FIRST_CONTACT aprovado e vinculado à WABA ativa deste tenant.");
+  }
   // Activation notices are allowed to use only the governed event plan or a
   // synchronized approved resource. Do not let the generic legacy resolver
   // invent a template name when an active policy is incomplete.
-  const resolvedTemplate = messagePlan || input.purpose === "brokerAccountActivated"
+  const resolvedTemplate = input.requireApprovedMetaTemplate || messagePlan || input.purpose === "brokerAccountActivated"
     ? null
     : await WhatsAppTemplateResolver.resolveTemplateForEvent(input.tenantId, input.purpose, channel?.wabaId ?? null);
-  const template = resolvedTemplate ?? (input.purpose === "brokerAccountActivated" || input.purpose === "dutyPresenceConfirmation" ? null : getMetaWhatsAppTemplate(input.purpose));
+  const template = input.requireApprovedMetaTemplate ? null : resolvedTemplate ?? (input.purpose === "brokerAccountActivated" || input.purpose === "dutyPresenceConfirmation" ? null : getMetaWhatsAppTemplate(input.purpose));
   // Team notices (DEC-125): one decision per notice. Disabled means not sent
   // (kept as 'skipped'); company number first falls back to the Meta resource
   // resolved above; Meta first keeps the company number as its fallback.
@@ -777,6 +880,41 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         });
         return;
       }
+      if (!await isCurrentColdLeadReactivation(row)) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "cancelled",
+          providerErrorCode: "COLD_LEAD_REACTIVATION_NO_LONGER_ELIGIBLE",
+          providerErrorMessage: "O lead não está mais elegível; reativação cancelada antes do envio.",
+          updatedAt: new Date(),
+        }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
+        await db.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: await resolveSystemUserId(row.tenantId),
+          entidade: "whatsapp_outbound_message",
+          entidadeId: row.id,
+          acao: "cold_lead_reactivation.cancelled_not_eligible",
+          createdAt: new Date(),
+        });
+        return;
+      }
+      if (!await isCurrentColdLeadAcknowledgement(row)) {
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "cancelled",
+          providerErrorCode: "COLD_LEAD_ACK_NO_LONGER_ELIGIBLE",
+          providerErrorMessage: "O lead não está mais atribuído a um corretor; aviso cancelado.",
+          updatedAt: new Date(),
+        }).where(and(eq(schema.whatsappOutboundMessages.id, row.id), eq(schema.whatsappOutboundMessages.tenantId, row.tenantId)));
+        await db.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: await resolveSystemUserId(row.tenantId),
+          entidade: "whatsapp_outbound_message",
+          entidadeId: row.id,
+          acao: "cold_lead_reactivation.ack_cancelled_not_assigned_to_broker",
+          createdAt: new Date(),
+        });
+        return;
+      }
+      if (await deferColdLeadReactivationOutsideWindow(row, new Date())) return;
 
       // Delivery guard (DEC-125): business hours, spacing and limits for team notices.
       if (row.noticeKey) {
@@ -987,6 +1125,33 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           throw templateError;
         }
       };
+
+      const coldReactivationMessage = row.idempotencyKey.startsWith("cold-lead-reactivation:");
+      const coldAcknowledgementMessage = row.idempotencyKey.startsWith("cold-lead-reactivation-ack:");
+      if ((coldReactivationMessage && !await isCurrentColdLeadReactivation(row))
+        || (coldAcknowledgementMessage && !await isCurrentColdLeadAcknowledgement(row))) {
+        const now = new Date();
+        await db.update(schema.whatsappOutboundMessages).set({
+          status: "cancelled",
+          providerErrorCode: "COLD_LEAD_NO_LONGER_ELIGIBLE",
+          providerErrorMessage: "O estado do lead mudou antes do envio; mensagem cancelada.",
+          updatedAt: now,
+        }).where(and(
+          eq(schema.whatsappOutboundMessages.id, row.id),
+          eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
+        ));
+        await db.insert(schema.auditLogs).values({
+          id: randomUUID(),
+          userId: await resolveSystemUserId(row.tenantId),
+          entidade: "whatsapp_outbound_message",
+          entidadeId: row.id,
+          acao: coldReactivationMessage
+            ? "cold_lead_reactivation.cancelled_not_eligible_before_provider"
+            : "cold_lead_reactivation.ack_cancelled_before_provider",
+          createdAt: now,
+        });
+        return;
+      }
 
       let metaResponse: { messages?: Array<{ id: string }> };
       try {

@@ -1,9 +1,10 @@
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { runQualificationTimeoutSweep, runSlaSweep, attendanceFlowsEnabled, wakeDueRuns } = vi.hoisted(() => ({
+const { runQualificationTimeoutSweep, runSlaSweep, runColdLeadReactivationSweep, attendanceFlowsEnabled, wakeDueRuns } = vi.hoisted(() => ({
   runQualificationTimeoutSweep: vi.fn(),
   runSlaSweep: vi.fn(),
+  runColdLeadReactivationSweep: vi.fn(),
   attendanceFlowsEnabled: vi.fn(),
   wakeDueRuns: vi.fn(),
 }));
@@ -19,6 +20,7 @@ vi.mock("@/features/ai-agent/qualification-timeout-sweep", () => ({
 vi.mock("@/features/leads/sla", () => ({
   runSlaSweep,
 }));
+vi.mock("@/features/ai-qualification/cold-lead-reactivation-sweep", () => ({ runColdLeadReactivationSweep }));
 
 import { GET } from "./route";
 
@@ -38,6 +40,7 @@ describe("qualification timeout internal job", () => {
   it("runs the timeout sweep only after scheduler authentication", async () => {
     runQualificationTimeoutSweep.mockResolvedValue({ tenantsChecked: 1, timedOutLeads: 2, distributedLeads: 2 });
     runSlaSweep.mockResolvedValue({ tenants: 1, unworked: 0, warnings: 0, stalled: 0, notifications: 0 });
+    runColdLeadReactivationSweep.mockResolvedValue({ tenantsChecked: 1, candidates: 1, queued: 1, sent: 0, blocked: 0 });
     attendanceFlowsEnabled.mockResolvedValue(true);
     wakeDueRuns.mockResolvedValue(3);
 
@@ -51,12 +54,14 @@ describe("qualification timeout internal job", () => {
       result: { tenantsChecked: 1, timedOutLeads: 2, distributedLeads: 2 },
       slaResult: { tenants: 1, unworked: 0, warnings: 0, stalled: 0, notifications: 0 },
       attendanceRuns: 3,
+      coldLeadReactivation: { tenantsChecked: 1, candidates: 1, queued: 1, sent: 0, blocked: 0 },
     });
   });
 
   it("does not wake attendance flows while their switch is off", async () => {
     runQualificationTimeoutSweep.mockResolvedValue({ tenantsChecked: 0, timedOutLeads: 0, distributedLeads: 0 });
     runSlaSweep.mockResolvedValue({ tenants: 0, unworked: 0, warnings: 0, stalled: 0, notifications: 0 });
+    runColdLeadReactivationSweep.mockResolvedValue({ tenantsChecked: 0, candidates: 0, queued: 0, sent: 0, blocked: 0 });
     attendanceFlowsEnabled.mockResolvedValue(false);
 
     const response = await GET(new NextRequest("http://localhost/api/internal/jobs/qualification-timeout", {
