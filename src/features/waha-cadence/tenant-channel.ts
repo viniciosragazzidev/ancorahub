@@ -174,6 +174,9 @@ export async function startTenantChannel(context: TenantContext, options: { fres
       status: normalizeWahaRelayStatus(live.status ?? "STARTING"),
       ...(phone ? { displayPhoneNumber: phone } : {}),
       ...pairedPhoneUpdate(existing, phone, now),
+      // A new pairing starts clean: failures of the previous connection do not pause it.
+      pausedUntil: null,
+      consecutiveFailures: 0,
       lastHealthAt: now,
       lastErrorCode: null,
       updatedAt: now,
@@ -223,6 +226,8 @@ export async function readTenantChannelState(context: TenantContext): Promise<Te
       status: relayStatus,
       ...(phone ? { displayPhoneNumber: phone } : {}),
       ...pairedPhoneUpdate(row, phone, now),
+      // Just paired again: failures of the previous connection do not pause it.
+      ...(status === "ready" && row.status !== "active" ? { pausedUntil: null, consecutiveFailures: 0 } : {}),
       lastHealthAt: now,
       updatedAt: now,
     }).where(eq(schema.wahaNumbers.id, row.id));

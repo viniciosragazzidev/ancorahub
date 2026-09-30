@@ -1,12 +1,13 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
 import { MetaCloudApiError, sendMetaCloudTemplate, sendMetaCloudText } from "./meta-cloud-client";
+import { companyChatUnavailableMessage } from "./meta-delivery-failure";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
@@ -421,6 +422,29 @@ export async function enqueueAndProcessMetaEventMessage(
   return message;
 }
 
+/** The company WAHA number when it can send now (connected and not paused by the breaker). */
+async function usableCompanyNumber(tenantId: string): Promise<{ id: string | null; pausedUntil: Date | null }> {
+  const id = await findConnectedTenantChannelId(tenantId);
+  if (!id) return { id: null, pausedUntil: null };
+  const [number] = await getDatabase().select({ pausedUntil: schema.wahaNumbers.pausedUntil }).from(schema.wahaNumbers).where(eq(schema.wahaNumbers.id, id)).limit(1);
+  const pausedUntil = number?.pausedUntil && number.pausedUntil > new Date() ? number.pausedUntil : null;
+  return { id: pausedUntil ? null : id, pausedUntil };
+}
+
+/** Whether the broker wrote to an official number in the last 24h (Meta's free-text window). */
+export async function brokerMetaWindowOpen(tenantId: string, phone: string) {
+  const suffix = phone.replace(/\D/g, "").slice(-8);
+  if (suffix.length < 8) return false;
+  const [message] = await getDatabase().select({ id: schema.whatsappMessages.id }).from(schema.whatsappMessages).where(and(
+    eq(schema.whatsappMessages.tenantId, tenantId),
+    inArray(schema.whatsappMessages.provider, [META_CLOUD_PROVIDER, "meta"]),
+    inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+    gte(schema.whatsappMessages.sentAt, new Date(Date.now() - 24 * 60 * 60 * 1000)),
+    sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${suffix}`,
+  )).limit(1);
+  return Boolean(message);
+}
+
 /** Queue a tenant-scoped text message through the protected outbox (supports Meta Cloud or WAHA Direct for team). */
 export async function enqueueMetaTextMessage(input: {
   tenantId: string;
@@ -461,7 +485,15 @@ export async function enqueueMetaTextMessage(input: {
   // Free text to a broker follows the "Mensagens do chat" choice: the company
   // WhatsApp when it is connected (Meta otherwise), or the official Meta only.
   const chatSetting = input.recipientType === "user" ? await getTeamNoticeSetting(input.tenantId, BROKER_CHAT_NOTICE).catch(() => null) : null;
-  const tenantChannelId = chatSetting?.channel === "company_number" ? await findConnectedTenantChannelId(input.tenantId).catch(() => null) : null;
+  const chatViaCompany = chatSetting?.channel === "company_number";
+  const company = chatViaCompany ? await usableCompanyNumber(input.tenantId).catch(() => ({ id: null, pausedUntil: null })) : null;
+  const tenantChannelId = company?.id ?? null;
+  // The chat was set to the company WhatsApp and it is down: Meta only
+  // delivers free text inside the broker's 24h window, so outside it the
+  // message is refused with the reason instead of failing at Meta.
+  if (chatViaCompany && !tenantChannelId && !(await brokerMetaWindowOpen(input.tenantId, destinationPhone))) {
+    throw new Error(companyChatUnavailableMessage(company?.pausedUntil ?? null));
+  }
   if (!channel && !tenantChannelId) throw new Error("Nenhum canal corporativo ativo foi configurado.");
   const [existing] = await db.select().from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), eq(schema.whatsappOutboundMessages.idempotencyKey, input.idempotencyKey))).limit(1);
   if (existing) return { id: existing.id, status: existing.status as WhatsAppOutboundStatus, duplicate: true };
@@ -784,6 +816,16 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           return;
         } catch (wahaError) {
           await recordCompanyNumberFailure(row.wahaNumberId!).catch(() => undefined);
+          if (!row.noticeKey && row.recipientType === "user" && !(await brokerMetaWindowOpen(row.tenantId, row.destinationPhone))) {
+            await db.update(schema.whatsappOutboundMessages).set({
+              status: "failed",
+              failedAt: new Date(),
+              providerErrorCode: "COMPANY_NUMBER_UNAVAILABLE",
+              providerErrorMessage: companyChatUnavailableMessage(null),
+              updatedAt: new Date(),
+            }).where(eq(schema.whatsappOutboundMessages.id, row.id));
+            return;
+          }
           // Never lose the notice: fall back to the Meta resource on the row.
           console.warn("[tenant-channel] waha_send_failed_falling_back_to_meta", {
             outboundMessageId: row.id,

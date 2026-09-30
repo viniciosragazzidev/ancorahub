@@ -17,6 +17,7 @@ import {
 } from "./guardrails";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
+import { initialMessageFailureNote } from "@/features/communication-channels/meta-delivery-failure";
 import { resolveCanonicalWhatsAppDestination } from "@/features/communication-channels/phone-resolution";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
@@ -86,11 +87,14 @@ export async function handleInitialMessageFailure({
   leadId,
   conversationId,
   reason = "initial_message_failed",
+  failureCode,
 }: {
   tenantId: string;
   leadId: string;
   conversationId?: string | null;
   reason?: string;
+  /** Meta's error code, when known, to tell the team why the message did not arrive. */
+  failureCode?: string | null;
 }) {
   try {
     const db = getDatabase();
@@ -132,7 +136,9 @@ export async function handleInitialMessageFailure({
       .set({
         status: "distributed",
         distributionStatus: "queued",
-        qualificationStatus: "disqualified",
+        // Not a disqualification: the lead never got the message. "Disqualified"
+        // leads are skipped by the distribution, so they reached no broker.
+        qualificationStatus: "no_whatsapp_contact",
         qualificationState: "COMPLETED",
         updatedAt: now,
       })
@@ -145,7 +151,7 @@ export async function handleInitialMessageFailure({
         leadId,
         userId: systemUserId,
         tipo: "note",
-        conteudo: "⚠️ Falha no envio da mensagem via WhatsApp pelo bot virtual. O atendimento da IA foi encerrado automaticamente, o lead foi desqualificado e transferido para a fila de distribuição geral.",
+        conteudo: initialMessageFailureNote(failureCode),
         createdAt: now,
       })
       .onConflictDoNothing();
@@ -161,6 +167,12 @@ export async function handleInitialMessageFailure({
         createdAt: now,
       })
       .onConflictDoNothing();
+
+    // Straight to a broker: the lead must be contacted by a person now.
+    const { enqueueAndProcessLeadDistribution } = await import("@/features/lead-distribution/jobs");
+    await enqueueAndProcessLeadDistribution({ tenantId, leadId, source: "human_handoff" }).catch((error) => {
+      console.warn("[handleInitialMessageFailure] distribution deferred to the queue sweep:", error instanceof Error ? error.message.slice(0, 160) : error);
+    });
   } catch (err) {
     console.warn("[handleInitialMessageFailure] DB operation skipped or warning:", err);
   }
@@ -484,7 +496,7 @@ export async function startQualificationConversationForLead(
   const isAlreadyQualifiedOrInHumanState =
     ["WAITING_HUMAN", "HUMAN_ACTIVE", "CLOSED"].includes(conversation.status) ||
     lead.qualificationState === "QUALIFIED" ||
-    ["waiting_human", "qualified", "hot", "warm", "cold", "disqualified"].includes(lead.qualificationStatus ?? "");
+    ["waiting_human", "qualified", "hot", "warm", "cold", "disqualified", "no_whatsapp_contact"].includes(lead.qualificationStatus ?? "");
 
   if (isAlreadyQualifiedOrInHumanState && !force) {
     console.info("[startQualificationConversationForLead] Lead já qualificado/em atendimento humano; pulando requalificação:", {

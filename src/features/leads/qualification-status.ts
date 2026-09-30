@@ -8,6 +8,8 @@ export const LEAD_QUALIFICATION_STATUSES = [
   "warm",
   "cold",
   "ia_disabled",
+  /** The AI's first message never reached the lead on WhatsApp: a person must contact them. Not a disqualification. */
+  "no_whatsapp_contact",
 ] as const;
 
 export type LeadQualificationStatus = (typeof LEAD_QUALIFICATION_STATUSES)[number];
@@ -20,6 +22,7 @@ export const LEAD_QUALIFICATION_LABELS: Record<LeadQualificationStatus, string> 
   warm: "Morno",
   cold: "Frio",
   ia_disabled: "IA Desativada",
+  no_whatsapp_contact: "Sem contato no WhatsApp",
 };
 
 /** Classifies only from explicit conversation signals; absence of a signal stays qualified. */

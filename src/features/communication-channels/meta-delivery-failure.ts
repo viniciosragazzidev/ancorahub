@@ -15,6 +15,11 @@ const knownFailures: Record<string, Omit<DirectorFacingMetaDeliveryFailure, "cod
     message:
       "A Meta não conseguiu entregar a mensagem para este número. Confirme se o destinatário usa WhatsApp e tente novamente.",
   },
+  "131049": {
+    title: "Meta limitou mensagens para este contato",
+    message:
+      "A Meta não entregou para manter o engajamento saudável: este contato recebeu muitas mensagens de empresas recentemente. Tente mais tarde ou fale por outro canal.",
+  },
   "131047": {
     title: "Janela de conversa indisponível",
     message:
@@ -42,4 +47,19 @@ export function getDirectorFacingMetaDeliveryFailure(
     message:
       "A Meta recusou a entrega. Consulte o código informado e a configuração do canal WhatsApp antes de tentar novamente.",
   };
+}
+
+/** The lead note: what happened, why (Meta's reason when known) and what the team does next. */
+export function initialMessageFailureNote(failureCode?: string | null) {
+  const failure = getDirectorFacingMetaDeliveryFailure(failureCode);
+  const why = failure ? ` Motivo (${failure.code}): ${failure.title}. ${failure.message}` : "";
+  return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi enviado para a distribuição como "Sem contato no WhatsApp" para um corretor entrar em contato.`;
+}
+
+/** Chat to a broker set to the company WhatsApp while it is down, outside the broker's Meta window. */
+export function companyChatUnavailableMessage(pausedUntil: Date | null) {
+  const state = pausedUntil
+    ? `está pausado até ${new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(pausedUntil)} por falhas seguidas`
+    : "está desconectado";
+  return `O WhatsApp da empresa ${state}. A mensagem não foi enviada: pela Meta, o corretor só recebe texto livre se tiver falado com o número oficial nas últimas 24h.`;
 }

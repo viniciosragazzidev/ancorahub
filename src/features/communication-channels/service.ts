@@ -424,7 +424,8 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
       for (const status of change.value?.statuses ?? []) {
         const eventId = await registerWebhookEvent({ channelId: channel.id, externalEventId: `${status.id}:${status.status}`, eventType: "message.status", payloadHash });
         if (!eventId) continue;
-        await db.update(schema.whatsappMessages).set({ providerStatus: status.status }).where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, status.id), eq(schema.whatsappMessages.provider, META_CLOUD_PROVIDER)));
+        // The AI stores its Meta messages as "meta": both are this channel's messages.
+        await db.update(schema.whatsappMessages).set({ providerStatus: status.status }).where(and(eq(schema.whatsappMessages.tenantId, channel.tenantId), eq(schema.whatsappMessages.messageId, status.id), inArray(schema.whatsappMessages.provider, [META_CLOUD_PROVIDER, "meta"])));
         const outboundUpdate: Partial<typeof schema.whatsappOutboundMessages.$inferInsert> = { updatedAt: new Date() };
         if (["sent", "delivered", "read"].includes(status.status)) outboundUpdate.status = status.status;
         else if (["failed", "deleted"].includes(status.status)) {
@@ -459,6 +460,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
                 leadId: msg.leadId,
                 conversationId: msg.conversationId,
                 reason: "webhook_delivery_failed",
+                failureCode: getMetaDeliveryFailure(status).code,
               });
             }
           }
