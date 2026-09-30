@@ -900,32 +900,38 @@ export function QueueControlCenter({
                 )}
               </div>
 
-              {/* Modo e Estratégia */}
+              {/* Destino dos leads e estratégia */}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="grid gap-1.5 text-sm font-medium">
-                  <span>Modo</span>
+                  <span>Destino dos leads</span>
                   <AppSelect
-                    aria-label="Modo de atribuição"
+                    aria-label="Destino dos leads"
                     value={form.assignmentMode}
                     onValueChange={(assignmentMode) => setForm({ ...form, assignmentMode })}
                     options={[
-                      { value: "automatic", label: "Automática" },
-                      { value: "manual", label: "Manual" },
+                      { value: "automatic", label: "Distribuir para os corretores" },
+                      { value: "manual", label: "Nenhum (ficam na fila)" },
                     ]}
                   />
                 </div>
-                <div className="grid gap-1.5 text-sm font-medium">
-                  <span>Estratégia</span>
-                  <AppSelect
-                    aria-label="Estratégia de atribuição"
-                    value={form.assignmentStrategy}
-                    onValueChange={(assignmentStrategy) => setForm({ ...form, assignmentStrategy })}
-                    options={[
-                      { value: "capacity", label: "Menor carga" },
-                      { value: "round_robin", label: "Round robin" },
-                    ]}
-                  />
-                </div>
+                {form.assignmentMode === "automatic" ? (
+                  <div className="grid gap-1.5 text-sm font-medium">
+                    <span>Estratégia</span>
+                    <AppSelect
+                      aria-label="Estratégia de atribuição"
+                      value={form.assignmentStrategy}
+                      onValueChange={(assignmentStrategy) => setForm({ ...form, assignmentStrategy })}
+                      options={[
+                        { value: "capacity", label: "Menor carga" },
+                        { value: "round_robin", label: "Round robin" },
+                      ]}
+                    />
+                  </div>
+                ) : (
+                  <p className="self-end rounded-lg border border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                    Os leads entram nesta fila e aguardam, sem corretor. Quando você mudar o destino para distribuir, os que estiverem aguardando são distribuídos na hora.
+                  </p>
+                )}
               </div>
 
               {/* Qualificação por Bot de IA */}

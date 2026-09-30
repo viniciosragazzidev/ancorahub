@@ -348,11 +348,28 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
   let created = false;
 
   if (queueId) {
-    const [queue] = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId }).from(schema.leadQueues)
+    const [queue] = await db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, assignmentMode: schema.leadQueues.assignmentMode }).from(schema.leadQueues)
       .where(and(eq(schema.leadQueues.id, queueId), eq(schema.leadQueues.tenantId, context.tenantId))).limit(1);
     if (!queue) throw new AuthorizationError("Fila não encontrada no seu escopo.");
     await db.update(schema.leadQueues).set(values).where(eq(schema.leadQueues.id, queue.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queue.id, acao: "queue.updated" });
+    // Destination went from "none" to distributing: the leads that were
+    // waiting in the queue are distributed now, not at the next retry.
+    if (queue.assignmentMode !== "automatic" && input.assignmentMode === "automatic" && input.status === "active") {
+      const waiting = await db.select({ id: schema.leads.id }).from(schema.leads).where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        eq(schema.leads.queueId, queue.id),
+        isNull(schema.leads.corretorId),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
+        inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
+      ));
+      const { enqueueLeadDistributionJob, wakeLeadDistributionJob } = await import("./jobs");
+      for (const lead of waiting) {
+        await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id });
+        await wakeLeadDistributionJob(context.tenantId, lead.id);
+      }
+    }
   } else {
     queueId = randomUUID();
     created = true;

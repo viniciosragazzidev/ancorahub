@@ -42,6 +42,11 @@ export function queueDutyScheduleIds(queue: Queue) {
   ]));
 }
 
+/**
+ * "Manual" mode is the queue with no destination: its leads arrive and wait
+ * in the queue, without a broker, until the destination is changed.
+ */
 export function assignmentLabel(queue: Queue) {
-  return `${queue.assignmentMode === "automatic" ? "Automática" : "Manual"} · ${queue.assignmentStrategy === "round_robin" ? "Round robin" : "Menor carga"}`;
+  if (queue.assignmentMode !== "automatic") return "Sem destino · leads aguardam na fila";
+  return `Automática · ${queue.assignmentStrategy === "round_robin" ? "Round robin" : "Menor carga"}`;
 }
