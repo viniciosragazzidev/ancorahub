@@ -8,6 +8,8 @@ import { ManualLeadSheet } from "./_components/manual-lead-sheet";
 import { BulkLeadImportDialog } from "./_components/bulk-lead-import-dialog";
 import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
+import { LeadsQueueTabs } from "./_components/leads-queue-tabs";
+import { buildQueueTabs, readQueueTab } from "@/features/leads/queue-tabs";
 import { LeadsWorkspace } from "./leads-workspace";
 import { LeadsHeaderActions } from "./_components/leads-header-actions";
 import { WifiHigh, Plus, Target } from "@/components/huge-icons";
@@ -71,6 +73,7 @@ async function LeadsPageContent({
     joinOperator?: string;
     eligibleCampaigns?: string;
     view?: string;
+    fila?: string;
   }>;
 }) {
   await connection();
@@ -314,6 +317,9 @@ async function LeadsPageContent({
   const origemFilter = filters.origem === "manual" || filters.origem === "webhook" ? eq(schema.leads.origem, filters.origem) : null;
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
+  // Queue tabs (?fila=): a queue id or "sem-fila".
+  const queueTab = readQueueTab(filters.fila);
+  const queueFilter = queueTab?.kind === "none" ? isNull(schema.leads.queueId) : queueTab?.kind === "queue" ? eq(schema.leads.queueId, queueTab.queueId) : null;
   const periodFilter = filters.period ? gte(schema.leads.createdAt, periodStart(period)) : null;
   const metaCampaignEligibility = eligibleCampaignsOnly
       ? await withPerfSpan("leads.campaign_eligibility", () => Promise.all([
@@ -374,7 +380,7 @@ async function LeadsPageContent({
   // Keep the common scope independent from the active projection. The
   // unassigned tab is a server-backed dataset of its own; deriving it from the
   // current page would produce a partial list and a misleading total.
-  const baseWhere = and(
+  const baseWhereAllQueues = and(
     buildLeadScopeWhere(context, { requestedBranchId: filters.branch }),
     isNull(schema.leads.deletedAt),
     isNull(schema.leads.archivedAt),
@@ -389,6 +395,7 @@ async function LeadsPageContent({
     ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
     ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : [])
   );
+  const baseWhere = and(baseWhereAllQueues, ...(queueFilter ? [queueFilter] : []));
 
   const commonWhere = and(baseWhere, qualifiedOrDistributedFilter);
 
@@ -398,7 +405,7 @@ async function LeadsPageContent({
       ? [isNull(schema.leads.corretorId)]
       : []),
   );
-  const unassignedWhere = canViewUnassigned
+  const unassignedWhereAllQueues = canViewUnassigned
     ? and(
         buildUnassignedLeadWhere(context, { requestedBranchId: filters.branch }),
         ...(tablecnFilter ? [tablecnFilter] : []),
@@ -413,6 +420,11 @@ async function LeadsPageContent({
         ...(expiredUnworkedBrokerFilter ? [expiredUnworkedBrokerFilter] : []),
       )
     : null;
+  const unassignedWhere = unassignedWhereAllQueues ? and(unassignedWhereAllQueues, ...(queueFilter ? [queueFilter] : [])) : null;
+  // The tab counts follow every other filter, but not the queue itself.
+  const queueCountWhere = canViewUnassigned && initialView === "sem-atribuicao" && unassignedWhereAllQueues
+    ? unassignedWhereAllQueues
+    : and(baseWhereAllQueues, qualifiedOrDistributedFilter);
 
   const isDirector = context.role === "director" || (isMarketing && isMatrix);
 
@@ -441,6 +453,7 @@ async function LeadsPageContent({
     unassignedRows,
     activeDutyAssignments,
     managementUserRows,
+    queueCounts,
   ] = await withPerfSpan("leads.data_loader", () => Promise.all([
     withPerfSpan("leads.count", () => db.select({ total: count() }).from(schema.leads).where(where)),
     withPerfSpan("leads.catalog_plans", () => listAvailableCatalogPlans(context)),
@@ -532,6 +545,7 @@ async function LeadsPageContent({
           ),
           notInArray(schema.leads.qualificationStatus, ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified", "waiting_human", "no_whatsapp_contact"]),
           ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
+          ...(queueFilter ? [queueFilter] : []),
           context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined
         )
       )
@@ -591,6 +605,14 @@ async function LeadsPageContent({
         eq(schema.tenantMemberships.tenantId, context.tenantId),
         inArray(schema.tenantMemberships.role, ["director", "manager"]),
       ))),
+    withPerfSpan("leads.queue_counts", () => db
+      .select({ queueId: schema.leads.queueId, queueName: schema.leadQueues.name, total: count() })
+      .from(schema.leads)
+      .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
+      .leftJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id))
+      .where(queueCountWhere)
+      .groupBy(schema.leads.queueId, schema.leadQueues.name)
+      .catch(() => [])),
   ]));
 
   const totalItems = Number(totalCountResult[0]?.total ?? 0);
@@ -653,6 +675,7 @@ async function LeadsPageContent({
     filters.origem ||
     filters.tipo ||
     filters.qualification ||
+    filters.fila ||
     eligibleCampaignsOnly
     || (canViewUnassigned && initialView === "sem-atribuicao")
   );
@@ -716,6 +739,12 @@ async function LeadsPageContent({
           initialTipo={filters.tipo}
           initialEligibleCampaigns={filters.eligibleCampaigns}
           storageKey={`ancorahub:leads-filters:${context.tenantId}:${context.userId}`}
+        />
+
+        {/* Queue tabs */}
+        <LeadsQueueTabs
+          tabs={buildQueueTabs({ activeQueues, counts: queueCounts.map((row) => ({ ...row, total: Number(row.total) })) })}
+          current={queueTab?.kind === "none" ? "sem-fila" : queueTab?.kind === "queue" ? queueTab.queueId : ""}
         />
 
         {/* Workspace or RCD Directional Empty State */}
