@@ -56,6 +56,13 @@ export async function getCompanyNumberState(tenantId: string): Promise<(NonNulla
  * stable per `seed` (a retry keeps its text) and avoids the version this
  * person received last. Null when every candidate renders empty.
  */
+/** The text with the notice's link, appended when the text does not carry it yet. */
+export function withNoticeLink(text: string, link: string | null) {
+  const trimmed = text.trim();
+  if (!trimmed || !link || trimmed.includes(link)) return trimmed;
+  return `${trimmed}\n\n${link}`;
+}
+
 export async function renderTeamNoticeText(input: {
   tenantId: string;
   notice: TeamNotice;
@@ -72,8 +79,11 @@ export async function renderTeamNoticeText(input: {
     const messages = await db.select({ id: schema.messageTemplates.id, content: schema.messageTemplates.content }).from(schema.messageTemplates)
       .where(and(inArray(schema.messageTemplates.id, input.setting.freeMessageIds), eq(schema.messageTemplates.tenantId, input.tenantId), eq(schema.messageTemplates.active, true)));
     const byId = new Map(messages.map((message) => [message.id, message.content]));
+    // A library message keeps the notice's link: whatever its wording, the
+    // link of the built-in text goes along (appended when it is missing).
+    const builtInLink = input.builtIn[0]?.match(/https?:\/\/\S+|\{\{link_convite\}\}/)?.[0] ?? null;
     pool = input.setting.freeMessageIds
-      .map((id) => ({ key: `msg:${id}`, text: event && byId.has(id) ? renderTenantChannelMessage(event, byId.get(id)!, input.variables) : "" }))
+      .map((id) => ({ key: `msg:${id}`, text: event && byId.has(id) ? withNoticeLink(renderTenantChannelMessage(event, byId.get(id)!, input.variables), builtInLink) : "" }))
       .filter((item) => item.text);
   }
   if (!pool.length) pool = input.builtIn.map((text, index) => ({ key: `builtin:${index}`, text: text.trim() })).filter((item) => item.text);
