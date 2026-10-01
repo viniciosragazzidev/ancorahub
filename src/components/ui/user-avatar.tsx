@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +20,8 @@ export interface UserAvatarProps {
   pixelSize?: number;
   className?: string;
   fallbackClassName?: string;
+  /** A real photo (e.g. the contact's WhatsApp picture); the illustration stays when it does not load. */
+  photoUrl?: string | null;
 }
 
 export function UserAvatar({
@@ -30,7 +32,9 @@ export function UserAvatar({
   pixelSize = 128,
   className,
   fallbackClassName,
+  photoUrl,
 }: UserAvatarProps) {
+  const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   const avatarUrl = useMemo(() => {
     const cleanSeed = encodeURIComponent(seed || name || "CorreTop");
     return `https://api.dicebear.com/9.x/${style}/svg?seed=${cleanSeed}&size=${pixelSize}`;
@@ -49,7 +53,11 @@ export function UserAvatar({
   return (
     <Avatar size={size} className={cn("overflow-hidden border border-border/40 shadow-xs", className)}>
       <AvatarImage
-        src={avatarUrl}
+        key={photoUrl && failedPhoto !== photoUrl ? photoUrl : avatarUrl}
+        src={photoUrl && failedPhoto !== photoUrl ? photoUrl : avatarUrl}
+        onLoadingStatusChange={(status) => {
+          if (status === "error" && photoUrl && failedPhoto !== photoUrl) setFailedPhoto(photoUrl);
+        }}
         alt={name || seed || "Avatar"}
         loading="lazy"
         className="size-full object-cover"

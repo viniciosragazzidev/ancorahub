@@ -866,6 +866,49 @@ export function buildApp() {
     },
   );
 
+  // ── WAHA Contact: profile picture of a number (CRM avatars) ──────────
+  app.get<{ Params: { id: string }; Querystring: { phone?: string } }>(
+    "/internal/waha/connections/:id/profile-picture",
+    {
+      schema: {
+        params: {
+          type: "object",
+          required: ["id"],
+          properties: { id: { type: "string", minLength: 1, maxLength: 120 } },
+        },
+        querystring: {
+          type: "object",
+          required: ["phone"],
+          additionalProperties: false,
+          properties: { phone: { type: "string", pattern: "^[0-9]{10,15}$" } },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!requireInternalAuth(request, reply, getInternalApiToken())) return;
+
+      let wahaConfig;
+      try {
+        wahaConfig = getWahaConfig();
+      } catch {
+        return reply.code(503).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_INTERNAL_ERROR" });
+      }
+
+      const { id: sessionName } = request.params;
+      try {
+        const url = await new WahaClient(wahaConfig).getProfilePicture(sessionName, request.query.phone ?? "");
+        request.log.info({ operation: "waha.contact.profile_picture", session: sessionName, found: Boolean(url) });
+        return reply.code(200).send({ ok: true, url });
+      } catch (error) {
+        const code = error instanceof Error ? error.message : "unknown";
+        request.log.warn({ operation: "waha.contact.profile_picture", session: sessionName, errorCode: code });
+        // A number that is not on WhatsApp simply has no picture.
+        if (error instanceof WahaClientError && error.code === "WAHA_RECIPIENT_NOT_FOUND") return reply.code(200).send({ ok: true, url: null });
+        return reply.code(502).send({ ok: false, service: "waha", status: "unavailable", error: "WAHA_UNAVAILABLE" });
+      }
+    },
+  );
+
   // ── WAHA Media: file download for the CRM (webhook `media.url`) ──────
   app.get<{ Querystring: { url?: string } }>(
     "/internal/waha/media",

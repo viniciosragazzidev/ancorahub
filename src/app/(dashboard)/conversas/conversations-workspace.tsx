@@ -655,7 +655,7 @@ function ConversationHeader({
             <ArrowLeft className="size-4" />
           </Button>
 
-          <ContactAvatar name={client.nome} className="shrink-0" />
+          <ContactAvatar name={client.nome} className="shrink-0" photoUrl={contactPhotoUrl(client)} />
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 min-w-0">
               <h2 className="text-sm font-semibold tracking-tight text-foreground truncate" title={client.nome}>{client.nome}</h2>
@@ -1667,7 +1667,7 @@ function ClientProfile({
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="border-b border-border px-5 py-5">
         <div className="flex items-start gap-3">
-          <ContactAvatar className="size-11 text-sm" name={client.nome} />
+          <ContactAvatar className="size-11 text-sm" name={client.nome} photoUrl={contactPhotoUrl(client)} />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -1866,8 +1866,15 @@ function ProfileTag({ label, tone, value }: { label: string; tone?: "success" | 
   return <div className="min-w-0 rounded-lg border border-border bg-muted/25 px-2.5 py-2"><dt className="truncate text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground">{label}</dt><dd className={cn("mt-1 truncate text-xs font-medium", tone === "success" && "text-success", tone === "warning" && "text-warning")}>{value}</dd></div>;
 }
 
-function ContactAvatar({ className, name }: { className?: string; name: string }) {
-  return <UserAvatar seed={name} name={name} className={className} />;
+function ContactAvatar({ className, name, photoUrl }: { className?: string; name: string; photoUrl?: string | null }) {
+  return <UserAvatar seed={name} name={name} className={className} photoUrl={photoUrl} />;
+}
+
+/** The contact's WhatsApp picture (read through the company number), for the open conversation only. */
+function contactPhotoUrl(conversation: Pick<ConversationItem, "id" | "telefone">) {
+  if (!conversation.id.startsWith("unassigned-")) return `/api/contacts/avatar?lead=${encodeURIComponent(conversation.id)}`;
+  const digits = conversation.telefone.replace(/\D/g, "");
+  return digits.length >= 10 ? `/api/contacts/avatar?phone=${digits}` : null;
 }
 
 function documentStatusLabel(status: string) {

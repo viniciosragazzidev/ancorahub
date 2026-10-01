@@ -516,6 +516,18 @@ export class WahaClient {
             errors,
         };
     }
+    /**
+     * Link da foto de perfil de um número, como o WhatsApp Web mostra. Null
+     * quando o contato não tem foto ou só mostra aos contatos dele. O link
+     * expira: quem usa baixa a imagem logo.
+     */
+    async getProfilePicture(sessionName, phone) {
+        const contactId = await this.resolveChatId(sessionName, phone);
+        const query = new URLSearchParams({ contactId, session: sessionName, refresh: "false" });
+        const result = await this.request(`/api/contacts/profile-picture?${query.toString()}`, { timeoutMs: 8_000 });
+        const url = result?.profilePictureURL ?? result?.url ?? null;
+        return typeof url === "string" && /^https:\/\//.test(url) ? url : null;
+    }
     /** Lista conversas para reconciliar números cujo DDD cadastrado está desatualizado. */
     async getChats(sessionName, limit = 500) {
         const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 500);

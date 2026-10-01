@@ -192,6 +192,21 @@ export async function downloadWahaMedia(providerPath: string): Promise<{ body: B
 }
 
 /** Lista conversas WAHA para reconciliar o chat real pelo sufixo do telefone. */
+/** WhatsApp's link to a number's profile picture (expires), or null when there is none. */
+export async function getWahaProfilePictureUrl(input: { sessionName: string; phone: string }): Promise<string | null> {
+  const config = relayConfig();
+  if (config.transport !== "fastify") throw new Error("WAHA_PROFILE_PICTURE_REQUIRES_FASTIFY");
+  const phone = input.phone.replace(/\D/g, "");
+  const response = await fetch(`${config.url}/internal/waha/connections/${encodeURIComponent(input.sessionName)}/profile-picture?phone=${phone}`, {
+    headers: getFastifyHeaders(config.secret, false),
+    cache: "no-store",
+    signal: AbortSignal.timeout(15_000),
+  });
+  const data = await response.json().catch(() => null) as { ok?: boolean; url?: string | null; error?: string } | null;
+  if (!response.ok || !data?.ok) throw new Error(`WAHA_PROFILE_PICTURE_FAILED:${data?.error ?? response.status}`);
+  return typeof data.url === "string" ? data.url : null;
+}
+
 export async function getWahaChats(input: { sessionName: string; limit?: number }) {
   const config = relayConfig();
   if (config.transport !== "fastify") throw new Error("WAHA_CHATS_REQUIRES_FASTIFY");

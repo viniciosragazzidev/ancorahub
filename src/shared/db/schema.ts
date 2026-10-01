@@ -2143,6 +2143,19 @@ export const leadTagAssignments = pgTable(
   ],
 );
 
+/** WhatsApp profile pictures of contacts, cached (WhatsApp's link expires). `imageBase64` null = no picture. */
+export const contactAvatars = pgTable(
+  "contact_avatars",
+  {
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    phoneKey: text("phone_key").notNull(),
+    imageBase64: text("image_base64"),
+    contentType: text("content_type"),
+    fetchedAt: timestamp("fetched_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.phoneKey] })],
+);
+
 /** Tenant-owned cadence aggregate. Published versions are immutable. */
 export const wahaCadences = pgTable(
   "waha_cadences",

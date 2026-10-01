@@ -599,3 +599,25 @@ test("resolveWebhookUrl: WHATSAPP_HOOK_URL tem precedência, depois INTERNAL_API
   assert.equal(resolveWebhookUrl({ WHATSAPP_HOOK_URL: "https://api.exemplo.com/hook", INTERNAL_API_URL: "https://x" }), "https://api.exemplo.com/hook");
   assert.equal(resolveWebhookUrl({ INTERNAL_API_URL: "https://api.exemplo.com/" }), "https://api.exemplo.com/internal/webhooks/waha");
 });
+
+// ── WahaClient.getProfilePicture ───────────────────────────────────────
+
+test("getProfilePicture: resolve o número e devolve o link da foto", async () => {
+  const calls: string[] = [];
+  const client = new WahaClient(config, mockFetch(async (input) => {
+    const url = String(input);
+    calls.push(url);
+    if (url.includes("/api/contacts/check-exists")) return new Response(JSON.stringify({ numberExists: true, chatId: "5524993338228@c.us" }), { status: 200 });
+    return new Response(JSON.stringify({ profilePictureURL: "https://pps.whatsapp.net/v/abc.jpg" }), { status: 200 });
+  }));
+  assert.equal(await client.getProfilePicture("tenant_x", "5524993338228"), "https://pps.whatsapp.net/v/abc.jpg");
+  assert.ok(calls[1]?.includes("contactId=5524993338228%40c.us"));
+  assert.ok(calls[1]?.includes("session=tenant_x"));
+});
+
+test("getProfilePicture: contato sem foto (ou só para contatos) → null", async () => {
+  const client = new WahaClient(config, mockFetch(async (input) => String(input).includes("check-exists")
+    ? new Response(JSON.stringify({ numberExists: true, chatId: "5521900000000@c.us" }), { status: 200 })
+    : new Response(JSON.stringify({ profilePictureURL: null }), { status: 200 })));
+  assert.equal(await client.getProfilePicture("tenant_x", "5521900000000"), null);
+});
