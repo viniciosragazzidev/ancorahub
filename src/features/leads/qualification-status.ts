@@ -10,6 +10,8 @@ export const LEAD_QUALIFICATION_STATUSES = [
   "ia_disabled",
   /** The AI's first message never reached the lead on WhatsApp: a person must contact them. Not a disqualification. */
   "no_whatsapp_contact",
+  /** The lead is on WhatsApp, but Meta refused to deliver to them (e.g. 130472): a person must contact them. Not a disqualification. */
+  "meta_blocked",
 ] as const;
 
 export type LeadQualificationStatus = (typeof LEAD_QUALIFICATION_STATUSES)[number];
@@ -23,6 +25,7 @@ export const LEAD_QUALIFICATION_LABELS: Record<LeadQualificationStatus, string> 
   cold: "Frio",
   ia_disabled: "IA Desativada",
   no_whatsapp_contact: "Sem contato no WhatsApp",
+  meta_blocked: "Envio bloqueado pela Meta",
 };
 
 /** Classifies only from explicit conversation signals; absence of a signal stays qualified. */

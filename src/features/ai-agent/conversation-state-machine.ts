@@ -17,7 +17,7 @@ import {
 } from "./guardrails";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
-import { initialMessageFailureNote } from "@/features/communication-channels/meta-delivery-failure";
+import { initialMessageFailureNote, initialMessageFailureStatus } from "@/features/communication-channels/meta-delivery-failure";
 import { resolveCanonicalWhatsAppDestination } from "@/features/communication-channels/phone-resolution";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
@@ -139,7 +139,8 @@ export async function handleInitialMessageFailure({
         distributionStatus: "queued",
         // Not a disqualification: the lead never got the message. "Disqualified"
         // leads are skipped by the distribution, so they reached no broker.
-        qualificationStatus: "no_whatsapp_contact",
+        // A lead Meta blocked (130472) does have WhatsApp: it is told apart.
+        qualificationStatus: initialMessageFailureStatus(failureCode),
         qualificationState: "COMPLETED",
         updatedAt: now,
       })
@@ -497,7 +498,7 @@ export async function startQualificationConversationForLead(
   const isAlreadyQualifiedOrInHumanState =
     ["WAITING_HUMAN", "HUMAN_ACTIVE", "CLOSED"].includes(conversation.status) ||
     lead.qualificationState === "QUALIFIED" ||
-    ["waiting_human", "qualified", "hot", "warm", "cold", "disqualified", "no_whatsapp_contact"].includes(lead.qualificationStatus ?? "");
+    ["waiting_human", "qualified", "hot", "warm", "cold", "disqualified", "no_whatsapp_contact", "meta_blocked"].includes(lead.qualificationStatus ?? "");
 
   if (isAlreadyQualifiedOrInHumanState && !force) {
     console.info("[startQualificationConversationForLead] Lead já qualificado/em atendimento humano; pulando requalificação:", {

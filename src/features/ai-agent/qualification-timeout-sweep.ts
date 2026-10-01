@@ -85,7 +85,8 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
             "disqualified",
             "not_qualified",
             "waiting_human",
-            "no_whatsapp_contact"
+            "no_whatsapp_contact",
+            "meta_blocked"
           ])
         )
       );

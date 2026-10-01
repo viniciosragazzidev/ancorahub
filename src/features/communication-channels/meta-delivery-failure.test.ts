@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { companyChatUnavailableMessage, getDirectorFacingMetaDeliveryFailure, initialMessageFailureNote } from "./meta-delivery-failure";
+import { companyChatUnavailableMessage, getDirectorFacingMetaDeliveryFailure, initialMessageFailureNote, initialMessageFailureStatus } from "./meta-delivery-failure";
 
 describe("getDirectorFacingMetaDeliveryFailure", () => {
   it("explica com segurança o bloqueio de cobrança da WABA", () => {
@@ -24,6 +24,16 @@ describe("falha da primeira mensagem do atendimento virtual", () => {
     expect(note).toContain("Sem contato no WhatsApp");
     expect(note).not.toMatch(/desqualificad/i);
     expect(initialMessageFailureNote(null)).not.toContain("Motivo");
+  });
+
+  it("130472: o lead tem WhatsApp, a Meta é que bloqueou — não vira \"Sem contato no WhatsApp\"", () => {
+    expect(initialMessageFailureStatus("130472")).toBe("meta_blocked");
+    expect(initialMessageFailureStatus("131026")).toBe("no_whatsapp_contact");
+    expect(initialMessageFailureStatus(null)).toBe("no_whatsapp_contact");
+    const note = initialMessageFailureNote("130472");
+    expect(note).toContain("Envio bloqueado pela Meta");
+    expect(note).not.toContain("Sem contato no WhatsApp");
+    expect(note).not.toMatch(/desqualificad/i);
   });
 });
 

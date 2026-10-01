@@ -20,6 +20,11 @@ const knownFailures: Record<string, Omit<DirectorFacingMetaDeliveryFailure, "cod
     message:
       "A Meta não entregou para manter o engajamento saudável: este contato recebeu muitas mensagens de empresas recentemente. Tente mais tarde ou fale por outro canal.",
   },
+  "130472": {
+    title: "Meta não deixou enviar para este contato",
+    message:
+      "O número existe no WhatsApp, mas a Meta incluiu este contato em um experimento e bloqueou a mensagem da empresa. Não é um problema do lead: fale com ele por outro canal ou pelo WhatsApp do corretor.",
+  },
   "131047": {
     title: "Janela de conversa indisponível",
     message:
@@ -49,11 +54,23 @@ export function getDirectorFacingMetaDeliveryFailure(
   };
 }
 
+/**
+ * Codes where the lead does have WhatsApp but Meta refused to deliver to them:
+ * not a missing contact, so the lead is not marked "Sem contato no WhatsApp".
+ */
+const META_BLOCKED_CODES = new Set(["130472"]);
+
+/** How a failed first message classifies the lead. */
+export function initialMessageFailureStatus(failureCode?: string | null): "meta_blocked" | "no_whatsapp_contact" {
+  return META_BLOCKED_CODES.has(failureCode?.trim() ?? "") ? "meta_blocked" : "no_whatsapp_contact";
+}
+
 /** The lead note: what happened, why (Meta's reason when known) and what the team does next. */
 export function initialMessageFailureNote(failureCode?: string | null) {
   const failure = getDirectorFacingMetaDeliveryFailure(failureCode);
   const why = failure ? ` Motivo (${failure.code}): ${failure.title}. ${failure.message}` : "";
-  return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi enviado para a distribuição como "Sem contato no WhatsApp" para um corretor entrar em contato.`;
+  const label = initialMessageFailureStatus(failureCode) === "meta_blocked" ? "Envio bloqueado pela Meta" : "Sem contato no WhatsApp";
+  return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi enviado para a distribuição como "${label}" para um corretor entrar em contato.`;
 }
 
 /** Chat to a broker set to the company WhatsApp while it is down, outside the broker's Meta window. */

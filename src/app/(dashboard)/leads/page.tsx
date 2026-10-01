@@ -372,7 +372,7 @@ async function LeadsPageContent({
   const qualifiedOrDistributedFilter = or(
     isNotNull(schema.leads.corretorId),
     ne(schema.leads.qualificationState, "IN_PROGRESS"),
-    inArray(schema.leads.qualificationStatus, ["waiting_human", "no_whatsapp_contact"]),
+    inArray(schema.leads.qualificationStatus, ["waiting_human", "no_whatsapp_contact", "meta_blocked"]),
     inArray(schema.leads.qualificationStatus, ["qualified", "hot", "warm", "cold", "manual_transfer", "disqualified"]),
     inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "converted", "lost"])
   );
@@ -543,7 +543,7 @@ async function LeadsPageContent({
             eq(schema.leads.qualificationStatus, "qualifying"),
             isNull(schema.leads.qualificationStatus)
           ),
-          notInArray(schema.leads.qualificationStatus, ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified", "waiting_human", "no_whatsapp_contact"]),
+          notInArray(schema.leads.qualificationStatus, ["qualified", "hot", "warm", "cold", "disqualified", "not_qualified", "waiting_human", "no_whatsapp_contact", "meta_blocked"]),
           ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
           ...(queueFilter ? [queueFilter] : []),
           context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined
