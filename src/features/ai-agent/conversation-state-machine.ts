@@ -835,6 +835,8 @@ async function completeDeterministicQualificationTurn(input: {
   memory: ConversationMemory;
   policy: Parameters<typeof persistQualificationEvaluation>[0]["policy"];
   turn: DeterministicQualificationTurn;
+  /** The newest customer message the turn read (see the stale-reply check). */
+  turnLatestInboundAt?: Date | null;
 }) {
   const db = getDatabase();
   const now = new Date();
@@ -884,6 +886,22 @@ async function completeDeterministicQualificationTurn(input: {
   let distribution: Awaited<ReturnType<typeof import("@/features/lead-distribution/service").distributeQualifiedLead>> | null = null;
   if (!isHandoff) {
     await transitionConversationState({ tenantId: input.tenantId, conversationId: input.conversationId, newStatus: "WAITING_CUSTOMER" });
+  }
+
+  // The customer wrote again while this turn was thinking: this reply is
+  // already out of date ("qual e-mail?" right after the e-mail). The newer
+  // message's turn answers with everything; the data read here is kept.
+  if (input.turnLatestInboundAt) {
+    const [newer] = await db.select({ id: schema.whatsappMessages.id }).from(schema.whatsappMessages).where(and(
+      eq(schema.whatsappMessages.tenantId, input.tenantId),
+      eq(schema.whatsappMessages.leadId, input.leadId),
+      inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+      gt(schema.whatsappMessages.sentAt, input.turnLatestInboundAt),
+    )).limit(1);
+    if (newer) {
+      console.info("[qualification] reply_superseded_by_newer_message", { tenantId: input.tenantId, leadId: input.leadId });
+      return { status: "superseded_by_newer_message", deliveryStatus: "skipped", reply: input.turn.reply };
+    }
   }
 
   const messageId = `ai_msg_qualification_${crypto.randomUUID()}`;
@@ -1273,6 +1291,11 @@ export async function processInboundAiResponse({
     console.warn(`[ai-agent] Concorrência na conversa ${conversation.id}. lockVersion mudou — outro processo já está processando.`);
     return { status: "skipped_concurrent" };
   }
+  // The newest customer message this turn reads: a reply is not sent when a
+  // newer one arrives meanwhile (its own turn answers with everything).
+  const [turnInbound] = await db.select({ latest: sql<Date | null>`max(${schema.whatsappMessages.sentAt})` }).from(schema.whatsappMessages)
+    .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId), inArray(schema.whatsappMessages.direction, ["incoming", "inbound"])));
+  const turnLatestInboundAt = turnInbound?.latest ? new Date(turnInbound.latest) : null;
 
   // 5. Buscar histórico de mensagens recentes do lead
   const pastMessages = await db
@@ -1461,11 +1484,15 @@ export async function processInboundAiResponse({
       )
     );
 
+  // Older messages are read without the question being asked now: "Faz uma
+  // coisa", said before the city question, is not a city.
+  const questionNow = updatedMemory.lastQuestionAsked;
   for (const inc of allIncomingMsgs) {
     if (inc.body) {
-      updatedMemory = extractFieldsFromMessage(inc.body, updatedMemory);
+      updatedMemory = extractFieldsFromMessage(inc.body, { ...updatedMemory, lastQuestionAsked: undefined });
     }
   }
+  updatedMemory = { ...updatedMemory, lastQuestionAsked: questionNow };
 
   // 6c. Buscar textos de mensagens enviadas para evitar repeticao de perguntas
   const allOutboundMsgs = await db
@@ -1683,6 +1710,7 @@ export async function processInboundAiResponse({
     memory: updatedMemory,
     policy: behavior.policy,
     turn: deterministicTurn,
+    turnLatestInboundAt,
   });
 
   // 7. Detectar idioma da mensagem do usuário

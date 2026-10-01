@@ -88,7 +88,8 @@ export function questionVariants(key: QualificationFieldKey, memory: Conversatio
       return ["Quantas pessoas vão entrar no plano?", "Quantas pessoas o plano vai incluir?"];
     case "age":
       if (plan === "empresarial") return ["Qual a média de idade das pessoas do plano?", "Qual a idade média do grupo que vai entrar no plano?"];
-      if (plan === "individual" || count === 1) return ["Qual a sua idade?", "Quantos anos você tem?"];
+      // The plan may be for someone else (a grandchild, a parent): ask about who uses it.
+      if (plan === "individual" || count === 1) return ["Qual a idade de quem vai usar o plano?", "Quantos anos tem quem vai usar o plano?"];
       if (count) return [`Quais as idades das ${count} pessoas?`, `Qual a idade de cada uma das ${count} pessoas?`];
       return ["Quais as idades das pessoas que vão entrar no plano?", "Qual a idade de cada pessoa que vai entrar no plano?"];
     case "city":

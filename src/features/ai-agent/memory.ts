@@ -421,16 +421,19 @@ export function extractFieldsFromMessage(
   if (!memory.age) {
     const previousQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
     const asksForAge = previousQuestion.includes("idade") || previousQuestion.includes("quantos anos");
-    const listedAgeValues = readAgeList(trimmed).filter((age) => age > 0);
+    // A baby's age in days, weeks or months ("bebê de 16 dias") is 0 years.
+    const babyAge = /\b\d{1,2}\s*(?:dias?|semanas?|m[eê]s(?:es)?)\b|\brec[eé]m[- ]nascid/i.test(trimmed);
+    const ageText = babyAge ? trimmed.replace(/\b\d{1,2}\s*(?:dias?|semanas?|m[eê]s(?:es)?)\b/gi, "0 anos") : trimmed;
+    const listedAgeValues = readAgeList(ageText).filter((age) => age > 0 || babyAge);
     const explicitAgeValues = listedAgeValues.length > 1
       ? listedAgeValues
-      : Array.from(trimmed.matchAll(/\b([1-9]\d?|1[0-4]\d)\s*a?\s*nos?\b/gi))
+      : Array.from(ageText.matchAll(/\b(\d{1,3})\s*a?\s*nos?\b/gi))
         .map((match) => Number(match[1]))
-        .filter((age) => age > 0 && age < 150);
+        .filter((age) => (age > 0 || babyAge) && age < 150);
     const ageValues = explicitAgeValues.length > 0
       ? explicitAgeValues
       : asksForAge
-        ? trimmed.match(/\d{1,3}/g)?.map(Number).filter((age) => age > 0 && age < 150) ?? []
+        ? ageText.match(/\d{1,3}/g)?.map(Number).filter((age) => (age > 0 || babyAge) && age < 150) ?? []
         : [];
     if (ageValues.length > 0) {
       if (memory.planType?.value === "empresarial") {

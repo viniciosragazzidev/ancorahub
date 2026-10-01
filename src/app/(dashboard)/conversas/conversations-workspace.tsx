@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { ContextNote } from "@/components/ui/context-note";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { brokerDisplayName, CONTACT_SHORTCUT, contactShortcutMessage, isContactShortcut } from "./_components/contact-shortcut";
+import { brokerDisplayName, CONTACT_SHORTCUT, contactShortcutMessage, isContactShortcut, isValidContactName } from "./_components/contact-shortcut";
 import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
 import { LeadTagsPicker } from "@/features/lead-tags/components/lead-tags-picker";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
@@ -1002,7 +1002,7 @@ function ChatInput({
 
   async function handleSendContact(e: React.FormEvent) {
     e.preventDefault();
-    if (!contactName.trim() || isPending) return;
+    if (!isValidContactName(contactName) || isPending) return;
     const sent = await sendText(contactShortcutMessage(contactName));
     if (sent) setContactOpen(false);
   }
@@ -1091,7 +1091,7 @@ function ChatInput({
                 <Button type="button" variant="outline" onClick={() => setContactOpen(false)} disabled={isPending}>
                   Cancelar
                 </Button>
-                <Button type="submit" disabled={isPending || !contactName.trim()}>
+                <Button type="submit" disabled={isPending || !isValidContactName(contactName)}>
                   {isPending ? "Enviando..." : "Enviar mensagem"}
                 </Button>
               </DialogFooter>

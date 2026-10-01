@@ -363,6 +363,7 @@ export async function sendLeadMessageAction(
           body: text,
           sentAt,
         });
+      await pauseAiForTeamReply(context.tenantId, lead.id, context.userId);
       synchronizeConversationWorkspace(context.tenantId, [context.userId]);
       return { success: true, message: { id, body: text, direction: "outgoing", sentAt } };
     }
@@ -485,6 +486,7 @@ export async function sendLeadMessageAction(
         target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId],
       });
 
+    await pauseAiForTeamReply(context.tenantId, lead.id, context.userId);
     synchronizeConversationWorkspace(context.tenantId, [context.userId]);
     return { success: true, message: { id, body: text, direction: "outgoing", sentAt } };
   } catch (error) {
@@ -492,6 +494,25 @@ export async function sendLeadMessageAction(
       success: false,
       error: error instanceof Error ? error.message : "Não foi possível enviar a mensagem.",
     };
+  }
+}
+
+/**
+ * Someone of the team answered the lead in the chat: the AI stops, so it
+ * never talks over a person (it used to send its closing right after).
+ */
+async function pauseAiForTeamReply(tenantId: string, leadId: string, userId: string) {
+  try {
+    const [conversation] = await getDatabase().select({ id: schema.aiConversations.id, status: schema.aiConversations.status }).from(schema.aiConversations)
+      .where(and(eq(schema.aiConversations.tenantId, tenantId), eq(schema.aiConversations.leadId, leadId))).limit(1);
+    if (!conversation || ["HUMAN_ACTIVE", "CLOSED", "FAILED"].includes(conversation.status)) return;
+    const { transitionConversationState } = await import("@/features/ai-agent/conversation-state-machine");
+    await transitionConversationState({
+      tenantId, conversationId: conversation.id, newStatus: "HUMAN_ACTIVE",
+      reason: "A equipe respondeu pelo chat do CRM; a IA parou.", assignedUserId: userId, pausedByUserId: userId,
+    });
+  } catch (error) {
+    console.warn("[send-lead-message] ai_pause_failed", { tenantId, leadId, error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
   }
 }
 

@@ -27,7 +27,7 @@ const firstWord = (text: string) => text.normalize("NFD").replace(/[̀-ͯ]/g, ""
 describe("reply composer", () => {
   it("asks the age according to who enters the plan", () => {
     const base = createEmptyMemory();
-    expect(questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } })).toContain("Qual a sua idade?");
+    expect(questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } })).toContain("Qual a idade de quem vai usar o plano?");
     expect(questionVariants("age", { ...base, planType: { value: "familiar", confidence: 1 }, numberOfLives: { value: "3", confidence: 1 } })).toContain("Quais as idades das 3 pessoas?");
     expect(questionVariants("age", { ...base, planType: { value: "empresarial", confidence: 1 } })).toContain("Qual a média de idade das pessoas do plano?");
     for (const text of [...questionVariants("age", base), ...questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } })]) {
@@ -154,7 +154,7 @@ describe("the reported conversation (Torquato), end to end", () => {
 
     const age = answer("Individual", 2);
     expect(age.nextQuestion?.key).toBe("age");
-    expect(age.reply).toMatch(/^(Individual, anotado!|Plano individual, perfeito\.|Certo, Torquato, só para você\.) (Qual a sua idade\?|Quantos anos você tem\?)$/);
+    expect(age.reply).toMatch(/^(Individual, anotado!|Plano individual, perfeito\.|Certo, Torquato, só para você\.) (Qual a idade de quem vai usar o plano\?|Quantos anos tem quem vai usar o plano\?)$/);
 
     const city = answer("40", 3);
     expect(memory.age?.value).toBe("40");

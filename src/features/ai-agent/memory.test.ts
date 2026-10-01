@@ -176,3 +176,18 @@ describe("ages listed in one answer (Fabiane's conversation)", () => {
     expect(extractFieldsFromMessage("Para 12", askedPlan).numberOfLives).toBeUndefined();
   });
 });
+
+describe("Michele's conversation (a plan for a 16-day-old grandchild)", () => {
+  const askedAge = { ...createEmptyMemory(), planType: { value: "individual", confidence: 1 as const }, lastQuestionAsked: "Qual a idade de quem vai usar o plano?" };
+  it("reads a baby's age in days, weeks or months as 0 years", () => {
+    expect(extractFieldsFromMessage("Mas é o bebê de 16 dias", askedAge).age?.value).toBe("0");
+    expect(extractFieldsFromMessage("tem 3 meses", askedAge).age?.value).toBe("0");
+    expect(extractFieldsFromMessage("Tenho 42 anos", askedAge).age?.value).toBe("42");
+  });
+
+  it("a message read without the city question is not a city", () => {
+    expect(extractFieldsFromMessage("Faz uma coisa", createEmptyMemory()).city).toBeUndefined();
+    const askedCity = { ...createEmptyMemory(), lastQuestionAsked: "Em qual cidade você vai usar o plano?" };
+    expect(extractFieldsFromMessage("Seria mais em Resende", askedCity).city?.value ?? "").not.toBe("Faz uma coisa");
+  });
+});

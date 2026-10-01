@@ -5,6 +5,11 @@ export function isContactShortcut(text: string) {
   return text.trim().toLowerCase() === CONTACT_SHORTCUT;
 }
 
+/** A name a customer can read: at least two letters (not "." or "-"). */
+export function isValidContactName(name: string) {
+  return (name.match(/\p{L}/gu) ?? []).length >= 2;
+}
+
 export function contactShortcutMessage(brokerName: string) {
   return `Nossa consultora ${brokerName.trim()} entrará em contato para dar continuidade ao nosso atendimento.`;
 }

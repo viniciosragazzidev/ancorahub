@@ -20,3 +20,12 @@ describe("/contato shortcut", () => {
     expect(brokerDisplayName(null)).toBe("");
   });
 });
+
+describe("/contato name", () => {
+  it("needs a readable name", async () => {
+    const { isValidContactName } = await import("./contact-shortcut");
+    expect(isValidContactName(".")).toBe(false);
+    expect(isValidContactName(" - ")).toBe(false);
+    expect(isValidContactName("Raiana")).toBe(true);
+  });
+});
