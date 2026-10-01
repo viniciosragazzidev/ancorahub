@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createEmptyMemory, extractFieldsFromMessage, isCoreQualificationComplete, COLLECTIBLE_FIELDS } from "./memory";
+import { createEmptyMemory, extractFieldsFromMessage, isCoreQualificationComplete, COLLECTIBLE_FIELDS, readAgeList } from "./memory";
 
 describe("number of lives in real conversations", () => {
   const asked = { ...createEmptyMemory(), lastQuestionAsked: "Perfeito, Maria. Quantas pessoas serão incluídas no plano?" };
@@ -150,5 +150,29 @@ describe("conversation memory", () => {
       email: { value: "rh@exemplo.com", confidence: 1 as const },
     };
     expect(isCoreQualificationComplete(memory)).toBe(true);
+  });
+});
+
+describe("ages listed in one answer (Fabiane's conversation)", () => {
+  const askedPlan = { ...createEmptyMemory(), lastQuestionAsked: "O plano seria individual, familiar ou empresarial (CNPJ)?" };
+  it("reads \"Para 12 , 42 anos\" as two people aged 12 and 42, not 12 lives", () => {
+    const memory = extractFieldsFromMessage("Para 12 , 42 anos", askedPlan, "m1");
+    expect(memory.numberOfLives?.value).toBe("2");
+    expect(memory.age?.value).toBe("12, 42");
+  });
+
+  it("reads the other ways of listing ages", () => {
+    expect(readAgeList("12anos e 42 anos")).toEqual([12, 42]);
+    expect(readAgeList("30 e 32 anos")).toEqual([30, 32]);
+    expect(readAgeList("somos 3 pessoas, 30 e 32 anos")).toEqual([30, 32]);
+    expect(readAgeList("2 vidas")).toEqual([]);
+    expect(extractFieldsFromMessage("12anos e 42 anos", askedPlan).numberOfLives?.value).toBe("2");
+  });
+
+  it("still reads a quantity said with \"para\" next to people, or as the answer to the lives question", () => {
+    const askedLives = { ...createEmptyMemory(), lastQuestionAsked: "Quantas pessoas serão incluídas no plano?" };
+    expect(extractFieldsFromMessage("para 3 pessoas", askedPlan).numberOfLives?.value).toBe("3");
+    expect(extractFieldsFromMessage("para 4", askedLives).numberOfLives?.value).toBe("4");
+    expect(extractFieldsFromMessage("Para 12", askedPlan).numberOfLives).toBeUndefined();
   });
 });

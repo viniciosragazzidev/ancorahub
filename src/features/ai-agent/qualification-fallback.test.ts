@@ -111,3 +111,12 @@ describe("qualification AI fallback", () => {
     })).toBe(true);
   });
 });
+
+describe("an age is not a number of lives", () => {
+  it("rejects the model's \"12 lives\" for \"Para 12 , 42 anos\" and keeps \"2 vidas\"", () => {
+    expect(isGroundedInMessage("numberOfLives", "12", "Para 12 , 42 anos")).toBe(false);
+    expect(isGroundedInMessage("numberOfLives", "2", "Para 12 , 42 anos")).toBe(true);
+    expect(isGroundedInMessage("numberOfLives", "2", "2 vidas")).toBe(true);
+    expect(isGroundedInMessage("numberOfLives", "3", "somos 3 pessoas, 30 e 32 anos")).toBe(true);
+  });
+});

@@ -37,6 +37,7 @@ import { handlePostClosingInboundMessage } from "@/features/ai-qualification/clo
 import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
 import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
 import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
+import { describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
 import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
 
 
@@ -838,6 +839,20 @@ async function completeDeterministicQualificationTurn(input: {
   const db = getDatabase();
   const now = new Date();
   const isHandoff = input.turn.kind === "handoff";
+  // The closing goes out once: a message arriving while the lead is being
+  // handed over must not send the same final text again.
+  if (isHandoff) {
+    const [sameClosing] = await db.select({ id: schema.whatsappMessages.id }).from(schema.whatsappMessages).where(and(
+      eq(schema.whatsappMessages.tenantId, input.tenantId),
+      eq(schema.whatsappMessages.leadId, input.leadId),
+      eq(schema.whatsappMessages.senderRole, "assistant"),
+      eq(schema.whatsappMessages.body, input.turn.reply),
+    )).limit(1);
+    if (sameClosing) {
+      await transitionConversationState({ tenantId: input.tenantId, conversationId: input.conversationId, newStatus: "WAITING_HUMAN", reason: "Mensagem final já enviada." }).catch(() => undefined);
+      return { status: "ignored_duplicate_closing", deliveryStatus: "skipped", reply: input.turn.reply };
+    }
+  }
   const memory = {
     ...input.memory,
     lastQuestionAsked: isHandoff ? undefined : input.turn.reply,
@@ -913,6 +928,14 @@ async function completeDeterministicQualificationTurn(input: {
   // The final message is a delivery contract: only a provider-confirmed send
   // may close automation and put the conversation in the human queue.
   if (isHandoff && isConfirmedClosingDelivery(deliveryStatus, providerMessageId)) {
+    // From now on a new customer message is a correction for the broker, not a
+    // new turn: the distribution below can take a while.
+    await transitionConversationState({
+      tenantId: input.tenantId,
+      conversationId: input.conversationId,
+      newStatus: "WAITING_HUMAN",
+      reason: "Mensagem final entregue; qualificação concluída e atendimento encaminhado.",
+    });
     const { distributeQualifiedLead } = await import("@/features/lead-distribution/service");
     distribution = await distributeQualifiedLead({ tenantId: input.tenantId, leadId: input.leadId, actorUserId: null });
     const { executeDeterministicClosing } = await import("@/features/ai-qualification/closing-state-service");
@@ -923,12 +946,6 @@ async function completeDeterministicQualificationTurn(input: {
       memory.customerName?.value,
       providerMessageId,
     );
-    await transitionConversationState({
-      tenantId: input.tenantId,
-      conversationId: input.conversationId,
-      newStatus: "WAITING_HUMAN",
-      reason: "Mensagem final entregue; qualificação concluída e atendimento encaminhado.",
-    });
   }
 
   await db.insert(schema.aiAttendanceLogs).values({
@@ -965,6 +982,58 @@ async function completeDeterministicQualificationTurn(input: {
   };
 }
 
+/**
+ * After the handoff the AI stays quiet, except when the customer corrects what
+ * was registered ("Não, 12anos e 42 anos, 2 vidas"): the lead is updated, the
+ * broker gets a note, and the customer is told once what was corrected.
+ */
+async function applyCustomerCorrectionAfterHandoff(input: {
+  tenantId: string;
+  leadId: string;
+  conversationId: string;
+  phone: string;
+  transport: AiTransport;
+  openWaSessionId?: string | null;
+  wahaRunId?: string | null;
+  memory: ConversationMemory;
+  message: string;
+  policy: Parameters<typeof persistQualificationEvaluation>[0]["policy"];
+}) {
+  const corrections = detectQualificationCorrections(input.memory, input.message);
+  if (!corrections.length) return false;
+  const db = getDatabase();
+  const memory: ConversationMemory = { ...input.memory, collectedFields: [...input.memory.collectedFields], updatedAt: new Date().toISOString() };
+  for (const correction of corrections) {
+    (memory as Record<string, unknown>)[correction.field] = { value: correction.value, confidence: 1 };
+    if (!memory.collectedFields.includes(correction.field)) memory.collectedFields.push(correction.field);
+  }
+  await db.update(schema.aiConversations).set({ memory: memory as unknown as Record<string, unknown>, lastActivityAt: new Date(), updatedAt: new Date() })
+    .where(and(eq(schema.aiConversations.id, input.conversationId), eq(schema.aiConversations.tenantId, input.tenantId)));
+  await persistQualificationEvaluation({ tenantId: input.tenantId, leadId: input.leadId, conversationId: input.conversationId, actorUserId: null, policy: input.policy, memory });
+  const summary = describeQualificationCorrections(corrections);
+  const systemUserId = await resolveSystemUserId(input.tenantId);
+  await db.insert(schema.leadInteractions).values({
+    id: randomUUID(), leadId: input.leadId, userId: systemUserId, tipo: "note",
+    conteudo: `📝 O cliente corrigiu os dados depois da qualificação: ${summary}. Mensagem: "${input.message.replace(/\s+/g, " ").slice(0, 200)}"`,
+  });
+  const [lead] = await db.select({ corretorId: schema.leads.corretorId }).from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
+  if (lead?.corretorId) {
+    await publishNotification({ capability: "quick_reply_human", tenantId: input.tenantId, recipientUserId: lead.corretorId, leadId: input.leadId, type: "quick_reply_human", title: "Cliente corrigiu os dados", message: summary, pushTitle: "Dados do lead corrigidos", pushBody: summary, url: `/leads/${input.leadId}`, tag: `lead-correction-${input.leadId}` }).catch(() => undefined);
+  }
+  const firstName = memory.customerFirstName?.value ? `, ${memory.customerFirstName.value}` : "";
+  const reply = `Anotei a correção${firstName}: ${summary}. Já avisei o corretor, que continua a conversa por aqui.`;
+  await db.insert(schema.whatsappMessages).values({
+    id: `ai_msg_correction_${crypto.randomUUID()}`, tenantId: input.tenantId, leadId: input.leadId, conversationId: input.conversationId,
+    senderRole: "assistant", provider: input.transport, phone: input.phone, direction: "outbound", body: reply, sentAt: new Date(),
+  });
+  await sendAiOutbound({ tenantId: input.tenantId, phone: input.phone, body: reply, transport: input.transport, openWaSessionId: input.openWaSessionId, wahaRunId: input.wahaRunId })
+    .catch((error) => console.error("[ai-wpp] correction_reply_failed", { tenantId: input.tenantId, leadId: input.leadId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" }));
+  return true;
+}
+
+/** Seconds the AI waits for the rest of a burst of customer messages before answering. */
+const DEFAULT_AI_DEBOUNCE_SECONDS = 8;
+
 export async function processInboundAiResponse({
   tenantId,
   leadId,
@@ -978,6 +1047,7 @@ export async function processInboundAiResponse({
   openWaSessionId,
   wahaRunId,
   skipDebounce = false,
+  correctionOnly = false,
 }: {
   tenantId: string;
   leadId: string;
@@ -991,6 +1061,8 @@ export async function processInboundAiResponse({
   openWaSessionId?: string | null;
   wahaRunId?: string | null;
   skipDebounce?: boolean;
+  /** A qualified lead's message: only a correction while waiting for the broker is handled. */
+  correctionOnly?: boolean;
 }) {
   const db = getDatabase();
   // Media messages arrive without a text body. Give the qualification engine
@@ -999,7 +1071,7 @@ export async function processInboundAiResponse({
   // that preceded the attachment. The file contents are never guessed here.
   const inboundPlaceholderKind = userMessageBody.trim().match(/^\[(image|document|audio|video|sticker)\]$/i)?.[1]?.toLowerCase();
   const effectiveMessageKind = (messageKind === "text" && inboundPlaceholderKind ? inboundPlaceholderKind : messageKind) as QuickReplyMessageKind;
-  const normalizedInboundMessage = (userMessageBody.trim() && !inboundPlaceholderKind ? userMessageBody.trim() : undefined) || (
+  let normalizedInboundMessage = (userMessageBody.trim() && !inboundPlaceholderKind ? userMessageBody.trim() : undefined) || (
     effectiveMessageKind === "image"
       ? "O cliente enviou uma imagem para análise (possivelmente uma carteirinha)."
       : effectiveMessageKind === "document"
@@ -1034,14 +1106,22 @@ export async function processInboundAiResponse({
     .set({ lastActivityAt: nowReceived, updatedAt: nowReceived })
     .where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, tenantId)));
 
-  // 1b. Debounce Buffer Window: aggregate rapid multi-message bursts into a single consolidated turn
+  // 1b. Debounce Buffer Window: aggregate rapid multi-message bursts into a single consolidated turn.
+  // People write in bursts ("Para 12 , 42 anos" then "Meu"): the AI waits a
+  // few seconds and answers the burst once (default 8s; "0" turns it off).
   if (!skipDebounce && process.env.NODE_ENV !== "test") {
     const { getSystemSetting } = await import("@/features/system-settings/queries");
     const debounceSetting = await getSystemSetting("ai_debounce_delay_seconds");
-    const debounceSeconds = debounceSetting !== null && debounceSetting !== undefined ? parseInt(debounceSetting, 10) : 0;
-    const debounceMs = isNaN(debounceSeconds) || debounceSeconds <= 0 ? 0 : Math.min(2000, debounceSeconds * 1000);
+    const debounceSeconds = debounceSetting !== null && debounceSetting !== undefined ? parseInt(debounceSetting, 10) : DEFAULT_AI_DEBOUNCE_SECONDS;
+    const debounceMs = isNaN(debounceSeconds) || debounceSeconds <= 0 ? 0 : Math.min(15_000, debounceSeconds * 1000);
 
     if (debounceMs > 0) {
+      // Newer than this message as the customer sent it (the provider time), not the server clock.
+      const [ownMessage] = providerMessageId || whatsappMessageId
+        ? await db.select({ sentAt: schema.whatsappMessages.sentAt }).from(schema.whatsappMessages)
+          .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.messageId, (providerMessageId || whatsappMessageId)!))).limit(1)
+        : [];
+      const receivedAt = ownMessage?.sentAt ?? nowReceived;
       await new Promise((resolve) => setTimeout(resolve, debounceMs));
 
       const last8DigitsPhone = phone.replace(/\D/g, "").slice(-8);
@@ -1060,7 +1140,7 @@ export async function processInboundAiResponse({
               eq(schema.whatsappMessages.direction, "incoming"),
               eq(schema.whatsappMessages.direction, "inbound")
             ),
-            gt(schema.whatsappMessages.sentAt, nowReceived)
+            gt(schema.whatsappMessages.sentAt, receivedAt)
           )
         )
         .limit(1);
@@ -1073,8 +1153,28 @@ export async function processInboundAiResponse({
         });
         return { status: "debounced_superceded" as const };
       }
+
+      // This is the last message of the burst: the turn reads the whole burst.
+      const [lastReply] = await db.select({ sentAt: schema.whatsappMessages.sentAt }).from(schema.whatsappMessages)
+        .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId), inArray(schema.whatsappMessages.direction, ["outbound", "outgoing"])))
+        .orderBy(desc(schema.whatsappMessages.sentAt)).limit(1);
+      const burst = await db.select({ body: schema.whatsappMessages.body }).from(schema.whatsappMessages)
+        .where(and(
+          eq(schema.whatsappMessages.tenantId, tenantId),
+          eq(schema.whatsappMessages.leadId, leadId),
+          inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+          lastReply?.sentAt ? gt(schema.whatsappMessages.sentAt, lastReply.sentAt) : undefined,
+        ))
+        .orderBy(schema.whatsappMessages.sentAt).limit(10);
+      const burstText = burst.map((message) => message.body?.trim() ?? "").filter((body) => body && !/^\[(image|document|audio|video|sticker)\]$/i.test(body));
+      if (burstText.length > 1) {
+        normalizedInboundMessage = burstText.join("\n");
+        userMessageBody = normalizedInboundMessage;
+      }
     }
   }
+
+  if (correctionOnly && conversation.status !== "WAITING_HUMAN") return { status: "ignored_after_qualification" as const };
 
   const behavior = await resolvePublishedAgentBehavior(tenantId, conversation.behaviorVersionId);
   if (!conversation.behaviorVersionId && behavior.versionId) {
@@ -1141,6 +1241,13 @@ export async function processInboundAiResponse({
 
   // 4. Optimistic lock — claim this conversation using lockVersion
   if (conversation.status === "WAITING_HUMAN") {
+    const correction = await applyCustomerCorrectionAfterHandoff({
+      tenantId, leadId, conversationId: conversation.id, phone, transport, openWaSessionId, wahaRunId,
+      memory: (conversation.memory as ConversationMemory | null) ?? createEmptyMemory(),
+      message: normalizedInboundMessage,
+      policy: behavior.policy,
+    });
+    if (correction) return { status: "correction_applied" as const };
     console.info("[ai-wpp] inbound_ignored_waiting_human", { tenantId, leadId, conversationId: conversation.id });
     return { status: "ignored_waiting_human" };
   }

@@ -1,5 +1,5 @@
 import type { AiMemoryUpdate } from "./ai-response-schema";
-import { COLLECTIBLE_FIELDS, type ConversationMemory, type MemoryField } from "./memory";
+import { COLLECTIBLE_FIELDS, readAgeList, type ConversationMemory, type MemoryField } from "./memory";
 
 /**
  * The model is only an interpreter here. It cannot choose a stage or write
@@ -145,8 +145,12 @@ export function isGroundedInMessage(field: string, value: string, customerMessag
       if (normalizedValue === "individual") return /individual|\bpf\b|pessoa fisica|pa?ra mim|so eu|sozinh|eu mesm|apenas eu/.test(message);
       if (normalizedValue === "familiar") return /famil|esposa|marido|filh|dependente|mulher|\bmae\b|\bpai\b|\bpais\b/.test(message);
       return /empres|\bpme\b|\bpj\b|\bmei\b|cnpj|coletiv|funcionari|socio|pessoa juridica/.test(message);
-    case "numberOfLives":
+    case "numberOfLives": {
+      // An age is not a quantity: in "Para 12 , 42 anos" the 12 is an age.
+      const saidAsPeople = new RegExp(`\\b${normalizedValue}\\s*(?:pessoas?|vidas?|beneficiari)`).test(message);
+      if (readAgeList(customerMessage).includes(Number(normalizedValue)) && !saidAsPeople) return false;
       return /\d|\b(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|so eu|sozinh|eu e)\b/.test(message);
+    }
     case "age":
     case "averageAge":
       return /\d/.test(message);
@@ -207,6 +211,7 @@ export function buildQualificationFallbackPrompt(expectedField: string, expected
     `Leia o histórico e a mensagem mais recente. Extraia somente fatos que o cliente realmente informou agora, ` +
     `inclusive se houver erro de digitação ou se ele responder em linguagem natural. Não invente valores. ` +
     `Uma única mensagem pode conter vários fatos; extraia todos os campos confiáveis de uma vez. ` +
+    `Números seguidos de "anos" são idades (ex.: "Para 12, 42 anos" são duas pessoas, de 12 e 42 anos: numberOfLives 2, age "12, 42"). ` +
     `Se a mensagem indicar uma imagem ou documento, registre apenas que o arquivo foi recebido e não invente seu conteúdo. ` +
     `Retorne memoryUpdates com os campos canônicos (customerName, planType, numberOfLives, age, city, email, ` +
     `companyHasCnpj ou intent), usando planType individual, familiar ou empresarial. ` +

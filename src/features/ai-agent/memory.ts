@@ -90,11 +90,27 @@ const PLAN_TYPE_PATTERNS = [
   /\b(?:empresarial|PME|PJ|MEI|para empresa|para minha empresa|coletivo)\b/i,
 ];
 
+// "para N" alone is not a quantity ("Para 12, 42 anos" are two ages): it only
+// counts next to pessoas/vidas, or as the answer to the lives question.
 const NUMBER_OF_LIVES_PATTERNS = [
   /(\d+)\s*(?:pessoas?|vidas?|familiares?|dependentes?|pessoal|integrantes?)/i,
-  /(?:somos|sou|minha família tem|seria para|apenas|para)\s*(\d+)/i,
+  /(?:somos|sou|minha família tem|seria para|apenas)\s*(\d+)/i,
   /para\s*(\d+)\s*(?:pessoas?|vidas?)/i,
 ];
+
+/**
+ * The ages in a message that talks about ages ("Para 12 , 42 anos", "12anos e
+ * 42 anos", "30 e 32 anos"): every number of the message except one that
+ * counts people ("2 vidas"). Empty when the message does not mention "anos".
+ */
+export function readAgeList(message: string): number[] {
+  const normalized = normalizeForMatching(message);
+  if (!/\d\s*a?nos?\b|\banos?\b/.test(normalized)) return [];
+  const withoutPeople = normalized.replace(/\b\d{1,3}\s*(?:pessoas?|vidas?|familiares?|dependentes?|integrantes?|beneficiari[oa]s?)\b/g, " ");
+  return Array.from(withoutPeople.matchAll(/(?<![\d@.])(\d{1,3})(?![\d@])/g))
+    .map((match) => Number(match[1]))
+    .filter((age) => age >= 0 && age <= 120);
+}
 
 const NUMBER_WORD_VALUES: Record<string, number> = {
   um: 1,
@@ -358,8 +374,21 @@ export function extractFieldsFromMessage(
       }
     }
 
+    // Several ages in one answer are the people of the plan: "12 e 42 anos" is 2 lives.
+    const listedAges = readAgeList(trimmed);
+    if (!memory.numberOfLives && listedAges.length >= 2 && listedAges.length < 100) {
+      memory.numberOfLives = { value: String(listedAges.length), confidence: 1, sourceMessageId };
+      addCollectedField(memory, "numberOfLives");
+    }
+    const livesQuestion = /quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizeForMatching(memory.lastQuestionAsked ?? ""));
+    const answersLivesWithPara = livesQuestion ? trimmed.match(/^para\s*(\d{1,2})$/i) : null;
+    if (!memory.numberOfLives && answersLivesWithPara) {
+      memory.numberOfLives = { value: answersLivesWithPara[1], confidence: 1, sourceMessageId };
+      addCollectedField(memory, "numberOfLives");
+    }
     for (const pattern of NUMBER_OF_LIVES_PATTERNS) {
-      if (memory.numberOfLives) break;
+      // A number in an age answer is an age, not a quantity.
+      if (memory.numberOfLives || listedAges.length) break;
       const match = trimmed.match(pattern);
       if (match?.[1]) {
         const num = parseInt(match[1], 10);
@@ -392,9 +421,12 @@ export function extractFieldsFromMessage(
   if (!memory.age) {
     const previousQuestion = normalizeForMatching(memory.lastQuestionAsked ?? "");
     const asksForAge = previousQuestion.includes("idade") || previousQuestion.includes("quantos anos");
-    const explicitAgeValues = Array.from(trimmed.matchAll(/\b([1-9]\d?|1[0-4]\d)\s*a?\s*nos?\b/gi))
-      .map((match) => Number(match[1]))
-      .filter((age) => age > 0 && age < 150);
+    const listedAgeValues = readAgeList(trimmed).filter((age) => age > 0);
+    const explicitAgeValues = listedAgeValues.length > 1
+      ? listedAgeValues
+      : Array.from(trimmed.matchAll(/\b([1-9]\d?|1[0-4]\d)\s*a?\s*nos?\b/gi))
+        .map((match) => Number(match[1]))
+        .filter((age) => age > 0 && age < 150);
     const ageValues = explicitAgeValues.length > 0
       ? explicitAgeValues
       : asksForAge

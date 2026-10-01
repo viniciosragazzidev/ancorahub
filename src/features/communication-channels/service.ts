@@ -448,6 +448,27 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           } catch {
             // Fallback: non-blocking execution outside a Next.js request context.
           }
+        } else if (activeLeadId && ["qualified", "hot", "warm", "cold"].includes(lead?.qualificationStatus ?? "")) {
+          // Qualified and waiting for the broker: the AI stays quiet unless the
+          // customer corrects what was registered (lives, ages, e-mail).
+          const { processInboundAiResponse } = await import("@/features/ai-agent/conversation-state-machine");
+          const correctionPromise = processInboundAiResponse({
+            tenantId: channel.tenantId,
+            leadId: activeLeadId,
+            phone: message.from,
+            userMessageBody: text,
+            messageKind,
+            communicationChannelId: channel.id,
+            providerMessageId: message.id,
+            correctionOnly: true,
+          }).catch((error) => {
+            console.error("[ai-wpp] correction.failed", { tenantId: channel.tenantId, leadId: activeLeadId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+          });
+          try {
+            after(() => correctionPromise);
+          } catch {
+            // Fallback: non-blocking execution outside a Next.js request context.
+          }
         } else if (activeLeadId) {
           console.info("[ai-wpp] inbound.ignored_non_pending_qualification", {
             tenantId: channel.tenantId,
