@@ -65,6 +65,20 @@ describe.skipIf(!enabled)("campaign capture toggle (rolled back)", () => {
         .where(and(eq(s.metaCampaignQueueRoutes.tenantId, pick!.tenantId), eq(s.metaCampaignQueueRoutes.campaignId, pick!.campaignId)));
       expect(campaignRoute!.enabled).toBe(false);
 
+      // Turning capture on with no active queue is refused: leads would arrive with no queue.
+      const inactiveQueueId = randomUUID();
+      await tx.insert(s.leadQueues).values({ id: inactiveQueueId, tenantId: pick!.tenantId, name: "Fila teste desativada", slug: `fila-teste-${inactiveQueueId}`, status: "inactive" });
+      await tx.update(s.metaCampaignQueueRoutes).set({ queueId: inactiveQueueId })
+        .where(and(eq(s.metaCampaignQueueRoutes.tenantId, pick!.tenantId), eq(s.metaCampaignQueueRoutes.campaignId, pick!.campaignId)));
+      const refused = await toggleMetaCampaignCaptureEligibilityAction({ campaignId: pick!.campaignId, enabled: true });
+      expect(refused.success).toBe(false);
+      expect(refused.error).toContain("Fila teste desativada");
+      await tx.update(s.metaCampaignQueueRoutes).set({ queueId: null })
+        .where(and(eq(s.metaCampaignQueueRoutes.tenantId, pick!.tenantId), eq(s.metaCampaignQueueRoutes.campaignId, pick!.campaignId)));
+      expect((await toggleMetaCampaignCaptureEligibilityAction({ campaignId: pick!.campaignId, enabled: true })).error).toContain("não tem fila");
+
+      await tx.update(s.metaCampaignQueueRoutes).set({ queueId: queue!.id })
+        .where(and(eq(s.metaCampaignQueueRoutes.tenantId, pick!.tenantId), eq(s.metaCampaignQueueRoutes.campaignId, pick!.campaignId)));
       expect(await toggleMetaCampaignCaptureEligibilityAction({ campaignId: pick!.campaignId, enabled: true })).toEqual({ success: true });
       expect((await routes()).filter((route) => route.queueId === null)).toEqual([]);
       const copies = await tx.select({ id: s.metaAdQueueRoutes.id }).from(s.metaAdQueueRoutes)

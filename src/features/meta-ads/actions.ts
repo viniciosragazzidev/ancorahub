@@ -517,6 +517,20 @@ export async function toggleMetaCampaignCaptureEligibilityAction(input: {
     }
 
     if (input.enabled) {
+      // Turning capture on keeps the campaign's saved queue: it must be an
+      // active one, or every lead would arrive with no queue.
+      const [route] = await db
+        .select({ queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, queueStatus: schema.leadQueues.status })
+        .from(schema.metaCampaignQueueRoutes)
+        .leftJoin(schema.leadQueues, eq(schema.leadQueues.id, schema.metaCampaignQueueRoutes.queueId))
+        .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, campaign.campaignId)))
+        .limit(1);
+      if (route?.queueId && route.queueStatus !== "active") {
+        return { success: false, error: `A fila desta campanha ("${route.queueName ?? "removida"}") está desativada. Escolha uma fila ativa para a campanha antes de ligar a captura.` };
+      }
+      if (!route?.queueId) {
+        return { success: false, error: "Esta campanha não tem fila. Escolha a fila da campanha antes de ligar a captura: os leads entrariam sem fila." };
+      }
       await ensureCaptureModeActiveIfDisabled(context.tenantId);
     }
 
