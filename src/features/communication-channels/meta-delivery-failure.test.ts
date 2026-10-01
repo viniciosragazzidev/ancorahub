@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { companyChatUnavailableMessage, getDirectorFacingMetaDeliveryFailure, initialMessageFailureNote, initialMessageFailureStatus } from "./meta-delivery-failure";
+import { companyChatSendFailedMessage, companyChatUnavailableMessage, getDirectorFacingMetaDeliveryFailure, initialMessageFailureNote, initialMessageFailureStatus } from "./meta-delivery-failure";
 
 describe("getDirectorFacingMetaDeliveryFailure", () => {
   it("explica com segurança o bloqueio de cobrança da WABA", () => {
@@ -41,6 +41,14 @@ describe("falha da primeira mensagem do atendimento virtual", () => {
 describe("chat com corretor pelo WhatsApp da empresa indisponível", () => {
   it("diz até quando o número está pausado, no horário de Brasília", () => {
     expect(companyChatUnavailableMessage(new Date("2026-09-30T12:18:00Z"))).toContain("está pausado até 09:18 por falhas seguidas");
+  });
+
+  it("conectado, mas o WAHA recusou: mostra o motivo do WAHA, sem dizer desconectado", () => {
+    const message = companyChatSendFailedMessage("O serviço WAHA não confirmou o envio da mensagem (session not ready).");
+    expect(message).toContain("está conectado");
+    expect(message).toContain("session not ready");
+    expect(message).not.toContain("desconectado");
+    expect(companyChatSendFailedMessage(null)).not.toContain("()");
   });
 
   it("diz que está desconectado e por que a Meta não entrega", () => {

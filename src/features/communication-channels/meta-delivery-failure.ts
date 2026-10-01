@@ -80,3 +80,9 @@ export function companyChatUnavailableMessage(pausedUntil: Date | null) {
     : "está desconectado";
   return `O WhatsApp da empresa ${state}. A mensagem não foi enviada: pela Meta, o corretor só recebe texto livre se tiver falado com o número oficial nas últimas 24h.`;
 }
+
+/** Chat to a broker: the company WhatsApp is connected, but WAHA refused this send (its reason, when it gave one). */
+export function companyChatSendFailedMessage(detail?: string | null) {
+  const reason = detail?.trim() ? ` (${detail.trim().slice(0, 160)})` : "";
+  return `O WhatsApp da empresa está conectado, mas o WAHA não conseguiu enviar esta mensagem${reason}. Tente de novo em instantes; pela Meta, o corretor só recebe texto livre se tiver falado com o número oficial nas últimas 24h.`;
+}

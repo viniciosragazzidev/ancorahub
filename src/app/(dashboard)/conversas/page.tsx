@@ -990,7 +990,7 @@ function normalizeOutboundStatus(status: string): OfficialBrokerMessage["status"
 }
 function getOfficialBrokerDeliveryError(deliveryRoute: string, providerErrorMessage: string | null) {
   if (deliveryRoute === "waha_direct") {
-    return "O WAHA não confirmou o envio. Verifique a conexão do número selecionado e tente novamente.";
+    return providerErrorMessage ?? "O WAHA não confirmou o envio. Verifique a conexão do número selecionado e tente novamente.";
   }
   return providerErrorMessage ?? "A Meta não confirmou a entrega. Consulte o status do canal e reenvie pelo fluxo de equipe.";
 }

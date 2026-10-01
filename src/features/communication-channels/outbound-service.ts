@@ -7,7 +7,7 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptChannelSecret } from "./secret-crypto";
 import { MetaCloudApiError, sendMetaCloudTemplate, sendMetaCloudText } from "./meta-cloud-client";
-import { companyChatUnavailableMessage } from "./meta-delivery-failure";
+import { companyChatSendFailedMessage, companyChatUnavailableMessage } from "./meta-delivery-failure";
 import { getMetaCloudServerConfig } from "./meta-cloud-config";
 import { getMetaWhatsAppTemplate, getMetaWhatsAppTemplateVariableNames, splitMetaWhatsAppTemplateVariables } from "./templates";
 import { META_CLOUD_PROVIDER } from "./types";
@@ -931,9 +931,16 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
             inArray(schema.wahaNumbers.status, TENANT_CHANNEL_CONNECTED_STATUSES),
           ))
           .limit(1);
+        let companyUnavailable: string | null = null;
         try {
-          if (!tenantNumber) throw new Error("Número da empresa desconectado.");
-          if (tenantNumber.pausedUntil && tenantNumber.pausedUntil > new Date()) throw new Error("Número da empresa pausado após falhas seguidas.");
+          if (!tenantNumber) {
+            companyUnavailable = companyChatUnavailableMessage(null);
+            throw new Error("Número da empresa desconectado.");
+          }
+          if (tenantNumber.pausedUntil && tenantNumber.pausedUntil > new Date()) {
+            companyUnavailable = companyChatUnavailableMessage(tenantNumber.pausedUntil);
+            throw new Error("Número da empresa pausado após falhas seguidas.");
+          }
           if (row.noticeKey && !await takeCompanySlot(row.wahaNumberId!, row.noticeKey, Boolean(outboundId))) {
             await db.update(schema.whatsappOutboundMessages).set({ status: "queued", attempts: row.attempts, nextAttemptAt: new Date(Date.now() + 5_000), holdReason: "number_spacing", updatedAt: new Date() })
               .where(eq(schema.whatsappOutboundMessages.id, row.id));
@@ -958,8 +965,9 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
             await db.update(schema.whatsappOutboundMessages).set({
               status: "failed",
               failedAt: new Date(),
-              providerErrorCode: "COMPANY_NUMBER_UNAVAILABLE",
-              providerErrorMessage: companyChatUnavailableMessage(null),
+              // Down or paused says so; a refused send keeps WAHA's own reason.
+              providerErrorCode: companyUnavailable ? "COMPANY_NUMBER_UNAVAILABLE" : "COMPANY_NUMBER_SEND_FAILED",
+              providerErrorMessage: companyUnavailable ?? companyChatSendFailedMessage(wahaError instanceof Error ? wahaError.message : null),
               updatedAt: new Date(),
             }).where(eq(schema.whatsappOutboundMessages.id, row.id));
             return;
