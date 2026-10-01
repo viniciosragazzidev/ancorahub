@@ -211,10 +211,19 @@ export async function toggleAutoDistributeAction(
       return { error: "Você só pode alterar a configuração de filiais sob sua gestão." };
     }
 
-    await db
-      .update(schema.branches)
-      .set({ autoDistribute: !branch.autoDistribute })
-      .where(eq(schema.branches.id, branch.id));
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schema.branches)
+        .set({ autoDistribute: !branch.autoDistribute, updatedAt: new Date() })
+        .where(eq(schema.branches.id, branch.id));
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: accessContext.userId,
+        entidade: "branch",
+        entidadeId: branch.id,
+        acao: branch.autoDistribute ? "branch.auto_distribution_disabled" : "branch.auto_distribution_enabled",
+      });
+    });
     return { success: true };
   } catch (error) {
     return actionError(error);

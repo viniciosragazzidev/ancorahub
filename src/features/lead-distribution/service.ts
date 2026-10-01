@@ -633,6 +633,10 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     }
   }
   let balanceAcrossBranches = requestedBranchIds.length === 0 || requestedBranchIds.length > 1;
+  // In a duty-exclusive queue the plantão rule prevails: an escalado receives
+  // even when their unit's "distribuição automática" is off (that switch only
+  // governs the unit's own, non-plantão distribution).
+  const dutyExclusiveQueue = Boolean(queue?.exclusiveDutyScheduleIds?.length || queue?.exclusiveDutyScheduleId);
   if (!requestedBranchIds.length) {
     const tenantWideBranches = await db.select({ id: schema.branches.id })
       .from(schema.branches)
@@ -640,7 +644,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         eq(schema.branches.tenantId, context.tenantId),
         eq(schema.branches.status, "active"),
         eq(schema.branches.acceptingLeads, true),
-        eq(schema.branches.autoDistribute, true),
+        dutyExclusiveQueue ? undefined : eq(schema.branches.autoDistribute, true),
         eq(schema.branches.isDistributionHub, false),
         intelligentPolicy.value.excludedBranchIds.length
           ? not(inArray(schema.branches.id, intelligentPolicy.value.excludedBranchIds))
@@ -662,7 +666,13 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     });
     branchToActivate.autoDistribute = true;
   }
-  let targetBranchIds = activeBranches.filter(isAutomaticDistributionBranch).map((branch) => branch.id);
+  let targetBranchIds = activeBranches
+    .filter((branch) => isAutomaticDistributionBranch(dutyExclusiveQueue ? { ...branch, autoDistribute: true } : branch))
+    .map((branch) => branch.id);
+  // Units with automatic distribution off only take part through the plantão:
+  // there, just the escalados of a running plantão are eligible (never the
+  // whole unit, e.g. when no plantão is running and the unit roster applies).
+  const rosterOnlyBranchIds = new Set(dutyExclusiveQueue ? activeBranches.filter((branch) => !branch.autoDistribute).map((branch) => branch.id) : []);
   if (!targetBranchIds.length) {
     return { status: "queued", leadId, reason: "Nenhuma unidade elegível está ativa para esta fila." };
   }
@@ -745,6 +755,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const hasActiveSelectedSchedule = rosterResults.some(([, result]) => result.hasActiveSelectedSchedule);
     const rosterBrokers = allBrokers.filter((broker) => {
       const rosterBrokerIds = broker.branchId ? rosterByBranch.get(broker.branchId) : null;
+      if (!rosterBrokerIds && broker.branchId && rosterOnlyBranchIds.has(broker.branchId)) return false;
       return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
     });
     let brokers = rosterBrokers;
