@@ -38,6 +38,9 @@ export type MetaWebhookMessage = {
   document?: { id?: string; mime_type?: string; filename?: string; sha256?: string } | unknown;
   video?: { id?: string; mime_type?: string; sha256?: string } | unknown;
   sticker?: { id?: string; mime_type?: string } | unknown;
+  /** On an "unsupported" message: what Meta could not deliver, and why. */
+  unsupported?: { type?: string };
+  errors?: Array<{ code?: number; title?: string; message?: string; error_data?: { details?: string } }>;
 };
 
 export type MetaWebhookStatus = {

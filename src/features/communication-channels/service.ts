@@ -19,6 +19,7 @@ import {
   type ConversationMediaKind,
 } from "./conversation-media";
 import { META_CLOUD_PROVIDER } from "./types";
+import { describeUnsupportedMessage } from "./meta-unsupported-message";
 import { readCtwaAdReferral } from "./meta-ctwa-referral";
 import { channelLeadIntakeKey, parseChannelLeadIntake } from "./channel-lead-intake";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -303,11 +304,13 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         }
 
         // Meta delivers some customer messages as "unsupported" (often the first
-        // message from an ad, or a format the API cannot show). On a coexistence
-        // number it is still a customer writing: kept with a note, so the
-        // contact becomes a lead instead of being dropped.
-        if (!text && message.type === "unsupported" && channel.onboardingMode === "coexistence") {
-          text = "[Mensagem que o WhatsApp não mostra aqui: veja no celular do número]";
+        // message from an ad, or a format the API cannot show). It is still a
+        // customer writing: kept with Meta's reason, so the conversation shows
+        // it and the contact becomes a lead (the AI does not answer it).
+        const unsupported = message.type === "unsupported" ? describeUnsupportedMessage(message) : null;
+        if (unsupported) {
+          text = unsupported.text;
+          console.info("[whatsapp] inbound.unsupported", { tenantId: channel.tenantId, channelId: channel.id, errors: message.errors ?? null, unsupported: message.unsupported ?? null, referral: message.referral ? { source_type: message.referral.source_type, source_id: message.referral.source_id, headline: message.referral.headline } : null });
         }
         if (!text && messageKind === "text" && message.type !== "text" && !mediaColumns) { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
         // OPTIMIZED: Query only leads matching the incoming phone (last 8 digits) instead of fetching ALL leads
@@ -395,7 +398,9 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           }
         }
 
-        if (skipAiQualification && activeLeadId) {
+        if (unsupported) {
+          console.info("[ai-wpp] inbound.ignored_unsupported_message", { tenantId: channel.tenantId, leadId: activeLeadId ?? null });
+        } else if (skipAiQualification && activeLeadId) {
           console.info("[ai-wpp] inbound.ignored_coexistence_number", { tenantId: channel.tenantId, leadId: activeLeadId });
         } else if (activeLeadId && lead?.qualificationStatus === "cold") {
           const coldLeadPromise = import("@/features/ai-qualification/service").then(({ handleColdLeadInbound }) => handleColdLeadInbound({
@@ -483,7 +488,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
             qualificationStatus: lead?.qualificationStatus ?? "unknown",
           });
         }
-        await setWebhookEventResult(eventId, "processed");
+        await setWebhookEventResult(eventId, "processed", unsupported?.errorCode);
         void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
         processed += 1;
       }
