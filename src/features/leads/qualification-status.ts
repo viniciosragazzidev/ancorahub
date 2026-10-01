@@ -10,7 +10,7 @@ export const LEAD_QUALIFICATION_STATUSES = [
   "ia_disabled",
   /** The AI's first message never reached the lead on WhatsApp: a person must contact them. Not a disqualification. */
   "no_whatsapp_contact",
-  /** The lead is on WhatsApp, but Meta refused to deliver to them (e.g. 130472): a person must contact them. Not a disqualification. */
+  /** The lead is on WhatsApp, but Meta refused to deliver to them (130472, 131049): a person must contact them. Not a disqualification. */
   "meta_blocked",
 ] as const;
 

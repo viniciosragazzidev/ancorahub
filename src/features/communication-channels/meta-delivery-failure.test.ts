@@ -28,6 +28,7 @@ describe("falha da primeira mensagem do atendimento virtual", () => {
 
   it("130472: o lead tem WhatsApp, a Meta é que bloqueou — não vira \"Sem contato no WhatsApp\"", () => {
     expect(initialMessageFailureStatus("130472")).toBe("meta_blocked");
+    expect(initialMessageFailureStatus("131049")).toBe("meta_blocked");
     expect(initialMessageFailureStatus("131026")).toBe("no_whatsapp_contact");
     expect(initialMessageFailureStatus(null)).toBe("no_whatsapp_contact");
     const note = initialMessageFailureNote("130472");

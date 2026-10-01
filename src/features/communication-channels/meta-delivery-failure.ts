@@ -58,7 +58,7 @@ export function getDirectorFacingMetaDeliveryFailure(
  * Codes where the lead does have WhatsApp but Meta refused to deliver to them:
  * not a missing contact, so the lead is not marked "Sem contato no WhatsApp".
  */
-const META_BLOCKED_CODES = new Set(["130472"]);
+const META_BLOCKED_CODES = new Set(["130472", "131049"]);
 
 /** How a failed first message classifies the lead. */
 export function initialMessageFailureStatus(failureCode?: string | null): "meta_blocked" | "no_whatsapp_contact" {
