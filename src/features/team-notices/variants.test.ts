@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { builtInNoticeVariants, localHour, pickNoticeVariant, timeOfDayGreeting, type NoticeFields } from "./variants";
+import { builtInNoticeVariants, INVITE_LINK_PLACEHOLDER, localHour, pickNoticeVariant, timeOfDayGreeting, withInviteLink, type NoticeFields } from "./variants";
 
 const pool = ["builtin:0", "builtin:1", "builtin:2", "builtin:3"].map((key) => ({ key }));
 
@@ -36,6 +36,18 @@ describe("team notice text rotation", () => {
       expect(version).toContain("https://crm.example/leads/1");
       expect(version).not.toMatch(/[​-‍﻿]/);
     }
+  });
+
+  it("first-access invite: the secret link is only put in at send time, also in a library message without a place for it", () => {
+    const versions = builtInNoticeVariants({ purpose: "brokerInvitation", name: "Ana", company: "Âncora", link: INVITE_LINK_PLACEHOLDER }, 9);
+    expect(new Set(versions).size).toBe(4);
+    for (const version of versions) {
+      expect(version).toContain(INVITE_LINK_PLACEHOLDER);
+      const sent = withInviteLink(version, "https://crm.example/convite/abc");
+      expect(sent).toContain("https://crm.example/convite/abc");
+      expect(sent).not.toContain(INVITE_LINK_PLACEHOLDER);
+    }
+    expect(withInviteLink("Olá Ana, bem-vinda!", "https://crm.example/convite/abc")).toBe("Olá Ana, bem-vinda!\n\nhttps://crm.example/convite/abc");
   });
 
   it("greets by the time of day in São Paulo", () => {

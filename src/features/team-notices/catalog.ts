@@ -99,10 +99,11 @@ export const TEAM_NOTICES: readonly TeamNotice[] = [
     key: "BROKER_WELCOME",
     purpose: "brokerInvitation",
     label: "Convite de primeiro acesso",
-    description: "Link seguro de primeiro acesso. Sai sempre pela Meta.",
+    description: "Link seguro de primeiro acesso. Sempre ligado: sem ele o colaborador não cria o acesso.",
     class: "critical",
     defaultEnabled: true,
-    metaOnly: true,
+    alwaysOn: true,
+    defaultChannel: "meta",
   },
   {
     key: "DUTY_PRESENCE_CONFIRMATION",

@@ -26,7 +26,7 @@ import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
 import { companyNumberUsable, decideTeamNotice } from "@/features/team-notices/decision";
 import { DELIVERY_LIMITS } from "@/features/team-notices/guard";
-import { builtInNoticeVariants, localHour, type NoticeFields } from "@/features/team-notices/variants";
+import { builtInNoticeVariants, INVITE_LINK_PLACEHOLDER, localHour, withInviteLink, type NoticeFields } from "@/features/team-notices/variants";
 import {
   evaluateNoticeRow,
   getCompanyNumberState,
@@ -623,6 +623,10 @@ function textBaseUrl() {
 
 /** The values a team notice's text shows, read from the outbox variables (same order as the Meta template). */
 function noticeTextFields(purpose: string, rawVariables: string[], urlButtonParameter?: string): NoticeFields | null {
+  if (purpose === "brokerInvitation") {
+    // The secret link is put in at send time (see withInviteLink).
+    return { purpose, name: rawVariables[0]?.trim() || "Corretor(a)", company: rawVariables[1]?.trim() || "sua corretora", link: INVITE_LINK_PLACEHOLDER };
+  }
   const baseUrl = textBaseUrl();
   if (purpose === "brokerAccountActivated") {
     return {
@@ -756,6 +760,15 @@ async function markPresenceNotified(row: OutboundRow) {
   ));
 }
 
+/** A first-access invite sent by the company number counts as delivered, as on the Meta path. */
+async function markInvitationSent(row: OutboundRow) {
+  if (row.purpose !== "brokerInvitation" || !row.recipientId) return;
+  await getDatabase().update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryAttempts: row.attempts + 1, deliveryError: null }).where(and(
+    eq(schema.brokerInvitations.id, row.recipientId),
+    eq(schema.brokerInvitations.tenantId, row.tenantId),
+  ));
+}
+
 /** Takes the company number's spacing slot; an exact dispatch retries once after the gap. */
 async function takeCompanySlot(wahaNumberId: string, noticeKey: string, exact: boolean) {
   const critical = teamNoticeByKey(noticeKey)?.class === "critical";
@@ -764,6 +777,39 @@ async function takeCompanySlot(wahaNumberId: string, noticeKey: string, exact: b
   if (!exact) return false;
   await sleep(gapMs);
   return reserveCompanyNumberSlot(wahaNumberId, gapMs);
+}
+
+/** The first-access invite's secret token, checked (pending, not expired). Throws the invite's delivery error. */
+async function loadInvitationToken(row: OutboundRow) {
+  const [invitation] = await getDatabase().select({ tokenCiphertext: schema.brokerInvitations.tokenCiphertext, expiresAt: schema.brokerInvitations.expiresAt, status: schema.brokerInvitations.status }).from(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.id, row.recipientId ?? ""), eq(schema.brokerInvitations.tenantId, row.tenantId))).limit(1);
+  if (!invitation) {
+    throw brokerInvitationError("BROKER_INVITATION_NOT_FOUND", "Convite de primeiro acesso não encontrado.");
+  }
+  if (invitation.status !== "PENDING") {
+    throw brokerInvitationError("BROKER_INVITATION_NOT_PENDING", "Convite de primeiro acesso não está mais pendente.");
+  }
+  if (invitation.expiresAt <= new Date()) {
+    throw brokerInvitationError("BROKER_INVITATION_EXPIRED", "Convite de primeiro acesso expirou antes do envio.");
+  }
+  const invitationKey = process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim() || process.env.META_WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim();
+  if (!invitation.tokenCiphertext || !invitationKey) {
+    throw brokerInvitationError(
+      "BROKER_INVITATION_TOKEN_UNAVAILABLE",
+      "Token seguro do convite indisponível para entrega pelo WhatsApp.",
+    );
+  }
+  try {
+    return { invitation, token: decryptChannelSecret(invitation.tokenCiphertext, invitationKey) };
+  } catch {
+    throw brokerInvitationError(
+      "BROKER_INVITATION_TOKEN_DECRYPT_FAILED",
+      "Não foi possível recuperar o token seguro do convite para entrega.",
+    );
+  }
+}
+
+function inviteLinkFor(token: string) {
+  return token.startsWith("http") ? token : `${textBaseUrl()}/convite/${token}`;
 }
 
 /** Company-number fallback for a team notice Meta could not send. True when it went out. */
@@ -781,7 +827,12 @@ async function sendNoticeByCompanyNumber(row: OutboundRow, metaError: unknown, e
     builtIn: resolveNoticeTextVariants(row.purpose, variables), seed: row.idempotencyKey, recipientId: row.recipientId,
   });
   if (!rendered) return false;
-  const text = rendered.text;
+  let text = rendered.text;
+  if (row.purpose === "brokerInvitation") {
+    const loaded = await loadInvitationToken(row).catch(() => null);
+    if (!loaded) return false;
+    text = withInviteLink(text, inviteLinkFor(loaded.token));
+  }
   if (!await takeCompanySlot(number.id, notice.key, exact)) return false;
   try {
     const sentByWaha = await sendWahaRelayMessage({ idempotencyKey: `${row.idempotencyKey}:company`, sessionId: number.relaySessionId, destination: row.destinationPhone.replace(/\D/g, ""), body: text, humanize: true });
@@ -793,6 +844,7 @@ async function sendNoticeByCompanyNumber(row: OutboundRow, metaError: unknown, e
     }).where(eq(schema.whatsappOutboundMessages.id, row.id));
     await recordCompanyNumberSuccess(number.id).catch(() => undefined);
     await markPresenceNotified(row);
+    await markInvitationSent(row);
     return true;
   } catch {
     await recordCompanyNumberFailure(number.id).catch(() => undefined);
@@ -932,6 +984,10 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
           ))
           .limit(1);
         let companyUnavailable: string | null = null;
+        // An invite carries its secret link, put in only now (an invalid invite fails as on Meta).
+        const body = row.purpose === "brokerInvitation" && row.renderedBody
+          ? withInviteLink(row.renderedBody, inviteLinkFor((await loadInvitationToken(row)).token))
+          : row.renderedBody!;
         try {
           if (!tenantNumber) {
             companyUnavailable = companyChatUnavailableMessage(null);
@@ -950,13 +1006,14 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
             idempotencyKey: row.idempotencyKey,
             sessionId: tenantNumber.relaySessionId,
             destination: row.destinationPhone.replace(/\D/g, ""),
-            body: row.renderedBody!,
+            body,
             humanize: true,
           });
           await db.update(schema.whatsappOutboundMessages).set({ status: "sent", providerMessageId: sentByWaha.messageId, providerErrorCode: null, providerErrorMessage: null, holdReason: null, sentAt: new Date(), updatedAt: new Date() })
             .where(eq(schema.whatsappOutboundMessages.id, row.id));
           await recordCompanyNumberSuccess(row.wahaNumberId!).catch(() => undefined);
           await markPresenceNotified(row);
+          await markInvitationSent(row);
           sent += 1;
           return;
         } catch (wahaError) {
@@ -989,32 +1046,9 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
       }
 
       if (row.purpose === "brokerInvitation" && row.recipientId) {
-        const [loadedInvitation] = await db.select({ tokenCiphertext: schema.brokerInvitations.tokenCiphertext, expiresAt: schema.brokerInvitations.expiresAt, status: schema.brokerInvitations.status }).from(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.id, row.recipientId), eq(schema.brokerInvitations.tenantId, row.tenantId))).limit(1);
-        invitation = loadedInvitation;
-        if (!invitation) {
-          throw brokerInvitationError("BROKER_INVITATION_NOT_FOUND", "Convite de primeiro acesso não encontrado.");
-        }
-        if (invitation.status !== "PENDING") {
-          throw brokerInvitationError("BROKER_INVITATION_NOT_PENDING", "Convite de primeiro acesso não está mais pendente.");
-        }
-        if (invitation.expiresAt <= now) {
-          throw brokerInvitationError("BROKER_INVITATION_EXPIRED", "Convite de primeiro acesso expirou antes do envio.");
-        }
-        const invitationKey = process.env.INVITATION_TOKEN_ENCRYPTION_KEY?.trim() || process.env.META_WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim();
-        if (!invitation.tokenCiphertext || !invitationKey) {
-          throw brokerInvitationError(
-            "BROKER_INVITATION_TOKEN_UNAVAILABLE",
-            "Token seguro do convite indisponível para entrega pelo WhatsApp.",
-          );
-        }
-        try {
-          urlButtonParameter = decryptChannelSecret(invitation.tokenCiphertext, invitationKey);
-        } catch {
-          throw brokerInvitationError(
-            "BROKER_INVITATION_TOKEN_DECRYPT_FAILED",
-            "Não foi possível recuperar o token seguro do convite para entrega.",
-          );
-        }
+        const loaded = await loadInvitationToken(row);
+        invitation = loaded.invitation;
+        urlButtonParameter = loaded.token;
       } else if (row.purpose === "leadAssignmentConfirmed") {
         const variables = Array.isArray(row.variables) ? row.variables.filter((value): value is string => typeof value === "string") : [];
         if (variables[7]) {

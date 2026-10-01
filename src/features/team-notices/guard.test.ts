@@ -114,11 +114,12 @@ describe("team notice decision", () => {
     expect(effectiveNoticeSetting(chat, { enabled: false, channel: "meta", freeMessageIds: ["x"] })).toEqual({ enabled: true, channel: "meta", freeMessageIds: [] });
   });
 
-  it("locks only the first-access invitation to Meta", () => {
+  it("keeps the first-access invitation always on, Meta by default, with the company number as an option", () => {
     const notice = teamNoticeByKey("BROKER_WELCOME")!;
+    expect(effectiveNoticeSetting(notice, null)).toEqual({ enabled: true, channel: "meta", freeMessageIds: [] });
     const setting = effectiveNoticeSetting(notice, { enabled: false, channel: "company_number" });
-    expect(setting).toEqual({ enabled: true, channel: "meta", freeMessageIds: [] });
-    expect(decideTeamNotice(notice, setting, number, now)).toEqual({ action: "send", primary: "meta", wahaNumberId: null, note: null });
+    expect(setting.enabled).toBe(true);
+    expect(decideTeamNotice(notice, setting, number, now)).toMatchObject({ action: "send", primary: "company_number" });
   });
 
   it("sends the lead offer through Meta only by default", () => {

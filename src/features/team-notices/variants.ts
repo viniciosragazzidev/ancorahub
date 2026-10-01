@@ -13,7 +13,21 @@ export type NoticeFields =
   | { purpose: "leadFeedbackReminder"; broker: string; lead: string }
   | { purpose: "taskReminder"; name: string; task: string; when: string }
   | { purpose: "brokerAccountActivated"; name: string; company: string; loginUrl: string }
-  | { purpose: "dutyPresenceConfirmation"; broker: string; hour: string; link: string | null };
+  | { purpose: "dutyPresenceConfirmation"; broker: string; hour: string; link: string | null }
+  | { purpose: "brokerInvitation"; name: string; company: string; link: string };
+
+/**
+ * Where the first-access link goes in an invite sent by the company number.
+ * The secret link is only put in at send time, so it is never stored in text.
+ */
+export const INVITE_LINK_PLACEHOLDER = "{{link_convite}}";
+
+/** The invite text with its secret link (appended when a library message has no place for it). */
+export function withInviteLink(text: string, link: string) {
+  return text.includes(INVITE_LINK_PLACEHOLDER)
+    ? text.split(INVITE_LINK_PLACEHOLDER).join(link)
+    : `${text.trim()}\n\n${link}`;
+}
 
 /** "Bom dia" / "Boa tarde" / "Boa noite" for a local hour (0–23). */
 export function timeOfDayGreeting(hour: number) {
@@ -95,6 +109,15 @@ export function builtInNoticeVariants(fields: NoticeFields, hour: number): strin
         `Oi *${name}*! Lembrete da sua tarefa: *${task}* (${when}).`,
         `${hi}, *${name}*. Você tem uma tarefa marcada: *${task}*\nQuando: ${when}`,
         `⏰ ${name}, não esqueça: *${task}* · ${when}`,
+      ];
+    }
+    case "brokerInvitation": {
+      const { name, company, link } = fields;
+      return [
+        `Olá *${name}*! 👋\n\nVocê recebeu um convite para criar seu acesso no sistema *${company}*.\n\nAcesse o link abaixo para definir sua senha e entrar no sistema:\n${link}\n\n_Este link é individual e seguro._`,
+        `${hi}, *${name}*! Seu acesso ao *${company}* está pronto para ser criado.\n\nDefina sua senha por aqui: ${link}\n\n_O link é só seu._`,
+        `Oi *${name}*, tudo bem? Você foi convidado(a) para o CRM da *${company}*.\n\nPara criar seu acesso: ${link}`,
+        `🔑 *Primeiro acesso*\n\n${name}, crie sua senha do *${company}* pelo link abaixo (individual):\n${link}`,
       ];
     }
     case "brokerAccountActivated": {

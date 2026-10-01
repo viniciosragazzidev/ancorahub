@@ -343,7 +343,7 @@ export function MessagePoliciesPanel({
                   <div className="rounded-lg border bg-muted/15 p-3 text-xs text-muted-foreground">
                     <Info className="mr-2 inline-block size-4 align-text-bottom text-primary" aria-hidden="true" />
                     {isBrokerWelcome
-                      ? "O primeiro acesso é enviado exclusivamente pelo template Meta aprovado broker_first_access. Esse contrato evita que um convite seja substituído por uma mensagem livre ou por outro modelo."
+                      ? "Pela Meta, o primeiro acesso usa o template aprovado broker_first_access. Ele também pode sair pelo WhatsApp da empresa, em Integrações → WhatsApp → Avisos da equipe; o link seguro é colocado só na hora do envio."
                       : isTemplateOnly
                       ? "Pela Meta, o lembrete de presença usa o template aprovado plantao_confirm_presence. Ele também pode sair pelo WhatsApp da empresa, em Integrações → WhatsApp → Avisos da equipe."
                       : selectedEvent.windowRule === "meta_required_without_window"
