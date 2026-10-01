@@ -137,9 +137,9 @@ export async function handleInitialMessageFailure({
       .set({
         status: "distributed",
         distributionStatus: "queued",
-        // Not a disqualification: the lead never got the message. "Disqualified"
-        // leads are skipped by the distribution, so they reached no broker.
-        // A lead Meta blocked (130472) does have WhatsApp: it is told apart.
+        // Undelivered is disqualified (the tenant's disqualified-lead rules
+        // decide where it goes); a lead Meta blocked (130472, 131049) does
+        // have WhatsApp and is told apart.
         qualificationStatus: initialMessageFailureStatus(failureCode),
         qualificationState: "COMPLETED",
         updatedAt: now,

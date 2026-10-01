@@ -18,22 +18,20 @@ describe("falha da primeira mensagem do atendimento virtual", () => {
     expect(getDirectorFacingMetaDeliveryFailure("131049")?.title).toBe("Meta limitou mensagens para este contato");
   });
 
-  it("registra no lead o motivo e que ele vai para um corretor, sem chamar de desqualificado", () => {
+  it("mensagem não entregue: registra o motivo e desqualifica o lead", () => {
+    expect(initialMessageFailureStatus("131026")).toBe("disqualified");
+    expect(initialMessageFailureStatus(null)).toBe("disqualified");
     const note = initialMessageFailureNote("131026");
     expect(note).toContain("Motivo (131026): Mensagem não pôde ser entregue.");
-    expect(note).toContain("Sem contato no WhatsApp");
-    expect(note).not.toMatch(/desqualificad/i);
+    expect(note).toContain("o lead foi desqualificado");
     expect(initialMessageFailureNote(null)).not.toContain("Motivo");
   });
 
-  it("130472: o lead tem WhatsApp, a Meta é que bloqueou — não vira \"Sem contato no WhatsApp\"", () => {
+  it("130472/131049: o lead tem WhatsApp, a Meta é que bloqueou — não é desqualificado", () => {
     expect(initialMessageFailureStatus("130472")).toBe("meta_blocked");
     expect(initialMessageFailureStatus("131049")).toBe("meta_blocked");
-    expect(initialMessageFailureStatus("131026")).toBe("no_whatsapp_contact");
-    expect(initialMessageFailureStatus(null)).toBe("no_whatsapp_contact");
     const note = initialMessageFailureNote("130472");
     expect(note).toContain("Envio bloqueado pela Meta");
-    expect(note).not.toContain("Sem contato no WhatsApp");
     expect(note).not.toMatch(/desqualificad/i);
   });
 });

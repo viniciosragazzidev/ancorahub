@@ -56,21 +56,26 @@ export function getDirectorFacingMetaDeliveryFailure(
 
 /**
  * Codes where the lead does have WhatsApp but Meta refused to deliver to them:
- * not a missing contact, so the lead is not marked "Sem contato no WhatsApp".
+ * the lead is not at fault, so it is not disqualified.
  */
 const META_BLOCKED_CODES = new Set(["130472", "131049"]);
 
-/** How a failed first message classifies the lead. */
-export function initialMessageFailureStatus(failureCode?: string | null): "meta_blocked" | "no_whatsapp_contact" {
-  return META_BLOCKED_CODES.has(failureCode?.trim() ?? "") ? "meta_blocked" : "no_whatsapp_contact";
+/**
+ * How a failed first message classifies the lead: undelivered (e.g. 131026,
+ * the number has no WhatsApp) is disqualified; blocked by Meta is told apart.
+ */
+export function initialMessageFailureStatus(failureCode?: string | null): "meta_blocked" | "disqualified" {
+  return META_BLOCKED_CODES.has(failureCode?.trim() ?? "") ? "meta_blocked" : "disqualified";
 }
 
 /** The lead note: what happened, why (Meta's reason when known) and what the team does next. */
 export function initialMessageFailureNote(failureCode?: string | null) {
   const failure = getDirectorFacingMetaDeliveryFailure(failureCode);
   const why = failure ? ` Motivo (${failure.code}): ${failure.title}. ${failure.message}` : "";
-  const label = initialMessageFailureStatus(failureCode) === "meta_blocked" ? "Envio bloqueado pela Meta" : "Sem contato no WhatsApp";
-  return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi enviado para a distribuição como "${label}" para um corretor entrar em contato.`;
+  if (initialMessageFailureStatus(failureCode) === "meta_blocked") {
+    return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi enviado para a distribuição como "Envio bloqueado pela Meta" para um corretor entrar em contato.`;
+  }
+  return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi desqualificado.`;
 }
 
 /** Chat to a broker set to the company WhatsApp while it is down, outside the broker's Meta window. */
