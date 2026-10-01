@@ -151,6 +151,17 @@ export function OnboardingWizard({ invitation, profile }: Props) {
         return;
       }
 
+      // This e-mail already has a login active in another company: its current
+      // password stays (the one typed here was not applied).
+      if (result.keptExistingPassword) {
+        toast.success("Acesso ativado! Este e-mail já tem uma senha.", {
+          description: "Entre com a senha que você já usa. Se não lembrar, use Esqueci minha senha.",
+          duration: 10000,
+        });
+        router.push("/login?message=onboarding_completed");
+        return;
+      }
+
       // DEC-082: auto-login com a senha recém-definida (ainda em memória).
       // Se falhar, a conta já está ativa e o login manual continua válido.
       try {

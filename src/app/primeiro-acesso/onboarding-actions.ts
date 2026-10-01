@@ -22,7 +22,7 @@ const completeOnboardingSchema = z.object({
   termsAccepted: z.literal("on"),
 });
 
-export type OnboardingResult = { success?: boolean; error?: string; email?: string; activationNoticeStatus?: BrokerAccountActivationNoticeStatus };
+export type OnboardingResult = { success?: boolean; error?: string; email?: string; activationNoticeStatus?: BrokerAccountActivationNoticeStatus; /** The e-mail already had a login active in another company: its password was kept. */ keptExistingPassword?: boolean };
 
 export async function completeOnboardingAction(
   _prev: OnboardingResult,
@@ -111,6 +111,18 @@ export async function completeOnboardingAction(
       : randomUUID();
 
     const hashedPassword = await hashPassword(input.password);
+    // An existing login active in another company keeps its password: an
+    // invite must never change someone's access elsewhere. With no other
+    // active company, the password typed here is the one that works.
+    const activeElsewhere = identityDecision.kind === "reuse"
+      ? await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships).where(and(
+        eq(schema.tenantMemberships.userId, identityDecision.userId),
+        ne(schema.tenantMemberships.tenantId, invitation.tenantId),
+        eq(schema.tenantMemberships.status, "active"),
+      )).limit(1)
+      : [];
+    const setPasswordOnReuse = identityDecision.kind === "reuse" && activeElsewhere.length === 0;
+    const keptExistingPassword = identityDecision.kind === "reuse" && !setPasswordOnReuse;
 
     // 5. Run transactional activation
     await db.transaction(async (tx) => {
@@ -149,7 +161,7 @@ export async function completeOnboardingAction(
           userId,
           password: hashedPassword,
         }));
-      } else if (identityDecision.kind === "reactivate") {
+      } else if (identityDecision.kind === "reactivate" || setPasswordOnReuse) {
         await tx
           .update(schema.account)
           .set({ password: hashedPassword, updatedAt: new Date() })
@@ -288,7 +300,7 @@ export async function completeOnboardingAction(
       // unavailable; the audit/outbox path records the operational failure.
     }
 
-    return { success: true, email: accessEmail, activationNoticeStatus };
+    return { success: true, email: accessEmail, activationNoticeStatus, keptExistingPassword };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao concluir o onboarding.";
     return { success: false, error: message };

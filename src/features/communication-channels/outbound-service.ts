@@ -690,7 +690,7 @@ export function resolveTemplateTextBody(purpose: string, rawVariables: string[],
     const nome = rawVariables[0]?.trim() || "Corretor(a)";
     const empresa = rawVariables[1]?.trim() || "Âncora";
     const link = urlButtonParameter
-      ? (urlButtonParameter.startsWith("http") ? urlButtonParameter : `${baseUrl}/convite/${urlButtonParameter}`)
+      ? inviteLinkFor(urlButtonParameter)
       : baseUrl;
     return `Olá *${nome}*! 👋\n\nVocê recebeu um convite para criar seu acesso no sistema *${empresa}*.\n\nAcesse o link abaixo para definir sua senha e entrar no sistema:\n${link}\n\n_Este link é individual e seguro._`;
   }
@@ -808,8 +808,9 @@ async function loadInvitationToken(row: OutboundRow) {
   }
 }
 
-function inviteLinkFor(token: string) {
-  return token.startsWith("http") ? token : `${textBaseUrl()}/convite/${token}`;
+/** The first-access page the invite opens (the same one the Meta button opens). */
+export function inviteLinkFor(token: string) {
+  return token.startsWith("http") ? token : `${textBaseUrl()}/primeiro-acesso?token=${encodeURIComponent(token)}`;
 }
 
 /** Company-number fallback for a team notice Meta could not send. True when it went out. */

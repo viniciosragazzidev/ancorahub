@@ -163,7 +163,8 @@ export const MESSAGE_EVENT_CATALOG = [
     variables: [
       { key: "nome", label: "Nome do membro", aliases: ["corretor_nome", "nome_usuario"], fallback: "Corretor(a)" },
       { key: "empresa", label: "Nome da empresa", aliases: ["company"], fallback: "Âncora" },
-      { key: "login_url", label: "Link de login", aliases: ["crm_login_url"], fallback: "https://crm.ancorasaude.cloud/login", urlOnly: true },
+      // Shown in the text ({{3}} of broker_account_activated), not a button parameter.
+      { key: "login_url", label: "Link de login", aliases: ["crm_login_url", "link"], fallback: "https://crm.ancorasaude.cloud/login" },
     ],
     defaultFreeMessage: "Olá *{{nome}}*!\n\nSua conta no *{{empresa}}* foi ativada com sucesso.\n\nAcesse o CRM pelo link:\n{{login_url}}",
   },

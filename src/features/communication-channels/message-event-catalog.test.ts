@@ -134,3 +134,11 @@ describe("Meta template parameters", () => {
     expect(buildMetaProviderVariables(event, ["Ana"], ["x"], { x: "corretor_nome" })).toEqual(["Ana"]);
   });
 });
+
+describe("account activated notice", () => {
+  it("fills the login link in {{3}} of the approved template (it showed \"Corretor(a)\")", () => {
+    const event = getMessageEventByKey("BROKER_ACCOUNT_ACTIVATED")!;
+    expect(buildMetaProviderVariables(event, ["Vinicios Ragazzi", "Âncora Saúde", "https://crm.ancorasaude.cloud/login"], ["1", "2", "3"], {}))
+      .toEqual(["Vinicios Ragazzi", "Âncora Saúde", "https://crm.ancorasaude.cloud/login"]);
+  });
+});
