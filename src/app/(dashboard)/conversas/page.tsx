@@ -79,6 +79,17 @@ export default async function ConversationsPage({
   const isDirector = context.role === "director";
   const canSeeBrokerTab = isDirector || (context.role === "manager" && Boolean(context.branchId));
   const officialBrokerTab = canSeeBrokerTab && tab === "corretores";
+  // Numbers connected in coexistence (the WhatsApp Business app and the CRM
+  // on the same number): their conversations get a tab of their own.
+  const coexChannels = canSeeBrokerTab
+    ? await db.select({ id: schema.communicationChannels.id, displayPhoneNumber: schema.communicationChannels.displayPhoneNumber })
+      .from(schema.communicationChannels)
+      .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.onboardingMode, "coexistence")))
+    : [];
+  const coexTab = !officialBrokerTab && coexChannels.length > 0 && tab === "coex";
+  const coexLabel = coexChannels.length
+    ? `WhatsApp coex · ${coexChannels.map((channel) => String(channel.displayPhoneNumber ?? "").replace(/\D/g, "").slice(-4)).filter(Boolean).join(", ")}`
+    : null;
   const scope =
     context.role === "manager" && context.branchId
       ? eq(schema.leads.branchId, context.branchId)
@@ -625,6 +636,16 @@ export default async function ConversationsPage({
         : new Date(b.stageEnteredAt).getTime();
       return timeB - timeA;
     });
+
+    // "WhatsApp coex": only the conversations that went through a coexistence number.
+    if (coexTab) {
+      const coexChannelIds = new Set(coexChannels.map((channel) => channel.id));
+      const coexMessages = messageRows.filter((message) => message.communicationChannelId && coexChannelIds.has(message.communicationChannelId));
+      const coexLeadIds = new Set(coexMessages.map((message) => message.leadId).filter((id): id is string => Boolean(id)));
+      const phoneKey = (phone: string | null | undefined) => String(phone ?? "").replace(/\D/g, "").slice(-8);
+      const coexPhones = new Set(coexMessages.map((message) => phoneKey(message.phone)).filter((key) => key.length === 8));
+      finalConversations = finalConversations.filter((conversation) => coexLeadIds.has(conversation.id) || coexPhones.has(phoneKey(conversation.telefone)));
+    }
   }
 
   let officialBrokerConversations: OfficialBrokerConversation[] = [];
@@ -951,8 +972,9 @@ export default async function ConversationsPage({
             <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
               <BulkQualificationDialog />
               <ConversasHeaderNav
-                currentTab={officialBrokerTab ? "corretores" : "leads"}
+                currentTab={officialBrokerTab ? "corretores" : coexTab ? "coex" : "leads"}
                 leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
+                coexLabel={coexLabel}
               />
             </nav>
           ) : undefined
