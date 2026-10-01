@@ -8,6 +8,8 @@ export type LeadRow = {
   email: string | null;
   status: string;
   source: string;
+  /** Set when the lead came in through WhatsApp (the coexistence number / click-to-WhatsApp ads). */
+  whatsappEntry?: { label: string | null } | null;
   planType: string;
   lives: number;
   city: string | null;

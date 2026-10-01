@@ -8,7 +8,7 @@ import type { LeadRow } from "./leads-table-config";
 import type { LeadWorkspaceItem, QualifyingLeadItem } from "./leads-workspace";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { getLeadProductLabel } from "@/features/leads/meta-lead-display";
+import { getLeadProductLabel, readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
 
 export interface LeadsDataTableProps {
   leads: LeadWorkspaceItem[];
@@ -30,6 +30,11 @@ export interface LeadsDataTableProps {
   onRowClick?: (lead: LeadWorkspaceItem) => void;
 }
 
+function readWhatsappEntry(item: { sourceChannel?: string | null; sourceMetadata?: unknown }) {
+  const details = readMetaLeadDisplayDetails(item.sourceChannel, item.sourceMetadata);
+  return details.entry === "whatsapp" ? { label: details.adsLabel } : null;
+}
+
 export function LeadsDataTable({
   leads,
   pagination,
@@ -43,6 +48,7 @@ export function LeadsDataTable({
       email: null,
       status: item.status,
       source: item.origem,
+      whatsappEntry: readWhatsappEntry(item),
       planType: getLeadProductLabel({ tipo: item.tipo, sourceChannel: item.sourceChannel, sourceMetadata: item.sourceMetadata }),
       lives: 1,
       city: item.branchName ?? null,
@@ -161,6 +167,7 @@ export function QualifyingLeadsDataTable({
       email: item.email ?? null,
       status: item.status,
       source: item.origem,
+      whatsappEntry: readWhatsappEntry(item),
       planType: getLeadProductLabel({ tipo: item.tipo, sourceChannel: item.sourceChannel, sourceMetadata: item.sourceMetadata }),
       lives: 1,
       city: item.branchName ?? null,

@@ -26,6 +26,7 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
 import type { LeadRow } from "./leads-table-config";
+import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { WhatsappLogo } from "@/components/huge-icons";
@@ -245,17 +246,28 @@ export const getLeadsColumns = (
             className="size-8 rounded-lg shrink-0 border border-border/60 text-[11px] font-bold"
           />
           <div className="min-w-0 flex flex-col gap-0.5">
-            <Button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenDrawer(lead);
-              }}
-              className="h-auto max-w-full justify-start truncate p-0 text-left text-xs font-semibold text-foreground"
-              variant="link"
-            >
-              {lead.name}
-            </Button>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <Button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenDrawer(lead);
+                }}
+                className="h-auto min-w-0 justify-start truncate p-0 text-left text-xs font-semibold text-foreground"
+                variant="link"
+              >
+                {lead.name}
+              </Button>
+              {lead.whatsappEntry ? (
+                <span
+                  title={lead.whatsappEntry.label ? `Entrou pelo WhatsApp · ${lead.whatsappEntry.label}` : "Entrou pelo WhatsApp"}
+                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground"
+                >
+                  <WhatsappLogo className="size-2.5" weight="fill" />
+                  WhatsApp
+                </span>
+              ) : null}
+            </div>
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <span className="font-mono tabular-nums">{lead.phone}</span>
               {phoneDigits && (
@@ -346,7 +358,7 @@ export const getLeadsColumns = (
       if (!qual) return <span className="text-muted-foreground text-[11px] font-mono">—</span>;
 
       const config = QUALIFICATION_CONFIG[qual.toLowerCase()] ?? {
-        label: qual,
+        label: LEAD_QUALIFICATION_LABELS[qual as LeadQualificationStatus] ?? qual,
         className: "bg-muted/50 text-muted-foreground border-border/50",
       };
 
