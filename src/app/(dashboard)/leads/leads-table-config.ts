@@ -10,6 +10,8 @@ export type LeadRow = {
   source: string;
   /** Set when the lead came in through WhatsApp (the coexistence number / click-to-WhatsApp ads). */
   whatsappEntry?: { label: string | null } | null;
+  /** Tags the team put on this lead's conversation. */
+  tags?: { id: string; name: string; colorHue: number }[];
   planType: string;
   lives: number;
   city: string | null;

@@ -26,6 +26,7 @@ import {
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import { QueueColorTag } from "@/features/lead-distribution/queue-color-tag";
 import type { LeadRow } from "./leads-table-config";
+import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -268,6 +269,7 @@ export const getLeadsColumns = (
                 </span>
               ) : null}
             </div>
+            <LeadTagChips tags={lead.tags} />
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
               <span className="font-mono tabular-nums">{lead.phone}</span>
               {phoneDigits && (

@@ -2112,6 +2112,37 @@ export const teamNoticeSettings = pgTable(
   (table) => [primaryKey({ columns: [table.tenantId, table.noticeKey] })],
 );
 
+/** Tags the team puts on lead conversations: a name and a hue (shown as a dot, like queues). */
+export const leadTags = pgTable(
+  "lead_tags",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    colorHue: integer("color_hue").notNull(),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("lead_tags_tenant_name_unique").on(table.tenantId, sql`lower(${table.name})`)],
+);
+
+/** Which tags each lead has. */
+export const leadTagAssignments = pgTable(
+  "lead_tag_assignments",
+  {
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    tagId: text("tag_id").notNull().references(() => leadTags.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leadId, table.tagId] }),
+    index("lead_tag_assignments_tenant_tag_idx").on(table.tenantId, table.tagId),
+  ],
+);
+
 /** Tenant-owned cadence aggregate. Published versions are immutable. */
 export const wahaCadences = pgTable(
   "waha_cadences",

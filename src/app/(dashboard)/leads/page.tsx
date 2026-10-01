@@ -30,6 +30,7 @@ import { listAvailableCatalogPlans } from "@/features/global-catalog/queries";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { resolveMetaCampaignEligibility } from "@/features/leads/meta-campaign-eligibility";
 import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
+import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { buildLeadScopeWhere, buildUnassignedLeadWhere } from "@/features/leads/lead-authorization";
 import { buildDrizzleFilter, buildDrizzleOrderBy } from "@/shared/data-table/drizzle-filters";
 import { leadsColumnMap, leadsSortMap } from "./leads-table-config";
@@ -63,6 +64,7 @@ async function LeadsPageContent({
     new?: string;
     tipo?: string;
     origem?: string;
+    tag?: string;
     qualification?: string;
     corretor?: string;
     page?: string;
@@ -315,6 +317,10 @@ async function LeadsPageContent({
         ? eq(schema.leads.tipo, "PME")
         : null;
   const origemFilter = filters.origem === "manual" || filters.origem === "webhook" ? eq(schema.leads.origem, filters.origem) : null;
+  // ?tag=: leads whose conversation has this tag.
+  const tagFilter = filters.tag && /^[0-9a-f-]{36}$/i.test(filters.tag)
+    ? sql`exists (select 1 from lead_tag_assignments lta where lta.lead_id = ${schema.leads.id} and lta.tag_id = ${filters.tag})`
+    : null;
   const qualificationFilter = filters.qualification ? eq(schema.leads.qualificationStatus, filters.qualification) : null;
   const corretorFilter = filters.corretor ? eq(schema.leads.corretorId, filters.corretor) : null;
   // Queue tabs (?fila=): a queue id or "sem-fila".
@@ -390,6 +396,7 @@ async function LeadsPageContent({
     ...(searchFilter ? [searchFilter] : []),
     ...(tipoFilter ? [tipoFilter] : []),
     ...(origemFilter ? [origemFilter] : []),
+    ...(tagFilter ? [tagFilter] : []),
     ...(qualificationFilter ? [qualificationFilter] : []),
     ...(corretorFilter ? [corretorFilter] : []),
     ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
@@ -414,6 +421,7 @@ async function LeadsPageContent({
         ...(searchFilter ? [searchFilter] : []),
         ...(tipoFilter ? [tipoFilter] : []),
         ...(origemFilter ? [origemFilter] : []),
+        ...(tagFilter ? [tagFilter] : []),
         ...(qualificationFilter ? [qualificationFilter] : []),
         ...(corretorFilter ? [corretorFilter] : []),
         ...(eligibleCampaignFilter ? [eligibleCampaignFilter] : []),
@@ -662,6 +670,11 @@ async function LeadsPageContent({
       createdAt: item.createdAt.toISOString(),
     }));
 
+  const [leadTagList, tagsByLead] = await Promise.all([
+    listLeadTags(context.tenantId),
+    getLeadTagsByLead(context.tenantId, [...leads, ...qualifyingLeads, ...unassignedRows].map((lead) => lead.id)),
+  ]);
+
   const slaFirstContactMinutes = Number(slaSettings.slaFirstContactMinutes);
   const slaStagnantDays = Number(slaSettings.slaStagnantDays);
   const leadManagementActionsEnabled = systemSettings.get("feature_lead_management_actions_enabled") !== "false";
@@ -745,6 +758,8 @@ async function LeadsPageContent({
           initialStatus={filters.status}
           initialTipo={filters.tipo}
           initialEligibleCampaigns={filters.eligibleCampaigns}
+          initialTag={filters.tag}
+          tags={leadTagList}
           storageKey={`ancorahub:leads-filters:${context.tenantId}:${context.userId}`}
         />
 
@@ -754,6 +769,7 @@ async function LeadsPageContent({
             <LeadsWorkspace
               leads={leads.map((lead) => ({
                 ...lead,
+                tags: tagsByLead.get(lead.id) ?? [],
                 sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 returnedUnaccepted: returnedUnacceptedIds.has(lead.id),
@@ -767,6 +783,7 @@ async function LeadsPageContent({
               }))}
               qualifyingLeads={qualifyingLeads.map((lead) => ({
                 ...lead,
+                tags: tagsByLead.get(lead.id) ?? [],
                 sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
               }))}
               queues={activeQueues}
@@ -783,6 +800,7 @@ async function LeadsPageContent({
               pageSize={pageSize}
               unassignedLeads={unassignedRows.map((lead) => ({
                 ...lead,
+                tags: tagsByLead.get(lead.id) ?? [],
                 sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
                 isPlantaoAtivo: isLeadOnActiveDuty(lead),
                 returnedUnaccepted: returnedUnacceptedIds.has(lead.id),

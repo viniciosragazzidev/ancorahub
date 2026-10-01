@@ -11,6 +11,8 @@ export type LeadWorkspaceItem = {
   sourceChannel?: string | null;
   sourceCampaign: string | null;
   sourceMetadata?: unknown;
+  /** Tags the team put on this lead's conversation. */
+  tags?: { id: string; name: string; colorHue: number }[];
   tipo: string;
   createdAt: string;
   assignedAt: string | null;

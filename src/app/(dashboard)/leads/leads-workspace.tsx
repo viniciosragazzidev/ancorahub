@@ -95,6 +95,7 @@ export type QualifyingLeadItem = {
   sourceChannel?: string | null;
   sourceCampaign?: string | null;
   sourceMetadata?: unknown;
+  tags?: { id: string; name: string; colorHue: number }[];
   tipo: string;
   queueId?: string | null;
   queueName?: string | null;

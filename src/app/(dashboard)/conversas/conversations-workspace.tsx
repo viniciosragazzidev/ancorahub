@@ -20,6 +20,10 @@ import { ContextNote } from "@/components/ui/context-note";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { brokerDisplayName, CONTACT_SHORTCUT, contactShortcutMessage, isContactShortcut } from "./_components/contact-shortcut";
+import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
+import { LeadTagsPicker } from "@/features/lead-tags/components/lead-tags-picker";
+import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
+import type { LeadTag } from "@/features/lead-tags/rules";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -171,6 +175,8 @@ export type ConversationItem = {
     createdAt: string;
   }[];
   aiConversation?: AiConversationData | null;
+  /** Tags the team put on this lead's conversation. */
+  tags?: LeadTag[];
 };
 
 type ViewFilter = "all" | "qualified" | "ai_active" | "human_active" | "with_messages" | "without_messages";
@@ -182,6 +188,8 @@ export function ConversationsWorkspace({
   initialLeadId,
   userId,
   tenantId,
+  leadTags = [],
+  canManageTags = false,
 }: {
   role: string;
   branches: { id: string; name: string }[];
@@ -189,8 +197,14 @@ export function ConversationsWorkspace({
   initialLeadId?: string;
   userId?: string;
   tenantId?: string;
+  /** The tenant's tag list (names and colors). */
+  leadTags?: LeadTag[];
+  /** Directors and managers create, rename and recolor tags. */
+  canManageTags?: boolean;
 }) {
   const router = useRouter();
+  const [allTags, setAllTags] = useState(leadTags);
+  const [tagFilter, setTagFilter] = useState<string>("all");
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [conversations, setConversations] = useState(initialConversations);
@@ -257,10 +271,11 @@ export function ConversationsWorkspace({
                 ? conversation.messages.length > 0
                 : conversation.messages.length === 0);
       const matchesBranch = branchFilter === "all" || conversation.branchId === branchFilter;
+      const matchesTag = tagFilter === "all" || Boolean(conversation.tags?.some((tag) => tag.id === tagFilter));
 
-      return matchesQuery && matchesFilter && matchesBranch;
+      return matchesQuery && matchesFilter && matchesBranch && matchesTag;
     });
-  }, [branchFilter, conversations, filter, query]);
+  }, [branchFilter, conversations, filter, query, tagFilter]);
 
   function updateSelectedLeadInUrl(leadId: string | null) {
     const params = new URLSearchParams(searchParams.toString());
@@ -328,6 +343,26 @@ export function ConversationsWorkspace({
               </Select>
             ) : null}
 
+            {allTags.length > 0 ? (
+              <Select
+                labels={{ all: "Todas as tags", ...Object.fromEntries(allTags.map((tag) => [tag.id, tag.name])) }}
+                onValueChange={(value) => setTagFilter(value ?? "all")}
+                value={tagFilter}
+              >
+                <SelectTrigger aria-label="Filtrar atendimentos por tag" className="w-auto min-w-[130px] shrink-0" size="sm">
+                  <SelectValue placeholder="Todas as tags" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as tags</SelectItem>
+                  {allTags.map((tag) => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      <span className="inline-flex items-center gap-1.5"><QueueColorDot hue={tag.colorHue} />{tag.name}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : null}
+
             <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
               <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
               <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
@@ -372,7 +407,7 @@ export function ConversationsWorkspace({
                   onClick={() => selectConversation(conversation.id)}
                 />
               ))}
-              {!filtered.length ? <EmptyConversationList hasQuery={Boolean(query || filter !== "all" || branchFilter !== "all")} /> : null}
+              {!filtered.length ? <EmptyConversationList hasQuery={Boolean(query || filter !== "all" || branchFilter !== "all" || tagFilter !== "all")} /> : null}
             </div>
           </ScrollArea>
         </section>
@@ -391,6 +426,24 @@ export function ConversationsWorkspace({
                 tenantId={tenantId}
                 role={role}
               />
+              {!selected.id.startsWith("unassigned-") ? (
+                <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-1.5 sm:px-5">
+                  <LeadTagChips tags={selected.tags} max={6} className="flex-1" />
+                  {!selected.tags?.length ? <span className="flex-1 text-[11px] text-muted-foreground">Sem tags</span> : null}
+                  <LeadTagsPicker
+                    leadId={selected.id}
+                    allTags={allTags}
+                    selected={selected.tags ?? []}
+                    canManage={canManageTags}
+                    onSelectedChange={(tags) => handleUpdateConversation(selected.id, { tags })}
+                    onAllTagsChange={(tags) => {
+                      setAllTags(tags);
+                      // Renamed, recolored or deleted tags update on every conversation.
+                      setConversations((prev) => prev.map((item) => ({ ...item, tags: item.tags?.flatMap((tag) => tags.filter((next) => next.id === tag.id)) })));
+                    }}
+                  />
+                </div>
+              ) : null}
               <ConversationHistory client={selected} />
               <ChatInput
                 leadId={selected.id}
@@ -1502,6 +1555,7 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
           {conversation.latestMessage?.direction === "outgoing" || conversation.latestMessage?.direction === "outbound" ? "Você: " : ""}
           {preview}
         </span>
+        {conversation.tags?.length ? <LeadTagChips tags={conversation.tags} className="pt-0.5" /> : null}
         <span className="flex items-center gap-2 pt-0.5">
           {renderRowQualificationBadge(conversation)}
           <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">

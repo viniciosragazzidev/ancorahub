@@ -51,9 +51,11 @@ export function LeadsFilters({
   initialCorretor,
   initialPageSize,
   initialEligibleCampaigns,
+  initialTag,
   storageKey,
   branches,
   brokers,
+  tags = [],
 }: {
   initialSearch?: string;
   initialStatus?: string;
@@ -64,9 +66,12 @@ export function LeadsFilters({
   initialCorretor?: string;
   initialPageSize?: string;
   initialEligibleCampaigns?: string;
+  initialTag?: string;
   storageKey: string;
   branches: Branch[];
   brokers: Broker[];
+  /** The tenant's lead tags (filter by tag). */
+  tags?: { id: string; name: string; colorHue: number }[];
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -84,12 +89,13 @@ export function LeadsFilters({
   const [origem, setOrigem] = useState(initialOrigem ?? "");
   const [qualification, setQualification] = useState(initialQualification ?? "");
   const [corretor, setCorretor] = useState(initialCorretor ?? "");
+  const [tag, setTag] = useState(initialTag ?? "");
   const [pageSize, setPageSize] = useState(initialPageSize ?? "20");
   const [eligibleCampaigns, setEligibleCampaigns] = useState(initialEligibleCampaigns === "1");
   const [restored, setRestored] = useState(false);
 
   const currentPreferences = (): LeadFilterPreferences => ({
-    search, status, branch, tipo, origem, qualification, corretor, pageSize, eligibleCampaigns,
+    search, status, branch, tipo, origem, qualification, corretor, tag, pageSize, eligibleCampaigns,
   });
 
   function buildUrl(preferences: LeadFilterPreferences) {
@@ -104,6 +110,7 @@ export function LeadsFilters({
     if (preferences.origem) params.set("origem", preferences.origem); else params.delete("origem");
     if (preferences.qualification) params.set("qualification", preferences.qualification); else params.delete("qualification");
     if (preferences.corretor) params.set("corretor", preferences.corretor); else params.delete("corretor");
+    if (preferences.tag) params.set("tag", preferences.tag); else params.delete("tag");
     if (preferences.eligibleCampaigns) params.set("eligibleCampaigns", "1"); else params.delete("eligibleCampaigns");
     if (preferences.pageSize !== "20") params.set("pageSize", preferences.pageSize); else params.delete("pageSize");
 
@@ -137,6 +144,7 @@ export function LeadsFilters({
     setOrigem(params.get("origem") ?? "");
     setQualification(params.get("qualification") ?? "");
     setCorretor(params.get("corretor") ?? "");
+    setTag(params.get("tag") ?? "");
     setEligibleCampaigns(params.get("eligibleCampaigns") === "1");
     setPageSize(params.get("pageSize") ?? "20");
   }, [serializedSearchParams]);
@@ -159,6 +167,7 @@ export function LeadsFilters({
     origem,
     qualification,
     corretor,
+    tag,
     eligibleCampaigns ? "eligible-campaigns" : "",
     pageSize !== "20" ? pageSize : "",
   ].filter(Boolean).length;
@@ -180,6 +189,7 @@ export function LeadsFilters({
     setOrigem("");
     setQualification("");
     setCorretor("");
+    setTag("");
     setEligibleCampaigns(false);
     setPageSize("20");
 
@@ -196,6 +206,7 @@ export function LeadsFilters({
   if (qualification) chips.push({ id: "qualification", label: "Qualificação", value: qualificationLabels[qualification] ?? qualification });
   if (branch) chips.push({ id: "branch", label: "Filial", value: branches.find((b) => b.id === branch)?.name ?? "Filial" });
   if (corretor) chips.push({ id: "corretor", label: "Corretor", value: brokers.find((b) => b.id === corretor)?.name ?? "Corretor" });
+  if (tag) chips.push({ id: "tag", label: "Tag", value: tags.find((item) => item.id === tag)?.name ?? "Tag" });
   if (pageSize !== "20") chips.push({ id: "pageSize", label: "Por página", value: `${pageSize}/pág.` });
 
   function handleRemoveChip(chipId: string) {
@@ -207,6 +218,7 @@ export function LeadsFilters({
     if (chipId === "qualification") { setQualification(""); updated.qualification = ""; }
     if (chipId === "branch") { setBranch(""); updated.branch = ""; }
     if (chipId === "corretor") { setCorretor(""); updated.corretor = ""; }
+    if (chipId === "tag") { setTag(""); updated.tag = ""; }
     if (chipId === "pageSize") { setPageSize("20"); updated.pageSize = "20"; }
 
     window.localStorage.setItem(storageKey, JSON.stringify(updated));
@@ -325,6 +337,23 @@ export function LeadsFilters({
                     ))}
                   </div>
                 </div>
+
+                {/* Tag */}
+                {tags.length ? (
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+                      Tag
+                    </label>
+                    <AppSelect
+                      aria-label="Tag"
+                      className="h-8.5"
+                      triggerClassName="h-8.5 rounded-lg border-border/60 bg-muted/30 px-3 text-xs font-medium hover:bg-muted/50"
+                      onValueChange={(value) => setTag(value ?? "")}
+                      options={[{ value: "", label: "Todas as tags" }, ...tags.map((item) => ({ value: item.id, label: item.name }))]}
+                      value={tag}
+                    />
+                  </div>
+                ) : null}
 
                 {/* Campanhas Meta */}
                 <div className="space-y-1.5">

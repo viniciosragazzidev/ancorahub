@@ -6,11 +6,13 @@ export type LeadFilterPreferences = {
   origem: string;
   qualification: string;
   corretor: string;
+  /** A lead tag id. */
+  tag: string;
   pageSize: string;
   eligibleCampaigns: boolean;
 };
 
-const preferenceKeys = ["search", "status", "branch", "tipo", "origem", "qualification", "corretor", "pageSize"] as const;
+const preferenceKeys = ["search", "status", "branch", "tipo", "origem", "qualification", "corretor", "tag", "pageSize"] as const;
 
 export const defaultLeadFilterPreferences: LeadFilterPreferences = {
   search: "",
@@ -20,6 +22,7 @@ export const defaultLeadFilterPreferences: LeadFilterPreferences = {
   origem: "",
   qualification: "",
   corretor: "",
+  tag: "",
   pageSize: "20",
   eligibleCampaigns: false,
 };
@@ -45,6 +48,6 @@ export function parseLeadFilterPreferences(raw: string | null): LeadFilterPrefer
 }
 
 export function hasLeadFilterQuery(params: URLSearchParams) {
-  return ["search", "status", "branch", "tipo", "origem", "qualification", "corretor", "pageSize", "eligibleCampaigns"]
+  return ["search", "status", "branch", "tipo", "origem", "qualification", "corretor", "tag", "pageSize", "eligibleCampaigns"]
     .some((key) => params.has(key));
 }

@@ -18,6 +18,8 @@ import {
   type OfficialBrokerMessage,
 } from "./official-broker-conversations";
 import { ConversasHeaderNav } from "./_components/conversas-header-nav";
+import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
+import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
 import { isMediaKindSupported } from "@/features/conversations/media-kinds";
 import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
@@ -87,6 +89,7 @@ export default async function ConversationsPage({
       .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.onboardingMode, "coexistence")))
     : [];
   const coexTab = !officialBrokerTab && coexChannels.length > 0 && tab === "coex";
+  const leadTags = officialBrokerTab ? [] : await listLeadTags(context.tenantId);
   const coexLabel = coexChannels.length
     ? `WhatsApp coex · ${coexChannels.map((channel) => String(channel.displayPhoneNumber ?? "").replace(/\D/g, "").slice(-4)).filter(Boolean).join(", ")}`
     : null;
@@ -637,6 +640,10 @@ export default async function ConversationsPage({
       return timeB - timeA;
     });
 
+    // Each lead's tags (the synthetic "unassigned-…" contacts have none).
+    const tagsByLead = await getLeadTagsByLead(context.tenantId, finalConversations.map((conversation) => conversation.id).filter((id) => !id.startsWith("unassigned-")));
+    finalConversations = finalConversations.map((conversation) => ({ ...conversation, tags: tagsByLead.get(conversation.id) ?? [] }));
+
     // "WhatsApp coex": only the conversations that went through a coexistence number.
     if (coexTab) {
       const coexChannelIds = new Set(coexChannels.map((channel) => channel.id));
@@ -996,6 +1003,8 @@ export default async function ConversationsPage({
               initialLeadId={leadId}
               userId={context.userId}
               tenantId={context.tenantId}
+              leadTags={leadTags}
+              canManageTags={canManageLeadTags(context.role)}
             />
           )}
         </div>
