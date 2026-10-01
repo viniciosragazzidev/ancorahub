@@ -223,7 +223,7 @@ export const FEATURE_FLAGS = {
     defaultValue: "true",
     allowedValues: ["true", "false"] as const,
     description:
-      "Habilita a Central de Relatórios (Reporting 1): catálogo canônico de métricas, abas por papel, funil de 8 estágios, seção de atenção e drill-down explicável. Desativa = layout legado anterior.",
+      "Habilita as análises da Central de Relatórios, incluindo qualidade/origem dos leads e drill-down explicável. Desativa as análises; a visão operacional do Dashboard permanece disponível.",
   },
 
   BROKER_AVAILABILITY_ONBOARDING: {

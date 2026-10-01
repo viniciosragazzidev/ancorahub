@@ -14,6 +14,31 @@ export function percentage(numerator: number, denominator: number): number {
   return safeRate(numerator, denominator) * 100;
 }
 
+export type LeadQualityCounts = {
+  total: number;
+  hot: number;
+  warm: number;
+  cold: number;
+  converted: number;
+  hotWarmConverted: number;
+  assigned: number;
+  metaAttributed: number;
+};
+
+/** Canonical derived rates for persisted lead-quality aggregates (DEC-129). */
+export function leadQualityRates(counts: LeadQualityCounts) {
+  const classified = counts.hot + counts.warm + counts.cold;
+  const hotWarm = counts.hot + counts.warm;
+  return {
+    classificationCoverage: percentage(classified, counts.total),
+    hotWarmShare: percentage(hotWarm, classified),
+    hotWarmConversionRate: percentage(counts.hotWarmConverted, hotWarm),
+    conversionRate: percentage(counts.converted, counts.total),
+    assignedRate: percentage(counts.assigned, counts.total),
+    metaAdAttributionCoverage: percentage(counts.metaAttributed, counts.total),
+  };
+}
+
 export function formatRatePtBR(numerator: number, denominator: number): string {
   return percentage(numerator, denominator).toLocaleString("pt-BR", {
     minimumFractionDigits: 1,

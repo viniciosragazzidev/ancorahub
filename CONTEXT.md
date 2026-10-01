@@ -65,6 +65,9 @@
 - **Relatório operacional supervisionado**: exportação de leads, qualificação, tarefas, distribuição, conversão e desempenho restrita aos corretores ativos vinculados ao Supervisor. Nunca contém valores ou comissões.
 - **Relatório consolidado**: exportação autorizada no escopo do Diretor (tenant) ou Gestor (filial atual), com as limitações da permissão do relatório.
 - **Métrica canônica**: definição versionada de um indicador (identificador estável, numerador, denominador e dimensões permitidas) mantida no catálogo de métricas. Toda superfície consome a mesma definição; nenhuma tela recalcula o indicador localmente.
+- **Temperatura de qualificação**: classificação comercial explícita do lead (`quente`, `morno` ou `frio`) persistida pelo fluxo autorizado. É diferente da completude da qualificação e não é, por si só, uma probabilidade de venda.
+- **Completude da qualificação**: medida de quantos campos necessários foram coletados. Ela descreve o preenchimento do perfil, não a intenção de compra.
+- **Análise de qualidade de leads**: leitura agregada da coorte de entrada, da temperatura persistida atual, da origem e dos resultados observados. Não recalcula a classificação nem promete causalidade ou desempenho futuro.
 - **Taxa de conversão (coorte de entrada)**: leads recebidos em um período que alcançaram o estágio `converted` divididos pelos leads recebidos no mesmo período, excluídos duplicados e descartados. Numerador e denominador pertencem à mesma população de leads.
 - **Família de relatórios**: agrupamento de análises sobre o mesmo recorte do negócio (Visão geral, Comercial, Equipe, Unidades, Financeiro) dentro da rota única de relatórios. Não é uma rota nem uma regra de negócio própria.
 - **Drill-down**: caminho de um número agregado até a população exata de registros que o compõe, respeitando o escopo da sessão. Todo número de relatório precisa ter um drill-down explicável.

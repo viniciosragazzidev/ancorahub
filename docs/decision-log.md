@@ -1487,3 +1487,20 @@ O detalhe compartilhado do lead para Diretor/Gestor também mostra o motivo
 registrado quando a gestão assumiu o lead para investigação, lendo a interação
 existente e auditando o acesso; nenhuma coluna redundante é criada. Execução em
 `docs/implementations/active/2026-09-30-cold-lead-reactivation.md`.
+
+## DEC-129 — Central de qualidade e origem dos leads
+
+**Aplicada em 2026-10-01 a partir da solicitação do usuário.** A leitura analítica
+usa a coorte de entrada do período e os estados atuais persistidos no lead. A
+temperatura é somente `qualificationStatus` (`hot`, `warm`, `cold`); demais estados
+permanecem sem temperatura. `qualificationScore` não será tratado como probabilidade
+de venda nem usado para recalcular a classe. Conversão e primeiro contato são
+resultados atuais da coorte, sem alegar snapshot histórico da temperatura.
+
+A atribuição de mídia usa IDs Meta persistidos por tenant; nomes são rótulos e IDs
+ausentes permanecem não atribuídos. Fila e corretor representam o vínculo atual,
+não o histórico de redistribuição. Idade aparece em faixas, sem telefone/e-mail no
+drill-down analítico; todas as consultas derivam tenant, unidade, equipe e carteira
+da sessão. A visão fica em `?tab=quality` no Dashboard unificado e é controlada pela
+capability global auditada `feature_reporting_center_enabled`. Investimento/CPL/CPA
+ficam fora até existir sincronização de gasto real da Meta.

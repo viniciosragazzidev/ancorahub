@@ -11,6 +11,10 @@
 | Funil | `leads.status` no período | `getFunnelSnapshot` | `/relatorios` | CANONICAL | Consumir diretamente |
 | Itens de atenção | SLA configurado no tenant, lead/filas | `getAttentionSnapshot` | `/relatorios` | CANONICAL | Consumir diretamente, com drill-down |
 | Desempenho por unidade | `leads.branchId` + vendas vinculadas | `getUnitPerformance` | `/relatorios` | CANONICAL | Consumir diretamente |
+| Temperatura e cobertura de classificação | `leads.qualificationStatus` persistido; `qualificationScore` não é intenção | `getLeadQualityReport` + `leadQualityRates` | `/dashboard?tab=quality` | CANONICAL (DEC-129) | Não recalcular no cliente; `hot`/`warm`/`cold` são estados atuais |
+| Conversão de quentes/mornos | `leads.status` + `qualificationStatus` na mesma coorte | `getLeadQualityReport` + `leadQualityRates` | `/dashboard?tab=quality` | CANONICAL (DEC-129) | Identificar como classificação e status atuais, sem snapshot histórico |
+| Cobertura de atribuição Meta | `leads.metaAdId` persistido | `getLeadQualityReport` + `leadQualityRates` | `/dashboard?tab=quality` | CANONICAL (DEC-129) | Não inferir atribuição ou custo a partir de nome/orçamento |
+| Perfil, fila e horário de entrada | `qualificationDetails`, `queueId`, `corretorId`, `createdAt` | `getLeadQualityReport` | `/dashboard?tab=quality` | AGREGADO (DEC-129) | Faixas etárias, horário de Brasília, grupos com n<3 suprimidos |
 | Série diária de entradas e conversões | `leads.createdAt` + `status=converted`, escopo canônico | `getLeadTimeline` | novo consumidor: `/dashboard` | CANONICAL (nova projeção) | Centralizar em `metrics-service.ts` |
 | Totais, tendência e funil do dashboard antigo | queries diretas em `src/app/(dashboard)/dashboard/data.ts` | `getDirectorDashboardData` | dashboard NOC legado | DUPLICATED / CONFLICTING | Não usar para Diretor; manter temporariamente para outros papéis |
 | NOC operacional | consultas próprias para monitoramento | `src/app/(dashboard)/noc/*` | `/noc` | REUSABLE, mas finalidade distinta | Não usar como origem executiva |

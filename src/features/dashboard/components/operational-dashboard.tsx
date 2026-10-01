@@ -3,6 +3,7 @@
 import { Buildings, Users } from "@/components/huge-icons";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { PeriodSelect } from "@/components/period-select";
+import { DashboardSectionTabs } from "./dashboard-section-tabs";
 import type { DashboardViewData } from "../service";
 import {
   AttentionGrid,
@@ -24,9 +25,11 @@ import {
 export function OperationalDashboard({
   model,
   period,
+  showQualityTab = false,
 }: {
   model: DashboardViewData;
   period: number;
+  showQualityTab?: boolean;
 }) {
   const now = new Date(model.generatedAt);
   const dateLabel = new Intl.DateTimeFormat("pt-BR", {
@@ -55,6 +58,7 @@ export function OperationalDashboard({
       />
 
       <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <DashboardSectionTabs active="overview" period={period as 7 | 14 | 30 | 90} showQuality={showQualityTab} />
         <WelcomeHero welcome={model.welcome} dateLabel={dateLabel} summary={summary} />
 
         <section aria-label="Resumo do período">

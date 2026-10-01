@@ -1,5 +1,19 @@
 # Controle de Execução do Redesign
 
+## 2026-10-01 — Central de qualidade de leads
+
+Refinamento coeso do Dashboard gerencial: a aba “Qualidade” ajuda Diretor, Gestor,
+Supervisor e Marketing autorizado a entender temperatura persistida, origem Meta,
+perfil e resposta operacional. A ação principal é comparar recortes e abrir a
+população de leads que os explica. A visão usa `/dashboard?tab=quality`, o período
+na URL e o escopo já autorizado pelo servidor; o modo Lite permanece preservado.
+Estados: loading, dados, período vazio, erro recuperável, capacidade desativada e
+drill-down. Reutiliza `PageTabs`, `PeriodSelect`, Card, Badge e DataTable; sem nova
+rota paralela, token ou primitive. A classificação não é recalculada; idade aparece
+por faixa e o gasto Meta não é inferido. Registro:
+`docs/implementations/completed/2026-10-01-lead-quality-center.md`. QA mobile UX-M1.10
+permanece pendente.
+
 ## 2026-09-30 — Agenda de plantões do Corretor Lite
 
 Nova rota `/plantoes`, mantendo o papel de corretor e a identidade visual Lite

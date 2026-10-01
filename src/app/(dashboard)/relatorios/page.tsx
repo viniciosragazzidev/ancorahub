@@ -1,4 +1,6 @@
 import { redirect } from "next/navigation";
+import { parsePeriod } from "@/shared/period";
+import { parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +12,24 @@ export const dynamic = "force-dynamic";
 export default async function ReportsCompatibilityPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; tab?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
   const query = new URLSearchParams();
-  if (params.period) query.set("period", params.period);
-  if (params.tab) query.set("tab", params.tab);
+  const rawPeriod = typeof params.period === "string" ? params.period : undefined;
+  const period = parsePeriod(rawPeriod);
+  if (rawPeriod && period !== 30) query.set("period", String(period));
+  const requestedTab = typeof params.tab === "string" ? params.tab : undefined;
+  const destinationTab = requestedTab === undefined || requestedTab === "quality" ? "quality" : "overview";
+  query.set("tab", destinationTab);
+  const focus = parseLeadQualityFocus(
+    typeof params.dimension === "string" ? params.dimension : undefined,
+    typeof params.key === "string" ? params.key : undefined,
+  );
+  if (destinationTab === "quality" && focus) {
+    query.set("dimension", focus.dimension);
+    query.set("key", focus.key);
+  }
   const suffix = query.toString();
-  redirect(suffix ? `/dashboard?${suffix}` : "/dashboard");
+  redirect(`/dashboard?${suffix}`);
 }

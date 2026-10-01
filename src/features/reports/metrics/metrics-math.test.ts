@@ -4,6 +4,7 @@ import {
   buildFunnelRows,
   comparisonDelta,
   formatDeltaPtBR,
+  leadQualityRates,
   percentage,
   previousWindowStart,
   safeRate,
@@ -17,6 +18,36 @@ describe("safeRate / percentage", () => {
 
   it("calcula a taxa da coorte", () => {
     expect(percentage(217, 1284)).toBeCloseTo(16.9, 1);
+  });
+});
+
+describe("leadQualityRates", () => {
+  it("mantém classes sem temperatura fora do denominador de quentes/mornos", () => {
+    const rates = leadQualityRates({
+      total: 20,
+      hot: 3,
+      warm: 5,
+      cold: 2,
+      converted: 4,
+      hotWarmConverted: 3,
+      assigned: 12,
+      metaAttributed: 10,
+    });
+
+    expect(rates.classificationCoverage).toBe(50);
+    expect(rates.hotWarmShare).toBe(80);
+    expect(rates.hotWarmConversionRate).toBe(37.5);
+    expect(rates.conversionRate).toBe(20);
+    expect(rates.assignedRate).toBe(60);
+    expect(rates.metaAdAttributionCoverage).toBe(50);
+  });
+
+  it("não divide por zero em coortes vazias", () => {
+    const rates = leadQualityRates({
+      total: 0, hot: 0, warm: 0, cold: 0, converted: 0,
+      hotWarmConverted: 0, assigned: 0, metaAttributed: 0,
+    });
+    expect(Object.values(rates).every((rate) => rate === 0)).toBe(true);
   });
 });
 

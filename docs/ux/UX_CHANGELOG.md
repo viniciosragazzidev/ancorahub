@@ -1,5 +1,14 @@
 # Histórico de Alterações de UX/UI (UX Changelog)
 
+## 2026-10-01 — Central de qualidade de leads
+
+- O Dashboard gerencial ganha uma visão navegável de qualidade por temperatura,
+  origem de anúncio, fila, perfil e horário, com filtros por período e drill-down
+  tenant/role-scoped até os leads correspondentes.
+- A tela distingue classificação atual de completude, usa faixas de idade e não
+  estima custo sem dados de gasto Meta. Modo Lite, tokens e componentes existentes
+  são preservados. QA autenticado UX-M1.10 permanece pendente.
+
 ## 2026-09-29 — Detalhes do lead acessíveis no plantão
 
 - O nome do lead na tabela de um plantão agora abre o drawer compartilhado com

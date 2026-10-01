@@ -149,3 +149,28 @@ superfície nova DEVE consumir o catálogo — nunca recalcular localmente.
 - `team.brokers_over_capacity` — corretores acima da capacidade (atenção)
 - `financial.gross_revenue` — soma de `saleValue` (vendas ativas)
 - `financial.average_ticket` — receita ÷ vendas
+
+## 11. Central de qualidade e aquisição (DEC-129)
+
+Disponível na aba **Qualidade dos leads** do Dashboard gerencial (`/dashboard?tab=quality`);
+`/relatorios` permanece como endereço de compatibilidade e abre esta análise por
+padrão. A visão cruza temperatura persistida, IDs Meta, atribuição atual, perfil e
+horário, com drill-down protegido até os leads do recorte. Continua submetida à
+matriz de acesso e a `resolveReportDataScope`; a capability de campanhas não
+concede escopo adicional de leads.
+
+Métricas versionadas em `src/features/reports/metrics/metric-catalog.ts`:
+
+- `lead_quality.temperature_distribution` — contagem por estado de temperatura
+  persistido (`hot`/`warm`/`cold`), sem usar `qualificationScore` como propensão.
+- `lead_quality.classification_coverage` — estados classificados ÷ coorte.
+- `lead_quality.hot_warm_conversion_rate` — conversões atuais de leads quentes/mornos
+  atuais ÷ leads quentes/mornos atuais; não é um snapshot histórico por temperatura.
+- `lead_quality.meta_ad_attribution_coverage` — leads com `metaAdId` persistido ÷ coorte.
+
+As dimensões são campanha, conjunto, anúncio, formulário, canal, fila, corretor,
+tipo, plano, cidade, faixa etária e dia/hora (`America/Sao_Paulo`). Fila/corretor,
+temperatura e status são valores atuais; grupos com menos de 3 registros são
+suprimidos. Investimento, CPL e CPA continuam ausentes até sincronização de gasto
+real da Meta. A feature flag global já auditada `feature_reporting_center_enabled`
+desativa esta análise sem desligar a visão operacional.

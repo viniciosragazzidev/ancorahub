@@ -9,7 +9,22 @@
 
 export type MetricFormat = "count" | "percentage" | "currency" | "seconds" | "days";
 
-export type MetricDimension = "unit" | "broker" | "source" | "period";
+export type MetricDimension =
+  | "unit"
+  | "broker"
+  | "source"
+  | "period"
+  | "qualification_temperature"
+  | "campaign"
+  | "adset"
+  | "ad"
+  | "form"
+  | "queue"
+  | "lead_type"
+  | "plan_type"
+  | "city"
+  | "age_band"
+  | "weekday_hour";
 
 export interface MetricDefinition {
   /** Identificador estável, ex.: "commercial.conversion_rate". */
@@ -89,6 +104,42 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     format: "seconds",
     explanation: "Média de firstContactLatencySeconds dos leads distribuídos no período.",
     allowedDimensions: ["unit", "broker", "source", "period"],
+    version: 1,
+  },
+  {
+    id: "lead_quality.temperature_distribution",
+    label: "Distribuição de temperatura",
+    description: "Classificações quentes, mornas e frias persistidas na coorte de entrada.",
+    format: "count",
+    explanation: "Contagem de leads por `qualificationStatus` atual (`hot`, `warm` ou `cold`); os demais estados ficam sem temperatura e não são recalculados pelo score.",
+    allowedDimensions: ["period", "source", "campaign", "adset", "ad", "form", "queue", "broker", "lead_type", "plan_type", "city", "age_band", "weekday_hour"],
+    version: 1,
+  },
+  {
+    id: "lead_quality.classification_coverage",
+    label: "Cobertura de classificação",
+    description: "Leads com temperatura persistida ÷ leads da coorte de entrada.",
+    format: "percentage",
+    explanation: "Contagem com `qualificationStatus` em `hot`, `warm` ou `cold` ÷ total de leads recebidos na mesma coorte.",
+    allowedDimensions: ["period", "source", "campaign", "adset", "ad", "form", "queue", "broker", "lead_type", "plan_type", "city", "age_band", "weekday_hour"],
+    version: 1,
+  },
+  {
+    id: "lead_quality.hot_warm_conversion_rate",
+    label: "Conversão de quentes e mornos",
+    description: "Leads quentes/mornos da coorte com status atual convertido ÷ leads quentes/mornos da coorte.",
+    format: "percentage",
+    explanation: "Leads atualmente `converted` e com temperatura persistida atual `hot` ou `warm` ÷ todos os leads atualmente `hot` ou `warm` da coorte. Não é conversão histórica por temperatura.",
+    allowedDimensions: ["period", "source", "campaign", "adset", "ad", "form", "queue", "broker", "lead_type", "plan_type", "city", "age_band", "weekday_hour"],
+    version: 1,
+  },
+  {
+    id: "lead_quality.meta_ad_attribution_coverage",
+    label: "Atribuição confirmada a anúncio Meta",
+    description: "Leads da coorte com ID de anúncio Meta persistido ÷ leads da coorte.",
+    format: "percentage",
+    explanation: "Contagem com `metaAdId` persistido ÷ total de leads recebidos no mesmo recorte; nomes ou orçamento não são usados para inferir atribuição ou custo.",
+    allowedDimensions: ["period", "source", "campaign", "adset", "ad", "form", "queue", "broker", "lead_type", "plan_type", "city", "age_band", "weekday_hour"],
     version: 1,
   },
   {

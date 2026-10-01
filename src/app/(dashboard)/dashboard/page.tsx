@@ -7,7 +7,17 @@ import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
 import { getDashboardViewModel } from "@/features/dashboard/service";
 import { OperationalDashboard } from "@/features/dashboard/components/operational-dashboard";
-import { parsePeriod } from "@/shared/period";
+import { parsePeriod, type PeriodValue } from "@/shared/period";
+import { canAccessLeadQualityCenter, getLeadQualityReport, parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
+import { LeadQualityCenter } from "@/features/reports/components/lead-quality-center";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { getFeatureFlag } from "@/features/system-settings/queries";
+
+type DashboardSearchParams = Record<string, string | string[] | undefined>;
+
+function singleParam(value: string | string[] | undefined) {
+  return typeof value === "string" ? value : undefined;
+}
 
 /**
  * The reporting center is the canonical operational dashboard. The old
@@ -19,10 +29,11 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string; tab?: string }>;
+  searchParams: Promise<DashboardSearchParams>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const period = parsePeriod(resolvedSearchParams.period);
+  const period = parsePeriod(singleParam(resolvedSearchParams.period));
+  const activeTab = singleParam(resolvedSearchParams.tab);
   const { result } = await withRequestTiming("/dashboard", async () => {
     const context = await getRequiredTenantContext();
 
@@ -42,8 +53,22 @@ export default async function DashboardPage({
       return <LightDashboard data={data} logoUrl={tenantRows[0]?.logoUrl ?? null} />;
     }
 
-    const model = await getDashboardViewModel(context, period);
-    return <OperationalDashboard model={model} period={period} />;
+    const canReadQuality = await canAccessLeadQualityCenter(context);
+    if (activeTab === "quality" && canReadQuality) {
+      const focus = parseLeadQualityFocus(
+        singleParam(resolvedSearchParams.dimension),
+        singleParam(resolvedSearchParams.key),
+      );
+      const report = await getLeadQualityReport(context, period, focus);
+      return <LeadQualityCenter report={report} showQualityTab={report.enabled} />;
+    }
+
+    const [model, reportingEnabled] = await Promise.all([
+      getDashboardViewModel(context, period),
+      canReadQuality ? getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER) : Promise.resolve("false"),
+    ]);
+    const showQualityTab = canReadQuality && reportingEnabled !== "false";
+    return <OperationalDashboard model={model} period={period as PeriodValue} showQualityTab={showQualityTab} />;
   });
 
   return result;

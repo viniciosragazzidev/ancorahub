@@ -2,6 +2,20 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 01/10/2026 - Central de qualidade e origem dos leads
+
+- Nova aba “Qualidade dos leads” em `/dashboard`, com períodos de 7/14/30/90 dias e
+  recortes de temperatura, conversão/atribuição atual, campanha, anúncio, fila,
+  corretor, perfil, cidade, faixa etária e horários de Brasília.
+- Segmentos podem ser abertos em drill-down auditado; dados de contato não são
+  carregados e categorias com menos de três leads são suprimidas. Atribuição de Meta
+  só é exibida quando sustentada pelos IDs persistidos; investimento e CPL/CPA não
+  são estimados sem dados reais de gasto.
+- Respeita tenant, unidade, equipe e carteira conforme o escopo efetivo do usuário;
+  ativação segue o controle global já disponível ao Super-admin. `/relatorios` mantém
+  compatibilidade e direciona para a central quando não há aba antiga explícita.
+- Implementação: `docs/implementations/completed/2026-10-01-lead-quality-center.md`.
+
 ## 30/09/2026 - Plantões no Corretor Lite
 
 - Nova área `/plantoes` no menu do corretor, com calendário mensal que marca os dias

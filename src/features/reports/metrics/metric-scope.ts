@@ -3,6 +3,7 @@ import "server-only";
 import { eq, inArray, type SQL } from "drizzle-orm";
 
 import { getSupervisedBrokerIds } from "@/features/team/supervisor-service";
+import { resolveAccessContext } from "@/shared/auth/access-context";
 import type { TenantContext } from "@/shared/auth/types";
 import { schema } from "@/shared/db";
 
@@ -30,6 +31,61 @@ export interface ReportDataScope {
 const NO_LEADS_SENTINEL = "__reporting_no_scope__";
 
 export async function resolveReportDataScope(context: TenantContext): Promise<ReportDataScope> {
+  // A custom role replaces legacy grants and may narrow a manager's/supervisor's
+  // data boundary. Translate that canonical scope before falling back to the
+  // older report-role matrix so a `own` or `none` role can never see a whole unit.
+  if (context.customRoleId) {
+    const effective = await resolveAccessContext(context);
+    if (effective.scopeType === "NONE") {
+      return {
+        tenantId: context.tenantId,
+        supervisedBrokerIds: null,
+        leadScope: eq(schema.leads.id, NO_LEADS_SENTINEL),
+        salesBrokerScope: eq(schema.sales.id, NO_LEADS_SENTINEL),
+        canSeeUnits: false,
+        canCompareUnits: false,
+      };
+    }
+    if (effective.scope.tenantWide) {
+      return {
+        tenantId: context.tenantId,
+        supervisedBrokerIds: null,
+        leadScope: undefined,
+        salesBrokerScope: undefined,
+        canSeeUnits: true,
+        canCompareUnits: context.role === "director",
+      };
+    }
+    if (effective.scope.ownership === "SELF") {
+      return {
+        tenantId: context.tenantId,
+        supervisedBrokerIds: null,
+        leadScope: eq(schema.leads.corretorId, context.userId),
+        salesBrokerScope: eq(schema.sales.brokerId, context.userId),
+        canSeeUnits: false,
+        canCompareUnits: false,
+      };
+    }
+    if (effective.allowedUnitIds.length > 0) {
+      return {
+        tenantId: context.tenantId,
+        supervisedBrokerIds: null,
+        leadScope: inArray(schema.leads.branchId, effective.allowedUnitIds),
+        salesBrokerScope: undefined,
+        canSeeUnits: true,
+        canCompareUnits: false,
+      };
+    }
+    return {
+      tenantId: context.tenantId,
+      supervisedBrokerIds: null,
+      leadScope: eq(schema.leads.id, NO_LEADS_SENTINEL),
+      salesBrokerScope: eq(schema.sales.id, NO_LEADS_SENTINEL),
+      canSeeUnits: false,
+      canCompareUnits: false,
+    };
+  }
+
   if (context.role === "broker") {
     return {
       tenantId: context.tenantId,
