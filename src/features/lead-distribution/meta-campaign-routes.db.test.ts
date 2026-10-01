@@ -77,6 +77,17 @@ describe.skipIf(!enabled)("campaign route with its ads (rolled back)", () => {
         .where(and(eq(s.auditLogs.entidadeId, pick.campaignId), eq(s.auditLogs.acao, `meta_campaign_queue_route.moved_from:${queue.id}`)));
       expect(audit).toBeTruthy();
 
+      // An ad never goes to a queue other than its campaign's.
+      const { saveMetaAdQueueRoute } = await import("./control-service");
+      await expect(saveMetaAdQueueRoute(context, { adId: adIds[0]!, queueId: queue.id, enabled: true }))
+        .rejects.toThrow(/fila diferente da sua campanha/);
+      // An ad already sent elsewhere is brought back when the campaign gets its queue.
+      await tx.insert(s.metaAdQueueRoutes).values({ id: randomUUID(), tenantId: pick.tenantId, adId: adIds[0]!, queueId: queue.id, enabled: true, createdBy: director.userId })
+        .onConflictDoUpdate({ target: [s.metaAdQueueRoutes.tenantId, s.metaAdQueueRoutes.adId], set: { queueId: queue.id, enabled: true } });
+      const resaved = await saveMetaCampaignQueueRoute(context, { campaignId: pick.campaignId, queueId: other.id, enabled: true });
+      expect(resaved.adsBrought).toBe(1);
+      expect(await ownRules()).toBe(0);
+
       tx.rollback();
     }).catch((error) => {
       if (!String(error?.message ?? error).includes("Rollback")) throw error;

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, gt, inArray, isNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 
 import type { TenantContext } from "@/shared/auth/types";
@@ -502,16 +502,22 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
       : input.enabled ? "meta_campaign_queue_route.saved" : "meta_campaign_queue_route.paused",
   });
   // An ad rule wins over the campaign rule. "Bring the ads" removes the rules of
-  // this campaign's ads, so each of them follows the campaign again.
+  // this campaign's ads, so each of them follows the campaign again. An ad sent
+  // to another queue than its campaign's is always removed: an ad never sends
+  // leads to two queues (campaign one place, its ad another).
   let adsBrought = 0;
-  if (input.includeAds) {
+  if (input.includeAds || (input.enabled && queue)) {
     const campaignAds = await db.select({ adId: schema.metaAds.adId }).from(schema.metaAds)
       .innerJoin(schema.metaAdSets, and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)))
       .where(and(eq(schema.metaAds.tenantId, context.tenantId), eq(schema.metaAdSets.campaignId, campaign.campaignId)));
     const adIds = campaignAds.map((row) => row.adId);
     if (adIds.length) {
       const removed = await db.delete(schema.metaAdQueueRoutes)
-        .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), inArray(schema.metaAdQueueRoutes.adId, adIds)))
+        .where(and(
+          eq(schema.metaAdQueueRoutes.tenantId, context.tenantId),
+          inArray(schema.metaAdQueueRoutes.adId, adIds),
+          input.includeAds || !queue ? undefined : and(isNotNull(schema.metaAdQueueRoutes.queueId), ne(schema.metaAdQueueRoutes.queueId, queue.id)),
+        ))
         .returning({ adId: schema.metaAdQueueRoutes.adId });
       adsBrought = removed.length;
       if (adsBrought) {
@@ -552,6 +558,18 @@ export async function saveMetaAdQueueRoute(context: TenantContext, rawInput: unk
       .limit(1);
     if (existingRoute?.queueId && existingRoute.queueId !== input.queueId) {
       throw new AuthorizationError("Este anúncio já está vinculado a outra fila. Desative a rota atual antes de escolher um novo destino.");
+    }
+    // An ad never sends leads to two queues: its campaign already has one.
+    const [campaignRoute] = await db.select({ queueId: schema.metaCampaignQueueRoutes.queueId, queueName: schema.leadQueues.name, campaignName: schema.metaCampaigns.name })
+      .from(schema.metaAds)
+      .innerJoin(schema.metaAdSets, and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)))
+      .innerJoin(schema.metaCampaignQueueRoutes, and(eq(schema.metaCampaignQueueRoutes.tenantId, schema.metaAdSets.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, schema.metaAdSets.campaignId), eq(schema.metaCampaignQueueRoutes.enabled, true)))
+      .leftJoin(schema.metaCampaigns, and(eq(schema.metaCampaigns.tenantId, schema.metaAdSets.tenantId), eq(schema.metaCampaigns.campaignId, schema.metaAdSets.campaignId)))
+      .leftJoin(schema.leadQueues, eq(schema.leadQueues.id, schema.metaCampaignQueueRoutes.queueId))
+      .where(and(eq(schema.metaAds.tenantId, context.tenantId), eq(schema.metaAds.adId, ad.adId)))
+      .limit(1);
+    if (campaignRoute?.queueId && campaignRoute.queueId !== input.queueId) {
+      throw new AuthorizationError(`Este anúncio é da campanha "${campaignRoute.campaignName ?? "sem nome"}", que já manda os leads para a fila "${campaignRoute.queueName ?? "atual"}". Um anúncio não pode ir para uma fila diferente da sua campanha: mude a fila da campanha.`);
     }
   }
   const now = new Date();

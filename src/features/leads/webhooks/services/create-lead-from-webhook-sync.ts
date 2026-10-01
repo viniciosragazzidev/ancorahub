@@ -18,6 +18,12 @@ import { enqueueLeadEffect, enqueueLeadEffectTx } from "./lead-effect-outbox";
 import { resolveLeadWebhookIdempotency } from "./resolve-lead-webhook-idempotency";
 import { resolveWebhookBranch, WebhookBranchNotFoundError } from "./resolve-webhook-branch";
 
+/** The lead's origin keys of its first form, kept when the same person sends another one. */
+const ORIGIN_METADATA_KEYS = ["campaignName", "pageId", "entry", "adsLabel", "withoutReferral", "adHeadline", "adUrl", "ctwaClid"];
+function keepOrigin(metadata: Record<string, unknown>) {
+  return Object.fromEntries(ORIGIN_METADATA_KEYS.filter((key) => metadata[key] !== undefined && metadata[key] !== null).map((key) => [key, metadata[key]]));
+}
+
 export type CreateLeadFromWebhookSyncInput = {
   tenantId: string;
   branchId: string | null;
@@ -129,13 +135,33 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
       return { conflict: true as const };
     }
     const existingLeads = await tx
-      .select({ id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone, sourceMetadata: schema.leads.sourceMetadata })
+      .select({
+        id: schema.leads.id, status: schema.leads.status, telefone: schema.leads.telefone, sourceMetadata: schema.leads.sourceMetadata,
+        corretorId: schema.leads.corretorId, queueId: schema.leads.queueId, qualificationState: schema.leads.qualificationState,
+        sourceChannel: schema.leads.sourceChannel, sourceCampaign: schema.leads.sourceCampaign, metaCampaignId: schema.leads.metaCampaignId,
+        sourceAd: schema.leads.sourceAd, sourceForm: schema.leads.sourceForm, metaAdId: schema.leads.metaAdId, metaAdSetId: schema.leads.metaAdSetId,
+        metaFormId: schema.leads.metaFormId, metaPageId: schema.leads.metaPageId, capturedAt: schema.leads.capturedAt,
+      })
       .from(schema.leads)
       .where(and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt)));
 
     const existingLead = existingLeads.find((l) => l.telefone && samePhone(l.telefone, normalizedPhone));
 
     if (existingLead) {
+      // The same person sent another form (maybe of another campaign): the
+      // lead keeps where it first came from (only blanks are filled) and the
+      // new form is recorded in a note. While no broker has it yet, it moves
+      // to the new form's queue, so it is attended by the right team.
+      const existingMetadata = existingLead.sourceMetadata && typeof existingLead.sourceMetadata === "object" && !Array.isArray(existingLead.sourceMetadata)
+        ? existingLead.sourceMetadata as Record<string, unknown>
+        : {};
+      const newMetadata = input.leadSource?.metadata
+        ? Object.fromEntries(Object.entries(input.leadSource.metadata).filter(([key, value]) =>
+          value !== null && !(key === "tipoPlanoStatus" && typeof input.leadSource?.metadata?.tipoPlano !== "string"),
+        ))
+        : null;
+      const moveToQueue = Boolean(queueId) && queueId !== existingLead.queueId && !existingLead.corretorId
+        && !["converted", "lost"].includes(existingLead.status ?? "");
       await tx
         .update(schema.leads)
         .set({
@@ -143,28 +169,49 @@ export async function createLeadFromWebhookSync(input: CreateLeadFromWebhookSync
           email: normalizedEmail || undefined,
           ...(metaLeadType ? { tipo: metaLeadType } : {}),
           ...(input.leadSource ? {
-            sourceChannel: input.leadSource.channel,
-            sourceCampaign: input.leadSource.campaign ?? null,
-            metaCampaignId: input.leadSource.campaign ?? null,
-            sourceAd: input.leadSource.ad ?? null,
-            sourceForm: input.leadSource.form ?? null,
-            metaAdId: input.leadSource.ad ?? null,
-            metaAdSetId: input.leadSource.adSet ?? null,
-            metaFormId: input.leadSource.form ?? null,
-            metaPageId: input.leadSource.page ?? null,
-            capturedAt: input.leadSource.capturedAt ?? receivedAt,
-            ...(input.leadSource.metadata ? {
-              sourceMetadata: {
-                ...(existingLead.sourceMetadata && typeof existingLead.sourceMetadata === "object" && !Array.isArray(existingLead.sourceMetadata) ? existingLead.sourceMetadata as Record<string, unknown> : {}),
-                ...Object.fromEntries(Object.entries(input.leadSource.metadata).filter(([key, value]) =>
-                  value !== null && !(key === "tipoPlanoStatus" && typeof input.leadSource?.metadata?.tipoPlano !== "string"),
-                )),
-              },
-            } : {}),
+            sourceChannel: existingLead.sourceChannel ?? input.leadSource.channel,
+            sourceCampaign: existingLead.sourceCampaign ?? input.leadSource.campaign ?? null,
+            metaCampaignId: existingLead.metaCampaignId ?? input.leadSource.campaign ?? null,
+            sourceAd: existingLead.sourceAd ?? input.leadSource.ad ?? null,
+            sourceForm: existingLead.sourceForm ?? input.leadSource.form ?? null,
+            metaAdId: existingLead.metaAdId ?? input.leadSource.ad ?? null,
+            metaAdSetId: existingLead.metaAdSetId ?? input.leadSource.adSet ?? null,
+            metaFormId: existingLead.metaFormId ?? input.leadSource.form ?? null,
+            metaPageId: existingLead.metaPageId ?? input.leadSource.page ?? null,
+            capturedAt: existingLead.capturedAt ?? input.leadSource.capturedAt ?? receivedAt,
+            // New answers (product, CNPJ type…) update the lead; where it came from stays.
+            ...(newMetadata ? { sourceMetadata: { ...existingMetadata, ...newMetadata, ...keepOrigin(existingMetadata) } } : {}),
           } : {}),
+          ...(moveToQueue ? { queueId, branchId, distributionUpdatedAt: now } : {}),
           updatedAt: now,
         })
         .where(eq(schema.leads.id, existingLead.id));
+
+      const newCampaign = input.leadSource?.campaign ?? null;
+      if (input.leadSource && (moveToQueue || (newCampaign && newCampaign !== existingLead.metaCampaignId))) {
+        const [newQueue] = queueId ? await tx.select({ name: schema.leadQueues.name }).from(schema.leadQueues).where(eq(schema.leadQueues.id, queueId)).limit(1) : [];
+        const campaignLabel = typeof newMetadata?.campaignName === "string" ? newMetadata.campaignName : newCampaign;
+        const where = moveToQueue
+          ? ` O lead foi movido para a fila "${newQueue?.name ?? "da campanha"}", porque ainda não tinha corretor.`
+          : newQueue?.name && queueId !== existingLead.queueId
+            ? ` A campanha vai para a fila "${newQueue.name}", mas o lead continua onde está porque já tem corretor.`
+            : "";
+        await tx.insert(schema.leadInteractions).values({
+          id: randomUUID(), leadId: existingLead.id, userId: createdByUserId, tipo: "note",
+          conteudo: `📝 Este contato preencheu um novo formulário${campaignLabel ? ` (campanha "${campaignLabel}")` : ""}. A origem original do lead foi mantida.${where}`,
+        });
+      }
+      if (moveToQueue) {
+        await tx.insert(schema.leadDistributionEvents).values({
+          id: randomUUID(), tenantId, leadId: existingLead.id, toBranchId: branchId, fromQueueId: existingLead.queueId, toQueueId: queueId,
+          action: "queue_changed_by_new_form", source: "webhook", strategy: "outbox",
+          reason: "Novo formulário de outra campanha; o lead ainda não tinha corretor.", actorId: createdByUserId, createdAt: now,
+        });
+        // Mid-qualification the AI hands it over later, as usual.
+        if (existingLead.qualificationState !== "IN_PROGRESS") {
+          await enqueueLeadEffectTx(tx, { tenantId, leadId: existingLead.id, webhookDeliveryId: deliveryId, type: "DISTRIBUTE_LEAD", idempotencyKey: `lead-intake:${deliveryId}:distribution`, payload: { branchId, leadName: normalizedName } });
+        }
+      }
 
       await tx.update(schema.webhookDeliveries).set({ status: "processed", leadId: existingLead.id, processedAt: now }).where(eq(schema.webhookDeliveries.id, deliveryId));
       return { duplicate: true as const, leadId: existingLead.id };
