@@ -302,6 +302,13 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           continue;
         }
 
+        // Meta delivers some customer messages as "unsupported" (often the first
+        // message from an ad, or a format the API cannot show). On a coexistence
+        // number it is still a customer writing: kept with a note, so the
+        // contact becomes a lead instead of being dropped.
+        if (!text && message.type === "unsupported" && channel.onboardingMode === "coexistence") {
+          text = "[Mensagem que o WhatsApp não mostra aqui: veja no celular do número]";
+        }
         if (!text && messageKind === "text" && message.type !== "text" && !mediaColumns) { await setWebhookEventResult(eventId, "discarded", "unsupported_message_type"); ignored += 1; continue; }
         // OPTIMIZED: Query only leads matching the incoming phone (last 8 digits) instead of fetching ALL leads
         const incomingDigits = normalizePhone(phone);
@@ -370,7 +377,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
           const receivedAt = message.timestamp ? new Date(Number(message.timestamp) * 1000) : new Date();
           const ctwaPromise = import("./meta-ctwa-intake").then(({ ingestCtwaLead, ingestChannelLead }) => ctwaReferral
             ? ingestCtwaLead({ tenantId: channel.tenantId, phone, profileName, referral: ctwaReferral, providerMessageId: message.id, receivedAt, channelIntake, skipAiQualification })
-            : ingestChannelLead({ tenantId: channel.tenantId, channelId: channel.id, channelActivatedAt: channel.activatedAt, phone, profileName, providerMessageId: message.id, receivedAt, intake: channelIntake!, skipAiQualification }),
+            : ingestChannelLead({ tenantId: channel.tenantId, channelId: channel.id, phone, profileName, providerMessageId: message.id, receivedAt, intake: channelIntake!, skipAiQualification }),
           ).then(async (result) => {
             if (result.status !== "ignored") {
               await db.update(schema.whatsappMessages).set({ leadId: result.leadId })

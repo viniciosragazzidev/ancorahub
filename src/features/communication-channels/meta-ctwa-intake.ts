@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, lt, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
 import { resolveMetaCapturePolicy, type MetaCaptureMode } from "@/features/meta-ads/meta-capture-policy";
@@ -161,16 +161,16 @@ export async function ingestCtwaLead(input: {
 }
 
 /**
- * A new contact that writes to a number dedicated to ads without the ad's
- * referral (Meta only sends it on the first message after the click): the
- * lead is created with the number's origin and queue. A contact that already
- * talked to this number before it was connected (the WhatsApp Business app
- * history: old customers, brokers, personal contacts) is not a new lead.
+ * A contact with no lead who writes to a number dedicated to ads without the
+ * ad's referral (Meta only sends it on the first message after the click):
+ * the lead is created with the number's origin and queue. A contact that had
+ * talked to the number before it was connected (an old ad lead coming back)
+ * is a lead too; team members never get here (their messages are handled
+ * before the intake).
  */
 export async function ingestChannelLead(input: {
   tenantId: string;
   channelId: string;
-  channelActivatedAt: Date | null;
   phone: string;
   profileName?: string;
   providerMessageId: string;
@@ -180,17 +180,6 @@ export async function ingestChannelLead(input: {
   skipAiQualification?: boolean;
 }): Promise<CtwaIntakeResult> {
   if (!input.intake.enabled) return { status: "ignored", reason: "policy" };
-  const db = getDatabase();
-  const suffix = input.phone.replace(/\D/g, "").slice(-8);
-  if (input.channelActivatedAt && suffix.length === 8) {
-    const [previous] = await db.select({ id: schema.whatsappMessages.id }).from(schema.whatsappMessages).where(and(
-      eq(schema.whatsappMessages.tenantId, input.tenantId),
-      eq(schema.whatsappMessages.communicationChannelId, input.channelId),
-      lt(schema.whatsappMessages.sentAt, input.channelActivatedAt),
-      sql`RIGHT(REGEXP_REPLACE(${schema.whatsappMessages.phone}, '[^0-9]', '', 'g'), 8) = ${suffix}`,
-    )).limit(1);
-    if (previous) return { status: "ignored", reason: "policy" };
-  }
   const source = await tenantIntakeSource(input.tenantId);
   if (!source) return { status: "ignored", reason: "no_source" };
   const result = await createLeadFromWebhookSync({

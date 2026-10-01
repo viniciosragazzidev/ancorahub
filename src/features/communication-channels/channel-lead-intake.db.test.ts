@@ -46,17 +46,18 @@ describe.skipIf(!enabled)("lead intake of a number dedicated to ads (rolled back
 
       // A new contact (fictitious number, never talked to this number).
       const newPhone = "5521900001234";
-      const created = await ingestChannelLead({ tenantId: channel!.tenantId, channelId: channel!.id, channelActivatedAt: channel!.activatedAt, phone: newPhone, profileName: "Cliente Teste", providerMessageId: `wamid.test.${randomUUID()}`, receivedAt: new Date(), intake, skipAiQualification: true });
+      const created = await ingestChannelLead({ tenantId: channel!.tenantId, channelId: channel!.id, phone: newPhone, profileName: "Cliente Teste", providerMessageId: `wamid.test.${randomUUID()}`, receivedAt: new Date(), intake, skipAiQualification: true });
       expect(created.status).toBe("created");
       const [lead] = await tx.select().from(s.leads).where(eq(s.leads.id, (created as { leadId: string }).leadId));
       expect(lead).toMatchObject({ nome: "Cliente Teste", queueId: queue!.id, sourceChannel: "meta_lead_ads", qualificationStatus: "ia_disabled" });
       expect(lead!.sourceMetadata).toMatchObject({ entry: "whatsapp", adsLabel: "Anúncios CA1 - Ancora Corretora", withoutReferral: true });
 
-      // A contact that talked to this number before it was connected (app history).
+      // A contact that talked to this number before it was connected (an old
+      // ad lead coming back) is a lead too.
       const historyPhone = "5521900005678";
       await tx.insert(s.whatsappMessages).values({ id: randomUUID(), tenantId: channel!.tenantId, communicationChannelId: channel!.id, provider: "meta_cloud", phone: historyPhone, direction: "incoming", body: "oi, tudo bem?", sentAt: new Date(channel!.activatedAt!.getTime() - 60_000) });
-      const skipped = await ingestChannelLead({ tenantId: channel!.tenantId, channelId: channel!.id, channelActivatedAt: channel!.activatedAt, phone: historyPhone, providerMessageId: `wamid.test.${randomUUID()}`, receivedAt: new Date(), intake });
-      expect(skipped).toEqual({ status: "ignored", reason: "policy" });
+      const returning = await ingestChannelLead({ tenantId: channel!.tenantId, channelId: channel!.id, phone: historyPhone, providerMessageId: `wamid.test.${randomUUID()}`, receivedAt: new Date(), intake });
+      expect(returning.status).toBe("created");
 
       tx.rollback();
     }).catch((error) => {
