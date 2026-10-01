@@ -41,6 +41,8 @@ export type MonthSchedule = {
   /** Queue that receives this plantão's leads (as on the Filas page). */
   queueId?: string | null;
   queueName?: string | null;
+  /** Every queue that receives this plantão (it may be several). */
+  queues?: { id: string; name: string }[];
   outside: null | { reason: "ends_before" | "starts_after" | "no_weekday" | "empty_range"; label: string };
 };
 
@@ -122,10 +124,14 @@ export function MonthlyDutyPlanner({
   const queues = useMemo(() => {
     const byKey = new Map<string, { key: string; label: string; ids: string[] }>();
     for (const schedule of inMonth) {
-      const key = schedule.queueId ?? NO_QUEUE;
-      const entry = byKey.get(key) ?? { key, label: schedule.queueId ? schedule.queueName ?? "Fila" : "Sem fila", ids: [] };
-      entry.ids.push(schedule.id);
-      byKey.set(key, entry);
+      // A plantão of several queues is staffed from each of them.
+      const linked = schedule.queues?.length ? schedule.queues : schedule.queueId ? [{ id: schedule.queueId, name: schedule.queueName ?? "Fila" }] : [];
+      for (const queue of linked.length ? linked : [null]) {
+        const key = queue?.id ?? NO_QUEUE;
+        const entry = byKey.get(key) ?? { key, label: queue ? queue.name : "Sem fila", ids: [] };
+        if (!entry.ids.includes(schedule.id)) entry.ids.push(schedule.id);
+        byKey.set(key, entry);
+      }
     }
     return [...byKey.values()].sort((a, b) => (a.key === NO_QUEUE ? 1 : b.key === NO_QUEUE ? -1 : a.label.localeCompare(b.label, "pt-BR")));
   }, [inMonth]);

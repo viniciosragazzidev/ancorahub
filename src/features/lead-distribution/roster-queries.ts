@@ -171,17 +171,19 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       .where(eq(schema.leadQueues.tenantId, context.tenantId))
       .orderBy(asc(schema.leadQueues.name))
     : [];
-  const linkedQueueBySchedule = new Map<string, { id: string; name: string }>();
+  // A plantão may serve several queues (each queue's list holds it).
+  const linkedQueuesBySchedule = new Map<string, { id: string; name: string }[]>();
   for (const queue of linkingQueues) {
     for (const id of new Set([...(queue.exclusiveDutyScheduleIds ?? []), ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : [])])) {
-      if (!linkedQueueBySchedule.has(id)) linkedQueueBySchedule.set(id, { id: queue.id, name: queue.name });
+      linkedQueuesBySchedule.set(id, [...(linkedQueuesBySchedule.get(id) ?? []), { id: queue.id, name: queue.name }]);
     }
   }
   const displaySchedules = schedules.map((schedule) => ({
     ...schedule,
     branchName: schedule.branchName ?? "Todas as unidades",
-    linkedQueueId: linkedQueueBySchedule.get(schedule.id)?.id ?? null,
-    queueName: linkedQueueBySchedule.get(schedule.id)?.name ?? schedule.queueName ?? "Sem fila vinculada",
+    linkedQueues: linkedQueuesBySchedule.get(schedule.id) ?? [],
+    linkedQueueId: linkedQueuesBySchedule.get(schedule.id)?.[0]?.id ?? null,
+    queueName: linkedQueuesBySchedule.get(schedule.id)?.map((queue) => queue.name).join(", ") || schedule.queueName || "Sem fila vinculada",
     credentialName: displayCredentialName(schedule.webhookCredentialId, schedule.credentialName),
   }));
 

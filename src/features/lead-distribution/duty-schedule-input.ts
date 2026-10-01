@@ -72,6 +72,11 @@ const createDutyScheduleInput = dutyScheduleFields.omit({ branchId: true, queueI
   // the same day/time are fine as long as they end up serving different
   // queues, so the check needs to know which queue this one is headed for.
   responsibleQueueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
+  /** Queues that receive the new plantão(s): several are allowed. */
+  responsibleQueueIds: z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    try { return JSON.parse(value); } catch { return value; }
+  }, z.array(z.string().uuid()).max(30).optional()),
   // "Datas" mode: each date becomes a plantão valid only on that day.
   dates: z.preprocess((value) => {
     if (typeof value !== "string") return value;

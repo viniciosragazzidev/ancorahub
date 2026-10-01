@@ -185,16 +185,18 @@ async function resolveDutyTypeId(tx: ReturnType<typeof getDatabase>, tenantId: s
 }
 
 /**
- * Makes `queueId` (or no queue) the one that receives this plantão, in the same
- * exclusivity lists the Filas page edits: removed from every other queue,
- * appended to the chosen one. Runs inside the caller's transaction.
+ * Makes `queueIds` (none, one or several) the queues that receive this
+ * plantão, in the same exclusivity lists the Filas page edits: removed from
+ * every other queue, appended to the chosen ones. Runs inside the caller's
+ * transaction.
  */
-async function relinkScheduleQueue(
+async function relinkScheduleQueues(
   tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
   context: { tenantId: string; userId: string },
   scheduleId: string,
-  queueId: string | null,
+  queueIds: readonly string[],
 ) {
+  const chosen = new Set(queueIds);
   const queues = await tx.select({ id: schema.leadQueues.id, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId })
     .from(schema.leadQueues)
     .where(and(
@@ -202,13 +204,13 @@ async function relinkScheduleQueue(
       or(
         sql`${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([scheduleId])}::jsonb`,
         eq(schema.leadQueues.exclusiveDutyScheduleId, scheduleId),
-        queueId ? eq(schema.leadQueues.id, queueId) : undefined,
+        chosen.size ? inArray(schema.leadQueues.id, [...chosen]) : undefined,
       ),
     ));
   const now = new Date();
   for (const queue of queues) {
     const current = Array.from(new Set([...(queue.exclusiveDutyScheduleIds ?? []), ...(queue.exclusiveDutyScheduleId ? [queue.exclusiveDutyScheduleId] : [])]));
-    const next = queue.id === queueId
+    const next = chosen.has(queue.id)
       ? Array.from(new Set([...current, scheduleId]))
       : current.filter((id) => id !== scheduleId);
     if (next.length === current.length && next.every((id, index) => id === current[index])) continue;
@@ -216,9 +218,19 @@ async function relinkScheduleQueue(
       .where(and(eq(schema.leadQueues.id, queue.id), eq(schema.leadQueues.tenantId, context.tenantId)));
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queue.id,
-      acao: queue.id === queueId ? "queue.duty_schedule_linked" : "queue.duty_schedule_unlinked",
+      acao: chosen.has(queue.id) ? "queue.duty_schedule_linked" : "queue.duty_schedule_unlinked",
     });
   }
+}
+
+/** The requested queues, each of the tenant and active (a missing or inactive one is refused). */
+async function activeQueueIds(db: ReturnType<typeof getDatabase>, tenantId: string, requested: readonly string[]) {
+  const ids = [...new Set(requested.filter(Boolean))];
+  if (!ids.length) return [];
+  const found = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues)
+    .where(and(inArray(schema.leadQueues.id, ids), eq(schema.leadQueues.tenantId, tenantId), eq(schema.leadQueues.status, "active")));
+  if (found.length !== ids.length) throw new Error("Fila não encontrada ou inativa.");
+  return ids;
 }
 
 function revalidateDutyWorkspace() {
@@ -246,8 +258,14 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       : parsed.data.daysOfWeek.map((dayOfWeek) => ({ ...base, dayOfWeek, validFrom: parsed.data.validFrom, validUntil: parsed.data.validUntil }));
     for (const schedule of schedules) validateSchedule(schedule);
     const { context, db } = await assertBatchDutyAccess();
+    const receivingQueueIds = await activeQueueIds(db, context.tenantId, [
+      ...(parsed.data.responsibleQueueIds ?? []),
+      ...(parsed.data.responsibleQueueId ? [parsed.data.responsibleQueueId] : []),
+    ]);
     for (const schedule of schedules) {
-      await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: parsed.data.responsibleQueueId ?? null }, context.tenantId);
+      // Each queue has its own roster: the plantão only collides with another of the same queue.
+      if (!receivingQueueIds.length) await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: null }, context.tenantId);
+      for (const queueId of receivingQueueIds) await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: queueId }, context.tenantId);
     }
     const scheduleIds = schedules.map(() => randomUUID());
     const now = new Date();
@@ -277,6 +295,9 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       await tx.insert(schema.auditLogs).values(scheduleIds.map((scheduleId) => ({
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: scheduleId, acao: "duty_schedule.created",
       })));
+      if (receivingQueueIds.length) {
+        for (const scheduleId of scheduleIds) await relinkScheduleQueues(tx, context, scheduleId, receivingQueueIds);
+      }
     });
     revalidateDutyWorkspace();
     return { success: true, scheduleId: scheduleIds[0], scheduleIds, message: `${scheduleIds.length} plantão(ões) criado(s) para todas as unidades.` };
@@ -294,15 +315,21 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
     const { context, db, schedule } = await findScheduleForMutation(scheduleId.data);
     if (schedule.status === "archived") throw new Error("Restaure o plantão antes de editá-lo.");
     if (context.role === "manager") throw new Error("Apenas Diretores podem editar plantões globais.");
-    // Optional: the queue that receives this plantão ("" = none). Absent = unchanged.
-    const queueField = formData.get("receivingQueueId");
-    const receivingQueueId = queueField === null ? undefined : z.union([z.literal(""), z.string().uuid()]).parse(queueField) || null;
-    if (receivingQueueId) {
-      const [queue] = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues)
-        .where(and(eq(schema.leadQueues.id, receivingQueueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1);
-      if (!queue) throw new Error("Fila não encontrada ou inativa.");
+    // Optional: the queues that receive this plantão ([] = none). Absent = unchanged.
+    // "receivingQueueId" (one queue) is still accepted from forms already open.
+    const queuesField = formData.get("receivingQueueIds");
+    const singleField = formData.get("receivingQueueId");
+    const requestedQueueIds = queuesField !== null
+      ? z.array(z.string().uuid()).max(30).parse(JSON.parse(String(queuesField) || "[]"))
+      : singleField !== null
+        ? [z.union([z.literal(""), z.string().uuid()]).parse(singleField)].filter(Boolean)
+        : undefined;
+    const receivingQueueIds = requestedQueueIds === undefined ? undefined : await activeQueueIds(db, context.tenantId, requestedQueueIds);
+    if (receivingQueueIds?.length) {
+      for (const queueId of receivingQueueIds) await assertNoScheduleConflict(db, { ...parsed.data, responsibleQueueId: queueId }, context.tenantId, schedule.id);
+    } else {
+      await assertNoScheduleConflict(db, parsed.data, context.tenantId, schedule.id);
     }
-    await assertNoScheduleConflict(db, receivingQueueId ? { ...parsed.data, responsibleQueueId: receivingQueueId } : parsed.data, context.tenantId, schedule.id);
     const typeId = await resolveDutyTypeId(db, context.tenantId, context.userId, parsed.data.typeName);
     await db.transaction(async (tx) => {
       for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek += 1) {
@@ -351,7 +378,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: schedule.id, acao: "duty_schedule.updated",
       });
-      if (receivingQueueId !== undefined) await relinkScheduleQueue(tx, context, schedule.id, receivingQueueId);
+      if (receivingQueueIds !== undefined) await relinkScheduleQueues(tx, context, schedule.id, receivingQueueIds);
     });
     revalidateDutyWorkspace();
     return { success: true, scheduleId: schedule.id, message: "Plantão atualizado." };

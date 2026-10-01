@@ -56,7 +56,6 @@ import {
   createRosterAssignmentAction,
   removeRosterAssignmentAction,
 } from "@/features/lead-distribution/roster-actions";
-import { syncDutySchedulesIntoQueueAction } from "@/features/lead-distribution/actions";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { buildMonthOccurrences, monthCoverage, monthShiftProgress, summarizeDutyDays } from "@/features/lead-distribution/monthly-duty-plan";
 import { DutyMonthCalendar } from "./duty-month-calendar";
@@ -202,7 +201,13 @@ function DutyFormSheet({
   // Only offered at creation: picking a queue here is a shortcut for the same
   // "Exclusividade de Plantão" checklist the queue editor already has.
   // The queue that receives this plantão (kept in sync with Filas → Exclusividade de Plantão).
-  const [queueId, setQueueId] = useState<string>(() => schedule?.linkedQueueId ?? "");
+  const [queueIds, setQueueIds] = useState<string[]>(() => schedule?.linkedQueues?.map((queue) => queue.id) ?? (schedule?.linkedQueueId ? [schedule.linkedQueueId] : []));
+  const toggleQueue = (id: string, checked: boolean) => setQueueIds((current) => (checked ? [...new Set([...current, id])] : current.filter((item) => item !== id)));
+  // A linked queue that is no longer active still shows by name.
+  const queueChoices = [
+    ...queues,
+    ...(schedule?.linkedQueues ?? []).filter((linked) => !queues.some((queue) => queue.id === linked.id)),
+  ];
   const tooManyDates = plannedDates.length > 93;
   const canSubmit = mode === "dates" && !schedule ? plannedDates.length > 0 && !tooManyDates : selectedDays.length > 0;
   const title = schedule ? "Editar plantão" : "Novo plantão";
@@ -212,7 +217,7 @@ function DutyFormSheet({
     const formData = new FormData(event.currentTarget);
     if (schedule) {
       formData.set("scheduleId", schedule.id);
-      formData.set("receivingQueueId", queueId);
+      formData.set("receivingQueueIds", JSON.stringify(queueIds));
       if (mode === "dates") {
         // A one-day plantão moved to another date: its weekday follows the date.
         formData.set("validFrom", rangeFrom);
@@ -228,9 +233,9 @@ function DutyFormSheet({
         formData.delete("validUntil");
       }
       formData.set("daysOfWeek", JSON.stringify(mode === "dates" ? [...new Set(plannedDates.map((date) => new Date(`${date}T12:00:00Z`).getUTCDay()))] : selectedDays));
-      // Lets the same-time conflict check scope by queue: a different queue
-      // at the same day/time is fine, only the same queue collides.
-      if (queueId) formData.set("responsibleQueueId", queueId);
+      // The queues that receive the new plantão(s): linked with it on the
+      // server, which also scopes the same-time check by queue.
+      if (queueIds.length) formData.set("responsibleQueueIds", JSON.stringify(queueIds));
     }
     const action: DutyAction = schedule ? updateDutyScheduleAction : createDutyScheduleAction;
     startTransition(async () => {
@@ -239,20 +244,11 @@ function DutyFormSheet({
         toast.error(result.error ?? "Não foi possível salvar o plantão.");
         return;
       }
-      if (!schedule && queueId && result.scheduleIds?.length) {
-        const syncResult = await syncDutySchedulesIntoQueueAction({ queueId, scheduleIds: result.scheduleIds });
-        if (!syncResult.success) {
-          toast.warning("Plantão criado, mas não foi possível vincular à fila.", { description: syncResult.error });
-          router.refresh();
-          onOpenChange(false);
-          return;
-        }
-      }
       toast.success(
         schedule
           ? "Plantão atualizado."
-          : queueId
-            ? `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s) e vinculado(s) à fila.`
+          : queueIds.length
+            ? `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s) e vinculado(s) a ${queueIds.length === 1 ? "1 fila" : `${queueIds.length} filas`}.`
             : `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s).`,
       );
       router.refresh();
@@ -467,24 +463,26 @@ function DutyFormSheet({
                 Quantos leads cada corretor pode receber em cada dia deste plantão. Quem atinge o limite para de receber até o próximo dia do plantão; oferta expirada ou recusada não conta. Em branco, sem limite.
               </p>
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="duty-queue">Fila que recebe este plantão</Label>
-              <AppSelect
-                id="duty-queue"
-                aria-label="Fila que recebe este plantão"
-                value={queueId}
-                onValueChange={setQueueId}
-                options={[
-                  { value: "", label: schedule ? "Nenhuma fila" : "Nenhuma agora — vincular depois" },
-                  ...queues.map((queue) => ({ value: queue.id, label: queue.name })),
-                  // A linked queue that is no longer active still shows by name.
-                  ...(schedule?.linkedQueueId && !queues.some((queue) => queue.id === schedule.linkedQueueId) ? [{ value: schedule.linkedQueueId, label: schedule.queueName }] : []),
-                ]}
-              />
+            <fieldset className="grid gap-2">
+              <legend className="text-sm font-medium">Filas que recebem este plantão</legend>
+              {queueChoices.length ? (
+                <div className="grid max-h-48 gap-1 overflow-y-auto rounded-lg border border-border p-2">
+                  {queueChoices.map((queue) => (
+                    <label key={queue.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent/40">
+                      <Checkbox checked={queueIds.includes(queue.id)} onCheckedChange={(checked) => toggleQueue(queue.id, checked === true)} aria-label={queue.name} />
+                      <span className="truncate">{queue.name}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Nenhuma fila ativa.</p>
+              )}
               <p className="text-xs text-muted-foreground">
-                Os leads dessa fila vão para os corretores deste plantão. Fica sincronizado com Filas → Exclusividade de Plantão.
+                {queueIds.length === 0
+                  ? schedule ? "Nenhuma fila: o plantão não recebe leads de fila." : "Nenhuma agora: dá para vincular depois."
+                  : `Os leads ${queueIds.length === 1 ? "dessa fila" : `dessas ${queueIds.length} filas`} vão para os corretores deste plantão.`} Fica sincronizado com Filas → Exclusividade de Plantão.
               </p>
-            </div>
+            </fieldset>
             <div className="grid gap-2">
               <Label htmlFor="duty-credential">Origem de entrada</Label>
               <AppSelect
@@ -1071,6 +1069,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
         finished: coverage.covered && upcoming === 0,
         queueId: schedule.linkedQueueId ?? null,
         queueName: schedule.linkedQueueId ? schedule.queueName : null,
+        queues: schedule.linkedQueues ?? [],
         outside: coverage.covered ? null : { reason: coverage.reason, label: outsideLabel(schedule, coverage.reason) },
       };
     });
