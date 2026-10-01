@@ -18,6 +18,8 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ContextNote } from "@/components/ui/context-note";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { brokerDisplayName, CONTACT_SHORTCUT, contactShortcutMessage, isContactShortcut } from "./_components/contact-shortcut";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -392,6 +394,7 @@ export function ConversationsWorkspace({
               <ConversationHistory client={selected} />
               <ChatInput
                 leadId={selected.id}
+                brokerName={brokerDisplayName(selected.corretorNome)}
                 onMediaSent={(msg) => {
                   setConversations((prev) =>
                     prev.map((item) =>
@@ -909,10 +912,13 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
 
 function ChatInput({
   leadId,
+  brokerName,
   onMessageSent,
   onMediaSent,
 }: {
   leadId: string;
+  /** The lead's broker, suggested in the /contato shortcut. */
+  brokerName?: string;
   onMessageSent: (msg: ConversationMessage) => void;
   onMediaSent?: (msg: {
     id: string;
@@ -925,12 +931,30 @@ function ChatInput({
   const [text, setText] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [contactName, setContactName] = useState("");
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = text.trim();
     if (!trimmed || isPending) return;
+    // "/contato": asks which broker will call, then sends the message with the name.
+    if (isContactShortcut(trimmed)) {
+      setContactName(brokerName ?? "");
+      setContactOpen(true);
+      return;
+    }
+    await sendText(trimmed);
+  }
 
+  async function handleSendContact(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactName.trim() || isPending) return;
+    const sent = await sendText(contactShortcutMessage(contactName));
+    if (sent) setContactOpen(false);
+  }
+
+  async function sendText(trimmed: string) {
     setIsPending(true);
     setError(null);
     try {
@@ -944,14 +968,15 @@ function ChatInput({
           direction: res.message.direction,
           sentAt: res.message.sentAt.toISOString(),
         });
-      } else {
-        setError(res.error ?? "Erro ao enviar mensagem.");
+        return true;
       }
+      setError(res.error ?? "Erro ao enviar mensagem.");
     } catch (err) {
       setError("Erro de rede ou permissão ao enviar mensagem.");
     } finally {
       setIsPending(false);
     }
+    return false;
   }
 
   function handleAppendQuickResponse(quickText: string) {
@@ -967,7 +992,7 @@ function ChatInput({
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Digite sua mensagem para o cliente (ou escolha uma resposta rápida)..."
+            placeholder={`Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
             disabled={isPending}
             className="h-10 text-sm"
           />
@@ -986,6 +1011,41 @@ function ChatInput({
           <PaperPlaneTilt className={cn("size-4", isPending && "animate-pulse")} />
         </Button>
       </form>
+
+      <Dialog open={contactOpen} onOpenChange={setContactOpen}>
+        <DialogPopup>
+          <form onSubmit={handleSendContact}>
+            <DialogPanel>
+              <DialogHeader>
+                <DialogTitle>Quem vai entrar em contato?</DialogTitle>
+                <DialogDescription>
+                  O cliente recebe: “{contactShortcutMessage(contactName.trim() || "…")}”
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-2 py-2">
+                <Label htmlFor="contact-broker-name">Nome do corretor</Label>
+                <Input
+                  id="contact-broker-name"
+                  value={contactName}
+                  onChange={(e) => setContactName(e.target.value)}
+                  placeholder="Ex.: Raiana Nunes"
+                  autoFocus
+                  disabled={isPending}
+                />
+                {error && <p className="text-xs font-medium text-destructive">{error}</p>}
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setContactOpen(false)} disabled={isPending}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isPending || !contactName.trim()}>
+                  {isPending ? "Enviando..." : "Enviar mensagem"}
+                </Button>
+              </DialogFooter>
+            </DialogPanel>
+          </form>
+        </DialogPopup>
+      </Dialog>
     </div>
   );
 }
