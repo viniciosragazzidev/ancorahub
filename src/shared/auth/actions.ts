@@ -4,6 +4,8 @@ import { eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { getAuth } from "@/shared/auth";
 import { headers } from "next/headers";
+import { getCachedSession } from "./cached-session";
+import { TtlCache } from "@/shared/cache/ttl-cache";
 import type { TenantRole } from "@/shared/db/schema";
 import { listEffectiveCapabilities, listEffectiveRoutes } from "@/features/custom-roles/service";
 import { isUserProfileEnabled } from "@/features/user-profile/feature";
@@ -36,9 +38,7 @@ export type UserDisplayInfo = {
 };
 
 export async function getRoleRedirect(): Promise<string> {
-  const session = await getAuth().api.getSession({
-    headers: await headers(),
-  });
+  const session = await getCachedSession(await headers());
 
   if (!session) return "/login";
 
@@ -87,15 +87,28 @@ const JOB_TITLE_LABELS: Record<string, string> = {
   support: "Suporte",
 };
 
+/**
+ * Sidebars, the command palette and the agent drawer each call this on every
+ * page: kept 30s per user (not for platform admins, whose role simulation is
+ * per browser).
+ */
+const displayInfoCache = new TtlCache<UserDisplayInfo>(30_000, 2000);
+
 export async function getUserDisplayInfo(): Promise<UserDisplayInfo> {
-  const session = await getAuth().api.getSession({
-    headers: await headers(),
-  });
+  const session = await getCachedSession(await headers());
 
   if (!session) {
     return { name: "Usuário", role: null, roleKey: null, jobTitle: null, redirectLogout: "/login" };
   }
 
+  const cached = displayInfoCache.get(session.user.id);
+  if (cached) return cached;
+  const info = await loadUserDisplayInfo(session);
+  if (!info.isPlatformAdmin) displayInfoCache.set(session.user.id, info);
+  return info;
+}
+
+async function loadUserDisplayInfo(session: NonNullable<Awaited<ReturnType<typeof getCachedSession>>>): Promise<UserDisplayInfo> {
   const [dbUser] = await getDatabase()
     .select({ isPlatformAdmin: schema.user.isPlatformAdmin })
     .from(schema.user)

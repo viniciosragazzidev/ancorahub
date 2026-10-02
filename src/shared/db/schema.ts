@@ -1296,7 +1296,10 @@ export const auditLogs = pgTable(
     acao: text("acao").notNull(),
     createdAt,
   },
-  (table) => [index("audit_logs_user_created_idx").on(table.userId, table.createdAt)],
+  (table) => [
+    index("audit_logs_user_created_idx").on(table.userId, table.createdAt),
+    index("audit_logs_entity_idx").on(table.entidade, table.entidadeId, table.createdAt.desc()),
+  ],
 );
 
 export const systemSettings = pgTable(
@@ -2042,7 +2045,11 @@ export const whatsappMessages = pgTable(
     mediaSha256: text("media_sha256"),
     createdAt,
   },
-  (table) => [index("whatsapp_messages_tenant_lead_idx").on(table.tenantId, table.leadId, table.createdAt), uniqueIndex("whatsapp_messages_message_unique").on(table.tenantId, table.messageId)],
+  (table) => [
+    index("whatsapp_messages_tenant_lead_idx").on(table.tenantId, table.leadId, table.createdAt),
+    index("whatsapp_messages_tenant_sent_idx").on(table.tenantId, table.sentAt.desc()),
+    uniqueIndex("whatsapp_messages_message_unique").on(table.tenantId, table.messageId),
+  ],
 );
 
 /** Private documents uploaded for internal reporting, never exposed through a public URL. */

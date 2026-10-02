@@ -21,6 +21,7 @@ import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { enqueueBrokerInvitation } from "@/features/team/broker-invitation-delivery";
 import { parseCsv } from "@/shared/utils/csv";
 
+import { invalidateTenantContextCache } from "@/shared/auth/tenant-context";
 export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
 
 const memberRole = z.enum(["director", "manager", "supervisor", "broker"]);
@@ -55,6 +56,7 @@ export async function createTeamUserAction(
 ): Promise<TeamActionState> {
   try {
     const res = await createTeamUser(Object.fromEntries(formData));
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true, token: res.token, invitationId: res.invitationId, whatsappStatus: res.whatsappStatus };
   } catch (e) {
     const message =
@@ -248,6 +250,7 @@ export async function updateTeamMemberAction(
         }
       });
 
+      invalidateTenantContextCache(); // role/unit/status changes apply at once
       return { success: true };
     }
 
@@ -376,6 +379,7 @@ export async function updateTeamMemberAction(
       }
     });
 
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao atualizar o membro.";
@@ -532,6 +536,7 @@ export async function toggleTeamMemberStatusAction(
       }
     });
 
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true, status: nextActive ? "active" : "disabled" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao atualizar o status.";
@@ -660,6 +665,7 @@ export async function deleteTeamMemberAction(
       });
     }
 
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao excluir o membro.";
@@ -731,6 +737,7 @@ export async function transferLeadsAction(
         ),
       );
 
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao transferir leads.";
@@ -767,6 +774,7 @@ export async function getPendingInvitesAction() {
 export async function resendInviteAction(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
     const result = await resendTeamInvitation(formData.get("memberId") ?? formData.get("invitationId"));
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true, ...result };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : "Erro ao reenviar convite." };
@@ -793,6 +801,7 @@ export async function revokeInviteAction(_prev: TeamActionState, formData: FormD
       .where(eq(schema.brokerInvitations.id, invitation.id));
 
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_invitation", entidadeId: invitation.id, acao: "revogou_convite" });
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true };
   } catch (e) {
     return { success: false, error: e instanceof Error ? e.message : "Erro ao revogar convite." };
@@ -1011,6 +1020,7 @@ export async function importBrokersAction(
     if (errors.length > 0) {
       reportMessage += ` Erros encontrados:\n${errors.join("\n")}`;
     }
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true, report: reportMessage };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao importar.";
@@ -1027,6 +1037,7 @@ export async function generateResetPasswordLinkAction(
     if (!userId) throw new Error("ID do usuário é obrigatório.");
 
     const result = await generatePasswordResetLinkForMember(userId);
+    invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true, resetUrl: result.resetUrl };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao gerar link de redefinição de senha.";

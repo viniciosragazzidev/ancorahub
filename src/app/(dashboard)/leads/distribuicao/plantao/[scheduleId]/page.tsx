@@ -211,7 +211,10 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     { key: "formulario", label: "Formulário", count: inSituation.length - whatsappInSituation },
     { key: "whatsapp", label: "WhatsApp", count: whatsappInSituation },
   ] as const;
-  const whatsappLeadCount = allLeads.filter((lead) => whatsappEntryOf(lead)).length;
+  // The plantão's leads: waiting for a broker plus handed out in this occurrence
+  // (not disqualified/blocked/qualifying ones, nor the other plantão's).
+  const plantaoLeads = allLeads.filter((lead) => isWaiting(lead) || isDistributed(lead));
+  const whatsappLeadCount = plantaoLeads.filter((lead) => whatsappEntryOf(lead)).length;
   const leadsHref = (next: { situacao?: string; canal?: string }) => {
     const query = new URLSearchParams();
     const nextSituacao = next.situacao ?? situacao;
@@ -306,7 +309,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           value={linkedQueues.length}
           sublabel={linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"}
         />
-        <StatCard label="Leads no plantão" value={allLeads.length} sublabel={channel === "todos" ? `${distributedCount} distribuídos · ${waitingCount} aguardando` : `${whatsappLeadCount} pelo WhatsApp · ${allLeads.length - whatsappLeadCount} por formulário`} />
+        <StatCard label="Leads no plantão" value={plantaoLeads.length} sublabel={channel === "todos" ? `${distributedCount} distribuídos · ${waitingCount} aguardando` : `${whatsappLeadCount} pelo WhatsApp · ${plantaoLeads.length - whatsappLeadCount} por formulário`} />
       </section>
 
       <div className="flex flex-col gap-5">
@@ -314,7 +317,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           <SectionCardHeader
             icon={<UserList />}
             title="Leads do plantão"
-            badge={<Badge variant="secondary">{leads.length}</Badge>}
+            badge={<Badge variant="secondary">{waitingCount + distributedCount}</Badge>}
             description={`Leads das filas vinculadas ${sinceLabel}.`}
             actions={<nav aria-label="Filtrar leads por situação" className="flex flex-wrap gap-2">
               {filters.map((item) => (

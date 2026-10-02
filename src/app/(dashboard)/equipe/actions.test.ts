@@ -113,6 +113,7 @@ vi.mock("@/shared/db", () => ({
 
 vi.mock("@/shared/auth/tenant-context", () => ({
   getRequiredTenantContext: () => Promise.resolve(state.mockTenantContext),
+  invalidateTenantContextCache: () => undefined,
 }));
 
 vi.mock("@/shared/auth/team-permissions", () => ({

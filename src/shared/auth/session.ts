@@ -2,7 +2,7 @@ import "server-only";
 
 import { cache } from "react";
 import { headers } from "next/headers";
-import { getAuth } from "./index";
+import { getCachedSession } from "./cached-session";
 import { AuthenticationError } from "./errors";
 import {
   markAuthStart,
@@ -19,10 +19,7 @@ async function resolveRequiredSession() {
 
   try {
     const session = await withPerfSpan("auth.session", async () => withTimeout(
-      getAuth().api.getSession({
-        headers: await headers(),
-        query: { disableCookieCache: true },
-      }),
+      getCachedSession(await headers()),
       SESSION_TIMEOUT_MS,
       "getRequiredSession",
     ));

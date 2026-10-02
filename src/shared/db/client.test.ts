@@ -18,12 +18,16 @@ describe("connectionLimit", () => {
     vi.unstubAllEnvs();
   });
 
-  it("uses one database socket by default in serverless production", () => {
+  it("gives the single VPS process 10 sockets on the transaction pooler and 4 on the session pooler", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PHASE", "");
     vi.stubEnv("DB_POOL_MAX", "");
+    vi.stubEnv("SUPABASE_DB_URL", "");
+    vi.stubEnv("DATABASE_URL", "postgresql://u:p@aws-0-sa-east-1.pooler.supabase.com:6543/postgres");
+    expect(connectionLimit()).toBe(10);
 
-    expect(connectionLimit()).toBe(1);
+    vi.stubEnv("DATABASE_URL", "postgresql://u:p@aws-0-sa-east-1.pooler.supabase.com:5432/postgres");
+    expect(connectionLimit()).toBe(4);
   });
 
   it("allows an explicit bounded production override", () => {

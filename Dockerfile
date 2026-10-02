@@ -42,7 +42,8 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
-ENV DB_POOL_MAX=2
+# DB pool size comes from src/shared/db/client.ts (10 on the transaction pooler,
+# 4 on the session pooler); DB_POOL_MAX in Coolify overrides it.
 
 RUN apk add --no-cache curl \
   && addgroup --system --gid 1001 nodejs \

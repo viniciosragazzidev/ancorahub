@@ -3,6 +3,7 @@ import "server-only";
 import { cache } from "react";
 import { eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
+import { TtlCache } from "@/shared/cache/ttl-cache";
 import { AuthorizationError } from "./errors";
 import { getRequiredSession } from "./session";
 import type { TenantContext } from "./types";
@@ -23,6 +24,43 @@ export type { TenantContext };
 
 const TENANT_QUERY_TIMEOUT_MS = 5_000;
 
+/**
+ * The user's memberships (role, unit, status) were re-read on every request.
+ * Kept for 20s per user in this process: a role/unit change or a deactivation
+ * applies within 20s; membership writers can call invalidateTenantContextCache.
+ */
+const MEMBERSHIP_CACHE_TTL_MS = 20_000;
+
+function loadMemberships(userId: string) {
+  return getDatabase()
+    .select({
+      userActive: schema.user.active,
+      isPlatformAdmin: schema.user.isPlatformAdmin,
+      tenantId: schema.tenants.id,
+      tenantStatus: schema.tenants.status,
+      membershipStatus: schema.tenantMemberships.status,
+      role: schema.tenantMemberships.role,
+      jobTitle: schema.tenantMemberships.jobTitle,
+      customRoleId: schema.tenantMemberships.customRoleId,
+      customRoleScope: schema.customRoles.scope,
+      branchId: schema.tenantMemberships.branchId,
+      branchStatus: schema.branches.status,
+    })
+    .from(schema.tenantMemberships)
+    .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+    .innerJoin(schema.tenants, eq(schema.tenantMemberships.tenantId, schema.tenants.id))
+    .leftJoin(schema.branches, eq(schema.tenantMemberships.branchId, schema.branches.id))
+    .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
+    .where(eq(schema.tenantMemberships.userId, userId));
+}
+
+const membershipCache = new TtlCache<Awaited<ReturnType<typeof loadMemberships>>>(MEMBERSHIP_CACHE_TTL_MS, 2000);
+
+export function invalidateTenantContextCache(userId?: string) {
+  if (userId) membershipCache.delete(userId);
+  else membershipCache.clear();
+}
+
 async function resolveRequiredTenantContext(): Promise<TenantContext> {
   // Session phase is already timed by getRequiredSession()
   const { user: sessionUser } = await getRequiredSession();
@@ -31,39 +69,11 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
   markDbStart();
 
   try {
-    const memberships = await withPerfSpan("tenant.resolve", () => withTimeout(
-      getDatabase()
-        .select({
-          userActive: schema.user.active,
-          isPlatformAdmin: schema.user.isPlatformAdmin,
-          tenantId: schema.tenants.id,
-          tenantStatus: schema.tenants.status,
-          membershipStatus: schema.tenantMemberships.status,
-          role: schema.tenantMemberships.role,
-          jobTitle: schema.tenantMemberships.jobTitle,
-          customRoleId: schema.tenantMemberships.customRoleId,
-          customRoleScope: schema.customRoles.scope,
-          branchId: schema.tenantMemberships.branchId,
-          branchStatus: schema.branches.status,
-        })
-        .from(schema.tenantMemberships)
-        .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-        .innerJoin(
-          schema.tenants,
-          eq(schema.tenantMemberships.tenantId, schema.tenants.id),
-        )
-        .leftJoin(
-          schema.branches,
-          eq(schema.tenantMemberships.branchId, schema.branches.id),
-        )
-        .leftJoin(
-          schema.customRoles,
-          eq(schema.tenantMemberships.customRoleId, schema.customRoles.id),
-        )
-        .where(eq(schema.tenantMemberships.userId, sessionUser.id)),
+    const memberships = await membershipCache.getOrLoad(sessionUser.id, () => withPerfSpan("tenant.resolve", () => withTimeout(
+      loadMemberships(sessionUser.id),
       TENANT_QUERY_TIMEOUT_MS,
       "getRequiredTenantContext",
-    ));
+    )));
 
     markDbEnd();
     markTenantEnd();

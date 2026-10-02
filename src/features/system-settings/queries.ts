@@ -1,8 +1,9 @@
 import "server-only";
 
-import { inArray, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { TtlCache } from "@/shared/cache/ttl-cache";
 import { FEATURE_FLAGS, type FeatureFlagDefinition } from "@/shared/feature-flags/catalog";
 
 type DatabaseError = { code?: string; cause?: { code?: string } };
@@ -13,14 +14,31 @@ function isMissingSystemSettingsTable(error: unknown) {
   return databaseError.code === "42P01" || databaseError.cause?.code === "42P01";
 }
 
+/**
+ * The whole settings table (a few dozen rows) is read once and kept for a few
+ * seconds: it used to be queried on every single flag check — millions of
+ * round trips through the small database pool. A change made here is seen at
+ * once by this process; any other writer within the TTL.
+ */
+const SETTINGS_CACHE_TTL_MS = 15_000;
+const settingsCache = new TtlCache<{ key: string; value: string }[]>(SETTINGS_CACHE_TTL_MS, 1);
+
+async function loadAllSettings() {
+  return settingsCache.getOrLoad("all", () => getDatabase()
+    .select({ key: schema.systemSettings.key, value: schema.systemSettings.value })
+    .from(schema.systemSettings));
+}
+
+export function invalidateSystemSettingsCache() {
+  settingsCache.clear();
+}
+
 export async function getSystemSettings(keys?: readonly string[]) {
   try {
-    return keys?.length
-      ? await getDatabase()
-          .select({ key: schema.systemSettings.key, value: schema.systemSettings.value })
-          .from(schema.systemSettings)
-          .where(inArray(schema.systemSettings.key, [...keys]))
-      : await getDatabase().select({ key: schema.systemSettings.key, value: schema.systemSettings.value }).from(schema.systemSettings);
+    const all = await loadAllSettings();
+    if (!keys?.length) return all;
+    const wanted = new Set(keys);
+    return all.filter((setting) => wanted.has(setting.key));
   } catch (error) {
     if (isMissingSystemSettingsTable(error)) {
       try {
@@ -78,4 +96,5 @@ export async function setSystemSetting(key: string, value: string, updatedAt = n
       target: schema.systemSettings.key,
       set: { value, updatedAt },
     });
+  invalidateSystemSettingsCache();
 }

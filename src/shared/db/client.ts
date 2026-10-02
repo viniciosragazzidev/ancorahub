@@ -9,18 +9,33 @@ type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 
 let database: Database | undefined;
 
+/** Supavisor transaction mode (port 6543): many client sockets share few server connections. */
+export function isTransactionPooler(databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim() || "") {
+  try {
+    const url = new URL(databaseUrl);
+    return url.hostname.includes("pooler.supabase.com") && url.port === "6543";
+  } catch {
+    return false;
+  }
+}
+
 export function connectionLimit() {
   // Static generation uses several workers and must not serialize all page-data
-  // queries through a single socket. Runtime serverless instances stay capped
-  // at a low number to protect Supabase's project limit.
+  // queries through a single socket.
   if (process.env.NEXT_PHASE === "phase-production-build") return 3;
   const configured = Number.parseInt(process.env.DB_POOL_MAX ?? "", 10);
-  if (Number.isFinite(configured) && configured >= 1 && configured <= 10) return configured;
-  // Keep serverless deployments at one socket. The self-hosted Docker image
-  // explicitly sets DB_POOL_MAX=2 for its single long-lived Next process,
-  // avoiding head-of-line blocking without spending the shared pool budget.
-  return process.env.NODE_ENV === "production" ? 1 : 3;
+  if (Number.isFinite(configured) && configured >= 1 && configured <= 20) return configured;
+  // The CRM is one long-lived Node process on the VPS (Coolify): every user's
+  // queries share this pool, so 1–2 sockets queued the whole team behind any
+  // heavy page. The transaction pooler (6543) takes 10 safely; the session
+  // pooler (5432) caps clients per project, so it gets fewer.
+  if (process.env.NODE_ENV !== "production") return 3;
+  return isTransactionPooler() ? 10 : 4;
 }
+
+/** Long-lived sockets: reconnecting (TLS + auth + type lookup) on every idle gap cost ~350k reconnects. */
+const IDLE_TIMEOUT_SECONDS = 120;
+const MAX_LIFETIME_SECONDS = 30 * 60;
 
 function getDatabaseUrl(): string {
   const databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim();
@@ -64,8 +79,9 @@ function logDbConfig(databaseUrl: string): void {
         driver: usesPostgresJsDriver(databaseUrl) ? "postgres.js" : "neon-serverless",
         prepare: false,
         connectTimeoutSeconds: 10,
-        idleTimeoutSeconds: 5,
-        maxLifetimeSeconds: 60,
+        idleTimeoutSeconds: IDLE_TIMEOUT_SECONDS,
+        maxLifetimeSeconds: MAX_LIFETIME_SECONDS,
+        transactionPooler: isTransactionPooler(databaseUrl),
         statementTimeoutMs: statementTimeoutMs(),
         env: process.env.NODE_ENV,
       }),
@@ -96,8 +112,8 @@ function createPostgresDatabase(databaseUrl: string): Database {
       prepare: false,
       max: connectionLimit(),
       connect_timeout: 10,
-      idle_timeout: 5,
-      max_lifetime: 60,
+      idle_timeout: IDLE_TIMEOUT_SECONDS,
+      max_lifetime: MAX_LIFETIME_SECONDS,
       // postgres.js offers an issue-time debug hook, not a completion hook.
       // It is used only to count/hash query shapes inside an opt-in request
       // trace; raw SQL and parameters are discarded before logging.
@@ -122,7 +138,7 @@ export function getDatabase(): Database {
       new Pool({
         connectionString: databaseUrl,
         max: connectionLimit(),
-        idleTimeoutMillis: 5000,
+        idleTimeoutMillis: IDLE_TIMEOUT_SECONDS * 1000,
         connectionTimeoutMillis: 5000,
         options: `-c statement_timeout=${statementTimeoutMs()}`,
       }),
