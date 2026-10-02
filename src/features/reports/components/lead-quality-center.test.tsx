@@ -6,6 +6,10 @@ vi.mock("@/components/dashboard-header", () => ({
   DashboardHeader: ({ title, rightSlot }: { title: string; rightSlot?: React.ReactNode }) => <header><h1>{title}</h1>{rightSlot}</header>,
 }));
 vi.mock("@/components/period-select", () => ({ PeriodSelect: () => <select aria-label="Período" /> }));
+vi.mock("./lead-quality-filters", () => ({
+  QualityQueueSelect: () => <select aria-label="Fila" />,
+  LeadQualityExportMenu: () => <button type="button">Exportar relatório</button>,
+}));
 vi.mock("@/features/dashboard/components/dashboard-section-tabs", () => ({
   DashboardSectionTabs: () => <nav aria-label="Seções do dashboard">Visão da operação · Qualidade dos leads</nav>,
 }));
@@ -13,7 +17,7 @@ vi.mock("@/features/dashboard/components/dashboard-section-tabs", () => ({
 import type { LeadQualityDimension, LeadQualityReport, LeadQualitySegment } from "../metrics/lead-quality-service";
 import { LeadQualityCenter } from "./lead-quality-center";
 
-const dimensionKeys: LeadQualityDimension[] = ["source", "campaign", "adset", "ad", "form", "queue", "broker", "lead_type", "plan_type", "city", "age_band", "hour"];
+const dimensionKeys: LeadQualityDimension[] = ["source", "campaign", "adset", "ad", "form", "queue", "broker", "lead_type", "plan_type", "city", "age_band", "hour", "origin", "shift", "origin_shift"];
 const segments = Object.fromEntries(dimensionKeys.map((dimension) => [dimension, []])) as unknown as Record<LeadQualityDimension, LeadQualitySegment[]>;
 segments.ad = [{
   dimension: "ad", key: "ad-1", label: "Anúncio PME", total: 8, hot: 2, warm: 3, cold: 1,
@@ -29,6 +33,8 @@ segments.queue = [{
 const report: LeadQualityReport = {
   enabled: true,
   period: 30,
+  window: { since: "2026-09-02T03:00:00.000Z", until: null },
+  filters: { queueId: null, origin: null },
   generatedAt: "2026-10-01T12:00:00.000Z",
   summary: {
     total: 8, hot: 2, warm: 3, cold: 1, unclassified: 2, classified: 6,

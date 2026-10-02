@@ -1,22 +1,23 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, count, desc, eq, gte, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, lt, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
-import { periodStart, type PeriodValue } from "@/shared/period";
+import { leadQualityWindow, type LeadQualityPeriod, type LeadQualityWindow } from "./lead-quality-period";
 import { listEffectiveCapabilities } from "@/features/custom-roles/service";
 
 import { resolveReportDataScope } from "./metric-scope";
-import { LEAD_QUALITY_DIMENSIONS, type LeadQualityDimension, type LeadQualityFocus } from "./lead-quality-contract";
+import { LEAD_ORIGINS, LEAD_QUALITY_DIMENSIONS, type LeadOrigin, type LeadQualityDimension, type LeadQualityFilters, type LeadQualityFocus } from "./lead-quality-contract";
 import { leadQualityRates, percentage } from "./metrics-math";
 
 export { LEAD_QUALITY_DIMENSIONS } from "./lead-quality-contract";
 export { parseLeadQualityFocus } from "./lead-quality-contract";
-export type { LeadQualityDimension, LeadQualityFocus } from "./lead-quality-contract";
+export { LEAD_ORIGINS, parseLeadOrigin } from "./lead-quality-contract";
+export type { LeadOrigin, LeadQualityDimension, LeadQualityFilters, LeadQualityFocus } from "./lead-quality-contract";
 
 export type LeadQualitySegment = {
   dimension: LeadQualityDimension;
@@ -48,7 +49,10 @@ export type LeadQualityLead = {
 
 export type LeadQualityReport = {
   enabled: boolean;
-  period: PeriodValue;
+  period: LeadQualityPeriod;
+  /** Leads created in [since, until); until null = open. */
+  window: { since: string; until: string | null };
+  filters: LeadQualityFilters;
   generatedAt: string;
   summary: {
     total: number;
@@ -95,7 +99,41 @@ export async function canAccessLeadQualityCenter(context: TenantContext) {
 const emptySegments = (): Record<LeadQualityDimension, LeadQualitySegment[]> => ({
   source: [], campaign: [], adset: [], ad: [], form: [], queue: [], broker: [],
   lead_type: [], plan_type: [], city: [], age_band: [], hour: [],
+  origin: [], shift: [], origin_shift: [],
 });
+
+/** Dimensions always shown in full (small, fixed groups), even under the minimum group size. */
+const COMPLETE_DIMENSIONS: ReadonlySet<LeadQualityDimension> = new Set(["origin", "shift", "origin_shift"]);
+
+/** Formulário / WhatsApp / Outros — the same rule as the "WhatsApp" pill in /leads. */
+export function leadOriginExpression() {
+  return sql<LeadOrigin>`CASE
+    WHEN ${schema.leads.sourceChannel} = 'meta_lead_ads' AND ${schema.leads.sourceMetadata}->>'entry' = 'whatsapp' THEN 'whatsapp'
+    WHEN ${schema.leads.sourceChannel} = 'meta_lead_ads' THEN 'form'
+    ELSE 'other'
+  END`;
+}
+
+/** Turno 2 = 13:30–18:00 (São Paulo); everything else (18:00–13:30) is Turno 1. */
+export function leadShiftExpression() {
+  return sql<number>`CASE
+    WHEN timezone('America/Sao_Paulo', ${schema.leads.createdAt})::time >= time '13:30'
+     AND timezone('America/Sao_Paulo', ${schema.leads.createdAt})::time < time '18:00' THEN 2
+    ELSE 1
+  END`;
+}
+
+/** Window + queue + origin conditions shared by every query of the report. */
+export function leadQualityCohortWhere(window: LeadQualityWindow, filters: LeadQualityFilters): SQL | undefined {
+  return and(
+    gte(schema.leads.createdAt, window.since),
+    window.until ? lt(schema.leads.createdAt, window.until) : undefined,
+    filters.queueId ? eq(schema.leads.queueId, filters.queueId) : undefined,
+    filters.origin ? sql`${leadOriginExpression()} = ${filters.origin}` : undefined,
+  );
+}
+
+const originLabels = Object.fromEntries(LEAD_ORIGINS.map((origin) => [origin.key, origin.label])) as Record<LeadOrigin, string>;
 
 function ageBandExpression() {
   const details = schema.leads.qualificationDetails;
@@ -146,6 +184,14 @@ function focusWhere(focus: LeadQualityFocus | null): SQL | undefined {
         : sql`${schema.leads.qualificationDetails}->>'city' = ${focus.key}`;
     case "age_band":
       return eq(ageBandExpression(), focus.key);
+    case "origin":
+      return sql`${leadOriginExpression()} = ${focus.key}`;
+    case "shift":
+      return sql`${leadShiftExpression()} = ${Number(focus.key)}`;
+    case "origin_shift": {
+      const [origin, shift] = focus.key.split(":");
+      return and(sql`${leadOriginExpression()} = ${origin}`, sql`${leadShiftExpression()} = ${Number(shift)}`);
+    }
     case "hour": {
       const [day, hour] = focus.key.split(":").map(Number);
       return and(
@@ -190,15 +236,19 @@ function aggregateFromSegment(segment: Pick<LeadQualitySegment,
  */
 export async function getLeadQualityReport(
   context: TenantContext,
-  period: PeriodValue,
+  period: LeadQualityPeriod,
   focus: LeadQualityFocus | null = null,
+  filters: LeadQualityFilters = { queueId: null, origin: null },
+  options: { audit?: boolean; now?: Date } = {},
 ): Promise<LeadQualityReport> {
+  const window = leadQualityWindow(period, options.now);
+  const serializedWindow = { since: window.since.toISOString(), until: window.until?.toISOString() ?? null };
   if (!(await canAccessLeadQualityCenter(context))) throw new Error("Você não tem permissão para acessar esta análise.");
 
   const enabled = (await getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER)) !== "false";
   if (!enabled) {
     return {
-      enabled: false, period, generatedAt: new Date().toISOString(),
+      enabled: false, period, window: serializedWindow, filters, generatedAt: new Date().toISOString(),
       summary: { total: 0, hot: 0, warm: 0, cold: 0, unclassified: 0, classified: 0, converted: 0, hotWarmConverted: 0, assigned: 0, metaAttributed: 0, averageFirstContactSeconds: null, classificationCoverage: 0, hotWarmShare: 0, hotWarmConversionRate: 0, conversionRate: 0, assignedRate: 0, metaAdAttributionCoverage: 0, temperatureDistribution: { hot: 0, warm: 0, cold: 0, unclassified: 0 } },
       segments: emptySegments(), focus, focusedLeads: [], focusedLeadCount: 0,
     };
@@ -227,6 +277,8 @@ export async function getLeadQualityReport(
       ageBand: ageBandExpression().as("ageBand"),
       weekday: sql<number>`extract(dow from timezone('America/Sao_Paulo', ${schema.leads.createdAt}))::int`.as("weekday"),
       hour: sql<number>`extract(hour from timezone('America/Sao_Paulo', ${schema.leads.createdAt}))::int`.as("hour"),
+      origin: leadOriginExpression().as("origin"),
+      shift: leadShiftExpression().as("shift"),
       qualificationStatus: schema.leads.qualificationStatus,
       status: schema.leads.status,
       hasMetaAd: sql<boolean>`${schema.leads.metaAdId} IS NOT NULL`.as("hasMetaAd"),
@@ -243,7 +295,7 @@ export async function getLeadQualityReport(
         eq(schema.leads.tenantId, scope.tenantId),
         isNull(schema.leads.deletedAt),
         isNull(schema.leads.archivedAt),
-        gte(schema.leads.createdAt, periodStart(period)),
+        leadQualityCohortWhere(window, filters),
         scope.leadScope,
         focusWhere(focus),
       )),
@@ -262,7 +314,12 @@ export async function getLeadQualityReport(
   const age = cohort.ageBand;
   const weekday = cohort.weekday;
   const hour = cohort.hour;
+  const origin = cohort.origin;
+  const shift = cohort.shift;
   const dimension = sql<string>`CASE
+    WHEN GROUPING(${origin}) = 0 AND GROUPING(${shift}) = 0 THEN 'origin_shift'
+    WHEN GROUPING(${origin}) = 0 THEN 'origin'
+    WHEN GROUPING(${shift}) = 0 THEN 'shift'
     WHEN GROUPING(${source}) = 0 THEN 'source'
     WHEN GROUPING(${campaign}) = 0 THEN 'campaign'
     WHEN GROUPING(${adset}) = 0 THEN 'adset'
@@ -278,6 +335,9 @@ export async function getLeadQualityReport(
     ELSE 'summary'
   END`;
   const key = sql<string>`CASE
+    WHEN GROUPING(${origin}) = 0 AND GROUPING(${shift}) = 0 THEN MAX(${origin}) || ':' || MAX(${shift})::text
+    WHEN GROUPING(${origin}) = 0 THEN MAX(${origin})
+    WHEN GROUPING(${shift}) = 0 THEN MAX(${shift})::text
     WHEN GROUPING(${source}) = 0 THEN COALESCE(NULLIF(MAX(${source}), ''), ${UNKNOWN_KEY})
     WHEN GROUPING(${campaign}) = 0 THEN COALESCE(NULLIF(MAX(${campaign}), ''), ${UNKNOWN_KEY})
     WHEN GROUPING(${adset}) = 0 THEN COALESCE(NULLIF(MAX(${adset}), ''), ${UNKNOWN_KEY})
@@ -293,6 +353,9 @@ export async function getLeadQualityReport(
     ELSE 'all'
   END`;
   const label = sql<string>`CASE
+    WHEN GROUPING(${origin}) = 0 AND GROUPING(${shift}) = 0 THEN MAX(${origin}) || ':' || MAX(${shift})::text
+    WHEN GROUPING(${origin}) = 0 THEN MAX(${origin})
+    WHEN GROUPING(${shift}) = 0 THEN 'Turno ' || MAX(${shift})::text
     WHEN GROUPING(${source}) = 0 THEN COALESCE(NULLIF(MAX(${source}), ''), 'Origem não identificada')
     WHEN GROUPING(${campaign}) = 0 THEN COALESCE(NULLIF(MAX(${cohort.campaignName}), ''), 'Campanha não identificada')
     WHEN GROUPING(${adset}) = 0 THEN COALESCE(NULLIF(MAX(${cohort.adsetName}), ''), 'Conjunto não identificado')
@@ -309,7 +372,8 @@ export async function getLeadQualityReport(
   END`;
   const groupingSets = sql`GROUPING SETS (
     (), (${source}), (${campaign}), (${adset}), (${ad}), (${form}), (${queue}),
-    (${broker}), (${leadType}), (${plan}), (${city}), (${age}), (${weekday}, ${hour})
+    (${broker}), (${leadType}), (${plan}), (${city}), (${age}), (${weekday}, ${hour}),
+    (${origin}), (${shift}), (${origin}, ${shift})
   )`;
 
   const groupedRows = await db.with(cohort).select({
@@ -354,11 +418,14 @@ export async function getLeadQualityReport(
       continue;
     }
     const dimensionKey = row.dimension as LeadQualityDimension;
-    if (!(LEAD_QUALITY_DIMENSIONS as readonly string[]).includes(dimensionKey) || total < LEAD_QUALITY_MINIMUM_GROUP_SIZE) continue;
+    if (!(LEAD_QUALITY_DIMENSIONS as readonly string[]).includes(dimensionKey)) continue;
+    if (total < LEAD_QUALITY_MINIMUM_GROUP_SIZE && !COMPLETE_DIMENSIONS.has(dimensionKey)) continue;
     const segment = {
       dimension: dimensionKey,
       key: row.key,
-      label: row.label,
+      label: dimensionKey === "origin" ? originLabels[row.key as LeadOrigin] ?? row.label
+        : dimensionKey === "origin_shift" ? `${originLabels[row.key.split(":")[0] as LeadOrigin] ?? row.key} · Turno ${row.key.split(":")[1]}`
+        : row.label,
       total,
       hot: numberValue(row.hot),
       warm: numberValue(row.warm),
@@ -376,7 +443,7 @@ export async function getLeadQualityReport(
   for (const dimensionKey of LEAD_QUALITY_DIMENSIONS) {
     segments[dimensionKey] = segments[dimensionKey]
       .sort((left, right) => right.total - left.total || left.label.localeCompare(right.label, "pt-BR"))
-      .slice(0, dimensionKey === "hour" ? 168 : MAX_SEGMENTS_PER_DIMENSION);
+      .slice(0, dimensionKey === "hour" ? 168 : COMPLETE_DIMENSIONS.has(dimensionKey) ? undefined : MAX_SEGMENTS_PER_DIMENSION);
   }
 
   const resolvedSummary = summary ?? {
@@ -408,7 +475,7 @@ export async function getLeadQualityReport(
           eq(schema.leads.tenantId, scope.tenantId),
           isNull(schema.leads.deletedAt),
           isNull(schema.leads.archivedAt),
-          gte(schema.leads.createdAt, periodStart(period)),
+          leadQualityCohortWhere(window, filters),
           scope.leadScope,
           focusWhere(focus),
         ))
@@ -419,7 +486,7 @@ export async function getLeadQualityReport(
     }
   }
 
-  await db.insert(schema.auditLogs).values({
+  if (options.audit !== false) await db.insert(schema.auditLogs).values({
     id: randomUUID(),
     userId: context.userId,
     entidade: "report",
@@ -433,6 +500,8 @@ export async function getLeadQualityReport(
   return {
     enabled: true,
     period,
+    window: serializedWindow,
+    filters,
     generatedAt: new Date().toISOString(),
     summary: resolvedSummary,
     segments,

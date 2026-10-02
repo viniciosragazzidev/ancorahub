@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // takumi-pdf loads its WebAssembly from its own folder: keep it out of the bundle.
+  serverExternalPackages: ["takumi-pdf"],
+  // The lead quality PDF reads its Inter fonts at runtime.
+  outputFileTracingIncludes: {
+    "/api/reports/lead-quality": ["./src/features/reports/pdf/fonts/**/*"],
+  },
   images: {
     remotePatterns: [
       {

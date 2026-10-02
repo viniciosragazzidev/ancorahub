@@ -9,6 +9,8 @@ import { getDashboardViewModel } from "@/features/dashboard/service";
 import { OperationalDashboard } from "@/features/dashboard/components/operational-dashboard";
 import { parsePeriod, type PeriodValue } from "@/shared/period";
 import { canAccessLeadQualityCenter, getLeadQualityReport, parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
+import { parseLeadQualityPeriod } from "@/features/reports/metrics/lead-quality-period";
+import { listLeadQualityQueues } from "@/features/reports/metrics/lead-quality-export";
 import { LeadQualityCenter } from "@/features/reports/components/lead-quality-center";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
@@ -59,8 +61,12 @@ export default async function DashboardPage({
         singleParam(resolvedSearchParams.dimension),
         singleParam(resolvedSearchParams.key),
       );
-      const report = await getLeadQualityReport(context, period, focus);
-      return <LeadQualityCenter report={report} showQualityTab={report.enabled} />;
+      const qualityPeriod = parseLeadQualityPeriod(singleParam(resolvedSearchParams.period));
+      const queues = await listLeadQualityQueues(context.tenantId);
+      const rawQueue = singleParam(resolvedSearchParams.queue);
+      const queueId = rawQueue && queues.some((queue) => queue.id === rawQueue) ? rawQueue : null;
+      const report = await getLeadQualityReport(context, qualityPeriod, focus, { queueId, origin: null });
+      return <LeadQualityCenter report={report} showQualityTab={report.enabled} queues={queues} />;
     }
 
     const [model, reportingEnabled] = await Promise.all([

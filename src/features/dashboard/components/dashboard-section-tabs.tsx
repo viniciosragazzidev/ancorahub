@@ -14,7 +14,8 @@ export function DashboardSectionTabs({
   showQuality = true,
 }: {
   active: "overview" | "quality";
-  period: PeriodValue;
+  /** "today" exists only on the quality tab; the overview falls back to its default. */
+  period: PeriodValue | "today";
   showQuality?: boolean;
 }) {
   const tabs = showQuality ? dashboardTabs : dashboardTabs.slice(0, 1);
@@ -27,7 +28,7 @@ export function DashboardSectionTabs({
       hrefBuilder={(tabId) => {
         const params = new URLSearchParams();
         if (tabId === "quality") params.set("tab", "quality");
-        if (period !== 30) params.set("period", String(period));
+        if (period !== 30 && (tabId === "quality" || period !== "today")) params.set("period", String(period));
         const query = params.toString();
         return query ? `/dashboard?${query}` : "/dashboard";
       }}

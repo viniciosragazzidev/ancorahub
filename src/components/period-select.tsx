@@ -27,11 +27,14 @@ import {
 export function PeriodSelect({
   value,
   includeAll = false,
+  includeToday = false,
   label = "Período",
   triggerClassName,
 }: {
-  value: PeriodValue | "all";
+  value: PeriodValue | "all" | "today";
   includeAll?: boolean;
+  /** "Hoje" option (`?period=today`) — the lead quality center's 18h-to-18h day. */
+  includeToday?: boolean;
   label?: string;
   /** Additive visual override — leave unset for the existing default look. */
   triggerClassName?: string;
@@ -41,7 +44,7 @@ export function PeriodSelect({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  function select(period: PeriodValue | "all") {
+  function select(period: PeriodValue | "all" | "today") {
     const params = new URLSearchParams(searchParams.toString());
     if (period === "all" || period === DEFAULT_PERIOD) {
       params.delete("period");
@@ -60,6 +63,10 @@ export function PeriodSelect({
           select("all");
           return;
         }
+        if (includeToday && val === "today") {
+          select("today");
+          return;
+        }
         const num = Number.parseInt(val, 10);
         if ((PERIOD_OPTIONS as readonly number[]).includes(num)) {
           select(num as PeriodValue);
@@ -75,6 +82,7 @@ export function PeriodSelect({
       </SelectTrigger>
       <SelectContent>
         {includeAll ? <SelectItem value="all">Geral</SelectItem> : null}
+        {includeToday ? <SelectItem value="today">Hoje</SelectItem> : null}
         {PERIOD_OPTIONS.map((p) => (
           <SelectItem key={p} value={String(p)}>
             {p} dias

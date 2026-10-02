@@ -16,8 +16,9 @@ import { PeriodSelect } from "@/components/period-select";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import type { PeriodValue } from "@/shared/period";
 import { DashboardSectionTabs } from "@/features/dashboard/components/dashboard-section-tabs";
+import { leadQualityPeriodLabel, leadQualityWindowLabel, type LeadQualityPeriod } from "../metrics/lead-quality-period";
+import { LeadQualityExportMenu, QualityQueueSelect } from "./lead-quality-filters";
 import type { LeadQualityDimension, LeadQualityReport, LeadQualitySegment } from "../metrics/lead-quality-service";
 
 const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -36,7 +37,21 @@ const dimensionLabels: Record<LeadQualityDimension, string> = {
   city: "Cidade",
   age_band: "Faixa etária",
   hour: "Dia e horário",
+  origin: "Origem do lead",
+  shift: "Turno",
+  origin_shift: "Origem e turno",
 };
+
+/** Period + queue carried by every link of the page. */
+type QualityLink = { period: LeadQualityPeriod; queueId: string | null };
+const linkOf = (report: LeadQualityReport): QualityLink => ({ period: report.period, queueId: report.filters.queueId });
+
+function qualityParams(link: QualityLink) {
+  const params = new URLSearchParams({ tab: "quality" });
+  if (link.period !== 30) params.set("period", String(link.period));
+  if (link.queueId) params.set("queue", link.queueId);
+  return params;
+}
 
 function percent(value: number) {
   return `${value.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
@@ -77,14 +92,15 @@ function leadStatusLabel(status: string) {
   return labels[status] ?? status.replaceAll("_", " ");
 }
 
-function focusHref(period: PeriodValue, dimension: LeadQualityDimension, key: string) {
-  const params = new URLSearchParams({ tab: "quality", dimension, key });
-  if (period !== 30) params.set("period", String(period));
+function focusHref(link: QualityLink, dimension: LeadQualityDimension, key: string) {
+  const params = qualityParams(link);
+  params.set("dimension", dimension);
+  params.set("key", key);
   return `/dashboard?${params.toString()}`;
 }
 
-function clearFocusHref(period: PeriodValue) {
-  return period === 30 ? "/dashboard?tab=quality" : `/dashboard?tab=quality&period=${period}`;
+function clearFocusHref(link: QualityLink) {
+  return `/dashboard?${qualityParams(link).toString()}`;
 }
 
 function MetricCard({
@@ -179,7 +195,7 @@ function SegmentTable({
   description: string;
   dimension: LeadQualityDimension;
   rows: LeadQualitySegment[];
-  period: PeriodValue;
+  period: QualityLink;
   icon: typeof Activity;
   metaOnly?: boolean;
 }) {
@@ -244,7 +260,7 @@ function SegmentTable({
 function HourHeatmap({ report }: { report: LeadQualityReport }) {
   const values = new Map(report.segments.hour.map((row) => [row.key, row]));
   const max = Math.max(3, ...report.segments.hour.map((row) => row.total));
-  const hrefFor = (key: string) => focusHref(report.period, "hour", key);
+  const hrefFor = (key: string) => focusHref(linkOf(report), "hour", key);
 
   return (
     <Card>
@@ -308,7 +324,7 @@ function FocusedLeads({ report }: { report: LeadQualityReport }) {
             <CardTitle>Leads deste recorte</CardTitle>
             <CardDescription className="mt-1">{dimensionLabels[report.focus.dimension]} · {label} · {numberLabel(report.focusedLeadCount)} registros</CardDescription>
           </div>
-          <Link href={clearFocusHref(report.period)} className="text-xs font-medium text-primary underline-offset-4 hover:underline">Limpar recorte</Link>
+          <Link href={clearFocusHref(linkOf(report))} className="text-xs font-medium text-primary underline-offset-4 hover:underline">Limpar recorte</Link>
         </div>
       </CardHeader>
       {report.focusedLeads.length ? (
@@ -365,14 +381,22 @@ function FocusBanner({ report }: { report: LeadQualityReport }) {
         <span className="font-semibold text-foreground">{label}</span>
         <span className="text-muted-foreground">· {numberLabel(report.summary.total)} leads</span>
       </div>
-      <Link href={clearFocusHref(report.period)} className="text-xs font-medium text-primary underline-offset-4 hover:underline">Ver coorte completa</Link>
+      <Link href={clearFocusHref(linkOf(report))} className="text-xs font-medium text-primary underline-offset-4 hover:underline">Ver coorte completa</Link>
     </div>
   );
 }
 
-export function LeadQualityCenter({ report, showQualityTab = true }: { report: LeadQualityReport; showQualityTab?: boolean }) {
+export function LeadQualityCenter({ report, showQualityTab = true, queues = [] }: { report: LeadQualityReport; showQualityTab?: boolean; queues?: { id: string; name: string }[] }) {
   const warmHot = report.summary.hot + report.summary.warm;
-  const period = report.period;
+  const period = linkOf(report);
+  const windowLabel = leadQualityWindowLabel({ since: new Date(report.window.since), until: report.window.until ? new Date(report.window.until) : null });
+  // Origin × shift in reading order: Turno 1 then 2, Formulário, WhatsApp, Outros.
+  const originOrder = ["form", "whatsapp", "other"];
+  const originShiftRows = [...report.segments.origin_shift].sort((a, b) => {
+    const [originA, shiftA] = a.key.split(":");
+    const [originB, shiftB] = b.key.split(":");
+    return shiftA.localeCompare(shiftB) || originOrder.indexOf(originA) - originOrder.indexOf(originB);
+  });
 
   return (
     <>
@@ -380,15 +404,22 @@ export function LeadQualityCenter({ report, showQualityTab = true }: { report: L
         breadcrumb="Operação comercial"
         title="Qualidade dos leads"
         rightSlot={
-          <PeriodSelect
-            value={period}
-            label="Período da análise de qualidade"
-            triggerClassName="rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground hover:bg-muted"
-          />
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="w-28 shrink-0">
+              <PeriodSelect
+                value={report.period}
+                includeToday
+                label="Período da análise de qualidade"
+                triggerClassName="h-8 rounded-lg border border-border bg-card px-3 text-sm text-foreground hover:bg-muted"
+              />
+            </div>
+            {report.enabled ? <QualityQueueSelect queues={queues} value={report.filters.queueId} /> : null}
+            {report.enabled ? <LeadQualityExportMenu queues={queues} period={report.period} queueId={report.filters.queueId} /> : null}
+          </div>
         }
       />
       <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        {report.enabled ? <DashboardSectionTabs active="quality" period={period} showQuality={showQualityTab} /> : null}
+        {report.enabled ? <DashboardSectionTabs active="quality" period={report.period} showQuality={showQualityTab} /> : null}
 
         {!report.enabled ? (
           <Card className="mx-auto w-full max-w-2xl gap-3 border-dashed py-10 text-center">
@@ -399,7 +430,7 @@ export function LeadQualityCenter({ report, showQualityTab = true }: { report: L
           </Card>
         ) : report.summary.total === 0 ? (
           <>
-            <Intro period={period} />
+            <Intro period={report.period} windowLabel={windowLabel} />
             <Card className="items-center gap-2 border-dashed px-6 py-14 text-center">
               <span className="grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground"><Megaphone aria-hidden="true" className="size-5" /></span>
               <CardTitle>Nenhum lead neste período</CardTitle>
@@ -408,11 +439,11 @@ export function LeadQualityCenter({ report, showQualityTab = true }: { report: L
           </>
         ) : (
           <>
-            <Intro period={period} />
+            <Intro period={report.period} windowLabel={windowLabel} />
             <FocusBanner report={report} />
 
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Indicadores principais">
-              <MetricCard title="Leads recebidos" value={numberLabel(report.summary.total)} detail={`Coorte dos últimos ${period} dias`} icon={ContactRound} tone="blue" />
+              <MetricCard title="Leads recebidos" value={numberLabel(report.summary.total)} detail={`${leadQualityPeriodLabel(report.period)} · ${windowLabel}`} icon={ContactRound} tone="blue" />
               <MetricCard title="Quentes + mornos" value={numberLabel(warmHot)} detail={`${percent(report.summary.hotWarmShare)} dos que têm temperatura`} icon={ArrowUpRight} tone="emerald" />
               <MetricCard title="Classificação registrada" value={percent(report.summary.classificationCoverage)} detail={`${numberLabel(report.summary.classified)} com temperatura persistida`} icon={BadgeCheck} tone="amber" />
               <MetricCard title="Com anúncio Meta" value={percent(report.summary.metaAdAttributionCoverage)} detail={`${numberLabel(report.summary.metaAttributed)} com ID de anúncio confirmado`} icon={Megaphone} />
@@ -450,6 +481,18 @@ export function LeadQualityCenter({ report, showQualityTab = true }: { report: L
                   <span>Tempo médio até o 1º contato: {report.summary.averageFirstContactSeconds == null ? "sem registros" : `${Math.round(report.summary.averageFirstContactSeconds / 60).toLocaleString("pt-BR")} min`}</span>
                 </div>
               </Card>
+            </section>
+
+            <section className="space-y-3" aria-labelledby="origin-heading">
+              <div className="px-1">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Entrada</p>
+                <h2 id="origin-heading" className="mt-1 text-lg font-semibold tracking-tight">Formulário × WhatsApp, por turno</h2>
+                <p className="mt-1 text-xs text-muted-foreground">Turno 1: das 18h do dia anterior às 13h30 · Turno 2: das 13h30 às 18h.</p>
+              </div>
+              <div className="grid gap-4 xl:grid-cols-2">
+                <SegmentTable title="Origem do lead" description="Formulário Meta, WhatsApp e demais origens." dimension="origin" rows={report.segments.origin} period={period} icon={ContactRound} />
+                <SegmentTable title="Origem por turno" description="Cada origem em cada turno do dia." dimension="origin_shift" rows={originShiftRows} period={period} icon={Clock3} />
+              </div>
             </section>
 
             <section className="space-y-3" aria-labelledby="acquisition-heading">
@@ -509,7 +552,7 @@ export function LeadQualityCenter({ report, showQualityTab = true }: { report: L
   );
 }
 
-function Intro({ period }: { period: PeriodValue }) {
+function Intro({ period, windowLabel }: { period: LeadQualityPeriod; windowLabel: string }) {
   return (
     <section className="relative isolate overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.085] via-card to-card p-5 sm:p-6" aria-label="Sobre a análise">
       <div aria-hidden="true" className="absolute -right-10 -top-16 -z-10 size-56 rounded-full bg-primary/[0.06] blur-3xl" />
@@ -522,7 +565,7 @@ function Intro({ period }: { period: PeriodValue }) {
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-          <Clock3 aria-hidden="true" className="size-3.5" /> Últimos {period} dias
+          <Clock3 aria-hidden="true" className="size-3.5" /> {period === "today" ? `Hoje · ${windowLabel}` : `Últimos ${period} dias`}
         </div>
       </div>
     </section>

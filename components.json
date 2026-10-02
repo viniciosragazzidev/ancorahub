@@ -23,6 +23,7 @@
   },
   "registries": {
     "@efferd": "https://efferd.com/r/{style}/{name}.json",
-    "@unlumen-ui": "https://ui.unlumen.com/r/{name}.json"
+    "@unlumen-ui": "https://ui.unlumen.com/r/{name}.json",
+    "@pdfcn": "https://pdfcn.dev/r/{name}.json"
   }
 }
