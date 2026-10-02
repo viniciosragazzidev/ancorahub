@@ -181,14 +181,26 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     const details = readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
     return details.entry === "whatsapp" ? { label: details.adsLabel } : null;
   };
-  const whatsappLeadCount = allLeads.filter((lead) => whatsappEntryOf(lead)).length;
+  const isDistributed = (lead: (typeof allLeads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
+  // Desqualificados ficam retidos fora da distribuição automática, inclusive
+  // quando ainda estão sem corretor. Eles não devem aparecer nesta fila.
+  const isDisqualified = (lead: (typeof allLeads)[number]) => normalizeRoutingQualificationStatus(lead.qualificationStatus) === "disqualified";
+  const isWaiting = (lead: (typeof allLeads)[number]) => !isDistributed(lead) && !isDisqualified(lead);
+  // Only two situations matter operationally here; "todos" mixed them back
+  // together and hid which bucket someone was actually looking at.
+  const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
+  // The channel tabs count the situation on screen, so a lead handed out
+  // leaves "Aguardando · WhatsApp" and joins "Distribuídos · WhatsApp".
+  const inSituation = allLeads.filter(filter === "distribuidos" ? isDistributed : isWaiting);
+  const whatsappInSituation = inSituation.filter((lead) => whatsappEntryOf(lead)).length;
   const channel = canal === "whatsapp" ? "whatsapp" : canal === "formulario" ? "formulario" : "todos";
   const leads = channel === "todos" ? allLeads : allLeads.filter((lead) => (channel === "whatsapp") === Boolean(whatsappEntryOf(lead)));
   const channelTabs = [
-    { key: "todos", label: "Todos", count: allLeads.length },
-    { key: "formulario", label: "Formulário", count: allLeads.length - whatsappLeadCount },
-    { key: "whatsapp", label: "WhatsApp", count: whatsappLeadCount },
+    { key: "todos", label: "Todos", count: inSituation.length },
+    { key: "formulario", label: "Formulário", count: inSituation.length - whatsappInSituation },
+    { key: "whatsapp", label: "WhatsApp", count: whatsappInSituation },
   ] as const;
+  const whatsappLeadCount = allLeads.filter((lead) => whatsappEntryOf(lead)).length;
   const leadsHref = (next: { situacao?: string; canal?: string }) => {
     const query = new URLSearchParams();
     const nextSituacao = next.situacao ?? situacao;
@@ -199,16 +211,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     return `/leads/distribuicao/plantao/${schedule.id}${search ? `?${search}` : ""}`;
   };
 
-  const isDistributed = (lead: (typeof leads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
   const distributedCount = leads.filter(isDistributed).length;
-  // Desqualificados ficam retidos fora da distribuição automática, inclusive
-  // quando ainda estão sem corretor. Eles não devem aparecer nesta fila.
-  const isDisqualified = (lead: (typeof leads)[number]) => normalizeRoutingQualificationStatus(lead.qualificationStatus) === "disqualified";
-  const waitingLeads = leads.filter((lead) => !isDistributed(lead) && !isDisqualified(lead));
+  const waitingLeads = leads.filter(isWaiting);
   const waitingCount = waitingLeads.length;
-  // Only two situations matter operationally here; "todos" mixed them back
-  // together and hid which bucket someone was actually looking at.
-  const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
   // Distributed rows read as the order leads were handed out (earliest
   // assignment first); the waiting list reads as the distribution order:
   // hot, then warm (or no temperature), then cold, oldest first in each.
