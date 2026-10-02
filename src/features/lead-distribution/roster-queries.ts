@@ -54,6 +54,7 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       minimumBrokers: schema.unitDutySchedules.minimumBrokers,
       maximumBrokers: schema.unitDutySchedules.maximumBrokers,
       maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
+      shiftSplitAt: schema.unitDutySchedules.shiftSplitAt,
       status: schema.unitDutySchedules.status,
       timezone: schema.unitDutySchedules.timezone,
       validFrom: schema.unitDutySchedules.validFrom,

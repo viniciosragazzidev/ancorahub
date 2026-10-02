@@ -7,6 +7,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
 import { dutyScheduleInput, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
+import { retimeAssignmentForSplit, validShiftSplit } from "./duty-shifts";
 import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
@@ -145,6 +146,7 @@ async function findScheduleForMutation(scheduleId: string) {
       minimumBrokers: schema.unitDutySchedules.minimumBrokers,
       maximumBrokers: schema.unitDutySchedules.maximumBrokers,
       maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
+      shiftSplitAt: schema.unitDutySchedules.shiftSplitAt,
       typeId: schema.unitDutySchedules.typeId,
       validFrom: schema.unitDutySchedules.validFrom,
       validUntil: schema.unitDutySchedules.validUntil,
@@ -249,6 +251,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       minimumBrokers: parsed.data.minimumBrokers,
       maximumBrokers: parsed.data.maximumBrokers ?? null,
       maxLeadsPerBroker: parsed.data.maxLeadsPerBroker ?? null,
+      shiftSplitAt: validShiftSplit(parsed.data, parsed.data.shiftSplitAt),
       webhookCredentialId: parsed.data.webhookCredentialId,
     };
     // "Datas": one plantão per chosen date, valid only on that day.
@@ -285,6 +288,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
         minimumBrokers: schedule.minimumBrokers,
         maximumBrokers: schedule.maximumBrokers,
         maxLeadsPerBroker: schedule.maxLeadsPerBroker,
+        shiftSplitAt: schedule.shiftSplitAt,
         validFrom: schedule.validFrom,
         validUntil: schedule.validUntil ?? null,
         webhookCredentialId: schedule.webhookCredentialId ?? null,
@@ -315,6 +319,8 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
     const { context, db, schedule } = await findScheduleForMutation(scheduleId.data);
     if (schedule.status === "archived") throw new Error("Restaure o plantão antes de editá-lo.");
     if (context.role === "manager") throw new Error("Apenas Diretores podem editar plantões globais.");
+    const nextSplit = validShiftSplit(parsed.data, parsed.data.shiftSplitAt);
+    if (parsed.data.shiftSplitAt && !nextSplit) throw new Error("A divisão em turnos precisa ficar entre o início e o fim do plantão.");
     // Optional: the queues that receive this plantão ([] = none). Absent = unchanged.
     // "receivingQueueId" (one queue) is still accepted from forms already open.
     const queuesField = formData.get("receivingQueueIds");
@@ -356,6 +362,8 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         typeId,
         maximumBrokers: parsed.data.maximumBrokers ?? null,
         maxLeadsPerBroker: parsed.data.maxLeadsPerBroker ?? null,
+        // Absent from the form = unchanged (older forms, "estender").
+        ...(formData.has("shiftSplitAt") ? { shiftSplitAt: nextSplit } : {}),
         validFrom: parsed.data.validFrom,
         validUntil: parsed.data.validUntil ?? null,
         webhookCredentialId: parsed.data.webhookCredentialId ?? null,
@@ -375,6 +383,17 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         eq(schema.dutyRosterAssignments.status, "active"),
         isNull(schema.dutyRosterAssignments.dutyDate),
       ));
+      // The split moved (or was removed): morning brokers keep the morning,
+      // afternoon brokers the afternoon, in their roster windows.
+      if (formData.has("shiftSplitAt") && nextSplit !== (schedule.shiftSplitAt ?? null)) {
+        const roster = await tx.select({ id: schema.dutyRosterAssignments.id, startsAt: schema.dutyRosterAssignments.startsAt, endsAt: schema.dutyRosterAssignments.endsAt })
+          .from(schema.dutyRosterAssignments)
+          .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.scheduleId, schedule.id), eq(schema.dutyRosterAssignments.status, "active")));
+        for (const assignment of roster) {
+          const retimed = retimeAssignmentForSplit(parsed.data, schedule.shiftSplitAt ?? null, nextSplit, assignment);
+          if (retimed) await tx.update(schema.dutyRosterAssignments).set({ ...retimed, updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
+        }
+      }
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: schedule.id, acao: "duty_schedule.updated",
       });

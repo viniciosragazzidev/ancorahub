@@ -876,6 +876,13 @@
                         "when":  1790967600000,
                         "tag":  "0177_contact_avatars",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  125,
+                        "version":  "7",
+                        "when":  1791052800000,
+                        "tag":  "0178_duty_shift_split",
+                        "breakpoints":  true
                     }
                 ]
 }

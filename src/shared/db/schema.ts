@@ -767,6 +767,8 @@ export const unitDutySchedules = pgTable(
     maximumBrokers: integer("maximum_brokers"),
     /** Leads each broker may receive in one occurrence of this plantão; null = no cap. */
     maxLeadsPerBroker: integer("max_leads_per_broker"),
+    /** Split in a morning and an afternoon shift at this time ("13:30"); null = one shift. */
+    shiftSplitAt: text("shift_split_at"),
     status: text("status").notNull().default("active"),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),

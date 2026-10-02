@@ -33,6 +33,7 @@ import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { getCachedLeadsBranches, getCachedLeadsBrokers, getCachedSlaSettings } from "@/features/leads/reference-data";
 import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
+import { dutyShifts, worksInShift } from "@/features/lead-distribution/duty-shifts";
 
 export const dynamic = "force-dynamic";
 
@@ -152,6 +153,12 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     </>;
   }
   const confirmedCount = roster.filter((entry) => entry.presenceStatus === "confirmed").length;
+  // A plantão split in shifts shows its roster by shift (whole-day brokers in both).
+  const shiftSections = dutyShifts(schedule)?.filter((shift) => shift.key !== "dia").map((shift) => ({
+    key: shift.key,
+    label: shift.label,
+    entries: roster.filter((entry) => worksInShift(entry.shift, shift.key as "manha" | "tarde")),
+  })) ?? null;
   const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
   const [branches, brokers, slaSettings, managementActionsSetting, assignmentChoiceSetting] = await Promise.all([
@@ -182,7 +189,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     ? sortByAssignmentTime(leads.filter(isDistributed))
     : sortByTemperaturePriority([...waitingLeads].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()));
   const leadGroups = filter === "distribuidos"
-    ? groupDutyLeadsByShift(visibleLeads)
+    ? groupDutyLeadsByShift(visibleLeads, schedule.shiftSplitAt)
     : [{ key: "ordem", label: "Ordem de distribuição · quentes, mornos e frios", leads: visibleLeads }];
   const filters = [
     { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
@@ -369,8 +376,16 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 <strong className="font-semibold">Nenhum escalado está elegível para receber leads.</strong> Há pendências de cadastro ou confirmação — os leads permanecem aguardando.
               </div>
             ) : null}
-            {roster.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{roster.map((entry) => (
-              <div key={entry.id} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5">
+            {roster.length ? (shiftSections ?? [{ key: "todos", label: null as string | null, entries: roster }]).map((section) => (
+              <section key={section.key} aria-label={section.label ?? "Escalados"} className="space-y-2">
+                {section.label ? (
+                  <h3 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground">
+                    {section.label}
+                    <Badge variant="outline">{section.entries.length}</Badge>
+                  </h3>
+                ) : null}
+                {section.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{section.entries.map((entry) => (
+              <div key={`${section.key}:${entry.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <p className="truncate text-sm font-medium">{entry.brokerName}</p>
@@ -379,20 +394,22 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                     {presenceEnabled ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
                     <BrokerPauseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} paused={Boolean(entry.pausedAt)} />
                   </div>
-                  <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}{shiftSections && entry.shift === "dia" ? " · Dia todo" : ""}</p>
                   {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}
                   <div className="mt-1.5">
                     <BrokerLiveStatus status={entry.liveStatus} nextEventAt={entry.nextEventAt ? entry.nextEventAt.toISOString() : null} />
                   </div>
                   <BrokerCapacityBar activeLeads={entry.activeLeads} capacity={entry.capacity} />
                 </div>
-                {/* Leads received in this occurrence: morning (até 12:59) in blue, afternoon (13:00+) in red. */}
+                {/* Leads received in this occurrence, by the same morning/afternoon cut as the leads list. */}
                 <div className="flex shrink-0 items-center gap-1.5" aria-label={`${entry.leadsMorning} leads de manhã e ${entry.leadsAfternoon} à tarde`}>
-                  <Badge variant="info" title="Leads recebidos de manhã (até 12:59)">Manhã {entry.leadsMorning}</Badge>
-                  <Badge variant="destructive" title="Leads recebidos à tarde (a partir de 13:00)">Tarde {entry.leadsAfternoon}</Badge>
+                  <Badge variant="info" title="Leads recebidos de manhã">Manhã {entry.leadsMorning}</Badge>
+                  <Badge variant="destructive" title="Leads recebidos à tarde">Tarde {entry.leadsAfternoon}</Badge>
                 </div>
               </div>
-            ))}</div> : <p className="text-sm text-muted-foreground">Nenhum corretor escalado neste plantão.</p>}
+            ))}</div> : <p className="text-sm text-muted-foreground">Ninguém escalado neste turno.</p>}
+              </section>
+            )) : <p className="text-sm text-muted-foreground">Nenhum corretor escalado neste plantão.</p>}
           </CardContent>
         </Card>
       </div>

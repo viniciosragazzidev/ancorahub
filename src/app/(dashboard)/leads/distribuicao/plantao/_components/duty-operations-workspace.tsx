@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/dashboard/metric-card";
 import { AppSelect } from "@/components/ui/select";
+import { assignmentShift, DEFAULT_SHIFT_SPLIT_AT, dutyShifts, worksInShift, type DutyShiftKey } from "@/features/lead-distribution/duty-shifts";
 import {
   Dialog,
   DialogDescription,
@@ -54,8 +55,10 @@ import {
 } from "@/features/lead-distribution/duty-actions";
 import {
   createRosterAssignmentAction,
+  moveRosterAssignmentAction,
   removeRosterAssignmentAction,
 } from "@/features/lead-distribution/roster-actions";
+import { cn } from "@/lib/utils";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { buildMonthOccurrences, monthCoverage, monthShiftProgress, summarizeDutyDays } from "@/features/lead-distribution/monthly-duty-plan";
 import { DutyMonthCalendar } from "./duty-month-calendar";
@@ -134,7 +137,7 @@ function dateLabel(value: Date | null) {
   }).format(value);
 }
 
-type RosterEntry = { id: string; brokerId: string; brokerName: string };
+type RosterEntry = { id: string; brokerId: string; brokerName: string; dayOfWeek: number; startsAt: string; endsAt: string; published: boolean };
 
 /**
  * Everyone on the plantão, as one list: the brokers added here plus the ones
@@ -142,10 +145,14 @@ type RosterEntry = { id: string; brokerId: string; brokerName: string };
  */
 function plantaoRoster(snapshot: Snapshot, scheduleId: string): RosterEntry[] {
   const today = dateInputValue(new Date());
+  const plantao = snapshot.schedules.find((schedule) => schedule.id === scheduleId);
   const entries: RosterEntry[] = [
-    ...snapshot.assignments.filter((row) => row.scheduleId === scheduleId),
-    ...snapshot.publishedAssignments.filter((row) => row.scheduleId === scheduleId && row.dutyDate >= today),
-  ].map((row) => ({ id: row.id, brokerId: row.brokerId, brokerName: row.brokerName }));
+    ...snapshot.assignments.filter((row) => row.scheduleId === scheduleId).map((row) => ({ ...row, published: false })),
+    // Monthly-plan rows follow the plantão's own hours.
+    ...snapshot.publishedAssignments.filter((row) => row.scheduleId === scheduleId && row.dutyDate >= today).map((row) => ({
+      ...row, published: true, dayOfWeek: plantao?.dayOfWeek ?? 0, startsAt: plantao?.startsAt ?? "", endsAt: plantao?.endsAt ?? "",
+    })),
+  ].map((row) => ({ id: row.id, brokerId: row.brokerId, brokerName: row.brokerName, dayOfWeek: row.dayOfWeek, startsAt: row.startsAt, endsAt: row.endsAt, published: row.published }));
   const seen = new Set<string>();
   return entries.filter((entry) => !seen.has(entry.brokerId) && seen.add(entry.brokerId));
 }
@@ -202,6 +209,9 @@ function DutyFormSheet({
   // "Exclusividade de Plantão" checklist the queue editor already has.
   // The queue that receives this plantão (kept in sync with Filas → Exclusividade de Plantão).
   const [queueIds, setQueueIds] = useState<string[]>(() => schedule?.linkedQueues?.map((queue) => queue.id) ?? (schedule?.linkedQueueId ? [schedule.linkedQueueId] : []));
+  // Morning/afternoon shifts: brokers are put on one of them (or the whole day).
+  const [splitOn, setSplitOn] = useState(Boolean(schedule?.shiftSplitAt));
+  const [splitAt, setSplitAt] = useState(schedule?.shiftSplitAt ?? DEFAULT_SHIFT_SPLIT_AT);
   const toggleQueue = (id: string, checked: boolean) => setQueueIds((current) => (checked ? [...new Set([...current, id])] : current.filter((item) => item !== id)));
   // A linked queue that is no longer active still shows by name.
   const queueChoices = [
@@ -463,6 +473,22 @@ function DutyFormSheet({
                 Quantos leads cada corretor pode receber em cada dia deste plantão. Quem atinge o limite para de receber até o próximo dia do plantão; oferta expirada ou recusada não conta. Em branco, sem limite.
               </p>
             </div>
+            <div className="grid gap-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <Checkbox checked={splitOn} onCheckedChange={(checked) => setSplitOn(checked === true)} aria-label="Dividir em turnos" />
+                Dividir em turnos (manhã e tarde)
+              </label>
+              <input type="hidden" name="shiftSplitAt" value={splitOn ? splitAt : ""} />
+              {splitOn ? (
+                <div className="grid gap-1.5 pl-6">
+                  <Label htmlFor="duty-split-at">A tarde começa às</Label>
+                  <Input id="duty-split-at" type="time" value={splitAt} onChange={(event) => setSplitAt(event.target.value)} className="w-32" />
+                  <p className="text-xs text-muted-foreground">
+                    Cada corretor fica na manhã, na tarde ou no dia todo. Ele só recebe leads e só é chamado para confirmar presença no turno dele.
+                  </p>
+                </div>
+              ) : null}
+            </div>
             <fieldset className="grid gap-2">
               <legend className="text-sm font-medium">Filas que recebem este plantão</legend>
               {queueChoices.length ? (
@@ -560,6 +586,8 @@ function DutyInspector({
   const [searchingBrokers, setSearchingBrokers] = useState(false);
   const [addingBrokerId, setAddingBrokerId] = useState<string | null>(null);
   const assignments = schedule ? plantaoRoster(snapshot, schedule.id) : [];
+  const shifts = schedule ? dutyShifts(schedule) : null;
+  const [addShift, setAddShift] = useState<DutyShiftKey>("manha");
   const eligibleBrokers = schedule
     ? snapshot.brokers.filter(
         (broker) =>
@@ -608,8 +636,9 @@ function DutyInspector({
     formData.set("scheduleId", schedule.id);
     formData.set("brokerId", brokerId);
     formData.set("dayOfWeek", String(schedule.dayOfWeek));
-    formData.set("startsAt", schedule.startsAt);
-    formData.set("endsAt", schedule.endsAt);
+    const shift = shifts?.find((item) => item.key === addShift);
+    formData.set("startsAt", shift?.startsAt ?? schedule.startsAt.slice(0, 5));
+    formData.set("endsAt", shift?.endsAt ?? schedule.endsAt.slice(0, 5));
     setAddingBrokerId(brokerId);
     startTransition(async () => {
       const result = await createRosterAssignmentAction({}, formData);
@@ -620,6 +649,27 @@ function DutyInspector({
       }
       setBrokerSearch("");
       toast.success("Corretor adicionado à escala.");
+      router.refresh();
+    });
+  }
+
+  function changeShift(assignment: RosterEntry, key: DutyShiftKey) {
+    const shift = shifts?.find((item) => item.key === key);
+    if (!schedule || !shift) return;
+    const formData = new FormData();
+    formData.set("assignmentId", assignment.id);
+    formData.set("scheduleId", schedule.id);
+    formData.set("brokerId", assignment.brokerId);
+    formData.set("dayOfWeek", String(assignment.dayOfWeek));
+    formData.set("startsAt", shift.startsAt);
+    formData.set("endsAt", shift.endsAt);
+    startTransition(async () => {
+      const result = await moveRosterAssignmentAction({}, formData);
+      if (!result.success) {
+        toast.error(result.error ?? "Não foi possível trocar o turno.");
+        return;
+      }
+      toast.success(`${assignment.brokerName}: ${shift.label}.`);
       router.refresh();
     });
   }
@@ -742,6 +792,29 @@ function DutyInspector({
                     </div>
                   </SheetSectionHeader>
                   <div className="grid gap-3 p-4">
+                    {shifts ? (
+                      <div className="grid gap-1.5">
+                        <p className="text-xs font-medium text-muted-foreground">Turno de quem você adicionar</p>
+                        <div className="grid grid-cols-3 rounded-lg border border-border bg-muted/40 p-0.5" role="radiogroup" aria-label="Turno de quem você adicionar">
+                          {shifts.map((shift) => (
+                            <button
+                              key={shift.key}
+                              type="button"
+                              role="radio"
+                              aria-checked={addShift === shift.key}
+                              onClick={() => setAddShift(shift.key)}
+                              className={cn(
+                                "rounded-md px-2 py-1.5 text-xs font-medium",
+                                addShift === shift.key ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                              )}
+                            >
+                              {shift.label.split(" · ")[0]}
+                              <span className="block text-[10px] font-normal text-muted-foreground">{shift.label.split(" · ")[1]}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="grid gap-2">
                       <Input
                         value={brokerSearch}
@@ -798,10 +871,16 @@ function DutyInspector({
                         </div>
                       ) : null}
                     </div>
-                    <div className="grid gap-2">
-                      {assignments.map((assignment) => (
+                    {(shifts ? shifts.filter((shift) => shift.key !== "dia").map((shift) => ({
+                      key: shift.key,
+                      label: shift.label as string | null,
+                      entries: assignments.filter((assignment) => worksInShift(assignmentShift(schedule, assignment), shift.key as "manha" | "tarde")),
+                    })) : [{ key: "todos", label: null as string | null, entries: assignments }]).map((section) => (
+                    <div key={section.key} className="grid gap-2">
+                      {section.label ? <p className="text-xs font-semibold text-muted-foreground">{section.label} · {section.entries.length}</p> : null}
+                      {section.entries.map((assignment) => (
                         <div
-                          key={assignment.id}
+                          key={`${section.key}:${assignment.id}`}
                           className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"
                         >
                           <span className="min-w-0">
@@ -809,9 +888,19 @@ function DutyInspector({
                               {assignment.brokerName}
                             </span>
                             <span className="block text-xs text-muted-foreground">
-                              Escalado neste horário
+                              {shifts ? (shifts.find((shift) => shift.key === assignmentShift(schedule, assignment))?.label ?? `${assignment.startsAt.slice(0, 5)}–${assignment.endsAt.slice(0, 5)}`) : "Escalado neste horário"}
                             </span>
                           </span>
+                          {shifts && !assignment.published ? (
+                            <AppSelect
+                              aria-label={`Turno de ${assignment.brokerName}`}
+                              className="w-28 shrink-0"
+                              value={assignmentShift(schedule, assignment) ?? ""}
+                              onValueChange={(value) => { if (value) changeShift(assignment, value as DutyShiftKey); }}
+                              options={shifts.map((shift) => ({ value: shift.key, label: shift.label.split(" · ")[0] }))}
+                              disabled={pending}
+                            />
+                          ) : null}
                           <Button
                             size="sm"
                             variant="ghost"
@@ -823,12 +912,13 @@ function DutyInspector({
                           </Button>
                         </div>
                       ))}
-                      {!assignments.length && (
+                      {!section.entries.length && (
                         <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-                          Nenhum corretor escalado.
+                          {section.label ? "Ninguém neste turno." : "Nenhum corretor escalado."}
                         </p>
                       )}
                     </div>
+                    ))}
                   </div>
                 </SheetSection>
                 <SheetSection>

@@ -9,6 +9,7 @@ import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, resolveDutyLeadWind
 import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
 import { normalizeOfferPacing } from "./offer-pacing";
+import { assignmentShift } from "./duty-shifts";
 import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
 
@@ -43,6 +44,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       priority: schema.unitDutySchedules.priority,
       minimumBrokers: schema.unitDutySchedules.minimumBrokers,
       maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
+      shiftSplitAt: schema.unitDutySchedules.shiftSplitAt,
       status: schema.unitDutySchedules.status,
       timezone: schema.unitDutySchedules.timezone,
       validFrom: schema.unitDutySchedules.validFrom,
@@ -227,7 +229,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     ))).map((row) => row.userId)
     : []);
   const leads = queriedLeads.filter((lead) => !isManagementInvestigation(lead, managementUserIds));
-  const leadsByShift = countBrokerLeadsByShift(leads);
+  const leadsByShift = countBrokerLeadsByShift(leads, schedule.shiftSplitAt);
 
   const leadsPerBroker = new Map<string, number>();
   for (const lead of leads) {
@@ -295,6 +297,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     },
     presenceEnabled,
     roster: roster.map(({ phone, userActive, membershipStatus, dayOfWeek, startsAt, endsAt, validFrom, validUntil, ...entry }) => {
+      // Which shift this broker works (morning, afternoon, whole day) on a split plantão.
+      const shift = assignmentShift(schedule, { startsAt, endsAt });
       const occurrence = occurrenceByAssignment.get(entry.id);
       const presence = occurrence ? presenceByAssignment.get(`${entry.id}:${occurrence.dutyDate}`) : null;
       // Same prerequisites the distribution engine applies before offering a lead.
@@ -310,6 +314,9 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       });
       return {
       ...entry,
+      shift,
+      shiftStartsAt: startsAt.slice(0, 5),
+      shiftEndsAt: endsAt.slice(0, 5),
       leadsInWindow: leadsPerBroker.get(entry.brokerId) ?? 0,
       leadsMorning: leadsByShift.get(entry.brokerId)?.manha ?? 0,
       leadsAfternoon: leadsByShift.get(entry.brokerId)?.tarde ?? 0,
