@@ -772,12 +772,23 @@ async function markInvitationSent(row: OutboundRow) {
 /** Takes the company number's spacing slot; an exact dispatch retries once after the gap. */
 async function takeCompanySlot(wahaNumberId: string, noticeKey: string, exact: boolean) {
   const critical = teamNoticeByKey(noticeKey)?.class === "critical";
-  const gapMs = critical ? DELIVERY_LIMITS.companyNumber.criticalGapMs : DELIVERY_LIMITS.companyNumber.gapMs;
+  const limits = DELIVERY_LIMITS.companyNumber;
+  const gapMs = critical ? limits.criticalGapMs : limits.gapMs;
   if (await reserveCompanyNumberSlot(wahaNumberId, gapMs)) return true;
-  if (!exact) return false;
-  await sleep(gapMs);
-  return reserveCompanyNumberSlot(wahaNumberId, gapMs);
+  // Wait for the number's turn inside this run instead of a whole worker cycle
+  // (a minute): a burst of presence calls used to leave one per minute. An
+  // exact dispatch waits one gap; a critical notice in a batch waits up to
+  // CRITICAL_SLOT_WAIT_MS. Informative notices go back to the queue.
+  const deadline = Date.now() + (exact ? gapMs : critical ? CRITICAL_SLOT_WAIT_MS : 0);
+  while (Date.now() < deadline) {
+    await sleep(gapMs + Math.floor(Math.random() * (critical ? limits.criticalJitterMs : limits.jitterMs)));
+    if (await reserveCompanyNumberSlot(wahaNumberId, gapMs)) return true;
+  }
+  return false;
 }
+
+/** How long a critical notice waits for the company number's turn within one outbox run. */
+const CRITICAL_SLOT_WAIT_MS = 40_000;
 
 /** The first-access invite's secret token, checked (pending, not expired). Throws the invite's delivery error. */
 async function loadInvitationToken(row: OutboundRow) {
