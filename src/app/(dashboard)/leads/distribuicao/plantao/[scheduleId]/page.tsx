@@ -3,7 +3,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CheckCircle2, Clock3, Download, FileSpreadsheet } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
-import { ArrowLeft, UserList, Users } from "@/components/huge-icons";
+import { ArrowLeft, UserList, Users, WhatsappLogo } from "@/components/huge-icons";
+import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
+import { cn } from "@/lib/utils";
 import { LeadStatusBadge, LeadTemperature } from "@/components/status-badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,11 +69,11 @@ function DutyProfileHeader({
   </section>;
 }
 
-export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string }> }) {
+export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string; canal?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { scheduleId } = await params;
-  const { situacao, data } = await searchParams;
+  const { situacao, data, canal } = await searchParams;
 
   let profile: Awaited<ReturnType<typeof getDutyScheduleProfile>>;
   try {
@@ -80,7 +82,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     redirect("/leads/distribuicao?view=plantao");
   }
 
-  const { schedule, roster, linkedQueues, leads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled } = profile;
+  const { schedule, roster, linkedQueues, leads: allLeads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled } = profile;
   const historyEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY)) === "true";
   // A plantão lasts one day: there is no "other occurrence" to browse.
   const singleDay = isSingleOccurrencePlantao(schedule);
@@ -170,8 +172,32 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled"),
   ]);
   const drawerContextRole = managementActionsSetting !== "false" ? context.role : "broker";
-  const returnedUnaccepted = await getReturnedUnacceptedLeadIds(context.tenantId, leads.map((lead) => lead.id));
+  const returnedUnaccepted = await getReturnedUnacceptedLeadIds(context.tenantId, allLeads.map((lead) => lead.id));
   const canExportReport = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
+
+  // Leads that came in through WhatsApp (coex number / click-to-WhatsApp ads)
+  // vs. the Meta form: a tab for each, the same mark as in /leads.
+  const whatsappEntryOf = (lead: (typeof allLeads)[number]) => {
+    const details = readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
+    return details.entry === "whatsapp" ? { label: details.adsLabel } : null;
+  };
+  const whatsappLeadCount = allLeads.filter((lead) => whatsappEntryOf(lead)).length;
+  const channel = canal === "whatsapp" ? "whatsapp" : canal === "formulario" ? "formulario" : "todos";
+  const leads = channel === "todos" ? allLeads : allLeads.filter((lead) => (channel === "whatsapp") === Boolean(whatsappEntryOf(lead)));
+  const channelTabs = [
+    { key: "todos", label: "Todos", count: allLeads.length },
+    { key: "formulario", label: "Formulário", count: allLeads.length - whatsappLeadCount },
+    { key: "whatsapp", label: "WhatsApp", count: whatsappLeadCount },
+  ] as const;
+  const leadsHref = (next: { situacao?: string; canal?: string }) => {
+    const query = new URLSearchParams();
+    const nextSituacao = next.situacao ?? situacao;
+    const nextCanal = next.canal ?? channel;
+    if (nextSituacao) query.set("situacao", nextSituacao);
+    if (nextCanal !== "todos") query.set("canal", nextCanal);
+    const search = query.toString();
+    return `/leads/distribuicao/plantao/${schedule.id}${search ? `?${search}` : ""}`;
+  };
 
   const isDistributed = (lead: (typeof leads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
   const distributedCount = leads.filter(isDistributed).length;
@@ -256,7 +282,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           value={linkedQueues.length}
           sublabel={linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"}
         />
-        <StatCard label="Leads no plantão" value={leads.length} sublabel={`${distributedCount} distribuídos · ${waitingCount} aguardando`} />
+        <StatCard label="Leads no plantão" value={allLeads.length} sublabel={channel === "todos" ? `${distributedCount} distribuídos · ${waitingCount} aguardando` : `${whatsappLeadCount} pelo WhatsApp · ${allLeads.length - whatsappLeadCount} por formulário`} />
       </section>
 
       <div className="flex flex-col gap-5">
@@ -270,7 +296,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
               {filters.map((item) => (
                 <Button
                   key={item.key}
-                  render={<Link href={`/leads/distribuicao/plantao/${schedule.id}?situacao=${item.key}`} />}
+                  render={<Link href={leadsHref({ situacao: item.key })} />}
                   size="sm"
                   variant={filter === item.key ? "secondary" : "outline"}
                 >
@@ -280,6 +306,24 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             </nav>}
           />
           <CardContent className="p-0">
+            <nav aria-label="Filtrar leads por canal de entrada" className="flex w-full items-center gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {channelTabs.map((tab) => (
+                <Link
+                  key={tab.key}
+                  href={leadsHref({ canal: tab.key })}
+                  aria-current={channel === tab.key ? "page" : undefined}
+                  className={cn(
+                    "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 pb-2.5 pt-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                    channel === tab.key ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {tab.key === "whatsapp" ? <WhatsappLogo className="size-3.5" weight="fill" /> : null}
+                  {tab.label}
+                  <span className="font-mono text-xs text-muted-foreground">{tab.count}</span>
+                  {channel === tab.key ? <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary" aria-hidden="true" /> : null}
+                </Link>
+              ))}
+            </nav>
             {visibleLeads.length ? (
               <DragScrollTable className="[&_[data-slot=table-container]]:max-h-[60vh] [&_[data-slot=table-container]]:overflow-y-auto [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
                 <Table className={dataTableStyles.native}>
@@ -308,6 +352,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                         </TableRow>
                         {group.leads.map((lead) => {
                           const distribution = leadDistributionStatusUi(lead.distributionStatus);
+                          const whatsappEntry = whatsappEntryOf(lead);
                           const drawerLead: LeadWorkspaceItem = {
                             id: lead.id,
                             nome: lead.nome,
@@ -340,7 +385,15 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                           };
                           return (
                             <TableRow key={lead.id} className={returnedUnaccepted.has(lead.id) ? "bg-warning/10 hover:bg-warning/15" : "group/lead-row"}>
-                              <TableCell className="font-medium"><DutyLeadDetailsTrigger lead={drawerLead} contextRole={drawerContextRole} contextJobTitle={context.jobTitle} contextBranchId={context.branchId} brokers={brokers} branches={branches} manualAssignmentChoiceEnabled={assignmentChoiceSetting !== "false"} slaFirstContactMinutes={Number.parseInt(slaSettings.slaFirstContactMinutes ?? "15", 10) || 15} slaStagnantDays={Number.parseInt(slaSettings.slaStagnantDays ?? "3", 10) || 3} /></TableCell>
+                              <TableCell className="font-medium"><div className="flex min-w-0 items-center gap-1.5"><DutyLeadDetailsTrigger lead={drawerLead} contextRole={drawerContextRole} contextJobTitle={context.jobTitle} contextBranchId={context.branchId} brokers={brokers} branches={branches} manualAssignmentChoiceEnabled={assignmentChoiceSetting !== "false"} slaFirstContactMinutes={Number.parseInt(slaSettings.slaFirstContactMinutes ?? "15", 10) || 15} slaStagnantDays={Number.parseInt(slaSettings.slaStagnantDays ?? "3", 10) || 3} />{whatsappEntry ? (
+                                <span
+                                  title={whatsappEntry.label ? `Entrou pelo WhatsApp · ${whatsappEntry.label}` : "Entrou pelo WhatsApp"}
+                                  className="inline-flex shrink-0 items-center gap-1 rounded-full border border-border px-1.5 py-px text-[10px] font-medium text-muted-foreground"
+                                >
+                                  <WhatsappLogo className="size-2.5" weight="fill" />
+                                  WhatsApp
+                                </span>
+                              ) : null}</div></TableCell>
                               <TableCell><LeadTemperature status={lead.qualificationStatus} /></TableCell>
                               <TableCell className="text-muted-foreground">{lead.queueName ?? "—"}</TableCell>
                               <TableCell className="text-muted-foreground">{returnedUnaccepted.has(lead.id) ? <span className="flex items-center gap-1.5 font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor"><span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />Devolvido — não aceito</span> : (lead.brokerName ?? "Sem corretor")}</TableCell>
@@ -357,7 +410,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 </Table>
               </DragScrollTable>
             ) : (
-              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead nesta situação para este plantão {sinceLabel}.</div>
+              <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead {channel === "whatsapp" ? "do WhatsApp " : channel === "formulario" ? "de formulário " : ""}nesta situação para este plantão {sinceLabel}.</div>
             )}
           </CardContent>
         </Card>
