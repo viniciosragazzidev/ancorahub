@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { UserAvatar } from "@/components/ui/user-avatar";
-import { getTeamMemberProfile } from "@/features/team/member-profile";
+import { getTeamMemberProfile, MEMBER_PROFILE_LEADS_LIMIT } from "@/features/team/member-profile";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 export const dynamic = "force-dynamic";
@@ -66,9 +66,9 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,.85fr)]">
         <Card className="border-transparent bg-transparent shadow-none">
-          <CardHeader className="border-b border-border/60 p-4"><CardTitle className="text-base">Carteira recente</CardTitle><CardDescription>Leads atualmente vinculados ou atendidos por este membro dentro do escopo permitido.</CardDescription></CardHeader>
-          <CardContent className="p-0">
-            {recentLeads.length ? <Table><TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Status</TableHead><TableHead>1º contato</TableHead><TableHead>Vinculado em</TableHead></TableRow></TableHeader><TableBody>{recentLeads.map((lead) => <TableRow key={lead.id}><TableCell className="font-medium">{lead.name}</TableCell><TableCell><LeadStatusBadge status={lead.status} /></TableCell><TableCell>{lead.firstContactAt ? dateTime.format(lead.firstContactAt) : <Badge variant="warning">Pendente</Badge>}</TableCell><TableCell className="text-muted-foreground">{lead.assignedAt ? date.format(lead.assignedAt) : date.format(lead.createdAt)}</TableCell></TableRow>)}</TableBody></Table> : <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead deste membro aparece no escopo atual.</div>}
+          <CardHeader className="border-b border-border/60 p-4"><CardTitle className="flex items-center gap-2 text-base">Carteira <Badge variant="outline">{recentLeads.length}</Badge></CardTitle><CardDescription>Todos os leads vinculados a este membro dentro do escopo permitido, dos recebidos por último aos mais antigos.{recentLeads.length >= MEMBER_PROFILE_LEADS_LIMIT ? ` Mostrando os ${MEMBER_PROFILE_LEADS_LIMIT} mais recentes.` : ""}</CardDescription></CardHeader>
+          <CardContent className="max-h-[70vh] overflow-y-auto p-0">
+            {recentLeads.length ? <Table><TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Status</TableHead><TableHead>1º contato</TableHead><TableHead>Vinculado em</TableHead></TableRow></TableHeader><TableBody>{recentLeads.map((lead) => <TableRow key={lead.id}><TableCell className="font-medium">{lead.name}</TableCell><TableCell><LeadStatusBadge status={lead.status} /></TableCell><TableCell>{lead.firstContactAt ? dateTime.format(lead.firstContactAt) : <Badge variant="warning">Pendente</Badge>}</TableCell><TableCell className="text-muted-foreground">{lead.assignedAt ? dateTime.format(lead.assignedAt) : date.format(lead.createdAt)}</TableCell></TableRow>)}</TableBody></Table> : <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead deste membro aparece no escopo atual.</div>}
           </CardContent>
         </Card>
 

@@ -11,6 +11,7 @@ import { retimeAssignmentForSplit, validShiftSplit } from "./duty-shifts";
 import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
+import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history";
 
 export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
 
@@ -560,6 +561,23 @@ export async function sendDutyPresenceInviteManuallyAction(scheduleId: string, a
     return await sendDutyPresenceInviteManually({ tenantId: context.tenantId, assignmentId, requestedBy: context.userId });
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível enviar o convite." };
+  }
+}
+
+/** A rostered broker's day (since 19:00 of the day before): leads received and offers sent. */
+export async function getBrokerDayHistoryAction(scheduleId: string, brokerId: string, dutyDate?: string | null): Promise<{ ok: true; history: BrokerDayHistory } | { ok: false; reason: string }> {
+  try {
+    const { context, db } = await findScheduleForMutation(z.string().uuid().parse(scheduleId));
+    const parsedBrokerId = z.string().min(1).max(64).parse(brokerId);
+    const [onRoster] = await db.select({ id: schema.dutyRosterAssignments.id }).from(schema.dutyRosterAssignments)
+      .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.scheduleId, scheduleId), eq(schema.dutyRosterAssignments.brokerId, parsedBrokerId)))
+      .limit(1);
+    if (!onRoster) return { ok: false, reason: "Este corretor não está na escala deste plantão." };
+    const day = dutyDate ? z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(dutyDate) : null;
+    const history = await getBrokerDayHistory(context.tenantId, parsedBrokerId, { dutyDate: day });
+    return history ? { ok: true, history } : { ok: false, reason: "Corretor não encontrado." };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível carregar o histórico." };
   }
 }
 

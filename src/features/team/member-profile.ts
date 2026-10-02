@@ -10,6 +10,8 @@ import { getDatabase, schema } from "@/shared/db";
 import type { TenantRole } from "@/shared/db/schema";
 
 const memberUserIdSchema = z.string().uuid();
+/** Leads listed on the member profile (the counters above cover the whole portfolio). */
+export const MEMBER_PROFILE_LEADS_LIMIT = 300;
 
 type Viewer = { role: TenantRole; branchId: string | null };
 
@@ -182,7 +184,8 @@ export async function getTeamMemberProfile(memberUserId: string) {
       .where(offerScope)
       .groupBy(schema.leadOffers.status, sql`${schema.leadOffers.expiresAt} <= now()`),
     db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, assignedAt: schema.leads.assignedAt, firstContactAt: schema.leads.firstContactAt, createdAt: schema.leads.createdAt })
-      .from(schema.leads).where(leadScope).orderBy(desc(schema.leads.updatedAt)).limit(6),
+      // The whole portfolio, newest handed-out first (it used to stop at the 6 last updated).
+      .from(schema.leads).where(leadScope).orderBy(sql`${schema.leads.assignedAt} desc nulls last`, desc(schema.leads.createdAt)).limit(MEMBER_PROFILE_LEADS_LIMIT),
     db.select({ id: schema.leadDistributionEvents.id, leadName: schema.leads.nome, action: schema.leadDistributionEvents.action, reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt })
       .from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id)).where(redistributionScope).orderBy(desc(schema.leadDistributionEvents.createdAt)).limit(6),
   ]);

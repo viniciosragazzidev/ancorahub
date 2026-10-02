@@ -35,6 +35,7 @@ import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { getCachedLeadsBranches, getCachedLeadsBrokers, getCachedSlaSettings } from "@/features/leads/reference-data";
 import { BrokerPresenceReleaseButton } from "../_components/broker-presence-release-button";
 import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
+import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigger";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { dutyShifts, worksInShift } from "@/features/lead-distribution/duty-shifts";
 
@@ -150,7 +151,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             badge={<Badge variant="secondary">{occurrenceHistory.roster.length}</Badge>}
             description="Vínculos válidos nesta data; alterações posteriores podem limitar a reconstituição de turnos antigos."
           />
-          <CardContent className="flex flex-wrap gap-2 pt-4">{occurrenceHistory.roster.length ? occurrenceHistory.roster.map((entry) => <Badge key={entry.id} variant="outline">{entry.brokerName}</Badge>) : <p className="text-sm text-muted-foreground">Nenhum vínculo de escala encontrado para esta data.</p>}</CardContent>
+          <CardContent className="flex flex-wrap gap-2 pt-4">{occurrenceHistory.roster.length ? occurrenceHistory.roster.map((entry) => <span key={entry.id} className="rounded-lg border border-border px-2.5 py-1"><BrokerDayHistoryTrigger scheduleId={schedule.id} brokerId={entry.brokerId} brokerName={entry.brokerName} dutyDate={historicalWindow.dutyDate} /></span>) : <p className="text-sm text-muted-foreground">Nenhum vínculo de escala encontrado para esta data.</p>}</CardContent>
         </Card>
       </main>
     </>;
@@ -451,7 +452,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
               <div key={`${section.key}:${entry.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    <p className="truncate text-sm font-medium">{entry.brokerName}</p>
+                    <BrokerDayHistoryTrigger scheduleId={schedule.id} brokerId={entry.brokerId} brokerName={entry.brokerName} />
                     {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Presença confirmada"}${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Confirmado"}${entry.confirmedAt ? ` em ${dateTime.format(entry.confirmedAt)}` : ""}`}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
