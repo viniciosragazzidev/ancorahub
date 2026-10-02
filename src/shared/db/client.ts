@@ -27,15 +27,21 @@ export function connectionLimit() {
   if (Number.isFinite(configured) && configured >= 1 && configured <= 20) return configured;
   // The CRM is one long-lived Node process on the VPS (Coolify): every user's
   // queries share this pool, so 1–2 sockets queued the whole team behind any
-  // heavy page. The transaction pooler (6543) takes 10 safely; the session
-  // pooler (5432) caps clients per project, so it gets fewer.
-  if (process.env.NODE_ENV !== "production") return 3;
-  return isTransactionPooler() ? 10 : 4;
+  // heavy page. The transaction pooler (6543) takes 10 safely. The session
+  // pooler (5432) allows 15 clients for the whole project (every app, job and
+  // script): more than 2 here ran it out (EMAXCONNSESSION) and broke /leads.
+  if (process.env.NODE_ENV !== "production") return isTransactionPooler() ? 3 : 2;
+  return isTransactionPooler() ? 10 : 2;
 }
 
-/** Long-lived sockets: reconnecting (TLS + auth + type lookup) on every idle gap cost ~350k reconnects. */
-const IDLE_TIMEOUT_SECONDS = 120;
-const MAX_LIFETIME_SECONDS = 30 * 60;
+/**
+ * On the transaction pooler sockets stay open (reconnecting — TLS + auth +
+ * type lookup — on every idle gap cost ~350k reconnects). On the session
+ * pooler each socket holds one of the project's 15 slots, so it is released
+ * quickly, as before.
+ */
+const IDLE_TIMEOUT_SECONDS = isTransactionPooler() ? 120 : 5;
+const MAX_LIFETIME_SECONDS = isTransactionPooler() ? 30 * 60 : 60;
 
 function getDatabaseUrl(): string {
   const databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim();
