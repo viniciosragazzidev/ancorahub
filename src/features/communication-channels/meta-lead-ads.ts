@@ -114,6 +114,30 @@ function collectUnmappedQuestionNames(fields: MetaLeadField[]) {
   return [...new Set(names)].slice(0, 40);
 }
 
+/** "você_tem_empresa?_" → "Você tem empresa?" */
+export function formQuestionLabel(name: string) {
+  const text = name.replace(/_+/g, " ").replace(/\s+/g, " ").trim();
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : name;
+}
+
+/**
+ * The client's answers to the questions the mapping doesn't recognize, as
+ * "Pergunta: resposta", so the broker sees everything the client filled in on
+ * the lead — nothing is discarded (decided by the business on 02/10). Answers
+ * may include health data (sensitive under the LGPD): they live on the lead
+ * only, are never logged and never go into a WhatsApp template.
+ */
+function collectUnmappedAnswers(fields: MetaLeadField[]) {
+  const answers = fields
+    .filter((field) => field.name?.trim() && !MAPPED_FIELD_NAMES.has(normalizeFieldName(field.name)))
+    .map((field) => {
+      const answer = (field.values ?? []).filter((value) => typeof value === "string" && value.trim()).map((value) => value.trim()).join(", ");
+      return answer ? `${formQuestionLabel(field.name!.trim()).slice(0, 120)}: ${answer.replace(/_+/g, " ").slice(0, 300)}` : null;
+    })
+    .filter((entry): entry is string => Boolean(entry));
+  return [...new Set(answers)].slice(0, 40);
+}
+
 /** Deterministic field mapping; unknown form answers are never sent to logs. */
 export function normalizeMetaLead(record: MetaLeadAdRecord) {
   const fields = record.field_data ?? [];
@@ -127,6 +151,7 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   // no explicit plan-type question.
   const leadType = (tipoPlano ? normalizeLeadType(tipoPlano) : undefined) ?? (tipoCnpj ? "PME" : undefined);
   const unmappedFormFields = collectUnmappedQuestionNames(fields);
+  const formAnswers = collectUnmappedAnswers(fields);
 
   // Fallbacks amigáveis para ferramentas de testes da Meta (Lead Gen Testing Tool)
   if (nome.includes("<test lead:") || nome.includes("dummy data")) {
@@ -156,6 +181,7 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
     ...(operadora ? { operadora } : {}),
     ...(leadType ? { leadType } : {}),
     ...(unmappedFormFields.length ? { unmappedFormFields } : {}),
+    ...(formAnswers.length ? { formAnswers } : {}),
     ...(record.adset_id ? { adSetId: record.adset_id } : {}),
     ...(record.page_id ? { pageId: record.page_id } : {}),
   };
@@ -395,6 +421,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
               tipoCnpj: lead.tipoCnpj ?? null,
               operadora: lead.operadora ?? null,
               unmappedFormFields: lead.unmappedFormFields ?? null,
+              formAnswers: lead.formAnswers ?? null,
             },
           },
         });

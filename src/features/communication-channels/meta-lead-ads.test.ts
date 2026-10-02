@@ -69,17 +69,28 @@ describe("Meta Lead Ads normalization", () => {
     })).toEqual({ action: "capture", queueId: "queue-campaign" });
   });
 
-  it("maps Meta standard fields and keeps only the name of unrelated questions, never their answers", () => {
+  it("maps Meta standard fields and lists the questions it does not recognize", () => {
     expect(normalizeMetaLead({
       id: "leadgen_123", ad_id: "ad_1", form_id: "form_1", created_time: "2026-07-31T12:34:56+0000",
       field_data: [
         { name: "full_name", values: ["Ana Lima"] },
         { name: "phone_number", values: ["+55 21 99999-0000"] },
         { name: "email", values: ["ana@example.test"] },
-        { name: "medical_history", values: ["not persisted here"] },
+        { name: "medical_history", values: ["kept on the lead"] },
       ],
-    })).toEqual({ nome: "Ana Lima", telefone: "+55 21 99999-0000", email: "ana@example.test", externalId: "leadgen_123", campaignId: null, campaignName: null, adId: "ad_1", formId: "form_1", createdTime: "2026-07-31T12:34:56+0000", unmappedFormFields: ["medical_history"] });
-    expect(JSON.stringify(normalizeMetaLead({ id: "x", field_data: [{ name: "medical_history", values: ["diabetes"] }] }))).not.toContain("diabetes");
+    })).toEqual({ nome: "Ana Lima", telefone: "+55 21 99999-0000", email: "ana@example.test", externalId: "leadgen_123", campaignId: null, campaignName: null, adId: "ad_1", formId: "form_1", createdTime: "2026-07-31T12:34:56+0000", unmappedFormFields: ["medical_history"], formAnswers: ["Medical history: kept on the lead"] });
+  });
+
+  it("keeps the answers of the other questions the client filled in, readable", () => {
+    expect(normalizeMetaLead({
+      id: "leadgen_answers",
+      field_data: [
+        { name: "full_name", values: ["Ana Lima"] },
+        { name: "você_tem_empresa?_", values: ["sim,_mei"] },
+        { name: "qual_seu_plano_atual", values: ["Amil 400"] },
+        { name: "possui_doença_preexistente?", values: ["sim"] },
+      ],
+    })).toMatchObject({ formAnswers: ["Você tem empresa?: sim, mei", "Qual seu plano atual: Amil 400", "Possui doença preexistente?: sim"] });
   });
 
   it("does not list contact or already-mapped questions as unmapped", () => {
@@ -105,7 +116,7 @@ describe("Meta Lead Ads normalization", () => {
         { name: "full_name", values: ["Ana Lima"] },
         { name: "phone_number", values: ["+55 21 99999-0000"] },
         { name: "Tipo de CNPJ", values: ["MEI"] },
-        { name: "medical_history", values: ["not persisted here"] },
+        { name: "medical_history", values: ["kept on the lead"] },
       ],
     })).toMatchObject({ nome: "Ana Lima", tipoCnpj: "MEI", leadType: "PME" });
     expect(normalizeMetaLead({ id: "leadgen_without_cnpj_type", field_data: [] })).not.toHaveProperty("tipoCnpj");
@@ -119,7 +130,7 @@ describe("Meta Lead Ads normalization", () => {
         { name: "Tipo de Plano", values: ["PME"] },
         { name: "Tipo de CNPJ", values: ["MEI"] },
         { name: "Operadora de preferência", values: ["SulAmérica"] },
-        { name: "medical_history", values: ["not persisted here"] },
+        { name: "medical_history", values: ["kept on the lead"] },
       ],
     })).toMatchObject({ tipoPlano: "PME", leadType: "PME", tipoCnpj: "MEI", operadora: "SulAmérica" });
   });

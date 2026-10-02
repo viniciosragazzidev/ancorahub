@@ -98,6 +98,8 @@ export type LightLeadDetailData = {
   aiIntelligence?: any;
   aiPolicyResult?: any;
   redistributionNotice?: { reason: string | null; createdAt: Date | string } | null;
+  /** Everything the client told us (AI qualification + form), see buildLeadClientInfo. */
+  clientInfo?: Array<{ key: string; label: string; value: string }>;
 };
 
 const DECLINE_REASONS = [
@@ -612,6 +614,25 @@ export function LightLeadDetail({
             ) : null}
           </div>
 
+          {/* Informações do cliente — tudo o que ele informou, antes e depois do aceite */}
+          {(() => {
+            // Contact data stays hidden until the broker accepts.
+            const info = (lead.clientInfo ?? []).filter((item) => !(isDistributed && item.key === "email"));
+            return info.length ? (
+              <section aria-labelledby="client-info-heading" className="rounded-xl border border-border p-3.5">
+                <h2 id="client-info-heading" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Informações do cliente</h2>
+                <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
+                  {info.map((item) => (
+                    <div key={item.key} className="min-w-0">
+                      <dt className="text-[11px] text-muted-foreground">{item.label}</dt>
+                      <dd className="break-words font-semibold text-foreground">{item.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ) : null;
+          })()}
+
           {/* Zona B — Ação Principal em Destaque */}
           {isDistributed ? (
             /* State 1: ANTES DO ACEITE */
@@ -795,7 +816,7 @@ export function LightLeadDetail({
                   <div>
                     <span className="text-muted-foreground block text-[11px]">Produto / Plano</span>
                     <strong className="font-semibold text-foreground truncate block">
-                      {lead.planName || lead.carrierName || "Plano Familiar"}
+                      {lead.planName || lead.carrierName || lead.clientInfo?.find((item) => item.key === "planType")?.value || "Não informado"}
                     </strong>
                   </div>
                   <div>

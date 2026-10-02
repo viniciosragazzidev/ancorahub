@@ -16,6 +16,7 @@ import { evaluateBrokerOfferPacing, isOfferPacingEnabled, type OfferPacingConfig
 import { normalizePhone } from "@/shared/utils/phone";
 import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, isBlockingActiveOffer, resolveLeadOfferAcceptance } from "./domain";
 import { formatLeadTypeLabel, readSourcePlanType } from "./lead-type-label";
+import { buildLeadClientInfo, buildLeadOfferSummary } from "@/features/leads/client-info";
 import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
 
 /**
@@ -115,8 +116,11 @@ export async function createLeadOffersForBrokers(input: {
       nome: schema.leads.nome,
       branchId: schema.leads.branchId,
       tipo: schema.leads.tipo,
+      email: schema.leads.email,
       formData: schema.leads.formData,
       sourceMetadata: schema.leads.sourceMetadata,
+      sourceChannel: schema.leads.sourceChannel,
+      qualificationDetails: schema.leads.qualificationDetails,
     })
     .from(schema.leads)
     .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
@@ -125,9 +129,11 @@ export async function createLeadOffersForBrokers(input: {
   if (!lead) throw new Error("Lead não encontrado.");
 
   const leadTypeLabel = formatLeadTypeLabel(lead.tipo, lead.sourceMetadata);
-  const produtoInteresse = readLeadFormValue(lead.formData, [
+  // The template's "Produto de interesse" carries what the client told us
+  // (plan · lives · ages · city · interest), so the broker decides with it.
+  const produtoInteresse = buildLeadOfferSummary(lead, readLeadFormValue(lead.formData, [
     "produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse", "interesse",
-  ]) ?? readSourcePlanType(lead.sourceMetadata) ?? leadTypeLabel;
+  ]) ?? readSourcePlanType(lead.sourceMetadata) ?? leadTypeLabel);
 
   // 2. Fetch brokers info
   const brokers = await db
@@ -719,8 +725,11 @@ export async function handleLeadOfferWebhookResponse(input: {
         nome: schema.leads.nome,
         telefone: schema.leads.telefone,
         tipo: schema.leads.tipo,
+        email: schema.leads.email,
         formData: schema.leads.formData,
         sourceMetadata: schema.leads.sourceMetadata,
+        sourceChannel: schema.leads.sourceChannel,
+        qualificationDetails: schema.leads.qualificationDetails,
         corretorId: schema.leads.corretorId,
         branchId: schema.leads.branchId,
         queueId: schema.leads.queueId,
@@ -853,12 +862,17 @@ export async function handleLeadOfferWebhookResponse(input: {
     });
     const brokerName = result.broker.name || "Corretor(a)";
     const leadTypeLabel = formatLeadTypeLabel(result.lead.tipo, result.lead.sourceMetadata);
-    const interest = readLeadFormValue(result.lead.formData, ["produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse"])
+    // What the client told us (AI qualification + form) fills the confirmation.
+    const clientInfo = buildLeadClientInfo(result.lead);
+    const info = (key: string) => clientInfo.find((item) => item.key === key)?.value ?? null;
+    const interest = buildLeadOfferSummary(result.lead, readLeadFormValue(result.lead.formData, ["produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse"])
       ?? readSourcePlanType(result.lead.sourceMetadata)
-      ?? "Plano de saúde";
-    const dependents = readLeadFormValue(result.lead.formData, ["dependentes", "n_dependentes", "numeroDependentes", "qtdDependentes"])
+      ?? "Plano de saúde");
+    // The template labels it "Dependentes"; the client tells lives (holder included).
+    const lives = info("lives");
+    const dependents = (lives ? `${lives} ${lives === "1" ? "vida" : "vidas"}` : null) ?? readLeadFormValue(result.lead.formData, ["dependentes", "n_dependentes", "numeroDependentes", "qtdDependentes"])
       ?? "Não informado";
-    const city = readLeadFormValue(result.lead.formData, ["cidade", "city", "municipio", "município", "cidade_residencia"])
+    const city = info("city") ?? readLeadFormValue(result.lead.formData, ["cidade", "city", "municipio", "município", "cidade_residencia"])
       ?? "Não informada";
 
     // Enqueue confirmation template: lead_assignment_confirmed

@@ -1,4 +1,5 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { buildLeadClientInfo } from "@/features/leads/client-info";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
@@ -177,7 +178,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       summary: qualificationDetails?.resumoAtendimento || qualificationDetails?.resumoNecessidade || null,
       livesCount: qualificationDetails?.qtdVidas ? Number(qualificationDetails.qtdVidas) : null,
       urgency: qualificationDetails?.urgenciaContratacao || null,
-      city: qualificationDetails?.cidade || null,
+      city: qualificationDetails?.cidade || (typeof (lead.qualificationDetails as Record<string, unknown> | null)?.city === "string" ? String((lead.qualificationDetails as Record<string, unknown>).city) : null),
       createdAt: lead.createdAt,
       assignedAt: lead.assignedAt,
       slaFirstContactMinutes: 15,
@@ -197,6 +198,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       consentimentoLgpd: lead.consentimentoLgpd,
       aiIntelligence: qualificationDetails?.aiIntelligence || null,
       aiPolicyResult: qualificationDetails?.aiPolicyResult || null,
+      clientInfo: buildLeadClientInfo({
+        email: lead.email,
+        tipo: lead.tipo,
+        sourceChannel: lead.sourceChannel,
+        sourceMetadata: lead.sourceMetadata,
+        qualificationDetails: lead.qualificationDetails,
+        formData: lead.formData,
+      }),
       redistributionNotice: redistributionNotice ? {
         reason: redistributionNotice.reason,
         createdAt: redistributionNotice.createdAt,
