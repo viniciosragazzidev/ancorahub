@@ -114,11 +114,11 @@ export function leadOriginExpression() {
   END`;
 }
 
-/** Turno 2 = 13:30–18:00 (São Paulo); everything else (18:00–13:30) is Turno 1. */
+/** Turno 2 = 13:30–19:00 (São Paulo); everything else (19:00–13:30) is Turno 1. */
 export function leadShiftExpression() {
   return sql<number>`CASE
     WHEN timezone('America/Sao_Paulo', ${schema.leads.createdAt})::time >= time '13:30'
-     AND timezone('America/Sao_Paulo', ${schema.leads.createdAt})::time < time '18:00' THEN 2
+     AND timezone('America/Sao_Paulo', ${schema.leads.createdAt})::time < time '19:00' THEN 2
     ELSE 1
   END`;
 }

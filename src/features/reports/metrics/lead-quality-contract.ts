@@ -13,7 +13,7 @@ export const LEAD_QUALITY_DIMENSIONS = [
   "hour",
   /** Formulário / WhatsApp / Outros (see LEAD_ORIGINS). */
   "origin",
-  /** Turno 1 (18h–13h30) / Turno 2 (13h30–18h). */
+  /** Turno 1 (19h–13h30) / Turno 2 (13h30–19h). */
   "shift",
   /** Origin × shift, key "whatsapp:2". */
   "origin_shift",

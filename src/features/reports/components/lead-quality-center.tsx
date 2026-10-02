@@ -487,7 +487,7 @@ export function LeadQualityCenter({ report, showQualityTab = true, queues = [] }
               <div className="px-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Entrada</p>
                 <h2 id="origin-heading" className="mt-1 text-lg font-semibold tracking-tight">Formulário × WhatsApp, por turno</h2>
-                <p className="mt-1 text-xs text-muted-foreground">Turno 1: das 18h do dia anterior às 13h30 · Turno 2: das 13h30 às 18h.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Turno 1: das 19h do dia anterior às 13h30 · Turno 2: das 13h30 às 19h.</p>
               </div>
               <div className="grid gap-4 xl:grid-cols-2">
                 <SegmentTable title="Origem do lead" description="Formulário Meta, WhatsApp e demais origens." dimension="origin" rows={report.segments.origin} period={period} icon={ContactRound} />

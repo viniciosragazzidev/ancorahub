@@ -134,7 +134,7 @@ function Cover({ input }: { input: LeadQualityPdfInput }) {
       <Row gap={6} style={{ flexWrap: "wrap" }}>
         <Badge variant="outline" size="sm" label={`Fila: ${input.queueName ?? "Todas as filas"}`} />
         <Badge variant="outline" size="sm" label={`Origem: ${input.originLabelFilter}`} />
-        <Badge variant="outline" size="sm" label="Turno 1: 18h–13h30 · Turno 2: 13h30–18h" />
+        <Badge variant="outline" size="sm" label="Turno 1: 19h–13h30 · Turno 2: 13h30–19h" />
       </Row>
     </View>
   );
@@ -246,7 +246,7 @@ function ShiftBlock({ input }: { input: LeadQualityPdfInput }) {
   return (
     <View>
       <View wrap={false}>
-        <SectionTitle title="Por turno" description="Turno 1: das 18h do dia anterior às 13h30 · Turno 2: das 13h30 às 18h." />
+        <SectionTitle title="Por turno" description="Turno 1: das 19h do dia anterior às 13h30 · Turno 2: das 13h30 às 19h." />
         <Row>
           {LEAD_SHIFTS.map((shift) => {
             const total = shiftTotals.get(shift.key);
@@ -304,7 +304,7 @@ function LeadList({ input }: { input: LeadQualityPdfInput }) {
     <View break>
       <SectionTitle
         title="Leads do período"
-        description={`T1 = Turno 1 (18h–13h30) · T2 = Turno 2 (13h30–18h). ` + (input.leadsTruncated ? `Os ${numberLabel(input.leads.length)} mais recentes; a planilha traz o mesmo recorte.` : `${numberLabel(input.leads.length)} leads, do mais recente ao mais antigo.`)}
+        description={`T1 = Turno 1 (19h–13h30) · T2 = Turno 2 (13h30–19h). ` + (input.leadsTruncated ? `Os ${numberLabel(input.leads.length)} mais recentes; a planilha traz o mesmo recorte.` : `${numberLabel(input.leads.length)} leads, do mais recente ao mais antigo.`)}
       />
       <DataTable
         size="compact"

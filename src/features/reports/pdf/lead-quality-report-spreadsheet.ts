@@ -41,7 +41,7 @@ export function encodeLeadQualitySpreadsheet(input: LeadQualityExport & { tenant
     ["Janela", `${leadQualityWindowLabel(window, input.generatedAt)} (horário de Brasília)`],
     ["Fila", input.queueName ?? "Todas as filas"],
     ["Origem", input.originLabelFilter],
-    ["Turnos", "Turno 1: 18h–13h30 · Turno 2: 13h30–18h"],
+    ["Turnos", "Turno 1: 19h–13h30 · Turno 2: 13h30–19h"],
     ["Gerado em", dateTimeLabel(input.generatedAt)],
     [],
     ["Indicador", "Valor"],

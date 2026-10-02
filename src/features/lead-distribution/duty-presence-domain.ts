@@ -155,7 +155,7 @@ function findTodaysUpcomingOccurrence(input: WeeklyWindowInput, now: Date): Duty
  * otherwise the most recently completed occurrence, bounded on the end so a
  * closed shift's page doesn't keep absorbing leads that arrived after it ended.
  *
- * The lower bound is 18:00 of the day before the occurrence: the leads of the
+ * The lower bound is 19:00 of the day before the occurrence: the leads of the
  * previous evening and night belong to the next plantão, older ones do not
  * (it used to reach back to the last plantão of the same queues, which could
  * be days earlier). `_family` is no longer used.
@@ -175,8 +175,8 @@ export function getDutyOccurrenceLeadWindow(schedule: WeeklyWindowInput, _family
   return { since: previousEveningOf(relevant, schedule.timezone), until: active ? null : relevant.endsAt };
 }
 
-/** The leads of an occurrence start at 18:00 of the day before it (the evening's leads go to the next plantão). */
-export const DUTY_LEADS_FROM_PREVIOUS_DAY_AT = "18:00";
+/** The leads of an occurrence start at 19:00 of the day before it (the evening's leads go to the next plantão). */
+export const DUTY_LEADS_FROM_PREVIOUS_DAY_AT = "19:00";
 
 function previousEveningOf(occurrence: DutyWindow, timezone: string) {
   const day = zonedParts(occurrence.startsAt, timezone);

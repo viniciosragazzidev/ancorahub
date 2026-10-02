@@ -69,25 +69,25 @@ describe("getDutyOccurrenceLeadWindow", () => {
   // No rotation — the only schedule on its queue is itself.
   const solo = [shift];
 
-  it("is open-ended while in progress, from 18:00 of the day before (not the last time the schedule ran, a week back)", () => {
+  it("is open-ended while in progress, from 19:00 of the day before (not the last time the schedule ran, a week back)", () => {
     const now = new Date("2026-09-23T14:00:00.000Z"); // Wed 11:00 in São Paulo, mid-shift
-    expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({ since: new Date("2026-09-22T21:00:00.000Z"), until: null });
+    expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({ since: new Date("2026-09-22T22:00:00.000Z"), until: null });
   });
 
   it("closes the window at today's own end right after the shift closes, not open-ended", () => {
     const now = new Date("2026-09-23T15:30:00.000Z"); // Wed 12:30 SP, just after close
-    expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({ since: new Date("2026-09-22T21:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
+    expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({ since: new Date("2026-09-22T22:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
   });
 
   it("scopes a past occurrence's page to only its own window the next day, not open past its close", () => {
     const now = new Date("2026-09-24T14:00:00.000Z"); // Thursday, well after Wednesday's shift
-    expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({ since: new Date("2026-09-22T21:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
+    expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({ since: new Date("2026-09-22T22:00:00.000Z"), until: new Date("2026-09-23T15:00:00.000Z") });
   });
 
-  it("shows today's not-yet-started occurrence (open-ended, since 18:00 of the day before) instead of last week's", () => {
+  it("shows today's not-yet-started occurrence (open-ended, since 19:00 of the day before) instead of last week's", () => {
     const now = new Date("2026-09-30T12:00:00.000Z"); // Wed 09:00 SP — today's own shift starts at 10:00
     expect(getDutyOccurrenceLeadWindow(shift, solo, now)).toEqual({
-      since: new Date("2026-09-29T21:00:00.000Z"),
+      since: new Date("2026-09-29T22:00:00.000Z"),
       until: null,
       upcomingStartsAt: new Date("2026-09-30T13:00:00.000Z"),
     });
@@ -97,11 +97,11 @@ describe("getDutyOccurrenceLeadWindow", () => {
     expect(getDutyOccurrenceLeadWindow({ ...shift, dayOfWeek: 9 }, solo, new Date("2026-09-23T12:00:00.000Z"))).toEqual({ since: new Date(0), until: null });
   });
 
-  it("a plantão whose queues last had a plantão days before counts only from 18:00 of the day before (PRESENCIAL counted from 30/09)", () => {
+  it("a plantão whose queues last had a plantão days before counts only from 19:00 of the day before (PRESENCIAL counted from 30/09)", () => {
     const presencial = { dayOfWeek: 5, startsAt: "09:00", endsAt: "13:30", timezone: "America/Sao_Paulo" };
     const lastWeekWednesday = { dayOfWeek: 3, startsAt: "09:00", endsAt: "18:00", timezone: "America/Sao_Paulo" };
     const now = new Date("2026-10-02T12:30:00.000Z"); // Fri 02/10 09:30 SP
-    expect(getDutyOccurrenceLeadWindow(presencial, [presencial, lastWeekWednesday], now)).toEqual({ since: new Date("2026-10-01T21:00:00.000Z"), until: null });
+    expect(getDutyOccurrenceLeadWindow(presencial, [presencial, lastWeekWednesday], now)).toEqual({ since: new Date("2026-10-01T22:00:00.000Z"), until: null });
   });
 
   describe("with a Tue/Wed/Thu rotation sharing the same queue — the reported bug", () => {
@@ -113,10 +113,10 @@ describe("getDutyOccurrenceLeadWindow", () => {
 
     it("pulls the lower bound from yesterday's *different* schedule closing, not this schedule a week back", () => {
       // Thursday 2026-09-24, mid-shift. The queue's Wednesday row closed at
-      // 18:00 the day before — every lead since then must count as waiting
+      // 19:00 the day before — every lead since then must count as waiting
       // for today's occurrence, exactly what was reported missing.
       const now = new Date("2026-09-24T16:00:00.000Z"); // Thu 13:00 SP, mid-shift
-      expect(getDutyOccurrenceLeadWindow(thu, rotation, now)).toEqual({ since: new Date("2026-09-23T21:00:00.000Z"), until: null });
+      expect(getDutyOccurrenceLeadWindow(thu, rotation, now)).toEqual({ since: new Date("2026-09-23T22:00:00.000Z"), until: null });
     });
 
     it("bounds a past day's own page between the two adjacent days in the rotation, not a week", () => {
@@ -124,7 +124,7 @@ describe("getDutyOccurrenceLeadWindow", () => {
       // Wednesday's own close — not last Wednesday, not open past today.
       const now = new Date("2026-09-24T16:00:00.000Z");
       expect(getDutyOccurrenceLeadWindow(wed, rotation, now)).toEqual({
-        since: new Date("2026-09-22T21:00:00.000Z"),
+        since: new Date("2026-09-22T22:00:00.000Z"),
         until: new Date("2026-09-23T21:00:00.000Z"),
       });
     });
@@ -136,7 +136,7 @@ describe("getDutyOccurrenceLeadWindow", () => {
       const fri = { dayOfWeek: 5, startsAt: "09:00", endsAt: "18:00", timezone: "America/Sao_Paulo" };
       const now = new Date("2026-09-25T11:29:00.000Z");
       expect(getDutyOccurrenceLeadWindow(fri, [...rotation, fri], now)).toEqual({
-        since: new Date("2026-09-24T21:00:00.000Z"),
+        since: new Date("2026-09-24T22:00:00.000Z"),
         until: null,
         upcomingStartsAt: new Date("2026-09-25T12:00:00.000Z"),
       });

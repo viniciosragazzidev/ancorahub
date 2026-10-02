@@ -43,7 +43,7 @@ export function QualityQueueSelect({ queues, value }: { queues: Queue[]; value: 
 }
 
 const PERIODS: { value: string; label: string }[] = [
-  { value: "today", label: "Hoje (18h–18h)" },
+  { value: "today", label: "Hoje (19h–19h)" },
   { value: "7", label: "7 dias" },
   { value: "14", label: "14 dias" },
   { value: "30", label: "30 dias" },
@@ -84,7 +84,7 @@ export function LeadQualityExportMenu({ queues, period, queueId }: { queues: Que
       <PopoverContent align="end" className="w-80 space-y-3">
         <div>
           <p className="text-sm font-semibold">Relatório de qualidade</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Mesmos números da página, separados por origem e por turno (18h–13h30 e 13h30–18h).</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Mesmos números da página, separados por origem e por turno (19h–13h30 e 13h30–19h).</p>
         </div>
         <label className="block space-y-1 text-xs font-medium text-muted-foreground">
           Período

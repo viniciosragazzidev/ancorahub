@@ -2,19 +2,19 @@ import { PERIOD_OPTIONS, DEFAULT_PERIOD, periodStart, type PeriodValue } from "@
 
 /**
  * Period of the lead quality center: the shared 7/14/30/90 days, or "today" —
- * the operation's day, from 18:00 of the day before to 18:00 of today
- * (a lead at 19:00 already belongs to tomorrow's "today").
+ * the operation's day, from 19:00 of the day before to 19:00 of today
+ * (a lead at 19:30 already belongs to tomorrow's "today").
  */
 export type LeadQualityPeriod = PeriodValue | "today";
 
 export const LEAD_QUALITY_TIMEZONE = "America/Sao_Paulo";
-/** The operation's day turns at 18:00; the first shift runs until 13:30. */
-export const OPERATION_DAY_STARTS_AT = "18:00";
+/** The operation's day turns at 19:00; the first shift runs until 13:30. */
+export const OPERATION_DAY_STARTS_AT = "19:00";
 export const SHIFT_SPLIT_AT = "13:30";
 
 export const LEAD_SHIFTS = [
-  { key: 1, label: "Turno 1", hours: "18h – 13h30" },
-  { key: 2, label: "Turno 2", hours: "13h30 – 18h" },
+  { key: 1, label: "Turno 1", hours: "19h – 13h30" },
+  { key: 2, label: "Turno 2", hours: "13h30 – 19h" },
 ] as const;
 export type LeadShift = (typeof LEAD_SHIFTS)[number]["key"];
 
@@ -51,7 +51,7 @@ export function leadQualityWindow(period: LeadQualityPeriod, now = new Date()): 
   return { since: new Date(until.getTime() - 24 * 60 * 60 * 1000), until };
 }
 
-/** Shift of a lead: 13:30–18:00 is the second; 18:00–13:30 (across midnight) the first. */
+/** Shift of a lead: 13:30–19:00 is the second; 19:00–13:30 (across midnight) the first. */
 export function leadShiftOf(createdAt: Date): LeadShift {
   const local = zonedParts(createdAt, LEAD_QUALITY_TIMEZONE);
   const minutes = local.hour * 60 + local.minute;
@@ -61,7 +61,7 @@ export function leadShiftOf(createdAt: Date): LeadShift {
 }
 
 export function leadQualityPeriodLabel(period: LeadQualityPeriod) {
-  return period === "today" ? "Hoje (18h de ontem às 18h)" : `Últimos ${period} dias`;
+  return period === "today" ? "Hoje (19h de ontem às 19h)" : `Últimos ${period} dias`;
 }
 
 const windowFormat = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: LEAD_QUALITY_TIMEZONE });
