@@ -216,10 +216,16 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
       not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
+      // A lead whose job is already pending/retrying is in the processor's
+      // hands: re-selecting it only took a slot of the batch. With 25+ hot
+      // leads held (queue in manual mode, arrived before the plantão), new hot
+      // leads were never seeded and sat in "queued" with no job at all.
+      sql`not exists (select 1 from ${schema.leadDistributionJobs} j where j.lead_id = ${schema.leads.id} and j.status in ('pending', 'retrying', 'processing'))`,
       tenantId ? eq(schema.leads.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leads.id, leadId) : undefined,
     ))
-    .orderBy(asc(leadTemperatureRank()), asc(schema.leads.distributionUpdatedAt), asc(schema.leads.createdAt))
+    // Never-tried leads (no distribution update yet) before the ones already tried.
+    .orderBy(asc(leadTemperatureRank()), sql`${schema.leads.distributionUpdatedAt} asc nulls first`, asc(schema.leads.createdAt))
     .limit(config.batchSize);
 
   await Promise.all(queuedLeads.map((lead) => enqueueLeadDistributionJob({ tenantId: lead.tenantId, leadId: lead.id, maxAttempts: config.maxAttempts })));
