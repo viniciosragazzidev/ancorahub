@@ -22,6 +22,8 @@ interface RealtimeSyncProviderProps {
   userId: string;
   role: string;
   syncTopic: string | null;
+  /** The person's "Novo lead recebido" pop-up preference (default on). */
+  leadToastEnabled?: boolean;
 }
 
 type RecentNotification = {
@@ -89,7 +91,10 @@ export function shouldDelayRealtimeUnavailable(status: string): boolean {
   return status === "CHANNEL_ERROR" || status === "TIMED_OUT";
 }
 
-export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic }: RealtimeSyncProviderProps) {
+/** Fired by the /notificacoes switch so the open shell follows it without a reload. */
+export const LEAD_TOAST_PREFERENCE_EVENT = "ancora:lead-toast-preference";
+
+export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic, leadToastEnabled: initialLeadToastEnabled = true }: RealtimeSyncProviderProps) {
   const router = useRouter();
   const localBroadcastRef = useRef<BroadcastChannel | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
@@ -103,6 +108,19 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   const [isOnline, setIsOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [incomingLeads, setIncomingLeads] = useState(createIncomingLeadQueueState);
+  const [leadToastEnabled, setLeadToastEnabled] = useState(initialLeadToastEnabled);
+  const leadToastEnabledRef = useRef(initialLeadToastEnabled);
+  leadToastEnabledRef.current = leadToastEnabled;
+  useEffect(() => setLeadToastEnabled(initialLeadToastEnabled), [initialLeadToastEnabled]);
+  useEffect(() => {
+    const onPreference = (event: Event) => {
+      const enabled = (event as CustomEvent<{ enabled: boolean }>).detail?.enabled !== false;
+      setLeadToastEnabled(enabled);
+      if (!enabled) setIncomingLeads(createIncomingLeadQueueState());
+    };
+    window.addEventListener(LEAD_TOAST_PREFERENCE_EVENT, onPreference);
+    return () => window.removeEventListener(LEAD_TOAST_PREFERENCE_EVENT, onPreference);
+  }, []);
 
   const isEligibleForLeadNotifications = role === "director" || role === "manager" || role === "broker";
 
@@ -146,7 +164,8 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, [scheduleServerRefresh]);
 
   const reconcileRecentNotifications = useCallback(async (notificationId?: string) => {
-    if (!isEligibleForLeadNotifications) return;
+    // Pop-up off: the notification stays unread in the bell, nothing is queued.
+    if (!isEligibleForLeadNotifications || !leadToastEnabledRef.current) return;
     try {
       const response = await fetch("/api/internal/unread-count?mode=recent", { cache: "no-store" });
       if (!response.ok) return;
@@ -332,7 +351,7 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
 
   return (
     <>
-      {isEligibleForLeadNotifications ? (
+      {isEligibleForLeadNotifications && leadToastEnabled ? (
         <IncomingLeadCard
           item={incomingLeads.queue[0] ?? null}
           queuedCount={Math.max(0, incomingLeads.queue.length - 1)}

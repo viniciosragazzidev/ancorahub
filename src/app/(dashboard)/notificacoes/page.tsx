@@ -47,7 +47,7 @@ export default async function NotificationsPage() {
     leadId: notification.leadId,
   }));
 
-  const [[totalResult], [unreadResult], [urgentResult]] = await Promise.all([
+  const [[totalResult], [unreadResult], [urgentResult], [membership]] = await Promise.all([
     db.select({ total: count() }).from(schema.notifications).where(
       and(
         eq(schema.notifications.tenantId, context.tenantId),
@@ -73,6 +73,10 @@ export default async function NotificationsPage() {
         ),
       ),
     ),
+    db.select({ leadToastEnabled: schema.tenantMemberships.leadToastEnabled }).from(schema.tenantMemberships).where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      eq(schema.tenantMemberships.userId, context.userId),
+    )).limit(1),
   ]);
 
   return (
@@ -85,6 +89,7 @@ export default async function NotificationsPage() {
         totalCount={Number(totalResult?.total ?? 0)}
         unreadCount={Number(unreadResult?.total ?? 0)}
         urgentCount={Number(urgentResult?.total ?? 0)}
+        leadToastEnabled={membership?.leadToastEnabled ?? true}
       />
     </>
   );

@@ -68,6 +68,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const membershipPromise = getDatabase()
     .select({
       availabilityStatus: schema.tenantMemberships.availabilityStatus,
+      leadToastEnabled: schema.tenantMemberships.leadToastEnabled,
     })
     .from(schema.tenantMemberships)
     .where(
@@ -172,6 +173,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           userId={context.userId}
           role={context.role}
           syncTopic={syncTopic}
+          leadToastEnabled={membership?.leadToastEnabled ?? true}
         >
           <NotificationCountProvider userId={context.userId}>
             <FeedbackToastHandler userId={context.userId} />

@@ -2781,6 +2781,8 @@ export const tenantMemberships = pgTable(
     status: membershipStatus("status").notNull().default("active"),
     availabilityStatus: availabilityStatus("availability_status").notNull().default("available"),
     preferredExperienceMode: text("preferred_experience_mode").notNull().default("LIGHT"),
+    /** "Novo lead recebido" pop-up (toast + sound); off keeps only the bell/inbox. */
+    leadToastEnabled: boolean("lead_toast_enabled").notNull().default(true),
     onboardingDismissedAt: timestamp("onboarding_dismissed_at", { withTimezone: true }),
     createdAt,
     updatedAt,

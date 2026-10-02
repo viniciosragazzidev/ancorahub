@@ -24,6 +24,18 @@ export async function markNotificationReadAction(formData: FormData) {
 
 }
 
+/** Turns the "Novo lead recebido" pop-up on/off for the signed-in person. */
+export async function setLeadToastEnabledAction(enabled: boolean) {
+  const context = await getRequiredTenantContext();
+  await getDatabase()
+    .update(schema.tenantMemberships)
+    .set({ leadToastEnabled: enabled, updatedAt: new Date() })
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      eq(schema.tenantMemberships.userId, context.userId),
+    ));
+}
+
 export async function markAllNotificationsReadAction() {
   const context = await getRequiredTenantContext();
   await getDatabase()
