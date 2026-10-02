@@ -146,15 +146,6 @@ function findTodaysUpcomingOccurrence(input: WeeklyWindowInput, now: Date): Duty
 }
 
 /** The most recently completed occurrence across a family of schedules (e.g. every weekday of the same rotating plantão), whichever of them ended latest at or before `referenceTime`. */
-function mostRecentCompletedAcrossFamily(schedules: WeeklyWindowInput[], referenceTime: Date): DutyWindow | null {
-  let best: DutyWindow | null = null;
-  for (const schedule of schedules) {
-    const occurrence = findMostRecentCompletedOccurrence(schedule, referenceTime);
-    if (occurrence && (!best || occurrence.endsAt > best.endsAt)) best = occurrence;
-  }
-  return best;
-}
-
 /**
  * The exact window of leads that belong to "this plantão" right now: the
  * occurrence currently in progress (open-ended — still collecting, so
@@ -164,33 +155,32 @@ function mostRecentCompletedAcrossFamily(schedules: WeeklyWindowInput[], referen
  * otherwise the most recently completed occurrence, bounded on the end so a
  * closed shift's page doesn't keep absorbing leads that arrived after it ended.
  *
- * The lower bound reaches into `family` — every schedule sharing the same
- * queue(s) as `schedule`, itself included — because a plantão is commonly
- * one row per weekday (Mon..Fri as five separate schedules): "the previous
- * occurrence" a lead should be counted from is usually a *different*
- * weekday's schedule (yesterday's), not this same schedule a week back.
- * Pass `[schedule]` when there is no rotation to widen into.
+ * The lower bound is 18:00 of the day before the occurrence: the leads of the
+ * previous evening and night belong to the next plantão, older ones do not
+ * (it used to reach back to the last plantão of the same queues, which could
+ * be days earlier). `_family` is no longer used.
  *
  * Falls back to "show everything" (epoch, no upper bound) if the schedule
  * never had a completed occurrence yet — brand new today, for example.
  */
-export function getDutyOccurrenceLeadWindow(schedule: WeeklyWindowInput, family: WeeklyWindowInput[], now: Date): { since: Date; until: Date | null; upcomingStartsAt?: Date } {
+export function getDutyOccurrenceLeadWindow(schedule: WeeklyWindowInput, _family: WeeklyWindowInput[], now: Date): { since: Date; until: Date | null; upcomingStartsAt?: Date } {
   const current = getRelevantDutyWindow(schedule, now, 0);
   const active = isDutyWindowActive(current, now);
   if (!active) {
     const upcoming = findTodaysUpcomingOccurrence(schedule, now);
-    if (upcoming) {
-      const previous = mostRecentCompletedAcrossFamily(family, upcoming.startsAt);
-      return { since: previous ? previous.endsAt : upcoming.startsAt, until: null, upcomingStartsAt: upcoming.startsAt };
-    }
+    if (upcoming) return { since: previousEveningOf(upcoming, schedule.timezone), until: null, upcomingStartsAt: upcoming.startsAt };
   }
   const relevant = active ? current! : findMostRecentCompletedOccurrence(schedule, now);
   if (!relevant) return { since: new Date(0), until: null };
+  return { since: previousEveningOf(relevant, schedule.timezone), until: active ? null : relevant.endsAt };
+}
 
-  const until = active ? null : relevant.endsAt;
-  const previous = mostRecentCompletedAcrossFamily(family, relevant.startsAt);
-  const since = previous ? previous.endsAt : relevant.startsAt;
-  return { since, until };
+/** The leads of an occurrence start at 18:00 of the day before it (the evening's leads go to the next plantão). */
+export const DUTY_LEADS_FROM_PREVIOUS_DAY_AT = "18:00";
+
+function previousEveningOf(occurrence: DutyWindow, timezone: string) {
+  const day = zonedParts(occurrence.startsAt, timezone);
+  return localTimeToUtc(addCalendarDays(dateKey(day.year, day.month, day.day), -1), DUTY_LEADS_FROM_PREVIOUS_DAY_AT, timezone);
 }
 
 export function isDutyWindowActive(window: DutyWindow | null, now: Date) {

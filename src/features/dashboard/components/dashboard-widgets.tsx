@@ -77,6 +77,8 @@ export function WelcomeHero({
 }) {
   const next = welcome.nextDuty;
   const short = next ? next.brokerCount < next.minimumBrokers : false;
+  // Several plantões at once: each one, with its own link.
+  const running = welcome.runningDuties ?? [];
   const { pulse } = welcome;
   return (
     <Card variant="overview" className="rounded-ds-large-cards">
@@ -92,6 +94,31 @@ export function WelcomeHero({
           </h1>
           <p className="mt-1 max-w-[60ch] text-xs text-muted-foreground">{summary}</p>
         </div>
+        {running.length > 1 ? (
+          <div className="flex min-w-52 flex-col gap-2 border-l border-border pl-4">
+            <span className="text-ds-caption font-medium uppercase tracking-[0.06em] text-muted-foreground">
+              {running.length} plantões agora
+            </span>
+            {running.map((duty) => (
+              <div key={duty.scheduleId} className="flex flex-col gap-0.5">
+                <span className="text-sm font-medium text-foreground">{duty.name} · {duty.startsAt}–{duty.endsAt}</span>
+                <span className="text-xs text-muted-foreground">
+                  {duty.queueName && duty.queueName !== duty.name ? `${duty.queueName} · ` : ""}
+                  <span className={cn(duty.brokerCount < duty.minimumBrokers && "font-medium text-ds-amber-ink")}>
+                    {duty.brokerCount === 0 ? "sem corretor" : `${duty.brokerCount} ${duty.brokerCount === 1 ? "corretor" : "corretores"}`}
+                  </span>
+                </span>
+                <Link
+                  href={`/leads/distribuicao/plantao/${duty.scheduleId}`}
+                  className="group inline-flex w-fit items-center gap-1 rounded-md text-xs font-medium text-ds-electric-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  Abrir plantão
+                  <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="flex min-w-52 flex-col gap-0.5 border-l border-border pl-4">
           <span className="text-ds-caption font-medium uppercase tracking-[0.06em] text-muted-foreground">
             {next?.running ? "Plantão agora" : "Próximo plantão"}
@@ -124,6 +151,7 @@ export function WelcomeHero({
             </>
           )}
         </div>
+        )}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-border bg-ds-paper-mist px-5 py-2.5 sm:px-6">
         <div className="flex flex-wrap gap-2">

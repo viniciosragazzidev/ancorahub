@@ -7,19 +7,23 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { pickBusiestRunning, pickNextDuty, upcomingShift, type RunningDutyActivity } from "./welcome-rules";
 
+export type DashboardDuty = {
+  scheduleId: string;
+  name: string;
+  dutyDate: string;
+  startsAt: string;
+  endsAt: string;
+  running: boolean;
+  queueName: string | null;
+  brokerCount: number;
+  minimumBrokers: number;
+};
+
 export type DashboardWelcome = {
   firstName: string | null;
-  nextDuty: {
-    scheduleId: string;
-    name: string;
-    dutyDate: string;
-    startsAt: string;
-    endsAt: string;
-    running: boolean;
-    queueName: string | null;
-    brokerCount: number;
-    minimumBrokers: number;
-  } | null;
+  nextDuty: DashboardDuty | null;
+  /** Every plantão running now (several can run at once, e.g. PME and PRESENCIAL). */
+  runningDuties?: DashboardDuty[];
   pulse: { activeQueues: number; runningDuties: number; brokersOnDutyNow: number };
 };
 
@@ -155,6 +159,22 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
           minimumBrokers: next.schedule.minimumBrokers,
         }
       : null,
+    runningDuties: running
+      .flatMap((schedule) => {
+        const shift = upcomingShift(schedule, now);
+        return shift?.running ? [{
+          scheduleId: schedule.id,
+          name: schedule.name,
+          dutyDate: shift.dutyDate,
+          startsAt: schedule.startsAt.slice(0, 5),
+          endsAt: schedule.endsAt.slice(0, 5),
+          running: true,
+          queueName: queueFor(schedule.id, schedule.queueId),
+          brokerCount: brokersOn(new Set([schedule.id]), shift.dutyDate, publishedToday),
+          minimumBrokers: schedule.minimumBrokers,
+        }] : [];
+      })
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.name.localeCompare(b.name, "pt-BR")),
     pulse: {
       activeQueues: queues.filter((queue) => queue.status === "active").length,
       runningDuties: running.length,
