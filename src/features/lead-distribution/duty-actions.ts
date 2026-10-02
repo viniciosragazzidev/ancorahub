@@ -9,7 +9,7 @@ import { isValidDutyWindow } from "./domain";
 import { dutyScheduleInput, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
 import { retimeAssignmentForSplit, validShiftSplit } from "./duty-shifts";
 import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
-import { sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
+import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 
 export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
@@ -560,6 +560,16 @@ export async function sendDutyPresenceInviteManuallyAction(scheduleId: string, a
     return await sendDutyPresenceInviteManually({ tenantId: context.tenantId, assignmentId, requestedBy: context.userId });
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível enviar o convite." };
+  }
+}
+
+/** Releases a broker on the plantão without their presence click (in-person check-in, etc.). */
+export async function releaseDutyPresenceAction(scheduleId: string, assignmentId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const { context } = await findScheduleForMutation(scheduleId);
+    return await releaseDutyPresenceManually({ tenantId: context.tenantId, assignmentId, releasedBy: context.userId });
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível liberar o corretor." };
   }
 }
 

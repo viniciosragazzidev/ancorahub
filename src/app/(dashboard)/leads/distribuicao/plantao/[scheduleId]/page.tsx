@@ -31,6 +31,7 @@ import { StatCard } from "@/components/dashboard/metric-card";
 import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { getCachedLeadsBranches, getCachedLeadsBrokers, getCachedSlaSettings } from "@/features/leads/reference-data";
+import { BrokerPresenceReleaseButton } from "../_components/broker-presence-release-button";
 import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { dutyShifts, worksInShift } from "@/features/lead-distribution/duty-shifts";
@@ -389,12 +390,13 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <p className="truncate text-sm font-medium">{entry.brokerName}</p>
-                    {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`Presença confirmada${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={entry.confirmedAt ? `Confirmado em ${dateTime.format(entry.confirmedAt)}` : "Presença confirmada"}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
+                    {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Presença confirmada"}${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Confirmado"}${entry.confirmedAt ? ` em ${dateTime.format(entry.confirmedAt)}` : ""}`}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
+                    {presenceEnabled && entry.presenceStatus === "pending" ? <BrokerPresenceReleaseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
                     <BrokerPauseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} paused={Boolean(entry.pausedAt)} />
                   </div>
-                  <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}{shiftSections && entry.shift === "dia" ? " · Dia todo" : ""}</p>
+                  <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}{shiftSections && entry.shift === "dia" ? " · Dia todo" : ""}{presenceEnabled && entry.releasedByName ? ` · Liberado por ${entry.releasedByName}` : ""}</p>
                   {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}
                   <div className="mt-1.5">
                     <BrokerLiveStatus status={entry.liveStatus} nextEventAt={entry.nextEventAt ? entry.nextEventAt.toISOString() : null} />

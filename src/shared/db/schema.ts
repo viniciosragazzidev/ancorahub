@@ -1446,6 +1446,8 @@ export const dutyPresenceConfirmations = pgTable(
     shiftEndsAt: timestamp("shift_ends_at", { withTimezone: true }).notNull(),
     status: text("status").notNull().default("pending"),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+    /** Who released the broker without their click (null = the broker confirmed). */
+    confirmedBy: text("confirmed_by").references(() => user.id, { onDelete: "set null" }),
     notificationStatus: text("notification_status").notNull().default("pending"),
     notificationErrorCode: text("notification_error_code"),
     createdAt,

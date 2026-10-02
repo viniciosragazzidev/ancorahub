@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNull, lte, lt, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, lt, ne, or } from "drizzle-orm";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
@@ -156,12 +156,13 @@ export async function processDutyPresenceReminders(now = new Date()) {
       updatedAt: now,
     }).onConflictDoNothing().returning({ id: schema.dutyPresenceConfirmations.id });
     const [record] = inserted
-      ? await db.select({ id: schema.dutyPresenceConfirmations.id, notificationStatus: schema.dutyPresenceConfirmations.notificationStatus, notificationErrorCode: schema.dutyPresenceConfirmations.notificationErrorCode }).from(schema.dutyPresenceConfirmations).where(eq(schema.dutyPresenceConfirmations.id, inserted.id)).limit(1)
-      : await db.select({ id: schema.dutyPresenceConfirmations.id, notificationStatus: schema.dutyPresenceConfirmations.notificationStatus, notificationErrorCode: schema.dutyPresenceConfirmations.notificationErrorCode }).from(schema.dutyPresenceConfirmations).where(and(
+      ? await db.select({ id: schema.dutyPresenceConfirmations.id, status: schema.dutyPresenceConfirmations.status, notificationStatus: schema.dutyPresenceConfirmations.notificationStatus, notificationErrorCode: schema.dutyPresenceConfirmations.notificationErrorCode }).from(schema.dutyPresenceConfirmations).where(eq(schema.dutyPresenceConfirmations.id, inserted.id)).limit(1)
+      : await db.select({ id: schema.dutyPresenceConfirmations.id, status: schema.dutyPresenceConfirmations.status, notificationStatus: schema.dutyPresenceConfirmations.notificationStatus, notificationErrorCode: schema.dutyPresenceConfirmations.notificationErrorCode }).from(schema.dutyPresenceConfirmations).where(and(
         eq(schema.dutyPresenceConfirmations.tenantId, assignment.tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, assignment.id), eq(schema.dutyPresenceConfirmations.dutyDate, window.dutyDate),
         eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt), eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
       )).limit(1);
-    if (!record || record.notificationStatus === "queued" || record.notificationStatus === "sent"
+    // Already confirmed (e.g. released by a director/manager): no invite.
+    if (!record || record.status === "confirmed" || record.notificationStatus === "queued" || record.notificationStatus === "sent"
       || record.notificationErrorCode === "OUTBOX_DELIVERY_FAILED"
       || record.notificationErrorCode === "TEMPLATE_DELIVERY_FAILED") continue;
     const staleDispatchCutoff = new Date(now.getTime() - 5 * 60_000);
@@ -200,6 +201,56 @@ export async function processDutyPresenceReminders(now = new Date()) {
     }
   }
   return { enabled: true, considered, queued, failed, expired: expiredRows.length };
+}
+
+/**
+ * A director/manager releases a broker for the current (or next) occurrence of
+ * their shift without the broker clicking the confirmation — e.g. an
+ * in-person plantão checked on site. The broker is then eligible for offers
+ * exactly as after their own click; who released it is kept.
+ */
+export async function releaseDutyPresenceManually(input: { tenantId: string; assignmentId: string; releasedBy: string }, now = new Date()): Promise<{ ok: true } | { ok: false; reason: string }> {
+  const db = getDatabase();
+  const [assignment] = await db.select({
+    id: schema.dutyRosterAssignments.id,
+    scheduleId: schema.dutyRosterAssignments.scheduleId,
+    brokerId: schema.dutyRosterAssignments.brokerId,
+    dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+    startsAt: schema.dutyRosterAssignments.startsAt,
+    endsAt: schema.dutyRosterAssignments.endsAt,
+    validFrom: schema.dutyRosterAssignments.validFrom,
+    validUntil: schema.dutyRosterAssignments.validUntil,
+    scheduleTimezone: schema.unitDutySchedules.timezone,
+  }).from(schema.dutyRosterAssignments)
+    .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
+    .where(and(eq(schema.dutyRosterAssignments.id, input.assignmentId), eq(schema.dutyRosterAssignments.tenantId, input.tenantId), eq(schema.dutyRosterAssignments.status, "active")))
+    .limit(1);
+  if (!assignment) return { ok: false, reason: "Escalação não encontrada." };
+  const window = getWindow({ id: assignment.scheduleId, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt, endsAt: assignment.endsAt, timezone: assignment.scheduleTimezone, validFrom: assignment.validFrom, validUntil: assignment.validUntil }, now);
+  if (!window) return { ok: false, reason: "Não há turno deste corretor acontecendo agora ou a seguir." };
+
+  const occurrence = and(
+    eq(schema.dutyPresenceConfirmations.tenantId, input.tenantId),
+    eq(schema.dutyPresenceConfirmations.assignmentId, assignment.id),
+    eq(schema.dutyPresenceConfirmations.dutyDate, window.dutyDate),
+    eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt),
+    eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
+  );
+  await db.transaction(async (tx) => {
+    await tx.insert(schema.dutyPresenceConfirmations).values({
+      id: randomUUID(), tenantId: input.tenantId, scheduleId: assignment.scheduleId, assignmentId: assignment.id, brokerId: assignment.brokerId,
+      dutyDate: window.dutyDate, shiftStartsAt: window.startsAt, shiftEndsAt: window.endsAt,
+      status: "pending", notificationStatus: "pending", createdAt: now, updatedAt: now,
+    }).onConflictDoNothing();
+    await tx.update(schema.dutyPresenceConfirmations)
+      .set({ status: "confirmed", confirmedAt: now, confirmedBy: input.releasedBy, updatedAt: now })
+      .where(and(occurrence, ne(schema.dutyPresenceConfirmations.status, "confirmed")));
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.releasedBy, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_presence.released_manually", createdAt: now });
+  });
+  // Leads waiting for an eligible broker get their turn now.
+  const { wakeLeadsAwaitingEligibleBroker } = await import("./jobs");
+  await wakeLeadsAwaitingEligibleBroker(input.tenantId).catch(() => 0);
+  return { ok: true };
 }
 
 export type ManualDutyPresenceInviteResult =

@@ -256,6 +256,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       dutyDate: schema.dutyPresenceConfirmations.dutyDate,
       status: schema.dutyPresenceConfirmations.status,
       confirmedAt: schema.dutyPresenceConfirmations.confirmedAt,
+      releasedByName: sql<string | null>`(select u.name from "user" u where u.id = ${schema.dutyPresenceConfirmations.confirmedBy})`,
       notificationStatus: schema.dutyPresenceConfirmations.notificationStatus,
       notificationErrorCode: schema.dutyPresenceConfirmations.notificationErrorCode,
     }).from(schema.dutyPresenceConfirmations).where(and(
@@ -323,6 +324,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       blockedReason,
       presenceStatus: !presenceEnabled || !occurrence ? "not_requested" as const : presence?.status === "confirmed" ? "confirmed" as const : "pending" as const,
       confirmedAt: presence?.confirmedAt ?? null,
+      /** Released by a director/manager (not the broker's own click). */
+      releasedByName: presence?.releasedByName ?? null,
       notificationStatus: presence?.notificationStatus ?? null,
       notificationErrorCode: presence?.notificationErrorCode ?? null,
       dutyDate: occurrence?.dutyDate ?? null,
