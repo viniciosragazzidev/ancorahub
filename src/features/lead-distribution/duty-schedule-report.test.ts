@@ -85,8 +85,8 @@ describe("buildDutyScheduleReport", () => {
   it("splits leads into the page's morning/afternoon blocks with readable labels", () => {
     const report = buildDutyScheduleReport(profile(), new Set(["w1"]), 200);
     expect(report.leadGroups.map((group) => [group.label, group.leads.map((item) => item.name)])).toEqual([
-      ["Manhã · até 12:59", ["Lead m1"]],
-      ["Tarde · a partir de 13:00", ["Lead t1", "Lead w1"]],
+      ["Manhã · até 13:29", ["Lead m1"]],
+      ["Tarde · a partir de 13:30", ["Lead t1", "Lead w1"]],
     ]);
     const waiting = report.leadGroups[1].leads[1];
     expect(waiting).toMatchObject({ broker: "Sem corretor", returnedUnaccepted: true, distribution: "Aguardando corretor", stage: "Novo", assignedAt: null });
@@ -112,7 +112,7 @@ describe("encodeDutySchedulePdf", () => {
     }));
     const bytes = await encodeDutySchedulePdf({
       ...buildDutyScheduleReport(profile(), new Set(), 200),
-      leadGroups: [{ label: "Manhã · até 12:59", leads: manyLeads }],
+      leadGroups: [{ label: "Manhã · até 13:29", leads: manyLeads }],
       tenantName: "Honorio ◤✠◢ Cavalcante",
       generatedAt: new Date("2026-09-24T18:00:00.000Z"),
     });

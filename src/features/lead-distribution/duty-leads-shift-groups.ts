@@ -6,10 +6,11 @@ export type DutyLeadShiftGroup<T> = {
   leads: T[];
 };
 
-/** Leads assigned (or, when never assigned, received) from 13:00 on belong to the afternoon block. */
+/** Leads assigned (or, when never assigned, received) from 13:30 on belong to the afternoon block. */
 export const AFTERNOON_CUTOFF_HOUR = 13;
+export const AFTERNOON_CUTOFF_MINUTES = 13 * 60 + 30;
 
-/** "Manhã · até 12:59" / "Tarde · a partir de 13:00", or the plantão's own split ("13:30"). */
+/** "Manhã · até 13:29" / "Tarde · a partir de 13:30", or the plantão's own split. */
 function shiftLabels(splitAt?: string | null): Record<DutyLeadShift, string> {
   const cutoff = splitMinutes(splitAt);
   const last = cutoff - 1;
@@ -34,10 +35,10 @@ function saoPauloMinutes(date: Date) {
   return (value("hour") % 24) * 60 + value("minute");
 }
 
-/** The afternoon starts at the plantão's split ("13:30"), or at 13:00 for a plantão with one shift. */
+/** The afternoon starts at the plantão's split, or at 13:30 for a plantão with one shift. */
 function splitMinutes(splitAt?: string | null) {
   const match = splitAt?.match(/^(\d{2}):(\d{2})/);
-  return match ? Number(match[1]) * 60 + Number(match[2]) : AFTERNOON_CUTOFF_HOUR * 60;
+  return match ? Number(match[1]) * 60 + Number(match[2]) : AFTERNOON_CUTOFF_MINUTES;
 }
 
 export function getDutyLeadShift(lead: { assignedAt: Date | null; corretorId: string | null; createdAt: Date }, splitAt?: string | null): DutyLeadShift {

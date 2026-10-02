@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { countBrokerLeadsByShift, getDutyLeadShift, groupDutyLeadsByShift, isManagementInvestigation, sortByAssignmentTime } from "./duty-leads-shift-groups";
 
-// São Paulo is UTC-3: 15:59Z = 12:59 local, 16:00Z = 13:00 local.
+// São Paulo is UTC-3: 16:29Z = 13:29 local, 16:30Z = 13:30 local.
 const lead = (id: string, assignedAt: string | null, createdAt = "2026-09-24T11:00:00.000Z", corretorId: string | null = "broker-1") => ({
   id,
   corretorId: assignedAt ? corretorId : null,
@@ -10,9 +10,9 @@ const lead = (id: string, assignedAt: string | null, createdAt = "2026-09-24T11:
 });
 
 describe("duty leads shift groups", () => {
-  it("cuts at 13:00 São Paulo time, not server/UTC time", () => {
-    expect(getDutyLeadShift(lead("a", "2026-09-24T15:59:59.000Z"))).toBe("manha");
-    expect(getDutyLeadShift(lead("b", "2026-09-24T16:00:00.000Z"))).toBe("tarde");
+  it("cuts at 13:30 São Paulo time, not server/UTC time", () => {
+    expect(getDutyLeadShift(lead("a", "2026-09-24T16:29:59.000Z"))).toBe("manha");
+    expect(getDutyLeadShift(lead("b", "2026-09-24T16:30:00.000Z"))).toBe("tarde");
     expect(getDutyLeadShift(lead("c", "2026-09-24T02:30:00.000Z"))).toBe("tarde"); // 23:30 local
   });
 
@@ -55,11 +55,11 @@ describe("duty leads shift groups", () => {
 });
 
 describe("countBrokerLeadsByShift", () => {
-  it("counts each broker's leads in the morning (até 12:59) and afternoon (13:00+) blocks", () => {
+  it("counts each broker's leads in the morning (até 13:29) and afternoon (13:30+) blocks", () => {
     const counts = countBrokerLeadsByShift([
       { corretorId: "kaio", assignedAt: new Date("2026-09-25T12:01:00.000Z"), createdAt: new Date("2026-09-25T11:00:00.000Z") }, // 09:01
-      { corretorId: "kaio", assignedAt: new Date("2026-09-25T15:59:00.000Z"), createdAt: new Date("2026-09-25T11:00:00.000Z") }, // 12:59
-      { corretorId: "kaio", assignedAt: new Date("2026-09-25T16:00:00.000Z"), createdAt: new Date("2026-09-25T11:00:00.000Z") }, // 13:00
+      { corretorId: "kaio", assignedAt: new Date("2026-09-25T16:29:00.000Z"), createdAt: new Date("2026-09-25T11:00:00.000Z") }, // 13:29
+      { corretorId: "kaio", assignedAt: new Date("2026-09-25T16:30:00.000Z"), createdAt: new Date("2026-09-25T11:00:00.000Z") }, // 13:30
       { corretorId: null, assignedAt: null, createdAt: new Date("2026-09-25T17:00:00.000Z") },
     ]);
     expect(counts.get("kaio")).toEqual({ manha: 2, tarde: 1 });

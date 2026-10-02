@@ -31,11 +31,12 @@ describe("plantão split in shifts (09:00–18:00 at 13:30)", () => {
     expect(retimeAssignmentForSplit(plantao, "13:30", "14:00", { startsAt: "09:00", endsAt: "18:00" })).toBeNull();
   });
 
-  it("splits the plantão's leads at 13:30 (13:00 for a plantão with one shift)", () => {
+  it("splits the plantão's leads at 13:30, also for a plantão with one shift", () => {
     const at = (iso: string) => ({ assignedAt: new Date(iso), corretorId: "b1", createdAt: new Date(iso) });
     expect(getDutyLeadShift(at("2026-10-02T16:15:00Z"), "13:30")).toBe("manha"); // 13:15 Brasília
     expect(getDutyLeadShift(at("2026-10-02T16:45:00Z"), "13:30")).toBe("tarde"); // 13:45
-    expect(getDutyLeadShift(at("2026-10-02T16:15:00Z"))).toBe("tarde");
+    expect(getDutyLeadShift(at("2026-10-02T16:15:00Z"))).toBe("manha");
+    expect(getDutyLeadShift(at("2026-10-02T16:30:00Z"))).toBe("tarde");
     expect(groupDutyLeadsByShift([at("2026-10-02T16:45:00Z")], "13:30")[0]!.label).toBe("Tarde · a partir de 13:30");
   });
 });
