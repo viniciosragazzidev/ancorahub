@@ -25,7 +25,7 @@ import { hasCapability } from "@/shared/auth/permissions";
 import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
 import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
 import { BrokerPauseButton } from "../_components/broker-pause-button";
-import { groupDutyLeadsByShift, sortByAssignmentTime } from "@/features/lead-distribution/duty-leads-shift-groups";
+import { countBrokerLeadsByShift, groupDutyLeadsByShift, sortByAssignmentTime } from "@/features/lead-distribution/duty-leads-shift-groups";
 import { sortByTemperaturePriority } from "@/features/lead-distribution/temperature-priority";
 import { normalizeRoutingQualificationStatus } from "@/features/lead-distribution/routing-catalog";
 import { DragScrollTable } from "@/components/ui/drag-scroll-table";
@@ -182,7 +182,13 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     const details = readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
     return details.entry === "whatsapp" ? { label: details.adsLabel } : null;
   };
-  const isDistributed = (lead: (typeof allLeads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
+  // This occurrence's own hours: its queues may also feed another plantão the
+  // same day (PRESENCIAL 09:00–13:30 and PRESENCIAL TARDE 13:30–19:00), and a
+  // lead handed out in the other one is not this plantão's.
+  const occurrence = getDutyWindowOnDate(schedule, dayKey.format(leadsUpcomingStartsAt ?? leadsUntil ?? now));
+  const isAssigned = (lead: (typeof allLeads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
+  const assignedInOccurrence = (lead: (typeof allLeads)[number]) => !occurrence || !lead.assignedAt || (lead.assignedAt >= occurrence.startsAt && lead.assignedAt < occurrence.endsAt);
+  const isDistributed = (lead: (typeof allLeads)[number]) => isAssigned(lead) && assignedInOccurrence(lead);
   // Desqualificados ficam retidos fora da distribuição automática, inclusive
   // quando ainda estão sem corretor. Eles não devem aparecer nesta fila.
   const isDisqualified = (lead: (typeof allLeads)[number]) => normalizeRoutingQualificationStatus(lead.qualificationStatus) === "disqualified";
@@ -190,7 +196,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // AI is still qualifying (the distribution holds those until it ends).
   const isMetaBlocked = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "meta_blocked";
   const isQualifying = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "qualifying" || lead.qualificationState === "IN_PROGRESS";
-  const isWaiting = (lead: (typeof allLeads)[number]) => !isDistributed(lead) && !isDisqualified(lead) && !isMetaBlocked(lead) && !isQualifying(lead);
+  const isWaiting = (lead: (typeof allLeads)[number]) => !isAssigned(lead) && !isDisqualified(lead) && !isMetaBlocked(lead) && !isQualifying(lead);
   // Only two situations matter operationally here; "todos" mixed them back
   // together and hid which bucket someone was actually looking at.
   const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
@@ -225,8 +231,16 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const visibleLeads = filter === "distribuidos"
     ? sortByAssignmentTime(leads.filter(isDistributed))
     : sortByTemperaturePriority([...waitingLeads].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()));
+  // Leads each broker received in this occurrence (not in the other plantão of the same queues).
+  const shiftCountsByBroker = countBrokerLeadsByShift(allLeads.filter(isDistributed), schedule.shiftSplitAt);
+  const brokerShiftCounts = (brokerId: string) => shiftCountsByBroker.get(brokerId) ?? { manha: 0, tarde: 0 };
+  // Morning/afternoon only for a plantão that crosses the cut (13:30 or its own split).
+  const cut = schedule.shiftSplitAt?.slice(0, 5) ?? "13:30";
+  const crossesCut = schedule.startsAt.slice(0, 5) < cut && schedule.endsAt.slice(0, 5) > cut;
   const leadGroups = filter === "distribuidos"
-    ? groupDutyLeadsByShift(visibleLeads, schedule.shiftSplitAt)
+    ? crossesCut
+      ? groupDutyLeadsByShift(visibleLeads, schedule.shiftSplitAt)
+      : [{ key: "ordem", label: `Ordem de entrega · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}`, leads: visibleLeads }]
     : [{ key: "ordem", label: "Ordem de distribuição · quentes, mornos e frios", leads: visibleLeads }];
   const filters = [
     { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
@@ -467,10 +481,10 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   <BrokerCapacityBar activeLeads={entry.activeLeads} capacity={entry.capacity} />
                 </div>
                 {/* Leads received in this occurrence, by the same morning/afternoon cut as the leads list. */}
-                <div className="flex shrink-0 items-center gap-1.5" aria-label={`${entry.leadsMorning} leads de manhã e ${entry.leadsAfternoon} à tarde`}>
-                  <Badge variant="info" title="Leads recebidos de manhã">Manhã {entry.leadsMorning}</Badge>
-                  <Badge variant="destructive" title="Leads recebidos à tarde">Tarde {entry.leadsAfternoon}</Badge>
-                </div>
+                {crossesCut ? <div className="flex shrink-0 items-center gap-1.5" aria-label={`${brokerShiftCounts(entry.brokerId).manha} leads de manhã e ${brokerShiftCounts(entry.brokerId).tarde} à tarde neste plantão`}>
+                  <Badge variant="info" title="Leads recebidos de manhã neste plantão">Manhã {brokerShiftCounts(entry.brokerId).manha}</Badge>
+                  <Badge variant="destructive" title="Leads recebidos à tarde neste plantão">Tarde {brokerShiftCounts(entry.brokerId).tarde}</Badge>
+                </div> : <Badge variant="outline" title="Leads recebidos neste plantão">{brokerShiftCounts(entry.brokerId).manha + brokerShiftCounts(entry.brokerId).tarde} leads</Badge>}
               </div>
             ))}</div> : <p className="text-sm text-muted-foreground">Ninguém escalado neste turno.</p>}
               </section>
