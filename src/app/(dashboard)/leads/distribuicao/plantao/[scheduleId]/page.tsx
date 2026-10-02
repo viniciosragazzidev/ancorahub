@@ -185,7 +185,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // Desqualificados ficam retidos fora da distribuição automática, inclusive
   // quando ainda estão sem corretor. Eles não devem aparecer nesta fila.
   const isDisqualified = (lead: (typeof allLeads)[number]) => normalizeRoutingQualificationStatus(lead.qualificationStatus) === "disqualified";
-  const isWaiting = (lead: (typeof allLeads)[number]) => !isDistributed(lead) && !isDisqualified(lead);
+  // Not waiting for a broker either: Meta blocked the first message, or the
+  // AI is still qualifying (the distribution holds those until it ends).
+  const isMetaBlocked = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "meta_blocked";
+  const isQualifying = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "qualifying" || lead.qualificationState === "IN_PROGRESS";
+  const isWaiting = (lead: (typeof allLeads)[number]) => !isDistributed(lead) && !isDisqualified(lead) && !isMetaBlocked(lead) && !isQualifying(lead);
   // Only two situations matter operationally here; "todos" mixed them back
   // together and hid which bucket someone was actually looking at.
   const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
