@@ -1,8 +1,10 @@
 'use client';
 
+import { useInterfaceAnimation as useAnimation } from '@/components/motion/use-interface-animation';
+
 import type { HTMLAttributes } from 'react';
 import { forwardRef, useCallback, useImperativeHandle, useRef } from 'react';
-import { motion, useAnimation } from 'motion/react';
+import { motion } from 'motion/react';
 
 import { cn } from '@/lib/utils';
 

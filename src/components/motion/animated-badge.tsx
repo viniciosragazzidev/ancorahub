@@ -18,9 +18,10 @@ import {
 } from "motion/react";
 import type { ReactNode } from "react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { motionTokens, transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-const EASE_OUT = [0.16, 1, 0.3, 1] as const;
+const EASE_OUT = motionTokens.easings.smoothOut;
 
 export type AnimatedBadgeStatus =
   | "neutral"
@@ -122,7 +123,7 @@ export function AnimatedBadge({
   return (
     <motion.span
       layout={motionEnabled}
-      transition={motionEnabled ? { type: "spring", stiffness: 420, damping: 30, mass: 0.7 } : { duration: 0 }}
+      transition={motionEnabled ? transitions.normal : { duration: 0 }}
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-full border font-medium tabular-nums select-none",
         motionEnabled && "transition-colors duration-[var(--duration-fast)]",

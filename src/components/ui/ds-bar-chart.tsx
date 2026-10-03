@@ -103,6 +103,7 @@ export function DsBarChart<T extends Record<string, unknown>>({
           <Bar
             key={s.key}
             dataKey={s.key}
+            isAnimationActive={false}
             fill={`var(--color-${s.key})`}
             radius={compact ? [2, 2, 0, 0] : [6, 6, 0, 0]}
             maxBarSize={compact ? 8 : 32}

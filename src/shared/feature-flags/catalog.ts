@@ -257,6 +257,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Permite configurar cotas mensais, gerar propostas automáticas e publicar escalas de plantão.",
   },
+  DUTY_INACTIVE_BROKERS: {
+    key: "feature_duty_inactive_brokers_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Permite incluir cadastros desativados em escalas sem reativar acesso ou recebimento de leads.",
+  },
   DUTY_OCCURRENCE_HISTORY: {
     key: "feature_duty_occurrence_history_enabled",
     scope: "global",

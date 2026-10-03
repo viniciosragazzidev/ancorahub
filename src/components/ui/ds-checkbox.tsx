@@ -22,7 +22,7 @@ export function DsCheckbox({ className, ...props }: CheckboxPrimitive.Root.Props
       )}
       {...props}
     >
-      <CheckboxPrimitive.Indicator className="grid place-content-center [&>svg]:size-3">
+      <CheckboxPrimitive.Indicator keepMounted data-slot="ds-checkbox-indicator" className="grid place-content-center [&>svg]:size-3">
         <Check aria-hidden="true" strokeWidth={3} />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>

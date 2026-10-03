@@ -103,19 +103,13 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const theme = (await cookies()).get("ancora-theme")?.value === "dark" ? "dark" : "light";
-  // Motion is enabled by default. The system setting check was removed from
-  // the root layout because a database query here blocks ALL page rendering,
-  // including the public landing page. If the database is slow or unreachable
-  // the entire site would fail to load.
-  // The setting can be evaluated client-side if stricter control is needed.
-  const motionEnabled = true;
 
   return (
-    <html lang="pt-BR" suppressHydrationWarning className={`${interSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${theme === "dark" ? "dark" : ""} h-full antialiased`}>
+    <html lang="pt-BR" data-interface-motion="off" suppressHydrationWarning className={`${interSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${theme === "dark" ? "dark" : ""} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <SkipToContent />
         <SplashScreen />
-        <InterfaceMotionProvider enabled={motionEnabled}>
+        <InterfaceMotionProvider>
           <AppProviders>
             <TooltipProvider><div id="main-content" tabIndex={-1}><RouteViewTransition>{children}</RouteViewTransition></div></TooltipProvider>
             <Toaster />

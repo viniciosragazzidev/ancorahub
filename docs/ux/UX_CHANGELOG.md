@@ -1,5 +1,41 @@
 # Histórico de Alterações de UX/UI (UX Changelog)
 
+## 2026-10-02 — Cadastros desativados no planejamento de plantões
+
+- Seleção e validação da escala passam a permitir corretores desativados conforme
+  DEC-130, sem reativar cadastro ou recebimento de leads. Texto de vazio atualizado.
+- Controle independente e auditado no card existente do Super-admin para reverter
+  a política, sem apagar escalas. Sem novas primitives, tokens ou animações.
+
+## 2026-10-02 — WhatsApp conectado acessível pelo celular
+
+- O aviso de computador fica restrito ao pareamento; não aparece em sessão pronta.
+- Controles de chat/desconexão ficam acessíveis no celular conectado. Sessão
+  existente é reconciliada sem criar outro QR; abrir o app usa o contexto atual,
+  sem nova aba. Desktop e suas permissões permanecem preservados.
+- QA sintético em 390px/1280px; lançamento do aplicativo instalado requer aparelho real.
+
+## 2026-10-02 — Confirmação de atribuição em verde
+
+- O CTA “Confirmar reatribuição” no drawer compartilhado de leads e plantão usa
+  a variante semântica `success` de Button. As demais ações não mudam de cor.
+- Mantidos rótulo, dimensões, foco, pendência, bloqueios e fluxo de atribuição.
+  QA sintético em light/dark comprova contraste mínimo de 4,93:1 no texto ativo.
+  Sem nova animação, token global, dependência ou mudança de regra de negócio.
+
+## 2026-10-02 — Movimento consistente na biblioteca compartilhada
+
+- Botões, seletores, menus, tooltips, dialogs, sheets, feedback, ícones e skeletons
+  compartilham tempos curtos, movimentos discretos e respeito ao controle global.
+  Saídas são mais rápidas, sheets preservam a direção e indicadores mantêm o estado
+  correto quando o movimento está desligado.
+- Listas, tabelas, gráficos e totais operacionais ficam estáticos. O carregamento
+  usa shimmer por transformação, sem animar o fundo a cada quadro. A flag existente
+  do Super-admin volta a governar CSS e JS sem bloquear o HTML inicial.
+- QA isolado com dados sintéticos: 1360px e 390px, dark mode, teclado/foco,
+  preferência reduzida e toggle global. Não substitui QA autenticado UX-M1.10.
+  Registro: `docs/implementations/completed/2026-10-01-shared-interface-motion.md`.
+
 ## 2026-10-01 — Central de qualidade de leads
 
 - O Dashboard gerencial ganha uma visão navegável de qualidade por temperatura,

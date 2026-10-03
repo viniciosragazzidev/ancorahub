@@ -29,7 +29,7 @@ function DsDialogPopup({
       <DialogPrimitive.Popup
         data-slot="ds-dialog-popup"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-ds-16 overflow-y-auto rounded-ds-large-cards border border-ds-ash bg-ds-canvas-white p-ds-24 font-ds-inter text-ds-charcoal shadow-ds-lg transition-[opacity,transform] duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0",
+          "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-ds-16 overflow-y-auto rounded-ds-large-cards border border-ds-ash bg-ds-canvas-white p-ds-24 font-ds-inter text-ds-charcoal shadow-ds-lg transition-[opacity,transform] duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0",
           className,
         )}
         {...props}

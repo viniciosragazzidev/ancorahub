@@ -28,7 +28,7 @@ function DsTabsList({ className, children, ...props }: TabsPrimitive.List.Props)
       {children}
       <TabsPrimitive.Indicator
         data-slot="ds-tabs-indicator"
-        className="pointer-events-none absolute bottom-0 left-(--active-tab-left) h-0.5 w-(--active-tab-width) rounded-full bg-ds-electric-blue transition-[left,width] duration-200 ease-out motion-reduce:transition-none"
+        className="pointer-events-none absolute bottom-0 left-0 translate-x-(--active-tab-left) h-0.5 w-(--active-tab-width) rounded-full bg-ds-electric-blue transition-transform duration-[var(--duration-fast)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none"
       />
     </TabsPrimitive.List>
   );

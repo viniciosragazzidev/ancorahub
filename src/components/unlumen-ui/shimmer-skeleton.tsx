@@ -23,27 +23,16 @@ function ShimmerSkeleton({
   return (
     <div
       role="status"
-      aria-label="Loading"
+      aria-label="Carregando"
+      data-slot="shimmer-skeleton"
+      data-animate={animate}
       className={cn(
-        "relative overflow-hidden bg-muted",
+        "ct-skeleton relative overflow-hidden bg-muted",
         roundedClass,
         className,
       )}
       {...props}
-    >
-      {animate && (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 -translate-x-full"
-          style={{
-            background:
-              "linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--foreground) 6%, transparent) 50%, transparent 100%)",
-            animation: "shimmer var(--shimmer-dur) var(--ease-linear) infinite",
-          }}
-        />
-      )}
-      <style>{`@keyframes shimmer { to { transform: translateX(200%); } }`}</style>
-    </div>
+    />
   );
 }
 

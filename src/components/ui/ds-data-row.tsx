@@ -33,7 +33,7 @@ export interface DsDataRowProps extends Omit<React.ComponentPropsWithoutRef<"li"
   actions?: React.ReactNode;
   /** Makes the whole row a hover target (pair with an inner link/button for the action). */
   interactive?: boolean;
-  /** Position in the list: rows rise in one after another (first 8 only). Omit to skip the entrance. */
+  /** @deprecated Retained for compatibility. Operational rows do not animate on entry. */
   index?: number;
 }
 
@@ -43,7 +43,6 @@ export function DsDataRow({ leading, title, description, meta, actions, interact
       data-slot="ds-data-row"
       style={index === undefined ? style : ({ ...style, "--ds-i": index } as React.CSSProperties)}
       className={cn(
-        index !== undefined && "ds-rise",
         "flex flex-col gap-ds-12 px-ds-16 py-ds-16 font-ds-inter text-ds-body text-ds-charcoal sm:flex-row sm:items-center sm:justify-between",
         interactive && "transition-colors duration-150 hover:bg-ds-paper-mist",
         className,

@@ -1,5 +1,7 @@
 "use client";
 
+import { useInterfaceReducedMotion as useReducedMotion } from "@/components/motion/interface-motion-provider";
+
 import {
   AlertCircle,
   Check,
@@ -15,12 +17,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import {
-  AnimatePresence,
-  LayoutGroup,
-  motion,
-  useReducedMotion,
-} from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import {
   useCallback,
   useEffect,
@@ -30,11 +27,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { Tooltip } from "@/components/motion/tooltip";
-import {
-  EASE_OUT,
-  SPRING_LAYOUT,
-  SPRING_PRESS,
-} from "@/lib/ease";
+import { motionTokens, transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 export type AttachmentUploadKind = "file" | "link" | "image" | "audio";
@@ -87,7 +80,8 @@ export interface AttachmentUploadProps {
   classNames?: AttachmentUploadClassNames;
 }
 
-const ITEM_TRANSITION = { duration: 0.2, ease: EASE_OUT } as const;
+const ITEM_TRANSITION = transitions.fast;
+const EASE_OUT = motionTokens.easings.smoothOut;
 const DEFAULT_MAX_FILE_SIZE = 500 * 1024 * 1024;
 const UPLOAD_PROGRESS_MS = 900;
 const UPLOAD_COMPLETE_HOLD_MS = 1000;
@@ -196,9 +190,9 @@ function RowAction({
         <motion.span
           role="status"
           aria-label={`Upload concluído para ${label}`}
-          initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.75 }}
+          initial={reduce ? false : { opacity: 0, scale: 0.75 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={ITEM_TRANSITION}
+          transition={reduce ? { duration: 0 } : ITEM_TRANSITION}
           className="grid size-9 shrink-0 place-items-center rounded-xl text-emerald-600 dark:text-emerald-400"
         >
           <Check className="size-4" />
@@ -216,11 +210,11 @@ function RowAction({
           className="grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground"
         >
           <motion.span
-            animate={reduce ? undefined : { rotate: 360 }}
+            animate={{ rotate: reduce ? 0 : 360 }}
             transition={{
-              duration: 0.7,
+              duration: reduce ? 0 : 0.7,
               ease: "linear",
-              repeat: Infinity,
+              repeat: reduce ? 0 : Infinity,
             }}
             className="grid place-items-center"
           >
@@ -252,8 +246,8 @@ function RowAction({
           type="button"
           aria-label={`Tentar novamente ${label}`}
           onClick={onClick}
-          whileTap={reduce ? undefined : { scale: 0.92 }}
-          transition={SPRING_PRESS}
+          whileTap={reduce ? undefined : { scale: motionTokens.scale.press }}
+          transition={reduce ? { duration: 0 } : transitions.fast}
           className="grid size-9 shrink-0 place-items-center rounded-xl text-destructive outline-none transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <RotateCcw className="size-4" />
@@ -268,8 +262,8 @@ function RowAction({
         type="button"
         aria-label={`Remover ${label}`}
         onClick={onClick}
-        whileTap={reduce ? undefined : { scale: 0.92 }}
-        transition={SPRING_PRESS}
+        whileTap={reduce ? undefined : { scale: motionTokens.scale.press }}
+        transition={reduce ? { duration: 0 } : transitions.fast}
         className="grid size-9 shrink-0 place-items-center rounded-xl text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         <X className="size-4" />
@@ -329,8 +323,8 @@ function ImageThumbnail({
           event.currentTarget.blur();
           onPreview(item);
         }}
-        whileTap={reduce ? undefined : { scale: 0.94 }}
-        transition={SPRING_PRESS}
+        whileTap={reduce ? undefined : { scale: motionTokens.scale.press }}
+        transition={reduce ? { duration: 0 } : transitions.fast}
         className="group/image relative size-9 shrink-0 overflow-hidden rounded-[10px] bg-muted outline-none ring-1 ring-border/70 focus-visible:ring-2 focus-visible:ring-ring"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -339,7 +333,7 @@ function ImageThumbnail({
           src={src}
           alt=""
           className="size-full object-cover"
-          transition={{ layout: SPRING_LAYOUT }}
+          transition={{ layout: transitions.normal }}
         />
       </motion.button>
     </Tooltip>
@@ -397,10 +391,10 @@ function ImagePreviewDialog({
           aria-label="Fechar pré-visualização de imagem"
           tabIndex={-1}
           className="pointer-events-auto absolute inset-0 size-full cursor-default bg-black/45 backdrop-blur-xl"
-          initial={{ opacity: 0 }}
+          initial={reduce ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={reduce ? undefined : { opacity: 0 }}
-          transition={{ duration: reduce ? 0.1 : 0.2, ease: EASE_OUT }}
+          transition={{ duration: reduce ? 0 : motionTokens.duration.fast, ease: EASE_OUT }}
           onClick={onClose}
         />
 
@@ -409,10 +403,10 @@ function ImagePreviewDialog({
             role="dialog"
             aria-modal="true"
             aria-label={`Visualização de ${item.name}`}
-            initial={{ opacity: 0 }}
+            initial={reduce ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={reduce ? undefined : { opacity: 0 }}
-            transition={ITEM_TRANSITION}
+            transition={reduce ? { duration: 0 } : ITEM_TRANSITION}
             className="pointer-events-auto relative"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -421,20 +415,20 @@ function ImagePreviewDialog({
               src={src}
               alt={item.name}
               className="max-h-[90vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl"
-              transition={{ layout: SPRING_LAYOUT }}
+              transition={{ layout: transitions.normal }}
             />
             <motion.button
               ref={closeRef}
               type="button"
               aria-label="Fechar visualização"
               onClick={onClose}
-              initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.8 }}
+              initial={reduce ? false : { opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={
                 reduce ? undefined : { opacity: 0, scale: 0.8 }
               }
-              whileTap={reduce ? undefined : { scale: 0.92 }}
-              transition={SPRING_PRESS}
+              whileTap={reduce ? undefined : { scale: motionTokens.scale.press }}
+              transition={reduce ? { duration: 0 } : transitions.fast}
               className="absolute -right-3 -top-3 grid size-9 place-items-center rounded-full bg-background text-foreground shadow-xl outline-none ring-1 ring-border/70 transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
             >
               <X className="size-4" />
@@ -457,7 +451,6 @@ function AttachmentRow({
   uploadComplete,
   failed,
   removing,
-  arrivalIndex,
   imageLayoutId,
   onAudioToggle,
   onImagePreview,
@@ -495,48 +488,24 @@ function AttachmentRow({
         : failed
           ? "failed"
           : "idle";
-  const arrivalDelay = Math.min(Math.max(arrivalIndex, 0), 5) * 0.055;
-  const rowTransition =
-    !reduce && arrivalIndex >= 0
-      ? {
-          ...SPRING_LAYOUT,
-          delay: arrivalDelay,
-          opacity: {
-            duration: 0.16,
-            ease: EASE_OUT,
-            delay: arrivalDelay,
-          },
-        }
-      : ITEM_TRANSITION;
   const showUploadProgress = uploading || uploadComplete;
   const uploadProgress = (
     <motion.span
       role="progressbar"
       aria-label={`Enviando ${item.name}`}
       className="pointer-events-none absolute inset-0 -z-10 origin-left bg-emerald-400/25 dark:bg-emerald-500/20"
-      initial={{ opacity: 1, scaleX: 0 }}
+      initial={reduce ? false : { opacity: 1, scaleX: 0 }}
       animate={{ opacity: 1, scaleX: 1 }}
       exit={reduce ? undefined : { opacity: 0 }}
       transition={{
-        duration: reduce ? 0.1 : UPLOAD_PROGRESS_MS / 1000,
+        duration: reduce ? 0 : UPLOAD_PROGRESS_MS / 1000,
         ease: EASE_OUT,
       }}
     />
   );
 
   return (
-    <motion.li
-      layout={!reduce}
-      initial={
-        reduce
-          ? { opacity: 0 }
-          : arrivalIndex >= 0
-            ? { opacity: 0, y: -16, scale: 0.985 }
-            : { opacity: 0, y: 6 }
-      }
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={reduce ? undefined : { opacity: 0, y: -4 }}
-      transition={rowTransition}
+    <li
       className={cn(
         "flex min-h-14 items-center gap-1 rounded-2xl bg-muted/70 p-1",
         className,
@@ -587,14 +556,14 @@ function AttachmentRow({
                   style={{ height: bar.height }}
                   animate={
                     reduce || !playing
-                      ? undefined
+                      ? { scaleY: 1 }
                       : { scaleY: [0.72, 1, 0.78] }
                   }
                   transition={{
-                    duration: 0.55,
+                    duration: reduce || !playing ? 0 : 0.55,
                     ease: EASE_OUT,
-                    repeat: Infinity,
-                    delay: index * 0.018,
+                    repeat: reduce || !playing ? 0 : Infinity,
+                    delay: reduce || !playing ? 0 : index * 0.018,
                   }}
                 />
               ))}
@@ -606,17 +575,17 @@ function AttachmentRow({
               type="button"
               aria-label={`${playing ? "Pausar" : "Tocar"} ${item.name}`}
               onClick={() => onAudioToggle?.(item)}
-              whileTap={{ scale: 0.94 }}
-              transition={SPRING_PRESS}
+              whileTap={reduce ? undefined : { scale: motionTokens.scale.press }}
+              transition={reduce ? { duration: 0 } : transitions.fast}
               className="grid size-9 shrink-0 place-items-center rounded-full bg-foreground text-background outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <AnimatePresence mode="wait" initial={false}>
                 <motion.span
                   key={playing ? "pause" : "play"}
-                  initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.8 }}
+                  initial={reduce ? false : { opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.8 }}
-                  transition={ITEM_TRANSITION}
+                  exit={reduce ? undefined : { opacity: 0, scale: 0.8 }}
+                  transition={reduce ? { duration: 0 } : ITEM_TRANSITION}
                 >
                   {playing ? (
                     <Pause className="size-4 fill-current" />
@@ -680,7 +649,7 @@ function AttachmentRow({
         retryable={onRetry !== undefined}
         reduce={reduce}
       />
-    </motion.li>
+    </li>
   );
 }
 
@@ -940,11 +909,11 @@ export function AttachmentUpload({
         data-dragging={dragging}
         animate={
           reduce
-            ? undefined
+            ? { scale: 1 }
             : { scale: dragging ? 1.006 : 1 }
         }
         whileTap={reduce ? undefined : { scale: 0.995 }}
-        transition={SPRING_PRESS}
+        transition={reduce ? { duration: 0 } : transitions.fast}
         onClick={() => inputRef.current?.click()}
         onDragEnter={(event) => {
           if (disabled || maxReached) return;
@@ -987,13 +956,13 @@ export function AttachmentUpload({
           aria-hidden="true"
           animate={
             reduce
-              ? undefined
+              ? { y: 0, scale: 1 }
               : {
                   y: dragging ? -4 : 0,
                   scale: dragging ? 1.08 : 1,
                 }
           }
-          transition={ITEM_TRANSITION}
+          transition={reduce ? { duration: 0 } : ITEM_TRANSITION}
           className="mb-2 grid size-9 place-items-center rounded-xl bg-muted text-foreground transition-colors duration-200 group-hover:bg-muted/80 group-data-[dragging=true]:bg-foreground group-data-[dragging=true]:text-background"
         >
           <Upload className="size-4" />

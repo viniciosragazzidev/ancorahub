@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { useInterfaceMotionEnabled } from "./interface-motion-provider";
+import { transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 export interface TooltipProps {
@@ -22,15 +24,17 @@ export function Tooltip({
   wrapperClassName,
 }: TooltipProps) {
   const [open, setOpen] = useState(false);
-  const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const motionEnabled = useInterfaceMotionEnabled();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const handleMouseEnter = () => {
-    const t = setTimeout(() => setOpen(true), delay);
-    setTimer(t);
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setOpen(true), delay);
   };
 
   const handleMouseLeave = () => {
-    if (timer) clearTimeout(timer);
+    if (timer.current) clearTimeout(timer.current);
     setOpen(false);
   };
 
@@ -50,13 +54,14 @@ export function Tooltip({
       onBlur={handleMouseLeave}
     >
       {children}
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {open && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: side === "top" ? 4 : side === "bottom" ? -4 : 0 }}
+            role="tooltip"
+            initial={motionEnabled ? { opacity: 0, scale: 0.98 } : false}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ opacity: 0, scale: motionEnabled ? 0.98 : 1 }}
+            transition={motionEnabled ? transitions.fast : { duration: 0 }}
             className={cn(
               "absolute z-50 whitespace-nowrap rounded-lg border border-border bg-popover px-2.5 py-1 text-xs font-medium text-popover-foreground shadow-md pointer-events-none",
               positionClasses[side],

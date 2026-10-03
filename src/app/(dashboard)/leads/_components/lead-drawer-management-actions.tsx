@@ -462,7 +462,7 @@ export function LeadDrawerManagementActions({
             </Select>
             )}
           </div>
-          <Button className="w-full justify-between h-9 text-xs" disabled={!brokerId || brokerId === "_none" || (activeQueueDuty && assignmentBrokers.length === 0) || reassignPending} type="submit" variant="outline">
+          <Button className="w-full justify-between h-9 text-xs" disabled={!brokerId || brokerId === "_none" || (activeQueueDuty && assignmentBrokers.length === 0) || reassignPending} type="submit" variant="success">
             {reassignPending ? "Reatribuindo..." : "Confirmar reatribuição"}<ArrowRight className="size-4" />
           </Button>
         </form>

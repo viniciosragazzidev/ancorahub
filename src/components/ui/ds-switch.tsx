@@ -20,6 +20,7 @@ export function DsSwitch({ className, ...props }: SwitchPrimitive.Root.Props) {
       {...props}
     >
       <SwitchPrimitive.Thumb
+        data-slot="ds-switch-thumb"
         className="pointer-events-none block size-4 rounded-full bg-ds-canvas-white shadow-ds-subtle transition-transform duration-150 data-checked:translate-x-4 data-unchecked:translate-x-0 motion-reduce:transition-none"
       />
     </SwitchPrimitive.Root>

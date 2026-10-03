@@ -1,0 +1,205 @@
+/* Shared interaction motion. Tokens are the installed transitions-dev scale.
+ * Base UI owns presence, interruption, focus and the starting/ending attributes.
+ * Data surfaces stay still; movement explains a user's action, never a refresh. */
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+:where(.ct-press, [data-slot="button"], [data-slot="toggle"],
+  [data-slot="checkbox"], [data-slot="ds-checkbox"],
+  [data-slot="switch"], [data-slot="ds-switch"],
+  [data-slot="tabs-trigger"], [data-slot="ds-tabs-trigger"],
+  [data-slot="sidebar-menu-button"], [data-slot="dropdown-menu-item"],
+  [data-slot="dropdown-menu-sub-trigger"], [data-slot="dropdown-menu-checkbox-item"],
+  [data-slot="dropdown-menu-radio-item"], [data-slot="select-item"]) {
+  transition-property: background-color, border-color, color, box-shadow, opacity, scale;
+  transition-duration: var(--duration-quick);
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-interface-motion="off"]) :where(.ct-press, [data-slot="button"]):not(:disabled):not([aria-disabled="true"]):not([aria-busy="true"]):not([data-motion="static"]):active {
+    scale: var(--scale-large);
+    transition-duration: var(--duration-micro);
+  }
+}
+
+:where([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"],
+  [data-slot="ds-input"], [data-slot="ds-input-field"]) {
+  transition-property: border-color, box-shadow, background-color, color, opacity;
+  transition-duration: var(--duration-quick);
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+:where([data-slot="card"], [data-slot="ds-dashboard-card"], [data-slot="table-row"], [data-slot="ds-data-row"]) {
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--duration-quick);
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+:where([data-slot="switch-thumb"], [data-slot="ds-switch-thumb"], [data-slot="progress-indicator"]) {
+  transition-property: transform, translate;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+:where([data-slot="checkbox-indicator"], [data-slot="ds-checkbox-indicator"]) {
+  transition: opacity var(--duration-quick) var(--ease-smooth-out), scale var(--duration-quick) var(--ease-smooth-out);
+}
+:where([data-slot="checkbox-indicator"], [data-slot="ds-checkbox-indicator"])[data-unchecked] {
+  opacity: 0;
+  scale: var(--scale-large);
+}
+
+/* Origin-aware anchored surfaces; exits finish sooner than entrances. */
+:where([data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="popover-content"], [data-slot="tooltip-content"]) {
+  transform-origin: var(--transform-origin);
+  transition-property: opacity, scale;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-smooth-out);
+}
+:where([data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="popover-content"])[data-starting-style] {
+  opacity: 0;
+  scale: var(--scale-medium);
+}
+:where([data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-sub-content"], [data-slot="popover-content"])[data-ending-style] {
+  opacity: 0;
+  scale: var(--scale-tiny);
+  transition-duration: var(--duration-quick);
+}
+[data-slot="tooltip-content"] { transition-duration: var(--duration-quick); }
+[data-slot="tooltip-content"]:is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  scale: var(--scale-small);
+}
+[data-slot="tooltip-content"][data-ending-style] { transition-duration: var(--duration-micro); }
+
+:where([data-slot="dialog-overlay"], [data-slot="ds-dialog-overlay"], [data-slot="sheet-overlay"], [data-slot="ds-sheet-overlay"]) {
+  transition: opacity var(--duration-fast) var(--ease-smooth-out);
+}
+:where([data-slot="dialog-popup"], [data-slot="ds-dialog-popup"]) {
+  transition-property: opacity, scale;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-smooth-out);
+}
+:where([data-slot="dialog-popup"], [data-slot="ds-dialog-popup"])[data-starting-style] {
+  opacity: 0;
+  scale: var(--scale-large);
+}
+:where([data-slot="dialog-popup"], [data-slot="ds-dialog-popup"])[data-ending-style] {
+  opacity: 0;
+  scale: var(--scale-small);
+}
+:where([data-slot="dialog-overlay"], [data-slot="ds-dialog-overlay"], [data-slot="sheet-overlay"], [data-slot="ds-sheet-overlay"], [data-slot="dialog-popup"], [data-slot="ds-dialog-popup"])[data-ending-style] {
+  transition-duration: var(--duration-quick);
+}
+
+/* A left/top panel enters from left/top, including during rapid reopening. */
+:where([data-slot="sheet-content"], [data-slot="ds-sheet-content"]) {
+  --ct-panel-x: 0px;
+  --ct-panel-y: 0px;
+  translate: 0 0;
+  transition: translate var(--duration-fast) var(--ease-smooth-out), opacity var(--duration-fast) var(--ease-smooth-out);
+}
+:where([data-slot="sheet-content"], [data-slot="ds-sheet-content"])[data-side="right"] { --ct-panel-x: var(--distance-medium); }
+:where([data-slot="sheet-content"], [data-slot="ds-sheet-content"])[data-side="left"] { --ct-panel-x: calc(-1 * var(--distance-medium)); }
+[data-slot="sheet-content"][data-side="top"] { --ct-panel-y: calc(-1 * var(--distance-medium)); }
+[data-slot="sheet-content"][data-side="bottom"] { --ct-panel-y: var(--distance-medium); }
+:where([data-slot="sheet-content"], [data-slot="ds-sheet-content"]):is([data-starting-style], [data-ending-style]) {
+  opacity: 0;
+  translate: var(--ct-panel-x) var(--ct-panel-y);
+}
+:where([data-slot="sheet-content"], [data-slot="ds-sheet-content"])[data-ending-style] { transition-duration: var(--duration-quick); }
+@media (max-width: 559px) {
+  [data-slot="sheet-content"]:is([data-side="left"], [data-side="right"]) {
+    --ct-panel-x: 0px;
+    --ct-panel-y: var(--distance-medium);
+  }
+}
+
+/* Dragging follows the finger without interpolation. */
+[data-slot="drawer-popup"] {
+  transition-property: transform, opacity;
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-smooth-out);
+}
+[data-slot="drawer-popup"][data-ending-style] { transition-duration: var(--duration-quick); }
+[data-slot="drawer-popup"]:is([data-swiping], [data-nested-drawer-swiping]) { transition-duration: 0s; }
+[data-slot="drawer-overlay"], [data-slot="drawer-content"], [data-slot="drawer-swipe-handle"] {
+  transition-property: opacity;
+  transition-duration: var(--duration-quick);
+  transition-timing-function: var(--ease-smooth-out);
+}
+[data-slot="drawer-overlay"][data-swiping] { transition-duration: 0s; }
+
+/* One transform-based shimmer for UI, DS and Unlumen. No background repaint. */
+.ct-skeleton, .ds-skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--muted);
+  background-image: none;
+  animation: none;
+}
+.ct-skeleton::after, .ds-skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--foreground) 6%, transparent), transparent);
+  transform: translateX(-100%);
+  animation: ct-shimmer var(--shimmer-dur, 1.6s) var(--ease-linear) infinite;
+}
+.ct-skeleton[data-animate="false"]::after { display: none; }
+@keyframes ct-shimmer { to { transform: translateX(100%); } }
+.ct-skeleton-pulse { animation: ct-pulse 1.8s var(--ease-in-out) infinite; background: var(--muted); }
+@keyframes ct-pulse { 50% { opacity: 0.55; } }
+
+.ct-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid color-mix(in oklch, var(--primary) 25%, transparent);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: ct-spin 0.7s var(--ease-linear) infinite;
+}
+@keyframes ct-spin { to { transform: rotate(360deg); } }
+
+/* Explicit opt-in legacy reveals. Never attached to data rows or badges. */
+.ct-reveal { animation: ct-reveal var(--duration-fast) var(--ease-smooth-out) both; }
+.ct-reveal-fast { animation: ct-reveal var(--duration-quick) var(--ease-smooth-out) both; }
+.ct-stagger > * {
+  animation: ct-reveal var(--duration-fast) var(--ease-smooth-out) both;
+  animation-delay: calc(min(var(--stagger, 0), 4) * var(--duration-stagger));
+}
+@keyframes ct-reveal {
+  from { opacity: 0; transform: translateY(var(--distance-micro)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Keep state transforms (switch position, progress, dialog centering). Only
+ * remove time, not the final visual state. The html attribute covers portals. */
+html[data-interface-motion="off"] *,
+html[data-interface-motion="off"] *::before,
+html[data-interface-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0s !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+html[data-interface-motion="off"] :is(.ct-skeleton, .ds-skeleton)::after { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
+  }
+  :is(.ct-skeleton, .ds-skeleton)::after { animation: none !important; opacity: 0; }
+}

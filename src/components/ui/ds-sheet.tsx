@@ -40,8 +40,8 @@ function DsSheetContent({
         className={cn(
           "fixed inset-y-0 z-50 flex h-dvh w-full flex-col border-ds-ash bg-ds-canvas-white font-ds-inter text-ds-charcoal shadow-ds-lg outline-none transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none sm:w-[min(100vw,34rem)]",
           side === "right"
-            ? "right-0 border-l sm:rounded-l-ds-large-cards data-ending-style:translate-x-6 data-starting-style:translate-x-6 data-ending-style:opacity-0 data-starting-style:opacity-0"
-            : "left-0 border-r sm:rounded-r-ds-large-cards data-ending-style:-translate-x-6 data-starting-style:-translate-x-6 data-ending-style:opacity-0 data-starting-style:opacity-0",
+            ? "right-0 border-l sm:rounded-l-ds-large-cards data-ending-style:opacity-0 data-starting-style:opacity-0"
+            : "left-0 border-r sm:rounded-r-ds-large-cards data-ending-style:opacity-0 data-starting-style:opacity-0",
           className,
         )}
         {...props}

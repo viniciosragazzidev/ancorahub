@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
+import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 
 export type DutyRosterSnapshot = Awaited<ReturnType<typeof getDutyRosterSnapshot>>;
 
@@ -101,9 +102,7 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
         inArray(schema.tenantMemberships.branchId, branchIds),
         eq(schema.tenantMemberships.role, "broker"),
         eq(schema.tenantMemberships.jobTitle, "broker"),
-        eq(schema.tenantMemberships.status, "active"),
-        eq(schema.user.active, true),
-        eq(schema.user.status, "active"),
+        await getRosterBrokerAccountFilter(),
       ))
       .orderBy(asc(schema.user.name)),
     db.select({

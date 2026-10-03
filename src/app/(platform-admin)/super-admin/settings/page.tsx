@@ -34,6 +34,7 @@ import {
   updateDutyPresenceConfirmationSettingsAction,
   updateAttendanceFlowsSettingsAction,
   updateDutyMonthlySchedulingSettingsAction,
+  updateDutyInactiveBrokersSettingsAction,
   updateDutyOccurrenceHistorySettingsAction,
   updateBrokerDutyCalendarEnabledSettingsAction,
   updateBrokerDutyCalendarHorizonSettingsAction,
@@ -57,6 +58,7 @@ import {
 import { setRouteOnboardingGlobalAction } from "@/features/onboarding/actions/route-onboarding-actions";
 import { PlatformAdminHeader } from "@/components/platform-admin-header";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -108,6 +110,7 @@ export default async function SuperAdminSettingsPage() {
     "feature_manual_lead_assignment_offer_choice_enabled",
     FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key,
     FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key,
+    FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key,
     FEATURE_FLAGS.ATTENDANCE_FLOWS.key,
@@ -170,6 +173,7 @@ export default async function SuperAdminSettingsPage() {
   const manualLeadAssignmentOfferChoiceEnabled = settingMap.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false";
   const dutyPresenceConfirmationEnabled = settingMap.get(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key) === "true";
   const dutyMonthlySchedulingEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key) ?? FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue) === "true";
+  const dutyInactiveBrokersEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key) ?? FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.defaultValue) === "true";
   const attendanceFlowsEnabled = (settingMap.get(FEATURE_FLAGS.ATTENDANCE_FLOWS.key) ?? FEATURE_FLAGS.ATTENDANCE_FLOWS.defaultValue) === "true";
   const dutyOccurrenceHistoryEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key) ?? FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.defaultValue) === "true";
   const brokerDutyCalendarEnabled = (settingMap.get(FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key) ?? FEATURE_FLAGS.BROKER_DUTY_CALENDAR.defaultValue) === "true";
@@ -1172,7 +1176,7 @@ export default async function SuperAdminSettingsPage() {
 
             <Card className="border-border bg-card shadow-none">
               <CardHeader>
-                <CardTitle>Escala mensal automática de plantões</CardTitle>
+                <CardTitle>Planejamento e inclusão em plantões</CardTitle>
                 <CardDescription>
                   Permite que Diretores e Gestores definam cotas mensais por corretor, gerem uma proposta equilibrada, revisem e publiquem a escala. Cada publicação fica auditada e pode ser desativada globalmente.
                 </CardDescription>
@@ -1187,6 +1191,16 @@ export default async function SuperAdminSettingsPage() {
                     </span>
                   </label>
                   <Button type="submit" variant="outline">Salvar configuração</Button>
+                </form>
+                <form action={updateDutyInactiveBrokersSettingsAction} className="mt-4 flex flex-wrap items-center justify-between gap-4 border-t border-border pt-4">
+                  <label className="flex items-center gap-2 text-sm">
+                    <Checkbox name="dutyInactiveBrokersEnabled" value="true" defaultChecked={dutyInactiveBrokersEnabled} />
+                    <span>
+                      <span className="font-medium">Permitir cadastros desativados na escala</span>
+                      <span className="block text-xs text-muted-foreground">Vale para inclusão manual e planejamento mensal. Não reativa o cadastro nem libera recebimento de leads. Desativar mantém as escalas existentes.</span>
+                    </span>
+                  </label>
+                  <Button type="submit" variant="outline">Salvar política de inclusão</Button>
                 </form>
               </CardContent>
             </Card>

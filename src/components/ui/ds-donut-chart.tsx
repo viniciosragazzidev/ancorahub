@@ -57,6 +57,7 @@ export function DsDonutChart({ data, centerValue, centerLabel, size = 180, class
             <ChartTooltip content={<ChartTooltipContent className="rounded-ds-buttons border-ds-ash shadow-ds-md" hideLabel />} />
             <Pie
               data={data}
+              isAnimationActive={false}
               dataKey="value"
               nameKey="key"
               innerRadius={size * 0.32}

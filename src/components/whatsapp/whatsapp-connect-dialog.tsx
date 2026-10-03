@@ -360,15 +360,20 @@ export function WhatsAppConnectDialog({
 
   // ── Ações ───────────────────────────────────────────────────────────
 
-  function shouldBlockQrOnMobile() {
+  function shouldBlockQrOnMobile(notify = true) {
     if (!window.matchMedia("(max-width: 767px)").matches) return false;
-    toast.info("Conecte o WhatsApp em um computador para gerar e ler o QR Code.");
+    if (notify) toast.info("Conecte o WhatsApp em um computador para gerar e ler o QR Code.");
     return true;
   }
 
   function openWhatsAppExternal() {
     const isMobile = window.matchMedia("(max-width: 767px)").matches;
-    window.open(isMobile ? "whatsapp://send" : "https://web.whatsapp.com/", "_blank", "noopener,noreferrer");
+    if (isMobile) {
+      // Keep the native-app handoff in the user's current mobile/PWA context.
+      window.open("whatsapp://send", "_self");
+      return;
+    }
+    window.open("https://web.whatsapp.com/", "_blank", "noopener,noreferrer");
   }
 
   /**
@@ -379,7 +384,7 @@ export function WhatsAppConnectDialog({
    *   por ação explícita do corretor ou por expiração confirmada.
    */
   function runStart({ forceNew, auto = false }: { forceNew: boolean; auto?: boolean }) {
-    if (!auto && shouldBlockQrOnMobile()) return;
+    if (shouldBlockQrOnMobile(!auto)) return;
     if (!auto) autoRestarts.current = 0;
     resetAttempt();
     // Renovação automática: recomeça o ciclo do zero (senão o "já houve QR"
@@ -434,8 +439,10 @@ export function WhatsAppConnectDialog({
       // Abrir NÃO recria a sessão: o start idempotente reutiliza a sessão viva.
       // (Recriar aqui desvinculava o aparelho de quem abria o dialog com o
       // WAHA já conectado e o CRM ainda desatualizado.)
-      if (ready) {
-        void pollOnce();
+      if (ready || shouldBlockQrOnMobile(false)) {
+        // Mobile can reconcile a session connected elsewhere without starting
+        // pairing or displaying a desktop-only toast over an already ready session.
+        if (connection.sessionId) void pollOnce();
       } else {
         runStart({ forceNew: false });
       }
@@ -560,10 +567,12 @@ export function WhatsAppConnectDialog({
               renewing={renewing}
             />
 
-            {/* Aviso mobile */}
-            <PairingCallout tone="info" title="Conexão somente pelo computador" icon={<Monitor className="size-4" aria-hidden />} className="md:hidden">
-              <p>Para gerar e ler o QR Code, abra esta integração em um computador. Volte ao celular depois para acompanhar o status.</p>
-            </PairingCallout>
+            {/* A restrição é do pareamento por QR, não do uso da sessão conectada. */}
+            {!ready && (
+              <PairingCallout tone="info" title="Conexão somente pelo computador" icon={<Monitor className="size-4" aria-hidden />} className="md:hidden">
+                <p>Para gerar e ler o QR Code, abra esta integração em um computador. Depois de conectar, você pode usar o WhatsApp pelo app no celular.</p>
+              </PairingCallout>
+            )}
 
             <div className="hidden flex-wrap gap-ds-8 md:flex">
               {phase === "idle" && (
@@ -577,17 +586,17 @@ export function WhatsAppConnectDialog({
                   Gerar novo QR
                 </Button>
               )}
-              {phase === "ready" && (
-                <>
-                  <Button disabled={pending} onClick={toggle} variant="outline" size="sm">
-                    {connection.chatInternoAtivo ? "Desativar chat" : "Ativar chat"}
-                  </Button>
-                  <Button disabled={pending} onClick={disconnect} variant="outline" size="sm">
-                    Desconectar
-                  </Button>
-                </>
-              )}
             </div>
+            {ready && (
+              <div className="flex flex-wrap gap-ds-8">
+                <Button disabled={pending} onClick={toggle} variant="outline" size="sm">
+                  {connection.chatInternoAtivo ? "Desativar chat" : "Ativar chat"}
+                </Button>
+                <Button disabled={pending} onClick={disconnect} variant="outline" size="sm">
+                  Desconectar
+                </Button>
+              </div>
+            )}
 
             <Button className="w-full md:w-auto" onClick={openWhatsAppExternal} size="sm" variant="outline">
               <WhatsappLogo className="size-4" /> Abrir WhatsApp Web ou app

@@ -14,6 +14,7 @@ function Switch({
 }: SwitchPrimitive.Root.Props) {
   return (
     <SwitchPrimitive.Root
+      data-slot="switch"
       checked={checked}
       onCheckedChange={onCheckedChange}
       disabled={disabled}
@@ -24,6 +25,7 @@ function Switch({
       {...props}
     >
       <SwitchPrimitive.Thumb
+        data-slot="switch-thumb"
         className={cn(
           "pointer-events-none block h-4 w-4 rounded-full bg-background shadow-[var(--shadow-xs)] ring-0 transition-transform data-checked:translate-x-4 data-unchecked:translate-x-0"
         )}

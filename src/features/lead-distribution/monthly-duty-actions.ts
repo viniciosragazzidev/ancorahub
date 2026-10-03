@@ -9,6 +9,7 @@ import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/querie
 import { getRequiredTenantContext, type TenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { generateDutyScheduleDraft } from "./duty-scheduling-engine";
+import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 import {
   buildMonthOccurrences,
   dayOfWeekOf,
@@ -60,7 +61,7 @@ async function lockMonth(tx: Transaction, tenantId: string, monthKey: string) {
   await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}), hashtext(${`duty-month:${monthKey}`}))`);
 }
 
-async function loadActiveBrokers(db: Executor, tenantId: string) {
+async function loadPlanningBrokers(db: Executor, tenantId: string) {
   const rows = await db.select({ id: schema.user.id, name: schema.user.name, branchId: schema.tenantMemberships.branchId })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
@@ -69,9 +70,7 @@ async function loadActiveBrokers(db: Executor, tenantId: string) {
       eq(schema.tenantMemberships.tenantId, tenantId),
       eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.jobTitle, "broker"),
-      eq(schema.tenantMemberships.status, "active"),
-      eq(schema.user.active, true),
-      eq(schema.user.status, "active"),
+      await getRosterBrokerAccountFilter(),
       eq(schema.branches.status, "active"),
     ));
   return rows.filter((row): row is typeof row & { branchId: string } => Boolean(row.branchId));
@@ -185,7 +184,7 @@ export async function generateMonthlyDutyPlanAction(input: { monthKey: string; q
     // publication, only the dates that have not ended yet.
 
     const [brokers, schedules, windows] = await Promise.all([
-      loadActiveBrokers(tx, context.tenantId),
+      loadPlanningBrokers(tx, context.tenantId),
       loadActiveSchedules(tx, context.tenantId),
       tx.select({ brokerId: schema.brokerAvailabilityWindows.brokerId, dayOfWeek: schema.brokerAvailabilityWindows.dayOfWeek, startsAt: schema.brokerAvailabilityWindows.startsAt, endsAt: schema.brokerAvailabilityWindows.endsAt })
         .from(schema.brokerAvailabilityWindows)
@@ -193,7 +192,7 @@ export async function generateMonthlyDutyPlanAction(input: { monthKey: string; q
     ]);
     const brokerIds = new Set(brokers.map((broker) => broker.id));
     if (new Set(quotas.map((item) => item.brokerId)).size !== quotas.length || quotas.some((item) => !brokerIds.has(item.brokerId))) {
-      throw new Error("A cota contém corretor inativo ou fora da corretora. Recarregue a página.");
+      throw new Error("A cota contém corretor fora da corretora ou da política de inclusão na escala. Recarregue a página.");
     }
     // Only shifts that have not ended yet: a past plantão is never staffed.
     const occurrences = buildMonthOccurrences(monthKey, chosen ? schedules.filter((schedule) => chosen.has(schedule.id)) : schedules, brokers, { from: new Date() });
@@ -252,8 +251,8 @@ export async function updateMonthlyDutyDraftAction(input: unknown): Promise<Mont
       next = current.filter((item) => !(item.occurrenceId === occurrenceId && item.brokerId === brokerId));
       if (next.length === current.length) throw new Error("Este corretor não está neste plantão.");
     } else {
-      const activeIds = new Set((await loadActiveBrokers(tx, context.tenantId)).map((broker) => broker.id));
-      if (!activeIds.has(brokerId)) throw new Error("Este corretor não está ativo.");
+      const planningIds = new Set((await loadPlanningBrokers(tx, context.tenantId)).map((broker) => broker.id));
+      if (!planningIds.has(brokerId)) throw new Error("Este corretor está fora da corretora ou da política de inclusão na escala.");
       const target = occurrences.find((occurrence) => occurrence.id === occurrenceId);
       if (target && occurrenceEnded(target, new Date())) throw new Error("Este plantão já terminou. Não é possível escalar corretores nele.");
       next = [...current, { occurrenceId, brokerId }];
@@ -302,7 +301,7 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     if (!storedAssignments.length) throw new Error("Não há corretores na proposta para publicar.");
 
     // Revalidate against today's data: the draft may be days old.
-    const [brokers, schedules] = await Promise.all([loadActiveBrokers(tx, context.tenantId), loadActiveSchedules(tx, context.tenantId)]);
+    const [brokers, schedules] = await Promise.all([loadPlanningBrokers(tx, context.tenantId), loadActiveSchedules(tx, context.tenantId)]);
     const stored = new Map(asArray<MonthlyPlanOccurrence>(plan.occurrences).map((occurrence) => [occurrence.id, occurrence]));
     // Only the plantões chosen for this draft.
     const draftScheduleIds = new Set([...stored.values()].map((occurrence) => occurrence.scheduleId));

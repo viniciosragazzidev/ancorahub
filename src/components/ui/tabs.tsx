@@ -1,5 +1,7 @@
 "use client";
 
+import { useInterfaceReducedMotion as useReducedMotion } from "@/components/motion/interface-motion-provider";
+
 import {
   createContext,
   useCallback,
@@ -11,7 +13,9 @@ import {
   type ComponentPropsWithoutRef,
   type MouseEvent,
 } from "react";
-import { motion, MotionConfig, useReducedMotion, type Transition } from "motion/react";
+import { motion, MotionConfig, type Transition } from "motion/react";
+
+import { transitions } from "@/lib/motion";
 
 import { cn } from "@/lib/utils";
 
@@ -49,12 +53,7 @@ function useTabs() {
 // Spring transition — indicador se move com vida, sem snap brusco
 // ---------------------------------------------------------------------------
 
-const springTransition: Transition = {
-  type: "spring",
-  stiffness: 170,
-  damping: 24,
-  mass: 1.2,
-};
+const springTransition: Transition = transitions.normal;
 
 // ---------------------------------------------------------------------------
 // Tabs (root)
@@ -152,6 +151,7 @@ function TabsTrigger({
   indicatorClassName?: string;
 }) {
   const { value: current, setValue, layoutId, variant } = useTabs();
+  const reduce = useReducedMotion();
   const active = current === value;
 
   const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
@@ -166,6 +166,7 @@ function TabsTrigger({
       <button
         type="button"
         role="tab"
+        data-slot="tabs-trigger"
         aria-selected={active}
         disabled={disabled}
         onClick={handleClick}
@@ -181,7 +182,7 @@ function TabsTrigger({
         {children}
         {active && (
           <motion.span
-            layoutId={layoutId}
+            layoutId={reduce ? undefined : layoutId}
             className={cn(
               "absolute -bottom-px left-0 right-0 h-0.5 bg-primary",
               indicatorClassName,
@@ -198,7 +199,7 @@ function TabsTrigger({
     <div className="relative">
       {active && (
         <motion.span
-          layoutId={layoutId}
+          layoutId={reduce ? undefined : layoutId}
           style={{
             borderRadius:
               variant === "pill"
@@ -215,6 +216,7 @@ function TabsTrigger({
       <button
         type="button"
         role="tab"
+        data-slot="tabs-trigger"
         aria-selected={active}
         disabled={disabled}
         onClick={handleClick}
@@ -261,9 +263,9 @@ function TabsContent({
   return (
     <motion.div
       key={value}
-      initial={{ opacity: 0, y: reduce ? 0 : 4 }}
+      initial={false}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+      transition={reduce ? { duration: 0 } : transitions.fast}
       className={cn("outline-none", className)}
       {...props}
     >

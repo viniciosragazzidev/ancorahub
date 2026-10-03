@@ -1,5 +1,58 @@
 # Controle de Execução do Redesign
 
+## 2026-10-02 — Inclusão de corretores desativados em plantões
+
+DEC-130 aprovada: gestão pode selecionar cadastros desativados para a escala,
+sem reativar acesso ou elegibilidade para leads. Papel: Diretor/Gestor na seleção;
+Super-admin no controle reversível. Mantidos estados e componentes das listas;
+o card existente de planejamento recebe formulário independente de política,
+com checkbox/label e Button existentes. Sem novo token, variante ou movimento.
+Preserva UX-M1.10 e a separação entre planejamento e prontidão operacional.
+Registro: `docs/implementations/completed/2026-10-02-inactive-brokers-duty-roster.md`.
+
+## 2026-10-02 — WhatsApp conectado no celular
+
+Correção autorizada do diálogo compartilhado de conexão, sem avançar a etapa
+global UX-M1.10. Papel: corretor; objetivo: usar a sessão já conectada e abrir o
+WhatsApp do próprio aparelho. Estados: desconectado, pareando, conectado e erro.
+O computador é necessário para o pareamento por QR, não para administrar uma
+sessão pronta nem para abrir o app. Reutiliza Dialog, Button e PairingCallout;
+sem nova primitive, token, animação ou alteração no escopo/autorização das ações.
+Teste de regressão reproduziu o erro antes da correção. A auditoria legada
+`docs/ux-audit-2026-07-13.md` está ausente; contrato e controle vigentes são a
+referência deste ajuste.
+Registro: `docs/implementations/completed/2026-10-02-whatsapp-connected-mobile.md`.
+
+## 2026-10-02 — Confirmação de atribuição em verde
+
+Hardening pontual autorizado pelo pedido do usuário, sem mudar a etapa global
+UX-M1.10. Papel: gestão autorizada no drawer compartilhado de leads/plantão;
+ação principal: confirmar a reatribuição após escolher o corretor. Mantém o
+disclosure, dimensões, teclado/foco e estados sem seleção, disponível e pendente.
+Gap: Button não possui variante afirmativa verde. Decisão: adicionar `success`
+na base compartilhada usando os tokens semânticos existentes, escurecendo o fundo
+no tema claro para contraste do texto, e aplicá-la apenas nesse CTA. Sem nova
+animação, token, regra, permissão ou controle administrativo; auditoria e governança
+da atribuição existente são preservadas. A referência legada
+`docs/ux-audit-2026-07-13.md` não está presente; contrato e controle vigentes foram
+usados para este refinamento exclusivamente visual.
+Registro e evidências: `docs/implementations/completed/2026-10-02-lead-assignment-green.md`.
+
+## 2026-10-01 — Movimento da biblioteca reutilizável
+
+Hardening transversal UX-H1 autorizado pelo pedido atual, para operação, corretores
+e gestão. Objetivo: reconhecer ações, seleção, carregamento e disclosure com feedback
+rápido. Aplicação nas primitivas UI/DS/Unlumen e motion compartilhado; tabelas, filas,
+métricas e estruturas permanecem estáticas. Estados: foco, pressionado, desabilitado,
+pendência, confirmação, aberto/fechado, movimento reduzido e controle administrativo
+desligado. Reutiliza a escala `transitions-dev` já instalada, sem nova biblioteca ou
+token visual. Gap: tempos conflitantes, movimento JS sem controle uniforme e flag do
+Super-admin ignorada na raiz. Decisão: consolidar os estados nas bases e reconectar a
+flag existente sem bloquear o HTML por uma consulta ao banco. Registro:
+`docs/implementations/completed/2026-10-01-shared-interface-motion.md`. Biblioteca
+validada com harness full e QA sintético em 02/10/2026. QA transversal
+autenticado UX-M1.10 continua sendo a etapa global pendente.
+
 ## 2026-10-01 — Central de qualidade de leads
 
 Refinamento coeso do Dashboard gerencial: a aba “Qualidade” ajuda Diretor, Gestor,

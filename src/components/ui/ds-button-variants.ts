@@ -8,7 +8,7 @@ import { cva, type VariantProps } from "class-variance-authority";
  * loose style.
  */
 export const dsButtonVariants = cva(
-  "inline-flex shrink-0 items-center justify-center whitespace-nowrap font-ds-inter text-ds-body font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-150 ease-out select-none active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 focus-visible:ring-offset-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "ct-press inline-flex shrink-0 items-center justify-center whitespace-nowrap font-ds-inter text-ds-body font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] select-none disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 focus-visible:ring-offset-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       dsVariant: {

@@ -547,6 +547,8 @@ O CorreTop migra de OpenWA para a Cloud API oficial da Meta em etapas. `communic
 
 As rotas do aplicativo usam a integração experimental de View Transitions do Next.js para transições curtas entre snapshots do navegador. A rota anterior e a nova não coexistem no DOM do aplicativo, evitando o efeito de tela dividida. A capacidade é reversível pela chave global `feature_interface_motion_enabled`, administrada exclusivamente pelo Super-admin e auditada em `platform_audit_logs`. A preferência `prefers-reduced-motion` sempre prevalece. Tabelas, filas e métricas não recebem animação de entrada ou reordenação; nelas só são permitidas transições de estado de baixo impacto, como hover e foco.
 
+**Estado de implementação — 02/10/2026:** o wrapper experimental de transições de rota permanece removido (ajuste de 30/07), sem reintroduzir snapshots ou sobreposição. O controle existente governa o movimento local dos componentes reutilizáveis. Sua leitura pública expõe apenas esse booleano, sem dados de tenant, e ocorre após hidratação para não bloquear o layout pelo banco. Falha na leitura mantém a interface estática e utilizável; a preferência de movimento reduzido continua prioritária. A escrita administrativa e sua auditoria não mudaram.
+
 ## DEC-035 — Serviço Fastify isolado para evidência e evolução da Cloud API
 
 **Estado:** Aceita
@@ -1504,3 +1506,19 @@ drill-down analítico; todas as consultas derivam tenant, unidade, equipe e cart
 da sessão. A visão fica em `?tab=quality` no Dashboard unificado e é controlada pela
 capability global auditada `feature_reporting_center_enabled`. Investimento/CPL/CPA
 ficam fora até existir sincronização de gasto real da Meta.
+
+## DEC-130 — Cadastro desativado pode integrar a escala de plantão
+
+**Aprovada pelo usuário em 2026-10-02**, incluindo explicitamente cadastros
+desativados. Incluir, mover e planejar um corretor na escala não requer cadastro
+ativo nem disponibilidade online. Exige vínculo existente no tenant, papel/cargo
+de corretor, unidade compatível, permissão de gestão, horário e capacidade válidos.
+Contas pendentes de cadastro continuam fora; exclusão do vínculo remove a
+elegibilidade para novas inclusões. A escala não reativa usuário ou vínculo e
+não libera recebimento de leads: o motor mantém suas verificações de atividade,
+disponibilidade, presença e demais regras operacionais.
+
+A política nasce habilitada e é reversível pelo Super-admin através de
+`feature_duty_inactive_brokers_enabled`, com auditoria da configuração e das
+alterações de escala. Desativá-la restaura a exigência de cadastro ativo para
+novas inclusões/edições/publicações, sem apagar escalas existentes.

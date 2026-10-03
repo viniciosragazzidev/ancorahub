@@ -43,5 +43,11 @@
 
 ## Riscos/passo restante
 
+Atualização de validação em 02/10: o teste SQL agora compila os campos realmente
+selecionados pelo serviço, sem acessar propriedades inexistentes no tipo da CTE
+do mock. A regressão passou; TypeScript e build completos também passaram no
+checkout atual. Evidência: `reports/agent/verification/2026-10-02T11-40-35.017Z.md`.
+Isso não substitui a validação da consulta contra uma base real.
+
 - A qualidade da consulta precisa ser conferida com dados reais e QA autenticado para Diretor/Gestor/Supervisor/custom roles, incluindo a amostra mínima e o filtro multi-unidade; nenhum escopo adicional deve ser concedido.
 - QA mobile UX-M1.10 e rollout/telemetria permanecem pendentes. Se a tabela Meta não tiver ID persistido, ela fica fora da atribuição confirmada.

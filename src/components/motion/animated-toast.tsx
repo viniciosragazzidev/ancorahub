@@ -2,6 +2,7 @@
 
 import React, { ReactNode } from "react";
 import { X } from "lucide-react";
+import { transitions } from "@/lib/motion";
 import { motion, useReducedMotion } from "motion/react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import {
@@ -67,13 +68,13 @@ export function AnimatedToast({
   return (
     <motion.div
       data-slot="animated-toast"
-      initial={motionEnabled ? { opacity: 0, y: -12, scale: 0.96, filter: "blur(4px)" } : false}
+      initial={motionEnabled ? { opacity: 0, y: -12, scale: 0.96 } : false}
       animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      exit={motionEnabled ? { opacity: 0, y: -8, scale: 0.96, filter: "blur(4px)" } : undefined}
-      transition={motionEnabled ? { type: "spring", stiffness: 420, damping: 28, mass: 0.8 } : { duration: 0 }}
+      exit={motionEnabled ? { opacity: 0, y: -8, scale: 0.96 } : undefined}
+      transition={motionEnabled ? transitions.normal : { duration: 0 }}
       className={cn(
         "group pointer-events-auto relative flex w-[380px] sm:w-[420px] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border bg-popover/95 p-4 text-popover-foreground shadow-2xl backdrop-blur-xl select-none",
-        motionEnabled && "transition-all",
+        motionEnabled && "transition-colors",
         "shadow-[0_12px_36px_-4px_rgba(0,0,0,0.16),0_4px_12px_-2px_rgba(0,0,0,0.08)] dark:shadow-[0_16px_40px_-6px_rgba(0,0,0,0.55)]",
         STATUS_ACCENTS[status],
         className
@@ -120,7 +121,7 @@ export function AnimatedToast({
             <button
               type="button"
               onClick={action.onClick}
-              className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-all hover:bg-primary/90 active:scale-[0.98] focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
+              className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 ct-press focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
             >
               {action.label}
             </button>
@@ -129,7 +130,7 @@ export function AnimatedToast({
             <button
               type="button"
               onClick={cancel.onClick}
-              className="inline-flex items-center justify-center rounded-lg border border-border/80 bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground transition-all hover:bg-muted hover:text-foreground active:scale-[0.98] focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
+              className="inline-flex items-center justify-center rounded-lg border border-border/80 bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted hover:text-foreground ct-press focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
             >
               {cancel.label}
             </button>

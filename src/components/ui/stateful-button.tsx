@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { CheckCircle, XCircle, Loader } from "lucide-react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 
+import { transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { buttonVariants, type ButtonVariants } from "./button-variants";
 
@@ -32,7 +33,7 @@ export interface StatefulButtonProps
   successText?: ReactNode;
   /** Text shown on error. */
   errorText?: ReactNode;
-  /** Override press scale (default 0.97). */
+  /** Override press scale (default 0.96). */
   pressScale?: number;
 }
 
@@ -47,17 +48,12 @@ const stateIcon: Record<ButtonState, ReactNode> = {
   error: <XCircle className="size-4" />,
 };
 
-const pressTransition = {
-  type: "spring" as const,
-  stiffness: 600,
-  damping: 28,
-  mass: 0.8,
-};
+const pressTransition = transitions.fast;
 
 const swapVariants = {
-  initial: { opacity: 0, filter: "blur(4px)", y: 6 },
-  animate: { opacity: 1, filter: "blur(0px)", y: 0 },
-  exit: { opacity: 0, filter: "blur(4px)", y: -6 },
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -6 },
 };
 
 // ---------------------------------------------------------------------------
@@ -73,7 +69,7 @@ export function StatefulButton({
   errorText = "Tentar novamente",
   variant = "default",
   size = "default",
-  pressScale = 0.97,
+  pressScale = 0.96,
   className,
   disabled,
   ...props
@@ -112,6 +108,7 @@ export function StatefulButton({
   return (
     <motion.button
       data-slot="button"
+      data-motion="static"
       data-state={state}
       type="button"
       disabled={disabled || isPendingOrComplete}
@@ -134,7 +131,7 @@ export function StatefulButton({
           initial={motionEnabled ? "initial" : false}
           animate={motionEnabled ? "animate" : undefined}
           exit={motionEnabled ? "exit" : undefined}
-          transition={motionEnabled ? { duration: 0.15, ease: [0.16, 1, 0.3, 1] } : { duration: 0 }}
+          transition={motionEnabled ? transitions.fast : { duration: 0 }}
           className="flex items-center gap-2 whitespace-nowrap"
         >
           {stateContent[state]}

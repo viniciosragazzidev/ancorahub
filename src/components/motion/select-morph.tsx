@@ -1,12 +1,12 @@
 "use client";
 
+import { useInterfaceReducedMotion as useReducedMotion } from "@/components/motion/interface-motion-provider";
+
 import { Check, ChevronDown } from "lucide-react";
 import {
   AnimatePresence,
   motion,
-  type Transition,
-  useReducedMotion,
-  type Variants,
+  type Transition, type Variants,
 } from "motion/react";
 import {
   createContext,
@@ -19,19 +19,20 @@ import {
   useRef,
   useState,
 } from "react";
+import { transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-const MORPH: Transition = { type: "spring", duration: 0.5, bounce: 0.22 };
+const MORPH: Transition = transitions.normal;
 const ROW = "flex w-full items-center justify-between gap-2 px-3.5 py-2 text-sm";
 
 const LIST: Variants = {
   hidden: {},
-  show: { transition: { staggerChildren: 0.035, delayChildren: 0.08 } },
+  show: {},
 };
 
 const ITEM: Variants = {
-  hidden: { opacity: 0, y: -6, filter: "blur(3px)" },
-  show: { opacity: 1, y: 0, filter: "blur(0px)" },
+  hidden: { opacity: 1 },
+  show: { opacity: 1 },
 };
 
 interface MorphContextValue {
@@ -223,7 +224,7 @@ export function MorphSelectTrigger({
         {!ctx.open ? (
           <motion.button
             key="trigger"
-            layoutId={ctx.layoutId}
+            layoutId={ctx.reduce ? undefined : ctx.layoutId}
             type="button"
             id={ctx.triggerId}
             disabled={ctx.disabled}
@@ -241,10 +242,10 @@ export function MorphSelectTrigger({
               className,
             )}
           >
-            <motion.span layout="position" className="min-w-0 truncate flex-1 text-left">
+            <motion.span layout={ctx.reduce ? false : "position"} className="min-w-0 truncate flex-1 text-left">
               {children}
             </motion.span>
-            <motion.span layout="position" className="text-muted-foreground shrink-0">
+            <motion.span layout={ctx.reduce ? false : "position"} className="text-muted-foreground shrink-0">
               <ChevronDown className="h-4 w-4" />
             </motion.span>
           </motion.button>
@@ -274,7 +275,7 @@ export function MorphSelectContent({
         {ctx.open ? (
           <motion.div
             key="panel"
-            layoutId={ctx.layoutId}
+            layoutId={ctx.reduce ? undefined : ctx.layoutId}
             id={ctx.listId}
             role="listbox"
             aria-labelledby={ctx.triggerId}
@@ -287,7 +288,7 @@ export function MorphSelectContent({
           >
             <motion.button
               type="button"
-              layout="position"
+              layout={ctx.reduce ? false : "position"}
               aria-expanded
               onClick={() => ctx.setOpen(false)}
               className={cn(ROW, "outline-none cursor-pointer")}

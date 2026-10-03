@@ -856,6 +856,20 @@ export async function updateDutyMonthlySchedulingSettingsAction(formData: FormDa
   });
 }
 
+export async function updateDutyInactiveBrokersSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const enabled = z.enum(["true", "false"]).parse(formData.get("dutyInactiveBrokersEnabled") ?? "false");
+  const now = new Date();
+  const key = FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key;
+  await setSystemSetting(key, enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(), actorUserId: admin.userId,
+    action: "duty_inactive_brokers.settings_updated",
+    targetType: "system_settings", targetId: key,
+    metadata: { enabled: enabled === "true" }, createdAt: now,
+  });
+}
+
 export async function updateDutyOccurrenceHistorySettingsAction(formData: FormData) {
   const admin = await getRequiredPlatformAdmin();
   const enabled = formData.get("dutyOccurrenceHistoryEnabled") === "true" ? "true" : "false";

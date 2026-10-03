@@ -19,6 +19,20 @@ describe("foundation primitives", () => {
     expect(button).toHaveClass("bg-primary")
   })
 
+  it("supports a semantic green confirmation with disabled and pending states", () => {
+    const { rerender } = render(<Button variant="success" type="submit">Confirmar reatribuição</Button>)
+
+    const button = screen.getByRole("button", { name: "Confirmar reatribuição" })
+    expect(button).toHaveClass("text-success-foreground", "dark:bg-success", "rounded-full")
+    expect(button).toHaveClass("bg-[color-mix(in_oklab,var(--success)_85%,black)]")
+    expect(button).toHaveAttribute("type", "submit")
+    expect(button).toBeEnabled()
+
+    rerender(<Button variant="success" type="submit" disabled>Reatribuindo...</Button>)
+    expect(screen.getByRole("button", { name: "Reatribuindo..." })).toBeDisabled()
+    expect(button).toHaveClass("disabled:opacity-50", "focus-visible:ring-2")
+  })
+
   it("keeps content grouped in the shared flat card surface", () => {
     render(
       <Card>

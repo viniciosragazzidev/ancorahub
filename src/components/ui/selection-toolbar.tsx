@@ -1,5 +1,7 @@
 "use client";
 
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { transitions } from "@/lib/motion";
 import { motion, AnimatePresence } from "motion/react";
 import { X } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -16,14 +18,15 @@ export function SelectionToolbar({
   onClear: () => void;
   children: ReactNode;
 }) {
+  const motionEnabled = useInterfaceMotionEnabled();
   return (
-    <AnimatePresence>
+    <AnimatePresence initial={false}>
       {selectedCount > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: -10, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -10, scale: 0.97 }}
-          transition={{ duration: 0.18, ease: [0, 0, 0.2, 1] }}
+          initial={motionEnabled ? { opacity: 0, y: -4 } : false}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: motionEnabled ? -4 : 0 }}
+          transition={motionEnabled ? transitions.fast : { duration: 0 }}
           className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/[0.04] px-3 py-2.5 shadow-xs sm:gap-4 sm:px-4"
         >
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">

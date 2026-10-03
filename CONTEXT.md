@@ -20,6 +20,7 @@
 
 ## Distribuição de leads
 
+- **Participação na escala**: compromisso de um corretor com um plantão, distinto da elegibilidade para receber leads. Pode ser planejada para um cadastro desativado sem reativar seu acesso ou torná-lo disponível para distribuição.
 - **Plantão multiunidade/multidia**: criação coordenada de regras de plantão independentes para mais de uma unidade e/ou dia da semana. Não é uma regra compartilhada: cada combinação de unidade, fila e dia conserva escala, cobertura e histórico próprios.
 - **Central de distribuição**: superfície operacional única para configurar filas, acompanhar exceções e explicar decisões. Ela não substitui o motor: toda ação manual, qualificação e automação deve usar o mesmo resolver determinístico.
 - **Decisão de distribuição**: resultado explicável de uma tentativa de roteamento, contendo fila, candidatos elegíveis, estratégia, corretor selecionado — quando houver — e os motivos de exclusão ou fallback.

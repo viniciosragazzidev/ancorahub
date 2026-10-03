@@ -1,13 +1,13 @@
 "use client"
 
+import { useInterfaceReducedMotion as useReducedMotion } from "@/components/motion/interface-motion-provider";
+
 import React, { useRef, type PropsWithChildren } from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 import {
   motion,
   MotionValue,
-  useMotionValue,
-  useReducedMotion,
-  useSpring,
+  useMotionValue, useSpring,
   useTransform,
 } from "motion/react"
 import type { MotionProps } from "motion/react"
@@ -123,24 +123,24 @@ const DockIcon = ({
     return val - bounds.x - bounds.width / 2
   })
 
-  const targetSize = disableMagnification ? size : magnification
+  const targetScale = disableMagnification ? 1 : Math.min(magnification / size, 1.12)
 
   const sizeTransform = useTransform(
     distanceCalc,
     [-distance, 0, distance],
-    [size, targetSize, size]
+    [1, targetScale, 1]
   )
 
   const scaleSize = useSpring(sizeTransform, {
     mass: 0.1,
     stiffness: 150,
-    damping: 12,
+    damping: 16,
   })
 
   return (
     <motion.div
       ref={ref}
-      style={{ width: scaleSize, height: scaleSize, padding }}
+      style={{ width: size, height: size, padding, scale: disableMagnification ? 1 : scaleSize }}
       className={cn(
         "flex aspect-square cursor-pointer items-center justify-center rounded-full",
         disableMagnification && "hover:bg-muted-foreground transition-colors",

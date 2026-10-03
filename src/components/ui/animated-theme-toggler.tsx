@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { SunDim, MoonStars } from "@/components/huge-icons"
 import { flushSync } from "react-dom"
 
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { cn } from "@/lib/utils"
 
 export type TransitionVariant =
@@ -142,6 +143,7 @@ export const AnimatedThemeToggler = ({
   onThemeChange,
   ...props
 }: AnimatedThemeTogglerProps) => {
+  const motionEnabled = useInterfaceMotionEnabled();
   const shape = variant ?? "circle"
   const isControlled = theme !== undefined
   const [internalIsDark, setInternalIsDark] = useState(false)
@@ -202,7 +204,7 @@ export const AnimatedThemeToggler = ({
       }
     }
 
-    if (typeof document.startViewTransition !== "function") {
+    if (!motionEnabled || typeof document.startViewTransition !== "function") {
       applyTheme()
       return
     }
@@ -270,7 +272,7 @@ export const AnimatedThemeToggler = ({
         )
       })
     }
-  }, [shape, fromCenter, duration, isDark, isControlled, onThemeChange])
+  }, [shape, fromCenter, duration, isDark, isControlled, onThemeChange, motionEnabled])
 
   return (
     <button

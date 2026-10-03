@@ -1,7 +1,10 @@
 "use client";
 
+import { useInterfaceReducedMotion as useReducedMotion } from "@/components/motion/interface-motion-provider";
+
 import * as React from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion } from "motion/react";
+import { transitions } from "@/lib/motion";
 import { cn } from "@/utils/core/cn";
 
 export interface DsSegmentedOption<T extends string = string> {
@@ -88,10 +91,10 @@ export function DsSegmentedControl<T extends string = string>({
           >
             {selected ? (
               <motion.span
-                layoutId={pillId}
+                layoutId={reduce ? undefined : pillId}
                 aria-hidden="true"
                 className="absolute inset-0 rounded-ds-inputs bg-ds-canvas-white shadow-ds-subtle"
-                transition={reduce ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 34 }}
+                transition={reduce ? { duration: 0 } : transitions.normal}
               />
             ) : null}
             <span className="relative">{option.label}</span>

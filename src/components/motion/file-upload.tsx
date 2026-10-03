@@ -1,5 +1,7 @@
 "use client";
 
+import { useInterfaceReducedMotion as useReducedMotion } from "@/components/motion/interface-motion-provider";
+
 import {
   AlertCircle,
   CheckCircle2,
@@ -16,9 +18,9 @@ import {
   UploadCloud,
   X,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { createElement, useCallback, useId, useRef, useState } from "react";
-import { EASE_OUT } from "@/lib/ease";
+import { transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 export type FileUploadStatus = "queued" | "uploading" | "success" | "error";
@@ -67,8 +69,7 @@ export interface FileUploadProps {
   classNames?: FileUploadClassNames;
 }
 
-const ROW_TRANSITION = { duration: 0.22, ease: EASE_OUT } as const;
-const FAST_TRANSITION = { duration: 0.16, ease: EASE_OUT } as const;
+const FAST_TRANSITION = transitions.fast;
 
 const STATUS_LABEL: Record<FileUploadStatus, string> = {
   queued: "Na fila",
@@ -219,17 +220,15 @@ function StatusIcon({
       <motion.span
         key={status}
         initial={
-          reduce
-            ? { opacity: 0 }
+          reduce ? false
             : { opacity: 0, transform: "translateY(4px)" }
         }
         animate={{ opacity: 1, transform: "translateY(0px)" }}
         exit={
-          reduce
-            ? { opacity: 0 }
+          reduce ? undefined
             : { opacity: 0, transform: "translateY(-4px)" }
         }
-        transition={FAST_TRANSITION}
+        transition={reduce ? { duration: 0 } : FAST_TRANSITION}
         className={cn("grid h-6 w-6 place-items-center", STATUS_TONE[status])}
       >
         {status === "success" ? (
@@ -272,16 +271,7 @@ function FileUploadRow({
   const leadingIcon = getFileIcon(item);
 
   return (
-    <motion.li
-      layout={!reduce}
-      initial={
-        reduce ? { opacity: 0 } : { opacity: 0, transform: "translateY(8px)" }
-      }
-      animate={{ opacity: 1, transform: "translateY(0px)" }}
-      exit={
-        reduce ? { opacity: 0 } : { opacity: 0, transform: "translateY(-6px)" }
-      }
-      transition={ROW_TRANSITION}
+    <li
       className={cn(
         "relative overflow-hidden rounded-2xl border border-border bg-background p-3",
         classNames?.item,
@@ -327,7 +317,7 @@ function FileUploadRow({
                   onClick={() => onRetry(item)}
                   aria-label={`Tentar novamente ${item.name}`}
                   className={cn(
-                    "grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-95",
+                    "grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground ct-press",
                     classNames?.action,
                   )}
                 >
@@ -339,7 +329,7 @@ function FileUploadRow({
                 onClick={() => onRemove(item)}
                 aria-label={`Remover ${item.name}`}
                 className={cn(
-                  "grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground active:scale-95",
+                  "grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-foreground ct-press",
                   classNames?.action,
                 )}
               >
@@ -375,13 +365,13 @@ function FileUploadRow({
                 animate={
                   reduce ? undefined : { transform: `scaleX(${progressRatio})` }
                 }
-                transition={{ duration: 0.28, ease: EASE_OUT }}
+                transition={reduce ? { duration: 0 } : transitions.normal}
               />
             </div>
           ) : null}
         </div>
       </div>
-    </motion.li>
+    </li>
   );
 }
 
@@ -525,7 +515,7 @@ export function FileUpload({
         }}
         className={cn(
           "group relative flex w-full overflow-hidden rounded-2xl border border-dashed border-border bg-background outline-none",
-          "transition-[border-color,transform] duration-200 active:scale-[0.99]",
+          "ct-press",
           "hover:border-foreground/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "data-[dragging=true]:border-foreground",
           "disabled:pointer-events-none disabled:opacity-55",
@@ -545,14 +535,14 @@ export function FileUpload({
           )}
           animate={
             reduce
-              ? undefined
+              ? { transform: "translateY(0px)" }
               : {
                   transform: dragging
                     ? "translateY(-2px)"
                     : "translateY(0px)",
                 }
           }
-          transition={FAST_TRANSITION}
+          transition={reduce ? { duration: 0 } : FAST_TRANSITION}
         >
           <UploadCloud className={centered ? "h-6 w-6" : "h-5 w-5"} />
         </motion.span>

@@ -394,7 +394,7 @@ export function MonthlyDutyPlanner({
                           ))}
                         </div>
                       </section>
-                    )) : <p className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">{eligibleBrokers.length ? "Nenhum corretor corresponde à busca." : "Nenhum corretor ativo com unidade definida."}</p>}
+                    )) : <p className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">{eligibleBrokers.length ? "Nenhum corretor corresponde à busca." : "Nenhum corretor elegível com unidade definida."}</p>}
                   </div>
                 ) : plan ? (
                   <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
@@ -547,4 +547,3 @@ export function MonthlyDutyPlanner({
     </>
   );
 }
-

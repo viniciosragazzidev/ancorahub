@@ -7,6 +7,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
+import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 
 export type RosterActionState = { success?: boolean; error?: string };
 
@@ -48,12 +49,10 @@ async function assertRosterScope(scheduleId: string, brokerId: string) {
       context.role === "manager" && context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : undefined,
       eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.jobTitle, "broker"),
-      eq(schema.tenantMemberships.status, "active"),
-      eq(schema.user.active, true),
-      eq(schema.user.status, "active"),
+      await getRosterBrokerAccountFilter(),
     ))
     .limit(1);
-  if (!broker) throw new Error("O corretor não pertence a uma unidade ativa elegível.");
+  if (!broker) throw new Error("O corretor está fora do escopo ou da política de inclusão na escala.");
   return { context, db, schedule, broker };
 }
 

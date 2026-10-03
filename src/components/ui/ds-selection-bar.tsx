@@ -1,7 +1,10 @@
 "use client";
 
+import { useInterfaceReducedMotion as useReducedMotion } from "@/components/motion/interface-motion-provider";
+
 import * as React from "react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
+import { transitions } from "@/lib/motion";
 import { cn } from "@/utils/core/cn";
 
 export interface DsSelectionBarProps extends Omit<React.ComponentPropsWithoutRef<"div">, "children" | "onAnimationStart" | "onDrag" | "onDragStart" | "onDragEnd"> {
@@ -28,10 +31,10 @@ export function DsSelectionBar({ count, children, className, ...props }: DsSelec
           key="selection-bar"
           role="status"
           aria-live="polite"
-          initial={reduce ? false : { opacity: 0, height: 0, y: -6 }}
-          animate={{ opacity: 1, height: "auto", y: 0 }}
+          initial={reduce ? false : { opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
           exit={reduce ? { opacity: 0 } : { opacity: 0, height: 0, y: -6 }}
-          transition={{ duration: reduce ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
+          transition={reduce ? { duration: 0 } : transitions.fast}
           className="overflow-hidden"
           {...props}
         >

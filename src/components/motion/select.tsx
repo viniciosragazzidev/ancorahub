@@ -1,12 +1,10 @@
 "use client";
 
+import { useInterfaceReducedMotion as useReducedMotion } from "@/components/motion/interface-motion-provider";
+
 import { Check, ChevronDown } from "lucide-react";
-import {
-  motion,
-  type Transition,
-  useReducedMotion,
-  type Variants,
-} from "motion/react";
+import { motion } from "motion/react";
+import { motionTokens, transitions } from "@/lib/motion";
 import {
   createContext,
   type ReactNode,
@@ -21,20 +19,6 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
-
-const EASE_OUT = [0.16, 1, 0.3, 1] as const;
-const INSTANT_TRANSITION: Transition = { duration: 0 };
-const CHEVRON_TRANSITION: Transition = { type: "spring", duration: 0.4, bounce: 0.3 };
-
-const LIST_VARIANTS: Variants = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.035, delayChildren: 0.05 } },
-};
-
-const ITEM_VARIANTS: Variants = {
-  hidden: { opacity: 0, y: -6, filter: "blur(3px)" },
-  show: { opacity: 1, y: 0, filter: "blur(0px)" },
-};
 
 type Placement = "bottom" | "top";
 
@@ -217,18 +201,11 @@ export function SelectTrigger({
   "aria-label": ariaLabel,
 }: SelectTriggerProps) {
   const ctx = useSelectContext("SelectTrigger");
-  const isTop = ctx.placement === "top";
   const isDisabled = disabled ?? ctx.disabled;
 
-  const kf = ctx.open ? [0, 0, 10] : [10, 0, 10];
-  const kfT: Transition = ctx.reduce
-    ? { duration: 0 }
-    : ctx.open
-      ? { duration: 0.6, times: [0, 0.4, 1], ease: EASE_OUT }
-      : { duration: 0.42, times: [0, 0.5, 1], ease: EASE_OUT };
-
   return (
-    <motion.button
+    <button
+      data-slot="select-trigger"
       ref={ctx.setTriggerElement}
       type="button"
       id={id ?? ctx.triggerId}
@@ -238,19 +215,6 @@ export function SelectTrigger({
       aria-expanded={ctx.open}
       aria-controls={ctx.listId}
       onClick={() => ctx.setOpen(!ctx.open)}
-      initial={false}
-      animate={{
-        borderTopLeftRadius: isTop ? kf : 10,
-        borderTopRightRadius: isTop ? kf : 10,
-        borderBottomLeftRadius: isTop ? 10 : kf,
-        borderBottomRightRadius: isTop ? 10 : kf,
-      }}
-      transition={{
-        borderTopLeftRadius: isTop ? kfT : INSTANT_TRANSITION,
-        borderTopRightRadius: isTop ? kfT : INSTANT_TRANSITION,
-        borderBottomLeftRadius: isTop ? INSTANT_TRANSITION : kfT,
-        borderBottomRightRadius: isTop ? INSTANT_TRANSITION : kfT,
-      }}
       className={cn(
         "relative z-10 flex w-full items-center justify-between gap-2 rounded-[10px] border border-input bg-card px-3 text-foreground outline-none transition-colors select-none",
         "hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring/20",
@@ -263,12 +227,12 @@ export function SelectTrigger({
       <motion.span
         aria-hidden
         animate={{ rotate: ctx.open ? 180 : 0 }}
-        transition={ctx.reduce ? { duration: 0 } : CHEVRON_TRANSITION}
+        transition={ctx.reduce ? { duration: 0 } : transitions.fast}
         className="text-muted-foreground shrink-0"
       >
         <ChevronDown className="h-4 w-4" />
       </motion.span>
-    </motion.button>
+    </button>
   );
 }
 
@@ -355,11 +319,6 @@ export function SelectContent({ className, children }: SelectContentProps) {
   }, [open, updatePosition]);
 
   const isTop = ctx.placement === "top";
-  const nearRadius = open ? 12 : 0;
-  const radiusT: Transition = open
-    ? { duration: 0.3, ease: EASE_OUT, delay: 0.14 }
-    : { duration: 0.16, ease: EASE_OUT };
-
   if (!mounted) return null;
 
   return createPortal(
@@ -371,32 +330,8 @@ export function SelectContent({ className, children }: SelectContentProps) {
       aria-hidden={!open}
       inert={!open}
       initial={false}
-      animate={
-        ctx.reduce
-          ? { opacity: open ? 1 : 0 }
-          : {
-              opacity: open ? 1 : 0,
-              scaleY: open ? 1 : 0.96,
-              borderTopLeftRadius: isTop ? 12 : nearRadius,
-              borderTopRightRadius: isTop ? 12 : nearRadius,
-              borderBottomLeftRadius: isTop ? nearRadius : 12,
-              borderBottomRightRadius: isTop ? nearRadius : 12,
-            }
-      }
-      transition={
-        ctx.reduce
-          ? { duration: 0.12 }
-          : {
-              opacity: open
-                ? { duration: 0.18 }
-                : { duration: 0.16, delay: 0.12 },
-              scaleY: { duration: 0.16, ease: EASE_OUT },
-              borderTopLeftRadius: isTop ? INSTANT_TRANSITION : radiusT,
-              borderTopRightRadius: isTop ? INSTANT_TRANSITION : radiusT,
-              borderBottomLeftRadius: isTop ? radiusT : INSTANT_TRANSITION,
-              borderBottomRightRadius: isTop ? radiusT : INSTANT_TRANSITION,
-            }
-      }
+      animate={{ display: "block", opacity: open ? 1 : 0, scale: ctx.reduce || open ? 1 : motionTokens.scale.enter, transitionEnd: { display: open ? "block" : "none" } }}
+      transition={ctx.reduce ? { duration: 0 } : open ? transitions.normal : transitions.fast}
       style={{
         position: "fixed",
         left: position.left,
@@ -404,7 +339,6 @@ export function SelectContent({ className, children }: SelectContentProps) {
         width: position.width,
         zIndex: 100,
         transformOrigin: isTop ? "bottom" : "top",
-        display: open ? "block" : "none",
         pointerEvents: open ? "auto" : "none",
       }}
       className={cn(
@@ -412,9 +346,9 @@ export function SelectContent({ className, children }: SelectContentProps) {
         className,
       )}
     >
-      <motion.div variants={ctx.reduce ? undefined : LIST_VARIANTS} initial={false} animate={open ? "show" : "hidden"} className="p-1">
+      <div className="p-1">
         {children}
-      </motion.div>
+      </div>
     </motion.div>,
     document.body,
   );
@@ -442,10 +376,11 @@ export function SelectItem({
   }, [ctx.register, ctx.unregister, value, children]);
 
   return (
-    <motion.li variants={ctx.reduce ? undefined : ITEM_VARIANTS} className="list-none">
+    <li className="list-none">
       <button
         type="button"
         role="option"
+        data-slot="select-item"
         aria-selected={selected}
         disabled={disabled}
         onClick={() => ctx.select(value)}
@@ -461,6 +396,6 @@ export function SelectItem({
         <span className="truncate flex-1">{children}</span>
         {selected ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
       </button>
-    </motion.li>
+    </li>
   );
 }

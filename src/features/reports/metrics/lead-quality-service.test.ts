@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sql } from "drizzle-orm";
+import type { SelectedFields } from "drizzle-orm/pg-core";
 import { drizzle } from "drizzle-orm/postgres-js";
 
 import * as realSchema from "@/shared/db/schema";
@@ -39,39 +39,33 @@ describe("getLeadQualityReport query projections", () => {
     const buildWith = db.with.bind(db);
     Object.assign(db, {
       with: (cohort: Parameters<typeof db.with>[0]) => {
-        compiledCohortSql = buildWith(cohort)
-          .select({
-            campaignName: sql<string | null>`MAX(${cohort.campaignName})`.as("campaignName"),
-            adsetName: sql<string | null>`MAX(${cohort.adsetName})`.as("adsetName"),
-            adName: sql<string | null>`MAX(${cohort.adName})`.as("adName"),
-            formName: sql<string | null>`MAX(${cohort.formName})`.as("formName"),
-            queueName: sql<string | null>`MAX(${cohort.queueName})`.as("queueName"),
-            brokerName: sql<string | null>`MAX(${cohort.brokerName})`.as("brokerName"),
-          })
-          .from(cohort)
-          .toSQL().sql;
         return {
-          select: () => ({
-            from: () => ({
-              groupBy: () => ({
-                orderBy: async () => [{
-                  dimension: "summary",
-                  key: "all",
-                  label: "Total da seleção",
-                  total: 0,
-                  hot: 0,
-                  warm: 0,
-                  cold: 0,
-                  unclassified: 0,
-                  converted: 0,
-                  hotWarmConverted: 0,
-                  assigned: 0,
-                  metaAttributed: 0,
-                  averageFirstContactSeconds: null,
-                }],
+          select: (fields: SelectedFields) => {
+            compiledCohortSql = buildWith(cohort).select(fields).from(cohort).toSQL().sql;
+            return {
+              from: () => ({
+                groupBy: () => ({
+                  orderBy: async () => [
+                    {
+                      dimension: "summary",
+                      key: "all",
+                      label: "Total da seleção",
+                      total: 0,
+                      hot: 0,
+                      warm: 0,
+                      cold: 0,
+                      unclassified: 0,
+                      converted: 0,
+                      hotWarmConverted: 0,
+                      assigned: 0,
+                      metaAttributed: 0,
+                      averageFirstContactSeconds: null,
+                    },
+                  ],
+                }),
               }),
-            }),
-          }),
+            };
+          },
         };
       },
       insert: () => ({ values: async () => undefined }),
