@@ -29,6 +29,10 @@ export function isMetaPermissionError(error: unknown) {
   return error instanceof MetaGraphApiError && [10, 100, 190, 200].includes(error.code ?? 0);
 }
 
+export function isMetaRateLimitError(error: unknown): error is MetaGraphApiError {
+  return error instanceof MetaGraphApiError && [4, 17, 32, 613].includes(error.code ?? 0);
+}
+
 export class MetaGraphClient {
   private accessToken: string;
 

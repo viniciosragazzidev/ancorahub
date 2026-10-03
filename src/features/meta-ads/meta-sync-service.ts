@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
 
-import { isMetaAdsReadPermissionError, isMetaPermissionError, MetaGraphClient } from "./meta-graph-client";
+import { isMetaAdsReadPermissionError, isMetaPermissionError, isMetaRateLimitError, MetaGraphClient } from "./meta-graph-client";
 import { decryptMetaToken } from "./meta-oauth";
 import { isMetaAdAccountId, isMetaPageId } from "./meta-id-validation";
 import type { MetaSyncWarning } from "./types";
@@ -62,7 +62,10 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
 
     // Permission data stored by older connections can be empty. Refresh the
     // server-side grant without returning or logging the token.
-    const grantedPermissions = await client.fetchGrantedPermissions().catch(() => connection.permissions as string[]);
+    const grantedPermissions = await client.fetchGrantedPermissions().catch((error: unknown) => {
+      if (isMetaRateLimitError(error)) throw error;
+      return connection.permissions as string[];
+    });
     const canReadAds = grantedPermissions.includes("ads_read") || grantedPermissions.includes("ads_management");
     const now = new Date();
 
@@ -158,10 +161,12 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
                   });
                 }
               } catch (adError) {
+                if (isMetaRateLimitError(adError)) throw adError;
                 console.error(`[meta-sync] Warning fetching ads for adSet ${adSet.id}:`, adError);
               }
             }
           } catch (adSetError) {
+            if (isMetaRateLimitError(adSetError)) throw adSetError;
             console.error(`[meta-sync] Warning fetching adSets for campaign ${campaign.id}:`, adSetError);
           }
         }
@@ -178,9 +183,11 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
             totalSynced++;
           }
         } catch (pixelError) {
+          if (isMetaRateLimitError(pixelError)) throw pixelError;
           console.error(`[meta-sync] Warning fetching pixels for account ${account.adAccountId}:`, pixelError);
         }
       } catch (error) {
+        if (isMetaRateLimitError(error)) throw error;
         console.error(`[meta-sync] Error syncing ad account ${account.adAccountId}:`, error);
         if (isMetaAdsReadPermissionError(error)) {
           warnings.push({ code: "missing_ads_read", message: MISSING_ADS_READ_MESSAGE });
@@ -206,6 +213,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
         totalSynced++;
       }
     } catch (error) {
+      if (isMetaRateLimitError(error)) throw error;
       if (isMetaPermissionError(error)) {
         warnings.push({ code: "asset_access_limited", message: "A Meta não liberou fontes de dados para esta conexão. O administrador precisa conceder acesso a esse ativo no Business Manager." });
       } else {
@@ -255,6 +263,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
         try {
           forms = await new MetaGraphClient(pageToken).fetchLeadForms(page.pageId);
         } catch (pageTokenError) {
+          if (isMetaRateLimitError(pageTokenError)) throw pageTokenError;
           if (pageToken !== rawToken) {
             forms = await client.fetchLeadForms(page.pageId);
           } else {
@@ -273,6 +282,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
           totalSynced++;
         }
       } catch (error) {
+        if (isMetaRateLimitError(error)) throw error;
         console.error(`[meta-sync] Error fetching lead forms for page ${page.pageId}:`, error);
         if (error instanceof Error && error.message.includes("leadgen")) {
           const message = "The Page leadgen subscription is not confirmed. The source remains active, but new leads may wait for Meta delivery to be repaired.";
@@ -311,6 +321,9 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
 
     return { success: true, itemsSynced: totalSynced, warnings: normalizedWarnings };
   } catch (error) {
+    if (isMetaRateLimitError(error)) {
+      console.warn(`[meta-sync] Meta rate limit (code ${error.code}); aborting tenant ${tenantId} sync.`);
+    }
     const errorDetails = error instanceof Error ? error.message : "Erro desconhecido durante a sincronização Meta.";
     await db.update(schema.metaSyncLogs).set({
       status: "error", errorDetails, durationMs: Date.now() - startTime, completedAt: new Date(),

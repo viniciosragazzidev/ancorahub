@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { isMetaAdsReadPermissionError, MetaGraphApiError, MetaGraphClient } from "./meta-graph-client";
+import { isMetaAdsReadPermissionError, isMetaRateLimitError, MetaGraphApiError, MetaGraphClient } from "./meta-graph-client";
 
 describe("MetaGraphClient permissions", () => {
   it("reads only granted scopes without exposing the access token", async () => {
@@ -21,6 +21,16 @@ describe("MetaGraphClient permissions", () => {
   it("identifies only Meta code 200 ad-account permission failures as a reconsent case", () => {
     expect(isMetaAdsReadPermissionError(new MetaGraphApiError("Ad account owner has NOT grant ads_read permission", 403, 200))).toBe(true);
     expect(isMetaAdsReadPermissionError(new MetaGraphApiError("Invalid OAuth access token", 400, 190))).toBe(false);
+  });
+
+  it.each([4, 17, 32, 613])("identifies Meta rate limit code %i from a paginated request", async (code) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response(JSON.stringify({
+      error: { message: "Rate limit", code },
+    }), { status: 429 }));
+
+    await expect(new MetaGraphClient("secret-token").fetchCampaigns("123456789"))
+      .rejects.toSatisfy(isMetaRateLimitError);
+    fetchMock.mockRestore();
   });
 
   it("confirms leadgen only when the Corretop app is subscribed on the Page", async () => {
