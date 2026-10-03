@@ -5,6 +5,7 @@ import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, sql } from
 
 import { BUILTIN_SITUATIONS } from "@/features/attendance-situations/catalog";
 import { loadTenantSituations } from "@/features/attendance-situations/service";
+import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -102,34 +103,68 @@ async function attachBrokerAnswers(now: Date) {
     gt(schema.situationLearningEvents.createdAt, new Date(now.getTime() - BROKER_ANSWER_WINDOW_HOURS * 60 * 60 * 1000)),
     lt(schema.situationLearningEvents.createdAt, new Date(now.getTime() - 5 * 60 * 1000)),
   )).limit(200);
-  let attached = 0;
+  if (!events.length) return 0;
+
+  // One read for every lead's candidate replies (instead of one select per event); matched per event in memory.
+  const windowMs = BROKER_ANSWER_WINDOW_HOURS * 60 * 60 * 1000;
+  const minCreated = Math.min(...events.map((event) => event.createdAt.getTime()));
+  const maxCreated = Math.max(...events.map((event) => event.createdAt.getTime()));
+  const replyRows = await db.select({
+    tenantId: schema.whatsappMessages.tenantId,
+    leadId: schema.whatsappMessages.leadId,
+    body: schema.whatsappMessages.body,
+    sentAt: schema.whatsappMessages.sentAt,
+  }).from(schema.whatsappMessages).where(and(
+    inArray(schema.whatsappMessages.tenantId, [...new Set(events.map((event) => event.tenantId))]),
+    inArray(schema.whatsappMessages.leadId, [...new Set(events.map((event) => event.leadId!))]),
+    inArray(schema.whatsappMessages.direction, ["outgoing", "outbound"]),
+    sql`coalesce(${schema.whatsappMessages.senderRole}, 'user') not in ('assistant', 'system')`,
+    gt(schema.whatsappMessages.sentAt, new Date(minCreated)),
+    lt(schema.whatsappMessages.sentAt, new Date(maxCreated + windowMs)),
+  )).orderBy(asc(schema.whatsappMessages.sentAt));
+  const repliesByLead = new Map<string, typeof replyRows>();
+  for (const row of replyRows) {
+    const key = `${row.tenantId}:${row.leadId}`;
+    const list = repliesByLead.get(key);
+    if (list) list.push(row); else repliesByLead.set(key, [row]);
+  }
+
+  const answered: Array<{ id: string; suggestionId: string | null; answer: string; sentAt: Date }> = [];
   for (const event of events) {
-    const [reply] = await db.select({ body: schema.whatsappMessages.body, sentAt: schema.whatsappMessages.sentAt })
-      .from(schema.whatsappMessages)
-      .where(and(
-        eq(schema.whatsappMessages.tenantId, event.tenantId),
-        eq(schema.whatsappMessages.leadId, event.leadId!),
-        inArray(schema.whatsappMessages.direction, ["outgoing", "outbound"]),
-        sql`coalesce(${schema.whatsappMessages.senderRole}, 'user') not in ('assistant', 'system')`,
-        gt(schema.whatsappMessages.sentAt, event.createdAt),
-        lt(schema.whatsappMessages.sentAt, new Date(event.createdAt.getTime() + BROKER_ANSWER_WINDOW_HOURS * 60 * 60 * 1000)),
-      ))
-      .orderBy(asc(schema.whatsappMessages.sentAt))
-      .limit(1);
+    const reply = repliesByLead.get(`${event.tenantId}:${event.leadId}`)?.find((row) =>
+      row.sentAt > event.createdAt && row.sentAt.getTime() < event.createdAt.getTime() + windowMs);
     const answer = reply ? scrubPersonalData(reply.body) : "";
     if (!reply || answer.length < 10 || /^\[[^\]]+\]$/.test(answer)) continue;
-    await db.update(schema.situationLearningEvents).set({ brokerAnswer: answer, brokerAnsweredAt: reply.sentAt }).where(eq(schema.situationLearningEvents.id, event.id));
-    attached += 1;
-    // Already grouped: the broker's answer enters the suggestion as a candidate reply.
-    const safe = acceptSuggestedReply(answer);
-    if (event.suggestionId && safe) {
-      const [suggestion] = await db.select({ responses: schema.situationSuggestions.responses, status: schema.situationSuggestions.status })
-        .from(schema.situationSuggestions).where(eq(schema.situationSuggestions.id, event.suggestionId)).limit(1);
-      if (suggestion?.status === "pending" && !suggestion.responses.includes(safe)) {
-        await db.update(schema.situationSuggestions).set({ responses: [safe, ...suggestion.responses].slice(0, 4), fromBroker: true, updatedAt: now }).where(eq(schema.situationSuggestions.id, event.suggestionId));
+    answered.push({ id: event.id, suggestionId: event.suggestionId, answer, sentAt: reply.sentAt });
+  }
+  if (!answered.length) return 0;
+
+  await db.execute(sql`
+    update ${schema.situationLearningEvents} as e
+    set broker_answer = v.answer, broker_answered_at = v.answered_at
+    from (values ${sql.join(answered.map((item) => sql`(${item.id}::text, ${item.answer}::text, ${item.sentAt.toISOString()}::timestamptz)`), sql`, `)}) as v(id, answer, answered_at)
+    where e.id = v.id
+  `);
+
+  // Already grouped: the broker's answer enters the suggestion as a candidate reply (later answers see earlier ones, as before).
+  const suggestionIds = [...new Set(answered.filter((item) => item.suggestionId && acceptSuggestedReply(item.answer)).map((item) => item.suggestionId!))];
+  if (suggestionIds.length) {
+    const suggestions = await db.select({ id: schema.situationSuggestions.id, responses: schema.situationSuggestions.responses, status: schema.situationSuggestions.status })
+      .from(schema.situationSuggestions).where(inArray(schema.situationSuggestions.id, suggestionIds));
+    const byId = new Map(suggestions.map((suggestion) => [suggestion.id, { responses: suggestion.responses, status: suggestion.status, changed: false }]));
+    for (const item of answered) {
+      const safe = acceptSuggestedReply(item.answer);
+      const suggestion = item.suggestionId ? byId.get(item.suggestionId) : undefined;
+      if (suggestion?.status === "pending" && safe && !suggestion.responses.includes(safe)) {
+        suggestion.responses = [safe, ...suggestion.responses].slice(0, 4);
+        suggestion.changed = true;
       }
     }
+    await runWithConcurrency([...byId].filter(([, suggestion]) => suggestion.changed), 2, async ([id, suggestion]) => {
+      await db.update(schema.situationSuggestions).set({ responses: suggestion.responses, fromBroker: true, updatedAt: now }).where(eq(schema.situationSuggestions.id, id));
+    });
   }
+  const attached = answered.length;
   return attached;
 }
 

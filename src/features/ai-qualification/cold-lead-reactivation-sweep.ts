@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, inArray, isNotNull, isNull, notInArray, sql } from "drizzle-orm";
 
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { runWithConcurrency } from "@/utils/async/run-with-concurrency";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getDatabase, schema } from "@/shared/db";
@@ -101,21 +102,42 @@ export async function runColdLeadReactivationSweep(tenantIdFilter?: string): Pro
   };
   const now = new Date();
 
-  for (const lead of candidates) {
-    if (!isEligibleColdLeadForReactivation(lead) || !lead.qualificationCompletedAt) continue;
-    const [conversation] = await db.select({ optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt })
-      .from(schema.aiConversations).where(and(
-        eq(schema.aiConversations.tenantId, lead.tenantId),
-        eq(schema.aiConversations.leadId, lead.id),
-      )).orderBy(desc(schema.aiConversations.updatedAt)).limit(1);
-    if (conversation?.optOutAt || conversation?.wrongNumberAt) continue;
+  const eligible = candidates.filter((lead) => isEligibleColdLeadForReactivation(lead) && lead.qualificationCompletedAt);
+  const tenantIds = [...new Set(eligible.map((lead) => lead.tenantId))];
+  const leadIds = eligible.map((lead) => lead.id);
+
+  // Two batch reads instead of two selects per lead: the pool has only 2 sockets.
+  const [conversations, outboundRows] = eligible.length ? await Promise.all([
+    db.selectDistinctOn([schema.aiConversations.tenantId, schema.aiConversations.leadId], {
+      tenantId: schema.aiConversations.tenantId,
+      leadId: schema.aiConversations.leadId,
+      optOutAt: schema.aiConversations.optOutAt,
+      wrongNumberAt: schema.aiConversations.wrongNumberAt,
+    }).from(schema.aiConversations).where(and(
+      inArray(schema.aiConversations.tenantId, tenantIds),
+      inArray(schema.aiConversations.leadId, leadIds),
+    )).orderBy(schema.aiConversations.tenantId, schema.aiConversations.leadId, desc(schema.aiConversations.updatedAt)),
+    db.select({
+      tenantId: schema.whatsappOutboundMessages.tenantId,
+      idempotencyKey: schema.whatsappOutboundMessages.idempotencyKey,
+      id: schema.whatsappOutboundMessages.id,
+      status: schema.whatsappOutboundMessages.status,
+    }).from(schema.whatsappOutboundMessages).where(and(
+      inArray(schema.whatsappOutboundMessages.tenantId, tenantIds),
+      inArray(schema.whatsappOutboundMessages.idempotencyKey, leadIds.map((id) => `${REACTIVATION_KEY_PREFIX}${id}`)),
+    )),
+  ]) : [[], []];
+  const conversationByLead = new Map(conversations.map((row) => [`${row.tenantId}:${row.leadId}`, row]));
+  const outboundByKey = new Map(outboundRows.map((row) => [`${row.tenantId}:${row.idempotencyKey}`, row]));
+
+  // Low concurrency: each worker holds a socket while it enqueues/sends.
+  await runWithConcurrency(eligible, 2, async (lead) => {
+    if (!lead.qualificationCompletedAt) return;
+    const conversation = conversationByLead.get(`${lead.tenantId}:${lead.id}`);
+    if (conversation?.optOutAt || conversation?.wrongNumberAt) return;
 
     const idempotencyKey = `${REACTIVATION_KEY_PREFIX}${lead.id}`;
-    const [existing] = await db.select({ id: schema.whatsappOutboundMessages.id, status: schema.whatsappOutboundMessages.status })
-      .from(schema.whatsappOutboundMessages).where(and(
-        eq(schema.whatsappOutboundMessages.tenantId, lead.tenantId),
-        eq(schema.whatsappOutboundMessages.idempotencyKey, idempotencyKey),
-      )).limit(1);
+    const existing = outboundByKey.get(`${lead.tenantId}:${idempotencyKey}`);
 
     let outboundId = existing?.id;
     if (!existing) {
@@ -140,13 +162,13 @@ export async function runColdLeadReactivationSweep(tenantIdFilter?: string): Pro
           : "OUTBOUND_UNAVAILABLE";
         await recordBlockedOnce(lead.tenantId, lead.id, code);
         result.blocked += 1;
-        continue;
+        return;
       }
     } else if (["sent", "delivered", "read", "cancelled", "expired", "skipped"].includes(existing.status)) {
-      continue;
+      return;
     }
 
-    if (!outboundId) continue;
+    if (!outboundId) return;
     const delivery = await processMetaOutboundBatch(1, lead.tenantId, outboundId).catch((error) => {
       console.error("[cold-lead-reactivation] delivery_deferred", {
         tenantId: lead.tenantId,
@@ -184,7 +206,7 @@ export async function runColdLeadReactivationSweep(tenantIdFilter?: string): Pro
       }
       result.sent += 1;
     }
-  }
+  });
 
   return result;
 }
