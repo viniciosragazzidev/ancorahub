@@ -282,7 +282,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
           <Link
             href={user?.jobTitle === "marketing" ? "/marketing/campanhas" : "/dashboard"}
             onClick={() => isMobile && setOpenMobile(false)}
-            className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-sidebar-border bg-sidebar-accent p-1.5 shadow-xs transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-sidebar-ring/50 hover:bg-sidebar-accent/80 active:scale-[0.96] motion-reduce:transition-none"
+            className="flex size-10 shrink-0 items-center justify-center rounded-[var(--radius-control)] border border-sidebar-border bg-sidebar-accent p-1.5 shadow-none transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-sidebar-ring/50 hover:bg-sidebar-accent/80 active:scale-[0.96] motion-reduce:transition-none"
             title="Âncora CRM"
           >
             <img src={logoUrl || "/icon.png"} alt="Âncora CRM" className="size-7 object-contain" />
@@ -309,7 +309,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     href="/distribuicao?view=plantao"
                     onClick={() => isMobile && setOpenMobile(false)}
                     className={cn(
-                      "relative flex w-full items-center gap-2.5 rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-emerald-700 transition-colors hover:bg-emerald-500/25 dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0",
+                      "relative flex w-full items-center gap-2.5 rounded-[var(--radius-card)] border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-emerald-700 transition-colors hover:bg-emerald-500/25 dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0",
                       isPlantaoActive && "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400/50"
                     )}
                   />
@@ -363,9 +363,9 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                         prefetch={priorityNavigationPaths.has(itemTargetUrl)}
                         onClick={() => isMobile && setOpenMobile(false)}
                         className={cn(
-                          "group relative flex min-h-10 w-full items-center gap-3 rounded-[var(--radius-control)] px-3 py-2 outline-none select-none transition-[background-color,color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-sidebar-accent/75 focus-visible:ring-2 focus-visible:ring-sidebar-ring/50 active:scale-[0.98] motion-reduce:transition-none",
+                          "group/navitem relative flex min-h-10 w-full items-center gap-3 rounded-full px-3 py-2 outline-none select-none transition-[background-color,color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-primary/8 focus-visible:ring-2 focus-visible:ring-sidebar-ring/50 active:scale-[0.98] motion-reduce:transition-none",
                           isMobile && "min-h-(--mobile-touch-target)",
-                          isActive && "bg-sidebar-accent text-sidebar-accent-foreground shadow-xs",
+                          isActive && "border border-primary/20 bg-primary/8 text-primary shadow-none",
                           !isMobile && "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0"
                         )}
                       />
@@ -375,9 +375,9 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     <div
                       data-slot="sidebar-nav-icon"
                       className={cn(
-                        "relative flex size-8 shrink-0 items-center justify-center rounded-[0.55rem] transition-[background-color,color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover:scale-[1.04] motion-reduce:transition-none",
+                        "relative flex size-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/navitem:scale-[1.04] motion-reduce:transition-none",
                         !isActive && !item.isWhatsApp && `${item.iconTone} bg-sidebar-accent/55`,
-                        isActive && "bg-sidebar-primary/12 text-sidebar-primary",
+                        isActive && "bg-primary/8 text-primary",
                         item.isWhatsApp && "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300",
                       )}
                     >
@@ -402,7 +402,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       data-slot="sidebar-nav-label"
                       className={cn(
                         "min-w-0 flex-1 truncate text-sm leading-tight tracking-tight transition-[max-width,opacity,transform,color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
-                        isActive ? "font-semibold text-sidebar-accent-foreground" : "font-medium text-sidebar-foreground/72 group-hover:text-sidebar-accent-foreground",
+                        isActive ? "font-semibold text-primary" : "font-medium text-sidebar-foreground/72 group-hover/navitem:text-primary",
                         !isMobile && "group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0",
                       )}
                     >
@@ -420,7 +420,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       <CaretDown className="size-3 shrink-0 -rotate-90 text-sidebar-primary transition-transform duration-[var(--duration-quick)] group-data-[collapsible=icon]:hidden motion-reduce:transition-none" />
                     )}
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-medium text-popover-foreground shadow-md">
+                  <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-medium text-popover-foreground shadow-none">
                     {item.fullLabel || item.label}
                   </TooltipContent>
                   </Tooltip>
@@ -448,14 +448,14 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     const event = new CustomEvent("open-agent-drawer");
                     window.dispatchEvent(event);
                   }}
-                  className={cn("h-10 w-full justify-start gap-3 rounded-[var(--radius-control)] border border-emerald-500/25 bg-emerald-500/10 px-3 text-emerald-700 shadow-xs transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-emerald-500/45 hover:bg-emerald-500/15 active:scale-[0.98] dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none", isMobile && "min-h-(--mobile-touch-target)")}
+                  className={cn("h-10 w-full justify-start gap-3 rounded-[var(--radius-control)] border border-emerald-500/25 bg-emerald-500/10 px-3 text-emerald-700 shadow-none transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-emerald-500/45 hover:bg-emerald-500/15 active:scale-[0.98] dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none", isMobile && "min-h-(--mobile-touch-target)")}
                 />
               }
             >
               <Sparkle weight="fill" className="size-[1.15rem] shrink-0" />
               <span className="truncate text-sm font-medium transition-[max-width,opacity,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">Agente IA</span>
             </TooltipTrigger>
-            <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-semibold text-popover-foreground shadow-md">
+            <TooltipContent side="right" className="border-sidebar-border bg-popover text-xs font-semibold text-popover-foreground shadow-none">
               Agente IA (Ctrl+J)
             </TooltipContent>
           </Tooltip>
@@ -497,7 +497,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       seed={userName}
                       name={userName}
                       size="sm"
-                      className="size-10 shrink-0 rounded-xl ring-2 ring-emerald-500/40 shadow-xs"
+                      className="size-10 shrink-0 rounded-[var(--radius-card)] ring-2 ring-emerald-500/40 shadow-none"
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <span className="truncate text-sm font-semibold tracking-tight text-popover-foreground">
