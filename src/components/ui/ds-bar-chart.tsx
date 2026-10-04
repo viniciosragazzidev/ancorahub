@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useInterfaceReducedMotion } from "@/components/motion/interface-motion-provider";
+import { motionTokens } from "@/lib/motion";
 import {
   ChartContainer,
   ChartTooltip,
@@ -48,6 +50,15 @@ export function DsBarChart<T extends Record<string, unknown>>({
   className,
   compact = false,
 }: DsBarChartProps<T>) {
+  const reducedMotion = useInterfaceReducedMotion();
+  const animatedOnce = React.useRef(false);
+  const completedSeries = React.useRef(0);
+  const animateEntrance = !reducedMotion && !animatedOnce.current && data.length > 0;
+  const finishSeriesAnimation = React.useCallback(() => {
+    completedSeries.current += 1;
+    if (completedSeries.current >= series.length) animatedOnce.current = true;
+  }, [series.length]);
+
   const config = React.useMemo<ChartConfig>(() => {
     const entries: ChartConfig = {};
     series.forEach((s, index) => {
@@ -103,7 +114,9 @@ export function DsBarChart<T extends Record<string, unknown>>({
           <Bar
             key={s.key}
             dataKey={s.key}
-            isAnimationActive={false}
+            isAnimationActive={animateEntrance}
+            animationDuration={motionTokens.duration.slow * 1000}
+            onAnimationEnd={finishSeriesAnimation}
             fill={`var(--color-${s.key})`}
             radius={compact ? [2, 2, 0, 0] : [6, 6, 0, 0]}
             maxBarSize={compact ? 8 : 32}

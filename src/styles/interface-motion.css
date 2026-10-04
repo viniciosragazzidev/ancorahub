@@ -151,7 +151,7 @@
 }
 @keyframes ct-toast-status-pulse {
   0% { scale: var(--scale-small); opacity: 0.6; }
-  55% { scale: 1.06; opacity: 1; }
+  55% { scale: 1; opacity: 1; }
   100% { scale: 1; opacity: 1; }
 }
 .ct-toaster [data-sonner-toast].ct-toast {

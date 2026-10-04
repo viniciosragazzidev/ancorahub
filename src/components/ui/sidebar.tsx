@@ -4,9 +4,12 @@ import * as React from "react"
 import { mergeProps } from "@base-ui/react/merge-props"
 import { useRender } from "@base-ui/react/use-render"
 import { cva, type VariantProps } from "class-variance-authority"
+import { motion } from "motion/react"
 
+import { useInterfaceReducedMotion } from "@/components/motion/interface-motion-provider"
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
+import { transitions } from "@/lib/motion"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
@@ -34,6 +37,7 @@ const SIDEBAR_WIDTH_ICON = "3.5rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
+  activeIndicatorId: string
   state: "expanded" | "collapsed"
   open: boolean
   setOpen: (open: boolean) => void
@@ -68,6 +72,7 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
+  const activeIndicatorId = React.useId()
   const [openMobile, setOpenMobile] = React.useState(false)
 
   // This is the internal state of the sidebar.
@@ -102,6 +107,7 @@ function SidebarProvider({
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
+      activeIndicatorId,
       state,
       open,
       setOpen,
@@ -110,7 +116,7 @@ function SidebarProvider({
       setOpenMobile,
       toggleSidebar,
     }),
-    [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+    [activeIndicatorId, state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
   )
 
   return (
@@ -478,7 +484,7 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button relative flex w-full items-center gap-2 overflow-hidden rounded-full border border-transparent p-2 text-left text-xs font-medium ring-sidebar-ring outline-hidden transition-[background-color,color,border-color] duration-150 group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:[&>span]:hidden hover:bg-primary/8 hover:text-primary focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:border-primary/20 data-active:bg-primary/8 data-active:font-semibold data-active:text-primary group-data-[collapsible=icon]:data-active:bg-primary/8 group-data-[collapsible=icon]:data-active:text-primary motion-reduce:transition-none [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button relative isolate flex w-full items-center gap-2 overflow-hidden rounded-full border border-transparent p-2 text-left text-xs font-medium ring-sidebar-ring outline-hidden transition-[background-color,color,border-color] duration-150 group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:[&>span]:hidden hover:bg-primary/8 hover:text-primary focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:font-semibold data-active:text-primary group-data-[collapsible=icon]:data-active:text-primary motion-reduce:transition-none [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {
@@ -501,6 +507,7 @@ const sidebarMenuButtonVariants = cva(
 
 function SidebarMenuButton({
   render,
+  children,
   isActive = false,
   variant = "default",
   size = "default",
@@ -512,7 +519,8 @@ function SidebarMenuButton({
     isActive?: boolean
     tooltip?: string | React.ComponentProps<typeof TooltipContent>
   } & VariantProps<typeof sidebarMenuButtonVariants>) {
-  const { isMobile, state } = useSidebar()
+  const { activeIndicatorId, isMobile, state } = useSidebar()
+  const reducedMotion = useInterfaceReducedMotion()
   const showTooltip = Boolean(tooltip && state === "collapsed" && !isMobile)
 
   // useRender sempre chamado (mesma ordem em todo render); ele mescla className
@@ -522,6 +530,19 @@ function SidebarMenuButton({
     props: mergeProps<"button">(
       {
         className: cn(sidebarMenuButtonVariants({ variant, size }), className),
+        children: isActive ? (
+          <>
+            <motion.span
+              data-slot="sidebar-active-indicator"
+              aria-hidden="true"
+              layoutId={reducedMotion ? undefined : activeIndicatorId}
+              initial={false}
+              transition={reducedMotion ? { duration: 0 } : transitions.normal}
+              className="pointer-events-none absolute inset-0 -z-10 rounded-full border border-primary/20 bg-primary/8 group-data-[collapsible=icon]:block!"
+            />
+            {children}
+          </>
+        ) : children,
       },
       props
     ),
