@@ -13,8 +13,8 @@
 @theme {
   /* ----- Colors --------------------------------------------------------- */
   --color-ds-canvas-white: #ffffff;
-  --color-ds-paper-mist: #f5f5f5;
-  --color-ds-ash: #e5e5e5;
+  --color-ds-paper-mist: #f4f3f0;
+  --color-ds-ash: #e4e4e7;
   --color-ds-smoke: #d4d4d4;
   --color-ds-pebble: #c8c8c8;
   --color-ds-midnight-ink: #0a0a0a;
@@ -22,20 +22,20 @@
   --color-ds-graphite: #262626;
   --color-ds-slate: #404040;
   --color-ds-steel: #525252;
-  --color-ds-fog: #737373;
+  --color-ds-fog: #71717a;
   --color-ds-silver: #a3a3a3;
-  --color-ds-electric-blue: #2563eb;
-  --color-ds-deep-sapphire: #1e40af;
+  --color-ds-electric-blue: #3b2dff;
+  --color-ds-deep-sapphire: #2f22d9;
   --color-ds-soft-mint: #dcfce7;
-  --color-ds-vivid-green: #16a34a;
+  --color-ds-vivid-green: #10b981;
   --color-ds-tangerine: #ea580c;
   --color-ds-lavender: #7c3aed;
-  --color-ds-primary-action-fill: #000000;
+  --color-ds-primary-action-fill: #3b2dff;
   /* Text on the primary action fill, and its hover fill (dark mode: indigo) */
   --color-ds-on-primary-action: #ffffff;
-  --color-ds-primary-action-hover: #171717;
+  --color-ds-primary-action-hover: #2f22d9;
   /* Fase 1 extension (docs/design-system.md) — semantic status pairs */
-  --color-ds-powder-blue: #dbeaff;
+  --color-ds-powder-blue: #ebe9ff;
   --color-ds-amber-wash: #fef3c7;
   --color-ds-amber-ink: #92400e;
   --color-ds-rose-wash: #fee2e2;
