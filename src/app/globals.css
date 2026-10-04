@@ -108,14 +108,14 @@
   /* ── Camada 3: Comunicação Semântica (Uniformidade OKLCH L ≈ 0.60-0.65) ── */
   --warning: #f59e0b;
   /* Alertas e Atenção */
-  --warning-foreground: #09090b;
+  --warning-foreground: #ffffff;
   --success: #10b981;
   /* Sucesso e Confirmação */
-  --success-foreground: #09090b;
+  --success-foreground: #ffffff;
   --destructive: #ef4444;
-  --destructive-foreground: #09090b;
+  --destructive-foreground: #fafafa;
   --info: #3b82f6;
-  --info-foreground: #09090b;
+  --info-foreground: #ffffff;
   /* Erro e Ação Destrutiva */
 
   --border: #e4e4e7;
@@ -301,7 +301,7 @@
   --sync-confirmed: var(--primary);
   --sync-error: var(--destructive);
   --sync-surface: var(--muted);
-  --dashboard-canvas: #faf9f7;
+  --dashboard-canvas: #ffffff;
   --radius: 1rem;
 }
 
@@ -342,13 +342,13 @@
 
   /* ── Status (ink over a deep wash, same pairs as the Ds tokens) ─────────── */
   --warning: #f59e0b;
-  --warning-foreground: #09090b;
+  --warning-foreground: #ffffff;
   --success: #10b981;
-  --success-foreground: #09090b;
+  --success-foreground: #ffffff;
   --destructive: #ef4444;
-  --destructive-foreground: #09090b;
+  --destructive-foreground: #fafafa;
   --info: #3b82f6;
-  --info-foreground: #09090b;
+  --info-foreground: #ffffff;
 
   --border: #27272a;
   --border-strong: #353535;

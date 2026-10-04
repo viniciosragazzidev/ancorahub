@@ -35,15 +35,15 @@ function formatDate(value: Date | null) {
 }
 
 function accountStatus(account: Channel | null, enabled: boolean, configured: boolean) {
-  if (!enabled) return { label: "Desativada pelo Super-admin", tone: "border-warning/30 bg-warning/10 text-warning-foreground" };
-  if (!configured) return { label: "Configuração incompleta", tone: "border-warning/30 bg-warning/10 text-warning-foreground" };
+  if (!enabled) return { label: "Desativada pelo Super-admin", tone: "border-warning/30 bg-warning/10 text-amber-800" };
+  if (!configured) return { label: "Configuração incompleta", tone: "border-warning/30 bg-warning/10 text-amber-800" };
   if (!account) return { label: "Não conectada", tone: "border-border bg-muted/30 text-muted-foreground" };
-  if (account.hasCredentials === false) return { label: "Reconexão necessária", tone: "border-warning/30 bg-warning/10 text-warning-foreground" };
-  if (account.registrationStatus === "registering") return { label: "Ativando na Meta", tone: "border-warning/30 bg-warning/10 text-warning-foreground" };
+  if (account.hasCredentials === false) return { label: "Reconexão necessária", tone: "border-warning/30 bg-warning/10 text-amber-800" };
+  if (account.registrationStatus === "registering") return { label: "Ativando na Meta", tone: "border-warning/30 bg-warning/10 text-amber-800" };
   if (account.registrationStatus === "failed") return { label: "Ativação pendente", tone: "border-destructive/30 bg-destructive/10 text-destructive" };
-  if (account.registrationStatus && account.registrationStatus !== "registered") return { label: "Confirmação pendente", tone: "border-warning/30 bg-warning/10 text-warning-foreground" };
+  if (account.registrationStatus && account.registrationStatus !== "registered") return { label: "Confirmação pendente", tone: "border-warning/30 bg-warning/10 text-amber-800" };
   if (account.status === "active") return { label: "Ativa", tone: "border-success/30 bg-success/10 text-success-foreground" };
-  return { label: "Pausada", tone: "border-warning/30 bg-warning/10 text-warning-foreground" };
+  return { label: "Pausada", tone: "border-warning/30 bg-warning/10 text-amber-800" };
 }
 
 export function MetaCloudSetupCard({ enabled, configured, missing, companyAccount, canManage = false, showTechnicalDetails = false }: { enabled: boolean; configured: boolean; missing: string[]; companyAccount: Channel | null; canManage?: boolean; showTechnicalDetails?: boolean }) {
