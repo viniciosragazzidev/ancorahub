@@ -61,8 +61,8 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
         >
           <defs>
             <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.92" />
+              <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="1" />
             </linearGradient>
           </defs>
           {stages.map((stage, index) => (
@@ -78,7 +78,7 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
           ))}
         </svg>
       ) : (
-        <div className="flex h-28 items-center justify-center rounded-ds-medium bg-muted/40 text-sm text-muted-foreground">
+        <div className="flex h-28 items-center justify-center rounded-[var(--radius-card)] bg-muted/40 text-sm text-muted-foreground">
           Sem dados de funil no período.
         </div>
       )}
@@ -91,7 +91,7 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
               <div className="flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
-                  className={cn("size-2 shrink-0 rounded-full", stage.lost ? "bg-muted-foreground/45" : "bg-primary")}
+                  className={cn("size-2 shrink-0 rounded-full", stage.lost ? "bg-muted-foreground/45" : "bg-[var(--chart-1)]")}
                 />
                 <span className="truncate text-xs text-muted-foreground">{stage.stage}</span>
               </div>
