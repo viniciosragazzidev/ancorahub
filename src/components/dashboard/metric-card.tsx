@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { MiniDonut } from "./mini-donut";
 import { MetricSparkline } from "./metric-sparkline";
+import { CountUpText } from "@/components/motion/count-up";
 
 export type StatCardProps = {
   /** Rótulo exibido no topo do card */
@@ -115,7 +116,7 @@ export function StatCard({
         </div>
         {(trend || change) && (
           <Badge
-            className="shrink-0 rounded-md text-[11px] font-medium"
+            className="shrink-0 rounded-full text-[11px] font-medium"
             variant={resolvedVariant}
           >
             {trend && trend !== "neutral" && TrendIcon && (
@@ -133,7 +134,7 @@ export function StatCard({
               valueClassName,
             )}
           >
-            {value}
+            <CountUpText text={value} />
           </p>
           {sublabel && (
             <p className="ui-metric-card-label mt-1 leading-tight transition-colors duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/card:text-foreground/70 motion-reduce:transition-none">

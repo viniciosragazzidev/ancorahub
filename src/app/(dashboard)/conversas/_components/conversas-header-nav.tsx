@@ -22,13 +22,13 @@ export function ConversasHeaderNav({
   const isCoexActive = currentTab === "coex";
 
   return (
-    <div className="flex items-center rounded-lg border border-border/80 bg-muted/50 p-1 backdrop-blur-sm shadow-xs">
+    <div className="flex items-center rounded-[var(--radius-card)] border border-border/80 bg-muted/50 p-1 backdrop-blur-sm shadow-none">
       <Link
         href="/conversas"
         className={cn(
-          "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+          "flex items-center gap-1.5 rounded-[var(--radius-card)] px-3 py-1.5 text-xs font-medium transition-colors",
           isLeadsActive
-            ? "bg-background text-foreground shadow-xs font-semibold"
+            ? "bg-background text-foreground shadow-none font-semibold"
             : "text-muted-foreground hover:text-foreground hover:bg-background/40",
         )}
       >
@@ -43,9 +43,9 @@ export function ConversasHeaderNav({
       <Link
         href="/conversas?tab=corretores"
         className={cn(
-          "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+          "flex items-center gap-1.5 rounded-[var(--radius-card)] px-3 py-1.5 text-xs font-medium transition-colors",
           isBrokersActive
-            ? "bg-background text-foreground shadow-xs font-semibold"
+            ? "bg-background text-foreground shadow-none font-semibold"
             : "text-muted-foreground hover:text-foreground hover:bg-background/40",
         )}
       >
@@ -56,9 +56,9 @@ export function ConversasHeaderNav({
         <Link
           href="/conversas?tab=coex"
           className={cn(
-            "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+            "flex items-center gap-1.5 rounded-[var(--radius-card)] px-3 py-1.5 text-xs font-medium transition-colors",
             isCoexActive
-              ? "bg-background text-foreground shadow-xs font-semibold"
+              ? "bg-background text-foreground shadow-none font-semibold"
               : "text-muted-foreground hover:text-foreground hover:bg-background/40",
           )}
         >

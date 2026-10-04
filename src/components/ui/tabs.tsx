@@ -109,12 +109,12 @@ function Tabs({
 // ---------------------------------------------------------------------------
 
 const listClasses: Record<Variant, string> = {
-  pill: "inline-flex items-center gap-1 rounded-full bg-card p-1",
+  pill: "inline-flex items-center gap-1 rounded-full bg-muted p-1",
   underline:
     "inline-flex w-full items-center gap-1 overflow-x-auto border-b border-border bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
   line:
     "inline-flex w-full items-center gap-1 overflow-x-auto border-b border-border bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-  segment: "inline-flex items-center gap-0 rounded-[var(--radius-control)] bg-muted/40 p-0.5",
+  segment: "inline-flex items-center gap-0 rounded-full bg-muted p-0.5",
 };
 
 function TabsList({
@@ -193,21 +193,16 @@ function TabsTrigger({
     );
   }
 
-  const radius = variant === "pill" ? "rounded-full" : "rounded-[var(--radius-control)]";
+  const radius = "rounded-full";
 
   return (
     <div className="relative">
       {active && (
         <motion.span
           layoutId={reduce ? undefined : layoutId}
-          style={{
-            borderRadius:
-              variant === "pill"
-                ? "var(--border-radius-pill)"
-                : "var(--radius-control)",
-          }}
+          style={{ borderRadius: "var(--border-radius-pill)" }}
           className={cn(
-            "absolute inset-0 bg-primary",
+            "absolute inset-0 border border-primary/20 bg-primary/8",
             radius,
             indicatorClassName,
           )}
@@ -224,7 +219,7 @@ function TabsTrigger({
           "relative z-10 inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap bg-transparent px-3.5 py-1.5 text-sm font-medium outline-none transition-colors",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           "disabled:pointer-events-none disabled:opacity-50",
-          active ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+          active ? "text-primary" : "text-muted-foreground hover:text-foreground",
           radius,
           className,
         )}
@@ -263,8 +258,8 @@ function TabsContent({
   return (
     <motion.div
       key={value}
-      initial={false}
-      animate={{ opacity: 1, y: 0 }}
+      initial={reduce ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
       transition={reduce ? { duration: 0 } : transitions.fast}
       className={cn("outline-none", className)}
       {...props}

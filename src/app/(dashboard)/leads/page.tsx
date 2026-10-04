@@ -727,7 +727,7 @@ async function LeadsPageContent({
 
         {/* Paused Branch Alert */}
         {isDirector && pausedBranchCount > 0 ? (
-          <div className="flex flex-col gap-3 rounded-lg border border-warning/20 bg-accent/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-warning/20 bg-accent/5 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <WifiHigh className="size-5 shrink-0 text-warning" />
               <div className="min-w-0 flex-1">
@@ -852,7 +852,7 @@ async function LeadsPageContent({
                 initiallyOpen={false}
                 plans={plans}
                 trigger={
-                  <Button size="sm" className="gap-1.5 font-medium shadow-sm">
+                  <Button size="sm" className="gap-1.5 font-medium shadow-none">
                     <Plus className="size-3.5" />
                     Cadastrar lead
                   </Button>

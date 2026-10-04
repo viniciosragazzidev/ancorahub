@@ -68,7 +68,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
 
   return (
     <div className="overflow-x-auto">
-      <div className="grid min-w-[840px] grid-cols-7 overflow-hidden rounded-lg border border-border bg-border gap-px" role="grid" aria-label="Calendário de plantões">
+      <div className="grid min-w-[840px] grid-cols-7 overflow-hidden rounded-[var(--radius-card)] border border-border bg-border gap-px" role="grid" aria-label="Calendário de plantões">
         {WEEKDAY_HEADERS.map((day) => (
           <div key={day} role="columnheader" className="bg-muted/40 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">{day}</div>
         ))}
@@ -110,7 +110,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                     onClick={() => onOpen(schedule)}
                     title={`${schedule.name} · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}${repeatingScheduleIds.has(schedule.id) ? " · repete toda semana" : ""}${done ? " · encerrado" : ""}`}
                     className={cn(
-                      "w-full min-w-0 rounded-md border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "w-full min-w-0 rounded-full border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       done
                         ? "border-dashed border-border bg-transparent py-0.5 text-muted-foreground hover:bg-muted/60"
                         : cn("bg-card py-1 hover:border-foreground/30", gap ? "border-warning/50" : "border-border", published && "border-success/50"),

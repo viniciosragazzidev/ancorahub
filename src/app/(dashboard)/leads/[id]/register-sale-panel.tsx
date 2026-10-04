@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
+import { useSuccessOverlay } from "@/components/motion/success-overlay";
 
 import { Button } from "@/components/ui/button";
 import { CurrencyInput } from "@/components/ui/currency-input";
@@ -38,6 +39,7 @@ export function RegisterSalePanel({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [policyNumber, setPolicyNumber] = useState("");
@@ -82,25 +84,27 @@ export function RegisterSalePanel({
       }
 
       toast.success("Venda registrada com ciclo de vida e lembretes de renovação agendados!");
+      celebrateSuccess("Venda registrada");
       onOpenChange(false);
       setTimeout(() => router.refresh(), 0);
     });
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPopup key={open ? "open" : "closed"} className="max-h-[min(90vh,48rem)] max-w-2xl overflow-y-auto">
         <DialogPanel className="space-y-6">
           <div className="space-y-1">
-            <DialogTitle className="text-lg font-bold">Declarar Venda e Registrar Pós-Venda</DialogTitle>
+            <DialogTitle className="text-lg font-semibold">Declarar Venda e Registrar Pós-Venda</DialogTitle>
             <DialogDescription className="text-xs text-muted-foreground">
               Insira os dados do contrato para conversão do lead e agendamento dos marcos de renovação futura.
             </DialogDescription>
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-lg border border-border/80 bg-muted/30 p-3.5 space-y-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">1. Confirmação da Operadora & Apólice</p>
+            <div className="rounded-[var(--radius-card)] border border-border/80 bg-muted/30 p-3.5 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">1. Confirmação da Operadora & Apólice</p>
               
               <div className="grid gap-3 sm:grid-cols-2">
                 {carriers.length > 0 && (
@@ -108,7 +112,7 @@ export function RegisterSalePanel({
                     <Label htmlFor="sale-carrier" className="text-xs">Operadora</Label>
                     <select
                       id="sale-carrier"
-                      className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+                      className="flex h-9 w-full rounded-full border border-input bg-background px-3 text-xs"
                       value={carrierId}
                       onChange={(event) => setCarrierId(event.target.value)}
                     >
@@ -145,7 +149,7 @@ export function RegisterSalePanel({
                   <Label htmlFor="confirmation-document" className="text-xs">Confirmação da Operadora</Label>
                   <select
                     id="confirmation-document"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+                    className="flex h-9 w-full rounded-full border border-input bg-background px-3 text-xs"
                     value={confirmationDocumentId}
                     onChange={(event) => setConfirmationDocumentId(event.target.value)}
                   >
@@ -168,8 +172,8 @@ export function RegisterSalePanel({
               </div>
             </div>
 
-            <div className="rounded-lg border border-border/80 bg-muted/30 p-3.5 space-y-3">
-              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">2. Ciclo de Vida do Contrato & Renovação Futurista</p>
+            <div className="rounded-[var(--radius-card)] border border-border/80 bg-muted/30 p-3.5 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">2. Ciclo de Vida do Contrato & Renovação Futurista</p>
 
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
@@ -187,7 +191,7 @@ export function RegisterSalePanel({
                   <Label htmlFor="contract-term" className="text-xs">Vigência do Contrato</Label>
                   <select
                     id="contract-term"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+                    className="flex h-9 w-full rounded-full border border-input bg-background px-3 text-xs"
                     value={contractTermMonths}
                     onChange={(event) => setContractTermMonths(Number(event.target.value))}
                   >
@@ -212,7 +216,7 @@ export function RegisterSalePanel({
                   <Label htmlFor="payment-method" className="text-xs">Forma de Pagamento</Label>
                   <select
                     id="payment-method"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+                    className="flex h-9 w-full rounded-full border border-input bg-background px-3 text-xs"
                     value={paymentMethod}
                     onChange={(event) => setPaymentMethod(event.target.value as typeof paymentMethod)}
                   >
@@ -228,7 +232,7 @@ export function RegisterSalePanel({
                   <Label htmlFor="renewal-type" className="text-xs">Estratégia de Renovação Futura</Label>
                   <select
                     id="renewal-type"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+                    className="flex h-9 w-full rounded-full border border-input bg-background px-3 text-xs"
                     value={renewalType}
                     onChange={(event) => setRenewalType(event.target.value as typeof renewalType)}
                   >
@@ -243,7 +247,7 @@ export function RegisterSalePanel({
                   <Label htmlFor="contact-preference" className="text-xs">Canal Preferencial de Contato</Label>
                   <select
                     id="contact-preference"
-                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-xs"
+                    className="flex h-9 w-full rounded-full border border-input bg-background px-3 text-xs"
                     value={renewalContactPreference}
                     onChange={(event) => setRenewalContactPreference(event.target.value)}
                   >
@@ -259,7 +263,7 @@ export function RegisterSalePanel({
                     id="post-sale-notes"
                     rows={2}
                     placeholder="Particularidades da negociação, carências especiais ou preferências do cliente para a renovação..."
-                    className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="flex w-full rounded-full border border-input bg-background px-3 py-2 text-xs outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     value={postSaleNotes}
                     onChange={(event) => setPostSaleNotes(event.target.value)}
                   />
@@ -290,5 +294,7 @@ export function RegisterSalePanel({
         </DialogPanel>
       </DialogPopup>
     </Dialog>
+    {successOverlay}
+    </>
   );
 }

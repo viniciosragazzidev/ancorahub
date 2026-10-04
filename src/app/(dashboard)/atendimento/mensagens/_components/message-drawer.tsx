@@ -47,7 +47,7 @@ function Section({ title, description, action, children }: { title: string; desc
 
 /** Neutral example of how the text reaches the customer (no WhatsApp bubble token exists yet). */
 export function Preview({ text }: { text: string }) {
-  return <p className="whitespace-pre-wrap break-words rounded-lg border border-border bg-muted/30 p-3 text-sm leading-6 text-foreground">{text || "Sem texto."}</p>;
+  return <p className="whitespace-pre-wrap break-words rounded-[var(--radius-card)] border border-border bg-muted/30 p-3 text-sm leading-6 text-foreground">{text || "Sem texto."}</p>;
 }
 
 function Validity({ message }: { message: Pick<LibraryMessage, "validity"> }) {
@@ -63,7 +63,7 @@ function Validity({ message }: { message: Pick<LibraryMessage, "validity"> }) {
 function Usages({ message }: { message: LibraryMessage }) {
   if (!message.usages.length) return <p className="text-sm text-muted-foreground">Nenhum lugar usa esta mensagem.</p>;
   return (
-    <ul className="divide-y divide-border/60 rounded-lg border border-border/70">
+    <ul className="divide-y divide-border/60 rounded-[var(--radius-card)] border border-border/70">
       {message.usages.map((usage) => (
         <li key={usage.label} className="flex items-center justify-between gap-3 px-3 py-2">
           <span className="min-w-0 truncate text-sm">{usage.label}</span>
@@ -88,7 +88,7 @@ export function Suggestions({ text, onUse, useLabel }: { text: string; onUse: (s
         <Sparkle className="size-3.5" /> {pending ? "Gerando…" : "Sugerir variações com IA"}
       </Button>
       {suggestions.length ? (
-        <ul className="divide-y divide-border/60 rounded-lg border border-border/70">
+        <ul className="divide-y divide-border/60 rounded-[var(--radius-card)] border border-border/70">
           {suggestions.map((suggestion) => (
             <li key={suggestion} className="flex items-start justify-between gap-3 px-3 py-2">
               <p className="min-w-0 whitespace-pre-wrap text-sm leading-6">{suggestion}</p>
@@ -239,7 +239,7 @@ function MetaTemplateBody({ message, onChanged, onClose, onUseInSituation }: { m
 
   return (
     <>
-      {meta.rejectedReason ? <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground">Motivo da rejeição: {meta.rejectedReason}</p> : null}
+      {meta.rejectedReason ? <p className="rounded-[var(--radius-card)] border border-destructive/30 bg-destructive/5 p-3 text-sm text-foreground">Motivo da rejeição: {meta.rejectedReason}</p> : null}
       <Section title="Texto" description={`${message.category ?? "Sem categoria"} · ${meta.language}${meta.headerType !== "NONE" ? ` · cabeçalho ${meta.headerType.toLowerCase()}` : ""}. O texto de um template só muda criando outro e aprovando na Meta.`}>
         <Preview text={[message.text, meta.footerText].filter(Boolean).join("\n\n")} />
       </Section>

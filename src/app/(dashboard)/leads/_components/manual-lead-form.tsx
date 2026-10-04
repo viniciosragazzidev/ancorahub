@@ -99,7 +99,7 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
 
       {/* ── PF-specific fields ─────────────────────────────────────────────── */}
       {tipo === "PF" && (
-        <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-3">
+        <div className="rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-4 space-y-3">
           <div>
             <p className="text-sm font-semibold">Dados para PF</p>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -139,7 +139,7 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
 
       {/* ── PME-specific fields ─────────────────────────────────────────────── */}
       {(tipo === "PJ" || tipo === "PME") && (
-        <div className="rounded-lg border border-border/70 bg-muted/20 p-4 space-y-3">
+        <div className="rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-4 space-y-3">
           <div>
             <p className="text-sm font-semibold">Dados da empresa</p>
             <p className="text-xs text-muted-foreground mt-0.5">
@@ -184,7 +184,7 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
         </div>
       )}
 
-      <label className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+      <label className="flex items-start gap-2 rounded-[var(--radius-card)] border border-border bg-muted/30 p-3 text-sm">
         <Checkbox
           className="mt-0.5"
           name="consentimentoLgpd"
@@ -200,7 +200,7 @@ export function ManualLeadForm({ plans }: { plans: PlanOption[] }) {
       </label>
 
       {state.duplicate ? (
-        <div className="rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-sm">
+        <div className="rounded-[var(--radius-card)] border border-amber-300/30 bg-amber-300/10 p-3 text-sm">
           <div className="flex gap-2 text-amber-100">
             <WarningCircle className="mt-0.5 shrink-0" />
             <span>

@@ -177,7 +177,7 @@ function CustomBody({ situation, onDone, onClose }: { situation: (SituationRow &
   return (
     <>
       {situation?.aiActivated ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border p-3">
           <p className="text-xs leading-5 text-muted-foreground">Ativada pela IA: clientes perguntaram isto várias vezes e a resposta passou na verificação de segurança.</p>
           <Button type="button" size="sm" variant="outline" disabled={pending} onClick={undo}><RotateCcw className="size-3.5" /> Desfazer</Button>
         </div>
@@ -227,7 +227,7 @@ function GuidedBody({ situation, onDone }: { situation: SituationRow; onDone: ()
   });
   return (
     <>
-      <p className="rounded-lg border border-border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
+      <p className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
         Orientação para a IA: não é enviada igual. Quando o cliente pergunta algo que nenhuma situação cobre, a IA usa este roteiro como referência para responder, sem preço, carência nem promessa.
       </p>
       <Section title="Nome"><Input value={title} onChange={(event) => setTitle(event.target.value)} /></Section>

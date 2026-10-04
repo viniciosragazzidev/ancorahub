@@ -259,12 +259,12 @@ export function MonthlyDutyPlanner({
           </SheetHeader>
           <SheetBody contentClassName="grid grid-cols-[minmax(0,1fr)] gap-4">
             {!enabled ? (
-              <div className="rounded-lg border border-border/70 bg-muted/30 p-4">
+              <div className="rounded-[var(--radius-card)] border border-border/70 bg-muted/30 p-4">
                 <p className="text-sm font-medium">Escala mensal indisponível</p>
                 <p className="mt-1 text-xs text-muted-foreground">Peça ao Super-admin para habilitar o planejamento mensal. Os plantões semanais continuam funcionando normalmente.</p>
               </div>
             ) : failed.has(month) ? (
-              <div className="grid gap-2 rounded-lg border border-destructive/30 p-4">
+              <div className="grid gap-2 rounded-[var(--radius-card)] border border-destructive/30 p-4">
                 <p className="text-sm">Não foi possível carregar a escala deste mês.</p>
                 <Button type="button" variant="outline" size="sm" className="justify-self-start" onClick={() => { void load(month, true); }}>Tentar novamente</Button>
               </div>
@@ -273,7 +273,7 @@ export function MonthlyDutyPlanner({
             ) : (
               <>
                 {editing ? (
-                  <ol aria-label="Etapas" className="grid grid-cols-3 gap-1 rounded-lg border border-border p-0.5">
+                  <ol aria-label="Etapas" className="grid grid-cols-3 gap-1 rounded-[var(--radius-card)] border border-border p-0.5">
                     {steps.map((item, index) => (
                       <li key={item.id}>
                         <button
@@ -281,7 +281,7 @@ export function MonthlyDutyPlanner({
                           aria-current={step === item.id ? "step" : undefined}
                           disabled={item.disabled}
                           onClick={() => setStep(item.id)}
-                          className={cn("w-full rounded-md px-2 py-1 text-xs font-medium transition-colors disabled:opacity-40", step === item.id ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
+                          className={cn("w-full rounded-full px-2 py-1 text-xs font-medium transition-colors disabled:opacity-40", step === item.id ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground")}
                         >
                           {index + 1}. {item.label}
                         </button>
@@ -309,7 +309,7 @@ export function MonthlyDutyPlanner({
                               onClick={() => chooseOnly(queue.ids)}
                               className={cn(
                                 "rounded-full border px-2.5 py-1 text-xs transition-colors",
-                                active ? "border-foreground bg-foreground text-background" : "border-border bg-card text-muted-foreground hover:text-foreground",
+                                active ? "border-primary/25 bg-primary/8 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground",
                               )}
                             >
                               {queue.label} · {queue.ids.length}
@@ -319,7 +319,7 @@ export function MonthlyDutyPlanner({
                       </div>
                     ) : null}
                     {inMonth.length ? (
-                      <ul className="divide-y divide-border/60 rounded-lg border border-border bg-card">
+                      <ul className="divide-y divide-border/60 rounded-[var(--radius-card)] border border-border bg-card">
                         {inMonth.map((schedule) => (
                           <li key={schedule.id}>
                             <label className="flex cursor-pointer items-center gap-3 px-3 py-2.5">
@@ -334,7 +334,7 @@ export function MonthlyDutyPlanner({
                         ))}
                       </ul>
                     ) : (
-                      <p className="rounded-lg border border-dashed border-border p-4 text-xs text-muted-foreground">Nenhum plantão ainda vai acontecer em {monthLabel(month)}. Crie um novo ou estenda um dos abaixo.</p>
+                      <p className="rounded-[var(--radius-card)] border border-dashed border-border p-4 text-xs text-muted-foreground">Nenhum plantão ainda vai acontecer em {monthLabel(month)}. Crie um novo ou estenda um dos abaixo.</p>
                     )}
                     {finished.length ? (
                       <p className="text-xs text-muted-foreground">
@@ -342,7 +342,7 @@ export function MonthlyDutyPlanner({
                       </p>
                     ) : null}
                     {outside.length ? (
-                      <details className="rounded-lg border border-border bg-card px-3 py-2 text-xs" open={!inMonth.length}>
+                      <details className="rounded-[var(--radius-card)] border border-border bg-card px-3 py-2 text-xs" open={!inMonth.length}>
                         <summary className="cursor-pointer font-medium">{outside.length} {outside.length === 1 ? "plantão não acontece" : "plantões não acontecem"} em {monthLabel(month)}</summary>
                         <ul className="mt-2 grid gap-1.5">
                           {outside.map((schedule) => (
@@ -381,7 +381,7 @@ export function MonthlyDutyPlanner({
                     {branchNames.length ? branchNames.map((branch) => (
                       <section key={branch} className="grid gap-1.5">
                         <h4 className="text-xs font-semibold text-muted-foreground">{branch}</h4>
-                        <div className="divide-y divide-border/60 rounded-lg border border-border bg-card">
+                        <div className="divide-y divide-border/60 rounded-[var(--radius-card)] border border-border bg-card">
                           {matchingBrokers.filter((broker) => (broker.branchName ?? "Sem unidade") === branch).map((broker) => (
                             <div key={broker.id} className="flex items-center justify-between gap-3 px-3 py-2">
                               <Label htmlFor={`quota-${month}-${broker.id}`} className="min-w-0 truncate text-xs font-medium">{broker.name}</Label>
@@ -394,11 +394,11 @@ export function MonthlyDutyPlanner({
                           ))}
                         </div>
                       </section>
-                    )) : <p className="rounded-lg border border-dashed p-4 text-xs text-muted-foreground">{eligibleBrokers.length ? "Nenhum corretor corresponde à busca." : "Nenhum corretor elegível com unidade definida."}</p>}
+                    )) : <p className="rounded-[var(--radius-card)] border border-dashed p-4 text-xs text-muted-foreground">{eligibleBrokers.length ? "Nenhum corretor corresponde à busca." : "Nenhum corretor elegível com unidade definida."}</p>}
                   </div>
                 ) : plan ? (
                   <div className="grid grid-cols-[minmax(0,1fr)] gap-4">
-                    <dl className="grid grid-cols-3 divide-x divide-border/70 rounded-lg border border-border bg-card">
+                    <dl className="grid grid-cols-3 divide-x divide-border/70 rounded-[var(--radius-card)] border border-border bg-card">
                       {[
                         { label: "Datas", value: plan.occurrences.length },
                         { label: "Alocações", value: plan.totalAssigned },
@@ -411,18 +411,18 @@ export function MonthlyDutyPlanner({
                       ))}
                     </dl>
                     {plan.problems.length ? (
-                      <div role="alert" className="flex gap-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs">
+                      <div role="alert" className="flex gap-2 rounded-[var(--radius-card)] border border-destructive/30 bg-destructive/5 p-3 text-xs">
                         <Warning aria-hidden="true" className="size-4 shrink-0 text-destructive" />
                         <div>{plan.problems.map((problem) => <p key={problem}>{problem}</p>)}</div>
                       </div>
                     ) : null}
                     {plan.replacesPublished && !published ? (
-                      <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                      <p className="rounded-[var(--radius-card)] border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                         Ao publicar, esta escala substitui a publicada nas datas que ainda não passaram. As datas que já passaram ficam como estão.
                       </p>
                     ) : null}
                     {shortfalls.length && !published ? (
-                      <details className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
+                      <details className="rounded-[var(--radius-card)] border border-warning/30 bg-warning/5 px-3 py-2 text-xs">
                         <summary className="cursor-pointer font-medium">{plan.missingQuota} plantões de cota não couberam na grade</summary>
                         <ul className="mt-2 grid gap-1 text-muted-foreground">
                           {shortfalls.map((item) => <li key={item.brokerId}>{brokerName.get(item.brokerId) ?? "Corretor"}: {item.assigned} de {item.quota}</li>)}
@@ -440,7 +440,7 @@ export function MonthlyDutyPlanner({
                             .filter((broker) => occurrence.allowedBrokerIds.includes(broker.id) && !occurrence.brokers.some((item) => item.id === broker.id))
                             .map((broker) => ({ id: broker.id, label: broker.name, hint: broker.branchName ?? undefined, keywords: broker.branchName ?? undefined }));
                           return (
-                            <article key={occurrence.id} className={cn("rounded-lg border bg-card p-3", occurrence.ended ? "border-dashed border-border opacity-60" : below ? "border-warning/40" : "border-border")}>
+                            <article key={occurrence.id} className={cn("rounded-[var(--radius-card)] border bg-card p-3", occurrence.ended ? "border-dashed border-border opacity-60" : below ? "border-warning/40" : "border-border")}>
                               <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                   <p className="truncate text-sm font-medium">{occurrence.scheduleName}</p>
@@ -493,7 +493,7 @@ export function MonthlyDutyPlanner({
                     ))}
                   </div>
                 ) : (
-                  <p className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">O Diretor ainda não montou a escala deste mês.</p>
+                  <p className="rounded-[var(--radius-card)] border border-dashed border-border p-4 text-sm text-muted-foreground">O Diretor ainda não montou a escala deste mês.</p>
                 )}
               </>
             )}

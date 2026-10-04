@@ -615,7 +615,7 @@ export function QueueControlCenter({
                       title={`Matiz ${hue}°`}
                       onClick={() => setForm({ ...form, colorHue: hue })}
                       className={cn(
-                        "grid size-7 place-items-center rounded-full border-2 transition-transform hover:scale-110",
+                        "grid size-10 place-items-center rounded-full border-2 transition-transform hover:scale-110",
                         form.colorHue === hue ? "border-foreground" : "border-transparent",
                       )}
                     >
@@ -652,7 +652,7 @@ export function QueueControlCenter({
               </label>
 
               {/* Exclusividade de Plantão */}
-              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+              <div className="rounded-[var(--radius-card)] border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
                 <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
                   <Lightning className="size-4 text-emerald-500 shrink-0" /> Exclusividade de
                   Plantão Agendado ou Ativo
@@ -661,11 +661,11 @@ export function QueueControlCenter({
                   Selecione um ou mais plantões. A fila só usa corretores escalados nos plantões
                   ativos escolhidos; sem seleção, segue a disponibilidade normal da unidade.
                 </p>
-                <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-lg border border-emerald-500/20 bg-background/70 p-2.5">
+                <div className="max-h-48 space-y-1.5 overflow-y-auto rounded-[var(--radius-card)] border border-emerald-500/20 bg-background/70 p-2.5">
                   {dutySchedules.length ? dutySchedules.map((ds) => {
                     const isChecked = form.exclusiveDutyScheduleIds.includes(ds.id);
                     return (
-                      <label key={ds.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-xs hover:bg-emerald-500/5">
+                      <label key={ds.id} className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-card)] px-2 py-2 text-xs hover:bg-emerald-500/5">
                         <Checkbox checked={isChecked} onCheckedChange={() => toggleDutySchedule(ds.id)} />
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-1.5">
@@ -719,9 +719,9 @@ export function QueueControlCenter({
                         <label
                           key={option.value}
                           className={cn(
-                            "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 transition-colors motion-reduce:transition-none",
+                            "flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] border px-3 py-2.5 transition-colors motion-reduce:transition-none",
                             form.dutyFallbackPolicy === option.value
-                              ? "border-primary/60 bg-primary/5"
+                              ? "border-primary/60 bg-primary/8"
                               : "border-border/70 bg-background hover:bg-accent/40",
                           )}
                         >
@@ -762,7 +762,7 @@ export function QueueControlCenter({
                     ) : null}
 
                     {form.dutyFallbackPolicy === "wait_next_duty" ? (
-                      <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
+                      <p className="rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
                         Sem plantão ativo agora, os leads permanecerão aguardando nesta fila e serão reavaliados automaticamente no próximo ciclo.
                       </p>
                     ) : null}
@@ -772,7 +772,7 @@ export function QueueControlCenter({
 
               {/* Multi-Unidades Adicionais */}
               {branches.length > 1 && (
-                <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
+                <div className="rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-4 space-y-2">
                   <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                     <Buildings className="size-4 text-primary shrink-0" /> Unidades adicionais
                     atendidas por esta fila
@@ -809,7 +809,7 @@ export function QueueControlCenter({
               )}
 
               {/* Fontes aceitas pela fila */}
-              <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-2">
+              <div className="rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-4 space-y-2">
                 <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                   <MagnifyingGlass className="size-4 text-primary shrink-0" /> Fontes aceitas
                 </p>
@@ -819,7 +819,7 @@ export function QueueControlCenter({
                 </p>
                 <div className="grid gap-1.5 pt-1 sm:grid-cols-2">
                   {QUEUE_SOURCE_OPTIONS.map((source) => (
-                    <label key={source.id} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/50 bg-background px-3 py-2 text-xs font-medium hover:bg-accent/40">
+                    <label key={source.id} className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-card)] border border-border/50 bg-background px-3 py-2 text-xs font-medium hover:bg-accent/40">
                       <Checkbox
                         checked={form.allowedSourceIds.includes(source.id)}
                         onCheckedChange={() => toggleAllowedSource(source.id)}
@@ -835,7 +835,7 @@ export function QueueControlCenter({
               </div>
 
               {/* Escopo e Seleção de Corretores */}
-              <div className="rounded-xl border border-border/70 bg-muted/20 p-4 space-y-3">
+              <div className="rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-4 space-y-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
                   <p className="text-xs font-semibold text-foreground flex items-center gap-1.5 shrink-0">
                     <UserList className="size-4 text-primary shrink-0" /> Corretores participantes
@@ -868,7 +868,7 @@ export function QueueControlCenter({
                           return (
                             <label
                               key={broker.id}
-                              className="flex items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer min-w-0"
+                              className="flex items-center justify-between gap-2 rounded-[var(--radius-card)] bg-background px-3 py-2 text-xs font-medium border border-border/50 hover:bg-accent/40 cursor-pointer min-w-0"
                             >
                               <span className="flex items-center gap-2 truncate min-w-0">
                                 <Checkbox
@@ -928,14 +928,14 @@ export function QueueControlCenter({
                     />
                   </div>
                 ) : (
-                  <p className="self-end rounded-lg border border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+                  <p className="self-end rounded-[var(--radius-card)] border border-border px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
                     Os leads entram nesta fila e aguardam, sem corretor. Quando você mudar o destino para distribuir, os que estiverem aguardando são distribuídos na hora.
                   </p>
                 )}
               </div>
 
               {/* Qualificação por Bot de IA */}
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-1.5">
+              <div className="rounded-[var(--radius-card)] border border-primary/20 bg-primary/8 p-4 space-y-1.5">
                 <label className="flex items-center justify-between text-sm font-semibold text-foreground cursor-pointer">
                   <span className="flex items-center gap-2">
                     <MagicWand className="size-4 text-primary shrink-0" /> Ativar Qualificação por
@@ -955,13 +955,13 @@ export function QueueControlCenter({
               </div>
 
               {attendanceFlows ? (
-                <div className="rounded-xl border border-border/70 p-4 space-y-1.5">
+                <div className="rounded-[var(--radius-card)] border border-border/70 p-4 space-y-1.5">
                   <label htmlFor="queue-attendance-flow" className="text-sm font-semibold text-foreground">Fluxo de atendimento</label>
                   <select
                     id="queue-attendance-flow"
                     value={form.attendanceFlowId ?? ""}
                     onChange={(event) => setForm({ ...form, attendanceFlowId: event.target.value || null })}
-                    className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    className="h-9 w-full rounded-full border border-input bg-background px-2 text-sm"
                   >
                     <option value="">Sem fluxo (atendimento atual)</option>
                     {attendanceFlows.map((flow) => <option key={flow.id} value={flow.id}>{flow.name}</option>)}
@@ -972,7 +972,7 @@ export function QueueControlCenter({
                 </div>
               ) : null}
 
-              <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+              <div className="rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-4">
                 <p className="text-xs font-semibold text-foreground">Entradas da fila</p>
                 <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                   Campanhas e exceções por anúncio são configuradas na seção “Entradas por campanha Meta”,
@@ -1109,7 +1109,7 @@ export function QueueControlCenter({
                       <p className="text-sm font-medium text-foreground">Pendências encontradas:</p>
                       <div className="space-y-2">
                         {deleteDependencies.campaignRoutes.length > 0 && (
-                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                          <div className="rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/5 p-3">
                             <p className="text-xs font-semibold text-warning">
                               {deleteDependencies.campaignRoutes.length} campanha(s) vinculada(s)
                             </p>
@@ -1123,7 +1123,7 @@ export function QueueControlCenter({
                           </div>
                         )}
                         {deleteDependencies.adRoutes.length > 0 && (
-                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                          <div className="rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/5 p-3">
                             <p className="text-xs font-semibold text-warning">
                               {deleteDependencies.adRoutes.length} anúncio(s) vinculado(s)
                             </p>
@@ -1137,7 +1137,7 @@ export function QueueControlCenter({
                           </div>
                         )}
                         {deleteDependencies.queuedLeads > 0 && (
-                          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+                          <div className="rounded-[var(--radius-card)] border border-amber-500/30 bg-amber-500/5 p-3">
                             <p className="text-xs font-semibold text-warning">
                               {deleteDependencies.queuedLeads} lead(s) na fila
                             </p>
@@ -1285,7 +1285,7 @@ export function QueueControlCenter({
               </Button>
 
               {simulation?.success ? (
-                <div className="rounded-xl border border-border bg-muted/30 p-4">
+                <div className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-4">
                   <div className="flex items-center gap-2">
                     <CheckCircle className="size-4 text-success" />
                     <p className="text-sm font-semibold">

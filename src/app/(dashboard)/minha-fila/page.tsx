@@ -424,13 +424,13 @@ export default async function MinhaFilaPage() {
           <div className="flex items-center gap-2">
             <BrokerAvailabilityButton initialStatus={availabilityStatus} />
             {overdueTasksCount > 0 && (
-              <Badge variant="destructive" className="gap-1.5 rounded-md text-xs">
+              <Badge variant="destructive" className="gap-1.5 rounded-full text-xs">
                 {overdueTasksCount} tarefa{overdueTasksCount > 1 ? "s" : ""} vencida{overdueTasksCount > 1 ? "s" : ""}
               </Badge>
             )}
             <Badge
               variant={urgentLeads > 0 ? "warning" : "success"}
-              className="gap-1.5 rounded-md text-xs"
+              className="gap-1.5 rounded-full text-xs"
             >
               <span className="relative flex size-2">
                 {urgentLeads > 0 && (
@@ -448,14 +448,14 @@ export default async function MinhaFilaPage() {
         }
       />
       <main className="mx-auto flex min-h-full w-full max-w-[1200px] flex-col gap-5 bg-background p-4 lg:gap-6 lg:p-6">
-        {monthlyDutySchedulingEnabled && <section aria-labelledby="my-duty-schedule-title" className="rounded-xl border border-border bg-card p-4">
+        {monthlyDutySchedulingEnabled && <section aria-labelledby="my-duty-schedule-title" className="rounded-[var(--radius-card)] border border-border bg-card p-4">
           <div className="mb-3 flex items-center gap-2">
             <CalendarCheck className="size-4 text-foreground" />
             <h2 id="my-duty-schedule-title" className="text-sm font-semibold">Minha escala de plantões</h2>
             <Badge variant="outline" className="ml-auto">Próximos 3 meses</Badge>
           </div>
           {myDutyAssignments.length ? <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {myDutyAssignments.map((assignment, index) => <li key={`${assignment.dutyDate}-${assignment.startsAt}-${index}`} className="flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2 text-sm">
+            {myDutyAssignments.map((assignment, index) => <li key={`${assignment.dutyDate}-${assignment.startsAt}-${index}`} className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] bg-muted/40 px-3 py-2 text-sm">
               <span className="min-w-0 truncate font-medium">{assignment.scheduleName}</span>
               <span className="shrink-0 text-xs text-muted-foreground">{new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC", day: "2-digit", month: "short" }).format(new Date(`${assignment.dutyDate}T12:00:00Z`))} · {assignment.startsAt.slice(0, 5)}–{assignment.endsAt.slice(0, 5)}</span>
             </li>)}
@@ -483,18 +483,18 @@ export default async function MinhaFilaPage() {
               <div
                 key={stat.label}
                 className={cn(
-                  "group flex flex-col justify-between rounded-xl border border-border/70 bg-card p-5 text-left shadow-sm transition-[border-color,box-shadow] duration-[var(--duration-quick)] hover:border-primary/25 hover:shadow-md motion-reduce:transition-none",
+                  "group flex flex-col justify-between rounded-[var(--radius-card)] border border-border/70 bg-card p-5 text-left shadow-none transition-[border-color,box-shadow] duration-[var(--duration-quick)] hover:border-primary/25 hover:shadow-none motion-reduce:transition-none",
                   stat.cardClassName,
                 )}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>
+                  <span className={cn("flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] transition-transform duration-200 group-hover:scale-110", stat.bg, stat.color)}>
                     <Icon className="size-4" />
                   </span>
                   <span className="text-[10px] font-mono font-medium text-muted-foreground uppercase tracking-wider">7 dias</span>
                 </div>
                 <div className="mt-3 space-y-1">
-                  <p className={cn("text-2xl font-bold tabular-nums tracking-tight", stat.color)}>{stat.value}</p>
+                  <p className={cn("text-2xl font-semibold tabular-nums tracking-tight", stat.color)}>{stat.value}</p>
                   <p className="text-xs font-medium text-muted-foreground">{stat.label}</p>
                 </div>
                 <Sparkline id={`queue-metric-${stat.label}`} data={stat.chart.map((val, idx) => ({ label: String(idx), value: val }))} color={stat.sparkColor} className="mt-3" />
@@ -519,7 +519,7 @@ export default async function MinhaFilaPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {pendingTasks.slice(0, 4).map((task) => (
-                <Link key={task.id} href={`/leads/${task.leadId}#tarefas`} className="group flex items-start gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50">
+                <Link key={task.id} href={`/leads/${task.leadId}#tarefas`} className="group flex items-start gap-2 rounded-[var(--radius-card)] px-2 py-1.5 transition-colors hover:bg-muted/50">
                   <span className={`mt-0.5 size-1.5 shrink-0 rounded-full ${task.dueAt && task.dueAt.getTime() < Date.now() ? "bg-destructive" : task.priority === "urgent" ? "bg-accent" : "bg-muted-foreground"}`} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-xs font-medium group-hover:text-primary">{task.title}</span>
@@ -550,7 +550,7 @@ export default async function MinhaFilaPage() {
             </CardHeader>
             <CardContent className="space-y-2">
               {leadsNeedingResponse.slice(0, 4).map((lead) => (
-                <Link key={lead.id} href={`/leads/${lead.id}`} className="group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-muted/50">
+                <Link key={lead.id} href={`/leads/${lead.id}`} className="group flex items-center gap-2 rounded-[var(--radius-card)] px-2 py-1.5 transition-colors hover:bg-muted/50">
                   <span className="size-1.5 shrink-0 rounded-full bg-accent" />
                   <span className="min-w-0 flex-1 truncate text-xs font-medium group-hover:text-primary">{lead.name}</span>
                 </Link>

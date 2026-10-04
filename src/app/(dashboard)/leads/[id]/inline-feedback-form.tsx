@@ -84,7 +84,7 @@ export function InlineFeedbackForm({ leadId, onSuccess }: { leadId: string; onSu
   // ── Phase: done ──
   if (phase === "done") {
     return (
-      <div className="flex items-center gap-3 rounded-lg bg-success/[0.06] px-4 py-3 text-sm">
+      <div className="flex items-center gap-3 rounded-[var(--radius-card)] bg-success/[0.06] px-4 py-3 text-sm">
         <CheckCircle className="size-5 text-success" />
         <div>
           <p className="font-medium text-success">Finalizado!</p>
@@ -99,7 +99,7 @@ export function InlineFeedbackForm({ leadId, onSuccess }: { leadId: string; onSu
     return (
       <div className="space-y-4">
         {/* Success banner */}
-        <div className="flex items-center justify-between rounded-lg bg-success/[0.06] px-4 py-3">
+        <div className="flex items-center justify-between rounded-[var(--radius-card)] bg-success/[0.06] px-4 py-3">
           <div className="flex items-center gap-3">
             <CheckCircle className="size-5 text-success" />
             <div>
@@ -111,7 +111,7 @@ export function InlineFeedbackForm({ leadId, onSuccess }: { leadId: string; onSu
 
         {/* Optional: fill checklist */}
         {checklist && (
-          <div className="space-y-3 rounded-lg border border-primary/10 bg-primary/[0.02] p-4">
+          <div className="space-y-3 rounded-[var(--radius-card)] border border-primary/10 bg-primary/[0.02] p-4">
             <div className="flex items-center gap-3">
               <ClipboardText className="size-5 text-primary" />
               <div className="flex-1">
@@ -201,7 +201,7 @@ export function InlineFeedbackForm({ leadId, onSuccess }: { leadId: string; onSu
                   <button
                     type="button"
                     onClick={() => setAnswers((prev) => ({ ...prev, [item.id]: true }))}
-                    className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    className={`flex-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                       answers[item.id] === true
                         ? "border-success bg-success/10 text-success"
                         : "border-border text-muted-foreground hover:bg-muted"
@@ -212,7 +212,7 @@ export function InlineFeedbackForm({ leadId, onSuccess }: { leadId: string; onSu
                   <button
                     type="button"
                     onClick={() => setAnswers((prev) => ({ ...prev, [item.id]: false }))}
-                    className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    className={`flex-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                       answers[item.id] === false
                         ? "border-destructive bg-destructive/10 text-destructive"
                         : "border-border text-muted-foreground hover:bg-muted"
@@ -230,9 +230,9 @@ export function InlineFeedbackForm({ leadId, onSuccess }: { leadId: string; onSu
                       key={rating}
                       type="button"
                       onClick={() => setAnswers((prev) => ({ ...prev, [item.id]: rating }))}
-                      className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition-colors ${
+                      className={`flex-1 rounded-full border py-1.5 text-xs font-semibold transition-colors ${
                         answers[item.id] === rating
-                          ? "border-primary bg-primary/10 text-primary"
+                          ? "border-primary bg-primary/8 text-primary"
                           : "border-border text-muted-foreground hover:bg-muted"
                       }`}
                     >
@@ -247,13 +247,13 @@ export function InlineFeedbackForm({ leadId, onSuccess }: { leadId: string; onSu
                   value={String(answers[item.id] ?? "")}
                   onChange={(e) => setAnswers((prev) => ({ ...prev, [item.id]: e.target.value }))}
                   placeholder="Descreva..."
-                  className="text-xs h-8"
+                  className="text-xs h-10"
                 />
               )}
 
               {item.answerType === "select" && Array.isArray(item.options) && (
                 <select
-                  className="flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-xs"
+                  className="flex h-10 w-full rounded-full border border-input bg-input/30 px-2.5 text-xs"
                   value={String(answers[item.id] ?? "")}
                   onChange={(e) => setAnswers((prev) => ({ ...prev, [item.id]: e.target.value }))}
                 >

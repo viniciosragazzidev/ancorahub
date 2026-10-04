@@ -21,6 +21,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { DsBarChart } from "@/components/ui/ds-bar-chart";
 import { FunnelChart } from "@/components/dashboard/funnel-chart";
+import { CountUpText } from "@/components/motion/count-up";
 import { dsButtonVariants } from "@/components/ui/ds-button-variants";
 import { DsEmptyState } from "@/components/ui/ds-empty-state";
 import { DsStatusBadge, type DsStatusBadgeStatus } from "@/components/ui/ds-status-badge";
@@ -219,7 +220,7 @@ export function KpiStrip({ metrics }: { metrics: DashboardViewData["metrics"] })
                 </span>
                 <ArrowRight className="size-3.5 -translate-x-1 text-muted-foreground opacity-0 transition-[opacity,transform] group-hover:translate-x-0 group-hover:opacity-100 motion-reduce:transition-none" />
               </span>
-              <span className="font-ds-mono text-2xl font-medium tabular-nums text-foreground">{metric.value}</span>
+              <span className="font-ds-mono text-2xl font-medium tabular-nums text-foreground"><CountUpText text={metric.value} /></span>
               {metric.description ? <span className="text-xs text-muted-foreground">{metric.description}</span> : null}
             </Link>
           );

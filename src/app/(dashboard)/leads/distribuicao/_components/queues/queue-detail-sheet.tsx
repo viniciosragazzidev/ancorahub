@@ -84,7 +84,7 @@ export function QueueDetailSheet({
               <SheetDescription>{queue.branchName || "Todas as unidades"} · {assignmentLabel(queue)}</SheetDescription>
             </SheetHeader>
             <SheetBody contentClassName="grid grid-cols-[minmax(0,1fr)] gap-4">
-              <dl className="grid grid-cols-3 divide-x divide-border/70 rounded-xl border border-border/80 bg-card">
+              <dl className="grid grid-cols-3 divide-x divide-border/70 rounded-[var(--radius-card)] border border-border/80 bg-card">
                 {[
                   { label: "Aguardando", value: queue.waiting },
                   { label: "Elegíveis", value: queue.members },

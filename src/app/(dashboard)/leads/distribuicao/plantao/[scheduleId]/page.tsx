@@ -58,7 +58,7 @@ function DutyProfileHeader({
   description: string;
   details: string[];
 }) {
-  return <section aria-label="Contexto do plantão" className="rounded-xl border border-border/70 bg-card p-4 sm:p-5">
+  return <section aria-label="Contexto do plantão" className="rounded-[var(--radius-card)] border border-border/70 bg-card p-4 sm:p-5">
     <div className="flex flex-wrap items-center gap-2">
       <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">{name}</h1>
       <Badge variant={stateTone}>{state}</Badge>
@@ -116,7 +116,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             schedule.queueName,
           ]}
         />
-        {invalidHistoryDate ? <p role="alert" className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground">A data informada não corresponde a um plantão encerrado desta regra. Exibindo o último turno terminado.</p> : null}
+        {invalidHistoryDate ? <p role="alert" className="rounded-[var(--radius-card)] border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground">A data informada não corresponde a um plantão encerrado desta regra. Exibindo o último turno terminado.</p> : null}
         <section aria-label="Resumo da ocorrência encerrada" className="grid gap-2 sm:grid-cols-3">
           <StatCard label="Leads atribuídos" value={occurrenceHistory.distributions.length} sublabel="Aceites e atribuições registradas" />
           <StatCard label="Ofertas enviadas" value={occurrenceHistory.offers.total} sublabel={`${occurrenceHistory.offers.accepted} aceitas · ${occurrenceHistory.offers.declined} recusadas · ${occurrenceHistory.offers.expired} expiradas`} />
@@ -151,7 +151,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             badge={<Badge variant="secondary">{occurrenceHistory.roster.length}</Badge>}
             description="Vínculos válidos nesta data; alterações posteriores podem limitar a reconstituição de turnos antigos."
           />
-          <CardContent className="flex flex-wrap gap-2 pt-4">{occurrenceHistory.roster.length ? occurrenceHistory.roster.map((entry) => <span key={entry.id} className="rounded-lg border border-border px-2.5 py-1"><BrokerDayHistoryTrigger scheduleId={schedule.id} brokerId={entry.brokerId} brokerName={entry.brokerName} dutyDate={historicalWindow.dutyDate} /></span>) : <p className="text-sm text-muted-foreground">Nenhum vínculo de escala encontrado para esta data.</p>}</CardContent>
+          <CardContent className="flex flex-wrap gap-2 pt-4">{occurrenceHistory.roster.length ? occurrenceHistory.roster.map((entry) => <span key={entry.id} className="rounded-[var(--radius-card)] border border-border px-2.5 py-1"><BrokerDayHistoryTrigger scheduleId={schedule.id} brokerId={entry.brokerId} brokerName={entry.brokerName} dutyDate={historicalWindow.dutyDate} /></span>) : <p className="text-sm text-muted-foreground">Nenhum vínculo de escala encontrado para esta data.</p>}</CardContent>
         </Card>
       </main>
     </>;
@@ -288,7 +288,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           schedule.timezone,
         ]}
       />
-      {invalidHistoryDate ? <p role="alert" className="rounded-lg border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground">A data informada não corresponde a um plantão encerrado desta regra.</p> : null}
+      {invalidHistoryDate ? <p role="alert" className="rounded-[var(--radius-card)] border border-warning/30 bg-warning/5 px-3 py-2 text-sm text-foreground">A data informada não corresponde a um plantão encerrado desta regra.</p> : null}
       {historyEnabled && !singleDay && completedWindows.length ? <Card className="border-border/70 shadow-none">
         <SectionCardHeader title="Histórico de ocorrências" badge={<Badge variant="secondary">{completedWindows.length} recentes</Badge>} description="Consulte os turnos encerrados; a regra semanal continua válida." />
         <CardContent className="flex flex-wrap items-end gap-2 pt-4">
@@ -453,7 +453,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           />
           <CardContent className="space-y-3" role={presenceEnabled ? "group" : undefined} aria-label={presenceEnabled ? "Status de confirmação dos corretores escalados" : undefined}>
             {roster.length && roster.every((entry) => entry.blockedReason) ? (
-              <div role="alert" className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
+              <div role="alert" className="rounded-[var(--radius-card)] border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
                 <strong className="font-semibold">Nenhum escalado está elegível para receber leads.</strong> Há pendências de cadastro ou confirmação — os leads permanecem aguardando.
               </div>
             ) : null}
@@ -466,7 +466,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   </h3>
                 ) : null}
                 {section.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{section.entries.map((entry) => (
-              <div key={`${section.key}:${entry.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5">
+              <div key={`${section.key}:${entry.id}`} className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 px-3 py-2.5">
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <BrokerDayHistoryTrigger scheduleId={schedule.id} brokerId={entry.brokerId} brokerName={entry.brokerName} />

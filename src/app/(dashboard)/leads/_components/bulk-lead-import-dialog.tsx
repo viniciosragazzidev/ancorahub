@@ -144,7 +144,7 @@ export function BulkLeadImportDialog({
                 </Select>
               </div>
             ) : (
-              <p className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
+              <p className="rounded-[var(--radius-card)] bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                 Os leads serão importados para sua unidade.
               </p>
             )}
@@ -201,7 +201,7 @@ export function BulkLeadImportDialog({
             </label>
 
             {result ? (
-              <div className="grid gap-1 rounded-lg border border-border bg-muted/30 p-3 text-sm">
+              <div className="grid gap-1 rounded-[var(--radius-card)] border border-border bg-muted/30 p-3 text-sm">
                 <p>
                   <strong>{result.imported}</strong> importados · <strong>{result.duplicates}</strong> duplicados ignorados
                 </p>

@@ -1,6 +1,6 @@
 # Migração para o Design System Venancor
 
-Fonte da verdade: `docs/design-system/venancor.md`. Branch `design/venancor-ds`. Sem mudar regra de negócio, dados ou comportamento. Tema claro por padrão.
+Fonte da verdade: `docs/design-system/venancor.md`. Trabalho atual na branch `design/venancor`, criada de `perf/crons-n1`; `design/venancor-ds` é só referência visual. Sem mudar regra de negócio, dados, comportamento ou estrutura das telas. Tema claro por padrão.
 
 **Donos:** Prumo = tokens e primitivos (`src/app/globals.css`, `src/app/layout.tsx`, `src/components/ui`, `src/components/base`, `src/components/motion`). Mosaico = componentes compostos e telas (`src/components/*` fora de ui/base/motion, `src/app/**`).
 **Revisão:** Arquiteto revisa só o `git diff` de cada tarefa. Sem push, sem deploy.

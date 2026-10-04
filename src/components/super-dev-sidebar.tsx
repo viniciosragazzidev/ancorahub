@@ -133,12 +133,12 @@ export function SuperDevSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton className="h-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto" size="lg" render={<Link href="/super-dev" prefetch={false} />}>
-              <AncoraLogo className="h-7 w-full rounded-md object-contain object-left group-data-[collapsible=icon]:hidden" />
+              <AncoraLogo className="h-7 w-full rounded-[var(--radius-card)] object-contain object-left group-data-[collapsible=icon]:hidden" />
               <img src="/icon.png" alt="Ancora" className="h-7 w-7 mx-auto hidden group-data-[collapsible=icon]:block object-contain" />
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
-        <div className="mx-2 rounded-md border border-sidebar-border bg-sidebar-warning/45 px-3 py-2.5 group-data-[collapsible=icon]:hidden">
+        <div className="mx-2 rounded-[var(--radius-card)] border border-sidebar-border bg-sidebar-warning/45 px-3 py-2.5 group-data-[collapsible=icon]:hidden">
           <p className="text-[11px] text-sidebar-foreground/55">Ambiente</p>
           <p className="mt-0.5 truncate text-sm font-medium">Super Administração</p>
         </div>

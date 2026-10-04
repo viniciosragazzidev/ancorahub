@@ -244,7 +244,7 @@ export const getLeadsColumns = (
           <UserAvatar
             seed={lead.email || lead.name}
             name={lead.name}
-            className="size-8 rounded-lg shrink-0 border border-border/60 text-[11px] font-bold"
+            className="size-8 rounded-[var(--radius-card)] shrink-0 border border-border/60 text-[11px] font-semibold"
           />
           <div className="min-w-0 flex flex-col gap-0.5">
             <div className="flex min-w-0 items-center gap-1.5">
@@ -367,7 +367,7 @@ export const getLeadsColumns = (
       return (
         <Badge
           variant="outline"
-          className={`gap-1 px-2 py-0.5 text-[11px] rounded-md inline-flex items-center transition-all ${config.className}`}
+          className={`gap-1 px-2 py-0.5 text-[11px] rounded-full inline-flex items-center transition-all ${config.className}`}
         >
           <Sparkles className="h-3 w-3 shrink-0" />
           {config.label}
@@ -393,7 +393,7 @@ export const getLeadsColumns = (
     cell: ({ row }) => {
       const plan = row.getValue("planType") as string;
       return (
-        <span className="inline-flex text-[11px] font-medium text-foreground bg-muted/40 px-2 py-0.5 rounded-md border border-border/40">
+        <span className="inline-flex text-[11px] font-medium text-foreground bg-muted/40 px-2 py-0.5 rounded-[var(--radius-card)] border border-border/40">
           {plan || "Não informado"}
         </span>
       );
@@ -496,7 +496,7 @@ export const getLeadsColumns = (
               target="_blank"
               rel="noreferrer"
               title="Abrir WhatsApp"
-              className="inline-flex size-7 items-center justify-center rounded-lg border border-border/60 bg-card hover:bg-emerald-500/10 hover:border-emerald-500/40 text-muted-foreground hover:text-emerald-500 transition-colors"
+              className="inline-flex size-7 items-center justify-center rounded-[var(--radius-card)] border border-border/60 bg-card hover:bg-emerald-500/10 hover:border-emerald-500/40 text-muted-foreground hover:text-emerald-500 transition-colors"
             >
               <WhatsappLogo className="size-3.5 text-emerald-500" weight="fill" />
             </a>
@@ -505,14 +505,14 @@ export const getLeadsColumns = (
             variant="outline"
             size="xs"
             onClick={() => onOpenDrawer(lead)}
-            className="h-7 px-2 text-xs font-medium"
+            className="h-10 px-2 text-xs font-medium"
           >
             Ver Detalhes
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
-                <Button variant="ghost" className="h-7 w-7 p-0 hover:bg-muted/60">
+                <Button variant="ghost" className="h-10 w-7 p-0 hover:bg-muted/60">
                   <span className="sr-only">Mais opções</span>
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </Button>
@@ -532,7 +532,7 @@ export const getLeadsColumns = (
                   onClick={() => {
                     window.open(`https://wa.me/55${phoneDigits}`, "_blank");
                   }}
-                  className="text-xs text-emerald-600 dark:text-emerald-400 font-bold"
+                  className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold"
                 >
                   Abrir no WhatsApp
                 </DropdownMenuItem>

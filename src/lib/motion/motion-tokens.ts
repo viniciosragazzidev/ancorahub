@@ -22,7 +22,7 @@ export const motionTokens = {
     xl: 20,
   },
   scale: {
-    press: 0.96,
+    press: 0.97,
     subtle: 0.99,
     enter: 0.98,
     hover: 1.01,

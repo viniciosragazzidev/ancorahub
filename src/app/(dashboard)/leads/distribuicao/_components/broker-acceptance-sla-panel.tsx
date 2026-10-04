@@ -67,7 +67,7 @@ export function BrokerAcceptanceSlaPanel({
 
       <CardContent className="space-y-5 p-4">
         {/* Toggle de Redistribuição Automática */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border/70 bg-muted/30 p-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 bg-muted/30 p-3.5">
           <div className="space-y-0.5">
             <label htmlFor="auto-redistribute-toggle" className="text-xs font-semibold text-foreground cursor-pointer">
               Tirar lead e passar para o próximo corretor
@@ -100,9 +100,9 @@ export function BrokerAcceptanceSlaPanel({
                   disabled={!canEdit || isPending}
                   onClick={() => handlePreset(preset)}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all duration-150 active:scale-95 disabled:opacity-50",
+                    "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all duration-150 active:scale-95 disabled:opacity-50",
                     isSelected
-                      ? "border-primary bg-primary text-primary-foreground shadow-xs font-bold"
+                      ? "border-primary bg-primary text-primary-foreground shadow-none font-semibold"
                       : "border-border bg-card text-foreground hover:bg-muted",
                   )}
                 >
@@ -120,7 +120,7 @@ export function BrokerAcceptanceSlaPanel({
                 value={minutes}
                 onChange={(e) => setMinutes(Math.max(1, Number(e.target.value) || 1))}
                 disabled={!canEdit || isPending}
-                className="h-8 w-20 text-xs text-center"
+                className="h-10 w-20 text-xs text-center"
               />
               <span className="text-xs text-muted-foreground">minutos</span>
             </div>
@@ -128,7 +128,7 @@ export function BrokerAcceptanceSlaPanel({
         </div>
 
         {/* Alerta explicativo do Worker */}
-        <div className="flex items-start gap-2.5 rounded-lg border border-primary/20 bg-primary/[0.03] p-3 text-xs text-foreground">
+        <div className="flex items-start gap-2.5 rounded-[var(--radius-card)] border border-primary/20 bg-primary/[0.03] p-3 text-xs text-foreground">
           <ShieldCheck className="size-4 text-primary shrink-0 mt-0.5" />
           <p className="leading-relaxed">
             O <strong>worker periódico de SLA</strong> verifica a cada minuto os leads com status <code>distribuído</code>. Caso o tempo ultrapasse <strong>{minutes} minutos</strong> sem que o corretor registre o primeiro contato ou abra o atendimento, o lead é transferido de forma transparente e auditável.

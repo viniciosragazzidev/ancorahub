@@ -127,7 +127,7 @@ export function CorretorSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton className="h-9 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto" size="lg" render={<Link href="/corretor/resumo" prefetch={false} />}>
-              <div className="grid size-7 place-items-center rounded-md bg-primary text-xs font-bold text-primary-foreground">
+              <div className="grid size-7 place-items-center rounded-[var(--radius-card)] bg-primary text-xs font-semibold text-primary-foreground">
                 C
               </div>
             </SidebarMenuButton>
@@ -148,14 +148,14 @@ export function CorretorSidebar() {
                   isActive={isActive}
                   render={<Link href={item.url} prefetch={false} />}
                   tooltip={item.label}
-                  className="px-3 py-2 text-xs font-medium rounded-lg transition-colors group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto"
+                  className="px-3 py-2 text-xs font-medium rounded-[var(--radius-card)] transition-colors group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto"
                 >
                   <Icon weight={isActive ? "fill" : "regular"} className="size-4 shrink-0" />
                   <span className="flex-1 group-data-[collapsible=icon]:hidden truncate">{item.label}</span>
                   {count > 0 && (
                     <Badge
                       variant="warning"
-                      className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-[9px] font-bold leading-none group-data-[collapsible=icon]:hidden"
+                      className="ml-auto h-5 min-w-5 rounded-full px-1.5 text-[9px] font-semibold leading-none group-data-[collapsible=icon]:hidden"
                     >
                       {count > 99 ? "99+" : count}
                     </Badge>

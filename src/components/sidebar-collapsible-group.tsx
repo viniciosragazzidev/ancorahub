@@ -38,7 +38,7 @@ export function SidebarCollapsibleGroup({
         aria-hidden="true"
       >
         {Icon && (
-          <div className="flex size-7 items-center justify-center rounded-md bg-sidebar-accent/40 text-sidebar-foreground/70">
+          <div className="flex size-7 items-center justify-center rounded-[var(--radius-card)] bg-sidebar-accent/40 text-sidebar-foreground/70">
             <Icon className="size-4 shrink-0" />
           </div>
         )}
@@ -49,7 +49,7 @@ export function SidebarCollapsibleGroup({
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
-          "flex h-9 w-full items-center justify-between rounded-lg px-2.5 text-sm font-semibold text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden",
+          "flex h-9 w-full items-center justify-between rounded-full px-2.5 text-sm font-semibold text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent/40 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring group-data-[collapsible=icon]:hidden",
           headerClassName,
         )}
       >
@@ -59,7 +59,7 @@ export function SidebarCollapsibleGroup({
         </div>
         <ChevronDownIcon
           className={cn(
-            "size-4 shrink-0 text-sidebar-foreground/50 transition-transform duration-200 ease-out",
+            "size-4 shrink-0 text-sidebar-foreground/50 transition-transform duration-200 ease-[cubic-bezier(0.25,1,0.5,1)] motion-reduce:transition-none",
             isOpen ? "rotate-0" : "-rotate-90",
           )}
         />

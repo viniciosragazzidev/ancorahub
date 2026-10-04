@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
+import { CopyCheckIcon } from "@/components/motion/copy-check-icon";
 
 // -----------------------------------------------------------------------------
 // TYPES & INTERFACES
@@ -378,7 +379,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
   const handleCopyText = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    setTimeout(() => setCopiedId(null), 1500);
   };
 
   const handleClearChat = () => {
@@ -538,7 +539,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
                                 className="h-5 w-5 text-muted-foreground hover:text-foreground"
                                 onClick={() => handleCopyText(JSON.stringify(msg.mcpToolCall?.args, null, 2), msg.id)}
                               >
-                                {copiedId === msg.id ? <Check size={12} className="text-emerald-500" /> : <Copy size={12} />}
+                                <CopyCheckIcon copied={copiedId === msg.id} className="relative inline-flex size-3 items-center justify-center"><Copy size={12} /></CopyCheckIcon>
                               </Button>
                             </div>
                             <pre className="overflow-x-auto rounded-md bg-black/40 p-2 font-mono text-[10.5px] text-sky-200/90 border border-white/5">

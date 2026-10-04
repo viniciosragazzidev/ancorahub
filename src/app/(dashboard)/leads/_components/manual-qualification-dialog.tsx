@@ -96,7 +96,7 @@ export function ManualQualificationDialog({
               <button
                 type="button"
                 onClick={() => setRating("hot")}
-                className={`flex items-center gap-2 rounded-lg border p-2.5 text-left text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-full border p-2.5 text-left text-xs font-medium transition-colors ${
                   rating === "hot" || rating === "qualified"
                     ? "border-rose-500/50 bg-rose-500/10 text-rose-700 dark:text-rose-300 font-semibold"
                     : "border-border/70 hover:bg-muted/40"
@@ -109,7 +109,7 @@ export function ManualQualificationDialog({
               <button
                 type="button"
                 onClick={() => setRating("warm")}
-                className={`flex items-center gap-2 rounded-lg border p-2.5 text-left text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-full border p-2.5 text-left text-xs font-medium transition-colors ${
                   rating === "warm"
                     ? "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-300 font-semibold"
                     : "border-border/70 hover:bg-muted/40"
@@ -122,7 +122,7 @@ export function ManualQualificationDialog({
               <button
                 type="button"
                 onClick={() => setRating("cold")}
-                className={`flex items-center gap-2 rounded-lg border p-2.5 text-left text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-full border p-2.5 text-left text-xs font-medium transition-colors ${
                   rating === "cold"
                     ? "border-sky-500/50 bg-sky-500/10 text-sky-700 dark:text-sky-300 font-semibold"
                     : "border-border/70 hover:bg-muted/40"
@@ -135,7 +135,7 @@ export function ManualQualificationDialog({
               <button
                 type="button"
                 onClick={() => setRating("not_qualified")}
-                className={`flex items-center gap-2 rounded-lg border p-2.5 text-left text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 rounded-full border p-2.5 text-left text-xs font-medium transition-colors ${
                   rating === "not_qualified"
                     ? "border-rose-500/50 bg-rose-500/10 text-rose-700 dark:text-rose-300 font-semibold"
                     : "border-border/70 hover:bg-muted/40"
@@ -167,7 +167,7 @@ export function ManualQualificationDialog({
 
           {/* Mensagem Padrão para o Cliente no WhatsApp */}
           {rating !== "not_qualified" && (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 grid gap-2.5">
+            <div className="rounded-[var(--radius-card)] border border-primary/20 bg-primary/8 p-3 grid gap-2.5">
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -197,7 +197,7 @@ export function ManualQualificationDialog({
                     value={customMessage}
                     onChange={(e) => setCustomMessage(e.target.value)}
                     rows={3}
-                    className="w-full rounded-md border border-border bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    className="w-full rounded-full border border-border bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                     placeholder="Digite ou edite a mensagem enviada..."
                   />
                 </div>

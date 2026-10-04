@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import { toast } from "@/components/ui/sonner";
 
 import {
@@ -365,12 +366,20 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                         className={cn(
                           "group/navitem relative flex min-h-10 w-full items-center gap-3 rounded-full px-3 py-2 outline-none select-none transition-[background-color,color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-primary/8 focus-visible:ring-2 focus-visible:ring-sidebar-ring/50 active:scale-[0.98] motion-reduce:transition-none",
                           isMobile && "min-h-(--mobile-touch-target)",
-                          isActive && "border border-primary/20 bg-primary/8 text-primary shadow-none",
+                          isActive && "text-primary shadow-none",
                           !isMobile && "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0"
                         )}
                       />
                     }
                   >
+                    {isActive ? (
+                      <motion.span
+                        layoutId="corretop-sidebar-active"
+                        aria-hidden="true"
+                        className="pointer-events-none absolute inset-0 rounded-full border border-primary/20 bg-primary/8"
+                        transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+                      />
+                    ) : null}
                     {/* Contextual icon */}
                     <div
                       data-slot="sidebar-nav-icon"

@@ -21,7 +21,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("border-b border-border bg-[var(--surface-secondary)] [&_tr]:border-b-0", className)}
+      className={cn("border-b border-border bg-card [&_tr]:border-b-0", className)}
       {...props}
     />
   )
@@ -55,7 +55,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-border/70 bg-card transition-[background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-muted/40 focus-within:bg-muted/40 data-[state=selected]:bg-accent/70 motion-reduce:transition-none",
+        "border-b border-border/70 bg-card transition-[background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-muted focus-within:bg-muted/70 data-[state=selected]:bg-primary/8 motion-reduce:transition-none",
         className
       )}
       {...props}

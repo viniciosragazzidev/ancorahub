@@ -4,7 +4,7 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 import {
   Select,
-  SelectTrigger,
+  SelectTrigger as MotionSelectTrigger,
   SelectValue,
   SelectContent,
   SelectItem,
@@ -16,7 +16,7 @@ import {
 } from "@/components/motion/select";
 import {
   MorphSelect,
-  MorphSelectTrigger,
+  MorphSelectTrigger as MotionMorphSelectTrigger,
   MorphSelectValue,
   MorphSelectContent,
   MorphSelectItem,
@@ -26,6 +26,14 @@ import {
   type MorphSelectContentProps,
   type MorphSelectItemProps,
 } from "@/components/motion/select-morph";
+
+function SelectTrigger({ className, ...props }: SelectTriggerProps) {
+  return <MotionSelectTrigger className={cn("!rounded-full", className)} {...props} />;
+}
+
+function MorphSelectTrigger({ className, ...props }: MorphSelectTriggerProps) {
+  return <MotionMorphSelectTrigger className={cn("!rounded-full", className)} {...props} />;
+}
 
 function SelectGroup({ className, children, ...props }: React.ComponentPropsWithoutRef<"div">) {
   return (

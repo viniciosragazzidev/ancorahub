@@ -119,7 +119,7 @@ export function LeadsDataTable({
       isPending={isPending}
       actionBar={
         selectedRows.length > 0 ? (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-card/95 backdrop-blur-md border border-border shadow-xl rounded-full animate-in fade-in slide-in-from-bottom-4">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-card/95 backdrop-blur-md border border-border shadow-none rounded-full animate-in fade-in slide-in-from-bottom-4">
             <Badge variant="default" className="text-xs px-2 py-0.5">
               {selectedRows.length} selecionado(s)
             </Badge>

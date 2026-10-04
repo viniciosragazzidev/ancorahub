@@ -13,6 +13,7 @@
 | DG-009 | EVOLUÍDO — DataTable migrado para base diceui/tablecn com server-side filtering. | `src/components/ui/data-table/` (pattern DG-009 original) substituído por `src/components/data-table/` (diceui). `useDataTable` hook gerencia URL state via nuqs; `DataTableFilterList` + `DataTableSortList` substituem `LeadsFilters` legado. Server-side: `buildDrizzleFilter` converte `ExtendedColumnFilter[]` → Drizzle SQL. | `src/components/ui/data-table/` mantido como referência legada; novo pattern usa `enableAdvancedFilter: true` com `shallow: false` para refetch server. | Design System + Engenharia |
 | DG-010 | RESOLVIDO — composição de formulário. | `Field`, `FieldLabel`, `FieldDescription` e `FieldError` já existem; controls continuam independentes. | FormField é a composição desses elementos; schema e regra de negócio ficam fora. | Design System + Engenharia |
 | DG-011 | RESOLVIDO — taxonomia de overlays. | Dialog, Drawer, Sheet, Popover, DropdownMenu e Tooltip já têm primitives distintos. | Consumidores usam Dialog, Drawer, Popover, DropdownMenu e Tooltip; Sheet é compatibilidade interna/legada e não é novo conceito de consumo. | Design System + Engenharia |
+| DG-012 | RESOLVIDO para a migração Venancor — `venancor.md` substitui a paleta, fonte e escala de raios da versão 1.2.0 do contrato. | Evita que agentes restaurem Inter, CTA escura ou controles de 10px de raio na branch atual. | O runtime usa tokens Venancor; o contrato 1.2.0 aguarda convergência editorial. | Vinicios + Design System |
 
 ## Template de resolução
 
@@ -62,3 +63,10 @@
 - Data e versão: 2026-08-20, Design Contract 1.2.0.
 - Tokens/componentes/páginas impactados: aliases `--radius-control`, `--radius-card`, `--radius-panel`, Button, Card, controls e overlays.
 - Migração e rollback: aliases evitam troca de API; a reversão é centralizada em `globals.css`.
+
+### DG-012 — Convergência Venancor
+- Proposta: aplicar `docs/design-system/venancor.md` como fonte visual aprovada na branch `design/venancor`, mantendo a composição e as regras operacionais desta linha.
+- Evidência/referência: instrução do Vinicios de 2026-10-04 e `docs/design-system/venancor.md`.
+- Decisão aprovada por: Vinicios, 2026-10-04.
+- Impacto: `globals.css`, fontes do layout, primitives e classes das telas indicadas. O contrato 1.2.0 ainda descreve tokens antigos e precisa de edição editorial.
+- Plano de convergência: atualizar `DESIGN_CONTRACT.md`, `FOUNDATIONS.md` e tokens de referência para Venancor em uma revisão própria; até lá, `venancor.md` prevalece nesta migração.

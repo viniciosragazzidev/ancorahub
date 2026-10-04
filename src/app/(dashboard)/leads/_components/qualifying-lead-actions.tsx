@@ -54,7 +54,7 @@ export function StartQualificationButton({
     return (
       <span
         title="A qualificação por IA deste lead já foi iniciada"
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 ${className}`}
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25 ${className}`}
       >
         <Sparkle className="size-3.5 text-emerald-500" />
         Qualificação Iniciada

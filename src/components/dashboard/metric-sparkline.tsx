@@ -42,7 +42,7 @@ export function MetricSparkline({
             stroke={color}
             strokeWidth={2}
             fill={`url(#sparkline-grad-${uniqueId})`}
-            isAnimationActive={false}
+            isAnimationActive animationDuration={600} animationEasing="ease-out"
             dot={false}
           />
         </AreaChart>

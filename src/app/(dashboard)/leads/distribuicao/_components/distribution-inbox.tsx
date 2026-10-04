@@ -325,7 +325,7 @@ function ChoiceSubmitForm({
   }, [onCommitted, onSubmitting, router, state]);
 
   return (
-    <form action={formAction} onSubmit={() => onSubmitting(true)} className="flex items-center justify-between gap-4 rounded-lg border border-border p-4">
+    <form action={formAction} onSubmit={() => onSubmitting(true)} className="flex items-center justify-between gap-4 rounded-[var(--radius-card)] border border-border p-4">
       <input type="hidden" name="leadId" value={lead.id} />
       <input type="hidden" name="brokerId" value={brokerId} />
       <input type="hidden" name="assignmentMode" value={mode} />
@@ -715,7 +715,7 @@ export function DistributionInbox({
         <CardContent className="p-0">
           {!selectable.length ? (
             <div className="flex flex-col items-center gap-2 px-4 py-12 text-center">
-              <span className="grid size-9 place-items-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <span className="grid size-9 place-items-center rounded-[var(--radius-card)] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
                 <CheckCircle aria-hidden="true" className="size-5" />
               </span>
               <p className="text-sm font-medium">Inbox em dia</p>
@@ -724,8 +724,8 @@ export function DistributionInbox({
               </p>
             </div>
           ) : !filtered.length ? (
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border px-4 py-12 text-center">
-              <span className="grid size-9 place-items-center rounded-lg bg-muted/60 text-muted-foreground">
+            <div className="flex flex-col items-center gap-2 rounded-[var(--radius-card)] border border-dashed border-border px-4 py-12 text-center">
+              <span className="grid size-9 place-items-center rounded-[var(--radius-card)] bg-muted/60 text-muted-foreground">
                 <UserList aria-hidden="true" className="size-5" />
               </span>
               <p className="text-sm font-medium">Nenhum lead com os filtros atuais</p>
@@ -786,7 +786,7 @@ export function DistributionInbox({
                               <div className="mt-1 flex flex-wrap items-center gap-1">
                                 <Badge
                                   variant="secondary"
-                                  className="text-[10px] bg-primary/10 text-primary border-primary/20 max-w-[220px] truncate"
+                                  className="text-[10px] bg-primary/8 text-primary border-primary/20 max-w-[220px] truncate"
                                 >
                                   <Target aria-hidden="true" className="size-3 shrink-0" />
                                   {lead.sourceCampaign || lead.metaCampaignId}
@@ -1068,7 +1068,7 @@ export function DistributionInbox({
                   />
                 </div>
               ) : null}
-              <p className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              <p className="rounded-[var(--radius-card)] border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                 {archiveScope === "all"
                   ? `${totalUnassigned} lead${totalUnassigned === 1 ? "" : "s"} sem corretor serão arquivados.`
                   : `${archivePreview.length} lead${archivePreview.length === 1 ? "" : "s"} corresponde${archivePreview.length === 1 ? "" : "m"} ao filtro carregado. O servidor fará a conferência final.`}

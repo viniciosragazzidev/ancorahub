@@ -81,7 +81,7 @@ export function DddRoutingPanel({
       />
 
       <CardContent className="grid gap-5 p-4">
-        <div className="flex items-start justify-between gap-4 rounded-lg border border-border/70 bg-muted/20 p-3">
+        <div className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-3">
           <div className="min-w-0 space-y-1">
             <p className="text-sm font-medium text-foreground">Aplicar a regra de DDD</p>
             <p className="text-xs leading-5 text-muted-foreground">

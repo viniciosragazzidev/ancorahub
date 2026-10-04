@@ -6,7 +6,6 @@ import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "@/components/huge-icons";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -29,7 +28,7 @@ function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
     <SheetPrimitive.Backdrop
       data-slot="sheet-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-foreground/24 supports-backdrop-filter:backdrop-blur-[2px] transition-[background-color,backdrop-filter,opacity] duration-[var(--dialog-overlay-duration)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none",
+        "fixed inset-0 z-50 bg-foreground/24 supports-backdrop-filter:backdrop-blur-[2px] transition-[background-color,backdrop-filter,opacity] duration-[var(--motion-duration-normal)] ease-[var(--dialog-ease)] data-ending-style:duration-[var(--duration-quick)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none",
         className,
       )}
       {...props}
@@ -54,7 +53,7 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-        "fixed z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-visible border border-border/80 bg-popover bg-clip-padding text-sm text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[transform,opacity] duration-[var(--dialog-content-duration)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:h-auto data-[side=bottom]:rounded-2xl sm:data-[side=bottom]:inset-x-4 sm:data-[side=bottom]:bottom-4 sm:data-[side=bottom]:mx-auto sm:data-[side=bottom]:max-w-xl data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:h-[calc(100dvh-1rem)] data-[side=left]:w-[min(100vw-1rem,32rem)] data-[side=left]:rounded-2xl sm:data-[side=left]:inset-y-3 sm:data-[side=left]:left-3 sm:data-[side=left]:h-[calc(100dvh-1.5rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100dvh-1rem)] data-[side=right]:w-[min(100vw-1rem,32rem)] data-[side=right]:rounded-2xl sm:data-[side=right]:inset-y-3 sm:data-[side=right]:right-3 sm:data-[side=right]:h-[calc(100dvh-1.5rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:h-auto data-[side=top]:rounded-2xl sm:data-[side=top]:inset-x-4 sm:data-[side=top]:top-4 sm:data-[side=top]:mx-auto sm:data-[side=top]:max-w-xl max-[559px]:data-[side=left]:inset-0 max-[559px]:data-[side=left]:h-dvh max-[559px]:data-[side=left]:max-h-dvh max-[559px]:data-[side=left]:w-full max-[559px]:data-[side=left]:rounded-none max-[559px]:data-[side=right]:inset-0 max-[559px]:data-[side=right]:h-dvh max-[559px]:data-[side=right]:max-h-dvh max-[559px]:data-[side=right]:w-full max-[559px]:data-[side=right]:rounded-none ",
+        "fixed z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-visible border border-border bg-popover bg-clip-padding text-sm text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[transform,opacity,translate] duration-[var(--motion-duration-normal)] data-ending-style:duration-[var(--duration-quick)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:h-auto data-[side=bottom]:rounded-[var(--radius-panel)] sm:data-[side=bottom]:inset-x-4 sm:data-[side=bottom]:bottom-4 sm:data-[side=bottom]:mx-auto sm:data-[side=bottom]:max-w-xl data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:h-[calc(100dvh-1rem)] data-[side=left]:w-[min(100vw-1rem,32rem)] data-[side=left]:rounded-[var(--radius-panel)] sm:data-[side=left]:inset-y-3 sm:data-[side=left]:left-3 sm:data-[side=left]:h-[calc(100dvh-1.5rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100dvh-1rem)] data-[side=right]:w-[min(100vw-1rem,32rem)] data-[side=right]:rounded-[var(--radius-panel)] sm:data-[side=right]:inset-y-3 sm:data-[side=right]:right-3 sm:data-[side=right]:h-[calc(100dvh-1.5rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:h-auto data-[side=top]:rounded-[var(--radius-panel)] sm:data-[side=top]:inset-x-4 sm:data-[side=top]:top-4 sm:data-[side=top]:mx-auto sm:data-[side=top]:max-w-xl max-[559px]:data-[side=left]:inset-0 max-[559px]:data-[side=left]:h-dvh max-[559px]:data-[side=left]:max-h-dvh max-[559px]:data-[side=left]:w-full max-[559px]:data-[side=left]:rounded-none max-[559px]:data-[side=right]:inset-0 max-[559px]:data-[side=right]:h-dvh max-[559px]:data-[side=right]:max-h-dvh max-[559px]:data-[side=right]:w-full max-[559px]:data-[side=right]:rounded-none ",
           className,
         )}
         {...props}
@@ -67,7 +66,7 @@ function SheetContent({
               <Button
                 variant="ghost"
                 aria-label="Fechar painel"
-                className="absolute top-[calc(1rem+var(--mobile-safe-top))] right-[max(1rem,var(--mobile-safe-right))] z-10 size-8 rounded-md border border-border bg-card text-muted-foreground shadow-sm hover:bg-muted hover:text-foreground focus-visible:ring-2 sm:top-4 sm:right-4"
+                className="absolute top-[calc(1rem+var(--mobile-safe-top))] right-[max(1rem,var(--mobile-safe-right))] z-10 size-8 rounded-full border border-border bg-card text-muted-foreground shadow-none hover:bg-muted hover:text-foreground focus-visible:ring-2 sm:top-4 sm:right-4"
                 size="icon"
               />
             }
@@ -99,14 +98,11 @@ function SheetBody({
   contentClassName,
   children,
   ...props
-}: React.ComponentProps<typeof ScrollArea> & { contentClassName?: string }) {
+}: React.ComponentProps<"div"> & { contentClassName?: string }) {
   return (
-    <ScrollArea
+    <div
       data-slot="sheet-body"
-      // Radix wraps content in `display: table`, which grows to the widest
-      // child (long names) and scrolls the drawer sideways; block keeps it
-      // at the drawer width so `truncate` works.
-      className={cn("min-h-0 flex-1 overscroll-contain [&_[data-radix-scroll-area-viewport]>div]:block!", className)}
+      className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", className)}
       {...props}
     >
       <div
@@ -115,7 +111,7 @@ function SheetBody({
       >
         {children}
       </div>
-    </ScrollArea>
+    </div>
   );
 }
 

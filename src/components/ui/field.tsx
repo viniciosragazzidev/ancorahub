@@ -1,6 +1,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { CheckIcon } from "@/components/huge-icons"
 
 function Field({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -43,4 +44,18 @@ function FieldError({ className, ...props }: React.ComponentProps<"p">) {
   )
 }
 
-export { Field, FieldLabel, FieldDescription, FieldError }
+function FieldSuccess({ className, children, ...props }: React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="field-success"
+      role="status"
+      className={cn("ct-field-success inline-flex items-center gap-1 text-xs font-medium text-success", className)}
+      {...props}
+    >
+      <CheckIcon className="size-3.5" aria-hidden="true" />
+      {children}
+    </p>
+  )
+}
+
+export { Field, FieldLabel, FieldDescription, FieldError, FieldSuccess }

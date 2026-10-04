@@ -104,7 +104,7 @@ export function LeadsHeaderActions({
             <MoreHorizontalIcon className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64 p-1.5">
-            <DropdownMenuLabel className="px-2 py-1 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+            <DropdownMenuLabel className="px-2 py-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
               Período
             </DropdownMenuLabel>
             <div className="grid grid-cols-4 gap-1 px-2 pb-1">
