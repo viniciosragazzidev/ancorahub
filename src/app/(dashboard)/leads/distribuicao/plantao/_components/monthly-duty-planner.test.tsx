@@ -45,6 +45,7 @@ const draft: MonthlyDutyPlanView = {
   belowMinimum: 1,
   missingQuota: 1,
   problems: [],
+  warnings: [],
   canEdit: true,
   replacesPublished: false,
 };

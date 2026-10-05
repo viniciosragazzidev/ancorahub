@@ -5,14 +5,14 @@ import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
-import { getDutyOccurrenceLeadWindow, getRelevantDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
+import { getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
 import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
 import { normalizeOfferPacing } from "./offer-pacing";
 import { assignmentShift } from "./duty-shifts";
 import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
-import { selectLeadsForDutySchedule } from "./shared-duty-roster";
+import { inferLegacyLeadDutyScheduleId, selectLeadsForDutySchedule } from "./shared-duty-roster";
 
 // Upper bound on how far back a lead can show even when the schedule has no
 // completed occurrence yet (brand-new schedule) — keeps the query sane.
@@ -137,10 +137,10 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     for (const id of queue.exclusiveDutyScheduleIds ?? []) familyScheduleIds.add(id);
   }
   const familySchedules = familyScheduleIds.size > 1
-    ? await db.select({ id: schema.unitDutySchedules.id, dayOfWeek: schema.unitDutySchedules.dayOfWeek, startsAt: schema.unitDutySchedules.startsAt, endsAt: schema.unitDutySchedules.endsAt, timezone: schema.unitDutySchedules.timezone, status: schema.unitDutySchedules.status, validFrom: schema.unitDutySchedules.validFrom, validUntil: schema.unitDutySchedules.validUntil })
+    ? await db.select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId, dayOfWeek: schema.unitDutySchedules.dayOfWeek, startsAt: schema.unitDutySchedules.startsAt, endsAt: schema.unitDutySchedules.endsAt, timezone: schema.unitDutySchedules.timezone, attendanceMode: schema.unitDutySchedules.attendanceMode, status: schema.unitDutySchedules.status, validFrom: schema.unitDutySchedules.validFrom, validUntil: schema.unitDutySchedules.validUntil })
       .from(schema.unitDutySchedules)
       .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), inArray(schema.unitDutySchedules.id, [...familyScheduleIds])))
-    : [{ id: schedule.id, dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone, status: schedule.status, validFrom: schedule.validFrom, validUntil: schedule.validUntil }];
+    : [{ id: schedule.id, branchId: schedule.branchId, dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone, attendanceMode: schedule.attendanceMode, status: schedule.status, validFrom: schedule.validFrom, validUntil: schedule.validUntil }];
   const hasOverlappingSiblingSchedule = familySchedules.some((candidate) => candidate.id !== scheduleId
     && candidate.status === "active"
     && candidate.validFrom <= now
@@ -168,9 +168,89 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // Same rule as the runtime (DEC-123): on a date with a published escala, its
   // brokers replace the weekly roster; any other date keeps the weekly roster.
   const monthlyEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true";
-  const occurrenceDate = getSaoPauloDateKey(upcomingStartsAt ?? since);
+  const occurrenceStart = upcomingStartsAt ?? getRelevantDutyWindow(schedule, referenceNow, 0)?.startsAt ?? since;
+  const occurrenceDate = getSaoPauloDateKey(occurrenceStart);
   const publishedHere = monthlyEnabled ? rosterRows.filter((row) => row.dutyDate === occurrenceDate) : [];
   const roster = publishedHere.length ? publishedHere : rosterRows.filter((row) => row.dutyDate === null);
+
+  // Before dutyScheduleId was persisted, shared queues still have enough
+  // context to restore assigned leads to one occurrence: the broker's roster,
+  // branch and check-in. Exact new attributions always override this fallback.
+  const attributionSchedules = hasOverlappingSiblingSchedule
+    ? familySchedules.filter((candidate) => candidate.status === "active"
+      && candidate.validFrom <= occurrenceStart
+      && (!candidate.validUntil || candidate.validUntil > occurrenceStart)
+      && candidate.dayOfWeek === schedule.dayOfWeek
+      && candidate.startsAt < schedule.endsAt
+      && candidate.endsAt > schedule.startsAt)
+    : [];
+  const attributionScheduleIds = attributionSchedules.map((candidate) => candidate.id);
+  const siblingAssignmentRows = attributionScheduleIds.length
+    ? await db.select({
+      id: schema.dutyRosterAssignments.id,
+      scheduleId: schema.dutyRosterAssignments.scheduleId,
+      brokerId: schema.dutyRosterAssignments.brokerId,
+      branchId: schema.dutyRosterAssignments.branchId,
+      dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`,
+      validFrom: schema.dutyRosterAssignments.validFrom,
+      validUntil: schema.dutyRosterAssignments.validUntil,
+    }).from(schema.dutyRosterAssignments).where(and(
+      eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+      eq(schema.dutyRosterAssignments.status, "active"),
+      inArray(schema.dutyRosterAssignments.scheduleId, attributionScheduleIds),
+      or(isNull(schema.dutyRosterAssignments.dutyDate), eq(schema.dutyRosterAssignments.dutyDate, occurrenceDate)),
+      lte(schema.dutyRosterAssignments.validFrom, occurrenceStart),
+      or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, occurrenceStart)),
+    ))
+    : [];
+  const assignmentsBySchedule = new Map<string, typeof siblingAssignmentRows>();
+  for (const row of siblingAssignmentRows) {
+    const rows = assignmentsBySchedule.get(row.scheduleId) ?? [];
+    rows.push(row);
+    assignmentsBySchedule.set(row.scheduleId, rows);
+  }
+  const attributionAssignments = siblingAssignmentRows.filter((row) => {
+    const rows = assignmentsBySchedule.get(row.scheduleId) ?? [];
+    return monthlyEnabled && rows.some((candidate) => candidate.dutyDate === occurrenceDate)
+      ? row.dutyDate === occurrenceDate
+      : row.dutyDate === null;
+  });
+  const attributionAssignmentIds = attributionAssignments.map((row) => row.id);
+  const attributionPresenceRows = attributionAssignmentIds.length
+    ? await db.select({
+      assignmentId: schema.dutyPresenceConfirmations.assignmentId,
+      scheduleId: schema.dutyPresenceConfirmations.scheduleId,
+      dutyDate: schema.dutyPresenceConfirmations.dutyDate,
+      status: schema.dutyPresenceConfirmations.status,
+      confirmedBy: schema.dutyPresenceConfirmations.confirmedBy,
+      shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt,
+      shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt,
+    }).from(schema.dutyPresenceConfirmations).where(and(
+      eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId),
+      inArray(schema.dutyPresenceConfirmations.assignmentId, attributionAssignmentIds),
+      eq(schema.dutyPresenceConfirmations.dutyDate, occurrenceDate),
+    ))
+    : [];
+  const confirmedAssignmentIds = new Set(attributionPresenceRows.flatMap((row) => {
+    const candidate = attributionSchedules.find((item) => item.id === row.scheduleId);
+    const window = candidate ? getDutyWindowOnDate(candidate, occurrenceDate) : null;
+    return window && row.status === "confirmed" && row.confirmedBy
+      && row.shiftStartsAt.getTime() === window.startsAt.getTime()
+      && row.shiftEndsAt.getTime() === window.endsAt.getTime()
+      ? [row.assignmentId]
+      : [];
+  }));
+  const attributionPresenceRequired = (await getFeatureFlag(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION)) === "true";
+  const candidateById = new Map(attributionSchedules.map((candidate) => [candidate.id, candidate]));
+  const attributionEligibleIds = new Set(attributionAssignments.flatMap((row) => {
+    const candidate = candidateById.get(row.scheduleId);
+    return candidate && (!(attributionPresenceRequired || candidate.attendanceMode === "presencial") || confirmedAssignmentIds.has(row.id))
+      ? [row.id]
+      : [];
+  }));
+  const activeAttributionScheduleIds = new Set(attributionSchedules.map((candidate) => candidate.id));
+  const attributionAssignmentsForSelection = attributionAssignments.map((row) => ({ id: row.id, brokerId: row.brokerId, scheduleId: row.scheduleId, branchId: row.branchId }));
+  const branchIdBySchedule = new Map(attributionSchedules.map((candidate) => [candidate.id, candidate.branchId]));
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.
@@ -215,7 +295,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
         inArray(schema.leads.queueId, queueIds),
-        hasOverlappingSiblingSchedule ? eq(schema.leads.dutyScheduleId, scheduleId) : undefined,
+        hasOverlappingSiblingSchedule ? or(eq(schema.leads.dutyScheduleId, scheduleId), isNull(schema.leads.dutyScheduleId)) : undefined,
         or(
           and(gte(schema.leads.createdAt, since), until ? lte(schema.leads.createdAt, until) : undefined),
           and(gte(schema.leads.assignedAt, since), until ? lte(schema.leads.assignedAt, until) : undefined),
@@ -238,7 +318,16 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       inArray(schema.tenantMemberships.role, ["director", "manager"]),
     ))).map((row) => row.userId)
     : []);
-  const leads = selectLeadsForDutySchedule(queriedLeads, scheduleId, !hasOverlappingSiblingSchedule)
+  const legacyScheduleForLead = (lead: (typeof queriedLeads)[number]) => inferLegacyLeadDutyScheduleId({
+    brokerId: lead.corretorId,
+    leadBranchId: lead.branchId,
+    assignments: attributionAssignmentsForSelection,
+    activeScheduleIds: activeAttributionScheduleIds,
+    eligibleAssignmentIds: attributionEligibleIds,
+    confirmedPresenceAssignmentIds: confirmedAssignmentIds,
+    branchIdBySchedule,
+  });
+  const leads = selectLeadsForDutySchedule(queriedLeads, scheduleId, !hasOverlappingSiblingSchedule, legacyScheduleForLead)
     .filter((lead) => !isManagementInvestigation(lead, managementUserIds));
   const leadsByShift = countBrokerLeadsByShift(leads, schedule.shiftSplitAt);
 
@@ -248,7 +337,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     leadsPerBroker.set(lead.corretorId, (leadsPerBroker.get(lead.corretorId) ?? 0) + 1);
   }
 
-  const presenceEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION)) === "true";
+  const presenceEnabled = attributionPresenceRequired;
   const occurrenceByAssignment = new Map(roster.flatMap((entry) => {
     const occurrence = getRelevantDutyWindow({
       dayOfWeek: entry.dayOfWeek,

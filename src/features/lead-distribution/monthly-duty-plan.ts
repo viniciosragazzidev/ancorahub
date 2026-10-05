@@ -233,6 +233,16 @@ export type DraftProblem =
 
 /** Everything that would make a draft unsafe to publish. Empty means publishable. */
 export function findDraftProblems(occurrences: readonly MonthlyPlanOccurrence[], assignments: readonly MonthlyPlanAssignment[]): DraftProblem[] {
+  // DEC-132: an overlap is a warning, not a blocker — see findDraftOverlaps.
+  return findDraftIssues(occurrences, assignments, false);
+}
+
+/** Same-broker simultaneous occurrences: allowed (DEC-132) but shown as a warning. */
+export function findDraftOverlaps(occurrences: readonly MonthlyPlanOccurrence[], assignments: readonly MonthlyPlanAssignment[]): DraftProblem[] {
+  return findDraftIssues(occurrences, assignments, true);
+}
+
+function findDraftIssues(occurrences: readonly MonthlyPlanOccurrence[], assignments: readonly MonthlyPlanAssignment[], onlyOverlaps: boolean): DraftProblem[] {
   const byId = new Map(occurrences.map((occurrence) => [occurrence.id, occurrence]));
   const problems: DraftProblem[] = [];
   const seen = new Set<string>();
@@ -241,24 +251,27 @@ export function findDraftProblems(occurrences: readonly MonthlyPlanOccurrence[],
   for (const assignment of assignments) {
     const occurrence = byId.get(assignment.occurrenceId);
     if (!occurrence) {
-      problems.push({ kind: "unknown_occurrence", occurrenceId: assignment.occurrenceId });
+      if (!onlyOverlaps) problems.push({ kind: "unknown_occurrence", occurrenceId: assignment.occurrenceId });
       continue;
     }
     const key = `${assignment.occurrenceId}|${assignment.brokerId}`;
     if (seen.has(key)) {
-      problems.push({ kind: "duplicate", occurrenceId: occurrence.id, brokerId: assignment.brokerId });
+      if (!onlyOverlaps) problems.push({ kind: "duplicate", occurrenceId: occurrence.id, brokerId: assignment.brokerId });
       continue;
     }
     seen.add(key);
-    if (!occurrence.allowedBrokerIds.includes(assignment.brokerId)) problems.push({ kind: "not_eligible", occurrenceId: occurrence.id, brokerId: assignment.brokerId });
+    if (!onlyOverlaps && !occurrence.allowedBrokerIds.includes(assignment.brokerId)) problems.push({ kind: "not_eligible", occurrenceId: occurrence.id, brokerId: assignment.brokerId });
     const others = perBroker.get(assignment.brokerId) ?? [];
-    if (others.some((other) => overlaps(other, occurrence))) problems.push({ kind: "overlap", occurrenceId: occurrence.id, brokerId: assignment.brokerId });
+    // Overlap is only collected by findDraftOverlaps (warning); it never blocks.
+    if (onlyOverlaps && others.some((other) => overlaps(other, occurrence))) problems.push({ kind: "overlap", occurrenceId: occurrence.id, brokerId: assignment.brokerId });
     perBroker.set(assignment.brokerId, [...others, occurrence]);
     perOccurrence.set(occurrence.id, (perOccurrence.get(occurrence.id) ?? 0) + 1);
   }
-  for (const [id, count] of perOccurrence) {
-    const occurrence = byId.get(id)!;
-    if (occurrence.maximumBrokers !== null && count > occurrence.maximumBrokers) problems.push({ kind: "over_capacity", occurrenceId: id });
+  if (!onlyOverlaps) {
+    for (const [id, count] of perOccurrence) {
+      const occurrence = byId.get(id)!;
+      if (occurrence.maximumBrokers !== null && count > occurrence.maximumBrokers) problems.push({ kind: "over_capacity", occurrenceId: id });
+    }
   }
   return problems;
 }
@@ -269,7 +282,7 @@ export function describeDraftProblem(problem: DraftProblem) {
     case "not_eligible": return "Um corretor da proposta não pode atuar neste plantão.";
     case "duplicate": return "Um corretor aparece duas vezes no mesmo plantão.";
     case "over_capacity": return "Um plantão passou do máximo de corretores.";
-    case "overlap": return "Um corretor ficou em dois plantões no mesmo horário.";
+    case "overlap": return "Um corretor ficou em dois plantões no mesmo horário; ele atenderá nos dois.";
   }
 }
 

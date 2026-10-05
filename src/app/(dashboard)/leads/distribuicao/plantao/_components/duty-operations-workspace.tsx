@@ -656,6 +656,7 @@ function DutyInspector({
       }
       setBrokerSearch("");
       toast.success("Corretor adicionado à escala.");
+      if (result.message) toast.info(result.message);
       router.refresh();
     });
   }
@@ -677,6 +678,7 @@ function DutyInspector({
         return;
       }
       toast.success(`${assignment.brokerName}: ${shift.label}.`);
+      if (result.message) toast.info(result.message);
       router.refresh();
     });
   }

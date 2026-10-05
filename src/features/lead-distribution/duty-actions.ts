@@ -608,10 +608,17 @@ export async function getBrokerOccurrenceLeadsAction(scheduleId: string, brokerI
     const dutyDate = new Intl.DateTimeFormat("en-CA", { timeZone: profile.schedule.timezone }).format(reference);
     const occurrence = getDutyWindowOnDate(profile.schedule, dutyDate);
     const { since: lower, until: upper } = brokerOccurrenceAssignmentBounds({ since: profile.leadsSince, until: profile.leadsUntil }, occurrence);
+    const inferredLegacyLeadIds = profile.leads
+      .filter((lead) => lead.dutyScheduleId === null && lead.corretorId === parsedBrokerId
+        && lead.assignedAt && lead.assignedAt >= lower && (!upper || lead.assignedAt < upper))
+      .map((lead) => lead.id);
     const rows = await db.select({ id: schema.leads.id, name: schema.leads.nome, assignedAt: schema.leads.assignedAt, origin: schema.leads.origem, queueName: schema.leadQueues.name, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt })
       .from(schema.leads)
       .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
-      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, parsedBrokerId), eq(schema.leads.dutyScheduleId, parsedScheduleId), inArray(schema.leads.queueId, queueIds), gte(schema.leads.assignedAt, lower), upper ? lt(schema.leads.assignedAt, upper) : undefined, isNull(schema.leads.deletedAt)))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, parsedBrokerId), or(
+        eq(schema.leads.dutyScheduleId, parsedScheduleId),
+        inferredLegacyLeadIds.length ? inArray(schema.leads.id, inferredLegacyLeadIds) : sql`false`,
+      ), inArray(schema.leads.queueId, queueIds), gte(schema.leads.assignedAt, lower), upper ? lt(schema.leads.assignedAt, upper) : undefined, isNull(schema.leads.deletedAt)))
       .orderBy(schema.leads.assignedAt);
     return { ok: true as const, leads: rows.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null })) };
   } catch (error) {

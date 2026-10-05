@@ -39,6 +39,7 @@ import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigg
 import { BrokerOccurrenceCard } from "../_components/broker-occurrence-card";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { dutyShifts, worksInShift } from "@/features/lead-distribution/duty-shifts";
+import { getDutyLeadQueueTabs, resolveDutyLeadQueueId, selectDutyLeadsForQueue } from "@/features/lead-distribution/duty-lead-queue-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -71,11 +72,11 @@ function DutyProfileHeader({
   </section>;
 }
 
-export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string; canal?: string }> }) {
+export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string; canal?: string; fila?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { scheduleId } = await params;
-  const { situacao, data, canal } = await searchParams;
+  const { situacao, data, canal, fila } = await searchParams;
 
   let profile: Awaited<ReturnType<typeof getDutyScheduleProfile>>;
   try {
@@ -198,15 +199,23 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const isMetaBlocked = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "meta_blocked";
   const isQualifying = (lead: (typeof allLeads)[number]) => lead.qualificationStatus === "qualifying" || lead.qualificationState === "IN_PROGRESS";
   const isWaiting = (lead: (typeof allLeads)[number]) => !isAssigned(lead) && !isDisqualified(lead) && !isMetaBlocked(lead) && !isQualifying(lead);
-  // Only two situations matter operationally here; "todos" mixed them back
-  // together and hid which bucket someone was actually looking at.
+  const allWaitingLeads = allLeads.filter(isWaiting);
+  const queueTabs = getDutyLeadQueueTabs(
+    [...linkedQueues].sort((first, second) => first.name.localeCompare(second.name, "pt-BR")),
+    allWaitingLeads,
+  );
+  const selectedQueueId = resolveDutyLeadQueueId(queueTabs, fila);
+  // Distributed leads remain one combined list; only the waiting list is
+  // narrowed to a queue when this plantão receives multiple queues.
   const filter = situacao === "distribuidos" ? "distribuidos" : "aguardando";
+  const queueScopedLeads = selectDutyLeadsForQueue(allLeads, selectedQueueId, filter === "distribuidos");
   // The channel tabs count the situation on screen, so a lead handed out
   // leaves "Aguardando · WhatsApp" and joins "Distribuídos · WhatsApp".
-  const inSituation = allLeads.filter(filter === "distribuidos" ? isDistributed : isWaiting);
+  const inSituation = queueScopedLeads.filter(filter === "distribuidos" ? isDistributed : isWaiting);
   const whatsappInSituation = inSituation.filter((lead) => whatsappEntryOf(lead)).length;
   const channel = canal === "whatsapp" ? "whatsapp" : canal === "formulario" ? "formulario" : "todos";
-  const leads = channel === "todos" ? allLeads : allLeads.filter((lead) => (channel === "whatsapp") === Boolean(whatsappEntryOf(lead)));
+  const channelLeads = channel === "todos" ? allLeads : allLeads.filter((lead) => (channel === "whatsapp") === Boolean(whatsappEntryOf(lead)));
+  const leads = selectDutyLeadsForQueue(channelLeads, selectedQueueId, filter === "distribuidos");
   const channelTabs = [
     { key: "todos", label: "Todos", count: inSituation.length },
     { key: "formulario", label: "Formulário", count: inSituation.length - whatsappInSituation },
@@ -216,19 +225,21 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // (not disqualified/blocked/qualifying ones, nor the other plantão's).
   const plantaoLeads = allLeads.filter((lead) => isWaiting(lead) || isDistributed(lead));
   const whatsappLeadCount = plantaoLeads.filter((lead) => whatsappEntryOf(lead)).length;
-  const leadsHref = (next: { situacao?: string; canal?: string }) => {
+  const leadsHref = (next: { situacao?: string; canal?: string; fila?: string }) => {
     const query = new URLSearchParams();
     const nextSituacao = next.situacao ?? situacao;
     const nextCanal = next.canal ?? channel;
     if (nextSituacao) query.set("situacao", nextSituacao);
     if (nextCanal !== "todos") query.set("canal", nextCanal);
+    const nextQueueId = next.fila ?? selectedQueueId;
+    if (nextQueueId) query.set("fila", nextQueueId);
     const search = query.toString();
     return `/leads/distribuicao/plantao/${schedule.id}${search ? `?${search}` : ""}`;
   };
 
-  const distributedCount = leads.filter(isDistributed).length;
+  const distributedCount = channelLeads.filter(isDistributed).length;
   const waitingLeads = leads.filter(isWaiting);
-  const waitingCount = waitingLeads.length;
+  const waitingCount = selectDutyLeadsForQueue(channelLeads.filter(isWaiting), selectedQueueId, false).length;
   // Distributed rows read as the order leads were handed out (earliest
   // assignment first); the waiting list reads as the distribution order:
   // hot, then warm (or no temperature), then cold, oldest first in each.
@@ -250,6 +261,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
     { key: "distribuidos", label: "Distribuídos", count: distributedCount },
   ] as const;
+  const totalWaitingCount = allWaitingLeads.length;
   const sinceLabel = leadsSince.getTime() === 0
     ? "desde a criação deste plantão"
     : leadsUpcomingStartsAt
@@ -310,7 +322,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           value={linkedQueues.length}
           sublabel={linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"}
         />
-        <StatCard label="Leads no plantão" value={plantaoLeads.length} sublabel={channel === "todos" ? `${distributedCount} distribuídos · ${waitingCount} aguardando` : `${whatsappLeadCount} pelo WhatsApp · ${plantaoLeads.length - whatsappLeadCount} por formulário`} />
+        <StatCard label="Leads no plantão" value={plantaoLeads.length} sublabel={channel === "todos" ? `${distributedCount} distribuídos · ${totalWaitingCount} aguardando` : `${whatsappLeadCount} pelo WhatsApp · ${plantaoLeads.length - whatsappLeadCount} por formulário`} />
       </section>
 
       <div className="flex flex-col gap-5">
@@ -334,6 +346,25 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             </nav>}
           />
           <CardContent className="p-0">
+            {filter === "aguardando" && queueTabs.length > 1 ? (
+              <nav aria-label="Filtrar leads aguardando distribuição por fila" className="flex w-full items-center gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {queueTabs.map((tab) => (
+                  <Link
+                    key={tab.id}
+                    href={leadsHref({ fila: tab.id })}
+                    aria-current={selectedQueueId === tab.id ? "page" : undefined}
+                    className={cn(
+                      "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap px-2 pb-2.5 pt-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                      selectedQueueId === tab.id ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {tab.name}
+                    <span className="font-mono text-xs text-muted-foreground">{tab.count}</span>
+                    {selectedQueueId === tab.id ? <span className="absolute -bottom-px left-0 right-0 h-0.5 bg-primary" aria-hidden="true" /> : null}
+                  </Link>
+                ))}
+              </nav>
+            ) : null}
             <nav aria-label="Filtrar leads por canal de entrada" className="flex w-full items-center gap-1 overflow-x-auto border-b border-border px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {channelTabs.map((tab) => (
                 <Link

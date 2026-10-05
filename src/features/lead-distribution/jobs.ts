@@ -14,6 +14,7 @@ import { processQueuedLead } from "./service";
 import { expireOutdatedLeadOffers } from "./offers";
 import { distributionRetryDelayMilliseconds, isDeferredDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
+import { dutyScheduleBranchCondition, isDutyScheduleBranchCompatible } from "./duty-job-schedule-scope";
 
 const JOB_TYPE = "process_queued_lead";
 
@@ -241,7 +242,11 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
   const db = getDatabase();
   const local = getLocalDutyParts(now);
   const rows = await db
-    .select({ id: schema.leadDistributionJobs.id })
+    .select({
+      id: schema.leadDistributionJobs.id,
+      scheduleBranchId: schema.unitDutySchedules.branchId,
+      leadBranchId: schema.leads.branchId,
+    })
     .from(schema.leadDistributionJobs)
     .innerJoin(schema.leads, eq(schema.leadDistributionJobs.leadId, schema.leads.id))
     .innerJoin(
@@ -249,7 +254,7 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
       and(
         eq(schema.unitDutySchedules.tenantId, schema.leads.tenantId),
         or(isNull(schema.unitDutySchedules.queueId), eq(schema.unitDutySchedules.queueId, schema.leads.queueId)),
-        or(isNull(schema.leads.branchId), eq(schema.unitDutySchedules.branchId, schema.leads.branchId)),
+        dutyScheduleBranchCondition(schema.unitDutySchedules.branchId, schema.leads.branchId),
       ),
     )
     .where(and(
@@ -274,7 +279,9 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
     .orderBy(asc(leadTemperatureRank()), asc(schema.leads.createdAt))
     .limit(200);
 
-  const jobIds = Array.from(new Set(rows.map((row) => row.id)));
+  const jobIds = Array.from(new Set(rows
+    .filter((row) => isDutyScheduleBranchCompatible(row.scheduleBranchId, row.leadBranchId))
+    .map((row) => row.id)));
   if (!jobIds.length) return 0;
 
   await db.update(schema.leadDistributionJobs).set({

@@ -1534,3 +1534,20 @@ estiver em mais de um plantao, prevalece a ocorrencia em que confirmou presenca.
 Paginas, contadores, gavetas, exportacoes e historico filtram pelo plantao
 registrado. Plantoes inativos ficam fora. Ofertas e leads existentes mantem
 compatibilidade por meio de colunas nullable; sem backfill de historico.
+
+## DEC-132 - Corretor em mais de um plantao no mesmo horario
+
+**Confirmada pelo usuario em 2026-10-05.** Um corretor pode estar escalado em
+dois ou mais plantoes simultaneos, incluindo plantoes da mesma fila e de
+unidades diferentes. A escala semanal deixa de bloquear a sobreposicao de
+horario do mesmo corretor (`assertNoOverlap` passa a avisar, sem impedir o
+save) e registra evento auditavel `duty_roster_assignment.overlap_allowed`
+com quem criou, quando e qual corretor/plantao. No plano mensal, a
+sobreposicao do mesmo corretor deixa de bloquear a publicacao e permanece
+como aviso na revisao. A distribuicao continua com o comportamento DEC-131:
+o corretor aparece uma vez na uniao das escalas ativas e o sistema escolhe a
+ocorrencia representativa (presenca confirmada vence; senao, id
+deterministico), com carga (`receivedInDuty`) e limite
+(`maxLeadsPerBroker`) contados apenas pela ocorrencia representativa - o
+limite segue por ocorrencia. Acoes: auditar, configurar e desativar pelo
+Super-admin permanecem obrigatorios.

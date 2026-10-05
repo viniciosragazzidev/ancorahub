@@ -416,6 +416,12 @@ export function MonthlyDutyPlanner({
                         <div>{plan.problems.map((problem) => <p key={problem}>{problem}</p>)}</div>
                       </div>
                     ) : null}
+                    {plan.warnings.length ? (
+                      <div className="flex gap-2 rounded-[var(--radius-card)] border border-warning/30 bg-warning/5 p-3 text-xs">
+                        <Warning aria-hidden="true" className="size-4 shrink-0 text-warning" />
+                        <div>{plan.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div>
+                      </div>
+                    ) : null}
                     {plan.replacesPublished && !published ? (
                       <p className="rounded-[var(--radius-card)] border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
                         Ao publicar, esta escala substitui a publicada nas datas que ainda não passaram. As datas que já passaram ficam como estão.

@@ -79,7 +79,7 @@ rastreabilidade. PendÃªncias que impedem uma implementaÃ§Ã£o definitiva fi
 | BR-029H | Empresa PJ pertence ao tenant e pode ser compartilhada apenas dentro do escopo permitido. | Cadastro de lead PJ com CNPJ vÃ¡lido â†’ reutiliza ou cria empresa no tenant; corretor enxerga somente empresas com oportunidade prÃ³pria. | DEC-071 |
 | BR-029I | Novos leads em triagem (qualificaÃ§Ã£o pendente) pertencem exclusivamente Ã  aba QualificaÃ§Ãµes e nÃ£o aparecem no Kanban ou lista de atendimento atÃ© a conclusÃ£o da qualificaÃ§Ã£o; leads jÃ¡ atribuÃ­dos ou qualificados nÃ£o aparecem na aba de qualificaÃ§Ãµes. | Lead criado com IA ativa â†’ entra em qualificaÃ§Ã£o pendente e sem corretor â†’ isolado na aba QualificaÃ§Ãµes; qualificaÃ§Ã£o concluÃ­da ou aprovaÃ§Ã£o manual â†’ passa a qualificado e Ã© distribuÃ­do para a lista e o Kanban. | DEC-078 |
 | BR-029V | Com a confirmaÃ§Ã£o de presenÃ§a habilitada, corretor escalado sÃ³ recebe leads do plantÃ£o apÃ³s confirmar a ocorrÃªncia especÃ­fica. | Lembrete Meta Ã© enfileirado 30 minutos antes; a confirmaÃ§Ã£o fica vinculada a tenant, escala, vÃ­nculo de escala e data local. ConfirmaÃ§Ã£o tardia libera o corretor imediatamente atÃ© o fim da mesma ocorrÃªncia. Sem confirmaÃ§Ã£o, template/canal ou registro vÃ¡lido, ele permanece inelegÃ­vel; os leads ficam na fila ou seguem apenas o fallback configurado. | DEC-119 |
-| BR-029X | Uma fila pode ser compartilhada por plantoes ativos simultaneos. | Distribuicao une corretores elegiveis e escolhe pela menor carga na ocorrencia; falta, pausa, presenca, pacing e limites por plantao continuam aplicados. A atribuicao persistida separa contadores, pagina, gaveta e exportacao; plantao inativo nao participa. | DEC-131 |
+| BR-029X | Uma fila pode ser compartilhada por plantoes ativos simultaneos. | Distribuicao une corretores elegiveis e escolhe pela menor carga na ocorrencia; falta, pausa, presenca, pacing e limites por plantao continuam aplicados. A atribuicao persistida separa contadores, pagina, gaveta e exportacao; plantao inativo nao participa. Na pagina com varias filas, leads aguardando distribuicao aparecem separados em uma aba por fila; leads distribuidos permanecem agregados entre as filas. | DEC-131 |
 
 ## CotaÃ§Ã£o, documentos e venda
 
@@ -176,3 +176,8 @@ A gestÃ£o autorizada pode transferir um lead ativo para outro corretor elegÃ�
 ### Reenvio de ativaÃ§Ã£o (DEC-122)
 
 Para membro pendente, a gestÃ£o autorizada pode renovar o convite mesmo sem convite anterior vÃ¡lido. O novo token tem 72h, preserva a autoridade cadastrada e substitui tokens pendentes; a fila usa o ID do novo convite. Conta ativa utiliza recuperaÃ§Ã£o de senha. AusÃªncia de telefone/canal nÃ£o equivale a entrega: retornar link e indisponibilidade explÃ­cita.
+
+
+### Corretor em múltiplos plantões simultâneos (DEC-132)
+
+Um corretor pode estar escalado em dois ou mais plantões no mesmo horário, na mesma fila ou em unidades diferentes. A escala semanal avisa sobre a sobreposição ao salvar (não bloqueia) e registra evento auditável `duty_roster_assignment.overlap_allowed`; o plano mensal mantém a sobreposição como aviso na revisão, sem impedir a publicação. Na distribuição, o corretor entra uma única vez na união das escalas ativas, com uma ocorrência representativa (presença confirmada tem prioridade; senão, ocorrência determinística por identificador); carga na ocorrência e limite por plantão contam apenas a ocorrência representativa. Falta, pausa, presença, pacing e limite continuam válidos por plantão.

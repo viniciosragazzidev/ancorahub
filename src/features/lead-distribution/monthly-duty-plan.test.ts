@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildMonthOccurrences,
+  findDraftOverlaps,
   findDraftProblems,
   firstValidShift,
   isSingleOccurrencePlantao,
@@ -95,7 +96,7 @@ describe("findDraftProblems", () => {
     expect(findDraftProblems(occurrences, [{ occurrenceId: "sat-am:2026-10-03", brokerId: "ana" }])).toEqual([]);
   });
 
-  it("flags capacity, eligibility, overlap, duplicates and stale occurrences", () => {
+  it("flags capacity, eligibility, duplicates and stale occurrences, but not overlaps", () => {
     const problems = findDraftProblems(occurrences, [
       { occurrenceId: "sat-am:2026-10-03", brokerId: "ana" },
       { occurrenceId: "sat-am:2026-10-03", brokerId: "bia" },
@@ -104,7 +105,19 @@ describe("findDraftProblems", () => {
       { occurrenceId: "sat-late:2026-10-03", brokerId: "bia" },
       { occurrenceId: "gone:2026-10-03", brokerId: "ana" },
     ]).map((problem) => problem.kind).sort();
-    expect(problems).toEqual(["duplicate", "not_eligible", "over_capacity", "overlap", "overlap", "unknown_occurrence"]);
+    // DEC-132: an overlap is a warning (findDraftOverlaps), never a blocker.
+    expect(problems).toEqual(["duplicate", "not_eligible", "over_capacity", "unknown_occurrence"]);
+  });
+
+  it("reports simultaneous occurrences of the same broker as warnings only", () => {
+    // Both occurrences are open to Ana (global plantões, 09:00–13:00).
+    const lateGlobal = [{ ...occurrences[0], id: "sat-copy:2026-10-03" }];
+    const both = [
+      { occurrenceId: "sat-am:2026-10-03", brokerId: "ana" },
+      { occurrenceId: "sat-copy:2026-10-03", brokerId: "ana" },
+    ];
+    expect(findDraftOverlaps(occurrences.concat(lateGlobal), both).map((problem) => problem.kind)).toEqual(["overlap"]);
+    expect(findDraftProblems(occurrences.concat(lateGlobal), both)).toEqual([]);
   });
 });
 

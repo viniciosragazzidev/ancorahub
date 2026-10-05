@@ -2,6 +2,7 @@
 
 | Data | Registro | Estado | Resumo |
 | --- | --- | --- | --- |
+| 2026-10-05 | `completed/2026-10-05-corretor-multi-plantoes-simultaneos.md` | concluído no código | Corretor pode estar em 2+ plantões no mesmo horário (DEC-132): escala semanal e plano mensal avisam em vez de bloquear, com auditoria; distribuição mantém ocorrência representativa. |
 | 2026-09-30 | `completed/2026-09-30-broker-lite-duty-calendar.md` | concluído no código | Área Plantões do corretor Lite com calendário mensal, agenda por data, detalhes somente leitura, escala semanal/publicada e controle global auditável. |
 | 2026-09-30 | `completed/2026-09-30-cold-lead-reactivation.md` | concluído no código | Reativação única de lead frio ainda não atribuído, retomada da qualificação em resposta, aviso após atribuição e observação de investigação no drawer compartilhado. |
 | 2026-09-21 | `active/2026-09-21-meta-control-consolidation-plan.md` | plano aprovado | Consolidar captura e fila da Meta em `/marketing/campanhas` (drawer por campanha/anúncio) e deixar `/integrations/meta` só com visualização, conexão e sincronização. |

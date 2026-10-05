@@ -9,7 +9,7 @@ import { isValidDutyWindow } from "./domain";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 
-export type RosterActionState = { success?: boolean; error?: string };
+export type RosterActionState = { success?: boolean; error?: string; message?: string };
 
 const assignmentInput = z.object({
   scheduleId: z.string().uuid(),
@@ -62,13 +62,19 @@ type DatabaseOrTransaction = Database | Parameters<Parameters<Database["transact
 
 type Validity = { validFrom: Date; validUntil: Date | null };
 
+/** Overlap warning returned to the caller; saving is allowed (DEC-132). */
+type BrokerOverlapWarning = { name: string; startsAt: string; endsAt: string } | null;
+
 /**
  * Same broker, same weekday, overlapping hours, in an active plantão whose
  * validity shares at least one date with `period`. The plantão's own validity
  * is the source of truth: a plantão from another week (e.g. "PME 24/09" when
  * adding to "PME 01/10") never collides.
+ *
+ * Since DEC-132 an overlap no longer blocks the save: the caller decides how
+ * to surface it (UI warning) and must audit it when saving anyway.
  */
-async function assertNoOverlap(db: DatabaseOrTransaction, tenantId: string, brokerId: string, dayOfWeek: number, startsAt: string, endsAt: string, period: Validity, excludedId?: string) {
+async function findBrokerOverlap(db: DatabaseOrTransaction, tenantId: string, brokerId: string, dayOfWeek: number, startsAt: string, endsAt: string, period: Validity, excludedId?: string): Promise<BrokerOverlapWarning> {
   const conditions = [
     eq(schema.dutyRosterAssignments.tenantId, tenantId),
     eq(schema.dutyRosterAssignments.brokerId, brokerId),
@@ -87,7 +93,18 @@ async function assertNoOverlap(db: DatabaseOrTransaction, tenantId: string, brok
     .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
     .where(and(...conditions))
     .limit(1);
-  if (conflict) throw new Error(`Este corretor já está no plantão "${conflict.name}" das ${conflict.startsAt} às ${conflict.endsAt}, no mesmo horário.`);
+  return conflict ?? null;
+}
+
+/** DEC-132: saving an overlapping scale is allowed, but always audited. */
+async function auditOverlapAllowed(db: DatabaseOrTransaction, userId: string, brokerId: string) {
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(),
+    userId,
+    entidade: "duty_roster_assignment",
+    entidadeId: brokerId,
+    acao: "duty_roster_assignment.overlap_allowed",
+  });
 }
 
 async function assertScheduleCapacity(db: DatabaseOrTransaction, tenantId: string, scheduleId: string, dayOfWeek: number, maximumBrokers: number | null, excludedId?: string) {
@@ -111,16 +128,20 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
     const now = new Date();
     if (!broker.branchId) throw new Error("O corretor não está vinculado a uma unidade ativa.");
     const brokerBranchId = broker.branchId;
-    await db.transaction(async (tx) => {
+    const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
-      await assertNoOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule);
+      const overlap = await findBrokerOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule);
+      if (overlap) await auditOverlapAllowed(tx, context.userId, input.brokerId);
       await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers);
       await tx.insert(schema.dutyRosterAssignments).values({ id: randomUUID(), tenantId: context.tenantId, branchId: brokerBranchId, scheduleId: schedule.id, brokerId: input.brokerId, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, validFrom: schedule.validFrom, validUntil: schedule.validUntil, status: "active", createdBy: context.userId, updatedBy: context.userId, createdAt: now, updatedAt: now });
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: input.brokerId, acao: "duty_roster_assignment.created" });
+      return overlap;
     });
     await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
-    return { success: true };
+    return overlapWarning
+      ? { success: true, message: `Corretor também está no plantão "${overlapWarning.name}" das ${overlapWarning.startsAt} às ${overlapWarning.endsAt}; ele ficará nos dois plantões neste horário.` }
+      : { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível adicionar o corretor à escala." };
   }
@@ -137,15 +158,19 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
       .where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), isNull(schema.dutyRosterAssignments.dutyDate)))
       .limit(1);
     if (!assignment || assignment.brokerId !== input.brokerId) throw new Error("A alocação não pertence a este corretor.");
-    await db.transaction(async (tx) => {
+    const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
-      await assertNoOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule, assignment.id);
+      const overlap = await findBrokerOverlap(tx, context.tenantId, input.brokerId, input.dayOfWeek, input.startsAt, input.endsAt, schedule, assignment.id);
+      if (overlap) await auditOverlapAllowed(tx, context.userId, input.brokerId);
       await assertScheduleCapacity(tx, context.tenantId, schedule.id, input.dayOfWeek, schedule.maximumBrokers, assignment.id);
       await tx.update(schema.dutyRosterAssignments).set({ scheduleId: schedule.id, dayOfWeek: input.dayOfWeek, startsAt: input.startsAt, endsAt: input.endsAt, updatedBy: context.userId, updatedAt: new Date() }).where(and(eq(schema.dutyRosterAssignments.id, assignment.id), eq(schema.dutyRosterAssignments.tenantId, context.tenantId)));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.moved" });
+      return overlap;
     });
-    return { success: true };
+    return overlapWarning
+      ? { success: true, message: `Corretor também está no plantão "${overlapWarning.name}" das ${overlapWarning.startsAt} às ${overlapWarning.endsAt}; ele ficará nos dois plantões neste horário.` }
+      : { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível mover a escala." };
   }

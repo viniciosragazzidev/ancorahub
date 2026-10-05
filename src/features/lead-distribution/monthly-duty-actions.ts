@@ -14,6 +14,7 @@ import {
   buildMonthOccurrences,
   dayOfWeekOf,
   describeDraftProblem,
+  findDraftOverlaps,
   findDraftProblems,
   MONTH_KEY_PATTERN,
   occurrenceValidity,
@@ -132,6 +133,8 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
   const visibleQuotas = quotas.filter((item) => visible(item.brokerId));
   const summary = summarizeDraft(occurrences, allAssignments, new Map(visibleQuotas.map((item) => [item.brokerId, item.quota])));
   const problems = plan.status === "draft" ? findDraftProblems(occurrences, allAssignments) : [];
+  // DEC-132: simultaneous occurrences are allowed; they surface as a warning.
+  const warnings = plan.status === "draft" ? findDraftOverlaps(occurrences, allAssignments) : [];
   const now = new Date();
   const [publishedBefore] = plan.status === "draft"
     ? await db.select({ id: schema.dutyScheduleMonthlyPlans.id }).from(schema.dutyScheduleMonthlyPlans)
@@ -156,6 +159,7 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
     belowMinimum: summary.belowMinimum,
     missingQuota: summary.missingQuota,
     problems: [...new Set(problems.map(describeDraftProblem))],
+    warnings: [...new Set(warnings.map(describeDraftProblem))],
     canEdit: context.role === "director",
     /** Publishing this draft replaces a published escala on the dates that have not ended. */
     replacesPublished: Boolean(publishedBefore),
@@ -256,7 +260,8 @@ export async function updateMonthlyDutyDraftAction(input: unknown): Promise<Mont
       const target = occurrences.find((occurrence) => occurrence.id === occurrenceId);
       if (target && occurrenceEnded(target, new Date())) throw new Error("Este plantão já terminou. Não é possível escalar corretores nele.");
       next = [...current, { occurrenceId, brokerId }];
-      const problems = findDraftProblems(occurrences, next).filter((problem) => problem.occurrenceId === occurrenceId);
+      // DEC-132: an overlap with the broker's other occurrences no longer blocks the add.
+      const problems = findDraftProblems(occurrences, next).filter((problem) => problem.occurrenceId === occurrenceId && problem.kind !== "overlap");
       if (problems.length) throw new Error(describeDraftProblem(problems[0]));
     }
     await tx.update(schema.dutyScheduleMonthlyPlans).set({ assignments: next, updatedAt: new Date() })
@@ -317,7 +322,8 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
       const before = stored.get(occurrence.id);
       return before && (before.startsAt !== occurrence.startsAt || before.endsAt !== occurrence.endsAt);
     });
-    const problems = findDraftProblems(occurrences, assignments);
+    // DEC-132: an overlap is a warning, never a publish blocker.
+    const problems = findDraftProblems(occurrences, assignments).filter((problem) => problem.kind !== "overlap");
     if (changed || problems.length) {
       throw new Error(`A proposta ficou desatualizada: ${changed ? "o horário de um plantão mudou." : describeDraftProblem(problems[0])} Gere uma nova proposta.`);
     }
