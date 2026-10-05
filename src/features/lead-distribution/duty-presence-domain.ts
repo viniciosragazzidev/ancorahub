@@ -5,6 +5,7 @@ export type DutyWindow = {
 };
 
 export type ConfirmedDutyOccurrence = {
+  assignmentId?: string;
   scheduleId: string;
   brokerId: string;
   dutyDate: string;
@@ -12,6 +13,23 @@ export type ConfirmedDutyOccurrence = {
   shiftEndsAt: Date;
   status: string;
 };
+
+/** Selects only the confirmation row belonging to this exact active assignment occurrence. */
+export function findDutyOccurrenceConfirmation<T extends ConfirmedDutyOccurrence>(input: {
+  confirmations: readonly T[];
+  assignment: { id: string; scheduleId: string; brokerId: string };
+  window: DutyWindow;
+  now: Date;
+}): T | undefined {
+  if (!isDutyWindowActive(input.window, input.now)) return undefined;
+  return input.confirmations.find((confirmation) =>
+    confirmation.assignmentId === input.assignment.id
+    && confirmation.scheduleId === input.assignment.scheduleId
+    && confirmation.brokerId === input.assignment.brokerId
+    && confirmation.dutyDate === input.window.dutyDate
+    && confirmation.shiftStartsAt.getTime() === input.window.startsAt.getTime()
+    && confirmation.shiftEndsAt.getTime() === input.window.endsAt.getTime());
+}
 
 /** An absence always blocks; an in-person shift requires a manager's check-in. */
 export function isDutyBrokerEligible(input: { attendanceMode: string; presenceRequired: boolean; status: string | null; confirmedBy: string | null }) {

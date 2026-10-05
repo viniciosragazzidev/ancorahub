@@ -1522,3 +1522,15 @@ A política nasce habilitada e é reversível pelo Super-admin através de
 `feature_duty_inactive_brokers_enabled`, com auditoria da configuração e das
 alterações de escala. Desativá-la restaura a exigência de cadastro ativo para
 novas inclusões/edições/publicações, sem apagar escalas existentes.
+
+## DEC-131 - Fila compartilhada entre plantoes simultaneos
+
+**Confirmada pelo usuario em 2026-10-05.** Uma fila pode atender por dois ou
+mais plantoes ativos no mesmo horario. A distribuicao considera a uniao dos
+corretores elegiveis e o ranking existente de menor carga na ocorrencia
+(`receivedInDuty`), aplicando falta, pausa, presenca, pacing e limites por
+plantao. A atribuicao registra o `dutyScheduleId` responsavel; se o corretor
+estiver em mais de um plantao, prevalece a ocorrencia em que confirmou presenca.
+Paginas, contadores, gavetas, exportacoes e historico filtram pelo plantao
+registrado. Plantoes inativos ficam fora. Ofertas e leads existentes mantem
+compatibilidade por meio de colunas nullable; sem backfill de historico.

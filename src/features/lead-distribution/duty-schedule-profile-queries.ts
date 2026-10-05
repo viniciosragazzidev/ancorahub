@@ -12,6 +12,7 @@ import { normalizeOfferPacing } from "./offer-pacing";
 import { assignmentShift } from "./duty-shifts";
 import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
+import { selectLeadsForDutySchedule } from "./shared-duty-roster";
 
 // Upper bound on how far back a lead can show even when the schedule has no
 // completed occurrence yet (brand-new schedule) — keeps the query sane.
@@ -136,10 +137,17 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     for (const id of queue.exclusiveDutyScheduleIds ?? []) familyScheduleIds.add(id);
   }
   const familySchedules = familyScheduleIds.size > 1
-    ? await db.select({ dayOfWeek: schema.unitDutySchedules.dayOfWeek, startsAt: schema.unitDutySchedules.startsAt, endsAt: schema.unitDutySchedules.endsAt, timezone: schema.unitDutySchedules.timezone })
+    ? await db.select({ id: schema.unitDutySchedules.id, dayOfWeek: schema.unitDutySchedules.dayOfWeek, startsAt: schema.unitDutySchedules.startsAt, endsAt: schema.unitDutySchedules.endsAt, timezone: schema.unitDutySchedules.timezone, status: schema.unitDutySchedules.status, validFrom: schema.unitDutySchedules.validFrom, validUntil: schema.unitDutySchedules.validUntil })
       .from(schema.unitDutySchedules)
       .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), inArray(schema.unitDutySchedules.id, [...familyScheduleIds])))
-    : [{ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }];
+    : [{ id: schedule.id, dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone, status: schedule.status, validFrom: schedule.validFrom, validUntil: schedule.validUntil }];
+  const hasOverlappingSiblingSchedule = familySchedules.some((candidate) => candidate.id !== scheduleId
+    && candidate.status === "active"
+    && candidate.validFrom <= now
+    && (!candidate.validUntil || candidate.validUntil > now)
+    && candidate.dayOfWeek === schedule.dayOfWeek
+    && candidate.startsAt < schedule.endsAt
+    && candidate.endsAt > schedule.startsAt);
 
   // Only leads that actually belong to this specific occurrence: the one
   // currently running (open-ended — still collecting) or, once it's closed,
@@ -162,8 +170,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   const monthlyEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true";
   const occurrenceDate = getSaoPauloDateKey(upcomingStartsAt ?? since);
   const publishedHere = monthlyEnabled ? rosterRows.filter((row) => row.dutyDate === occurrenceDate) : [];
-  const roster = (publishedHere.length ? publishedHere : rosterRows.filter((row) => row.dutyDate === null))
-    .map(({ dutyDate: _dutyDate, ...row }) => row);
+  const roster = publishedHere.length ? publishedHere : rosterRows.filter((row) => row.dutyDate === null);
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.
@@ -190,6 +197,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         branchId: schema.leads.branchId,
         branchName: schema.branches.name,
         queueId: schema.leads.queueId,
+        dutyScheduleId: schema.leads.dutyScheduleId,
         queueName: schema.leadQueues.name,
         queueColorHue: schema.leadQueues.colorHue,
         assignedAt: schema.leads.assignedAt,
@@ -207,6 +215,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
         inArray(schema.leads.queueId, queueIds),
+        hasOverlappingSiblingSchedule ? eq(schema.leads.dutyScheduleId, scheduleId) : undefined,
         or(
           and(gte(schema.leads.createdAt, since), until ? lte(schema.leads.createdAt, until) : undefined),
           and(gte(schema.leads.assignedAt, since), until ? lte(schema.leads.assignedAt, until) : undefined),
@@ -229,7 +238,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       inArray(schema.tenantMemberships.role, ["director", "manager"]),
     ))).map((row) => row.userId)
     : []);
-  const leads = queriedLeads.filter((lead) => !isManagementInvestigation(lead, managementUserIds));
+  const leads = selectLeadsForDutySchedule(queriedLeads, scheduleId, !hasOverlappingSiblingSchedule)
+    .filter((lead) => !isManagementInvestigation(lead, managementUserIds));
   const leadsByShift = countBrokerLeadsByShift(leads, schedule.shiftSplitAt);
 
   const leadsPerBroker = new Map<string, number>();
@@ -299,7 +309,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       queueName: schedule.legacyQueueName ?? (linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"),
     },
     presenceEnabled,
-    roster: roster.map(({ phone, userActive, membershipStatus, dayOfWeek, startsAt, endsAt, validFrom, validUntil, ...entry }) => {
+    roster: roster.map(({ phone, userActive, membershipStatus, startsAt, endsAt, ...entry }) => {
       // Which shift this broker works (morning, afternoon, whole day) on a split plantão.
       const shift = assignmentShift(schedule, { startsAt, endsAt });
       const occurrence = occurrenceByAssignment.get(entry.id);

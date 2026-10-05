@@ -108,6 +108,24 @@ export function parseDutyScheduleInput(formData: FormData) {
   return dutyScheduleInput.safeParse(cleanFormData(formData));
 }
 
+/** Omit this property for legacy callers so editing a schedule keeps its saved attendance mode. */
+export function getAttendanceModeUpdate(formData: Pick<FormData, "has">, attendanceMode: "online" | "presencial") {
+  return formData.has("attendanceMode") ? { attendanceMode } : {};
+}
+
+/** The duplicate path requires attendanceMode in its source projection and carries it into the clone. */
+export function buildDuplicateDutyScheduleValues<T extends { name: string; attendanceMode: string }>(schedule: T, cloneId: string, userId: string, now: Date) {
+  return {
+    ...schedule,
+    id: cloneId,
+    name: `${schedule.name} (cópia)`,
+    status: "inactive" as const,
+    createdBy: userId,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 export function parseCreateDutyScheduleInput(formData: FormData) {
   return createDutyScheduleInput.safeParse(cleanFormData(formData));
 }

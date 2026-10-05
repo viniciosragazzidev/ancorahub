@@ -261,6 +261,7 @@ function DutyFormSheet({
             ? `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s) e vinculado(s) a ${queueIds.length === 1 ? "1 fila" : `${queueIds.length} filas`}.`
             : `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s).`,
       );
+      if (result.message?.startsWith("Esta fila também está no plantão")) toast.info(result.message);
       router.refresh();
       onOpenChange(false);
     });
@@ -629,6 +630,7 @@ function DutyInspector({
         return;
       }
       toast.success(successMessage);
+      if (result.message?.startsWith("Esta fila também está no plantão")) toast.info(result.message);
       setConfirmArchive(false);
       router.refresh();
       if (close) onOpenChange(false);

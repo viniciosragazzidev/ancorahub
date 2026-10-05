@@ -14,6 +14,8 @@ import { QUEUE_SINGLETON_SOURCE_IDS, QUEUE_SOURCE_OPTIONS } from "./routing-cata
 import { dutyFallbackPolicyValues, type DutyFallbackPolicy } from "./types";
 import { getLocalDutyParts } from "@/features/leads/assignment";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
+import { loadBrokerPacingOffers } from "./offers";
+import { evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type PacingOffer } from "./offer-pacing";
 
 const queueInput = z.object({
   id: z.string().uuid().optional(),
@@ -628,9 +630,9 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   }
   const db = getDatabase();
   const branchCond = input.branchId ? eq(schema.leadQueues.branchId, input.branchId) : undefined;
-  const [queue] = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, status: schema.leadQueues.status })
+  const [queue] = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, status: schema.leadQueues.status })
     .from(schema.leadQueues).where(and(eq(schema.leadQueues.id, input.queueId ?? ""), eq(schema.leadQueues.tenantId, context.tenantId), branchCond)).limit(1);
-  const fallbackQueue = !queue ? await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, status: schema.leadQueues.status })
+  const fallbackQueue = !queue ? await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, strategy: schema.leadQueues.assignmentStrategy, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, status: schema.leadQueues.status })
     .from(schema.leadQueues).where(and(eq(schema.leadQueues.tenantId, context.tenantId), branchCond, eq(schema.leadQueues.status, "active"))).orderBy(desc(schema.leadQueues.isDefault), asc(schema.leadQueues.createdAt)).limit(1) : [];
   const effectiveQueue = queue ?? fallbackQueue[0];
   if (!effectiveQueue || effectiveQueue.status !== "active") return { queue: null, eligible: [], selected: null, reason: "Não existe uma fila ativa para esta unidade." };
@@ -641,6 +643,7 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   const policy = readPolicy(policyRow?.policy);
   const activeDutyRoster = await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: effectiveQueue.id, webhookCredentialId: null });
   const dutyEligibleBrokerIds = activeDutyRoster.hasActiveDuty ? new Set(activeDutyRoster.brokers.map((broker) => broker.id)) : null;
+  const dutyScheduleIdByBroker = new Map(activeDutyRoster.brokers.map((broker) => [broker.id, broker.scheduleId]));
   const targetBranchIds = Array.from(new Set([input.branchId, ...(policy.allowedBranchIds ?? [])].filter((id): id is string => typeof id === "string" && id.length > 0)));
 
   const brokers = await db.select({ id: schema.user.id, name: schema.user.name, createdAt: schema.user.createdAt })
@@ -661,26 +664,34 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
     .filter((id) => (!dutyEligibleBrokerIds || dutyEligibleBrokerIds.has(id)) && !policy.excludedBrokerIds.includes(id) && (!allowedBrokerSet || allowedBrokerSet.has(id)));
 
   if (!ids.length) return { queue: effectiveQueue, eligible: [], selected: null, reason: "Nenhum corretor disponível atende a política desta fila." };
+  const pacing = normalizeOfferPacing({ intervalMinutes: effectiveQueue.offerIntervalMinutes, maxPending: effectiveQueue.maxPendingOffers });
+  const pacingNow = new Date();
+  const recentOffers: Map<string, PacingOffer[]> = isOfferPacingEnabled(pacing)
+    ? await loadBrokerPacingOffers(db, { tenantId: context.tenantId, queueId: effectiveQueue.id, brokerIds: ids, intervalMinutes: pacing.intervalMinutes, now: pacingNow })
+    : new Map(ids.map((id) => [id, []]));
+  const paceableIds = ids.filter((id) => evaluateBrokerOfferPacing(recentOffers.get(id) ?? [], pacing, pacingNow).allowed);
+  if (!paceableIds.length) return { queue: effectiveQueue, eligible: [], selected: null, reason: "Todos os corretores elegíveis estão no intervalo de ofertas ou com ofertas pendentes." };
   const loads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads)
-    .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]))).groupBy(schema.leads.corretorId);
+    .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, paceableIds), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]))).groupBy(schema.leads.corretorId);
   const loadByBroker = new Map(loads.map((row) => [row.brokerId, Number(row.total)]));
   // Same "menor carga" of the plantão as the real distribution (service.ts): distinct leads
   // assigned (automatically, by offer or manually) or offered (pending/accepted) in the operation day.
   const dutySince = operationDayStart(new Date());
-  const [dutyAttempts, dutyOffers, dutyLeads] = ids.length ? await Promise.all([
-    db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId }).from(schema.leadAssignmentAttempts)
-      .where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids), gte(schema.leadAssignmentAttempts.assignedAt, dutySince))),
-    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId }).from(schema.leadOffers)
-      .where(and(eq(schema.leadOffers.tenantId, context.tenantId), inArray(schema.leadOffers.brokerId, ids), gte(schema.leadOffers.offeredAt, dutySince), inArray(schema.leadOffers.status, ["PENDING", "ACCEPTED"]))),
+  const [dutyAttempts, dutyOffers, dutyLeads] = paceableIds.length ? await Promise.all([
+    db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId }).from(schema.leadAssignmentAttempts)
+      .where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, paceableIds), gte(schema.leadAssignmentAttempts.assignedAt, dutySince))),
+    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, dutyScheduleId: schema.leadOffers.dutyScheduleId }).from(schema.leadOffers)
+      .where(and(eq(schema.leadOffers.tenantId, context.tenantId), inArray(schema.leadOffers.brokerId, paceableIds), gte(schema.leadOffers.offeredAt, dutySince), inArray(schema.leadOffers.status, ["PENDING", "ACCEPTED"]))),
     // Includes leads handed over manually.
-    db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id }).from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), gte(schema.leads.assignedAt, dutySince))),
+    db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, dutyScheduleId: schema.leads.dutyScheduleId }).from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, paceableIds), gte(schema.leads.assignedAt, dutySince))),
   ]) : [[], [], []];
   const receivedInDutyByBroker = new Map<string, number>();
-  for (const id of ids) {
-    receivedInDutyByBroker.set(id, new Set([...dutyAttempts, ...dutyOffers, ...dutyLeads].filter((row) => row.brokerId === id).map((row) => row.leadId)).size);
+  for (const id of paceableIds) {
+    const scheduleId = dutyScheduleIdByBroker.get(id);
+    receivedInDutyByBroker.set(id, new Set([...dutyAttempts, ...dutyOffers, ...dutyLeads].filter((row) => row.brokerId === id && (!scheduleId || row.dutyScheduleId === scheduleId)).map((row) => row.leadId)).size);
   }
-  const candidates: RankedBroker[] = brokers.filter((broker) => ids.includes(broker.id)).map((broker) => {
+  const candidates: RankedBroker[] = brokers.filter((broker) => paceableIds.includes(broker.id)).map((broker) => {
     const activeLeads = loadByBroker.get(broker.id) ?? 0;
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads, receivedInDuty: receivedInDutyByBroker.get(broker.id) ?? 0, capacity: effectiveQueue.capacityEnabled ? effectiveQueue.capacity : null, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: input.temperature === "hot" || input.score >= 80 ? 1 : 0, idleSince: null, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, policy) };
@@ -688,8 +699,8 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   const decision = resolveDistributionCandidate(candidates, policy, effectiveQueue.strategy === "round_robin" ? "round_robin" : "capacity");
   return {
     queue: effectiveQueue,
-    eligible: decision.eligible.map((candidate) => ({ id: candidate.id, name: brokers.find((broker) => broker.id === candidate.id)?.name ?? "Corretor", activeLeads: candidate.activeLeads, capacity: candidate.capacity, score: candidate.rankingScore })),
-    selected: decision.selected ? { id: decision.selected.id, name: brokers.find((broker) => broker.id === decision.selected?.id)?.name ?? "Corretor", activeLeads: decision.selected.activeLeads, capacity: decision.selected.capacity } : null,
+    eligible: decision.eligible.map((candidate) => ({ id: candidate.id, name: brokers.find((broker) => broker.id === candidate.id)?.name ?? "Corretor", dutyScheduleId: dutyScheduleIdByBroker.get(candidate.id) ?? null, activeLeads: candidate.activeLeads, capacity: candidate.capacity, score: candidate.rankingScore })),
+    selected: decision.selected ? { id: decision.selected.id, name: brokers.find((broker) => broker.id === decision.selected?.id)?.name ?? "Corretor", dutyScheduleId: dutyScheduleIdByBroker.get(decision.selected.id) ?? null, activeLeads: decision.selected.activeLeads, capacity: decision.selected.capacity } : null,
     reason: decision.selected ? "A simulação usa os mesmos critérios da distribuição automática (empates são sorteados). Nenhum dado foi alterado." : "Todos os corretores elegíveis estão na capacidade da fila.",
   };
 }

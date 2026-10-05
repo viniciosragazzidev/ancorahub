@@ -48,10 +48,7 @@ export async function getDutyOccurrenceHistory(
       .innerJoin(schema.user, eq(schema.leadOffers.brokerId, schema.user.id))
       .where(and(
         eq(schema.leadOffers.tenantId, context.tenantId),
-        or(
-          queueIds.length ? inArray(schema.leads.queueId, queueIds) : sql`false`,
-          sql`exists (select 1 from lead_distribution_events duty_event where duty_event.tenant_id = ${context.tenantId} and duty_event.action = 'offer_sent' and duty_event.metadata->>'offerId' = ${schema.leadOffers.id} and duty_event.metadata->>'scheduleId' = ${scheduleId} and duty_event.metadata->>'dutyDate' = ${window.dutyDate})`,
-        ),
+        eq(schema.leadOffers.dutyScheduleId, scheduleId),
         gte(schema.leadOffers.offeredAt, window.startsAt),
         lt(schema.leadOffers.offeredAt, window.endsAt),
         context.role === "manager" && context.branchId ? sql`exists (select 1 from lead_distribution_events scoped_offer where scoped_offer.tenant_id = ${context.tenantId} and scoped_offer.lead_id = ${schema.leadOffers.leadId} and scoped_offer.new_owner_id = ${schema.leadOffers.brokerId} and scoped_offer.action = 'offer_sent' and scoped_offer.to_branch_id = ${context.branchId} and scoped_offer.created_at >= ${window.startsAt} and scoped_offer.created_at < ${window.endsAt})` : undefined,
@@ -71,10 +68,7 @@ export async function getDutyOccurrenceHistory(
       .where(and(
         eq(schema.leadDistributionEvents.tenantId, context.tenantId),
         inArray(schema.leadDistributionEvents.action, ["assigned", "routed_and_assigned"]),
-        or(
-          queueIds.length ? inArray(schema.leadDistributionEvents.toQueueId, queueIds) : sql`false`,
-          sql`${schema.leadDistributionEvents.metadata}->>'dutyScheduleId' = ${scheduleId} and ${schema.leadDistributionEvents.metadata}->>'dutyDate' = ${window.dutyDate}`,
-        ),
+        sql`${schema.leadDistributionEvents.metadata}->>'dutyScheduleId' = ${scheduleId}`,
         isNotNull(schema.leadDistributionEvents.newOwnerId),
         gte(schema.leadDistributionEvents.createdAt, window.startsAt),
         lt(schema.leadDistributionEvents.createdAt, window.endsAt),
@@ -103,8 +97,8 @@ export async function getDutyOccurrenceHistory(
       )),
   ]);
   const exactOfferIds = new Set(offerEvents.flatMap((event) => {
-    const metadata = event.metadata as { offerId?: unknown; scheduleId?: unknown; dutyDate?: unknown } | null;
-    return metadata?.scheduleId === scheduleId && metadata.dutyDate === window.dutyDate && typeof metadata.offerId === "string" ? [metadata.offerId] : [];
+    const metadata = event.metadata as { offerId?: unknown; scheduleId?: unknown; dutyScheduleId?: unknown; dutyDate?: unknown } | null;
+    return (metadata?.dutyScheduleId === scheduleId || metadata?.scheduleId === scheduleId && metadata.dutyDate === window.dutyDate) && typeof metadata.offerId === "string" ? [metadata.offerId] : [];
   }));
 
   const distributions = [

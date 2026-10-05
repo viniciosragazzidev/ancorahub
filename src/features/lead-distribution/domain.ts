@@ -187,9 +187,12 @@ export function resolveDistributionCandidate(
   random: () => number = Math.random,
 ) {
   const eligible = rankBrokers(brokers, policy, new Date(), random);
-  const selected = policy.ranking.enabled
+  const chosen = policy.ranking.enabled
     ? eligible[0] ?? null
     : chooseBroker(eligible, strategy === "round_robin" ? "round_robin" : "capacity", random);
+  // chooseBroker exposes the smaller EligibleBroker shape; return the
+  // matching ranked row so callers keep schedule and duty-load metadata.
+  const selected = chosen ? eligible.find((broker) => broker.id === chosen.id) ?? null : null;
   return { eligible, selected };
 }
 
@@ -272,10 +275,12 @@ export function buildPendingLeadOfferLeadUpdate(input: {
   brokerId: string;
   now: Date;
   assignmentSource?: "automatic_offer" | "manual_offer";
+  dutyScheduleId?: string | null;
 }) {
   return {
     branchId: input.targetBranchId,
     corretorId: input.brokerId,
+    dutyScheduleId: input.dutyScheduleId ?? null,
     status: "distributed" as const,
     distributionStatus: "assigned" as const,
     assignedAt: input.now,
@@ -295,6 +300,7 @@ export function buildPendingLeadOfferLeadUpdate(input: {
 export function buildManualOfferLeadReleaseUpdate(now: Date, cycleStartedAt: Date) {
   return {
     corretorId: null,
+    dutyScheduleId: null,
     status: "distributed" as const,
     distributionStatus: "queued" as const,
     assignmentSource: "redistribution" as const,

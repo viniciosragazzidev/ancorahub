@@ -5,7 +5,7 @@ import { and, eq, gt, inArray, isNull, lte, lt, ne, or } from "drizzle-orm";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
-import { formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
+import { findDutyOccurrenceConfirmation, formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 
 type PresenceAssignment = { id: string; scheduleId: string; brokerId: string; dayOfWeek: number; startsAt: string; endsAt: string; validFrom: Date; validUntil: Date | null };
@@ -21,14 +21,14 @@ function getWindow(schedule: PresenceSchedule, now: Date): DutyWindow | null {
   return window;
 }
 
-/** Restricts a currently active roster to exact, tenant-scoped confirmed occurrences. */
-export async function getPresenceConfirmedAssignmentIds(input: {
+/** Restricts a roster to eligible occurrences and identifies explicit check-ins. */
+export async function getPresenceEligibleAssignments(input: {
   tenantId: string;
   assignments: PresenceAssignment[];
   schedules: PresenceSchedule[];
   now: Date;
 }) {
-  if (!input.assignments.length) return new Set<string>();
+  if (!input.assignments.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>() };
   const presenceRequired = await isDutyPresenceConfirmationEnabled();
 
   const scheduleById = new Map(input.schedules.map((schedule) => [schedule.id, schedule]));
@@ -38,7 +38,7 @@ export async function getPresenceConfirmedAssignmentIds(input: {
     const window = getWindow({ ...schedule, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt, endsAt: assignment.endsAt, validFrom: assignment.validFrom, validUntil: assignment.validUntil }, input.now);
     return window && isDutyWindowActive(window, input.now) ? [{ assignment, schedule, window }] : [];
   });
-  if (!occurrences.length) return new Set<string>();
+  if (!occurrences.length) return { eligibleAssignmentIds: new Set<string>(), confirmedPresenceAssignmentIds: new Set<string>() };
 
   const confirmationRows = await getDatabase()
     .select({
@@ -57,14 +57,23 @@ export async function getPresenceConfirmedAssignmentIds(input: {
       gt(schema.dutyPresenceConfirmations.shiftEndsAt, input.now),
       inArray(schema.dutyPresenceConfirmations.assignmentId, occurrences.map(({ assignment }) => assignment.id)),
     ));
-  const confirmationByAssignment = new Map(confirmationRows.map((row) => [row.assignmentId, row]));
-  return new Set(occurrences
-    .filter(({ assignment, schedule, window }) => {
-      const confirmation = confirmationByAssignment.get(assignment.id);
+  const eligible = occurrences.filter(({ assignment, schedule, window }) => {
+      const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
       return isDutyBrokerEligible({ attendanceMode: schedule.attendanceMode ?? "online", presenceRequired, status: confirmation?.status ?? null, confirmedBy: confirmation?.confirmedBy ?? null })
         && (!(presenceRequired || schedule.attendanceMode === "presencial") || isConfirmationForActiveOccurrence({ confirmation, assignment, window, now: input.now }));
-    })
-    .map(({ assignment }) => assignment.id));
+    });
+  return {
+    eligibleAssignmentIds: new Set(eligible.map(({ assignment }) => assignment.id)),
+    confirmedPresenceAssignmentIds: new Set(eligible.flatMap(({ assignment, window }) => {
+      const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
+      return confirmation?.status === "confirmed" && confirmation.confirmedBy ? [assignment.id] : [];
+    })),
+  };
+}
+
+/** Backward-compatible view for callers that only need eligible assignment IDs. */
+export async function getPresenceConfirmedAssignmentIds(input: Parameters<typeof getPresenceEligibleAssignments>[0]) {
+  return (await getPresenceEligibleAssignments(input)).eligibleAssignmentIds;
 }
 
 /** Creates idempotent occurrence records and sends the approved Meta template before each shift. */

@@ -102,6 +102,7 @@ export async function createLeadOffersForBrokers(input: {
   pacing?: OfferPacingConfig | null;
   assignmentSource?: "automatic_offer" | "manual_offer";
   dutyScheduleIds?: string[];
+  dutyScheduleIdByBroker?: Record<string, string>;
 }) {
   const db = getDatabase();
   // Same bounds as the "SLA de Aceite" setting (1–1440 min).
@@ -240,6 +241,7 @@ export async function createLeadOffersForBrokers(input: {
         tenantId: input.tenantId,
         leadId: input.leadId,
         brokerId: broker.id,
+        dutyScheduleId: input.dutyScheduleIdByBroker?.[broker.id] ?? null,
         status: destinationPhone ? "PENDING" : "CANCELLED",
         offeredAt: now,
         expiresAt,
@@ -263,7 +265,7 @@ export async function createLeadOffersForBrokers(input: {
             eq(schema.dutyRosterAssignments.brokerId, broker.id),
             eq(schema.dutyRosterAssignments.status, "active"),
             isNull(schema.dutyRosterAssignments.pausedAt),
-            inArray(schema.dutyRosterAssignments.scheduleId, input.dutyScheduleIds),
+            inArray(schema.dutyRosterAssignments.scheduleId, input.dutyScheduleIdByBroker?.[broker.id] ? [input.dutyScheduleIdByBroker[broker.id]] : input.dutyScheduleIds),
             lte(schema.dutyRosterAssignments.validFrom, now),
             or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now)),
           ))
@@ -286,6 +288,7 @@ export async function createLeadOffersForBrokers(input: {
           brokerId: broker.id,
           now,
           assignmentSource: input.assignmentSource,
+          dutyScheduleId: input.dutyScheduleIdByBroker?.[broker.id] ?? null,
         })).where(and(
           eq(schema.leads.id, input.leadId),
           eq(schema.leads.tenantId, input.tenantId),
@@ -311,7 +314,7 @@ export async function createLeadOffersForBrokers(input: {
             ? "Responsabilidade provisória transferida ao próximo corretor elegível."
             : "Responsabilidade provisória atribuída ao primeiro corretor elegível.",
           actorId: input.requestedBy ?? broker.id,
-          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true, offerId, ...(exactOccurrence ?? {}) },
+          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true, offerId, ...(input.dutyScheduleIdByBroker?.[broker.id] ? { dutyScheduleId: input.dutyScheduleIdByBroker[broker.id] } : {}), ...(exactOccurrence ?? {}) },
           createdAt: now,
         });
         if (input.requestedBy) {

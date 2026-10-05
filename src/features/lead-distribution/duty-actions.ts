@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
-import { dutyScheduleInput, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
+import { buildDuplicateDutyScheduleValues, dutyScheduleInput, getAttendanceModeUpdate, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
 import { retimeAssignmentForSplit, validShiftSplit } from "./duty-shifts";
 import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
@@ -79,9 +79,9 @@ async function assertNoScheduleConflict(
       .from(schema.leadQueues)
       .where(and(inArray(schema.leadQueues.id, queueIdsToCheck), eq(schema.leadQueues.tenantId, tenantId)));
     const scopedIds = Array.from(new Set(queues.flatMap((queue) => queue.exclusiveDutyScheduleIds ?? []))).filter((id) => id !== excludedScheduleId);
-    if (!scopedIds.length) return;
-    const [conflict] = await db
-      .select({ id: schema.unitDutySchedules.id })
+    if (!scopedIds.length) return [];
+    const conflicts = await db
+      .select({ id: schema.unitDutySchedules.id, name: schema.unitDutySchedules.name })
       .from(schema.unitDutySchedules)
       .where(and(
         eq(schema.unitDutySchedules.tenantId, tenantId),
@@ -92,9 +92,8 @@ async function assertNoScheduleConflict(
         inArray(schema.unitDutySchedules.id, scopedIds),
         overlapsValidity(input),
       ))
-      .limit(1);
-    if (conflict) throw new Error("A fila responsável já tem um plantão ativo no mesmo horário.");
-    return;
+      .limit(10);
+    return conflicts.map((conflict) => `Esta fila também está no plantão ${conflict.name} neste horário; os leads serão divididos entre os dois.`);
   }
 
   const conditions = [
@@ -115,6 +114,7 @@ async function assertNoScheduleConflict(
     .from(schema.unitDutySchedules)
     .where(and(...conditions))
     .limit(1);
+  if (!conflict) return [];
   if (conflict) {
     throw new Error(
       isGlobal
@@ -122,6 +122,7 @@ async function assertNoScheduleConflict(
         : "Já existe um plantão ativo com o mesmo horário neste escopo.",
     );
   }
+  return [];
 }
 
 function validateSchedule(input: Pick<z.infer<typeof dutyScheduleInput>, "dayOfWeek" | "startsAt" | "endsAt" | "validFrom" | "validUntil">) {
@@ -151,6 +152,7 @@ async function findScheduleForMutation(scheduleId: string) {
       maximumBrokers: schema.unitDutySchedules.maximumBrokers,
       maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
       shiftSplitAt: schema.unitDutySchedules.shiftSplitAt,
+      attendanceMode: schema.unitDutySchedules.attendanceMode,
       typeId: schema.unitDutySchedules.typeId,
       validFrom: schema.unitDutySchedules.validFrom,
       validUntil: schema.unitDutySchedules.validUntil,
@@ -270,10 +272,11 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       ...(parsed.data.responsibleQueueIds ?? []),
       ...(parsed.data.responsibleQueueId ? [parsed.data.responsibleQueueId] : []),
     ]);
+    const sharedWarnings = new Set<string>();
     for (const schedule of schedules) {
       // Each queue has its own roster: the plantão only collides with another of the same queue.
-      if (!receivingQueueIds.length) await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: null }, context.tenantId);
-      for (const queueId of receivingQueueIds) await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: queueId }, context.tenantId);
+      if (!receivingQueueIds.length) for (const warning of await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: null }, context.tenantId)) sharedWarnings.add(warning);
+      for (const queueId of receivingQueueIds) for (const warning of await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: queueId }, context.tenantId)) sharedWarnings.add(warning);
     }
     const scheduleIds = schedules.map(() => randomUUID());
     const now = new Date();
@@ -310,7 +313,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       }
     });
     revalidateDutyWorkspace();
-    return { success: true, scheduleId: scheduleIds[0], scheduleIds, message: `${scheduleIds.length} plantão(ões) criado(s) para todas as unidades.` };
+    return { success: true, scheduleId: scheduleIds[0], scheduleIds, message: [...sharedWarnings].join(" ") || `${scheduleIds.length} plantão(ões) criado(s) para todas as unidades.` };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível criar o plantão." };
   }
@@ -337,10 +340,11 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         ? [z.union([z.literal(""), z.string().uuid()]).parse(singleField)].filter(Boolean)
         : undefined;
     const receivingQueueIds = requestedQueueIds === undefined ? undefined : await activeQueueIds(db, context.tenantId, requestedQueueIds);
+    const sharedWarnings = new Set<string>();
     if (receivingQueueIds?.length) {
-      for (const queueId of receivingQueueIds) await assertNoScheduleConflict(db, { ...parsed.data, responsibleQueueId: queueId }, context.tenantId, schedule.id);
+      for (const queueId of receivingQueueIds) for (const warning of await assertNoScheduleConflict(db, { ...parsed.data, responsibleQueueId: queueId }, context.tenantId, schedule.id)) sharedWarnings.add(warning);
     } else {
-      await assertNoScheduleConflict(db, parsed.data, context.tenantId, schedule.id);
+      for (const warning of await assertNoScheduleConflict(db, parsed.data, context.tenantId, schedule.id)) sharedWarnings.add(warning);
     }
     const typeId = await resolveDutyTypeId(db, context.tenantId, context.userId, parsed.data.typeName);
     await db.transaction(async (tx) => {
@@ -368,7 +372,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         typeId,
         maximumBrokers: parsed.data.maximumBrokers ?? null,
         maxLeadsPerBroker: parsed.data.maxLeadsPerBroker ?? null,
-        attendanceMode: parsed.data.attendanceMode,
+        ...getAttendanceModeUpdate(formData, parsed.data.attendanceMode),
         // Absent from the form = unchanged (older forms, "estender").
         ...(formData.has("shiftSplitAt") ? { shiftSplitAt: nextSplit } : {}),
         validFrom: parsed.data.validFrom,
@@ -407,7 +411,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
       if (receivingQueueIds !== undefined) await relinkScheduleQueues(tx, context, schedule.id, receivingQueueIds);
     });
     revalidateDutyWorkspace();
-    return { success: true, scheduleId: schedule.id, message: "Plantão atualizado." };
+    return { success: true, scheduleId: schedule.id, message: [...sharedWarnings].join(" ") || "Plantão atualizado." };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível editar o plantão." };
   }
@@ -447,15 +451,7 @@ export async function duplicateDutyScheduleAction(_previous: DutyActionState, fo
     const cloneId = randomUUID();
     const now = new Date();
     await db.transaction(async (tx) => {
-      await tx.insert(schema.unitDutySchedules).values({
-        ...schedule,
-        id: cloneId,
-        name: `${schedule.name} (cópia)`,
-        status: "inactive",
-        createdBy: context.userId,
-        createdAt: now,
-        updatedAt: now,
-      });
+      await tx.insert(schema.unitDutySchedules).values(buildDuplicateDutyScheduleValues(schedule, cloneId, context.userId, now));
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: cloneId, acao: "duty_schedule.duplicated",
       });
@@ -580,7 +576,7 @@ export async function getBrokerDayHistoryAction(scheduleId: string, brokerId: st
       .limit(1);
     if (!onRoster) return { ok: false, reason: "Este corretor não está na escala deste plantão." };
     const day = dutyDate ? z.string().regex(/^\d{4}-\d{2}-\d{2}$/).parse(dutyDate) : null;
-    const history = await getBrokerDayHistory(context.tenantId, parsedBrokerId, { dutyDate: day });
+    const history = await getBrokerDayHistory(context.tenantId, parsedBrokerId, { dutyDate: day, dutyScheduleId: scheduleId });
     return history ? { ok: true, history } : { ok: false, reason: "Corretor não encontrado." };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível carregar o histórico." };
@@ -615,7 +611,7 @@ export async function getBrokerOccurrenceLeadsAction(scheduleId: string, brokerI
     const rows = await db.select({ id: schema.leads.id, name: schema.leads.nome, assignedAt: schema.leads.assignedAt, origin: schema.leads.origem, queueName: schema.leadQueues.name, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt })
       .from(schema.leads)
       .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
-      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, parsedBrokerId), inArray(schema.leads.queueId, queueIds), gte(schema.leads.assignedAt, lower), upper ? lt(schema.leads.assignedAt, upper) : undefined, isNull(schema.leads.deletedAt)))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, parsedBrokerId), eq(schema.leads.dutyScheduleId, parsedScheduleId), inArray(schema.leads.queueId, queueIds), gte(schema.leads.assignedAt, lower), upper ? lt(schema.leads.assignedAt, upper) : undefined, isNull(schema.leads.deletedAt)))
       .orderBy(schema.leads.assignedAt);
     return { ok: true as const, leads: rows.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null })) };
   } catch (error) {

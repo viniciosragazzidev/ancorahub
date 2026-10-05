@@ -911,6 +911,13 @@
                         "when":  1791090000000,
                         "tag":  "0182_duty_attendance_mode_and_absence",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  130,
+                        "version":  "7",
+                        "when":  1791158400000,
+                        "tag":  "0183_shared_duty_schedule_attribution",
+                        "breakpoints":  true
                     }
                 ]
 }

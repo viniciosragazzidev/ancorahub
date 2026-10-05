@@ -5,14 +5,18 @@ import { and, asc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import { getLocalDutyParts } from "@/features/leads/assignment";
 import { getDatabase, schema } from "@/shared/db";
 import { selectMatchingDutyScheduleIds, selectQueueLinkedDutySchedules } from "./duty-roster-matching";
-import { getPresenceConfirmedAssignmentIds } from "./duty-presence";
+import { getPresenceEligibleAssignments } from "./duty-presence";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
+import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
+import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
+import { findRunningDutySchedule } from "./duty-presence-domain";
 
 export type ActiveQueueDutyBroker = {
   id: string;
   name: string;
   branchId: string;
   branchName: string;
+  scheduleId: string;
 };
 
 export type ActiveQueueDutyRoster = {
@@ -73,6 +77,7 @@ export async function getActiveQueueDutyRoster(input: {
       endsAt: schema.unitDutySchedules.endsAt,
       timezone: schema.unitDutySchedules.timezone,
       attendanceMode: schema.unitDutySchedules.attendanceMode,
+      maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
       validFrom: schema.unitDutySchedules.validFrom,
       validUntil: schema.unitDutySchedules.validUntil,
     })
@@ -106,6 +111,7 @@ export async function getActiveQueueDutyRoster(input: {
       branchId: schema.dutyRosterAssignments.branchId,
       branchName: schema.branches.name,
       dutyDate: schema.dutyRosterAssignments.dutyDate,
+      pausedAt: schema.dutyRosterAssignments.pausedAt,
     })
     .from(schema.dutyRosterAssignments)
     .innerJoin(schema.tenantMemberships, and(
@@ -120,6 +126,7 @@ export async function getActiveQueueDutyRoster(input: {
     .where(and(
       eq(schema.dutyRosterAssignments.tenantId, input.tenantId),
       eq(schema.dutyRosterAssignments.status, "active"),
+      isNull(schema.dutyRosterAssignments.pausedAt),
       eq(schema.dutyRosterAssignments.dayOfWeek, local.weekday),
       lte(schema.dutyRosterAssignments.startsAt, local.time),
       gt(schema.dutyRosterAssignments.endsAt, local.time),
@@ -136,7 +143,7 @@ export async function getActiveQueueDutyRoster(input: {
 
   const effectiveBrokers = await resolveEffectiveDutyAssignments(input.tenantId, brokers, now);
   const effectiveAssignmentIds = new Set(effectiveBrokers.map((assignment) => assignment.assignmentId));
-  const confirmedAssignmentIds = await getPresenceConfirmedAssignmentIds({
+  const presence = await getPresenceEligibleAssignments({
     tenantId: input.tenantId,
     assignments: brokers.filter((broker) => effectiveAssignmentIds.has(broker.assignmentId)).map((broker) => ({
       id: broker.assignmentId,
@@ -151,8 +158,33 @@ export async function getActiveQueueDutyRoster(input: {
     schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
     now,
   });
+  const scheduleIdByBroker = selectBrokerDutyScheduleIds(
+    effectiveBrokers.map((broker) => ({ id: broker.assignmentId, brokerId: broker.id, scheduleId: broker.scheduleId })),
+    new Set(matchingScheduleIds),
+    presence.eligibleAssignmentIds,
+    presence.confirmedPresenceAssignmentIds,
+  );
+  const capBySchedule = new Map<string, DutyLeadCap>();
+  for (const schedule of activeSchedules) {
+    const running = findRunningDutySchedule([schedule], now);
+    if (running && schedule.maxLeadsPerBroker) capBySchedule.set(schedule.id, {
+      scheduleId: schedule.id,
+      limit: schedule.maxLeadsPerBroker,
+      startsAt: running.window.startsAt,
+      endsAt: running.window.endsAt,
+    });
+  }
+  const receivedBySchedule = new Map<string, Map<string, number>>();
+  await Promise.all([...capBySchedule.values()].map(async (cap) => {
+    const brokerIds = [...scheduleIdByBroker].filter(([, scheduleId]) => scheduleId === cap.scheduleId).map(([brokerId]) => brokerId);
+    if (brokerIds.length) receivedBySchedule.set(cap.scheduleId, await countLeadsReceivedInDuty(db, input.tenantId, cap, brokerIds));
+  }));
+  for (const [brokerId, scheduleId] of scheduleIdByBroker) {
+    const cap = capBySchedule.get(scheduleId);
+    if (cap && (receivedBySchedule.get(scheduleId)?.get(brokerId) ?? 0) >= cap.limit) scheduleIdByBroker.delete(brokerId);
+  }
   return {
     hasActiveDuty: true,
-    brokers: brokers.filter((broker) => effectiveAssignmentIds.has(broker.assignmentId) && confirmedAssignmentIds.has(broker.assignmentId)).map((broker) => ({ id: broker.id, name: broker.name, branchId: broker.branchId, branchName: broker.branchName })),
+    brokers: brokers.filter((broker) => effectiveAssignmentIds.has(broker.assignmentId) && presence.eligibleAssignmentIds.has(broker.assignmentId) && scheduleIdByBroker.get(broker.id) === broker.scheduleId).map((broker) => ({ id: broker.id, scheduleId: broker.scheduleId, name: broker.name, branchId: broker.branchId, branchName: broker.branchName })),
   };
 }

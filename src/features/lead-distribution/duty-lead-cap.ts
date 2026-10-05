@@ -31,6 +31,7 @@ export async function countLeadsReceivedInDuty(db: Database, tenantId: string, c
     .where(and(
       eq(schema.leads.tenantId, tenantId),
       inArray(schema.leads.corretorId, [...brokerIds]),
+      eq(schema.leads.dutyScheduleId, cap.scheduleId),
       gte(schema.leads.assignedAt, cap.startsAt),
       lt(schema.leads.assignedAt, cap.endsAt),
       isNull(schema.leads.deletedAt),

@@ -68,7 +68,7 @@ export function operationDayOf(dutyDate: string) {
  * What a broker received in the operation's day: leads handed to them and every
  * offer sent. Today's (open) day by default; a past plantão's day with `dutyDate`.
  */
-export async function getBrokerDayHistory(tenantId: string, brokerId: string, options: { now?: Date; dutyDate?: string | null } = {}): Promise<BrokerDayHistory | null> {
+export async function getBrokerDayHistory(tenantId: string, brokerId: string, options: { now?: Date; dutyDate?: string | null; dutyScheduleId?: string | null } = {}): Promise<BrokerDayHistory | null> {
   const db = getDatabase();
   const past = options.dutyDate ? operationDayOf(options.dutyDate) : null;
   const since = past?.since ?? operationDayStart(options.now ?? new Date());
@@ -94,6 +94,7 @@ export async function getBrokerDayHistory(tenantId: string, brokerId: string, op
       .where(and(
         eq(schema.leads.tenantId, tenantId),
         eq(schema.leads.corretorId, brokerId),
+        options.dutyScheduleId ? eq(schema.leads.dutyScheduleId, options.dutyScheduleId) : undefined,
         gte(schema.leads.assignedAt, since),
         until ? lt(schema.leads.assignedAt, until) : undefined,
         isNull(schema.leads.deletedAt),
@@ -112,6 +113,7 @@ export async function getBrokerDayHistory(tenantId: string, brokerId: string, op
       .where(and(
         eq(schema.leadOffers.tenantId, tenantId),
         eq(schema.leadOffers.brokerId, brokerId),
+        options.dutyScheduleId ? eq(schema.leadOffers.dutyScheduleId, options.dutyScheduleId) : undefined,
         gte(schema.leadOffers.offeredAt, since),
         until ? lt(schema.leadOffers.offeredAt, until) : undefined,
       ))

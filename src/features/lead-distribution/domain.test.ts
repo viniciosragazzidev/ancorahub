@@ -162,6 +162,7 @@ describe("lead offer ownership", () => {
     expect(pendingUpdate).toEqual({
       branchId: "unit-a",
       corretorId: "broker-a",
+      dutyScheduleId: null,
       status: "distributed",
       distributionStatus: "assigned",
       assignedAt: now,
