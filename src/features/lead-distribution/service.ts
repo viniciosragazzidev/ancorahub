@@ -22,7 +22,7 @@ import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getPresenceEligibleAssignments } from "./duty-presence";
-import { findRunningDutySchedule, getDutyOccurrenceLeadWindow, isLeadInDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
+import { findRunningDutySchedule } from "./duty-presence-domain";
 import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
 
@@ -750,10 +750,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const running = findRunningDutySchedule(dutySchedules, activeNow);
     const activeSchedule = running?.schedule;
     if (activeSchedule) {
-      const bounds = resolveDutyLeadWindowBounds(getDutyOccurrenceLeadWindow(activeSchedule, dutySchedules, activeNow), activeNow);
-      if (!isLeadInDutyWindow(lead, bounds)) {
-        return { status: "queued", leadId, reason: "Lead chegou antes do início deste plantão; aguarda atribuição manual e não entra na distribuição automática." };
-      }
+      // Any lead waiting in the queue goes to a broker, in order of importance
+      // (hot, warm, cold; oldest first) — a lead that arrived before this
+      // plantão's window is no longer held for manual assignment.
       const occurrence = running.window;
       if (activeSchedule.maxLeadsPerBroker) {
         dutyLeadCaps.set(activeSchedule.id, { scheduleId: activeSchedule.id, limit: activeSchedule.maxLeadsPerBroker, startsAt: occurrence.startsAt, endsAt: occurrence.endsAt });
