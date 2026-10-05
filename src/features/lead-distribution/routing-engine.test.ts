@@ -10,6 +10,7 @@ describe("Routing Engine - evaluateLeadAgainstConditions", () => {
     expect(normalizeQueueSource("landing_page", null, true)).toBe("webhook");
     expect(normalizeQueueSource(null, "webhook")).toBe("webhook");
     expect(normalizeQueueSource("meta_lead_ads", null, true)).toBe("meta_lead_ads");
+    expect(normalizeQueueSource("meta_lead_ads", "webhook", true)).toBe("meta_lead_ads");
   });
 
   it("returns match when lead matches planType and minLives conditions", () => {
