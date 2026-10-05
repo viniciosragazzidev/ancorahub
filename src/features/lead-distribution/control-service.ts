@@ -12,6 +12,7 @@ import { pickDistinctHue, QUEUE_HUE_MAX, QUEUE_HUE_MIN } from "./queue-color";
 import { QUEUE_SINGLETON_SOURCE_IDS, QUEUE_SOURCE_OPTIONS } from "./routing-catalog";
 import { dutyFallbackPolicyValues, type DutyFallbackPolicy } from "./types";
 import { getLocalDutyParts } from "@/features/leads/assignment";
+import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 
 const queueInput = z.object({
   id: z.string().uuid().optional(),
@@ -637,6 +638,8 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
     .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.queueId, effectiveQueue.id), eq(schema.leadDistributionPolicies.enabled, true))).limit(1);
 
   const policy = readPolicy(policyRow?.policy);
+  const activeDutyRoster = await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: effectiveQueue.id, webhookCredentialId: null });
+  const dutyEligibleBrokerIds = activeDutyRoster.hasActiveDuty ? new Set(activeDutyRoster.brokers.map((broker) => broker.id)) : null;
   const targetBranchIds = Array.from(new Set([input.branchId, ...(policy.allowedBranchIds ?? [])].filter((id): id is string => typeof id === "string" && id.length > 0)));
 
   const brokers = await db.select({ id: schema.user.id, name: schema.user.name, createdAt: schema.user.createdAt })
@@ -654,7 +657,7 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   const allowedBrokerSet = policy.allowedBrokerIds?.length ? new Set(policy.allowedBrokerIds) : null;
   const ids = brokers
     .map((broker) => broker.id)
-    .filter((id) => !policy.excludedBrokerIds.includes(id) && (!allowedBrokerSet || allowedBrokerSet.has(id)));
+    .filter((id) => (!dutyEligibleBrokerIds || dutyEligibleBrokerIds.has(id)) && !policy.excludedBrokerIds.includes(id) && (!allowedBrokerSet || allowedBrokerSet.has(id)));
 
   if (!ids.length) return { queue: effectiveQueue, eligible: [], selected: null, reason: "Nenhum corretor disponível atende a política desta fila." };
   const loads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads)

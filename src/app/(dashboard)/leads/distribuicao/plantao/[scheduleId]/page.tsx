@@ -36,6 +36,7 @@ import { getCachedLeadsBranches, getCachedLeadsBrokers, getCachedSlaSettings } f
 import { BrokerPresenceReleaseButton } from "../_components/broker-presence-release-button";
 import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
 import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigger";
+import { BrokerOccurrenceCard } from "../_components/broker-occurrence-card";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { dutyShifts, worksInShift } from "@/features/lead-distribution/duty-shifts";
 
@@ -465,16 +466,21 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                     <Badge variant="outline">{section.entries.length}</Badge>
                   </h3>
                 ) : null}
-                {section.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{section.entries.map((entry) => (
-              <div key={`${section.key}:${entry.id}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5">
+                {section.entries.length ? ([
+                  { key: "active", label: "Ativos", entries: section.entries.filter((entry) => !entry.absent) },
+                  { key: "absent", label: "Faltaram", entries: section.entries.filter((entry) => entry.absent) },
+                ]).map((group) => <section key={group.key} aria-label={group.label} className="space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground">{group.label} <Badge variant="outline">{group.entries.length}</Badge></h4>
+                  {group.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{group.entries.map((entry) => (
+              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={schedule.attendanceMode} onSitePending={entry.onSitePending}>
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
-                    <BrokerDayHistoryTrigger scheduleId={schedule.id} brokerId={entry.brokerId} brokerName={entry.brokerName} />
+                    <span className="truncate text-sm font-medium">{entry.brokerName}</span>
                     {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Presença confirmada"}${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Confirmado"}${entry.confirmedAt ? ` em ${dateTime.format(entry.confirmedAt)}` : ""}`}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
-                    {presenceEnabled ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
-                    {presenceEnabled && entry.presenceStatus === "pending" ? <BrokerPresenceReleaseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
-                    <BrokerPauseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} paused={Boolean(entry.pausedAt)} />
+                    {presenceEnabled && schedule.attendanceMode !== "presencial" && !entry.absent ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
+                    {(presenceEnabled || schedule.attendanceMode === "presencial") && entry.presenceStatus === "pending" && !entry.absent ? <BrokerPresenceReleaseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} inUnit={schedule.attendanceMode === "presencial"} /> : null}
+                    {!entry.absent && !entry.onSitePending ? <BrokerPauseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} paused={Boolean(entry.pausedAt)} /> : null}
                   </div>
                   <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}{shiftSections && entry.shift === "dia" ? " · Dia todo" : ""}{presenceEnabled && entry.releasedByName ? ` · Liberado por ${entry.releasedByName}` : ""}</p>
                   {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}
@@ -488,8 +494,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   <Badge variant="info" title="Leads recebidos de manhã neste plantão">Manhã {brokerShiftCounts(entry.brokerId).manha}</Badge>
                   <Badge variant="destructive" title="Leads recebidos à tarde neste plantão">Tarde {brokerShiftCounts(entry.brokerId).tarde}</Badge>
                 </div> : <Badge variant="outline" title="Leads recebidos neste plantão">{brokerShiftCounts(entry.brokerId).manha + brokerShiftCounts(entry.brokerId).tarde} leads</Badge>}
-              </div>
-            ))}</div> : <p className="text-sm text-muted-foreground">Ninguém escalado neste turno.</p>}
+              </BrokerOccurrenceCard>
+            ))}</div> : <p className="text-sm text-muted-foreground">Nenhum corretor nesta seção.</p>}
+                </section>) : <p className="text-sm text-muted-foreground">Ninguém escalado neste turno.</p>}
               </section>
             )) : <p className="text-sm text-muted-foreground">Nenhum corretor escalado neste plantão.</p>}
           </CardContent>

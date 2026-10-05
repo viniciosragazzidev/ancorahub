@@ -769,6 +769,7 @@ export const unitDutySchedules = pgTable(
     maxLeadsPerBroker: integer("max_leads_per_broker"),
     /** Split in a morning and an afternoon shift at this time ("13:30"); null = one shift. */
     shiftSplitAt: text("shift_split_at"),
+    attendanceMode: text("attendance_mode").notNull().default("online"),
     status: text("status").notNull().default("active"),
     timezone: text("timezone").notNull().default("America/Sao_Paulo"),
     validFrom: timestamp("valid_from", { withTimezone: true }).notNull(),
@@ -778,7 +779,10 @@ export const unitDutySchedules = pgTable(
     createdAt,
     updatedAt,
   },
-  (table) => [index("unit_duty_schedules_tenant_status_idx").on(table.tenantId, table.status, table.dayOfWeek, table.startsAt)],
+  (table) => [
+    index("unit_duty_schedules_tenant_status_idx").on(table.tenantId, table.status, table.dayOfWeek, table.startsAt),
+    check("unit_duty_schedules_attendance_mode_check", sql`${table.attendanceMode} in ('online', 'presencial')`),
+  ],
 );
 
 export const dutyScheduleMonthlyPlans = pgTable(
@@ -1460,7 +1464,7 @@ export const dutyPresenceConfirmations = pgTable(
     uniqueIndex("duty_presence_occurrence_assignment_unique").on(table.tenantId, table.assignmentId, table.dutyDate, table.shiftStartsAt, table.shiftEndsAt),
     index("duty_presence_schedule_date_idx").on(table.tenantId, table.scheduleId, table.dutyDate),
     index("duty_presence_broker_date_idx").on(table.tenantId, table.brokerId, table.dutyDate, table.status),
-    check("duty_presence_status_check", sql`${table.status} in ('pending', 'confirmed', 'expired')`),
+    check("duty_presence_status_check", sql`${table.status} in ('pending', 'confirmed', 'expired', 'absent')`),
     check("duty_presence_notification_status_check", sql`${table.notificationStatus} in ('pending', 'dispatching', 'queued', 'sent', 'error')`),
   ],
 );

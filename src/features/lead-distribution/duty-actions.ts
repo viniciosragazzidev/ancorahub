@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -12,6 +12,9 @@ import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history";
+import { getRelevantDutyWindow } from "./duty-presence-domain";
+import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
+import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 
 export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
 
@@ -253,6 +256,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       maximumBrokers: parsed.data.maximumBrokers ?? null,
       maxLeadsPerBroker: parsed.data.maxLeadsPerBroker ?? null,
       shiftSplitAt: validShiftSplit(parsed.data, parsed.data.shiftSplitAt),
+      attendanceMode: parsed.data.attendanceMode,
       webhookCredentialId: parsed.data.webhookCredentialId,
     };
     // "Datas": one plantão per chosen date, valid only on that day.
@@ -290,6 +294,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
         maximumBrokers: schedule.maximumBrokers,
         maxLeadsPerBroker: schedule.maxLeadsPerBroker,
         shiftSplitAt: schedule.shiftSplitAt,
+        attendanceMode: schedule.attendanceMode,
         validFrom: schedule.validFrom,
         validUntil: schedule.validUntil ?? null,
         webhookCredentialId: schedule.webhookCredentialId ?? null,
@@ -363,6 +368,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         typeId,
         maximumBrokers: parsed.data.maximumBrokers ?? null,
         maxLeadsPerBroker: parsed.data.maxLeadsPerBroker ?? null,
+        attendanceMode: parsed.data.attendanceMode,
         // Absent from the form = unchanged (older forms, "estender").
         ...(formData.has("shiftSplitAt") ? { shiftSplitAt: nextSplit } : {}),
         validFrom: parsed.data.validFrom,
@@ -588,6 +594,73 @@ export async function releaseDutyPresenceAction(scheduleId: string, assignmentId
     return await releaseDutyPresenceManually({ tenantId: context.tenantId, assignmentId, releasedBy: context.userId });
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível liberar o corretor." };
+  }
+}
+
+/** Exact, uncapped lead list for the broker drawer, scoped to this schedule's queues and occurrence. */
+export async function getBrokerOccurrenceLeadsAction(scheduleId: string, brokerId: string) {
+  try {
+    const parsedScheduleId = z.string().uuid().parse(scheduleId);
+    const parsedBrokerId = z.string().min(1).max(64).parse(brokerId);
+    const { context, db } = await findScheduleForMutation(parsedScheduleId);
+    const profile = await getDutyScheduleProfile(context, parsedScheduleId);
+    if (!profile.roster.some((entry) => entry.brokerId === parsedBrokerId)) return { ok: false as const, reason: "Corretor não está nesta ocorrência." };
+    const queueIds = profile.linkedQueues.map((queue) => queue.id);
+    if (!queueIds.length) return { ok: true as const, leads: [] };
+    const now = new Date();
+    const reference = profile.leadsUpcomingStartsAt ?? profile.leadsUntil ?? now;
+    const dutyDate = new Intl.DateTimeFormat("en-CA", { timeZone: profile.schedule.timezone }).format(reference);
+    const occurrence = getDutyWindowOnDate(profile.schedule, dutyDate);
+    const { since: lower, until: upper } = brokerOccurrenceAssignmentBounds({ since: profile.leadsSince, until: profile.leadsUntil }, occurrence);
+    const rows = await db.select({ id: schema.leads.id, name: schema.leads.nome, assignedAt: schema.leads.assignedAt, origin: schema.leads.origem, queueName: schema.leadQueues.name, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt })
+      .from(schema.leads)
+      .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, parsedBrokerId), inArray(schema.leads.queueId, queueIds), gte(schema.leads.assignedAt, lower), upper ? lt(schema.leads.assignedAt, upper) : undefined, isNull(schema.leads.deletedAt)))
+      .orderBy(schema.leads.assignedAt);
+    return { ok: true as const, leads: rows.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null })) };
+  } catch (error) {
+    return { ok: false as const, reason: error instanceof Error ? error.message : "Não foi possível carregar os leads." };
+  }
+}
+
+/** A director/manager records absence for one calendar occurrence, never the weekly roster. */
+export async function setDutyAbsenceAction(scheduleId: string, assignmentId: string, absent: boolean): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const parsedScheduleId = z.string().uuid().parse(scheduleId);
+    const parsedAssignmentId = z.string().uuid().parse(assignmentId);
+    if (typeof absent !== "boolean") throw new Error("Estado de falta inválido.");
+    const { context, db } = await findScheduleForMutation(parsedScheduleId);
+    const profile = await getDutyScheduleProfile(context, parsedScheduleId);
+    if (!profile.roster.some((entry) => entry.id === parsedAssignmentId)) return { ok: false, reason: "Corretor não está na escala efetiva desta ocorrência." };
+    const [assignment] = await db.select({
+      id: schema.dutyRosterAssignments.id,
+      brokerId: schema.dutyRosterAssignments.brokerId,
+      dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+      startsAt: schema.dutyRosterAssignments.startsAt,
+      endsAt: schema.dutyRosterAssignments.endsAt,
+      validFrom: schema.dutyRosterAssignments.validFrom,
+      validUntil: schema.dutyRosterAssignments.validUntil,
+      timezone: schema.unitDutySchedules.timezone,
+    }).from(schema.dutyRosterAssignments)
+      .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
+      .where(and(eq(schema.dutyRosterAssignments.id, parsedAssignmentId), eq(schema.dutyRosterAssignments.scheduleId, parsedScheduleId), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active")))
+      .limit(1);
+    if (!assignment) return { ok: false, reason: "Corretor não está nesta escala." };
+    const now = new Date();
+    const window = getRelevantDutyWindow(assignment, now, 24 * 60);
+    if (!window || window.startsAt < assignment.validFrom || (assignment.validUntil && window.startsAt >= assignment.validUntil)) return { ok: false, reason: "Não há ocorrência atual ou próxima para este corretor." };
+    const occurrence = and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, assignment.id), eq(schema.dutyPresenceConfirmations.dutyDate, window.dutyDate), eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt), eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt));
+    await db.transaction(async (tx) => {
+      await tx.insert(schema.dutyPresenceConfirmations).values({ id: randomUUID(), tenantId: context.tenantId, scheduleId: parsedScheduleId, assignmentId: assignment.id, brokerId: assignment.brokerId, dutyDate: window.dutyDate, shiftStartsAt: window.startsAt, shiftEndsAt: window.endsAt, status: "pending", notificationStatus: "pending", createdAt: now, updatedAt: now }).onConflictDoNothing();
+      const changed = await tx.update(schema.dutyPresenceConfirmations).set({ status: absent ? "absent" : "pending", confirmedAt: null, confirmedBy: null, updatedAt: now }).where(and(occurrence, absent ? ne(schema.dutyPresenceConfirmations.status, "absent") : eq(schema.dutyPresenceConfirmations.status, "absent"))).returning({ id: schema.dutyPresenceConfirmations.id });
+      if (!changed.length) throw new Error(absent ? "Falta já registrada." : "Não há falta para desfazer.");
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_presence_confirmation", entidadeId: changed[0].id, acao: absent ? "duty_presence.absence_marked" : "duty_presence.absence_undone", createdAt: now });
+    });
+    if (!absent) await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
+    revalidateDutyWorkspace();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível atualizar a falta." };
   }
 }
 

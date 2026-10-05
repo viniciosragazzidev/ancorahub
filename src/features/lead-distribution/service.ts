@@ -59,6 +59,7 @@ async function getRosterBrokerIds(
     startsAt: schema.unitDutySchedules.startsAt,
     endsAt: schema.unitDutySchedules.endsAt,
     timezone: schema.unitDutySchedules.timezone,
+    attendanceMode: schema.unitDutySchedules.attendanceMode,
     validFrom: schema.unitDutySchedules.validFrom,
     validUntil: schema.unitDutySchedules.validUntil,
   })

@@ -904,6 +904,13 @@
                         "when":  1791080000000,
                         "tag":  "0181_perf_indexes",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  129,
+                        "version":  "7",
+                        "when":  1791090000000,
+                        "tag":  "0182_duty_attendance_mode_and_absence",
+                        "breakpoints":  true
                     }
                 ]
 }

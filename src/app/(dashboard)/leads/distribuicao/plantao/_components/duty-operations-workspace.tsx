@@ -291,6 +291,11 @@ function DutyFormSheet({
             </div>
             {/* Type stays in the data (kept on save) but is not part of the form. */}
             <input type="hidden" name="typeName" value={schedule?.typeName ?? ""} />
+            <div className="grid gap-2">
+              <Label htmlFor="duty-attendance-mode">Tipo de plantão</Label>
+              <AppSelect id="duty-attendance-mode" name="attendanceMode" defaultValue={schedule?.attendanceMode ?? "online"} options={[{ value: "online", label: "Online" }, { value: "presencial", label: "Presencial" }]} />
+              <p className="text-xs text-muted-foreground">No presencial, o gestor confirma cada corretor na unidade antes de ele receber leads.</p>
+            </div>
             <div className="grid gap-3 rounded-lg border border-border p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">Quando</p>

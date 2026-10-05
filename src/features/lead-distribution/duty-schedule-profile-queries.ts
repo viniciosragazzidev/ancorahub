@@ -45,6 +45,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       minimumBrokers: schema.unitDutySchedules.minimumBrokers,
       maxLeadsPerBroker: schema.unitDutySchedules.maxLeadsPerBroker,
       shiftSplitAt: schema.unitDutySchedules.shiftSplitAt,
+      attendanceMode: schema.unitDutySchedules.attendanceMode,
       status: schema.unitDutySchedules.status,
       timezone: schema.unitDutySchedules.timezone,
       validFrom: schema.unitDutySchedules.validFrom,
@@ -250,11 +251,12 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       : [];
   }));
   const dutyDates = [...new Set([...occurrenceByAssignment.values()].map((occurrence) => occurrence.dutyDate))];
-  const presenceRows = presenceEnabled && dutyDates.length
+  const presenceRows = dutyDates.length
     ? await db.select({
       assignmentId: schema.dutyPresenceConfirmations.assignmentId,
       dutyDate: schema.dutyPresenceConfirmations.dutyDate,
       status: schema.dutyPresenceConfirmations.status,
+      confirmedBy: schema.dutyPresenceConfirmations.confirmedBy,
       confirmedAt: schema.dutyPresenceConfirmations.confirmedAt,
       releasedByName: sql<string | null>`(select u.name from "user" u where u.id = ${schema.dutyPresenceConfirmations.confirmedBy})`,
       notificationStatus: schema.dutyPresenceConfirmations.notificationStatus,
@@ -303,9 +305,11 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       const occurrence = occurrenceByAssignment.get(entry.id);
       const presence = occurrence ? presenceByAssignment.get(`${entry.id}:${occurrence.dutyDate}`) : null;
       // Same prerequisites the distribution engine applies before offering a lead.
-      const blockedReason = !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
+      const blockedReason = presence?.status === "absent" ? "Falta registrada neste plantão" : !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : schedule.attendanceMode === "presencial" && (!presence || presence.status !== "confirmed" || !presence.confirmedBy) ? "Aguardando presença na unidade" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
+      const absent = presence?.status === "absent";
+      const onSitePending = schedule.attendanceMode === "presencial" && Boolean(occurrence && occurrence.startsAt <= new Date(now.getTime() + 30 * 60_000)) && (!presence || presence.status !== "confirmed" || !presence.confirmedBy);
       const liveStatus = classifyBrokerLiveOfferStatus({
-        paused: Boolean(entry.pausedAt),
+        paused: Boolean(entry.pausedAt) || onSitePending,
         blockedReason,
         capacity: operatingCapacity,
         activeLeads: leadsPerBroker.get(entry.brokerId) ?? 0,
@@ -315,6 +319,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       });
       return {
       ...entry,
+      phone,
       shift,
       shiftStartsAt: startsAt.slice(0, 5),
       shiftEndsAt: endsAt.slice(0, 5),
@@ -322,7 +327,9 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       leadsMorning: leadsByShift.get(entry.brokerId)?.manha ?? 0,
       leadsAfternoon: leadsByShift.get(entry.brokerId)?.tarde ?? 0,
       blockedReason,
-      presenceStatus: !presenceEnabled || !occurrence ? "not_requested" as const : presence?.status === "confirmed" ? "confirmed" as const : "pending" as const,
+      absent,
+      onSitePending,
+      presenceStatus: absent ? "absent" as const : !occurrence || (!presenceEnabled && schedule.attendanceMode !== "presencial") ? "not_requested" as const : presence?.status === "confirmed" && !onSitePending ? "confirmed" as const : "pending" as const,
       confirmedAt: presence?.confirmedAt ?? null,
       /** Released by a director/manager (not the broker's own click). */
       releasedByName: presence?.releasedByName ?? null,

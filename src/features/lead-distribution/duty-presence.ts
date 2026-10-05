@@ -5,11 +5,11 @@ import { and, eq, gt, inArray, isNull, lte, lt, ne, or } from "drizzle-orm";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
-import { formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
+import { formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 
 type PresenceAssignment = { id: string; scheduleId: string; brokerId: string; dayOfWeek: number; startsAt: string; endsAt: string; validFrom: Date; validUntil: Date | null };
-type PresenceSchedule = { id: string; dayOfWeek: number; startsAt: string; endsAt: string; timezone: string; validFrom: Date; validUntil: Date | null };
+type PresenceSchedule = { id: string; dayOfWeek: number; startsAt: string; endsAt: string; timezone: string; validFrom: Date; validUntil: Date | null; attendanceMode?: string };
 
 export async function isDutyPresenceConfirmationEnabled() {
   return (await getFeatureFlag(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION)) === "true";
@@ -29,7 +29,7 @@ export async function getPresenceConfirmedAssignmentIds(input: {
   now: Date;
 }) {
   if (!input.assignments.length) return new Set<string>();
-  if (!(await isDutyPresenceConfirmationEnabled())) return new Set(input.assignments.map((assignment) => assignment.id));
+  const presenceRequired = await isDutyPresenceConfirmationEnabled();
 
   const scheduleById = new Map(input.schedules.map((schedule) => [schedule.id, schedule]));
   const occurrences = input.assignments.flatMap((assignment) => {
@@ -49,19 +49,20 @@ export async function getPresenceConfirmedAssignmentIds(input: {
       shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt,
       shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt,
       status: schema.dutyPresenceConfirmations.status,
+      confirmedBy: schema.dutyPresenceConfirmations.confirmedBy,
     })
     .from(schema.dutyPresenceConfirmations)
     .where(and(
       eq(schema.dutyPresenceConfirmations.tenantId, input.tenantId),
-      eq(schema.dutyPresenceConfirmations.status, "confirmed"),
       gt(schema.dutyPresenceConfirmations.shiftEndsAt, input.now),
       inArray(schema.dutyPresenceConfirmations.assignmentId, occurrences.map(({ assignment }) => assignment.id)),
     ));
   const confirmationByAssignment = new Map(confirmationRows.map((row) => [row.assignmentId, row]));
   return new Set(occurrences
-    .filter(({ assignment, window }) => {
+    .filter(({ assignment, schedule, window }) => {
       const confirmation = confirmationByAssignment.get(assignment.id);
-      return isConfirmationForActiveOccurrence({ confirmation, assignment, window, now: input.now });
+      return isDutyBrokerEligible({ attendanceMode: schedule.attendanceMode ?? "online", presenceRequired, status: confirmation?.status ?? null, confirmedBy: confirmation?.confirmedBy ?? null })
+        && (!(presenceRequired || schedule.attendanceMode === "presencial") || isConfirmationForActiveOccurrence({ confirmation, assignment, window, now: input.now }));
     })
     .map(({ assignment }) => assignment.id));
 }
@@ -81,6 +82,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
     startsAt: schema.unitDutySchedules.startsAt,
     endsAt: schema.unitDutySchedules.endsAt,
     timezone: schema.unitDutySchedules.timezone,
+    attendanceMode: schema.unitDutySchedules.attendanceMode,
     validFrom: schema.unitDutySchedules.validFrom,
     validUntil: schema.unitDutySchedules.validUntil,
     tenantId: schema.unitDutySchedules.tenantId,
@@ -127,7 +129,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
   let failed = 0;
   for (const assignment of assignments) {
     const schedule = scheduleById.get(assignment.scheduleId);
-    if (!schedule || schedule.tenantId !== assignment.tenantId) continue;
+    if (!schedule || schedule.tenantId !== assignment.tenantId || schedule.attendanceMode === "presencial") continue;
     const window = getWindow({
       id: schedule.id, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt,
       endsAt: assignment.endsAt, timezone: schedule.timezone,
@@ -162,7 +164,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
         eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt), eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
       )).limit(1);
     // Already confirmed (e.g. released by a director/manager): no invite.
-    if (!record || record.status === "confirmed" || record.notificationStatus === "queued" || record.notificationStatus === "sent"
+    if (!record || record.status === "confirmed" || record.status === "absent" || record.notificationStatus === "queued" || record.notificationStatus === "sent"
       || record.notificationErrorCode === "OUTBOX_DELIVERY_FAILED"
       || record.notificationErrorCode === "TEMPLATE_DELIVERY_FAILED") continue;
     const staleDispatchCutoff = new Date(now.getTime() - 5 * 60_000);
@@ -236,17 +238,21 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
     eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt),
     eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
   );
-  await db.transaction(async (tx) => {
+  const released = await db.transaction(async (tx) => {
     await tx.insert(schema.dutyPresenceConfirmations).values({
       id: randomUUID(), tenantId: input.tenantId, scheduleId: assignment.scheduleId, assignmentId: assignment.id, brokerId: assignment.brokerId,
       dutyDate: window.dutyDate, shiftStartsAt: window.startsAt, shiftEndsAt: window.endsAt,
       status: "pending", notificationStatus: "pending", createdAt: now, updatedAt: now,
     }).onConflictDoNothing();
-    await tx.update(schema.dutyPresenceConfirmations)
+    const changed = await tx.update(schema.dutyPresenceConfirmations)
       .set({ status: "confirmed", confirmedAt: now, confirmedBy: input.releasedBy, updatedAt: now })
-      .where(and(occurrence, ne(schema.dutyPresenceConfirmations.status, "confirmed")));
+      .where(and(occurrence, ne(schema.dutyPresenceConfirmations.status, "absent"), or(ne(schema.dutyPresenceConfirmations.status, "confirmed"), isNull(schema.dutyPresenceConfirmations.confirmedBy))))
+      .returning({ id: schema.dutyPresenceConfirmations.id });
+    if (!changed.length) return false;
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.releasedBy, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_presence.released_manually", createdAt: now });
+    return true;
   });
+  if (!released) return { ok: false, reason: "Corretor já liberado ou com falta registrada." };
   // Leads waiting for an eligible broker get their turn now.
   const { wakeLeadsAwaitingEligibleBroker } = await import("./jobs");
   await wakeLeadsAwaitingEligibleBroker(input.tenantId).catch(() => 0);
@@ -310,7 +316,7 @@ export async function sendDutyPresenceInviteManually(input: { tenantId: string; 
     notificationStatus: "pending",
     createdAt: now,
     updatedAt: now,
-  }).onConflictDoNothing().returning({ id: schema.dutyPresenceConfirmations.id });
+  }).onConflictDoNothing().returning({ id: schema.dutyPresenceConfirmations.id, status: schema.dutyPresenceConfirmations.status });
   const record = inserted ?? (await db.select({ id: schema.dutyPresenceConfirmations.id, status: schema.dutyPresenceConfirmations.status }).from(schema.dutyPresenceConfirmations).where(and(
     eq(schema.dutyPresenceConfirmations.tenantId, input.tenantId),
     eq(schema.dutyPresenceConfirmations.assignmentId, assignment.id),
@@ -319,6 +325,7 @@ export async function sendDutyPresenceInviteManually(input: { tenantId: string; 
     eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
   )).limit(1))[0];
   if (!record) return { ok: false, reason: "Não foi possível preparar a confirmação." };
+  if (record.status === "absent") return { ok: false, reason: "Corretor com falta registrada nesta ocorrência." };
 
   await db.update(schema.dutyPresenceConfirmations).set({ notificationStatus: "dispatching", updatedAt: now }).where(eq(schema.dutyPresenceConfirmations.id, record.id));
   try {

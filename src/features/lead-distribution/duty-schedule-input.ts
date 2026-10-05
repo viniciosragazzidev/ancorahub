@@ -22,6 +22,7 @@ const dutyScheduleFields = z.object({
   queueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
   name: z.string().trim().min(2).max(100),
   typeName: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().trim().min(2).max(60).nullable().optional()),
+  attendanceMode: z.enum(["online", "presencial"]).default("online"),
   dayOfWeek: z.coerce.number().int().min(0).max(6),
   startsAt: z.string(),
   endsAt: z.string(),

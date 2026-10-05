@@ -32,3 +32,4 @@
 | 2026-07-29 | `completed/2026-07-29-mobile-live-leads.md` | concluído | Navegação móvel segura, atualização de fila sem F5 e correção de reatribuição. |
 | 2026-07-29 | `completed/2026-07-29-operational-visual-standardization.md` | concluído | Fundação visual compacta para superfícies operacionais, tabela, cards e kanban de leads. |
 | 2026-08-03 | `completed/2026-08-03-broker-workspace.md` | parcial | V1 do cockpit do Corretor, prioridade determinística, rollback global e fluxos operacionais reais. |
+| 2026-10-05 | `completed/2026-10-05-plantao-drawer-falta-presencial.md` | concluído | Drawer da ocorrência, falta por corretor/data bloqueada antes do ranking e escala presencial pausada até confirmação do gestor. |

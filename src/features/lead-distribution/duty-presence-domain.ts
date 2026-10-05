@@ -13,6 +13,21 @@ export type ConfirmedDutyOccurrence = {
   status: string;
 };
 
+/** An absence always blocks; an in-person shift requires a manager's check-in. */
+export function isDutyBrokerEligible(input: { attendanceMode: string; presenceRequired: boolean; status: string | null; confirmedBy: string | null }) {
+  if (input.status === "absent") return false;
+  if (input.attendanceMode === "presencial") return input.status === "confirmed" && Boolean(input.confirmedBy);
+  return !input.presenceRequired || input.status === "confirmed";
+}
+
+/** The drawer uses the occurrence lead window and never includes assignments from a neighbouring shift. */
+export function brokerOccurrenceAssignmentBounds(leadWindow: { since: Date; until: Date | null }, shift: DutyWindow | null) {
+  return {
+    since: shift && shift.startsAt > leadWindow.since ? shift.startsAt : leadWindow.since,
+    until: shift?.endsAt ?? leadWindow.until,
+  };
+}
+
 type WeeklyWindowInput = {
   dayOfWeek: number;
   startsAt: string;
