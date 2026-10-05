@@ -23,6 +23,7 @@ import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getPresenceEligibleAssignments } from "./duty-presence";
 import { findRunningDutySchedule } from "./duty-presence-domain";
+import { getSystemSetting } from "@/features/system-settings/queries";
 import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
 
@@ -492,6 +493,22 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
 }
 
+/**
+ * Automatic distribution only takes leads created from this moment on: older
+ * ones (before 02/10/2026) were held for manual assignment and should not
+ * flood the brokers. Change it with the system setting
+ * distribution_auto_min_created_at (ISO date; "off" removes the cut).
+ */
+const DEFAULT_AUTO_DISTRIBUTION_START = "2026-10-02T00:00:00-03:00";
+const AUTO_DISTRIBUTION_START_LABEL = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
+
+async function getAutoDistributionStart(): Promise<Date | null> {
+  const configured = (await getSystemSetting("distribution_auto_min_created_at"))?.trim();
+  if (configured === "off") return null;
+  const value = new Date(configured || DEFAULT_AUTO_DISTRIBUTION_START);
+  return Number.isNaN(value.getTime()) ? new Date(DEFAULT_AUTO_DISTRIBUTION_START) : value;
+}
+
 export async function processQueuedLead(context: TenantContext, leadId: string, excludeBrokerId?: string | null, fallbackDepth = 0): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Você não pode executar a distribuição automática.");
   if (fallbackDepth > 3) return { status: "queued", leadId, reason: "O encadeamento de filas de contingência excedeu o limite seguro." };
@@ -523,6 +540,12 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     createdAt: schema.leads.createdAt,
   }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId))).limit(1);
   if (!lead) return { status: "queued", leadId, reason: "Lead não encontrado." };
+  // Leads older than the cut-off stay for manual assignment; everything from
+  // it on is handed out automatically (setting distribution_auto_min_created_at).
+  const autoFrom = await getAutoDistributionStart();
+  if (autoFrom && lead.createdAt < autoFrom) {
+    return { status: "queued", leadId, reason: `Lead anterior a ${AUTO_DISTRIBUTION_START_LABEL.format(autoFrom)}: fica para atribuição manual.` };
+  }
   if (lead.distributionRemovedAt && !lead.corretorId) {
     return { status: "manual_required", leadId, reason: "Lead removido da distribuição; só uma atribuição manual o leva a um corretor." };
   }

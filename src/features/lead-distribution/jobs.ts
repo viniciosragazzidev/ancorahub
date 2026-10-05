@@ -394,7 +394,8 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
       sql`case when ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila está em modo manual%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila configurada pertence a outra unidade%'
-        or ${schema.leadDistributionJobs.lastErrorMessage} like 'A origem %' then 1 else 0 end`,
+        or ${schema.leadDistributionJobs.lastErrorMessage} like 'A origem %'
+        or ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead anterior a %' then 1 else 0 end`,
       asc(leadTemperatureRank()),
       asc(schema.leadDistributionJobs.runAfter),
       asc(schema.leadDistributionJobs.createdAt),

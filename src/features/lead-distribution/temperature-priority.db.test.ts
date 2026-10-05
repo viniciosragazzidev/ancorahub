@@ -17,7 +17,7 @@ import * as realSchema from "@/shared/db/schema";
 vi.mock("server-only", () => ({}));
 const state: { tx: unknown } = { tx: null };
 vi.mock("@/shared/db", () => ({ schema: realSchema, getDatabase: () => state.tx }));
-vi.mock("@/features/system-settings/queries", () => ({ getSystemSettings: async () => [] }));
+vi.mock("@/features/system-settings/queries", () => ({ getSystemSettings: async () => [], getSystemSetting: async () => undefined }));
 vi.mock("@/features/communication-channels/outbound-service", () => ({ processMetaOutboundBatch: vi.fn() }));
 vi.mock("./offers", () => ({ expireOutdatedLeadOffers: vi.fn() }));
 const processed: string[] = [];

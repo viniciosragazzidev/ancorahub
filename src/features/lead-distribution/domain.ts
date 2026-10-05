@@ -428,6 +428,7 @@ const HELD_DISTRIBUTION_REASON_PREFIXES = [
   "A fila está em modo manual",
   "A fila configurada pertence a outra unidade",
   "A origem ",
+  "Lead anterior a ",
 ] as const;
 
 export function isHeldDistributionReason(reason: string | null | undefined) {
