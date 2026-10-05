@@ -267,6 +267,26 @@ describe("lead distribution domain", () => {
     expect(getDutyCoverage(3, 2)).toEqual({ assigned: 3, minimum: 2, missing: 0, covered: true });
   });
 
+  it("gives the next lead to whoever received fewer leads in this plantão, not to the smallest portfolio", () => {
+    // Reported on 2026-10-05: a broker with 0 leads in the plantão kept losing to
+    // brokers who already had plantão leads, because the load was the whole
+    // portfolio (old open/unstarted leads).
+    const ranked = rankBrokers([
+      { id: "has-plantao-leads", createdAt: new Date("2026-01-01"), activeLeads: 2, unstartedLeads: 0, receivedInDuty: 3, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
+      { id: "zero-in-plantao", createdAt: new Date("2026-01-02"), activeLeads: 40, unstartedLeads: 12, receivedInDuty: 0, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
+    ], defaultIntelligentDistributionPolicy);
+    expect(ranked[0]?.id).toBe("zero-in-plantao");
+  });
+
+  it("still lets the 5-minute cooldown and on-duty rules come first", () => {
+    const now = new Date();
+    const ranked = rankBrokers([
+      { id: "just-got-one", createdAt: new Date("2026-01-01"), activeLeads: 0, receivedInDuty: 0, lastAssignedAt: new Date(now.getTime() - 60_000), capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
+      { id: "rested", createdAt: new Date("2026-01-02"), activeLeads: 0, receivedInDuty: 1, capacity: null, onDuty: true, conversionRate: 0, slaRate: 0, manualPriority: 0, idleSince: null, rankingScore: 0 },
+    ], defaultIntelligentDistributionPolicy, now);
+    expect(ranked[0]?.id).toBe("rested");
+  });
+
   it("always ranks active duty before performance", () => {
     const ranked = rankBrokers([
       { id: "high", createdAt: new Date("2026-01-01"), activeLeads: 1, capacity: null, onDuty: false, conversionRate: 1, slaRate: 1, manualPriority: 1, idleSince: new Date("2026-01-01"), rankingScore: 100 },

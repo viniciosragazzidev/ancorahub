@@ -1,7 +1,8 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, not, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, not, or, sql } from "drizzle-orm";
+import { operationDayStart } from "./broker-day-history";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
@@ -1061,7 +1062,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   }
 
   const ids = remainingBrokers.map((broker) => broker.id);
-  const [loads, brokerLeadHistory, slaAttempts] = await Promise.all([
+  // "Menor carga" do plantão: indicações do dia da operação (19:00 do dia anterior; sexta 19:00 na segunda).
+  const dutySince = operationDayStart(new Date());
+  const [loads, brokerLeadHistory, slaAttempts, dutyOffers] = await Promise.all([
     db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads).where(and(
       eq(schema.leads.tenantId, context.tenantId),
       inArray(schema.leads.corretorId, ids),
@@ -1070,8 +1073,15 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       isNull(schema.leads.deletedAt),
       isNull(schema.leads.archivedAt),
     )).groupBy(schema.leads.corretorId),
-    db.select({ brokerId: schema.leads.corretorId, status: schema.leads.status, assignedAt: schema.leads.assignedAt, serviceStartedAt: schema.leads.serviceStartedAt, firstContactAt: schema.leads.firstContactAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))),
-    db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, assignedAt: schema.leadAssignmentAttempts.assignedAt, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
+    db.select({ leadId: schema.leads.id, brokerId: schema.leads.corretorId, status: schema.leads.status, assignedAt: schema.leads.assignedAt, serviceStartedAt: schema.leads.serviceStartedAt, firstContactAt: schema.leads.firstContactAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))),
+    db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, assignedAt: schema.leadAssignmentAttempts.assignedAt, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
+    // Pending or accepted offers count as load; declined/expired ones do not (or declining would pay off).
+    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId }).from(schema.leadOffers).where(and(
+      eq(schema.leadOffers.tenantId, context.tenantId),
+      inArray(schema.leadOffers.brokerId, ids),
+      gte(schema.leadOffers.offeredAt, dutySince),
+      inArray(schema.leadOffers.status, ["PENDING", "ACCEPTED"]),
+    )),
   ]);
   const loadMap = new Map(loads.map((item) => [item.brokerId, Number(item.total)]));
   const candidates = remainingBrokers.map((broker) => {
@@ -1080,8 +1090,14 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     const conversionRate = history.length ? history.filter((item) => item.status === "converted").length / history.length : 0;
     const slaRate = attempts.length ? attempts.filter((item) => item.firstContactAt && item.firstContactAt <= item.feedbackDueAt).length / attempts.length : 0;
     const idleSince = [...history.map((item) => item.assignedAt), ...attempts.map((item) => item.assignedAt)].reduce<Date | null>((newest, assignedAt) => !assignedAt ? newest : (!newest || assignedAt > newest ? assignedAt : newest), null);
+    const receivedInDuty = new Set([
+      // Leads now with the broker since the start of the day, however they got there (automatic, offer or manual).
+      ...history.filter((item) => item.assignedAt && item.assignedAt >= dutySince).map((item) => item.leadId),
+      ...attempts.filter((item) => item.assignedAt && item.assignedAt >= dutySince).map((item) => item.leadId),
+      ...dutyOffers.filter((item) => item.brokerId === broker.id).map((item) => item.leadId),
+    ]).size;
     const unstartedLeads = history.filter((item) => item.status === "distributed" || item.status === "new" || (!item.serviceStartedAt && !item.firstContactAt)).length + attempts.filter((item) => !item.firstContactAt).length;
-    const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, unstartedLeads, lastAssignedAt: idleSince, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
+    const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, unstartedLeads, receivedInDuty, lastAssignedAt: idleSince, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };
   });
   // Offer pacing: a broker that just received an offer (or still has one
