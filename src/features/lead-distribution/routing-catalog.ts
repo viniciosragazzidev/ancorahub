@@ -34,6 +34,10 @@ export function normalizeQueueSource(value: string | null | undefined, origem?: 
   // Manual leads created in the CRM do not populate sourceChannel, so the
   // persisted origem remains the authoritative signal for this singleton.
   if (normalized === "bulk_import" || normalizedOrigin === "manual") return "manual";
+  // Meta leads (forms and click-to-WhatsApp) arrive through a webhook, so
+  // their origem is "webhook" too; they are Meta. Read as "webhook", a queue
+  // that accepts Meta but not "webhook" refused all of them, forever.
+  if (normalized === "meta_lead_ads") return "meta_lead_ads";
   if (normalized === "webhook" || normalizedOrigin === "webhook") return "webhook";
   if (hasWebhookCredential && normalized !== "meta_lead_ads") return "webhook";
   return normalized;
