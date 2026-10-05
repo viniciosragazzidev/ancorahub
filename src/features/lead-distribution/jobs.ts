@@ -12,7 +12,7 @@ import { getLocalDutyParts } from "@/features/leads/assignment";
 
 import { processQueuedLead } from "./service";
 import { expireOutdatedLeadOffers } from "./offers";
-import { distributionRetryDelayMilliseconds, isDeferredDistributionReason } from "./domain";
+import { HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
 
 const JOB_TYPE = "process_queued_lead";
@@ -381,7 +381,17 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
       tenantId ? eq(schema.leadDistributionJobs.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leadDistributionJobs.leadId, leadId) : undefined,
     ))
-    .orderBy(asc(leadTemperatureRank()), asc(schema.leadDistributionJobs.runAfter), asc(schema.leadDistributionJobs.createdAt))
+    // Leads held by a rule go last: they can't be handed out anyway, and being
+    // hot/warm they used to take every batch ahead of the cold leads that can.
+    .orderBy(
+      sql`case when ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%'
+        or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila está em modo manual%'
+        or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila configurada pertence a outra unidade%'
+        or ${schema.leadDistributionJobs.lastErrorMessage} like 'A origem %' then 1 else 0 end`,
+      asc(leadTemperatureRank()),
+      asc(schema.leadDistributionJobs.runAfter),
+      asc(schema.leadDistributionJobs.createdAt),
+    )
     .limit(1);
   if (!candidate) return null;
 
@@ -524,9 +534,12 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
           return;
         }
         const reason = distribution.reason ?? "O lead não está pronto para atribuição automática.";
-        const deferred = isDeferredDistributionReason(reason);
-        const retryAt = distribution.status === "queued" ? distribution.retryAt : undefined;
-        const failed = await deferOrFailJob(job, effectiveConfig, deferred ? "AWAITING_ELIGIBILITY" : "DISTRIBUTION_CONFLICT", reason, deferred, retryAt);
+        const held = isHeldDistributionReason(reason);
+        const deferred = held || isDeferredDistributionReason(reason);
+        const retryAt = held
+          ? new Date(Date.now() + HELD_DISTRIBUTION_RETRY_MS)
+          : distribution.status === "queued" ? distribution.retryAt : undefined;
+        const failed = await deferOrFailJob(job, effectiveConfig, held ? "HELD_BY_RULE" : deferred ? "AWAITING_ELIGIBILITY" : "DISTRIBUTION_CONFLICT", reason, deferred, retryAt);
         if (failed) result.failed += 1; else result.deferred += 1;
       } catch (error) {
         const failed = await deferOrFailJob(job, effectiveConfig, "PROCESSING_ERROR", sanitizeError(error), false);

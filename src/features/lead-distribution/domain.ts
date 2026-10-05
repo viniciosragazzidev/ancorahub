@@ -415,6 +415,25 @@ export function resolveDutyFallbackDecision(input: {
   return "wait_next_duty";
 }
 
+/**
+ * Reasons that won't change by retrying in a couple of minutes: the lead is
+ * held by a rule (arrived before the plantão — manual only; a queue in manual
+ * mode, of another unit, or that doesn't accept its source). Retried every
+ * 15 minutes and processed after every other due lead, so ~100 of them no
+ * longer take each run's whole batch from the leads that can be handed out.
+ */
+export const HELD_DISTRIBUTION_RETRY_MS = 15 * 60_000;
+const HELD_DISTRIBUTION_REASON_PREFIXES = [
+  "Lead chegou antes do início deste plantão",
+  "A fila está em modo manual",
+  "A fila configurada pertence a outra unidade",
+  "A origem ",
+] as const;
+
+export function isHeldDistributionReason(reason: string | null | undefined) {
+  return Boolean(reason && HELD_DISTRIBUTION_REASON_PREFIXES.some((prefix) => reason.startsWith(prefix)));
+}
+
 export function distributionRetryDelayMilliseconds(attempt: number, baseSeconds: number) {
   return Math.min(baseSeconds * 1000 * (2 ** Math.max(attempt - 1, 0)), 30 * 60_000);
 }

@@ -680,3 +680,14 @@ describe("shouldReleaseUnacceptedProvisionalOwner", () => {
     expect(shouldReleaseUnacceptedProvisionalOwner({ ...stuck, assignmentSource: "manual_offer" })).toBe(false);
   });
 });
+
+describe("isHeldDistributionReason", () => {
+  it("recognizes the reasons that only a rule change or a manual action releases", async () => {
+    const { isHeldDistributionReason } = await import("./domain");
+    expect(isHeldDistributionReason("Lead chegou antes do início deste plantão; aguarda atribuição manual e não entra na distribuição automática.")).toBe(true);
+    expect(isHeldDistributionReason("A fila está em modo manual.")).toBe(true);
+    expect(isHeldDistributionReason("A origem webhook não está habilitada nesta fila.")).toBe(true);
+    expect(isHeldDistributionReason("Aguardando intervalo entre ofertas: os corretores elegíveis receberam um lead há pouco.")).toBe(false);
+    expect(isHeldDistributionReason(null)).toBe(false);
+  });
+});
