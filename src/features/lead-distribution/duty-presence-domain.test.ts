@@ -63,6 +63,22 @@ describe("duty presence occurrence windows", () => {
   });
 });
 
+describe("getDutyOccurrenceLeadWindow on Monday", () => {
+  // Monday 10:00–12:00 America/Sao_Paulo (UTC-3) — 13:00–15:00 UTC.
+  const monday = { dayOfWeek: 1, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
+
+  it("takes the whole weekend: from Friday 19:00, not Sunday 19:00", () => {
+    const now = new Date("2026-10-05T14:00:00.000Z"); // Mon 11:00 SP, mid-shift
+    expect(getDutyOccurrenceLeadWindow(monday, [monday], now)).toEqual({ since: new Date("2026-10-02T22:00:00.000Z"), until: null });
+  });
+
+  it("keeps the 1-day rule on Tuesday", () => {
+    const tuesday = { ...monday, dayOfWeek: 2 };
+    const now = new Date("2026-10-06T14:00:00.000Z"); // Tue 11:00 SP
+    expect(getDutyOccurrenceLeadWindow(tuesday, [tuesday], now)).toEqual({ since: new Date("2026-10-05T22:00:00.000Z"), until: null });
+  });
+});
+
 describe("getDutyOccurrenceLeadWindow", () => {
   // Wednesday 10:00–12:00 America/Sao_Paulo (UTC-3) — 13:00–15:00 UTC.
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
