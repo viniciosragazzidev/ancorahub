@@ -77,3 +77,11 @@ describe("isManagementInvestigation", () => {
     expect(isManagementInvestigation({ status: "in_contact", corretorId: "director-1" }, management)).toBe(false);
   });
 });
+
+describe("groupDutyLeadsByShift keepEmpty", () => {
+  it("keeps an empty shift for an all-day plantão", () => {
+    const afternoon = { corretorId: "b1", assignedAt: new Date("2026-10-05T17:00:00.000Z"), createdAt: new Date("2026-10-05T17:00:00.000Z") }; // 14:00
+    expect(groupDutyLeadsByShift([afternoon], null, { keepEmpty: true }).map((group) => [group.key, group.leads.length])).toEqual([["manha", 0], ["tarde", 1]]);
+    expect(groupDutyLeadsByShift([afternoon]).map((group) => group.key)).toEqual(["tarde"]);
+  });
+});

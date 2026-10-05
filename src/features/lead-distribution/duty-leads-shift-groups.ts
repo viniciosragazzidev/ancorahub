@@ -64,11 +64,13 @@ export function sortByAssignmentTime<T extends { assignedAt: Date | null; create
 export function groupDutyLeadsByShift<T extends { assignedAt: Date | null; corretorId: string | null; createdAt: Date }>(
   leads: T[],
   splitAt?: string | null,
+  /** An all-day plantão shows both shifts, an empty one included. */
+  options: { keepEmpty?: boolean } = {},
 ): DutyLeadShiftGroup<T>[] {
   const labels = shiftLabels(splitAt);
   const groups: DutyLeadShiftGroup<T>[] = (["manha", "tarde"] as const).map((key) => ({ key, label: labels[key], leads: [] }));
   for (const lead of leads) groups[getDutyLeadShift(lead, splitAt) === "manha" ? 0 : 1].leads.push(lead);
-  return groups.filter((group) => group.leads.length > 0);
+  return options.keepEmpty ? groups : groups.filter((group) => group.leads.length > 0);
 }
 
 /** Leads each broker received in the occurrence, split by the same morning/afternoon cut as the list. */

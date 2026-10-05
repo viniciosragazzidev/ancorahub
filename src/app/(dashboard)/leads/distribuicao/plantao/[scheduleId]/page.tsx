@@ -254,7 +254,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const crossesCut = schedule.startsAt.slice(0, 5) < cut && schedule.endsAt.slice(0, 5) > cut;
   const leadGroups = filter === "distribuidos"
     ? crossesCut
-      ? groupDutyLeadsByShift(visibleLeads, schedule.shiftSplitAt)
+      ? groupDutyLeadsByShift(visibleLeads, schedule.shiftSplitAt, { keepEmpty: true })
       : [{ key: "ordem", label: `Ordem de entrega · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}`, leads: visibleLeads }]
     : [{ key: "ordem", label: "Ordem de distribuição · quentes, mornos e frios", leads: visibleLeads }];
   const filters = [
@@ -409,6 +409,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                             </span>
                           </TableCell>
                         </TableRow>
+                        {group.leads.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={8} className="py-3 text-center text-xs text-muted-foreground">Nenhum lead distribuído neste turno.</TableCell>
+                          </TableRow>
+                        ) : null}
                         {group.leads.map((lead) => {
                           const distribution = leadDistributionStatusUi(lead.distributionStatus);
                           const whatsappEntry = whatsappEntryOf(lead);
