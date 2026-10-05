@@ -106,6 +106,7 @@ const state = vi.hoisted(() => {
 });
 
 // ── Mocks ─────────────────────────────────────────────────────────────
+vi.mock("server-only", () => ({}));
 vi.mock("@/shared/db", () => ({
   getDatabase: () => state.db,
   schema: state.schema,

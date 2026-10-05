@@ -19,10 +19,11 @@ import { getDddRoutingSettings } from "./ddd-routing-settings";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
+import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getPresenceEligibleAssignments } from "./duty-presence";
 import { findRunningDutySchedule, getDutyOccurrenceLeadWindow, isLeadInDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
-import { brokersUnderDutyCap, countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
+import { countLeadsReceivedInDuty, type DutyLeadCap } from "./duty-lead-cap";
 import { selectBrokerDutyScheduleIds } from "./shared-duty-roster";
 
 const activeCommercialStatuses = ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
@@ -41,6 +42,7 @@ type RosterResolution = {
   brokerIds: Set<string> | null;
   hasActiveSelectedSchedule: boolean;
   scheduleIdByBroker: Map<string, string>;
+  brokersStoppedByDutyCap: number;
 };
 
 async function getRosterBrokerIds(
@@ -50,6 +52,7 @@ async function getRosterBrokerIds(
   webhookCredentialId?: string | null,
   exclusiveScheduleIds?: string[] | null,
   dutyFallbackPolicy: DutyFallbackPolicy = "unit_roster",
+  dutyLeadCaps?: ReadonlyMap<string, DutyLeadCap>,
 ): Promise<RosterResolution> {
   const db = getDatabase();
   const local = getLocalDutyParts(date);
@@ -90,14 +93,14 @@ async function getRosterBrokerIds(
     hasExplicitSchedule: Boolean(exclusiveScheduleIds?.length),
     hasActiveSelectedSchedule: scopedSchedules.length > 0,
   });
-  if (fallbackDecision === "use_unit_roster") return { brokerIds: null, hasActiveSelectedSchedule: false, scheduleIdByBroker: new Map() };
-  if (!scopedSchedules.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: false, scheduleIdByBroker: new Map() };
+  if (fallbackDecision === "use_unit_roster") return { brokerIds: null, hasActiveSelectedSchedule: false, scheduleIdByBroker: new Map(), brokersStoppedByDutyCap: 0 };
+  if (!scopedSchedules.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: false, scheduleIdByBroker: new Map(), brokersStoppedByDutyCap: 0 };
 
   // 2. Filter plantões by credential if the lead has a source
   const matchingScheduleIds = selectMatchingDutyScheduleIds(scopedSchedules, webhookCredentialId);
 
   // Plantões exist for this branch but none match the credential → no brokers eligible
-  if (!matchingScheduleIds.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: true, scheduleIdByBroker: new Map() };
+  if (!matchingScheduleIds.length) return { brokerIds: new Set<string>(), hasActiveSelectedSchedule: true, scheduleIdByBroker: new Map(), brokersStoppedByDutyCap: 0 };
 
   // 3. Get brokers assigned to matching plantões right now
   const assignments = await db.select({
@@ -138,13 +141,32 @@ async function getRosterBrokerIds(
     schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
     now: date,
   });
+  const scheduleAssignments = effectiveAssignments.map((assignment) => ({ id: assignment.id, brokerId: assignment.brokerId, scheduleId: assignment.scheduleId }));
+  const eligibleBeforeCap = new Set(presence.eligibleAssignmentIds);
+  const eligibleAfterCap = new Set(presence.eligibleAssignmentIds);
+  const receivedBySchedule = new Map<string, Map<string, number>>();
+  await Promise.all([...(dutyLeadCaps?.values() ?? [])].map(async (cap) => {
+    const brokerIds = [...new Set(effectiveAssignments
+      .filter((assignment) => assignment.scheduleId === cap.scheduleId && presence.eligibleAssignmentIds.has(assignment.id))
+      .map((assignment) => assignment.brokerId))];
+    if (brokerIds.length) receivedBySchedule.set(cap.scheduleId, await countLeadsReceivedInDuty(db, tenantId, cap, brokerIds));
+  }));
+  if (dutyLeadCaps?.size) {
+    for (const assignment of effectiveAssignments) {
+      const cap = dutyLeadCaps.get(assignment.scheduleId);
+      if (cap && (receivedBySchedule.get(cap.scheduleId)?.get(assignment.brokerId) ?? 0) >= cap.limit) eligibleAfterCap.delete(assignment.id);
+    }
+  }
+  const brokersBeforeCap = new Set(effectiveAssignments.filter((assignment) => eligibleBeforeCap.has(assignment.id)).map((assignment) => assignment.brokerId));
+  const brokersAfterCap = new Set(effectiveAssignments.filter((assignment) => eligibleAfterCap.has(assignment.id)).map((assignment) => assignment.brokerId));
+  const brokersStoppedByDutyCap = [...brokersBeforeCap].filter((brokerId) => !brokersAfterCap.has(brokerId)).length;
   const scheduleIdByBroker = selectBrokerDutyScheduleIds(
-    effectiveAssignments,
+    scheduleAssignments,
     new Set(matchingScheduleIds),
-    presence.eligibleAssignmentIds,
+    eligibleAfterCap,
     presence.confirmedPresenceAssignmentIds,
   );
-  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker };
+  return { brokerIds: new Set(scheduleIdByBroker.keys()), hasActiveSelectedSchedule: true, scheduleIdByBroker, brokersStoppedByDutyCap };
 }
 
 async function ensureDefaultQueue(tenantId: string, branchId: string, actorId: string) {
@@ -346,7 +368,7 @@ export async function routeLeadToBranchAndAssignBroker(
     .limit(1);
 
   const queueId = targetQueue?.id ?? null;
-  const activeDutyRoster = queueId ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId, webhookCredentialId: lead.webhookCredentialId }) : null;
+  const activeDutyRoster = queueId ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId, webhookCredentialId: lead.webhookCredentialId, respectDutyCap: false, includePaused: true }) : null;
   const dutyScheduleId = activeDutyRoster?.brokers.find((candidate) => candidate.id === brokerId)?.scheduleId ?? null;
   const assignmentEventId = randomUUID();
 
@@ -433,7 +455,7 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   assertBranchScope(context, assignmentBranchId);
   const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), eq(schema.tenantMemberships.branchId, assignmentBranchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.tenantMemberships.availabilityStatus, "available"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
   if (!broker) return { status: "conflict", leadId, reason: "O corretor não está elegível nesta unidade." };
-  const activeDutyRoster = lead.queueId ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: lead.queueId, webhookCredentialId: lead.webhookCredentialId }) : null;
+  const activeDutyRoster = lead.queueId ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: lead.queueId, webhookCredentialId: lead.webhookCredentialId, respectDutyCap: false, includePaused: true }) : null;
   const dutyScheduleId = activeDutyRoster?.brokers.find((candidate) => candidate.id === brokerId)?.scheduleId ?? null;
   if (excludeBrokerId && brokerId === excludeBrokerId) return { status: "conflict", leadId, reason: "O corretor que perdeu o SLA não pode receber este lead novamente." };
   const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
@@ -771,31 +793,17 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         eq(schema.user.status, "active"),
       ))
       .orderBy(asc(schema.user.createdAt));
-    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"))] as const));
+    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"), dutyLeadCaps)] as const));
     const rosterByBranch = new Map(rosterResults.map(([branchId, result]) => [branchId, result.brokerIds] as const));
     const scheduleIdByBroker = new Map(rosterResults.flatMap(([, result]) => [...result.scheduleIdByBroker]));
     const hasActiveSelectedSchedule = rosterResults.some(([, result]) => result.hasActiveSelectedSchedule);
+    brokersStoppedByDutyCap = rosterResults.reduce((total, [, result]) => total + result.brokersStoppedByDutyCap, 0);
     const rosterBrokers = allBrokers.filter((broker) => {
       const rosterBrokerIds = broker.branchId ? rosterByBranch.get(broker.branchId) : null;
       if (!rosterBrokerIds && broker.branchId && rosterOnlyBranchIds.has(broker.branchId)) return false;
       return (!rosterBrokerIds || rosterBrokerIds.has(broker.id)) && broker.id !== brokerToExclude && !intelligentPolicy.value.excludedBrokerIds.includes(broker.id) && (!allowedBrokerSet || allowedBrokerSet.has(broker.id));
     });
-    let brokers = rosterBrokers;
-    if (dutyLeadCaps.size && rosterBrokers.length) {
-      const receivedBySchedule = new Map<string, Map<string, number>>();
-      await Promise.all([...dutyLeadCaps.values()].map(async (cap) => {
-        const brokerIds = rosterBrokers.filter((broker) => scheduleIdByBroker.get(broker.id) === cap.scheduleId).map((broker) => broker.id);
-        if (brokerIds.length) receivedBySchedule.set(cap.scheduleId, await countLeadsReceivedInDuty(db, context.tenantId, cap, brokerIds));
-      }));
-      brokers = rosterBrokers.filter((broker) => {
-        const scheduleId = scheduleIdByBroker.get(broker.id);
-        const cap = scheduleId ? dutyLeadCaps.get(scheduleId) : undefined;
-        const underCap = !cap || brokersUnderDutyCap([broker.id], receivedBySchedule.get(cap.scheduleId) ?? new Map(), cap.limit).has(broker.id);
-        if (!underCap) brokersStoppedByDutyCap += 1;
-        return underCap;
-      });
-    }
-    return { brokers, rosterByBranch, scheduleIdByBroker, hasActiveSelectedSchedule };
+    return { brokers: rosterBrokers, rosterByBranch, scheduleIdByBroker, hasActiveSelectedSchedule };
   };
 
   let { brokers, rosterByBranch, scheduleIdByBroker, hasActiveSelectedSchedule } = await loadEligibleBrokers(targetBranchIds);
@@ -1105,7 +1113,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     db.select({ leadId: schema.leads.id, brokerId: schema.leads.corretorId, dutyScheduleId: schema.leads.dutyScheduleId, status: schema.leads.status, assignedAt: schema.leads.assignedAt, serviceStartedAt: schema.leads.serviceStartedAt, firstContactAt: schema.leads.firstContactAt }).from(schema.leads).where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids))),
     db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId, assignedAt: schema.leadAssignmentAttempts.assignedAt, firstContactAt: schema.leadAssignmentAttempts.firstContactAt, feedbackDueAt: schema.leadAssignmentAttempts.feedbackDueAt }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids))),
     // Pending or accepted offers count as load; declined/expired ones do not (or declining would pay off).
-    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, dutyScheduleId: schema.leadOffers.dutyScheduleId }).from(schema.leadOffers).where(and(
+    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, dutyScheduleId: schema.leadOffers.dutyScheduleId, offeredAt: schema.leadOffers.offeredAt }).from(schema.leadOffers).where(and(
       eq(schema.leadOffers.tenantId, context.tenantId),
       inArray(schema.leadOffers.brokerId, ids),
       gte(schema.leadOffers.offeredAt, dutySince),
@@ -1113,18 +1121,19 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
     )),
   ]);
   const loadMap = new Map(loads.map((item) => [item.brokerId, Number(item.total)]));
+  const dutyReceipts: DutyReceipt[] = [
+    ...brokerLeadHistory.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
+    ...slaAttempts.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.assignedAt })),
+    ...dutyOffers.map((item) => ({ brokerId: item.brokerId, leadId: item.leadId, dutyScheduleId: item.dutyScheduleId, receivedAt: item.offeredAt })),
+  ];
   const candidates = remainingBrokers.map((broker) => {
     const history = brokerLeadHistory.filter((item) => item.brokerId === broker.id);
     const attempts = slaAttempts.filter((item) => item.brokerId === broker.id);
     const conversionRate = history.length ? history.filter((item) => item.status === "converted").length / history.length : 0;
     const slaRate = attempts.length ? attempts.filter((item) => item.firstContactAt && item.firstContactAt <= item.feedbackDueAt).length / attempts.length : 0;
     const idleSince = [...history.map((item) => item.assignedAt), ...attempts.map((item) => item.assignedAt)].reduce<Date | null>((newest, assignedAt) => !assignedAt ? newest : (!newest || assignedAt > newest ? assignedAt : newest), null);
-    const receivedInDuty = new Set([
-      // Leads now with the broker since the start of the day, however they got there (automatic, offer or manual).
-      ...history.filter((item) => item.assignedAt && item.assignedAt >= dutySince && (!scheduleIdByBroker.has(broker.id) || item.dutyScheduleId === scheduleIdByBroker.get(broker.id))).map((item) => item.leadId),
-      ...attempts.filter((item) => item.assignedAt && item.assignedAt >= dutySince && (!scheduleIdByBroker.has(broker.id) || item.dutyScheduleId === scheduleIdByBroker.get(broker.id))).map((item) => item.leadId),
-      ...dutyOffers.filter((item) => item.brokerId === broker.id && (!scheduleIdByBroker.has(broker.id) || item.dutyScheduleId === scheduleIdByBroker.get(broker.id))).map((item) => item.leadId),
-    ]).size;
+    // Null attribution retains the pre-migration operation-day + broker behavior.
+    const receivedInDuty = countReceivedInDuty({ brokerId: broker.id, scheduleId: scheduleIdByBroker.get(broker.id), since: dutySince, receipts: dutyReceipts });
     const unstartedLeads = history.filter((item) => item.status === "distributed" || item.status === "new" || (!item.serviceStartedAt && !item.firstContactAt)).length + attempts.filter((item) => !item.firstContactAt).length;
     const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads: loadMap.get(broker.id) ?? 0, unstartedLeads, receivedInDuty, lastAssignedAt: idleSince, capacity: queue?.capacityEnabled ? queue.capacity ?? null : null, onDuty: Boolean(broker.branchId && rosterByBranch.get(broker.branchId)?.has(broker.id)), conversionRate, slaRate, manualPriority: 0, idleSince, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, intelligentPolicy.value) };

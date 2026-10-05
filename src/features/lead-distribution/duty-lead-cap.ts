@@ -1,6 +1,7 @@
 import { and, eq, gte, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { countDutyLeadsByBroker } from "./duty-attribution";
 
 /** The cap of the plantão occurrence running now: leads each broker may receive in it. */
 export type DutyLeadCap = { scheduleId: string; limit: number; startsAt: Date; endsAt: Date };
@@ -25,13 +26,13 @@ export function brokersUnderDutyCap(brokerIds: readonly string[], received: Read
 export async function countLeadsReceivedInDuty(db: Database, tenantId: string, cap: DutyLeadCap, brokerIds: readonly string[]) {
   if (!brokerIds.length) return new Map<string, number>();
   const rows = await db
-    .select({ brokerId: schema.leads.corretorId, total: sql<number>`count(*)::int` })
+    .select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, dutyScheduleId: schema.leads.dutyScheduleId })
     .from(schema.leads)
     .innerJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
     .where(and(
       eq(schema.leads.tenantId, tenantId),
       inArray(schema.leads.corretorId, [...brokerIds]),
-      eq(schema.leads.dutyScheduleId, cap.scheduleId),
+      or(eq(schema.leads.dutyScheduleId, cap.scheduleId), isNull(schema.leads.dutyScheduleId)),
       gte(schema.leads.assignedAt, cap.startsAt),
       lt(schema.leads.assignedAt, cap.endsAt),
       isNull(schema.leads.deletedAt),
@@ -39,7 +40,6 @@ export async function countLeadsReceivedInDuty(db: Database, tenantId: string, c
         eq(schema.leadQueues.exclusiveDutyScheduleId, cap.scheduleId),
         sql`${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([cap.scheduleId])}::jsonb`,
       ),
-    ))
-    .groupBy(schema.leads.corretorId);
-  return new Map(rows.filter((row) => row.brokerId).map((row) => [row.brokerId as string, Number(row.total)]));
+    ));
+  return countDutyLeadsByBroker(rows, cap.scheduleId);
 }

@@ -42,3 +42,11 @@ novas consultas; sem migration adicional.
 - Com varias filas vinculadas, a lista "Aguardando distribuicao" mostra uma aba por fila, com sua contagem e leads filtrados. A lista "Distribuidos" continua agregando todas as filas; os filtros de canal permanecem.
 - A fila selecionada fica no parametro `fila` da URL e a pagina usa apenas filas ja carregadas no escopo tenant do perfil.
 - Testes focados e ESLint passaram. O typecheck atual esta bloqueado por sintaxe invalida em `.next/dev/types/routes.d.ts` (artefato gerado), sem erros reportados nos arquivos desta alteracao. `agent:context` continua falhando por `uv_os_get_passwd returned ENOMEM`; build nao executado conforme solicitado.
+
+## Compatibilidade da atribuicao legada (2026-10-05)
+
+- `duty_schedule_id` nulo continua contando na menor carga pela janela da operacao e corretor; IDs explicitos de outras ocorrencias ficam fora (`service.ts`, `control-service.ts`).
+- Limite por ocorrencia usa a mesma compatibilidade nula, restringida a janela e fila vinculada (`duty-lead-cap.ts`). Em filas compartilhadas, a selecao tenta outra ocorrencia elegivel se a atribuicao preferida estiver no teto (`active-queue-duty-roster.ts`, `service.ts`).
+- Historico inclui atribuicoes legadas por fila ou por `scheduleId+dutyDate`, mantendo marcacao estimada para registros sem vinculo exato (`duty-occurrence-history.ts`).
+- Transferencia manual grava o plantao ativo representado pelo corretor por fila; remover o corretor limpa o vinculo (`equipe/actions.ts`). Atribuicoes manuais individuais ignoram o teto ao resolver o ID representativo.
+- Vitest focado, typecheck e ESLint: ver `reports/agent/verification/2026-10-05-duty-attribution-null-fallback.md`. Sem migration e sem build.

@@ -13,6 +13,15 @@ describe("selectBrokerDutyScheduleIds", () => {
     expect([...selected]).toEqual([["broker-a", "schedule-b"], ["broker-b", "schedule-b"]]);
   });
 
+  it("keeps a broker in the shared roster through another occurrence when the confirmed one is at cap", () => {
+    const selected = selectBrokerDutyScheduleIds([
+      { id: "assignment-a", brokerId: "broker-a", scheduleId: "schedule-a" },
+      { id: "assignment-b", brokerId: "broker-a", scheduleId: "schedule-b" },
+    ], new Set(["schedule-a", "schedule-b"]), new Set(["assignment-b"]), new Set(["assignment-a"]));
+
+    expect(selected.get("broker-a")).toBe("schedule-b");
+  });
+
   it("selects the lower-load broker from the union of two active schedules", () => {
     const scheduleByBroker = selectBrokerDutyScheduleIds([
       { id: "a1", brokerId: "broker-a", scheduleId: "schedule-a" },

@@ -36,6 +36,8 @@ export async function getActiveQueueDutyRoster(input: {
   queueId: string | null;
   webhookCredentialId: string | null;
   now?: Date;
+  respectDutyCap?: boolean;
+  includePaused?: boolean;
 }): Promise<ActiveQueueDutyRoster> {
   if (!input.queueId) return noActiveDuty;
 
@@ -126,7 +128,7 @@ export async function getActiveQueueDutyRoster(input: {
     .where(and(
       eq(schema.dutyRosterAssignments.tenantId, input.tenantId),
       eq(schema.dutyRosterAssignments.status, "active"),
-      isNull(schema.dutyRosterAssignments.pausedAt),
+      input.includePaused ? undefined : isNull(schema.dutyRosterAssignments.pausedAt),
       eq(schema.dutyRosterAssignments.dayOfWeek, local.weekday),
       lte(schema.dutyRosterAssignments.startsAt, local.time),
       gt(schema.dutyRosterAssignments.endsAt, local.time),
@@ -158,31 +160,38 @@ export async function getActiveQueueDutyRoster(input: {
     schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
     now,
   });
-  const scheduleIdByBroker = selectBrokerDutyScheduleIds(
-    effectiveBrokers.map((broker) => ({ id: broker.assignmentId, brokerId: broker.id, scheduleId: broker.scheduleId })),
-    new Set(matchingScheduleIds),
-    presence.eligibleAssignmentIds,
-    presence.confirmedPresenceAssignmentIds,
-  );
   const capBySchedule = new Map<string, DutyLeadCap>();
-  for (const schedule of activeSchedules) {
-    const running = findRunningDutySchedule([schedule], now);
-    if (running && schedule.maxLeadsPerBroker) capBySchedule.set(schedule.id, {
-      scheduleId: schedule.id,
-      limit: schedule.maxLeadsPerBroker,
-      startsAt: running.window.startsAt,
-      endsAt: running.window.endsAt,
-    });
+  if (input.respectDutyCap !== false) {
+    for (const schedule of activeSchedules) {
+      const running = findRunningDutySchedule([schedule], now);
+      if (running && schedule.maxLeadsPerBroker) capBySchedule.set(schedule.id, {
+        scheduleId: schedule.id,
+        limit: schedule.maxLeadsPerBroker,
+        startsAt: running.window.startsAt,
+        endsAt: running.window.endsAt,
+      });
+    }
   }
   const receivedBySchedule = new Map<string, Map<string, number>>();
   await Promise.all([...capBySchedule.values()].map(async (cap) => {
-    const brokerIds = [...scheduleIdByBroker].filter(([, scheduleId]) => scheduleId === cap.scheduleId).map(([brokerId]) => brokerId);
+    const brokerIds = [...new Set(effectiveBrokers
+      .filter((broker) => broker.scheduleId === cap.scheduleId && presence.eligibleAssignmentIds.has(broker.assignmentId))
+      .map((broker) => broker.id))];
     if (brokerIds.length) receivedBySchedule.set(cap.scheduleId, await countLeadsReceivedInDuty(db, input.tenantId, cap, brokerIds));
   }));
-  for (const [brokerId, scheduleId] of scheduleIdByBroker) {
-    const cap = capBySchedule.get(scheduleId);
-    if (cap && (receivedBySchedule.get(scheduleId)?.get(brokerId) ?? 0) >= cap.limit) scheduleIdByBroker.delete(brokerId);
-  }
+  const eligibleAssignmentIds = new Set(effectiveBrokers.flatMap((broker) => {
+    if (!presence.eligibleAssignmentIds.has(broker.assignmentId)) return [];
+    const cap = input.respectDutyCap === false ? null : capBySchedule.get(broker.scheduleId);
+    return !cap || (receivedBySchedule.get(broker.scheduleId)?.get(broker.id) ?? 0) < cap.limit ? [broker.assignmentId] : [];
+  }));
+  // Resolve attribution after applying each occurrence's cap: a full schedule
+  // must not remove a broker who has another shared occurrence with capacity.
+  const scheduleIdByBroker = selectBrokerDutyScheduleIds(
+    effectiveBrokers.map((broker) => ({ id: broker.assignmentId, brokerId: broker.id, scheduleId: broker.scheduleId })),
+    new Set(matchingScheduleIds),
+    eligibleAssignmentIds,
+    presence.confirmedPresenceAssignmentIds,
+  );
   return {
     hasActiveDuty: true,
     brokers: brokers.filter((broker) => effectiveAssignmentIds.has(broker.assignmentId) && presence.eligibleAssignmentIds.has(broker.assignmentId) && scheduleIdByBroker.get(broker.id) === broker.scheduleId).map((broker) => ({ id: broker.id, scheduleId: broker.scheduleId, name: broker.name, branchId: broker.branchId, branchName: broker.branchName })),

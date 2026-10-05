@@ -14,6 +14,7 @@ import { QUEUE_SINGLETON_SOURCE_IDS, QUEUE_SOURCE_OPTIONS } from "./routing-cata
 import { dutyFallbackPolicyValues, type DutyFallbackPolicy } from "./types";
 import { getLocalDutyParts } from "@/features/leads/assignment";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
+import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
 import { loadBrokerPacingOffers } from "./offers";
 import { evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type PacingOffer } from "./offer-pacing";
 
@@ -678,18 +679,22 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   // assigned (automatically, by offer or manually) or offered (pending/accepted) in the operation day.
   const dutySince = operationDayStart(new Date());
   const [dutyAttempts, dutyOffers, dutyLeads] = paceableIds.length ? await Promise.all([
-    db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId }).from(schema.leadAssignmentAttempts)
+    db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId, dutyScheduleId: schema.leadAssignmentAttempts.dutyScheduleId, assignedAt: schema.leadAssignmentAttempts.assignedAt }).from(schema.leadAssignmentAttempts)
       .where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, paceableIds), gte(schema.leadAssignmentAttempts.assignedAt, dutySince))),
-    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, dutyScheduleId: schema.leadOffers.dutyScheduleId }).from(schema.leadOffers)
+    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId, dutyScheduleId: schema.leadOffers.dutyScheduleId, offeredAt: schema.leadOffers.offeredAt }).from(schema.leadOffers)
       .where(and(eq(schema.leadOffers.tenantId, context.tenantId), inArray(schema.leadOffers.brokerId, paceableIds), gte(schema.leadOffers.offeredAt, dutySince), inArray(schema.leadOffers.status, ["PENDING", "ACCEPTED"]))),
     // Includes leads handed over manually.
-    db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, dutyScheduleId: schema.leads.dutyScheduleId }).from(schema.leads)
+    db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, dutyScheduleId: schema.leads.dutyScheduleId, assignedAt: schema.leads.assignedAt }).from(schema.leads)
       .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, paceableIds), gte(schema.leads.assignedAt, dutySince))),
   ]) : [[], [], []];
+  const dutyReceipts: DutyReceipt[] = [
+    ...dutyAttempts.map((row) => ({ brokerId: row.brokerId, leadId: row.leadId, dutyScheduleId: row.dutyScheduleId, receivedAt: row.assignedAt })),
+    ...dutyOffers.map((row) => ({ brokerId: row.brokerId, leadId: row.leadId, dutyScheduleId: row.dutyScheduleId, receivedAt: row.offeredAt })),
+    ...dutyLeads.map((row) => ({ brokerId: row.brokerId, leadId: row.leadId, dutyScheduleId: row.dutyScheduleId, receivedAt: row.assignedAt })),
+  ];
   const receivedInDutyByBroker = new Map<string, number>();
   for (const id of paceableIds) {
-    const scheduleId = dutyScheduleIdByBroker.get(id);
-    receivedInDutyByBroker.set(id, new Set([...dutyAttempts, ...dutyOffers, ...dutyLeads].filter((row) => row.brokerId === id && (!scheduleId || row.dutyScheduleId === scheduleId)).map((row) => row.leadId)).size);
+    receivedInDutyByBroker.set(id, countReceivedInDuty({ brokerId: id, scheduleId: dutyScheduleIdByBroker.get(id), since: dutySince, receipts: dutyReceipts }));
   }
   const candidates: RankedBroker[] = brokers.filter((broker) => paceableIds.includes(broker.id)).map((broker) => {
     const activeLeads = loadByBroker.get(broker.id) ?? 0;

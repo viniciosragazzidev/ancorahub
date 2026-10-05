@@ -5,6 +5,7 @@ import { and, asc, eq, gte, inArray, isNotNull, isNull, lt, lte, or, gt, sql } f
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import type { DutyWindow } from "./duty-presence-domain";
+import { matchesDutyHistoryAttribution } from "./duty-history-attribution";
 
 const HISTORY_LIMIT = 200;
 
@@ -40,6 +41,7 @@ export async function getDutyOccurrenceHistory(
       brokerId: schema.leadOffers.brokerId,
       brokerName: schema.user.name,
       queueId: schema.leads.queueId,
+      dutyScheduleId: schema.leadOffers.dutyScheduleId,
       status: schema.leadOffers.status,
       assignedAt: schema.leadOffers.acceptedAt,
       offeredAt: schema.leadOffers.offeredAt,
@@ -48,7 +50,24 @@ export async function getDutyOccurrenceHistory(
       .innerJoin(schema.user, eq(schema.leadOffers.brokerId, schema.user.id))
       .where(and(
         eq(schema.leadOffers.tenantId, context.tenantId),
-        eq(schema.leadOffers.dutyScheduleId, scheduleId),
+        or(
+          eq(schema.leadOffers.dutyScheduleId, scheduleId),
+          and(
+            isNull(schema.leadOffers.dutyScheduleId),
+            or(
+              queueIds.length ? inArray(schema.leads.queueId, queueIds) : sql`false`,
+              sql`exists (
+                select 1 from lead_distribution_events legacy_offer_event
+                where legacy_offer_event.tenant_id = ${context.tenantId}
+                  and legacy_offer_event.lead_id = ${schema.leadOffers.leadId}
+                  and legacy_offer_event.action = 'offer_sent'
+                  and legacy_offer_event.metadata->>'offerId' = ${schema.leadOffers.id}
+                  and legacy_offer_event.metadata->>'scheduleId' = ${scheduleId}
+                  and legacy_offer_event.metadata->>'dutyDate' = ${window.dutyDate}
+              )`,
+            ),
+          ),
+        ),
         gte(schema.leadOffers.offeredAt, window.startsAt),
         lt(schema.leadOffers.offeredAt, window.endsAt),
         context.role === "manager" && context.branchId ? sql`exists (select 1 from lead_distribution_events scoped_offer where scoped_offer.tenant_id = ${context.tenantId} and scoped_offer.lead_id = ${schema.leadOffers.leadId} and scoped_offer.new_owner_id = ${schema.leadOffers.brokerId} and scoped_offer.action = 'offer_sent' and scoped_offer.to_branch_id = ${context.branchId} and scoped_offer.created_at >= ${window.startsAt} and scoped_offer.created_at < ${window.endsAt})` : undefined,
@@ -59,7 +78,7 @@ export async function getDutyOccurrenceHistory(
       leadName: schema.leads.nome,
       brokerId: schema.leadDistributionEvents.newOwnerId,
       brokerName: schema.user.name,
-      queueId: schema.leadDistributionEvents.toQueueId,
+      queueId: schema.leads.queueId,
       assignedAt: schema.leadDistributionEvents.createdAt,
       metadata: schema.leadDistributionEvents.metadata,
     }).from(schema.leadDistributionEvents)
@@ -68,13 +87,22 @@ export async function getDutyOccurrenceHistory(
       .where(and(
         eq(schema.leadDistributionEvents.tenantId, context.tenantId),
         inArray(schema.leadDistributionEvents.action, ["assigned", "routed_and_assigned"]),
-        sql`${schema.leadDistributionEvents.metadata}->>'dutyScheduleId' = ${scheduleId}`,
+        or(
+          sql`${schema.leadDistributionEvents.metadata}->>'dutyScheduleId' = ${scheduleId}`,
+          and(
+            sql`${schema.leadDistributionEvents.metadata}->>'dutyScheduleId' is null`,
+            or(
+              queueIds.length ? inArray(schema.leads.queueId, queueIds) : sql`false`,
+              sql`${schema.leadDistributionEvents.metadata}->>'scheduleId' = ${scheduleId} and ${schema.leadDistributionEvents.metadata}->>'dutyDate' = ${window.dutyDate}`,
+            ),
+          ),
+        ),
         isNotNull(schema.leadDistributionEvents.newOwnerId),
         gte(schema.leadDistributionEvents.createdAt, window.startsAt),
         lt(schema.leadDistributionEvents.createdAt, window.endsAt),
         context.role === "manager" && context.branchId ? eq(schema.leadDistributionEvents.toBranchId, context.branchId) : undefined,
       )).orderBy(asc(schema.leadDistributionEvents.createdAt)).limit(HISTORY_LIMIT + 1),
-    db.select({ metadata: schema.leadDistributionEvents.metadata })
+    db.select({ metadata: schema.leadDistributionEvents.metadata, queueId: schema.leadDistributionEvents.toQueueId })
       .from(schema.leadDistributionEvents)
       .where(and(
         eq(schema.leadDistributionEvents.tenantId, context.tenantId),
@@ -96,18 +124,46 @@ export async function getDutyOccurrenceHistory(
         context.role === "manager" && context.branchId ? sql`exists (select 1 from duty_roster_assignments scoped_roster where scoped_roster.id = ${schema.dutyPresenceConfirmations.assignmentId} and scoped_roster.tenant_id = ${context.tenantId} and scoped_roster.branch_id = ${context.branchId})` : undefined,
       )),
   ]);
-  const exactOfferIds = new Set(offerEvents.flatMap((event) => {
+  const matchedOfferEvents = offerEvents.filter((event) => {
     const metadata = event.metadata as { offerId?: unknown; scheduleId?: unknown; dutyScheduleId?: unknown; dutyDate?: unknown } | null;
-    return (metadata?.dutyScheduleId === scheduleId || metadata?.scheduleId === scheduleId && metadata.dutyDate === window.dutyDate) && typeof metadata.offerId === "string" ? [metadata.offerId] : [];
+    return matchesDutyHistoryAttribution({
+      dutyScheduleId: typeof metadata?.dutyScheduleId === "string" ? metadata.dutyScheduleId : null,
+      queueId: event.queueId,
+      metadata,
+      scheduleId,
+      dutyDate: window.dutyDate,
+      queueIds,
+    });
+  });
+  const exactOfferIds = new Set(matchedOfferEvents.flatMap((event) => {
+    const metadata = event.metadata as { offerId?: unknown; dutyScheduleId?: unknown } | null;
+    return metadata?.dutyScheduleId === scheduleId && typeof metadata.offerId === "string" ? [metadata.offerId] : [];
   }));
+  const legacyOfferIds = new Set(matchedOfferEvents.flatMap((event) => {
+    const metadata = event.metadata as { offerId?: unknown; dutyScheduleId?: unknown } | null;
+    return !metadata?.dutyScheduleId && typeof metadata?.offerId === "string" ? [metadata.offerId] : [];
+  }));
+  const legacyManualEvents = manualEvents.filter((row) => {
+    const metadata = row.metadata as { scheduleId?: unknown; dutyScheduleId?: unknown; dutyDate?: unknown } | null;
+    return matchesDutyHistoryAttribution({
+      dutyScheduleId: typeof metadata?.dutyScheduleId === "string" ? metadata.dutyScheduleId : null,
+      queueId: row.queueId,
+      metadata,
+      scheduleId,
+      dutyDate: window.dutyDate,
+      queueIds,
+    });
+  });
+  const matchingOffers = offers.filter((row) => row.dutyScheduleId === scheduleId
+    || (row.dutyScheduleId === null && (queueIds.includes(row.queueId ?? "") || legacyOfferIds.has(row.id))));
 
   const distributions = [
-    ...offers.filter((row) => row.assignedAt).map((row) => ({
+    ...matchingOffers.filter((row) => row.assignedAt).map((row) => ({
       id: row.id, leadId: row.leadId, leadName: row.leadName,
       brokerId: row.brokerId, brokerName: row.brokerName,
       assignedAt: row.assignedAt!, kind: "Aceite da oferta", exact: exactOfferIds.has(row.id),
     })),
-    ...manualEvents.filter((row) => row.brokerId).map((row) => ({
+    ...legacyManualEvents.filter((row) => row.brokerId).map((row) => ({
       id: row.id, leadId: row.leadId, leadName: row.leadName,
       brokerId: row.brokerId!, brokerName: row.brokerName ?? "Corretor não encontrado",
       assignedAt: row.assignedAt, kind: "Atribuição manual",

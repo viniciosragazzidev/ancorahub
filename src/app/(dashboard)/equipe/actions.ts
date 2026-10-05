@@ -20,6 +20,7 @@ import { processMetaOutboundBatch } from "@/features/communication-channels/outb
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { enqueueBrokerInvitation } from "@/features/team/broker-invitation-delivery";
 import { parseCsv } from "@/shared/utils/csv";
+import { getActiveQueueDutyRoster } from "@/features/lead-distribution/active-queue-duty-roster";
 
 import { invalidateTenantContextCache } from "@/shared/auth/tenant-context";
 export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
@@ -594,6 +595,7 @@ export async function deleteTeamMemberAction(
             .update(schema.leads)
             .set({
               corretorId: null,
+              dutyScheduleId: null,
               distributionStatus: "returned_to_queue",
               assignedAt: null,
               distributionUpdatedAt: now,
@@ -726,16 +728,39 @@ export async function transferLeadsAction(
       throw new Error("Gestores só podem transferir leads dentro das unidades autorizadas.");
     }
 
-    await db
-      .update(schema.leads)
-      .set({ corretorId: input.toUserId, assignedAt: new Date() })
-      .where(
-        and(
+    const leadsToTransfer = await db.select({
+      id: schema.leads.id,
+      queueId: schema.leads.queueId,
+      webhookCredentialId: schema.leads.webhookCredentialId,
+    }).from(schema.leads).where(and(
+      eq(schema.leads.tenantId, context.tenantId),
+      eq(schema.leads.corretorId, input.fromUserId),
+      source.branchId ? eq(schema.leads.branchId, source.branchId) : sql`true`,
+    ));
+    const groups = new Map<string, { queueId: string | null; webhookCredentialId: string | null; leadIds: string[]; dutyScheduleId: string | null }>();
+    for (const lead of leadsToTransfer) {
+      const key = `${lead.queueId ?? ""}:${lead.webhookCredentialId ?? ""}`;
+      const group = groups.get(key) ?? { queueId: lead.queueId, webhookCredentialId: lead.webhookCredentialId, leadIds: [], dutyScheduleId: null };
+      group.leadIds.push(lead.id);
+      groups.set(key, group);
+    }
+    const assignedAt = new Date();
+    for (const group of groups.values()) {
+      const activeDutyRoster = group.queueId
+        ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: group.queueId, webhookCredentialId: group.webhookCredentialId, respectDutyCap: false, includePaused: true })
+        : null;
+      group.dutyScheduleId = activeDutyRoster?.brokers.find((broker) => broker.id === input.toUserId)?.scheduleId ?? null;
+    }
+    await db.transaction(async (tx) => {
+      for (const group of groups.values()) {
+        await tx.update(schema.leads).set({ corretorId: input.toUserId, assignedAt, dutyScheduleId: group.dutyScheduleId }).where(and(
           eq(schema.leads.tenantId, context.tenantId),
+          inArray(schema.leads.id, group.leadIds),
           eq(schema.leads.corretorId, input.fromUserId),
           source.branchId ? eq(schema.leads.branchId, source.branchId) : sql`true`,
-        ),
-      );
+        ));
+      }
+    });
 
     invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true };
