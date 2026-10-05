@@ -448,6 +448,7 @@ export function ConversationsWorkspace({
               <ChatInput
                 leadId={selected.id}
                 brokerName={brokerDisplayName(selected.corretorNome)}
+                phone={selected.telefone}
                 onMediaSent={(msg) => {
                   setConversations((prev) =>
                     prev.map((item) =>
@@ -966,10 +967,13 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
 function ChatInput({
   leadId,
   brokerName,
+  phone,
   onMessageSent,
   onMediaSent,
 }: {
   leadId: string;
+  /** Client phone: on mobile, a visible "Abrir no WhatsApp" stays available even with the in-app chat connected. */
+  phone?: string | null;
   /** The lead's broker, suggested in the /contato shortcut. */
   brokerName?: string;
   onMessageSent: (msg: ConversationMessage) => void;
@@ -1038,6 +1042,17 @@ function ChatInput({
 
   return (
     <div className="border-t border-border bg-card px-4 py-3 sm:px-5">
+      {phone ? (
+        <a
+          href={getWhatsAppUrl(phone)}
+          rel="noreferrer"
+          target="_blank"
+          className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mb-2 w-full gap-2 lg:hidden")}
+        >
+          <WhatsappLogo className="size-4 text-emerald-600" />
+          Abrir no WhatsApp
+        </a>
+      ) : null}
       <form onSubmit={handleSend} className="flex gap-2 items-center">
         <MediaAttachButton leadId={leadId} onMediaSent={onMediaSent} />
         <QuickResponsesPopover onSelectResponse={handleAppendQuickResponse} />
