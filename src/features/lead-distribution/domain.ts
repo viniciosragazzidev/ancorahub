@@ -67,6 +67,12 @@ export type IntelligentDistributionPolicy = {
 
 export type RankedBroker = EligibleBroker & {
   onDuty: boolean;
+  /**
+   * Leads offered or assigned to the broker in the current operation day (the
+   * plantão window: 19:00 of the day before, Friday 19:00 on Monday). This is
+   * the "menor carga" of the plantão; the portfolio counts below only break ties.
+   */
+  receivedInDuty?: number;
   conversionRate: number;
   slaRate: number;
   manualPriority: number;
@@ -126,18 +132,25 @@ export function rankBrokers(brokers: RankedBroker[], policy: IntelligentDistribu
       const bCooled = b.lastAssignedAt ? (nowMs - b.lastAssignedAt.getTime() < BROKER_COOLDOWN_MS) : false;
       if (aCooled !== bCooled) return Number(aCooled) - Number(bCooled);
 
-      // 3. Menor quantidade de leads sem iniciar atendimento
+      // 3. Menor carga no plantão: quem recebeu menos indicações no dia da operação.
+      //    Antes a carga era a carteira inteira (leads ativos e não iniciados de
+      //    qualquer data), e quem tinha leads antigos em aberto nunca recebia,
+      //    mesmo com 0 leads no plantão.
+      const aDuty = a.receivedInDuty ?? 0;
+      const bDuty = b.receivedInDuty ?? 0;
+      if (aDuty !== bDuty) return aDuty - bDuty;
+      // 4. Menor quantidade de leads sem iniciar atendimento
       const aUnstarted = a.unstartedLeads ?? 0;
       const bUnstarted = b.unstartedLeads ?? 0;
       if (aUnstarted !== bUnstarted) return aUnstarted - bUnstarted;
 
-      // 4. Menor quantidade de leads ativos totais
+      // 5. Menor quantidade de leads ativos totais
       if (a.activeLeads !== b.activeLeads) return a.activeLeads - b.activeLeads;
 
-      // 5. Pontuação de desempenho / ranking inteligente
+      // 6. Pontuação de desempenho / ranking inteligente
       if (policy.ranking.enabled && b.rankingScore !== a.rankingScore) return b.rankingScore - a.rankingScore;
 
-      // 6. Maior tempo em descanso (idleSince)
+      // 7. Maior tempo em descanso (idleSince)
       const aIdle = a.idleSince?.getTime() ?? 0;
       const bIdle = b.idleSince?.getTime() ?? 0;
       if (aIdle !== bIdle) return aIdle - bIdle;
