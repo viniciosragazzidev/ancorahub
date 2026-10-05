@@ -183,7 +183,7 @@ export const DUTY_LEADS_FROM_PREVIOUS_DAY_AT = "19:00";
  * the whole weekend: from Friday 19:00 (nobody works the weekend shift, so
  * those leads would otherwise belong to no plantão). Every other day: 1.
  */
-function daysBackForLeadWindow(weekday: number) {
+export function daysBackForLeadWindow(weekday: number) {
   return weekday === 1 ? 3 : 1;
 }
 

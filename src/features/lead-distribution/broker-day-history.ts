@@ -4,7 +4,7 @@ import { and, desc, eq, gte, isNull, lt } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
-import { DUTY_LEADS_FROM_PREVIOUS_DAY_AT } from "./duty-presence-domain";
+import { DUTY_LEADS_FROM_PREVIOUS_DAY_AT, daysBackForLeadWindow } from "./duty-presence-domain";
 
 export type BrokerDayHistoryLead = {
   id: string;
@@ -37,7 +37,12 @@ export type BrokerDayHistory = {
 
 const TIMEZONE = "America/Sao_Paulo";
 
-/** Start of the operation's day: 19:00 of yesterday (or of today, once past 19:00). */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Start of the operation's day: 19:00 of yesterday (or of today, once past 19:00).
+ * Monday's day takes the weekend: from Friday 19:00, same rule as the plantão lead window.
+ */
 export function operationDayStart(now: Date) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
     timeZone: TIMEZONE, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
@@ -45,15 +50,18 @@ export function operationDayStart(now: Date) {
   const [cutHour, cutMinute] = DUTY_LEADS_FROM_PREVIOUS_DAY_AT.split(":").map(Number);
   // São Paulo has no DST: UTC-3 all year.
   const todayCut = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), cutHour + 3, cutMinute));
-  return todayCut <= now ? todayCut : new Date(todayCut.getTime() - 24 * 60 * 60 * 1000);
+  if (todayCut <= now) return todayCut;
+  const weekday = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day))).getUTCDay();
+  return new Date(todayCut.getTime() - daysBackForLeadWindow(weekday) * DAY_MS);
 }
 
-/** The operation's day of a past plantão date ("YYYY-MM-DD"): 19:00 of the day before to 19:00 of that day. */
+/** The operation's day of a past plantão date ("YYYY-MM-DD"): 19:00 of the day before (Friday, for a Monday) to 19:00 of that day. */
 export function operationDayOf(dutyDate: string) {
   const [year, month, day] = dutyDate.split("-").map(Number);
   const [cutHour, cutMinute] = DUTY_LEADS_FROM_PREVIOUS_DAY_AT.split(":").map(Number);
   const until = new Date(Date.UTC(year, month - 1, day, cutHour + 3, cutMinute));
-  return { since: new Date(until.getTime() - 24 * 60 * 60 * 1000), until };
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+  return { since: new Date(until.getTime() - daysBackForLeadWindow(weekday) * DAY_MS), until };
 }
 
 /**
