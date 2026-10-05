@@ -1,7 +1,8 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
+import { operationDayStart } from "./broker-day-history";
 import { z } from "zod";
 
 import type { TenantContext } from "@/shared/auth/types";
@@ -660,9 +661,25 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   const loads = await db.select({ brokerId: schema.leads.corretorId, total: count(schema.leads.id) }).from(schema.leads)
     .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), inArray(schema.leads.status, ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]))).groupBy(schema.leads.corretorId);
   const loadByBroker = new Map(loads.map((row) => [row.brokerId, Number(row.total)]));
+  // Same "menor carga" of the plantão as the real distribution (service.ts): distinct leads
+  // assigned (automatically, by offer or manually) or offered (pending/accepted) in the operation day.
+  const dutySince = operationDayStart(new Date());
+  const [dutyAttempts, dutyOffers, dutyLeads] = ids.length ? await Promise.all([
+    db.select({ brokerId: schema.leadAssignmentAttempts.brokerId, leadId: schema.leadAssignmentAttempts.leadId }).from(schema.leadAssignmentAttempts)
+      .where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), inArray(schema.leadAssignmentAttempts.brokerId, ids), gte(schema.leadAssignmentAttempts.assignedAt, dutySince))),
+    db.select({ brokerId: schema.leadOffers.brokerId, leadId: schema.leadOffers.leadId }).from(schema.leadOffers)
+      .where(and(eq(schema.leadOffers.tenantId, context.tenantId), inArray(schema.leadOffers.brokerId, ids), gte(schema.leadOffers.offeredAt, dutySince), inArray(schema.leadOffers.status, ["PENDING", "ACCEPTED"]))),
+    // Includes leads handed over manually.
+    db.select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id }).from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, ids), gte(schema.leads.assignedAt, dutySince))),
+  ]) : [[], [], []];
+  const receivedInDutyByBroker = new Map<string, number>();
+  for (const id of ids) {
+    receivedInDutyByBroker.set(id, new Set([...dutyAttempts, ...dutyOffers, ...dutyLeads].filter((row) => row.brokerId === id).map((row) => row.leadId)).size);
+  }
   const candidates: RankedBroker[] = brokers.filter((broker) => ids.includes(broker.id)).map((broker) => {
     const activeLeads = loadByBroker.get(broker.id) ?? 0;
-    const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads, capacity: effectiveQueue.capacityEnabled ? effectiveQueue.capacity : null, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: input.temperature === "hot" || input.score >= 80 ? 1 : 0, idleSince: null, rankingScore: 0 };
+    const candidate = { id: broker.id, createdAt: broker.createdAt, activeLeads, receivedInDuty: receivedInDutyByBroker.get(broker.id) ?? 0, capacity: effectiveQueue.capacityEnabled ? effectiveQueue.capacity : null, onDuty: false, conversionRate: 0, slaRate: 0, manualPriority: input.temperature === "hot" || input.score >= 80 ? 1 : 0, idleSince: null, rankingScore: 0 };
     return { ...candidate, rankingScore: calculateBrokerRankingScore(candidate, policy) };
   });
   const decision = resolveDistributionCandidate(candidates, policy, effectiveQueue.strategy === "round_robin" ? "round_robin" : "capacity");
