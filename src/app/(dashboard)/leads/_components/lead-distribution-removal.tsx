@@ -62,7 +62,7 @@ export function LeadDistributionRemoval({
   useActionDialogLifecycle({ state, pending, onSuccess: handleSuccess, onError: handleError });
 
   return (
-    <div className="space-y-2 rounded-lg border border-border/70 bg-card p-3">
+    <div className="space-y-2 rounded-[var(--radius-card)] border border-border/70 bg-card p-3">
       <p className="text-xs font-semibold text-foreground">Distribuição</p>
       <p className="text-xs leading-normal text-muted-foreground">
         Tira o lead da fila de distribuição automática. Ele só volta se for atribuído manualmente a um corretor.

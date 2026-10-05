@@ -311,7 +311,7 @@ export function OfficialBrokerConversations({
 
   if (!enabled) {
     return (
-      <section className="flex min-h-[26rem] items-center justify-center rounded-xl border border-border bg-card p-6">
+      <section className="flex min-h-[26rem] items-center justify-center rounded-[var(--radius-card)] border border-border bg-card p-6">
         <EmptyState
           icon={WhatsappLogo}
           title="Canal oficial desativado"
@@ -330,7 +330,7 @@ export function OfficialBrokerConversations({
       <header className="shrink-0 border-b border-border bg-card px-4 py-3 lg:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <div className="flex size-9 items-center justify-center rounded-[var(--radius-card)] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <WhatsappLogo className="size-5" />
             </div>
             <div>
@@ -351,7 +351,7 @@ export function OfficialBrokerConversations({
             <Button
               onClick={handleOpenBulkModal}
               size="sm"
-              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs"
+              className="gap-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-none"
             >
               <Zap className="size-3.5 fill-current" />
               Disparo em Massa
@@ -380,7 +380,7 @@ export function OfficialBrokerConversations({
               />
               <Input
                 aria-label="Buscar corretor ou unidade"
-                className="h-8 pl-8 text-xs bg-muted/30"
+                className="h-10 pl-8 text-xs bg-muted/30"
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Buscar corretor ou unidade..."
                 value={query}
@@ -431,9 +431,9 @@ export function OfficialBrokerConversations({
                     type="button"
                     onClick={() => setSelectedId(item.brokerProfileId)}
                     className={cn(
-                      "w-full rounded-lg p-3 text-left transition-all duration-150 relative",
+                      "w-full rounded-full p-3 text-left transition-all duration-150 relative",
                       isSelected
-                        ? "bg-muted/90 shadow-xs border-l-2 border-primary pl-2.5"
+                        ? "bg-muted/90 shadow-none border-l-2 border-primary pl-2.5"
                         : "hover:bg-muted/40"
                     )}
                   >
@@ -587,7 +587,7 @@ export function OfficialBrokerConversations({
                         {dateLabel !== previousDateLabel ? (
                           <div className="my-2 flex items-center justify-center gap-3" role="separator" aria-label={dateLabel}>
                             <div className="h-px flex-1 bg-border/50" />
-                            <span className="rounded-full border border-border/60 bg-muted/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shadow-2xs">
+                            <span className="rounded-full border border-border/60 bg-muted/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground shadow-none">
                               {dateLabel}
                             </span>
                             <div className="h-px flex-1 bg-border/50" />
@@ -686,7 +686,7 @@ export function OfficialBrokerConversations({
             </div>
 
             {activeTemplate && (
-              <div className="space-y-1.5 rounded-lg border p-3 bg-muted/20">
+              <div className="space-y-1.5 rounded-[var(--radius-card)] border p-3 bg-muted/20">
                 <div className="flex items-center justify-between text-xs font-medium text-muted-foreground">
                   <span>Prévia com dados de {selected?.name}:</span>
                   <Badge variant={activeTemplate.type === "meta" ? "default" : "success"} className="text-[10px]">
@@ -753,7 +753,7 @@ export function OfficialBrokerConversations({
 
             {/* Prévia do Template */}
             {activeTemplate && (
-              <div className="rounded-lg border p-3 bg-muted/20 space-y-1">
+              <div className="rounded-[var(--radius-card)] border p-3 bg-muted/20 space-y-1">
                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                   <span>Prévia da Mensagem (exemplo com variáveisl):</span>
                   <Badge variant={activeTemplate.type === "meta" ? "default" : "success"} className="text-[10px]">
@@ -796,7 +796,7 @@ export function OfficialBrokerConversations({
                 </div>
               </div>
 
-              <div className="max-h-48 overflow-y-auto rounded-lg border p-2 space-y-1 bg-background">
+              <div className="max-h-48 overflow-y-auto rounded-[var(--radius-card)] border p-2 space-y-1 bg-background">
                 {filtered.map((b) => {
                   const isChecked = selectedBrokerIds.includes(b.brokerProfileId);
                   return (

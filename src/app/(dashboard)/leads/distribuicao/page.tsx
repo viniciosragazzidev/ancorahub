@@ -66,9 +66,9 @@ function DistributionStages() {
   return (
     <ol className="grid gap-2">
       {stages.map((stage, index) => (
-        <li key={stage.title} className="flex min-w-0 gap-3 rounded-lg border border-border/70 p-3">
+        <li key={stage.title} className="flex min-w-0 gap-3 rounded-[var(--radius-card)] border border-border/70 p-3">
           <span
-            className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary"
+            className="mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/8 text-[10px] font-semibold text-primary"
             aria-hidden="true"
           >
             {index + 1}

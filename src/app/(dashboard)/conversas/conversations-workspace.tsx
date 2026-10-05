@@ -389,7 +389,7 @@ export function ConversationsWorkspace({
               <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label="Buscar atendimento por nome, telefone ou e-mail"
-                className="h-8 pl-8 text-xs"
+                className="h-10 pl-8 text-xs"
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Buscar por nome, telefone ou e-mail"
                 value={query}
@@ -664,7 +664,7 @@ function ConversationHeader({
                 {LEAD_STATUS_LABELS[client.status] ?? client.status}
               </Badge>
               {isAiActive ? (
-                <Badge className="hidden shrink-0 bg-primary/10 text-primary border-primary/25 sm:inline-flex" variant="outline">
+                <Badge className="hidden shrink-0 bg-primary/8 text-primary border-primary/25 sm:inline-flex" variant="outline">
                   Atendente Virtual
                 </Badge>
               ) : isWaitingHuman ? (
@@ -688,7 +688,7 @@ function ConversationHeader({
                 <Button
                   aria-label="Ações do atendimento"
                   size="sm"
-                  className="h-8 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-2xs shrink-0"
+                  className="h-10 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"
                   disabled={isPending}
                 >
                   <Sparkles className="size-3.5 text-amber-300" />
@@ -699,7 +699,7 @@ function ConversationHeader({
               }
             />
             <DropdownMenuContent align="end" className="w-64 p-1.5 space-y-0.5">
-              <DropdownMenuLabel className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase px-2 py-1">
+              <DropdownMenuLabel className="text-[10px] font-semibold tracking-wider text-muted-foreground uppercase px-2 py-1">
                 Ações & Automações por IA
               </DropdownMenuLabel>
 
@@ -707,7 +707,7 @@ function ConversationHeader({
               <DropdownMenuItem
                 onClick={handleResumeAi}
                 disabled={isPending}
-                className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-lg text-emerald-700 dark:text-emerald-300 focus:bg-emerald-500/10"
+                className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-emerald-700 dark:text-emerald-300 focus:bg-emerald-500/10"
               >
                 <Sparkles className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
                 <div className="flex flex-col">
@@ -721,7 +721,7 @@ function ConversationHeader({
                 <DropdownMenuItem
                   onClick={handleTakeover}
                   disabled={isPending}
-                  className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-lg text-blue-700 dark:text-blue-300 focus:bg-blue-500/10"
+                  className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-blue-700 dark:text-blue-300 focus:bg-blue-500/10"
                 >
                   <UserCheck className="size-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
                   <div className="flex flex-col">
@@ -735,7 +735,7 @@ function ConversationHeader({
               <DropdownMenuItem
                 onClick={handleSyncChat}
                 disabled={isPending}
-                className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-lg focus:bg-muted"
+                className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] focus:bg-muted"
               >
                 <RefreshCw className={cn("size-4 shrink-0 text-muted-foreground mt-0.5", isPending && "animate-spin")} />
                 <div className="flex flex-col">
@@ -751,7 +751,7 @@ function ConversationHeader({
                   <DropdownMenuItem
                     onClick={handleResetChat}
                     disabled={isPending}
-                    className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-lg text-destructive focus:bg-destructive/10"
+                    className="flex items-start gap-2.5 text-xs font-medium px-2.5 py-2 cursor-pointer rounded-[var(--radius-card)] text-destructive focus:bg-destructive/10"
                   >
                     <RotateCcw className="size-4 text-destructive shrink-0 mt-0.5" />
                     <div className="flex flex-col">
@@ -767,7 +767,7 @@ function ConversationHeader({
                   <DropdownMenuItem
                     onClick={() => setDeleteDialogOpen(true)}
                     disabled={isPending}
-                    className="flex cursor-pointer items-start gap-2.5 rounded-lg px-2.5 py-2 text-xs font-medium text-destructive focus:bg-destructive/10"
+                    className="flex cursor-pointer items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium text-destructive focus:bg-destructive/10"
                   >
                     <Trash className="mt-0.5 size-4 shrink-0 text-destructive" />
                     <div className="flex flex-col">
@@ -859,7 +859,7 @@ function FilterChip({ active, count, label, onClick }: { active: boolean; count:
     <button
       aria-pressed={active}
       className={cn(
-        "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-2 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active ? "border-primary/20 bg-primary/[0.08] text-primary" : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
       onClick={onClick}
@@ -929,7 +929,7 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
               {/* Date Separator Pill */}
               <div className="my-2 flex items-center justify-center gap-3">
                 <div className="h-[1px] flex-1 bg-border/50" />
-                <span className="rounded-full bg-muted/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-2xs border border-border/60">
+                <span className="rounded-full bg-muted/90 px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-none border border-border/60">
                   {dateLabel}
                 </span>
                 <div className="h-[1px] flex-1 bg-border/50" />
@@ -1130,14 +1130,14 @@ function MessageSenderBadge({
   if (isOutbound) {
     if (senderRole === "assistant" || direction === "outbound") {
       return (
-        <span className="inline-flex items-center gap-1 rounded-md bg-primary/[0.08] px-1.5 py-0.5 text-[10px] font-semibold tracking-tight text-primary">
+        <span className="inline-flex items-center gap-1 rounded-[var(--radius-card)] bg-primary/[0.08] px-1.5 py-0.5 text-[10px] font-semibold tracking-tight text-primary">
           <Sparkles className="size-2.5" />
           IA Assistente
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold tracking-tight text-foreground">
+      <span className="inline-flex items-center gap-1 rounded-[var(--radius-card)] bg-muted px-1.5 py-0.5 text-[10px] font-semibold tracking-tight text-foreground">
         Atendente Humano
       </span>
     );
@@ -1342,7 +1342,7 @@ function MediaLightbox({ media, onClose }: { media: MediaBubbleData; onClose: ()
         <img
           src={media.url}
           alt={media.caption || media.filename || "Mídia da conversa"}
-          className="max-h-[80vh] w-auto rounded-lg object-contain"
+          className="max-h-[80vh] w-auto rounded-[var(--radius-card)] object-contain"
         />
         <figcaption className="text-center text-xs text-white/80">
           {media.caption || media.filename || ""} {formatMediaSize(media.sizeBytes)}
@@ -1439,7 +1439,7 @@ function HistoryEmptyState({ client }: { client: ConversationItem }) {
           }
         />
         {client.aiConversation?.transferReason && (
-          <div className="rounded-lg border border-border bg-card p-3 text-xs text-muted-foreground text-left">
+          <div className="rounded-[var(--radius-card)] border border-border bg-card p-3 text-xs text-muted-foreground text-left">
             <strong>Contexto do Atendimento Virtual:</strong> {client.aiConversation.transferReason}
           </div>
         )}
@@ -1500,7 +1500,7 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
     const targetStatus = qualStatus || leadStatus;
     if (targetStatus.includes("hot") || targetStatus.includes("quente")) {
       return (
-        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold">
+        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold">
           <Flame aria-hidden="true" className="size-3 shrink-0" />
           Quente
         </Badge>
@@ -1508,7 +1508,7 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
     }
     if (targetStatus.includes("warm") || targetStatus.includes("morno")) {
       return (
-        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold">
+        <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold">
           <SunDim aria-hidden="true" className="size-3 shrink-0" />
           Morno
         </Badge>
@@ -1552,7 +1552,7 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
     <button
       aria-current={active ? "page" : undefined}
       className={cn(
-        "group flex w-full items-start gap-3 rounded-lg px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        "group flex w-full items-start gap-3 rounded-full px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active ? "bg-muted/80" : "hover:bg-muted/65",
       )}
       onClick={onClick}
@@ -1601,7 +1601,7 @@ function renderQualificationRatingBadge(status: string, qualStatus?: string | nu
   const norm = (qualStatus || status || "").toLowerCase();
   if (norm.includes("hot") || norm.includes("quente")) {
     return (
-      <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-bold text-xs gap-1">
+      <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold text-xs gap-1">
         <Flame aria-hidden="true" className="size-3.5 shrink-0" />
         Quente (Alta Prioridade)
       </Badge>
@@ -1609,7 +1609,7 @@ function renderQualificationRatingBadge(status: string, qualStatus?: string | nu
   }
   if (norm.includes("warm") || norm.includes("morno")) {
     return (
-      <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold text-xs gap-1">
+      <Badge variant="outline" className="border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 font-semibold text-xs gap-1">
         <SunDim aria-hidden="true" className="size-3.5 shrink-0" />
         Morno (Interessado)
       </Badge>
@@ -1709,7 +1709,7 @@ function ClientProfile({
         <div className="space-y-5 p-4">
           {isQualified ? (
             <ProfileSection title="Status de Qualificação">
-              <div className="rounded-lg border border-border/80 bg-card p-3 space-y-2.5">
+              <div className="rounded-[var(--radius-card)] border border-border/80 bg-card p-3 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground font-medium">Classificação</span>
                   {renderQualificationRatingBadge(client.status, client.qualificationStatus)}
@@ -1722,7 +1722,7 @@ function ClientProfile({
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="w-full h-7 text-[11px] text-muted-foreground hover:text-foreground gap-1 justify-center mt-1"
+                  className="w-full h-10 text-[11px] text-muted-foreground hover:text-foreground gap-1 justify-center mt-1"
                   disabled={isReverting}
                   onClick={handleRevertToQualifying}
                 >
@@ -1733,7 +1733,7 @@ function ClientProfile({
             </ProfileSection>
           ) : (
             <ProfileSection title="Estágio & Qualificação">
-              <div className="rounded-lg border border-border/80 bg-card p-3 space-y-2">
+              <div className="rounded-[var(--radius-card)] border border-border/80 bg-card p-3 space-y-2">
                 <p className="text-xs text-muted-foreground">
                   Altere manualmente a etapa de qualificação do lead.
                 </p>
@@ -1742,7 +1742,7 @@ function ClientProfile({
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="w-full h-8 text-xs gap-1.5 justify-center"
+                    className="w-full h-10 text-xs gap-1.5 justify-center"
                     disabled={isReverting}
                     onClick={handleRevertToQualifying}
                   >
@@ -1754,7 +1754,7 @@ function ClientProfile({
                     type="button"
                     variant="default"
                     size="sm"
-                    className="w-full h-8 text-xs gap-1.5 justify-center font-medium"
+                    className="w-full h-10 text-xs gap-1.5 justify-center font-medium"
                     onClick={() => setOpenQualifyDialog(true)}
                   >
                     <Sparkle className="size-3.5 shrink-0" />
@@ -1776,7 +1776,7 @@ function ClientProfile({
 
           {client.aiConversation ? (
             <ProfileSection title="Atendimento Virtual">
-              <div className="rounded-lg border border-border/80 bg-muted/20 p-3 space-y-2">
+              <div className="rounded-[var(--radius-card)] border border-border/80 bg-muted/20 p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-foreground">Status</span>
                   <Badge variant="outline" className="text-[11px] font-medium">
@@ -1825,8 +1825,8 @@ function ClientProfile({
                 {client.documents.length ? (
                   <div className="mt-3 space-y-1.5">
                     {client.documents.slice(0, 3).map((document) => (
-                      <a className="flex items-center gap-2 rounded-lg px-2 py-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" href={document.fileUrl} key={document.id} rel="noreferrer" target="_blank">
-                        <span className="grid size-7 shrink-0 place-items-center rounded-md bg-primary/[0.08] text-primary"><FileText className="size-3.5" /></span>
+                      <a className="flex items-center gap-2 rounded-[var(--radius-card)] px-2 py-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" href={document.fileUrl} key={document.id} rel="noreferrer" target="_blank">
+                        <span className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-card)] bg-primary/[0.08] text-primary"><FileText className="size-3.5" /></span>
                         <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{document.requirementName ?? document.filename}</span><span className="block truncate text-[11px] text-muted-foreground">{document.requirementName ? document.filename : documentStatusLabel(document.status)}</span></span>
                         <ArrowSquareOut className="size-3.5 shrink-0 text-muted-foreground" />
                       </a>
@@ -1841,8 +1841,8 @@ function ClientProfile({
             <ProfileSection action={<span className="text-xs tabular-nums text-muted-foreground">{sharedMedia.length}</span>} title="Links compartilhados">
               <div className="space-y-1.5">
                 {sharedMedia.slice(0, 3).map((media) => (
-                  <a className="flex items-center gap-2 rounded-lg px-2 py-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" href={media.url} key={media.url} rel="noreferrer" target="_blank">
-                    <span className="grid size-7 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground"><LinkSimple className="size-3.5" /></span>
+                  <a className="flex items-center gap-2 rounded-[var(--radius-card)] px-2 py-2 outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring" href={media.url} key={media.url} rel="noreferrer" target="_blank">
+                    <span className="grid size-7 shrink-0 place-items-center rounded-[var(--radius-card)] bg-muted text-muted-foreground"><LinkSimple className="size-3.5" /></span>
                     <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium">{media.label}</span><span className="block truncate text-[11px] text-muted-foreground">Compartilhado {formatRelative(media.sentAt)}</span></span>
                     <ArrowSquareOut className="size-3.5 shrink-0 text-muted-foreground" />
                   </a>
@@ -1874,11 +1874,11 @@ function ProfileAction({ children, label, render }: { children: ReactNode; label
 }
 
 function ProfileMetric({ label, tone, value }: { label: string; tone?: "warning"; value: number }) {
-  return <div className={cn("min-w-0 rounded-lg border border-border px-2.5 py-2", tone === "warning" && "border-warning/25 bg-accent/[0.06]")}><p className="truncate text-[11px] text-muted-foreground">{label}</p><p className={cn("mt-1 text-lg font-semibold tabular-nums", tone === "warning" && "text-warning")}>{value}</p></div>;
+  return <div className={cn("min-w-0 rounded-[var(--radius-card)] border border-border px-2.5 py-2", tone === "warning" && "border-warning/25 bg-accent/[0.06]")}><p className="truncate text-[11px] text-muted-foreground">{label}</p><p className={cn("mt-1 text-lg font-semibold tabular-nums", tone === "warning" && "text-warning")}>{value}</p></div>;
 }
 
 function ProfileTag({ label, tone, value }: { label: string; tone?: "success" | "warning"; value: string }) {
-  return <div className="min-w-0 rounded-lg border border-border bg-muted/25 px-2.5 py-2"><dt className="truncate text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground">{label}</dt><dd className={cn("mt-1 truncate text-xs font-medium", tone === "success" && "text-success", tone === "warning" && "text-warning")}>{value}</dd></div>;
+  return <div className="min-w-0 rounded-[var(--radius-card)] border border-border bg-muted/25 px-2.5 py-2"><dt className="truncate text-[10px] font-medium uppercase tracking-[0.06em] text-muted-foreground">{label}</dt><dd className={cn("mt-1 truncate text-xs font-medium", tone === "success" && "text-success", tone === "warning" && "text-warning")}>{value}</dd></div>;
 }
 
 function ContactAvatar({ className, name, photoUrl }: { className?: string; name: string; photoUrl?: string | null }) {
@@ -1968,7 +1968,7 @@ function LeadNotesSection({ leadId, initialNote }: { leadId: string; initialNote
         value={note}
         onChange={(e) => handleChange(e.target.value)}
         placeholder="Anote preferências do cliente (ex: busca plano sem coparticipação, 2 dependentes)..."
-        className="w-full min-h-[70px] text-xs p-2 rounded-lg border border-border bg-card text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
+        className="w-full min-h-[70px] text-xs p-2 rounded-full border border-border bg-card text-foreground resize-none focus:outline-none focus:ring-1 focus:ring-primary/50"
       />
     </ProfileSection>
   );

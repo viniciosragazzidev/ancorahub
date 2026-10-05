@@ -42,6 +42,7 @@ function renderToast(
     return sonnerToast.custom(
       (t) => (
         <AnimatedToast
+          className="!rounded-[var(--radius-card)] !bg-card !shadow-[var(--shadow-dialog)]"
           id={t}
           status={status}
           title={message}

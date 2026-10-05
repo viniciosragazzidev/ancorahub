@@ -4,6 +4,7 @@ import Link from "next/link";
 import { startTransition, useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
+import { useSuccessOverlay } from "@/components/motion/success-overlay";
 import { Clock, UserPlus, ListChecks, ArrowRight, ChatCircleText, UserSwitch } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ export function SupervisionPanel({
   isLost: boolean;
   currentUserId: string;
 }) {
+  const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
   const router = useRouter();
   const [mode, setMode] = useState<"reassign" | "investigate">("reassign");
   const [brokerId, setBrokerId] = useState("");
@@ -83,11 +85,12 @@ export function SupervisionPanel({
       });
     }
     toast.success("Lead reatribuído e SLA reiniciado.");
+    celebrateSuccess("Lead reatribuído");
     reassignSnapshotRef.current = null;
     setBrokerId("");
     setReassignVersion((version) => version + 1);
     startTransition(() => router.refresh());
-  }, [brokers, currentOwner, router]);
+  }, [brokers, celebrateSuccess, currentOwner, router]);
   const handleReassignError = useCallback((result: typeof reassignState) => {
     if (reassignSnapshotRef.current) {
       setDisplayedAssignment(reassignSnapshotRef.current);
@@ -201,7 +204,8 @@ export function SupervisionPanel({
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(displayedAssignment.status);
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/[0.01] shadow-sm">
+    <>
+    <Card className="border-primary/20 bg-gradient-to-br from-card to-primary/[0.01] shadow-none">
       <CardHeader className="border-b border-border/40 pb-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="space-y-1">
@@ -214,12 +218,12 @@ export function SupervisionPanel({
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            <Button className="h-8 text-xs gap-1.5" render={<Link href={`/conversas?leadId=${leadId}`} />} variant="outline">
+            <Button className="h-10 text-xs gap-1.5" render={<Link href={`/conversas?leadId=${leadId}`} />} variant="outline">
               <ChatCircleText className="size-3.5 text-primary" />
               Abrir Conversa
             </Button>
             <LeadAssignedNotificationButton leadId={leadId} compact />
-            <Badge variant="outline" className="border-primary/30 bg-primary/5 text-primary text-xs">
+            <Badge variant="outline" className="border-primary/30 bg-primary/8 text-primary text-xs">
               Modo Supervisor
             </Badge>
           </div>
@@ -229,7 +233,7 @@ export function SupervisionPanel({
         {/* Row 1: Metrics Grid */}
         <div className="grid gap-4 sm:grid-cols-3">
           {/* Card: SLA Status */}
-          <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
+          <div className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2">
             <div className="flex items-center gap-2 text-muted-foreground">
               <Clock className="size-4 text-primary" />
               <span className="text-xs font-semibold uppercase tracking-wider">Status do SLA</span>
@@ -253,7 +257,7 @@ export function SupervisionPanel({
           </div>
 
           {/* Card: Assigned Broker */}
-          <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
+          <div className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2">
             <div className="flex items-center gap-2 text-muted-foreground">
               <UserPlus className="size-4 text-primary" />
               <span className="text-xs font-semibold uppercase tracking-wider">Responsável</span>
@@ -267,7 +271,7 @@ export function SupervisionPanel({
           </div>
 
           {/* Card: Tasks Progress */}
-          <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-2">
+          <div className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-4 space-y-2">
             <div className="flex items-center gap-2 text-muted-foreground">
               <ListChecks className="size-4 text-primary" />
               <span className="text-xs font-semibold uppercase tracking-wider">Tarefas no Lead</span>
@@ -288,7 +292,7 @@ export function SupervisionPanel({
 
         {/* Row 2: Takeover banner if active under someone else */}
         {activeStatus && displayedAssignment.ownerId && displayedAssignment.ownerId !== currentUserId && (
-          <div className="flex flex-col gap-4 rounded-xl border border-primary/20 bg-primary/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-[var(--radius-card)] border border-primary/20 bg-primary/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
               <p className="text-sm font-medium text-foreground">Intervir no Atendimento</p>
               <p className="text-xs text-muted-foreground leading-relaxed">
@@ -309,7 +313,7 @@ export function SupervisionPanel({
 
         {/* Row 2.5: Remove current assignment, even mid-service */}
         {displayedAssignment.ownerId && (
-          <div className="rounded-lg border border-warning/25 bg-warning/[0.04] p-3 space-y-2">
+          <div className="rounded-[var(--radius-card)] border border-warning/25 bg-warning/[0.04] p-3 space-y-2">
             <div className="flex items-center gap-2">
               <UserSwitch className="size-4 text-warning" />
               <p className="text-xs font-semibold text-foreground">Atribuição atual</p>
@@ -343,13 +347,13 @@ export function SupervisionPanel({
         <div className="border-t border-border/40 pt-5 space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-foreground">Ações Administrativas</span>
-            <div className="inline-flex rounded-lg border border-border bg-muted/50 p-0.5" role="group">
-              <Button className="h-7 text-xs px-3" onClick={() => setMode("reassign")} size="sm" type="button" variant={mode === "reassign" ? "secondary" : "ghost"}>Reatribuir</Button>
-              <Button className="h-7 text-xs px-3" onClick={() => setMode("investigate")} size="sm" type="button" variant={mode === "investigate" ? "secondary" : "ghost"}>Investigar</Button>
+            <div className="inline-flex rounded-[var(--radius-card)] border border-border bg-muted/50 p-0.5" role="group">
+              <Button className="h-10 text-xs px-3" onClick={() => setMode("reassign")} size="sm" type="button" variant={mode === "reassign" ? "secondary" : "ghost"}>Reatribuir</Button>
+              <Button className="h-10 text-xs px-3" onClick={() => setMode("investigate")} size="sm" type="button" variant={mode === "investigate" ? "secondary" : "ghost"}>Investigar</Button>
             </div>
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/[0.15] p-4">
+          <div className="rounded-[var(--radius-card)] border border-border bg-muted/[0.15] p-4">
             {mode === "reassign" ? (
               <form key={`${formKey}-reassign-${reassignVersion}`} action={reassign} className="space-y-4" onSubmit={handleOptimisticReassign}>
                 <input name="leadId" type="hidden" value={leadId} />
@@ -387,5 +391,7 @@ export function SupervisionPanel({
         </div>
       </CardContent>
     </Card>
+    {successOverlay}
+    </>
   );
 }

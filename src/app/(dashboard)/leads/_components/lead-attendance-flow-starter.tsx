@@ -44,7 +44,7 @@ export function LeadAttendanceFlowStarter({ leadId, onStarted }: { leadId: strin
   }
 
   return (
-    <div className="space-y-3 rounded-lg border border-border p-3">
+    <div className="space-y-3 rounded-[var(--radius-card)] border border-border p-3">
       <div className="flex items-center gap-2">
         <Sparkle className="size-4 text-primary" />
         <p className="text-xs font-semibold text-foreground">Iniciar atendimento pela fila</p>

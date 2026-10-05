@@ -720,7 +720,7 @@ export function LeadsWorkspace({
           {showScrollButton && (
             <button
               onClick={scrollToStart}
-              className="absolute bottom-12 left-3 z-10 flex items-center gap-1.5 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm backdrop-blur-sm transition-all duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-background hover:text-foreground hover:shadow-md active:scale-95"
+              className="absolute bottom-12 left-3 z-10 flex items-center gap-1.5 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-none backdrop-blur-sm transition-all duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-background hover:text-foreground hover:shadow-none active:scale-95"
             >
               <ArrowLeft className="size-3.5" />
               Início
@@ -796,7 +796,7 @@ export function LeadsWorkspace({
               />
             ) : (
               <div className="space-y-4">
-                <div className="flex flex-col gap-3 rounded-lg border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-col gap-3 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm font-medium text-foreground">Recuperar leads sem corretor</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
@@ -931,7 +931,7 @@ function KanbanColumn({
 
   return (
     <section
-      className={`w-72 shrink-0 rounded-xl border p-3 sm:w-80 ${tone.column}`}
+      className={`w-72 shrink-0 rounded-[var(--radius-card)] border p-3 sm:w-80 ${tone.column}`}
       aria-labelledby={`kanban-${status}`}
     >
       <div className="flex min-w-0 items-center gap-2 border-b border-border/70 pb-3">
@@ -952,7 +952,7 @@ function KanbanColumn({
           <KanbanLeadCard key={lead.id} lead={lead} onOpen={onOpen} isSelected={isSelected} onToggle={onToggle} slaFirstContactMinutes={slaFirstContactMinutes} slaStagnantDays={slaStagnantDays} />
         ))}
         {!leads.length ? (
-          <div className="rounded-lg border border-dashed border-border bg-background/40 px-4 py-8 text-center">
+          <div className="rounded-[var(--radius-card)] border border-dashed border-border bg-background/40 px-4 py-8 text-center">
             <p className="text-xs font-medium text-muted-foreground">Nenhum lead nesta etapa</p>
             <p className="mt-1 text-xs text-muted-foreground">Arraste as colunas para organizar sua visão.</p>
           </div>
@@ -989,7 +989,7 @@ function KanbanLeadCard({
           ? "border-primary/40 bg-primary/[0.03] ring-1 ring-primary/20"
           : lead.isManagementInvestigation
           ? "border-violet-500/35 bg-violet-500/[0.06] hover:border-violet-500/55 hover:bg-violet-500/[0.1]"
-          : "border-border/80 hover:border-primary/40 hover:shadow-xs hover:bg-card/80"
+          : "border-border/80 hover:border-primary/40 hover:shadow-none hover:bg-card/80"
       }`}
     >
       {/* Checkbox row */}
@@ -1030,7 +1030,7 @@ function KanbanLeadCard({
           <UserAvatar
             seed={lead.nome}
             name={lead.nome}
-            className="size-7 rounded-lg shrink-0 border border-border/60 text-[10px] font-bold"
+            className="size-7 rounded-[var(--radius-card)] shrink-0 border border-border/60 text-[10px] font-semibold"
           />
           <div className="min-w-0 flex-1">
             <p className="truncate font-semibold text-xs text-foreground group-hover:text-primary transition-colors">
@@ -1055,7 +1055,7 @@ function KanbanLeadCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <LeadStatusBadge status={lead.status} />
             {lead.isManagementInvestigation ? <Badge variant="secondary" size="sm">Investigação da gestão</Badge> : null}
-            <span className={`inline-flex items-center rounded-md px-1.5 py-0.2 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
+            <span className={`inline-flex items-center rounded-full px-1.5 py-0.2 text-[10px] font-semibold ring-1 ring-inset ${lead.tipo === "PME" ? "bg-indigo-400/10 text-indigo-400 ring-indigo-400/20" : "bg-sky-400/10 text-sky-400 ring-sky-400/20"}`}>
               {lead.tipo}
             </span>
             <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />

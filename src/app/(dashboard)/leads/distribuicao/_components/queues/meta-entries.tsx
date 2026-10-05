@@ -227,7 +227,7 @@ Cancelar: adicionar só a campanha e manter essas exceções.`,
       ) : null}
 
       {linkedCampaigns.length || linkedAds.length ? (
-        <ul className="divide-y divide-border/60 rounded-lg border border-border/70">
+        <ul className="divide-y divide-border/60 rounded-[var(--radius-card)] border border-border/70">
           {linkedCampaigns.map((route) => {
             const campaign = campaignById.get(route.campaignId);
             const name = campaign?.name ?? route.campaignId;
@@ -299,7 +299,7 @@ Cancelar: adicionar só a campanha e manter essas exceções.`,
           })}
         </ul>
       ) : hiddenCount > 0 ? null : (
-        <p className="rounded-lg border border-dashed border-border/70 px-3 py-4 text-center text-xs text-muted-foreground">
+        <p className="rounded-[var(--radius-card)] border border-dashed border-border/70 px-3 py-4 text-center text-xs text-muted-foreground">
           {ignoredMode
             ? "Nenhuma campanha ou anúncio marcado para não registrar."
             : "Sem campanha vinculada: esta fila recebe pelas regras gerais (fila geral, fontes e plantões)."}

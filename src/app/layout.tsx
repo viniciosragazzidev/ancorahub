@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { cookies } from "next/headers";
-import { Inter, Geist_Mono, JetBrains_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { AppProviders } from "@/components/app-providers";
@@ -10,8 +10,8 @@ import { RouteViewTransition } from "@/components/motion/route-view-transition";
 import { SkipToContent } from "@/components/skip-to-content";
 import "./globals.css";
 
-const interSans = Inter({
-  variable: "--font-inter-sans",
+const jakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-jakarta-sans",
   subsets: ["latin"],
 });
 
@@ -102,10 +102,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const theme = (await cookies()).get("ancora-theme")?.value === "dark" ? "dark" : "light";
+  const theme = (await cookies()).get("corretop-theme")?.value === "dark" ? "dark" : "light";
 
   return (
-    <html lang="pt-BR" data-interface-motion="off" suppressHydrationWarning className={`${interSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${theme === "dark" ? "dark" : ""} h-full antialiased`}>
+    <html lang="pt-BR" data-interface-motion="off" suppressHydrationWarning className={`${jakartaSans.variable} ${geistMono.variable} ${jetbrainsMono.variable} ${theme === "dark" ? "dark" : ""} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <SkipToContent />
         <SplashScreen />

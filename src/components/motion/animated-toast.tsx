@@ -68,9 +68,10 @@ export function AnimatedToast({
   return (
     <motion.div
       data-slot="animated-toast"
-      initial={motionEnabled ? { opacity: 0, y: -12, scale: 0.96 } : false}
-      animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
-      exit={motionEnabled ? { opacity: 0, y: -8, scale: 0.96 } : undefined}
+      data-status={status}
+      initial={motionEnabled ? { opacity: 0 } : false}
+      animate={{ opacity: 1 }}
+      exit={motionEnabled ? { opacity: 0, transition: transitions.fast } : undefined}
       transition={motionEnabled ? transitions.normal : { duration: 0 }}
       className={cn(
         "group pointer-events-auto relative flex w-[380px] sm:w-[420px] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border bg-popover/95 p-4 text-popover-foreground shadow-2xl backdrop-blur-xl select-none",

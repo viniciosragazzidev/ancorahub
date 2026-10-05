@@ -104,7 +104,7 @@ function PhraseTester() {
     setResult(response.result);
   });
   return (
-    <div className="grid gap-2 rounded-lg border border-border p-3">
+    <div className="grid gap-2 rounded-[var(--radius-card)] border border-border p-3">
       <p className="text-sm font-medium">Teste uma frase</p>
       <p className="text-xs leading-5 text-muted-foreground">Escreva o que um cliente diria no meio da qualificação e veja qual situação dispara, a resposta e o que acontece. Nada é enviado.</p>
       <div className="flex gap-2">
@@ -112,7 +112,7 @@ function PhraseTester() {
         <Button type="button" variant="outline" disabled={pending || !text.trim()} onClick={run}>{pending ? "Testando…" : "Testar"}</Button>
       </div>
       {result ? (
-        <div className="grid gap-2 rounded-lg border border-border bg-muted/30 p-3" aria-live="polite">
+        <div className="grid gap-2 rounded-[var(--radius-card)] border border-border bg-muted/30 p-3" aria-live="polite">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={result.kind === "ai" ? "secondary" : result.kind === "none" ? "outline" : "info"}>{RESULT_TITLE[result.kind]}</Badge>
             <span className="text-sm font-medium">{result.label}</span>

@@ -66,7 +66,7 @@ export function BrokerDayHistoryTrigger({ scheduleId, brokerId, brokerName, duty
               { label: "Ofertas", value: s.offered },
               { label: "Aceitas", value: s.accepted },
             ].map((item) => (
-              <div key={item.label} className="rounded-xl border border-border p-2.5">
+              <div key={item.label} className="rounded-[var(--radius-card)] border border-border p-2.5">
                 <p className="text-[11px] text-muted-foreground">{item.label}</p>
                 <p className="mt-1 font-mono text-lg font-semibold tabular-nums">{item.value}</p>
               </div>
@@ -75,13 +75,13 @@ export function BrokerDayHistoryTrigger({ scheduleId, brokerId, brokerName, duty
         ) : null}
       >
         {loading && !history ? <p className="text-sm text-muted-foreground">Carregando…</p> : null}
-        {error ? <p role="alert" className="rounded-lg border border-border p-3 text-sm text-muted-foreground">{error}</p> : null}
+        {error ? <p role="alert" className="rounded-[var(--radius-card)] border border-border p-3 text-sm text-muted-foreground">{error}</p> : null}
         {history ? (
           <>
             <section className="space-y-2" aria-labelledby="broker-day-leads">
               <h3 id="broker-day-leads" className="text-sm font-semibold">Leads recebidos <Badge variant="outline">{history.leads.length}</Badge></h3>
               {history.leads.length ? (
-                <ul className="divide-y divide-border rounded-xl border border-border">
+                <ul className="divide-y divide-border rounded-[var(--radius-card)] border border-border">
                   {history.leads.map((lead) => (
                     <li key={lead.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
                       <div className="min-w-0">
@@ -115,7 +115,7 @@ export function BrokerDayHistoryTrigger({ scheduleId, brokerId, brokerName, duty
                 <p className="text-xs text-muted-foreground">{s.declined} recusada(s) · {s.expired} expirada(s) · {s.pending} aguardando resposta</p>
               ) : null}
               {history.offers.length ? (
-                <ul className="divide-y divide-border rounded-xl border border-border">
+                <ul className="divide-y divide-border rounded-[var(--radius-card)] border border-border">
                   {history.offers.map((offer) => {
                     const ui = offerStatus[offer.status] ?? { label: offer.status, variant: "outline" as const };
                     return (

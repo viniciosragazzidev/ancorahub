@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, ArrowRight } from "@/components/huge-icons";
+import { Copy, ArrowRight } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
+import { CopyCheckIcon } from "@/components/motion/copy-check-icon";
 
 const steps = [
   {
@@ -106,7 +107,7 @@ function CodeBlock({ code, filename }: { code: string; filename?: string }) {
         <div className="flex items-center justify-between border-b border-border px-4 py-2">
           <span className="text-xs font-medium text-muted-foreground">{filename}</span>
           <Button onClick={handleCopy} size="sm" variant="ghost" className="h-7 gap-1.5 px-2 text-xs">
-            {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+            <CopyCheckIcon copied={copied} className="relative inline-flex size-3.5 items-center justify-center"><Copy className="size-3.5" /></CopyCheckIcon>
             {copied ? "Copiado" : "Copiar"}
           </Button>
         </div>
@@ -117,7 +118,7 @@ function CodeBlock({ code, filename }: { code: string; filename?: string }) {
           className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
           title="Copiar código"
         >
-          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+          <CopyCheckIcon copied={copied} className="relative inline-flex size-4 items-center justify-center"><Copy className="size-4" /></CopyCheckIcon>
         </button>
       )}
       <pre className="overflow-x-auto p-4 text-[12px] leading-6 text-foreground">

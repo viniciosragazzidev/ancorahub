@@ -308,7 +308,7 @@ export function RoutingMatrixPanel({
 
       <CardContent className="space-y-4 p-4">
         {rules.length === 0 ? (
-          <div className="rounded-xl border border-dashed p-8 text-center bg-muted/20">
+          <div className="rounded-[var(--radius-card)] border border-dashed p-8 text-center bg-muted/20">
             <Zap className="mx-auto h-8 w-8 text-muted-foreground/60 mb-2" />
             <p className="text-sm font-semibold">Nenhuma regra de roteamento configurada</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">
@@ -341,7 +341,7 @@ export function RoutingMatrixPanel({
               return (
                 <div
                   key={rule.id}
-                  className={`flex flex-col gap-3 rounded-xl border p-4 transition-colors ${
+                  className={`flex flex-col gap-3 rounded-[var(--radius-card)] border p-4 transition-colors ${
                     rule.enabled
                       ? "bg-card border-border/80"
                       : "bg-muted/30 border-dashed opacity-75"
@@ -349,7 +349,7 @@ export function RoutingMatrixPanel({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/8 text-xs font-semibold text-primary">
                         #{rule.priority}
                       </span>
                       <div className="min-w-0">
@@ -493,7 +493,7 @@ export function RoutingMatrixPanel({
           </DialogHeader>
 
           <div className="space-y-6 py-2">
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm">
+            <div className="rounded-[var(--radius-card)] border border-primary/20 bg-primary/8 p-3 text-sm">
               <p className="font-semibold text-foreground">Como esta regra decide</p>
               <p className="mt-1 leading-5 text-muted-foreground">
                 O destino acima só recebe leads que passarem por todos os filtros abaixo. Sem origem,
@@ -598,7 +598,7 @@ export function RoutingMatrixPanel({
               </p>
             </div>
 
-            <div className="flex items-start justify-between gap-4 rounded-lg border border-border/70 bg-muted/20 p-3">
+            <div className="flex items-start justify-between gap-4 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 p-3">
               <div className="space-y-1">
                 <Label htmlFor="automatic-distribution">Distribuição automática</Label>
                 <p className="text-[11px] leading-4 text-muted-foreground">

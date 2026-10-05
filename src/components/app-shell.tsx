@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -93,6 +94,20 @@ export function AppShell({
     });
     return () => window.cancelAnimationFrame(frame);
   }, [pathname]);
+
+  // Crossfade leve (150ms, só opacity) do conteúdo principal ao trocar de rota; header e sidebar ficam fixos.
+  const motionEnabled = useInterfaceMotionEnabled();
+  const firstPathname = useRef(pathname);
+  useEffect(() => {
+    if (!motionEnabled || firstPathname.current === pathname) return;
+    firstPathname.current = pathname;
+    const content = document.querySelector<HTMLElement>("[data-slot=\"app-content\"]");
+    if (!content) return;
+    for (const child of Array.from(content.children)) {
+      if (child.tagName === "HEADER" || typeof child.animate !== "function") continue;
+      child.animate([{ opacity: 0.4 }, { opacity: 1 }], { duration: 150, easing: "cubic-bezier(0.25, 1, 0.5, 1)" });
+    }
+  }, [pathname, motionEnabled]);
 
   if (isLightBroker) {
     return (

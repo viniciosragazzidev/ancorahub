@@ -22,7 +22,7 @@ function Evidence({ suggestion }: { suggestion: SuggestionRow }) {
   return (
     <Section title="O que os clientes perguntaram" description={`${suggestion.occurrences} ${suggestion.occurrences === 1 ? "vez" : "vezes"} · última em ${formatAskedAt(suggestion.lastAskedAt)}. Dados pessoais removidos.`}>
       <ul className="grid gap-1.5">
-        {suggestion.examples.map((example) => <li key={example} className="rounded-lg border border-border px-3 py-2 text-sm">{example}</li>)}
+        {suggestion.examples.map((example) => <li key={example} className="rounded-[var(--radius-card)] border border-border px-3 py-2 text-sm">{example}</li>)}
       </ul>
     </Section>
   );
@@ -127,7 +127,7 @@ function MergeBody({ suggestion, situations, onDone }: { suggestion: SuggestionR
   });
   return (
     <>
-      <p className="rounded-lg border border-border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
+      <p className="rounded-[var(--radius-card)] border border-border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
         Os clientes perguntaram algo que já tem situação, com palavras que ela ainda não reconhece. Ensinar estas frases faz a situação responder da próxima vez.
       </p>
       <Evidence suggestion={suggestion} />

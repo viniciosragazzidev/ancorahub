@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 import { cn } from "@/lib/utils";
+import { NewItemHighlight, StaggerItem, useNewItemIds } from "@/components/motion/stagger";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 import { AcceptLeadButton } from "@/features/broker-workspace/components/accept-lead-button";
 
@@ -122,6 +123,7 @@ export function LightLeadsList({
 
     return list;
   }, [leads, filter, searchQuery]);
+  const newLeadIds = useNewItemIds(filteredAndSortedLeads.map((lead) => lead.id));
 
   return (
     <div className="min-h-full bg-background text-foreground flex flex-col">
@@ -287,7 +289,7 @@ export function LightLeadsList({
         {/* Leads List */}
         <div className="space-y-3">
           {filteredAndSortedLeads.length > 0 ? (
-            filteredAndSortedLeads.map((lead) => {
+            filteredAndSortedLeads.map((lead, index) => {
               const isDistributed = (lead.isAwaitingAcceptance || lead.status === "distributed" || lead.status === "new") && !lead.isLost;
               const isConverted = lead.status === "converted" && !lead.isLost;
               const isLost = lead.status === "lost" || lead.isLost;
@@ -305,12 +307,12 @@ export function LightLeadsList({
                         : { variant: "outline" as const, label: "Em atendimento" };
 
               return (
+                <StaggerItem key={lead.id} index={index}>
                 <Card
-                  key={lead.id}
                   variant="subtle"
                   aria-label={`Lead ${lead.name}`}
                   className={cn(
-                    "bg-card/95 transition-colors hover:border-primary/30",
+                    "relative bg-card/95 transition-colors hover:border-primary/30",
                     isLost && "border-l-[3px] border-l-destructive/80 opacity-90",
                     isDistributed && "border-l-[3px] border-l-warning",
                     isConverted && "border-l-[3px] border-l-success",
@@ -318,6 +320,7 @@ export function LightLeadsList({
                     lead.isOverdue && !isDistributed && !lead.isAwaitingResponse && !isLost && "border-l-[3px] border-l-destructive",
                   )}
                 >
+                  <NewItemHighlight active={newLeadIds.has(lead.id)} />
                   <div className="space-y-3 p-4 sm:p-5">
                     <div className="min-w-0">
                       <div className="flex items-start justify-between gap-2">
@@ -437,6 +440,7 @@ export function LightLeadsList({
                     </div>
                   </div>
                 </Card>
+                </StaggerItem>
               );
             })
           ) : (

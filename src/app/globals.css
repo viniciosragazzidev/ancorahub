@@ -33,7 +33,10 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -47,95 +50,110 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --font-sans: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), monospace;
-  --font-heading: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
-  --radius: var(--radius-md);
-  --radius-sm: var(--radius-control);
+  --font-heading: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-logo: "Amil Typeface", var(--font-jakarta-sans), sans-serif;
+  --radius: 1rem;
+  --radius-sm: calc(var(--radius) - 0.5rem);
   --radius-md: var(--radius-card);
-  --radius-lg: var(--radius-card);
+  --radius-lg: calc(var(--radius) + 0.25rem);
   --radius-xl: var(--radius-panel);
+}
+
+@font-face {
+  font-family: "Amil Typeface";
+  src: url("/fonts/Amil%20Typeface%20Bold.ttf") format("truetype");
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
 }
 
 :root {
   color-scheme: light;
   /* ── Camada 1: Fundação Neutra (4 Níveis de Elevação em OKLCH) ────────── */
-  --surface-base: #ffffff;
+  --surface-base: #faf9f7;
   /* Lvl 0: Base Canvas (#f5f5f3) */
   --surface-card: oklch(1 0 0);
   /* Lvl 1: Card Surface (#fafaf9) */
-  --surface-secondary: #f7f8f9;
+  --surface-secondary: #f4f3f0;
   /* Lvl 2: Recessed / Input (#eeeee9) */
   --surface-elevated: oklch(1.000 0 0);
   /* Lvl 3: Elevated Popover (#ffffff) */
   --surface-overlay: oklch(1.000 0 0);
 
   --background: #ffffff;
-  --foreground: #1e1e1e;
+  --foreground: #09090b;
 
   --card: #ffffff;
-  --card-foreground: #1e1e1e;
+  --card-foreground: #09090b;
 
   --popover: oklch(1 0 0);
-  --popover-foreground: #1e1e1e;
+  --popover-foreground: #09090b;
 
   /* ── Camada 2: Acentos Funcionais & Ações da Marca ─────────────────────── */
-  --primary: #0d111b;
+  --primary: #3b2dff;
   --primary-foreground: #ffffff;
 
-  --secondary: #f7fafc;
-  --secondary-foreground: #1e1e1e;
+  --secondary: #f4f3f0;
+  --secondary-foreground: #09090b;
 
-  --accent: #eef6fb;
-  --accent-foreground: #1e1e1e;
+  --accent: #f4f3f0;
+  --accent-foreground: #09090b;
 
-  --muted: #f7fafc;
-  --muted-foreground: #666666;
+  --muted: #f4f3f0;
+  --muted-foreground: #71717a;
   --muted-text: #8d8d8d;
 
   /* ── Camada 3: Comunicação Semântica (Uniformidade OKLCH L ≈ 0.60-0.65) ── */
-  --warning: oklch(0.660 0.165 75);
+  --warning: #f59e0b;
   /* Alertas e Atenção */
-  --warning-foreground: oklch(0.990 0 0);
-  --success: oklch(0.620 0.170 145);
+  --warning-foreground: #ffffff;
+  --success: #10b981;
   /* Sucesso e Confirmação */
-  --success-foreground: oklch(0.990 0 0);
-  --destructive: oklch(0.580 0.200 25);
+  --success-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --info: #3b82f6;
+  --info-foreground: #ffffff;
   /* Erro e Ação Destrutiva */
 
-  --border: #ccd1da;
+  --border: #e4e4e7;
   /* Bordas suaves 1px */
   --border-strong: #afb0b1;
-  --input: #ffffff;
-  --ring: #0098f2;
+  --input: #e4e4e7;
+  --ring: #3b2dff;
 
   --sidebar: var(--card);
   --sidebar-foreground: var(--card-foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.965 0.012 260);
-  --sidebar-accent-foreground: oklch(0.230 0.018 260);
+  --sidebar-accent: #f4f3f0;
+  --sidebar-accent-foreground: #09090b;
   --sidebar-warning: oklch(0.965 0.003 260);
   --sidebar-warning-foreground: oklch(0.220 0.012 260);
-  --sidebar-border: oklch(0.900 0.012 260);
-  --sidebar-ring: #0098f2;
+  --sidebar-border: #e4e4e7;
+  --sidebar-ring: #3b2dff;
 
-  --ct-blue: #0098f2;
-  --ct-blue-strong: #007fc9;
+  --ct-blue: #3b82f6;
+  --ct-blue-strong: #1f6fe5;
 
   /* ── Camada 4: Paleta de Gráficos em OKLCH (L = 0.64, C = 0.16) ─────────── */
-  --chart-1: oklch(0.640 0.160 260);
+  --chart-1: #3b2dff;
   /* Indigo/Blue */
-  --chart-2: oklch(0.640 0.160 150);
+  --chart-2: #3b82f6;
   /* Emerald */
-  --chart-3: oklch(0.640 0.160 230);
+  --chart-3: #f59e0b;
   /* Sky */
-  --chart-4: oklch(0.640 0.160 300);
+  --chart-4: #10b981;
   /* Violet */
-  --chart-5: oklch(0.640 0.160 65);
+  --chart-5: #94a3b8;
   /* Amber */
 
-  --font-sans: var(--font-inter-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-heading: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-logo: "Amil Typeface", var(--font-jakarta-sans), sans-serif;
+  --font-inter-sans: var(--font-jakarta-sans);
   --font-mono: var(--font-jetbrains-mono), var(--font-geist-mono), monospace;
   --duration-stagger: 40ms;
   --duration-micro: 80ms;
@@ -167,9 +185,9 @@
   --motion-timing-function-ease-out: cubic-bezier(0.215, 0.61, 0.355, 1);
   --motion-timing-function-ease-in-out: cubic-bezier(0.645, 0.045, 0.355, 1);
 
-  --radius-control: 0.625rem;
+  --radius-control: 999px;
   --radius-card: 1rem;
-  --radius-panel: 2rem;
+  --radius-panel: 1.5rem;
   --border-radius-rounded: var(--radius-control);
   --border-radius-circle: 50%;
   --border-radius-pill: 999px;
@@ -179,9 +197,9 @@
   --shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.10), 0 8px 16px -4px rgb(0 0 0 / 0.08);
   --shadow-lg: 0 8px 16px -4px rgb(0 0 0 / 0.12), 0 16px 32px -8px rgb(0 0 0 / 0.10);
   --shadow-xl: 0 16px 32px -8px rgb(0 0 0 / 0.18), 0 32px 64px -16px rgb(0 0 0 / 0.14);
-  --shadow-action: 0 1px 2px rgb(13 17 27 / 0.18);
-  --shadow-card: 0 1px 2px rgb(10 13 20 / 0.03);
-  --shadow-dialog: 0 12px 30px rgb(15 23 42 / 0.12);
+  --shadow-action: none;
+  --shadow-card: none;
+  --shadow-dialog: 0 16px 48px rgb(9 9 11 / 0.12);
   --dialog-overlay-duration: 180ms;
   --dialog-content-duration: 220ms;
   --dialog-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -283,8 +301,8 @@
   --sync-confirmed: var(--primary);
   --sync-error: var(--destructive);
   --sync-surface: var(--muted);
-  --dashboard-canvas: oklch(0.968 0.006 235);
-  --radius: var(--radius-card);
+  --dashboard-canvas: #ffffff;
+  --radius: 1rem;
 }
 
 .dark {
@@ -293,68 +311,71 @@
      MIT): a neutral #151515 ground, #1C1C1C cards, #1E1E1E controls and an
      indigo primary. Recorded in docs/design-system.md § Dark Mode. */
   /* ── Surfaces ─────────────────────────────────────────────────────────── */
-  --surface-base: #151515;
-  --surface-card: #1c1c1c;
-  --surface-secondary: #1a1a1a;
-  --surface-elevated: #1e1e1e;
-  --surface-overlay: #232323;
+  --surface-base: #09090b;
+  --surface-card: #18181b;
+  --surface-secondary: #27272a;
+  --surface-elevated: #27272a;
+  --surface-overlay: #27272a;
 
-  --background: #151515;
-  --foreground: #f3f3f3;
+  --background: #09090b;
+  --foreground: #fafafa;
 
-  --card: #1c1c1c;
-  --card-foreground: #e6e6e6;
+  --card: #18181b;
+  --card-foreground: #fafafa;
 
-  --popover: #1e1e1e;
-  --popover-foreground: #e6e6e6;
+  --popover: #27272a;
+  --popover-foreground: #fafafa;
 
   /* ── Action ───────────────────────────────────────────────────────────── */
-  --primary: #3b1fe5;
+  --primary: #1f6fe5;
   --primary-foreground: #ffffff;
 
-  --secondary: #1e1e1e;
-  --secondary-foreground: #e6e6e6;
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
 
-  --accent: #262626;
-  --accent-foreground: #f3f3f3;
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
 
-  --muted: #252525;
-  --muted-foreground: #8a8a8a;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
   --muted-text: #6b6b6b;
 
   /* ── Status (ink over a deep wash, same pairs as the Ds tokens) ─────────── */
-  --warning: #e8b98f;
-  --warning-foreground: #151515;
-  --success: #7fd1a0;
-  --success-foreground: #151515;
-  --destructive: #f4a3a9;
+  --warning: #f59e0b;
+  --warning-foreground: #ffffff;
+  --success: #10b981;
+  --success-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #fafafa;
+  --info: #3b82f6;
+  --info-foreground: #ffffff;
 
-  --border: #2a2a2a;
+  --border: #27272a;
   --border-strong: #353535;
-  --input: #2a2a2a;
-  --ring: #6350ff;
+  --input: #27272a;
+  --ring: #1f6fe5;
 
-  --sidebar: #111111;
-  --sidebar-foreground: #c7c7c7;
-  --sidebar-primary: #3b1fe5;
+  --sidebar: #18181b;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #1f6fe5;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #262626;
-  --sidebar-accent-foreground: #f3f3f3;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #fafafa;
   --sidebar-warning: #1a1a1a;
   --sidebar-warning-foreground: #c7c7c7;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #6350ff;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #1f6fe5;
 
-  --ct-blue: #c0d4f2;
-  --ct-blue-strong: #c0d4f2;
+  --ct-blue: #3b82f6;
+  --ct-blue-strong: #1f6fe5;
 
   /* ── Charts: the reference's tag inks, one hue each ───────────────────── */
-  --chart-1: #c0d4f2;
-  --chart-2: #7fd1a0;
-  --chart-3: #b5e4ec;
-  --chart-4: #b6aede;
-  --chart-5: #dfb099;
-  --radius: var(--radius-card);
+  --chart-1: #1f6fe5;
+  --chart-2: #3b82f6;
+  --chart-3: #f59e0b;
+  --chart-4: #10b981;
+  --chart-5: #94a3b8;
+  --radius: 1rem;
 }
 
 /* Contrast guardrails for legacy status utilities. The light theme must keep

@@ -276,7 +276,7 @@ export function LeadDrawerManagementActions({
   return (
     <div className="space-y-4 pt-2">
       {canRemoveAssignment ? (
-        <div className="rounded-lg border border-warning/25 bg-warning/[0.04] p-3 space-y-2">
+        <div className="rounded-[var(--radius-card)] border border-warning/25 bg-warning/[0.04] p-3 space-y-2">
           <div className="flex items-center gap-2">
             <UserSwitch className="size-4 text-warning" />
             <p className="text-xs font-semibold text-foreground">Atribuição atual</p>
@@ -307,7 +307,7 @@ export function LeadDrawerManagementActions({
       ) : null}
 
       {!currentOwner && isDirectorOrManager && distributionRemovalReason ? (
-        <div className="space-y-2 rounded-lg border border-border/70 bg-card p-3">
+        <div className="space-y-2 rounded-[var(--radius-card)] border border-border/70 bg-card p-3">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-xs font-semibold text-foreground">Fora da distribuição</p>
             <LeadDistributionRemovedTag reason={distributionRemovalReason} note={distributionRemovalNote} />
@@ -321,7 +321,7 @@ export function LeadDrawerManagementActions({
 
       {/* Atribuir unidade */}
       {canReassignUnit && (
-        <div className="rounded-lg border border-primary/20 bg-primary/[0.02] p-3 space-y-3">
+        <div className="rounded-[var(--radius-card)] border border-primary/20 bg-primary/[0.02] p-3 space-y-3">
           <div className="flex items-center gap-2">
             <Buildings className="size-4 text-primary" />
             <p className="text-xs font-semibold text-foreground">Reatribuir unidade</p>
@@ -357,7 +357,7 @@ export function LeadDrawerManagementActions({
 
       {/* Seção de assumir atendimento se já estiver ativo */}
       {activeStatus && (
-        <div className="rounded-lg border border-primary/25 bg-primary/[0.02] p-3 space-y-2">
+        <div className="rounded-[var(--radius-card)] border border-primary/25 bg-primary/[0.02] p-3 space-y-2">
           <p className="text-xs text-muted-foreground leading-normal">
             Atendimento ativo com <strong className="text-foreground">{currentOwner || "outro corretor"}</strong>. Como gestor/diretor, você pode assumir a conversa para si.
           </p>
@@ -375,7 +375,7 @@ export function LeadDrawerManagementActions({
 
       {/* Seção de Controle de Estágio e Qualificação */}
       {!isQualifiedOrDistributed && (
-        <div className="rounded-lg border border-border/70 bg-card p-3 space-y-2">
+        <div className="rounded-[var(--radius-card)] border border-border/70 bg-card p-3 space-y-2">
           <p className="text-xs font-semibold text-foreground">Estágio & Qualificação do Lead</p>
           <p className="text-xs text-muted-foreground">
             Altere manualmente a etapa deste lead entre a fila de qualificação IA e o status de lead qualificado.
@@ -385,7 +385,7 @@ export function LeadDrawerManagementActions({
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 text-xs gap-1"
+              className="h-10 text-xs gap-1"
               disabled={isReverting}
               onClick={handleRevertToQualifying}
             >
@@ -397,7 +397,7 @@ export function LeadDrawerManagementActions({
               type="button"
               variant="default"
               size="sm"
-              className="h-8 text-xs gap-1 font-medium"
+              className="h-10 text-xs gap-1 font-medium"
               onClick={() => setOpenQualifyDialog(true)}
             >
               <Sparkle className="size-3.5" />
@@ -416,19 +416,19 @@ export function LeadDrawerManagementActions({
       />
 
       {/* Seletor de modo */}
-      <div className="inline-flex w-full rounded-lg border border-border/80 bg-muted/50 p-1" role="group" aria-label="Tipo de intervenção">
-        <Button className="h-8 flex-1 text-xs" onClick={() => setMode("reassign")} size="sm" type="button" variant={mode === "reassign" ? "secondary" : "ghost"}>Reatribuir</Button>
-        <Button className="h-8 flex-1 text-xs" onClick={() => setMode("investigate")} size="sm" type="button" variant={mode === "investigate" ? "secondary" : "ghost"}>Investigar</Button>
+      <div className="inline-flex w-full rounded-[var(--radius-card)] border border-border/80 bg-muted/50 p-1" role="group" aria-label="Tipo de intervenção">
+        <Button className="h-10 flex-1 text-xs" onClick={() => setMode("reassign")} size="sm" type="button" variant={mode === "reassign" ? "secondary" : "ghost"}>Reatribuir</Button>
+        <Button className="h-10 flex-1 text-xs" onClick={() => setMode("investigate")} size="sm" type="button" variant={mode === "investigate" ? "secondary" : "ghost"}>Investigar</Button>
       </div>
 
       <p className="text-xs leading-normal text-muted-foreground">{selectedModeDescription}</p>
 
       {mode === "reassign" && dutyRosterLoading ? (
-        <p className="rounded-md border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground" role="status">
+        <p className="rounded-[var(--radius-card)] border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground" role="status">
           Verificando o plantão vinculado à fila do lead…
         </p>
       ) : mode === "reassign" && dutyRosterError ? (
-        <p className="rounded-md border border-destructive/25 bg-destructive/[0.04] p-3 text-xs text-destructive" role="alert">
+        <p className="rounded-[var(--radius-card)] border border-destructive/25 bg-destructive/[0.04] p-3 text-xs text-destructive" role="alert">
           {dutyRosterError} Atualize o drawer para tentar novamente.
         </p>
       ) : mode === "reassign" ? (
@@ -440,7 +440,7 @@ export function LeadDrawerManagementActions({
               {activeQueueDuty ? "Corretores escalados no plantão ativo" : "Novo responsável"}
             </Label>
             {activeQueueDuty && assignmentBrokers.length === 0 ? (
-              <p className="rounded-md border border-warning/25 bg-warning/[0.04] p-3 text-xs text-muted-foreground" role="status">
+              <p className="rounded-[var(--radius-card)] border border-warning/25 bg-warning/[0.04] p-3 text-xs text-muted-foreground" role="status">
                 Não há corretores ativos escalados neste plantão agora.
               </p>
             ) : (

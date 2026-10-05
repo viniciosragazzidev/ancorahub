@@ -251,7 +251,7 @@ export function BrokerDailySummaryPanel({
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Period Buttons */}
-            <div className="flex items-center gap-1 rounded-lg border p-1 bg-muted/20">
+            <div className="flex items-center gap-1 rounded-[var(--radius-card)] border p-1 bg-muted/20">
               <Button
                 size="xs"
                 variant={period === "today" ? "primary" : "ghost"}
@@ -313,7 +313,7 @@ export function BrokerDailySummaryPanel({
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="h-8 text-xs"
+                className="h-10 text-xs"
               />
             </div>
             <div className="space-y-1">
@@ -322,7 +322,7 @@ export function BrokerDailySummaryPanel({
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="h-8 text-xs"
+                className="h-10 text-xs"
               />
             </div>
             <Button size="xs" onClick={handleCustomDateSubmit} disabled={isLoading}>
@@ -448,7 +448,7 @@ export function BrokerDailySummaryPanel({
                     <TableCell className="text-right tabular-nums text-destructive">
                       {item.lostLeads}
                     </TableCell>
-                    <TableCell className="text-right font-bold tabular-nums text-success">
+                    <TableCell className="text-right font-semibold tabular-nums text-success">
                       {item.convertedLeads}
                     </TableCell>
                     <TableCell className="text-right font-semibold tabular-nums">

@@ -95,10 +95,10 @@ export function LeadAssignmentHistory({
   return (
     <div className="space-y-4">
       {/* ─── 1. Data e Horário da Última Atribuição ─── */}
-      <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
+      <div className="rounded-[var(--radius-card)] border border-border/60 bg-card p-3.5 shadow-none">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <div className="flex size-7 items-center justify-center rounded-[var(--radius-card)] bg-primary/8 text-primary">
               <Clock className="size-4" />
             </div>
             <div>
@@ -139,10 +139,10 @@ export function LeadAssignmentHistory({
       </div>
 
       {/* ─── 2. Histórico de Atribuições ─── */}
-      <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-xs">
+      <div className="rounded-[var(--radius-card)] border border-border/60 bg-card p-3.5 shadow-none">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-violet-500/10 text-violet-500">
+            <div className="flex size-7 items-center justify-center rounded-[var(--radius-card)] bg-violet-500/10 text-violet-500">
               <UserSwitch className="size-4" />
             </div>
             <div>

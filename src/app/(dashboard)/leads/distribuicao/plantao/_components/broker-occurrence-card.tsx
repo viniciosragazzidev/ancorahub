@@ -61,8 +61,8 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
   }
 
   return <>
-    <div className="relative flex items-center justify-between gap-3 rounded-lg border border-border/70 px-3 py-2.5">
-      <button type="button" onClick={show} className="absolute inset-0 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Abrir detalhes de ${brokerName} neste plantão`} />
+    <div className="relative flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 px-3 py-2.5">
+      <button type="button" onClick={show} className="absolute inset-0 rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Abrir detalhes de ${brokerName} neste plantão`} />
       <div className="pointer-events-none relative z-10 flex w-full items-center justify-between gap-3 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
         {children}
       </div>

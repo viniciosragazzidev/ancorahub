@@ -297,7 +297,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         <Card variant="overview" className="border-border/60 bg-card/80 p-5 shadow-none dark:border-border/80 dark:bg-card sm:p-6" data-onboarding="lead-profile">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex items-start gap-4">
-              <UserAvatar seed={lead.email || lead.nome} name={lead.nome} className="size-12 rounded-xl shrink-0 border border-border/50" />
+              <UserAvatar seed={lead.email || lead.nome} name={lead.nome} className="size-12 rounded-[var(--radius-card)] shrink-0 border border-border/50" />
 
               <div className="min-w-0 space-y-1.5">
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -344,7 +344,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             {/* Quick Header Actions */}
             <div id="lead-actions" className="flex flex-wrap items-center gap-2 xl:justify-end">
               {hasPermission(context.role, "acessar_conversas") ? (
-                <Button className="h-8 text-xs gap-1.5" render={<Link href={`/conversas?leadId=${lead.id}&draft=broker_intro`} />} variant="outline">
+                <Button className="h-10 text-xs gap-1.5" render={<Link href={`/conversas?leadId=${lead.id}&draft=broker_intro`} />} variant="outline">
                   <ChatCircleText className="size-3.5 text-primary" />
                   Conversas
                 </Button>
@@ -436,7 +436,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             })()}
 
             <Tabs defaultValue={defaultLeadTab} variant="segment" className="min-h-0 min-w-0 gap-5 overflow-hidden">
-              <TabsList aria-label="Etapas do atendimento" id="tabs-lead-page" className="flex h-auto w-full snap-x snap-mandatory flex-nowrap gap-1 overflow-x-auto rounded-xl border border-border/60 bg-muted/20 p-1.5">
+              <TabsList aria-label="Etapas do atendimento" id="tabs-lead-page" className="flex h-auto w-full snap-x snap-mandatory flex-nowrap gap-1 overflow-x-auto rounded-[var(--radius-card)] border border-border/60 bg-muted/20 p-1.5">
                 <TabsTrigger value="service" className="min-h-(--mobile-touch-target) min-w-[130px] shrink-0 snap-start justify-start px-3 py-2 text-left sm:flex-1">
                   <span className="flex flex-col items-start gap-0.5">
                     <span className="font-semibold text-xs">Atendimento</span>
@@ -579,11 +579,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
                 {/* ── Origem Meta Ads ──────────────── */}
                 {(lead.origem === "webhook" || lead.sourceCampaign || lead.metaCampaignId) && (
-                  <Card className="border-primary/20 bg-primary/5 shadow-none">
+                  <Card className="border-primary/20 bg-primary/8 shadow-none">
                     <CardHeader className="pb-2">
                       <div className="flex items-center gap-2">
-                        <span className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">f</span>
-                        <CardTitle className="text-sm font-bold">Origem Meta Ads</CardTitle>
+                        <span className="flex size-6 items-center justify-center rounded-[var(--radius-card)] bg-primary text-primary-foreground text-xs font-semibold">f</span>
+                        <CardTitle className="text-sm font-semibold">Origem Meta Ads</CardTitle>
                       </div>
                       <CardDescription className="text-xs">Rastreabilidade completa do anúncio até este lead.</CardDescription>
                     </CardHeader>
@@ -649,7 +649,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               </CardHeader>
               <CardContent className="space-y-3 pt-4">
                 <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-muted text-muted-foreground">
                     <Phone className="size-4" />
                   </div>
                   <div className="min-w-0">
@@ -663,7 +663,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-muted text-muted-foreground">
                     <Clock className="size-4" />
                   </div>
                   <div className="min-w-0">
@@ -677,7 +677,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-muted text-muted-foreground">
                     <Share className="size-4" />
                   </div>
                   <div>
@@ -687,7 +687,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-muted text-muted-foreground">
                     <Buildings className="size-4" />
                   </div>
                   <div>
@@ -697,7 +697,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </div>
 
                 <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-muted text-muted-foreground">
                     <UserPlus className="size-4" />
                   </div>
                   <div>
@@ -707,14 +707,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </div>
 
                 {lead.motivoPerda && (
-                  <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
+                  <div className="rounded-[var(--radius-card)] border border-destructive/20 bg-destructive/5 p-3 text-xs text-destructive">
                     <p className="font-semibold uppercase tracking-wider text-[10px]">Motivo da perda</p>
                     <p className="mt-1 font-medium">{lead.motivoPerda}</p>
                   </div>
                 )}
 
                 {!canSeePersonalData && (
-                  <div className="rounded-lg border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-relaxed text-muted-foreground">
+                  <div className="rounded-[var(--radius-card)] border border-amber-300/20 bg-amber-300/5 p-3 text-xs leading-relaxed text-muted-foreground">
                     O telefone e o e-mail serão liberados quando você iniciar o atendimento.
                   </div>
                 )}

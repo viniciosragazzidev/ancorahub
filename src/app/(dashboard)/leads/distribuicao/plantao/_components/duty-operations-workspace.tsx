@@ -297,7 +297,7 @@ function DutyFormSheet({
               <AppSelect id="duty-attendance-mode" name="attendanceMode" defaultValue={schedule?.attendanceMode ?? "online"} options={[{ value: "online", label: "Online" }, { value: "presencial", label: "Presencial" }]} />
               <p className="text-xs text-muted-foreground">No presencial, o gestor confirma cada corretor na unidade antes de ele receber leads.</p>
             </div>
-            <div className="grid gap-3 rounded-lg border border-border p-3">
+            <div className="grid gap-3 rounded-[var(--radius-card)] border border-border p-3">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-medium">Quando</p>
                 {!schedule || !isSingleDaySchedule(schedule) ? (
@@ -337,7 +337,7 @@ function DutyFormSheet({
                             aria-pressed={selected}
                             disabled={count === 0}
                             onClick={() => setSelectedDays((current) => (selected ? current.filter((day) => day !== index) : [...current, index].sort((a, b) => a - b)))}
-                            className={`rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-40 ${selected && count ? "border-foreground bg-foreground text-background" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}
+                            className={`rounded-full border px-2.5 py-1 text-xs transition-colors disabled:opacity-40 ${selected && count ? "border-primary/25 bg-primary/8 text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground"}`}
                           >
                             {DAYS[index]}{count ? ` · ${count === 1 ? datesInRange(rangeFrom, rangeUntil, [index])[0].slice(8, 10) + "/" + datesInRange(rangeFrom, rangeUntil, [index])[0].slice(5, 7) : `${count}×`}` : ""}
                           </button>
@@ -370,7 +370,7 @@ function DutyFormSheet({
                     return (
                       <label
                         key={day}
-                        className="flex cursor-pointer items-center gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-2 text-xs has-[:checked]:border-primary has-[:checked]:bg-primary/5"
+                        className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-card)] border border-border/70 bg-card px-2.5 py-2 text-xs has-[:checked]:border-primary has-[:checked]:bg-primary/8"
                       >
                         <Checkbox
                           checked={selected}
@@ -498,9 +498,9 @@ function DutyFormSheet({
             <fieldset className="grid gap-2">
               <legend className="text-sm font-medium">Filas que recebem este plantão</legend>
               {queueChoices.length ? (
-                <div className="grid max-h-48 gap-1 overflow-y-auto rounded-lg border border-border p-2">
+                <div className="grid max-h-48 gap-1 overflow-y-auto rounded-[var(--radius-card)] border border-border p-2">
                   {queueChoices.map((queue) => (
-                    <label key={queue.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-accent/40">
+                    <label key={queue.id} className="flex cursor-pointer items-center gap-2 rounded-[var(--radius-card)] px-2 py-1.5 text-sm hover:bg-accent/40">
                       <Checkbox checked={queueIds.includes(queue.id)} onCheckedChange={(checked) => toggleQueue(queue.id, checked === true)} aria-label={queue.name} />
                       <span className="truncate">{queue.name}</span>
                     </label>
@@ -534,7 +534,7 @@ function DutyFormSheet({
             </div>
             <section
               aria-labelledby="duty-review"
-              className="rounded-xl border border-primary/20 bg-primary/5 p-4"
+              className="rounded-[var(--radius-card)] border border-primary/20 bg-primary/8 p-4"
             >
               <h3 id="duty-review" className="text-sm font-semibold">
                 Resumo da criação
@@ -547,7 +547,7 @@ function DutyFormSheet({
                 <Badge variant="outline">Todas as unidades</Badge>
               </div>
             </section>
-            <p className="rounded-lg border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+            <p className="rounded-[var(--radius-card)] border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               Fuso operacional: America/Sao_Paulo. A fila de entrada seleciona os leads; a escala
               do plantão reúne corretores de todas as unidades.
             </p>
@@ -802,7 +802,7 @@ function DutyInspector({
                     {shifts ? (
                       <div className="grid gap-1.5">
                         <p className="text-xs font-medium text-muted-foreground">Turno de quem você adicionar</p>
-                        <div className="grid grid-cols-3 rounded-lg border border-border bg-muted/40 p-0.5" role="radiogroup" aria-label="Turno de quem você adicionar">
+                        <div className="grid grid-cols-3 rounded-[var(--radius-card)] border border-border bg-muted/40 p-0.5" role="radiogroup" aria-label="Turno de quem você adicionar">
                           {shifts.map((shift) => (
                             <button
                               key={shift.key}
@@ -811,8 +811,8 @@ function DutyInspector({
                               aria-checked={addShift === shift.key}
                               onClick={() => setAddShift(shift.key)}
                               className={cn(
-                                "rounded-md px-2 py-1.5 text-xs font-medium",
-                                addShift === shift.key ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground",
+                                "rounded-full px-2 py-1.5 text-xs font-medium",
+                                addShift === shift.key ? "bg-background text-foreground shadow-none" : "text-muted-foreground hover:text-foreground",
                               )}
                             >
                               {shift.label.split(" · ")[0]}
@@ -831,7 +831,7 @@ function DutyInspector({
                         disabled={pending || schedule.status !== "active"}
                       />
                       {brokerSearch.trim() && schedule.status === "active" ? (
-                        <div className="rounded-lg border border-border/70 bg-card">
+                        <div className="rounded-[var(--radius-card)] border border-border/70 bg-card">
                           {searchingBrokers ? (
                             <p className="flex items-center gap-2 px-3 py-2.5 text-xs text-muted-foreground">
                               <Loader2Icon className="size-3.5 animate-spin" />
@@ -888,7 +888,7 @@ function DutyInspector({
                       {section.entries.map((assignment) => (
                         <div
                           key={`${section.key}:${assignment.id}`}
-                          className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2"
+                          className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 bg-muted/20 px-3 py-2"
                         >
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-medium">
@@ -920,7 +920,7 @@ function DutyInspector({
                         </div>
                       ))}
                       {!section.entries.length && (
-                        <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+                        <p className="rounded-[var(--radius-card)] border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
                           {section.label ? "Ninguém neste turno." : "Nenhum corretor escalado."}
                         </p>
                       )}
@@ -1308,7 +1308,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
               onCreateOnDate={(date) => openCreate(date)}
             />
           ) : (
-            <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-8 text-center">
+            <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-dashed border-border p-8 text-center">
               <p className="text-sm font-medium">Nenhum plantão acontece em {monthLabel(month)}</p>
               <Button onClick={() => openCreate()}>
                 <Plus />
@@ -1321,7 +1321,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
             Mostrar arquivados
           </label>
           {outsideSchedules.length ? (
-            <details className="rounded-lg border border-border bg-card px-3 py-2 text-xs">
+            <details className="rounded-[var(--radius-card)] border border-border bg-card px-3 py-2 text-xs">
               <summary className="cursor-pointer font-medium">
                 {outsideSchedules.length} {outsideSchedules.length === 1 ? "plantão não acontece" : "plantões não acontecem"} em {monthLabel(month)}
               </summary>

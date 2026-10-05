@@ -192,7 +192,7 @@ export function PlatformAdminSidebar() {
                 <SidebarMenuButton
                   size="lg"
                   tooltip={userName}
-                  className="w-full justify-start rounded-lg hover:bg-sidebar-warning px-3 py-2"
+                  className="w-full justify-start rounded-[var(--radius-card)] hover:bg-sidebar-warning px-3 py-2"
                 >
                   <span className="grid size-7 place-items-center rounded-full bg-sidebar-warning/50 text-foreground/80">
                     <ShieldStar weight="fill" className="size-3.5" />

@@ -6,7 +6,7 @@ function LoadingCard({ className = "" }: { className?: string }) {
     <Card className={className}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-1 items-center gap-3">
-          <Skeleton className="size-9 rounded-lg" />
+          <Skeleton className="size-9 rounded-[var(--radius-card)]" />
           <div className="flex flex-1 flex-col gap-2">
             <Skeleton className="h-4 w-28" />
             <Skeleton className="h-3 w-40" />
@@ -37,12 +37,12 @@ export default function Loading() {
         <LoadingCard />
       </div>
       <div className="grid gap-5 xl:grid-cols-12">
-        <Skeleton className="h-[340px] rounded-xl xl:col-span-8" />
-        <Skeleton className="h-[340px] rounded-xl xl:col-span-4" />
+        <Skeleton className="h-[340px] rounded-[var(--radius-card)] xl:col-span-8" />
+        <Skeleton className="h-[340px] rounded-[var(--radius-card)] xl:col-span-4" />
       </div>
       <div className="grid gap-5 xl:grid-cols-12">
-        <Skeleton className="h-[270px] rounded-xl xl:col-span-8" />
-        <Skeleton className="h-[270px] rounded-xl xl:col-span-4" />
+        <Skeleton className="h-[270px] rounded-[var(--radius-card)] xl:col-span-8" />
+        <Skeleton className="h-[270px] rounded-[var(--radius-card)] xl:col-span-4" />
       </div>
     </div>
   );

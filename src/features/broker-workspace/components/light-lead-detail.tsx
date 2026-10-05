@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
+import { useSuccessOverlay } from "@/components/motion/success-overlay";
 import {
   ArrowLeft,
   ArrowRight,
@@ -152,6 +153,7 @@ export function LightLeadDetail({
   carriers?: CarrierOption[];
   availabilityStatus?: "available" | "paused" | "offline";
 }) {
+  const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
   const router = useRouter();
   const [accepted, setAccepted] = useState(lead.status !== "distributed" && lead.status !== "new");
   const [leadStatus, setLeadStatus] = useState(lead.status);
@@ -290,6 +292,7 @@ export function LightLeadDetail({
       }
 
       setAccepted(true);
+      celebrateSuccess("Lead aceito");
       setLeadStatus("in_contact");
 
       const firstName = lead.nome.split(" ")[0] || lead.nome;
@@ -1301,6 +1304,7 @@ export function LightLeadDetail({
         onOpenChange={setShowSaleConfirm}
       />
       </div>
+      {successOverlay}
     </div>
   );
 }

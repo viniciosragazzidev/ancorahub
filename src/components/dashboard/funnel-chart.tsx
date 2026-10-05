@@ -1,6 +1,8 @@
 "use client";
 
 import { useId } from "react";
+import { motion } from "motion/react";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { cn } from "@/lib/utils";
 
 export type FunnelDatum = {
@@ -45,6 +47,7 @@ function stagePath(index: number, total: number, value: number, nextValue: numbe
 
 export function FunnelChart({ data, className }: FunnelChartProps) {
   const gradientId = useId();
+  const enabled = useInterfaceMotionEnabled();
   const stages = data.filter((item) => !item.lost);
   const terminal = data.find((item) => item.lost);
   const maximum = Math.max(stages[0]?.volume ?? 0, 1);
@@ -52,7 +55,11 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
   return (
     <div className={cn("space-y-4", className)} aria-label="Funil de leads">
       {stages.length ? (
-        <svg
+        <motion.svg
+          initial={enabled ? { opacity: 0, scaleX: 0.9 } : false}
+          animate={{ opacity: 1, scaleX: 1 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+          style={{ transformOrigin: "left center" }}
           aria-hidden="true"
           className="block h-auto w-full overflow-visible"
           viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
@@ -61,8 +68,8 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
         >
           <defs>
             <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="var(--primary)" stopOpacity="0.92" />
+              <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="1" />
             </linearGradient>
           </defs>
           {stages.map((stage, index) => (
@@ -76,9 +83,9 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
               vectorEffect="non-scaling-stroke"
             />
           ))}
-        </svg>
+        </motion.svg>
       ) : (
-        <div className="flex h-28 items-center justify-center rounded-ds-medium bg-muted/40 text-sm text-muted-foreground">
+        <div className="flex h-28 items-center justify-center rounded-[var(--radius-card)] bg-muted/40 text-sm text-muted-foreground">
           Sem dados de funil no período.
         </div>
       )}
@@ -91,7 +98,7 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
               <div className="flex items-center gap-1.5">
                 <span
                   aria-hidden="true"
-                  className={cn("size-2 shrink-0 rounded-full", stage.lost ? "bg-muted-foreground/45" : "bg-primary")}
+                  className={cn("size-2 shrink-0 rounded-full", stage.lost ? "bg-muted-foreground/45" : "bg-[var(--chart-1)]")}
                 />
                 <span className="truncate text-xs text-muted-foreground">{stage.stage}</span>
               </div>

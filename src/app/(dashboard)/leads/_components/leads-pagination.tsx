@@ -105,7 +105,7 @@ export function LeadsPagination({
             disabled={isPending}
             value={pageSize}
             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-            className="h-7 rounded-md border border-border/80 bg-background px-2 text-xs font-medium text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary cursor-pointer disabled:opacity-50"
+            className="h-10 rounded-full border border-border/80 bg-background px-2 text-xs font-medium text-foreground shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary cursor-pointer disabled:opacity-50"
           >
             <option value={10}>10 por pág.</option>
             <option value={20}>20 por pág.</option>
@@ -120,7 +120,7 @@ export function LeadsPagination({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 gap-1 px-2.5 text-xs"
+            className="h-10 gap-1 px-2.5 text-xs"
             disabled={currentPage <= 1 || isPending}
             onClick={() => goToPage(currentPage - 1)}
             onPointerEnter={() => prefetchPage(currentPage - 1)}
@@ -135,7 +135,7 @@ export function LeadsPagination({
                 key={`page-${p}`}
                 size="sm"
                 variant={p === currentPage ? "default" : "outline"}
-                className="h-8 w-8 p-0 text-xs font-semibold"
+                className="h-10 w-8 p-0 text-xs font-semibold"
                 disabled={isPending}
                 onClick={() => goToPage(p)}
                 onPointerEnter={() => prefetchPage(p)}
@@ -152,7 +152,7 @@ export function LeadsPagination({
           <Button
             size="sm"
             variant="outline"
-            className="h-8 gap-1 px-2.5 text-xs"
+            className="h-10 gap-1 px-2.5 text-xs"
             disabled={currentPage >= totalPages || isPending}
             onClick={() => goToPage(currentPage + 1)}
             onPointerEnter={() => prefetchPage(currentPage + 1)}

@@ -15,6 +15,7 @@ import { DataTablePagination } from "@/components/data-table/data-table-paginati
 import { DragScrollTable } from "@/components/ui/drag-scroll-table";
 import { getCommonPinningStyles } from "@/lib/data-table";
 import { cn } from "@/lib/utils";
+import { useRowEnter } from "@/components/motion/stagger";
 import {
   DataTableFrame,
   dataTableStyles,
@@ -43,6 +44,7 @@ export function DataTable<TData>({
   onRowClick,
   ...props
 }: DataTableProps<TData>) {
+  const rowEnterRef = useRowEnter();
   return (
     <div data-slot="data-table" className={cn("w-full space-y-3", className)} {...props}>
       {children}
@@ -81,9 +83,10 @@ export function DataTable<TData>({
             </TableHeader>
             <TableBody className={cn(dataTableStyles.body, "transition-opacity duration-200", isPending && "opacity-50 pointer-events-none")}>
               {table.getRowModel().rows?.length ? (
-                table.getRowModel().rows.map((row) => (
+                table.getRowModel().rows.map((row, rowIndex) => (
                   <TableRow
                     key={row.id}
+                    ref={rowEnterRef(rowIndex)}
                     data-state={row.getIsSelected() && "selected"}
                     className={cn(dataTableStyles.row, "cursor-pointer", getRowClassName?.(row.original))}
                     onClick={() => {

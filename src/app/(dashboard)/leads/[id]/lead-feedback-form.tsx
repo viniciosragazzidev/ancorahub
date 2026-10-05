@@ -100,9 +100,9 @@ export function LeadFeedbackForm({ leadId }: { leadId: string }) {
 
           {/* ─── Checklist questions ─── */}
           {checklist && (
-            <div className="sm:col-span-2 space-y-3 rounded-lg border border-primary/10 bg-primary/[0.02] p-4">
+            <div className="sm:col-span-2 space-y-3 rounded-[var(--radius-card)] border border-primary/10 bg-primary/[0.02] p-4">
               <div className="flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-wider text-primary">{checklist.name}</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-primary">{checklist.name}</p>
                 <span className="text-[10px] text-muted-foreground">
                   {answeredRequired}/{totalRequired} obrigatórias
                 </span>
@@ -136,7 +136,7 @@ export function LeadFeedbackForm({ leadId }: { leadId: string }) {
                         <button
                           type="button"
                           onClick={() => setAnswers((prev) => ({ ...prev, [item.id]: true }))}
-                          className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          className={`flex-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                             answers[item.id] === true
                               ? "border-success bg-success/10 text-success"
                               : "border-border text-muted-foreground hover:bg-muted"
@@ -147,7 +147,7 @@ export function LeadFeedbackForm({ leadId }: { leadId: string }) {
                         <button
                           type="button"
                           onClick={() => setAnswers((prev) => ({ ...prev, [item.id]: false }))}
-                          className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
+                          className={`flex-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                             answers[item.id] === false
                               ? "border-destructive bg-destructive/10 text-destructive"
                               : "border-border text-muted-foreground hover:bg-muted"
@@ -165,9 +165,9 @@ export function LeadFeedbackForm({ leadId }: { leadId: string }) {
                             key={rating}
                             type="button"
                             onClick={() => setAnswers((prev) => ({ ...prev, [item.id]: rating }))}
-                            className={`flex-1 rounded-lg border py-1.5 text-xs font-bold transition-colors ${
+                            className={`flex-1 rounded-full border py-1.5 text-xs font-semibold transition-colors ${
                               answers[item.id] === rating
-                                ? "border-primary bg-primary/10 text-primary"
+                                ? "border-primary bg-primary/8 text-primary"
                                 : "border-border text-muted-foreground hover:bg-muted"
                             }`}
                           >
@@ -188,7 +188,7 @@ export function LeadFeedbackForm({ leadId }: { leadId: string }) {
 
                     {item.answerType === "select" && Array.isArray(item.options) && (
                       <select
-                        className="flex h-8 w-full rounded-lg border border-input bg-input/30 px-2.5 text-xs"
+                        className="flex h-10 w-full rounded-full border border-input bg-input/30 px-2.5 text-xs"
                         value={String(answers[item.id] ?? "")}
                         onChange={(e) => setAnswers((prev) => ({ ...prev, [item.id]: e.target.value }))}
                       >

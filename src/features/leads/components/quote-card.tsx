@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import { toast } from "@/components/ui/sonner";
+import { CopyCheckIcon } from "@/components/motion/copy-check-icon";
 
 import { CheckCircle, Copy, Trash, WhatsappLogo } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -56,7 +57,7 @@ export function QuoteCard({ quote, leadName, leadPhone, baseUrl }: QuoteCardProp
     navigator.clipboard.writeText(proposalUrl);
     setCopied(true);
     toast.success("Link copiado!");
-    setTimeout(() => setCopied(false), 2000);
+    setTimeout(() => setCopied(false), 1500);
   }
 
   function handleWhatsApp() {
@@ -100,7 +101,7 @@ export function QuoteCard({ quote, leadName, leadPhone, baseUrl }: QuoteCardProp
 
       <div className="flex flex-wrap gap-1.5 pt-1">
         <Button className="h-7 px-2 text-[10px]" size="sm" variant="outline" onClick={handleCopy}>
-          {copied ? <CheckCircle className="size-3" /> : <Copy className="size-3" />}
+          <CopyCheckIcon copied={copied} className="relative inline-flex size-3 items-center justify-center"><Copy className="size-3" /></CopyCheckIcon>
           {copied ? "Copiado" : "Copiar link"}
         </Button>
         {leadPhone && (

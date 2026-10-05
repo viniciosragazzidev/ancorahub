@@ -86,7 +86,7 @@ export function BrokerQueueClient({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 rounded-full border border-input bg-background px-3 py-1 text-sm shadow-none transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             <option value="all">Todos os status</option>
             {Object.entries(statusLabels).map(([key, value]) => (
@@ -111,9 +111,9 @@ export function BrokerQueueClient({
           return (
             <motion.div
               key={lead.id}
-              initial={{ opacity: 0, y: 8 }}
+              initial={i < 8 ? { opacity: 0, y: 4 } : false}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.12, delay: Math.min(i * 0.02, 0.2) }}
+              transition={{ duration: 0.3, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
             >
               <Link
                 href={`/leads/${lead.id}`}
@@ -171,9 +171,9 @@ export function BrokerQueueClient({
             return (
               <motion.tr
                 key={lead.id}
-                initial={{ opacity: 0, y: 4 }}
+                initial={i < 8 ? { opacity: 0, y: 4 } : false}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.12, delay: Math.min(i * 0.01, 0.15) }}
+                transition={{ duration: 0.3, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
                 className="group"
               >
                 <TableCell className="pl-5">

@@ -82,7 +82,7 @@ export function EmptyState({
   action,
   variant = "default",
   className,
-  animated,
+  animated = true,
   animationDelay = 0,
   loading,
 }: EmptyStateProps) {

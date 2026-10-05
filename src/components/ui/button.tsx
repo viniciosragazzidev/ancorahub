@@ -13,6 +13,8 @@ import { buttonVariants, type ButtonVariants } from "./button-variants";
 type NativeButtonProps = React.ComponentPropsWithoutRef<"button">;
 
 export interface ButtonProps extends NativeButtonProps, ButtonVariants {
+  /** Shows a spinner without changing the button's width. */
+  loading?: boolean;
   /**
    * Render the button as a different element (e.g. Next.js <Link>).
    * The render element receives the button's className, onClick and children.
@@ -37,13 +39,39 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size = "default",
       render,
       asChild = false,
+      loading = false,
       pressScale: _pressScale,
       children,
       ...restProps
     },
     ref,
   ) {
-    const mergedClass = cn(buttonVariants({ variant, size }), className);
+    const mergedClass = cn(buttonVariants({ variant, size }), loading && "pointer-events-none", className);
+    const loadingContent = (label: React.ReactNode) => {
+      const parts = React.Children.toArray(label);
+      const iconIndex = parts.findIndex(
+        (part) => React.isValidElement(part) && (
+          part.type === "svg" ||
+          "data-icon" in (part.props as object) ||
+          /(?:HugeIcon|Icon)$/.test((part.type as { displayName?: string }).displayName ?? "")
+        ),
+      );
+      if (iconIndex >= 0) {
+        return parts.map((part, index) => index === iconIndex ? (
+          <span key="loading-icon" className="relative inline-grid place-items-center">
+            <span className="opacity-0">{part}</span>
+            <span className="ct-spinner absolute" aria-hidden="true" />
+          </span>
+        ) : part);
+      }
+      return (
+        <span className="relative inline-grid place-items-center">
+          <span className="opacity-0">{label}</span>
+          <span className="ct-spinner absolute" aria-hidden="true" />
+        </span>
+      );
+    };
+    const content = loading ? loadingContent(children) : children;
 
     // -------------------------------------------------------------------------
     // render-prop path  →  <Button render={<Link href="/..." />}>label</Button>
@@ -71,8 +99,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           data-slot="button"
           className={mergedClass}
           {...safeRestProps}
+          aria-busy={loading || restProps["aria-busy"]}
+          aria-disabled={loading || restProps["aria-disabled"]}
+          tabIndex={loading ? -1 : restProps.tabIndex}
         >
-          {React.cloneElement(render, renderOwnProps, children)}
+          {React.cloneElement(render, renderOwnProps, content)}
         </Slot>
       );
     }
@@ -85,14 +116,20 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         type?: string;
         [key: string]: unknown;
       };
+      const child = React.Children.only(children) as React.ReactElement<{ children?: React.ReactNode }>;
       return (
         <Slot
           ref={ref as React.Ref<HTMLElement>}
           data-slot="button"
           className={mergedClass}
           {...safeRestProps}
+          aria-busy={loading || restProps["aria-busy"]}
+          aria-disabled={loading || restProps["aria-disabled"]}
+          tabIndex={loading ? -1 : restProps.tabIndex}
         >
-          {children}
+          {loading
+            ? React.cloneElement(child, undefined, loadingContent(child.props.children))
+            : child}
         </Slot>
       );
     }
@@ -110,8 +147,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         }
         className={mergedClass}
         {...restProps}
+        disabled={loading || restProps.disabled}
+        aria-busy={loading || restProps["aria-busy"]}
       >
-        {children}
+        {content}
       </button>
     );
   },
