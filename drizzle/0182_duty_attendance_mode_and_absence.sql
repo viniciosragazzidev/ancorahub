@@ -4,6 +4,9 @@ ALTER TABLE unit_duty_schedules
   ADD COLUMN IF NOT EXISTS attendance_mode text NOT NULL DEFAULT 'online';
 
 ALTER TABLE unit_duty_schedules
+  DROP CONSTRAINT IF EXISTS unit_duty_schedules_attendance_mode_check;
+
+ALTER TABLE unit_duty_schedules
   ADD CONSTRAINT unit_duty_schedules_attendance_mode_check
   CHECK (attendance_mode IN ('online', 'presencial')) NOT VALID;
 
