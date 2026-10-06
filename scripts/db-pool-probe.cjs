@@ -90,11 +90,43 @@ async function probe(name, url, max, extra = {}) {
   const transaction = process.env.DATABASE_URL || "";
   const cleaned = cleanUrl(transaction);
   const results = [];
+  if (process.env.SO_CONEXOES) {
+    // pula os testes de carga
+  } else {
   results.push(await probe("A · atual (SUPABASE_DB_URL), pool 2", current, 2));
   results.push(await probe("B · 6543 limpa (sem sslmode), pool 10", cleaned, 10));
   if (!process.env.SO_NOVOS) results.push(await probe("C · 6543 com ?sslmode=require, pool 10", cleaned ? `${cleaned}?sslmode=require` : "", 10));
   results.push(await probe("D · 6543 limpa, pool 10, sem pipelining", cleaned, 10, { max_pipeline: 1 }));
   results.push(await probe("E · 5432 atual, pool 5", current, 5));
+  }
   for (const r of results) console.log(JSON.stringify(r));
+  // Quem ocupa as conexões do banco agora (somente leitura).
+  if (current) {
+    const sql = postgres(current, { max: 1, prepare: false, connect_timeout: 10, idle_timeout: 2, onnotice: () => {} });
+    try {
+      const rows = await withTimeout(sql`
+        select coalesce(nullif(application_name, ''), '(sem nome)') as app, usename as usuario, state as estado,
+               count(*)::int as conexoes,
+               coalesce(max(extract(epoch from now() - query_start))::int, 0) as consulta_mais_longa_s
+        from pg_stat_activity
+        where datname = current_database()
+        group by 1, 2, 3
+        order by conexoes desc`, "pg_stat_activity");
+      console.log("== CONEXOES ABERTAS NO BANCO AGORA ==");
+      for (const r of rows) console.log(JSON.stringify(r));
+      const longas = await withTimeout(sql`
+        select coalesce(nullif(application_name, ''), '(sem nome)') as app, state as estado,
+               extract(epoch from now() - query_start)::int as segundos, left(regexp_replace(query, '\s+', ' ', 'g'), 140) as consulta
+        from pg_stat_activity
+        where datname = current_database() and state <> 'idle' and pid <> pg_backend_pid()
+        order by query_start asc nulls last limit 8`, "consultas longas");
+      console.log("== CONSULTAS RODANDO AGORA (mais antigas primeiro) ==");
+      for (const r of longas) console.log(JSON.stringify(r));
+    } catch (error) {
+      console.log("pg_stat_activity indisponível:", String(error && error.message).slice(0, 160));
+    } finally {
+      await sql.end({ timeout: 2 }).catch(() => {});
+    }
+  }
   console.log("FIM: compare login_ms e paralelo_p95_ms; FALHOU/TIMEOUT indica o que derrubou o login.");
 })();
