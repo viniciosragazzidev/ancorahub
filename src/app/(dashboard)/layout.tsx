@@ -102,7 +102,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const pathname = headersList.get("x-pathname") || "";
 
   if (isLightBroker) {
-    const allowedLightPrefixes = ["/dashboard", "/minha-fila", "/plantoes", "/leads", "/clientes", "/conversas", "/l/", "/settings", "/notificacoes", "/primeiro-acesso"];
+    const allowedLightPrefixes = ["/dashboard", "/minha-fila", "/cotacao", "/plantoes", "/leads", "/clientes", "/conversas", "/l/", "/settings", "/notificacoes", "/primeiro-acesso"];
     const isAllowed = allowedLightPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix));
     if (!isAllowed && pathname !== "") {
       redirect("/dashboard");
@@ -150,6 +150,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       <AppShell
         cleanUiEnabled={cleanUiEnabled}
         isLightBroker={isLightBroker}
+        showQuoteSimulator={isLightBroker}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         branding={{
           tenantName: tenant?.name ?? null,
