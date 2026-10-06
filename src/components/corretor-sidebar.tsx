@@ -2,6 +2,7 @@
 
 import {
   Bell,
+  Calculator,
   ChartLineUp,
   ChatCircleText,
   ClipboardText,
@@ -44,6 +45,7 @@ const allBrokerItems: BrokerSidebarItem[] = [
   { label: "Conversas & WhatsApp", icon: ChatCircleText, url: "/conversas", permission: "acessar_conversas" },
   { label: "Meus Leads", icon: ListChecks, url: "/leads", permission: "acessar_leads" },
   { label: "Minha Fila", icon: ListChecks, url: "/minha-fila", permission: "acessar_leads" },
+  { label: "Cotação", icon: Calculator, url: "/cotacao", permission: "acessar_leads" },
   { label: "Documentos", icon: Note, url: "/documentos", permission: "acessar_documentos" },
   { label: "Meu Perfil", icon: UserCircle, url: "/settings?tab=conta", permission: "acessar_configuracoes_pessoais" },
 ];

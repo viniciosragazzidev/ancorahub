@@ -1,3 +1,18 @@
+## 2026-10-06 — Simulador demonstrativo de cotação do Corretor Lite
+
+Papel: Corretor no modo Lite. Objetivo: comparar exemplos de planos para um perfil
+de beneficiários. Ação principal: escolher um plano demonstrativo após comparar
+preço, faixa etária e rede indicada. A disclosure segue seis etapas sem rolagem
+horizontal: perfil, beneficiários, preferências, resultados, comparação e resumo.
+Estados: idade inválida, nenhum resultado pelos filtros, seleção/comparação,
+resumo demonstrativo e prévia visual de lead. Os componentes compartilhados são
+reutilizados; não há token, primitive, dado real, API ou persistência novos.
+Os nomes, valores e redes são exemplos fictícios, separados do catálogo oficial
+da DEC-031; o resumo informa que não é proposta comercial. O QA visual autenticado
+transversal UX-M1.10 continua pendente.
+Registro: docs/implementations/active/2026-10-06-lite-quote-simulator.md.
+
+
 # Controle de Execução do Redesign
 
 ## 2026-10-02 — Inclusão de corretores desativados em plantões

@@ -7,6 +7,7 @@
 - **Beneficiário**: pessoa incluída na contratação de um lead. Todo lead deve ter um titular; dependentes são beneficiários adicionais.
 - **Titular**: beneficiário marcado como responsável principal pela contratação. Há exatamente um titular por lead.
 - **Cotação**: versão histórica e imutável de uma proposta para um lead; seus itens detalham plano, beneficiário e valor calculado.
+- Simulação demonstrativa de cotação: estimativa local, não vinculante e feita com dados fictícios; não consulta o catálogo oficial, não cria uma Cotação e não persiste vínculo com lead.
 - **Catálogo oficial**: base de operadoras, planos, tabelas e versões comerciais mantida pela plataforma. Não pertence a uma corretora e somente o Super-admin pode publicá-la.
 - **Extensão privada de catálogo**: operadora ou plano de acordo exclusivo de uma corretora. Pertence a exatamente um tenant, não é compartilhável e pode ser administrada apenas pelo Diretor desse tenant.
 - **Tabela comercial**: identidade lógica das condições de um plano; não é o preço em si.

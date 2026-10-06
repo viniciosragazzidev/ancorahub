@@ -40,6 +40,7 @@ export function AppShell({
   user,
   isLightBroker = false,
   showDutyCalendar = false,
+  showQuoteSimulator = false,
   initialAvailability = "available",
   cleanUiEnabled = false,
 }: {
@@ -48,6 +49,7 @@ export function AppShell({
   user?: UserInfo;
   isLightBroker?: boolean;
   showDutyCalendar?: boolean;
+  showQuoteSimulator?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
   cleanUiEnabled?: boolean;
 }) {
@@ -138,6 +140,7 @@ export function AppShell({
             branding={branding}
             user={user}
             showDutyCalendar={showDutyCalendar}
+            showQuoteSimulator={showQuoteSimulator}
             initialAvailability={initialAvailability}
           />
           <main ref={canvasRef} className="flex-1 min-h-0 w-full overflow-y-auto">
