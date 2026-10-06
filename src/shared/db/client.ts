@@ -28,10 +28,14 @@ export function connectionLimit() {
   // The CRM is one long-lived Node process on the VPS (Coolify): every user's
   // queries share this pool, so 1–2 sockets queued the whole team behind any
   // heavy page. The transaction pooler (6543) takes 10 safely. The session
-  // pooler (5432) allows 15 clients for the whole project (every app, job and
-  // script): more than 2 here ran it out (EMAXCONNSESSION) and broke /leads.
+  // pooler (5432) allows `pool size` clients for the whole project (every app, job
+  // and script): with the default 15, more than 2 here ran it out (EMAXCONNSESSION)
+  // and broke /leads. Pool size is 30 since 2026-10-06, and a probe inside the app
+  // container measured 4-5 session sockets as safe (30 parallel logins, p95 < 100 ms),
+  // so production uses 4. The transaction pooler hung under load on this project
+  // (scripts/db-pool-probe.cjs), so keep the CRM on 5432 until that is solved.
   if (process.env.NODE_ENV !== "production") return isTransactionPooler() ? 3 : 2;
-  return isTransactionPooler() ? 10 : 2;
+  return isTransactionPooler() ? 10 : 4;
 }
 
 /**

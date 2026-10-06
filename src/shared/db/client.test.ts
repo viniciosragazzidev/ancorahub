@@ -18,7 +18,7 @@ describe("connectionLimit", () => {
     vi.unstubAllEnvs();
   });
 
-  it("gives the single VPS process 10 sockets on the transaction pooler and 2 on the session pooler", () => {
+  it("gives the single VPS process 10 sockets on the transaction pooler and 4 on the session pooler", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("NEXT_PHASE", "");
     vi.stubEnv("DB_POOL_MAX", "");
@@ -27,7 +27,7 @@ describe("connectionLimit", () => {
     expect(connectionLimit()).toBe(10);
 
     vi.stubEnv("DATABASE_URL", "postgresql://u:p@aws-0-sa-east-1.pooler.supabase.com:5432/postgres");
-    expect(connectionLimit()).toBe(2);
+    expect(connectionLimit()).toBe(4);
   });
 
   it("allows an explicit bounded production override", () => {
