@@ -396,8 +396,11 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila configurada pertence a outra unidade%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A origem %'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead anterior a %' then 1 else 0 end`,
-      asc(leadTemperatureRank()),
-      asc(schema.leadDistributionJobs.runAfter),
+      // Temperature with aging: each rank costs 5 minutes of waiting. A strict
+      // rank order starved cold leads: 100+ hot/warm jobs without an eligible
+      // broker are deferred ~2 min and come back due every run, so a cold lead
+      // whose broker was free never got claimed (PME 2026-10-06).
+      sql`${schema.leadDistributionJobs.runAfter} + (${leadTemperatureRank()}) * interval '5 minutes'`,
       asc(schema.leadDistributionJobs.createdAt),
     )
     .limit(1);
