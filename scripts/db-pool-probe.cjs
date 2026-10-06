@@ -41,10 +41,11 @@ function percentile(values, p) {
   return sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))] ?? 0;
 }
 
-async function probe(name, url, max) {
+async function probe(name, url, max, extra = {}) {
   const out = { cenario: name, destino: describe(url), pool: max };
   if (!url) return { ...out, resultado: "SEM URL" };
-  const sql = postgres(url, { max, prepare: false, connect_timeout: 10, idle_timeout: 5, onnotice: () => {} });
+  const sql = postgres(url, { max, prepare: false, connect_timeout: 10, idle_timeout: 5, onnotice: () => {}, ...extra });
+  if (Object.keys(extra).length) out.opcoes = extra;
   const t = async (label, fn) => {
     const start = Date.now();
     await withTimeout(fn(), label);
@@ -91,7 +92,9 @@ async function probe(name, url, max) {
   const results = [];
   results.push(await probe("A · atual (SUPABASE_DB_URL), pool 2", current, 2));
   results.push(await probe("B · 6543 limpa (sem sslmode), pool 10", cleaned, 10));
-  results.push(await probe("C · 6543 com ?sslmode=require, pool 10", cleaned ? `${cleaned}?sslmode=require` : "", 10));
+  if (!process.env.SO_NOVOS) results.push(await probe("C · 6543 com ?sslmode=require, pool 10", cleaned ? `${cleaned}?sslmode=require` : "", 10));
+  results.push(await probe("D · 6543 limpa, pool 10, sem pipelining", cleaned, 10, { max_pipeline: 1 }));
+  results.push(await probe("E · 5432 atual, pool 5", current, 5));
   for (const r of results) console.log(JSON.stringify(r));
   console.log("FIM: compare login_ms e paralelo_p95_ms; FALHOU/TIMEOUT indica o que derrubou o login.");
 })();
