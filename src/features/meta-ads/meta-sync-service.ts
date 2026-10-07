@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
@@ -12,6 +12,24 @@ import { isMetaAdAccountId, isMetaPageId } from "./meta-id-validation";
 import type { MetaSyncWarning } from "./types";
 
 const MISSING_ADS_READ_MESSAGE = "A conexão Meta atual não recebeu leitura da conta de anúncios. Reconecte Marketing com um administrador da conta e conceda ads_read para sincronizar campanhas, anúncios e pixels.";
+const META_RATE_LIMIT_BASE_COOLDOWN_MS = 60 * 60 * 1000;
+const META_RATE_LIMIT_MAX_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const META_SCHEDULED_SYNC_MIN_INTERVAL_MS = 60 * 60 * 1000;
+
+type MetaSyncOptions = { scheduled?: boolean };
+
+function isPersistedMetaRateLimit(errorDetails: string | null) {
+  return typeof errorDetails === "string"
+    && /user request limit reached|request limit reached|rate.?limit/i.test(errorDetails);
+}
+
+function formatBrasiliaTime(date: Date) {
+  return `${new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date)} (horário de Brasília)`;
+}
 
 function uniqueWarnings(warnings: MetaSyncWarning[]) {
   return [...new Map(warnings.map((warning) => [warning.code, warning])).values()];
@@ -36,7 +54,11 @@ function serializeSyncWarnings(warnings: MetaSyncWarning[]) {
   return warnings.length ? JSON.stringify({ warnings }) : null;
 }
 
-export async function runMetaTenantSync(tenantId: string, syncType: "full" | "campaigns" | "forms" = "full"): Promise<{
+export async function runMetaTenantSync(
+  tenantId: string,
+  syncType: "full" | "campaigns" | "forms" = "full",
+  options: MetaSyncOptions = {},
+): Promise<{
   success: boolean;
   itemsSynced: number;
   error?: string;
@@ -45,6 +67,48 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
   const db = getDatabase();
   const startTime = Date.now();
   const syncLogId = randomUUID();
+
+  const recentLogs = await db.select({
+    status: schema.metaSyncLogs.status,
+    errorDetails: schema.metaSyncLogs.errorDetails,
+    startedAt: schema.metaSyncLogs.startedAt,
+    completedAt: schema.metaSyncLogs.completedAt,
+  }).from(schema.metaSyncLogs)
+    .where(eq(schema.metaSyncLogs.tenantId, tenantId))
+    .orderBy(desc(schema.metaSyncLogs.startedAt))
+    .limit(8);
+
+  const consecutiveRateLimitFailures = recentLogs.reduce((count, log, index) => {
+    if (index !== count || log.status !== "error" || !isPersistedMetaRateLimit(log.errorDetails)) return count;
+    return count + 1;
+  }, 0);
+  const latestLog = recentLogs[0];
+  if (consecutiveRateLimitFailures > 0 && latestLog) {
+    const backoffMs = Math.min(
+      META_RATE_LIMIT_MAX_COOLDOWN_MS,
+      META_RATE_LIMIT_BASE_COOLDOWN_MS * (2 ** (consecutiveRateLimitFailures - 1)),
+    );
+    const retryAt = new Date((latestLog.completedAt ?? latestLog.startedAt).getTime() + backoffMs);
+    if (retryAt.getTime() > startTime) {
+      return {
+        success: false,
+        itemsSynced: 0,
+        error: `A Meta limitou as chamadas. Para evitar novas falhas, a sincronização será liberada após ${formatBrasiliaTime(retryAt)}.`,
+      };
+    }
+  }
+
+  if (options.scheduled && latestLog && ["success", "partial"].includes(latestLog.status)) {
+    const lastCompletedAt = latestLog.completedAt ?? latestLog.startedAt;
+    const retryAt = new Date(lastCompletedAt.getTime() + META_SCHEDULED_SYNC_MIN_INTERVAL_MS);
+    if (retryAt.getTime() > startTime) {
+      return {
+        success: false,
+        itemsSynced: 0,
+        error: `A sincronização automática seguinte está prevista após ${formatBrasiliaTime(retryAt)}.`,
+      };
+    }
+  }
 
   await db.insert(schema.metaSyncLogs).values({
     id: syncLogId,
