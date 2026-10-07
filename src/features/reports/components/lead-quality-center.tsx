@@ -409,6 +409,7 @@ export function LeadQualityCenter({ report, showQualityTab = true, queues = [] }
               <PeriodSelect
                 value={report.period}
                 includeToday
+                includeThreeDays
                 label="Período da análise de qualidade"
                 triggerClassName="h-8 rounded-lg border border-border bg-card px-3 text-sm text-foreground hover:bg-muted"
               />

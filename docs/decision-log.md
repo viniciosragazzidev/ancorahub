@@ -1551,3 +1551,84 @@ deterministico), com carga (`receivedInDuty`) e limite
 (`maxLeadsPerBroker`) contados apenas pela ocorrencia representativa - o
 limite segue por ocorrencia. Acoes: auditar, configurar e desativar pelo
 Super-admin permanecem obrigatorios.
+
+## DEC-133 — Transferência manual entre unidades e corretores
+
+**Confirmada pelo usuário em 2026-10-06.** Nas ações manuais de reatribuição
+individual, transferência de carteira na equipe e envio em lote para unidade,
+o Diretor ou Gestor autorizado pode escolher qualquer unidade ativa e apta a
+receber leads dentro do próprio tenant. Para atribuição direta individual, a
+unidade é escolhida antes do corretor; o corretor deve ter vínculo ativo no
+tenant e pertencer à unidade escolhida, mas disponibilidade, pausa, agenda,
+escala, capacidade da fila e rota de campanha não restringem essa ação. A
+atribuição atualizada define `branchId` e a fila padrão ativa da unidade; os
+campos de campanha e origem permanecem como atribuição de aquisição. A
+validação de campanha não roda nessa transferência manual; redistribuições
+automáticas futuras continuam usando as regras normais.
+
+A transferência é permitida durante atendimento iniciado: reinicia contato,
+atendimento e SLA para o novo corretor, encerra tentativas anteriores na mesma
+transação e preserva o histórico e a timeline. Todas as rotas mantêm a
+autorização do ator, o isolamento por tenant, os registros de auditoria e o
+controle reversível pelo Super-admin em
+`feature_lead_management_actions_enabled`. Unidades pausadas/inativas,
+corretores desativados e membros de outro tenant não são destinos válidos.
+
+**Isenção total da fila Pós Venda (confirmada pelo usuário em 2026-10-06, via
+grilling; complementa esta DEC).** Leads ligados à fila "Pós Venda" — como
+origem OU como destino — não têm nenhum bloqueio de negócio na transferência
+manual entre unidades e corretores: a rota de campanha (fim do erro "Bloqueio
+de Regra: A campanha ... está vinculada exclusivamente a outra fila"), a
+disponibilidade/pausa do corretor, a exigência de unidade ativa/aceitando
+leads e o estado do atendimento iniciado deixam de bloquear. A fila é
+reconhecida pelo nome normalizado ("Pós Venda" sem caixa, acentos ou hífens;
+não por id, sem valor de negócio fixado no código além do próprio nome
+aprovado). Permanecem as salvaguardas de identidade: membro com vínculo ativo
+no tenant, conta ativa, autorização do ator (gestor segue no escopo da própria
+unidade) e Central de redistribuição exclusiva do Diretor. Cada transferência
+isenta registra auditoria `lead.post_sale_transfer:<fila>` e evento de
+distribuição com escopo `post_sale_transfer_exemption`. Por decisão
+explícita do usuário, a isenção é permanente no código sem chave de
+Super-admin; o controle global `feature_lead_management_actions_enabled`
+continua governando as ações de gestão. Transferências que não envolvem a
+Pós Venda seguem exatamente as regras desta DEC.
+
+## DEC-134 — Herança da elegibilidade de captura Meta pela campanha
+
+**Confirmada pelo usuário em 2026-10-06.** Ativar a captura de uma campanha
+autoriza os leads atribuídos à campanha e aos seus anúncios/formulários filhos
+pela atribuição recebida no webhook. Essa herança é avaliada por campanha no
+intake e não cria uma ativação global própria para um formulário que possa ser
+compartilhado por outras campanhas. Regras específicas de fila continuam
+resolvendo o destino. Elegibilidade do CRM e status de veiculação informado pela
+Meta são estados distintos; ativar captura no CRM nunca liga/desliga a campanha
+na Meta.
+
+## DEC-135 — Configuração e fila Meta centralizadas na campanha
+
+**Confirmada pelo usuário em 2026-10-07.** Cada campanha é o único local para
+ativar/pausar captura no CRM e escolher a fila de destino. Os anúncios e
+formulários atribuídos a ela herdam a fila automaticamente no intake; regras
+por anúncio ou formulário não substituem nem desviam a rota da campanha. Um
+formulário compartilhado segue a campanha informada pela atribuição daquele
+lead, sem configuração global que afete outras campanhas. A campanha só pode
+capturar quando sua fila pertence ao mesmo tenant e está ativa. Campanha sem
+rota, com captura pausada ou fila ausente/inativa é ignorada, nunca inserida
+sem fila nem enviada à distribuição geral como fallback. O modo global Meta é
+apenas o controle de segurança do tenant (liberar ou pausar intake), sem criar
+regras de captura em lote para campanhas, anúncios ou formulários. Telas de
+campanhas e filas fora do detalhe mostram estado e link para a configuração
+canônica; integração Meta mantém conexão e sincronização. Toda alteração
+mantém tenant scoping e auditoria, e o controle global segue reversível pelo
+Super-admin.
+
+## DEC-136 — Fila padrão por conta de anúncios Meta
+
+**Confirmada pelo usuário em 2026-10-07.** A conta de anúncios Meta `CA1 -
+Ancora Corretora` usa `FILA TATIANA` como destino padrão. Campanhas já
+sincronizadas da conta são alinhadas a essa fila; novas campanhas herdam o
+destino quando sincronizadas. Uma rota explícita por campanha continua sendo a
+configuração específica, e campanhas pausadas no CRM permanecem pausadas.
+Intake, sincronização e associação de leads são isolados pelo tenant e cada
+alteração de destino registra auditoria. O padrão da conta pode ser alterado
+ou removido por configuração autorizada.

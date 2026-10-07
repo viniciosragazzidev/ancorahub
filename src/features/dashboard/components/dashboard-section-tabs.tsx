@@ -15,7 +15,7 @@ export function DashboardSectionTabs({
 }: {
   active: "overview" | "quality";
   /** "today" exists only on the quality tab; the overview falls back to its default. */
-  period: PeriodValue | "today";
+  period: PeriodValue | 3 | "today";
   showQuality?: boolean;
 }) {
   const tabs = showQuality ? dashboardTabs : dashboardTabs.slice(0, 1);

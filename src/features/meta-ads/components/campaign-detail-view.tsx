@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppSelect } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrency } from "@/features/quotes/utils";
 import { saveMetaCampaignQueueRouteAction } from "@/features/lead-distribution/actions";
@@ -24,19 +25,36 @@ export type CampaignAdItem = {
   activeLeadsCount?: number;
 };
 
+export type CampaignFormItem = {
+  id: string;
+  formId: string;
+  name: string;
+  status: string;
+  locale: string | null;
+};
+
 export function CampaignDetailView({
   campaign,
   ads = [],
+  forms = [],
   queues = [],
   initialQueueId = null,
+  initialCaptureEnabled = false,
+  canConfigureCapture = false,
+  canDisableCapture = false,
 }: {
   campaign: MetaCampaignItem;
   ads?: CampaignAdItem[];
+  forms?: CampaignFormItem[];
   queues?: Array<{ id: string; name: string; branchName?: string | null }>;
   initialQueueId?: string | null;
+  initialCaptureEnabled?: boolean;
+  canConfigureCapture?: boolean;
+  canDisableCapture?: boolean;
 }) {
   const router = useRouter();
   const [selectedQueueId, setSelectedQueueId] = useState<string>(initialQueueId ?? "");
+  const [captureEnabled, setCaptureEnabled] = useState(initialCaptureEnabled);
   const [isSaving, setIsSaving] = useState(false);
 
   const leadsCount = campaign.leadsCount || 0;
@@ -46,7 +64,7 @@ export function CampaignDetailView({
   const conversionRate = campaign.conversionRate || 0;
 
   const sortedAds = useMemo(() => {
-    const visible = ads.filter((ad) => ad.status.trim().toUpperCase() === "ACTIVE" || (ad.activeLeadsCount || 0) > 0);
+    const visible = [...ads];
     return visible.sort((a, b) => {
       const aActive = a.status === "ACTIVE" || a.status === "active";
       const bActive = b.status === "ACTIVE" || b.status === "active";
@@ -62,7 +80,7 @@ export function CampaignDetailView({
       const res = await saveMetaCampaignQueueRouteAction({
         campaignId: campaign.campaignId,
         queueId: selectedQueueId || null,
-        enabled: true,
+        enabled: captureEnabled,
       });
       if (res.success) {
         toast.success(res.message || "Fila de distribuição salva com sucesso!");
@@ -92,7 +110,7 @@ export function CampaignDetailView({
         <div>
           <div className="flex items-center gap-2">
             <Badge variant={campaign.status === "ACTIVE" || campaign.status === "active" ? "success" : "outline"} className="text-[10px]">
-            {campaign.status === "ACTIVE" || campaign.status === "active" ? "Ativa" : "Pausada"}
+              {campaign.status.trim().toUpperCase() === "ACTIVE" ? "Veiculação ativa na Meta" : `Veiculação Meta: ${campaign.status}`}
             </Badge>
             <span className="font-mono text-xs text-muted-foreground">ID: {campaign.campaignId}</span>
           </div>
@@ -124,11 +142,29 @@ export function CampaignDetailView({
           </div>
         </CardHeader>
         <CardContent className="p-4">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/70 bg-muted/20 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="size-4 text-primary" />
+              <div>
+                <p className="text-xs font-semibold text-foreground">Captura no CRM</p>
+                <p className="text-[11px] text-muted-foreground">Anúncios e formulários desta campanha herdam esta configuração.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{captureEnabled ? "Ativa" : "Pausada"}</span>
+              <Switch
+                checked={captureEnabled}
+                disabled={!canConfigureCapture || isSaving || (captureEnabled && !canDisableCapture)}
+                onCheckedChange={setCaptureEnabled}
+                aria-label={captureEnabled ? "Pausar captura da campanha" : "Ativar captura da campanha"}
+              />
+            </div>
+          </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex-1 space-y-1">
               <label className="text-xs font-semibold text-foreground">Fila Alvo para Envios de Leads</label>
               <p className="text-[11px] text-muted-foreground">
-                Como padrão, selecionada a Fila Geral (todas as unidades e corretores elegíveis).
+                A fila é obrigatória para ativar a captura. A atribuição da Meta permanece separada da fila de distribuição.
               </p>
             </div>
             <div className="flex items-center gap-2 sm:w-[420px]">
@@ -138,21 +174,22 @@ export function CampaignDetailView({
                 triggerClassName="h-9 w-full rounded-lg border-border/60 bg-card px-3 text-xs font-medium shadow-xs"
                 onValueChange={(val) => setSelectedQueueId(val)}
                 options={[
-                  { value: "", label: "Fila Geral (Todas as Unidades e Corretores)" },
+                  { value: "", label: "Sem fila (captura pausada)" },
                   ...queues.map((q) => ({
                     value: q.id,
                     label: `${q.name}${q.branchName ? ` (${q.branchName})` : ""}`,
                   })),
                 ]}
                 value={selectedQueueId}
+                disabled={!canConfigureCapture || isSaving}
               />
               <Button
                 size="sm"
                 onClick={handleSaveQueue}
-                disabled={isSaving}
+                disabled={!canConfigureCapture || isSaving || (captureEnabled && !selectedQueueId)}
                 className="h-9 px-4 text-xs font-semibold shrink-0"
               >
-                {isSaving ? "Salvando..." : "Salvar Fila"}
+                {isSaving ? "Salvando..." : "Salvar configuração"}
               </Button>
             </div>
           </div>
@@ -250,6 +287,40 @@ export function CampaignDetailView({
               )}
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      {/* Formulários efetivamente atribuídos a campanhas por leads recebidos. */}
+      <Card className="rounded-2xl border-border/70 shadow-none">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 border-b border-border/50 p-3.5 sm:px-4">
+          <div>
+            <CardTitle className="text-base font-bold">Formulários da Campanha ({forms.length})</CardTitle>
+            <CardDescription className="text-xs">
+              Formulários identificados pela atribuição dos leads desta campanha; todos herdam a fila configurada acima.
+            </CardDescription>
+          </div>
+          <Badge variant="outline" className="text-[10px]">Herança da campanha</Badge>
+        </CardHeader>
+        <CardContent className="p-0">
+          {forms.length ? (
+            <ul className="divide-y divide-border/60">
+              {forms.map((form) => (
+                <li key={form.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{form.name}</p>
+                    <p className="truncate font-mono text-[11px] text-muted-foreground">ID: {form.formId}{form.locale ? ` · ${form.locale}` : ""}</p>
+                  </div>
+                  <Badge variant={form.status.toUpperCase() === "ACTIVE" ? "success" : "outline"} className="text-[10px]">
+                    {form.status.toUpperCase() === "ACTIVE" ? "Ativo" : form.status.toUpperCase() === "UNKNOWN" ? "Status não sincronizado" : "Pausado"}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="px-4 py-8 text-center text-xs text-muted-foreground">
+              Nenhum formulário foi identificado nos anúncios sincronizados ou nos leads atribuídos a esta campanha. Formulários compartilhados seguem a atribuição enviada pela Meta.
+            </p>
+          )}
         </CardContent>
       </Card>
 

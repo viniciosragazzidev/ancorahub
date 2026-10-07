@@ -283,13 +283,13 @@ export async function createLeadOffersForBrokers(input: {
         // lead appears in the wallet and can be accepted. The source remains
         // `automatic_offer`, allowing decline/expiration to release or rotate
         // this link without treating it as confirmed attendance.
-        await tx.update(schema.leads).set(buildPendingLeadOfferLeadUpdate({
+        await tx.update(schema.leads).set({ ...buildPendingLeadOfferLeadUpdate({
           targetBranchId: input.targetBranchId,
           brokerId: broker.id,
           now,
           assignmentSource: input.assignmentSource,
           dutyScheduleId: input.dutyScheduleIdByBroker?.[broker.id] ?? null,
-        })).where(and(
+        }), queueId: input.queueId ?? null }).where(and(
           eq(schema.leads.id, input.leadId),
           eq(schema.leads.tenantId, input.tenantId),
           // A concurrent manual assignment or offer acceptance must not be

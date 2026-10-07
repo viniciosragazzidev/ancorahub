@@ -12,6 +12,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { findBranchDefaultQueueName, isPostSaleQueueName } from "@/features/lead-distribution/post-sale-transfer";
 
 export type StatusChangeState = {
   success?: boolean;
@@ -51,6 +53,12 @@ export async function bulkReassignLeadsAction(
     if (context.role !== "director" && context.role !== "manager") {
       return { mutationId, error: "Apenas diretores e gestores podem reatribuir leads." };
     }
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
+    const [targetBroker] = await getDatabase().select({ branchId: schema.tenantMemberships.branchId })
+      .from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
+    if (!targetBroker?.branchId) return { mutationId, error: "O corretor de destino não está ativo em uma unidade." };
+    if (context.role === "manager" && targetBroker.branchId !== context.branchId) return { mutationId, error: "O corretor de destino está fora da unidade autorizada." };
 
     const source = context.role === "director" ? "manual_director" : "manual_manager";
     let successCount = 0;
@@ -69,7 +77,10 @@ export async function bulkReassignLeadsAction(
           leadId,
           brokerId,
           source,
-          "Reatribuição em lote",
+          "Transferência manual em lote entre unidades e corretores",
+          undefined,
+          targetBroker.branchId,
+          { manualTransferOverride: true },
         );
         if (result.status === "assigned") {
           successCount++;
@@ -93,7 +104,7 @@ export async function bulkReassignLeadsAction(
       void publishLeadInvalidation({
         tenantId: context.tenantId,
         actorId: context.userId,
-        branchIds: changedLeads.map((lead) => lead.branchId),
+        branchIds: [...changedLeads.map((lead) => lead.branchId), targetBroker.branchId],
         brokerIds: [brokerId, ...changedLeads.map((lead) => lead.corretorId)],
       }).catch(() => undefined);
 
@@ -289,19 +300,31 @@ export async function bulkReassignBranchAction(
     if (context.role !== "director" && context.role !== "manager") {
       return { mutationId, error: "Apenas diretores e gestores podem transferir leads de unidade." };
     }
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
 
     const db = getDatabase();
     const branches = await db.select({ id: schema.branches.id, acceptingLeads: schema.branches.acceptingLeads, status: schema.branches.status })
       .from(schema.branches)
       .where(and(eq(schema.branches.tenantId, context.tenantId), inArray(schema.branches.id, branchIds)));
-    if (branches.length !== new Set(branchIds).size || branches.some((branch) => branch.status !== "active" || !branch.acceptingLeads)) {
+    if (branches.length !== new Set(branchIds).size) {
+      return { mutationId, error: "Selecione apenas unidades ativas e aptas a receber leads." };
+    }
+    // DEC-133 (Pós Venda): com a Pós Venda entre as unidades de destino, a
+    // isenção dispensa a exigência de unidade ativa/aceitando leads no lote;
+    // unidades inexistentes/fora do tenant continuam inválidas (peek sem criar fila).
+    const postSaleBranchIds = new Set(
+      (await Promise.all(branchIds.map(async (branchId) => ({ branchId, queueName: await findBranchDefaultQueueName(context.tenantId, branchId) }))))
+        .filter(({ queueName }) => isPostSaleQueueName(queueName))
+        .map(({ branchId }) => branchId),
+    );
+    if (!branchIds.every((branchId) => postSaleBranchIds.has(branchId)) && branches.some((branch) => branch.status !== "active" || !branch.acceptingLeads)) {
       return { mutationId, error: "Selecione apenas unidades ativas e aptas a receber leads." };
     }
 
     const changedLeadIds: string[] = [];
     for (let index = 0; index < leadIds.length; index += 1) {
       const targetBranchId = branchIds[index % branchIds.length];
-      const result = await routeLeadToBranch(context, leadIds[index], targetBranchId, "Distribuição manual por unidade");
+      const result = await routeLeadToBranch(context, leadIds[index], targetBranchId, "Distribuição manual por unidade", true);
       if (result.status === "routed") {
         changedLeadIds.push(leadIds[index]);
         await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: leadIds[index] });

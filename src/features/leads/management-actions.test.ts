@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => {
   const schema = {
     leads: { id: "leads.id", nome: "leads.nome", tenantId: "leads.tenantId", branchId: "leads.branchId", status: "leads.status", corretorId: "leads.corretorId", distributionStatus: "leads.distributionStatus", firstContactAt: "leads.firstContactAt", serviceStartedAt: "leads.serviceStartedAt", archivedAt: "leads.archivedAt", deletedAt: "leads.deletedAt", queueId: "leads.queueId" },
+    branches: { id: "branches.id", tenantId: "branches.tenantId", status: "branches.status", acceptingLeads: "branches.acceptingLeads", isDistributionHub: "branches.isDistributionHub" },
     leadOffers: { tenantId: "offers.tenantId", leadId: "offers.leadId", brokerId: "offers.brokerId", outboundMessageId: "offers.outboundMessageId", status: "offers.status" },
     whatsappOutboundMessages: { tenantId: "outbound.tenantId", id: "outbound.id", status: "outbound.status" },
     leadAssignmentAttempts: { tenantId: "attempts.tenantId", leadId: "attempts.leadId", brokerId: "attempts.brokerId", status: "attempts.status" },
@@ -34,9 +35,10 @@ const state = vi.hoisted(() => {
   const db = {
     select: vi.fn(() => ({
       from: vi.fn((table: unknown) => ({
-        innerJoin: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000003", branchId: "branch-test" }]) })) })),
+        innerJoin: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000003", branchId: "00000000-0000-4000-8000-000000000004" }]) })) })),
         where: vi.fn(() => table === schema.leads
           ? { limit: vi.fn(async () => [{ ...lead }]) }
+          : table === schema.branches ? { limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000004", status: "active", acceptingLeads: true, isDistributionHub: false }]) }
           : table === schema.tenants ? { limit: vi.fn(async () => [{ feedbackRequiredEnabled: true, slaFirstContactMinutes: "15", feedbackGraceMinutes: "5" }]) } : Promise.resolve([{ outboundMessageId: "outbound-test" }]),
         ),
       })),
@@ -90,7 +92,7 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: vi.fn(async () => state.controls.enabled ? "true" : "false") }));
 vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ getActiveQueueDutyRoster: vi.fn(async () => ({ hasActiveDuty: false, brokers: [] })) }));
-vi.mock("@/features/lead-distribution/service", () => ({ offerLeadToBrokerManually: vi.fn() }));
+vi.mock("@/features/lead-distribution/service", () => ({ ensureDefaultQueue: vi.fn(async (_tenantId: string, branchId: string) => `queue-${branchId}`), offerLeadToBrokerManually: vi.fn(), routeLeadToBranch: vi.fn() }));
 vi.mock("@/features/lead-distribution/jobs", () => ({ enqueueAndProcessLeadDistribution: vi.fn(), enqueueLeadDistributionJob: vi.fn() }));
 
 import { removeLeadAssignmentAction, reassignLeadAction } from "./management-actions";
@@ -160,18 +162,19 @@ describe("manual service reassignment", () => {
   function reassignmentForm() {
     const data = formData();
     data.set("brokerId", "00000000-0000-4000-8000-000000000003");
+    data.set("branchId", "00000000-0000-4000-8000-000000000004");
     return data;
   }
   it.each(["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"])("restarts %s and preserves the previous service in history", async (status) => {
     state.lead.status = status;
     const result = await reassignLeadAction({}, reassignmentForm());
     expect(result).toMatchObject({ success: true, entity: { status: "distributed", distributionStatus: "assigned", corretorId: "00000000-0000-4000-8000-000000000003" } });
-    expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null, assignedAt: expect.any(Date), stageEnteredAt: expect.any(Date) });
+    expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ branchId: "00000000-0000-4000-8000-000000000004", queueId: "queue-00000000-0000-4000-8000-000000000004", firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null, assignedAt: expect.any(Date), stageEnteredAt: expect.any(Date) });
     expect(state.updates.find(u => u.table === state.schema.leadAssignmentAttempts)?.values).toMatchObject({ status: "released" });
     const attempt = state.inserts.find(i => i.table === state.schema.leadAssignmentAttempts)?.values;
     expect(attempt).toMatchObject({ status: "open", brokerId: "00000000-0000-4000-8000-000000000003" });
     expect((attempt!.feedbackDueAt as Date).getTime() - (attempt!.assignedAt as Date).getTime()).toBe(20 * 60_000);
-    expect(state.inserts.find(i => i.table === state.schema.leadDistributionEvents)?.values).toMatchObject({ previousOwnerId: state.lead.corretorId, newOwnerId: "00000000-0000-4000-8000-000000000003", metadata: { previousStatus: status, previousFirstContactAt: "2026-09-25T10:00:00.000Z", previousServiceStartedAt: "2026-09-25T10:00:00.000Z", serviceRestarted: true } });
+    expect(state.inserts.find(i => i.table === state.schema.leadDistributionEvents)?.values).toMatchObject({ previousOwnerId: state.lead.corretorId, newOwnerId: "00000000-0000-4000-8000-000000000003", toBranchId: "00000000-0000-4000-8000-000000000004", toQueueId: "queue-00000000-0000-4000-8000-000000000004", metadata: { assignmentScope: "manual_cross_unit_override", previousStatus: status, previousFirstContactAt: "2026-09-25T10:00:00.000Z", previousServiceStartedAt: "2026-09-25T10:00:00.000Z", serviceRestarted: true } });
     expect(state.inserts.some(i => i.table === state.schema.leadInteractions)).toBe(true);
     expect(state.inserts.some(i => i.table === state.schema.auditLogs)).toBe(true);
     expect(state.updates.every(u => u.table === state.schema.leads || u.table === state.schema.leadAssignmentAttempts)).toBe(true);

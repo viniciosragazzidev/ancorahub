@@ -1767,6 +1767,8 @@ export const metaAdAccounts = pgTable(
     connectionId: text("connection_id").notNull().references(() => metaConnections.id, { onDelete: "cascade" }),
     adAccountId: text("ad_account_id").notNull(),
     name: text("name").notNull(),
+    /** Default lead destination inherited by campaigns synced from this ad account. */
+    defaultQueueId: text("default_queue_id").references(() => leadQueues.id, { onDelete: "set null" }),
     currency: text("currency").notNull().default("BRL"),
     accountStatus: integer("account_status").notNull().default(1),
     status: text("status").notNull().default("active"),
@@ -1919,6 +1921,7 @@ export const metaAds = pgTable(
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     adSetId: text("ad_set_id").notNull(),
     adId: text("ad_id").notNull(),
+    leadGenFormId: text("lead_gen_form_id"),
     name: text("name").notNull(),
     status: text("status").notNull().default("PAUSED"),
     createdAt,

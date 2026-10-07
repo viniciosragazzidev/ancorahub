@@ -190,6 +190,7 @@ export class MetaGraphClient {
     name: string;
     objective?: string;
     status?: string;
+    effective_status?: string;
     daily_budget?: string;
     lifetime_budget?: string;
     start_time?: string;
@@ -198,10 +199,55 @@ export class MetaGraphClient {
     this.assertMetaObjectId(adAccountId, "conta de anuncios", isMetaAdAccountId);
     const formattedAccountId = normalizeMetaAdAccountId(adAccountId);
     return this.fetchAllPages<{
-      id: string; name: string; objective?: string; status?: string; daily_budget?: string; lifetime_budget?: string; start_time?: string; stop_time?: string;
+      id: string; name: string; objective?: string; status?: string; effective_status?: string; daily_budget?: string; lifetime_budget?: string; start_time?: string; stop_time?: string;
     }>(`/${formattedAccountId}/campaigns`, {
-      fields: "id,name,objective,status,daily_budget,lifetime_budget,start_time,stop_time",
+      fields: "id,name,objective,status,effective_status,daily_budget,lifetime_budget,start_time,stop_time",
     });
+  }
+
+  /** Busca todos os conjuntos da conta em uma paginação, incluindo a campanha-pai. */
+  async fetchAdSetsForAccount(adAccountId: string): Promise<Array<{
+    id: string;
+    name: string;
+    status?: string;
+    targeting?: Record<string, unknown>;
+    campaign_id?: string;
+  }>> {
+    this.assertMetaObjectId(adAccountId, "conta de anuncios", isMetaAdAccountId);
+    const formattedAccountId = normalizeMetaAdAccountId(adAccountId);
+    return this.fetchAllPages<{
+      id: string; name: string; status?: string; targeting?: Record<string, unknown>; campaign_id?: string;
+    }>(`/${formattedAccountId}/adsets`, {
+      fields: "id,name,status,targeting,campaign_id",
+    });
+  }
+
+  /** Busca todos os anúncios da conta em uma paginação, incluindo os vínculos pai. */
+  async fetchAdsForAccount(adAccountId: string): Promise<Array<{
+    id: string;
+    name: string;
+    status?: string;
+    adset_id?: string;
+    campaign_id?: string;
+    creative?: { object_story_spec?: unknown };
+  }>> {
+    this.assertMetaObjectId(adAccountId, "conta de anuncios", isMetaAdAccountId);
+    const formattedAccountId = normalizeMetaAdAccountId(adAccountId);
+    const fields = "id,name,status,adset_id,campaign_id,creative{object_story_spec}";
+    try {
+      return await this.fetchAllPages<{
+        id: string; name: string; status?: string; adset_id?: string; campaign_id?: string; creative?: { object_story_spec?: unknown };
+      }>(`/${formattedAccountId}/ads`, { fields });
+    } catch (error) {
+      // Some Meta permissions/API versions reject creative expansion. Keep the
+      // existing ad sync working and leave form linkage to captured attribution.
+      if (isMetaRateLimitError(error)) throw error;
+      return this.fetchAllPages<{
+        id: string; name: string; status?: string; adset_id?: string; campaign_id?: string; creative?: { object_story_spec?: unknown };
+      }>(`/${formattedAccountId}/ads`, {
+        fields: "id,name,status,adset_id,campaign_id",
+      });
+    }
   }
 
   /** Busca conjuntos de anúncios (AdSets) paginados de uma campanha */

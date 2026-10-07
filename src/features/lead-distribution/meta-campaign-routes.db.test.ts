@@ -60,11 +60,11 @@ describe.skipIf(!enabled)("campaign route with its ads (rolled back)", () => {
 
       const { saveMetaCampaignQueueRoute } = await import("./control-service");
       const kept = await saveMetaCampaignQueueRoute(context, { campaignId: pick.campaignId, queueId: queue.id, enabled: true });
-      expect(kept.adsBrought).toBe(0);
-      expect(await ownRules()).toBeGreaterThan(0);
+      expect(kept.adsBrought).toBeGreaterThan(0);
+      expect(await ownRules()).toBe(0);
 
       const brought = await saveMetaCampaignQueueRoute(context, { campaignId: pick.campaignId, queueId: queue.id, enabled: true, includeAds: true });
-      expect(brought.adsBrought).toBeGreaterThan(0);
+      expect(brought.adsBrought).toBe(0);
       expect(await ownRules()).toBe(0);
 
       // Choosing another queue moves the campaign (it used to be refused) and the move is audited.

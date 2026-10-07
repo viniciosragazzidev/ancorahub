@@ -17,6 +17,21 @@ function uniqueWarnings(warnings: MetaSyncWarning[]) {
   return [...new Map(warnings.map((warning) => [warning.code, warning])).values()];
 }
 
+function readLeadGenFormId(creative: { object_story_spec?: unknown } | undefined): string | null {
+  const pending: Array<{ value: unknown; depth: number }> = [{ value: creative?.object_story_spec, depth: 0 }];
+  while (pending.length) {
+    const current = pending.pop()!;
+    if (!current.value || typeof current.value !== "object" || current.depth > 8) continue;
+    for (const [key, value] of Object.entries(current.value)) {
+      if ((key === "lead_gen_form_id" || key === "lead_form_id") && (typeof value === "string" || typeof value === "number")) {
+        return String(value);
+      }
+      if (value && typeof value === "object") pending.push({ value, depth: current.depth + 1 });
+    }
+  }
+  return null;
+}
+
 function serializeSyncWarnings(warnings: MetaSyncWarning[]) {
   return warnings.length ? JSON.stringify({ warnings }) : null;
 }
@@ -75,6 +90,10 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
 
     const adAccounts = await db.select().from(schema.metaAdAccounts)
       .where(and(eq(schema.metaAdAccounts.tenantId, tenantId), eq(schema.metaAdAccounts.status, "active")));
+    const activeQueueIds = new Set((await db.select({ id: schema.leadQueues.id })
+      .from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.tenantId, tenantId), eq(schema.leadQueues.status, "active"))))
+      .map((queue) => queue.id));
 
     const validAdAccounts = [] as typeof adAccounts;
     for (const account of adAccounts) {
@@ -108,7 +127,9 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     for (const account of canReadAds ? validAdAccounts : []) {
       try {
         const remoteCampaigns = await client.fetchCampaigns(account.adAccountId);
+        const remoteCampaignIds = new Set(remoteCampaigns.map((campaign) => campaign.id));
         for (const campaign of remoteCampaigns) {
+          const deliveryStatus = campaign.effective_status || campaign.status || "PAUSED";
           await db.insert(schema.metaCampaigns).values({
             id: randomUUID(),
             tenantId,
@@ -116,7 +137,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
             campaignId: campaign.id,
             name: campaign.name,
             objective: campaign.objective || null,
-            status: campaign.status || "PAUSED",
+            status: deliveryStatus,
             dailyBudget: campaign.daily_budget ? parseInt(campaign.daily_budget, 10) : null,
             lifetimeBudget: campaign.lifetime_budget ? parseInt(campaign.lifetime_budget, 10) : null,
             startTime: campaign.start_time ? new Date(campaign.start_time) : null,
@@ -129,45 +150,72 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
               adAccountId: account.adAccountId,
               name: campaign.name,
               objective: campaign.objective || null,
-              status: campaign.status || "PAUSED",
+              status: deliveryStatus,
               dailyBudget: campaign.daily_budget ? parseInt(campaign.daily_budget, 10) : null,
               lifetimeBudget: campaign.lifetime_budget ? parseInt(campaign.lifetime_budget, 10) : null,
               updatedAt: now,
             },
           });
+          if (account.defaultQueueId && activeQueueIds.has(account.defaultQueueId)) {
+            await db.insert(schema.metaCampaignQueueRoutes).values({
+              id: randomUUID(),
+              tenantId,
+              campaignId: campaign.id,
+              queueId: account.defaultQueueId,
+              enabled: true,
+              createdAt: now,
+              updatedAt: now,
+            }).onConflictDoNothing();
+          }
           totalSynced++;
+        }
 
+        const adSetIds = new Set<string>();
+        try {
+          const adSets = await client.fetchAdSetsForAccount(account.adAccountId);
+          for (const adSet of adSets) {
+            const campaignId = adSet.campaign_id;
+            if (!campaignId || !remoteCampaignIds.has(campaignId)) continue;
+            adSetIds.add(adSet.id);
+            await db.insert(schema.metaAdSets).values({
+              id: randomUUID(), tenantId, campaignId, adSetId: adSet.id,
+              name: adSet.name, status: adSet.status || "PAUSED", targeting: adSet.targeting || null,
+              createdAt: now, updatedAt: now,
+            }).onConflictDoUpdate({
+              target: [schema.metaAdSets.tenantId, schema.metaAdSets.adSetId],
+              set: { campaignId, name: adSet.name, status: adSet.status || "PAUSED", targeting: adSet.targeting || null, updatedAt: now },
+            });
+          }
+        } catch (adSetError) {
+          if (isMetaRateLimitError(adSetError)) throw adSetError;
+          console.error(`[meta-sync] Warning fetching adSets for account ${account.adAccountId}:`, adSetError);
+          warnings.push({
+            code: "asset_access_limited",
+            message: `Não foi possível sincronizar os conjuntos de anúncios da conta ${account.name || account.adAccountId}. ${adSetError instanceof Error ? adSetError.message : "Erro na API da Meta."}`,
+          });
+        }
+
+        if (adSetIds.size) {
           try {
-            const adSets = await client.fetchAdSets(campaign.id);
-            for (const adSet of adSets) {
-              await db.insert(schema.metaAdSets).values({
-                id: randomUUID(), tenantId, campaignId: campaign.id, adSetId: adSet.id,
-                name: adSet.name, status: adSet.status || "PAUSED", targeting: adSet.targeting || null,
-                createdAt: now, updatedAt: now,
+            const ads = await client.fetchAdsForAccount(account.adAccountId);
+            for (const ad of ads) {
+              if (!ad.adset_id || !adSetIds.has(ad.adset_id)) continue;
+              const leadGenFormId = readLeadGenFormId(ad.creative);
+              await db.insert(schema.metaAds).values({
+                id: randomUUID(), tenantId, adSetId: ad.adset_id, adId: ad.id, leadGenFormId,
+                name: ad.name, status: ad.status || "PAUSED", createdAt: now, updatedAt: now,
               }).onConflictDoUpdate({
-                target: [schema.metaAdSets.tenantId, schema.metaAdSets.adSetId],
-                set: { name: adSet.name, status: adSet.status || "PAUSED", updatedAt: now },
+                target: [schema.metaAds.tenantId, schema.metaAds.adId],
+                set: { adSetId: ad.adset_id, ...(leadGenFormId ? { leadGenFormId } : {}), name: ad.name, status: ad.status || "PAUSED", updatedAt: now },
               });
-
-              try {
-                const ads = await client.fetchAds(adSet.id);
-                for (const ad of ads) {
-                  await db.insert(schema.metaAds).values({
-                    id: randomUUID(), tenantId, adSetId: adSet.id, adId: ad.id,
-                    name: ad.name, status: ad.status || "PAUSED", createdAt: now, updatedAt: now,
-                  }).onConflictDoUpdate({
-                    target: [schema.metaAds.tenantId, schema.metaAds.adId],
-                    set: { name: ad.name, status: ad.status || "PAUSED", updatedAt: now },
-                  });
-                }
-              } catch (adError) {
-                if (isMetaRateLimitError(adError)) throw adError;
-                console.error(`[meta-sync] Warning fetching ads for adSet ${adSet.id}:`, adError);
-              }
             }
-          } catch (adSetError) {
-            if (isMetaRateLimitError(adSetError)) throw adSetError;
-            console.error(`[meta-sync] Warning fetching adSets for campaign ${campaign.id}:`, adSetError);
+          } catch (adError) {
+            if (isMetaRateLimitError(adError)) throw adError;
+            console.error(`[meta-sync] Warning fetching ads for account ${account.adAccountId}:`, adError);
+            warnings.push({
+              code: "asset_access_limited",
+              message: `Não foi possível sincronizar os anúncios da conta ${account.name || account.adAccountId}. ${adError instanceof Error ? adError.message : "Erro na API da Meta."}`,
+            });
           }
         }
 

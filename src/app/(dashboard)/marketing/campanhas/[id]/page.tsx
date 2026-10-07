@@ -62,7 +62,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
   }
 
   // Fetch active distribution queues, campaign route, and ad sets/ads for this campaign
-  const [queues, currentRoutes, adSets, adLeadCounts] = await Promise.all([
+  const [queues, currentRoutes, adSets, adLeadCounts, accountDefaults] = await Promise.all([
     db
       .select({
         id: schema.leadQueues.id,
@@ -74,6 +74,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
       .where(and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))),
     db
       .select({
+        campaignId: schema.metaCampaignQueueRoutes.campaignId,
         queueId: schema.metaCampaignQueueRoutes.queueId,
         enabled: schema.metaCampaignQueueRoutes.enabled,
       })
@@ -81,10 +82,10 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
       .where(
         and(
           eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId),
-          eq(schema.metaCampaignQueueRoutes.campaignId, campaign.campaignId),
+          inArray(schema.metaCampaignQueueRoutes.campaignId, [campaign.campaignId, campaign.id]),
         ),
       )
-      .limit(1),
+      .limit(2),
     db
       .select({ adSetId: schema.metaAdSets.adSetId })
       .from(schema.metaAdSets)
@@ -104,6 +105,18 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
         ),
       )
       .groupBy(schema.leads.metaAdId),
+    db
+      .select({ queueId: schema.metaAdAccounts.defaultQueueId, queueStatus: schema.leadQueues.status })
+      .from(schema.metaAdAccounts)
+      .leftJoin(schema.leadQueues, and(
+        eq(schema.leadQueues.id, schema.metaAdAccounts.defaultQueueId),
+        eq(schema.leadQueues.tenantId, schema.metaAdAccounts.tenantId),
+      ))
+      .where(and(
+        eq(schema.metaAdAccounts.tenantId, context.tenantId),
+        eq(schema.metaAdAccounts.adAccountId, campaign.adAccountId),
+      ))
+      .limit(1),
   ]);
 
   const adSetIds = adSets.map((s) => s.adSetId);
@@ -113,6 +126,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
         .select({
           id: schema.metaAds.id,
           adId: schema.metaAds.adId,
+          leadGenFormId: schema.metaAds.leadGenFormId,
           name: schema.metaAds.name,
           status: schema.metaAds.status,
           adSetId: schema.metaAds.adSetId,
@@ -128,7 +142,50 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
     leadsCount: leadCountMap.get(ad.adId) ?? 0,
   }));
 
-  const currentRoute = currentRoutes[0];
+  // Forms are related through actual lead attribution, since Meta forms can be
+  // shared and the local campaign/ad snapshot does not claim ownership.
+  const campaignFormAttributions = await db.selectDistinct({ formId: schema.leads.metaFormId })
+    .from(schema.leads)
+    .where(and(
+      eq(schema.leads.tenantId, context.tenantId),
+      or(
+        eq(schema.leads.metaCampaignId, campaign.campaignId),
+        campaignAds.length ? inArray(schema.leads.metaAdId, campaignAds.map((ad) => ad.adId)) : undefined,
+      ),
+      isNotNull(schema.leads.metaFormId),
+      isNull(schema.leads.deletedAt),
+    ));
+  const campaignFormIds = [...new Set([
+    ...campaignFormAttributions.map((item) => item.formId).filter((id): id is string => Boolean(id)),
+    ...campaignAds.map((ad) => ad.leadGenFormId).filter((id): id is string => Boolean(id)),
+  ])];
+  const syncedCampaignForms = campaignFormIds.length
+    ? await db.select({ id: schema.metaLeadForms.id, formId: schema.metaLeadForms.formId, name: schema.metaLeadForms.name, status: schema.metaLeadForms.status, locale: schema.metaLeadForms.locale })
+      .from(schema.metaLeadForms)
+      .where(and(eq(schema.metaLeadForms.tenantId, context.tenantId), inArray(schema.metaLeadForms.formId, campaignFormIds)))
+      .orderBy(schema.metaLeadForms.name)
+    : [];
+  const syncedFormIds = new Set(syncedCampaignForms.map((form) => form.formId));
+  const campaignForms = [
+    ...syncedCampaignForms,
+    ...campaignFormIds.filter((formId) => !syncedFormIds.has(formId)).map((formId) => ({
+      id: `meta-form:${formId}`,
+      formId,
+      name: `Formulário Meta ${formId}`,
+      status: "UNKNOWN",
+      locale: null,
+    })),
+  ];
+
+  // Prefer the Meta ID; older bulk activation wrote the CRM UUID instead.
+  const storedRoute = currentRoutes.find((route) => route.campaignId === campaign.campaignId) ?? currentRoutes[0];
+  const accountDefault = accountDefaults[0]?.queueStatus === "active" ? accountDefaults[0].queueId : null;
+  const currentRoute = storedRoute
+    ? { ...storedRoute, queueId: storedRoute.queueId ?? accountDefault }
+    : accountDefault
+      ? { campaignId: campaign.campaignId, queueId: accountDefault, enabled: true }
+      : undefined;
+  const canConfigureCapture = context.role === "director" || context.role === "manager" || context.jobTitle === "marketing";
 
   return (
     <>
@@ -137,8 +194,12 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
         <CampaignDetailView
           campaign={campaign}
           ads={campaignAds}
+          forms={campaignForms}
           queues={queues}
           initialQueueId={currentRoute?.queueId ?? null}
+          initialCaptureEnabled={currentRoute?.enabled ?? false}
+          canConfigureCapture={canConfigureCapture}
+          canDisableCapture={context.role === "director"}
         />
       </main>
     </>

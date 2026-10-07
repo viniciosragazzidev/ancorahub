@@ -1,7 +1,10 @@
 # Índice de Implementações
 
 | Data | Registro | Estado | Resumo |
+| 2026-10-07 | `completed/2026-10-07-meta-campaign-routing-single-home.md` | type-check e build passaram | Captura e fila são configuradas no detalhe da campanha; anúncios/formulários herdam a fila ativa e intake sem rota é ignorado. |
+| 2026-10-06 | `completed/2026-10-06-meta-sync-and-campaign-capture.md` | concluído no código | Reduzir falhas de sync Meta, separar veiculação de captura e herdar elegibilidade por campanha e seus descendentes. |
 | --- | --- | --- | --- |
+| 2026-10-06 | `completed/2026-10-06-pos-venda-transfer-bypass.md` | concluído no código | Isenção total da fila Pós Venda (complemento DEC-133): transferências manuais entre unidades e corretores com origem/destino na Pós Venda dispensam rota de campanha, disponibilidade, unidade ativa e estado de atendimento, com auditoria `lead.post_sale_transfer`. |
 | 2026-10-05 | `completed/2026-10-05-corretor-multi-plantoes-simultaneos.md` | concluído no código | Corretor pode estar em 2+ plantões no mesmo horário (DEC-132): escala semanal e plano mensal avisam em vez de bloquear, com auditoria; distribuição mantém ocorrência representativa. |
 | 2026-09-30 | `completed/2026-09-30-broker-lite-duty-calendar.md` | concluído no código | Área Plantões do corretor Lite com calendário mensal, agenda por data, detalhes somente leitura, escala semanal/publicada e controle global auditável. |
 | 2026-09-30 | `completed/2026-09-30-cold-lead-reactivation.md` | concluído no código | Reativação única de lead frio ainda não atribuído, retomada da qualificação em resposta, aviso após atribuição e observação de investigação no drawer compartilhado. |
@@ -34,3 +37,4 @@
 | 2026-07-29 | `completed/2026-07-29-operational-visual-standardization.md` | concluído | Fundação visual compacta para superfícies operacionais, tabela, cards e kanban de leads. |
 | 2026-08-03 | `completed/2026-08-03-broker-workspace.md` | parcial | V1 do cockpit do Corretor, prioridade determinística, rollback global e fluxos operacionais reais. |
 | 2026-10-05 | `completed/2026-10-05-plantao-drawer-falta-presencial.md` | concluído | Drawer da ocorrência, falta por corretor/data bloqueada antes do ranking e escala presencial pausada até confirmação do gestor. |
+| 2026-10-07 | `completed/2026-10-07-meta-campaign-routing-single-home.md` | concluído | Campanha como fonte única da fila Meta, anúncios/formulários herdam a rota, conta de anúncios tem fila padrão e há reparo auditável de leads sem fila. |

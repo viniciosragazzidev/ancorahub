@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { resendTeamInvitation } from "@/features/team/resend-invitation";
@@ -20,7 +20,10 @@ import { processMetaOutboundBatch } from "@/features/communication-channels/outb
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { enqueueBrokerInvitation } from "@/features/team/broker-invitation-delivery";
 import { parseCsv } from "@/shared/utils/csv";
-import { getActiveQueueDutyRoster } from "@/features/lead-distribution/active-queue-duty-roster";
+import { ensureDefaultQueue } from "@/features/lead-distribution/service";
+import { findPostSaleExemptionQueueName, postSaleTransferAuditAction } from "@/features/lead-distribution/post-sale-transfer";
+import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
 import { invalidateTenantContextCache } from "@/shared/auth/tenant-context";
 export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
@@ -687,11 +690,14 @@ export async function transferLeadsAction(
   try {
     const input = transferLeadsInput.parse(Object.fromEntries(formData));
     const context = await getRequiredTenantContext();
+    if (context.role !== "director" && context.role !== "manager") throw new Error("Apenas Diretores e Gestores podem transferir carteiras.");
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
     const db = getDatabase();
 
     const members = await db
-      .select({ userId: schema.tenantMemberships.userId })
+      .select({ userId: schema.tenantMemberships.userId, branchId: schema.tenantMemberships.branchId, role: schema.tenantMemberships.role, status: schema.tenantMemberships.status, userActive: schema.user.active, userStatus: schema.user.status })
       .from(schema.tenantMemberships)
+      .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
       .where(
         and(
           eq(schema.tenantMemberships.tenantId, context.tenantId),
@@ -703,66 +709,101 @@ export async function transferLeadsAction(
       throw new Error("Os usuários de origem e destino devem pertencer ao mesmo tenant.");
     }
 
-    const [source] = await db.select({ role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId })
-      .from(schema.tenantMemberships)
-      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.fromUserId)))
-      .limit(1);
-    const [target] = await db.select({ role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId, status: schema.tenantMemberships.status })
-      .from(schema.tenantMemberships)
-      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.toUserId)))
-      .limit(1);
-    if (!source || !target || source.role !== "broker" || target.role !== "broker" || target.status !== "active" || source.branchId !== target.branchId) {
-      throw new Error("A transferência só pode ocorrer entre corretores ativos da mesma unidade.");
+    const source = members.find((member) => member.userId === input.fromUserId);
+    const target = members.find((member) => member.userId === input.toUserId);
+    if (!source || !target || source.role !== "broker" || target.role !== "broker" || target.status !== "active" || !target.userActive || target.userStatus !== "active" || !target.branchId) {
+      throw new Error("Selecione um corretor de destino ativo no mesmo tenant.");
+    }
+    if (context.role === "manager" && (source.branchId !== context.branchId || target.branchId !== context.branchId)) {
+      throw new Error("Gestores só podem transferir leads entre corretores da unidade autorizada.");
     }
 
-    const isDirector = context.role === "director";
-    const authorizedUnitIds = isDirector
-      ? []
-      : ("allowedUnitIds" in context && Array.isArray(context.allowedUnitIds))
-        ? context.allowedUnitIds
-        : context.branchId
-          ? [context.branchId]
-          : [];
-
-    if (!isDirector && (!source.branchId || !authorizedUnitIds.includes(source.branchId))) {
-      throw new Error("Gestores só podem transferir leads dentro das unidades autorizadas.");
-    }
+    const [targetBranch] = await db.select({ id: schema.branches.id, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, isDistributionHub: schema.branches.isDistributionHub })
+      .from(schema.branches).where(and(eq(schema.branches.id, target.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+    if (!targetBranch) throw new Error("A unidade do corretor de destino não está ativa e apta a receber leads.");
+    const targetQueueId = await ensureDefaultQueue(context.tenantId, target.branchId, context.userId);
+    // DEC-133 (Pós Venda): com origem OU destino na Pós Venda, a isenção
+    // dispensa a exigência de unidade ativa/aceitando leads na transferência
+    // de carteira; a salvaguarda de membro ativo no tenant já foi feita acima.
+    const postSaleExemptQueueName = await findPostSaleExemptionQueueName({ tenantId: context.tenantId, targetQueueId }).catch(() => null);
+    if (!postSaleExemptQueueName && (targetBranch.status !== "active" || !targetBranch.acceptingLeads || targetBranch.isDistributionHub)) throw new Error("A unidade do corretor de destino não está ativa e apta a receber leads.");
 
     const leadsToTransfer = await db.select({
       id: schema.leads.id,
+      branchId: schema.leads.branchId,
       queueId: schema.leads.queueId,
-      webhookCredentialId: schema.leads.webhookCredentialId,
+      status: schema.leads.status,
+      distributionStatus: schema.leads.distributionStatus,
+      firstContactAt: schema.leads.firstContactAt,
+      serviceStartedAt: schema.leads.serviceStartedAt,
     }).from(schema.leads).where(and(
       eq(schema.leads.tenantId, context.tenantId),
       eq(schema.leads.corretorId, input.fromUserId),
       source.branchId ? eq(schema.leads.branchId, source.branchId) : sql`true`,
+      isNull(schema.leads.archivedAt),
+      isNull(schema.leads.deletedAt),
     ));
-    const groups = new Map<string, { queueId: string | null; webhookCredentialId: string | null; leadIds: string[]; dutyScheduleId: string | null }>();
-    for (const lead of leadsToTransfer) {
-      const key = `${lead.queueId ?? ""}:${lead.webhookCredentialId ?? ""}`;
-      const group = groups.get(key) ?? { queueId: lead.queueId, webhookCredentialId: lead.webhookCredentialId, leadIds: [], dutyScheduleId: null };
-      group.leadIds.push(lead.id);
-      groups.set(key, group);
-    }
     const assignedAt = new Date();
-    for (const group of groups.values()) {
-      const activeDutyRoster = group.queueId
-        ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: group.queueId, webhookCredentialId: group.webhookCredentialId, respectDutyCap: false, includePaused: true })
-        : null;
-      group.dutyScheduleId = activeDutyRoster?.brokers.find((broker) => broker.id === input.toUserId)?.scheduleId ?? null;
-    }
+    const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
     await db.transaction(async (tx) => {
-      for (const group of groups.values()) {
-        await tx.update(schema.leads).set({ corretorId: input.toUserId, assignedAt, dutyScheduleId: group.dutyScheduleId }).where(and(
+      for (const lead of leadsToTransfer) {
+        const activeLead = !["lost", "converted"].includes(lead.status);
+        const transferred = await tx.update(schema.leads).set({
+          branchId: target.branchId,
+          queueId: targetQueueId,
+          dutyScheduleId: null,
+          corretorId: input.toUserId,
+          assignedAt: activeLead ? assignedAt : undefined,
+          firstContactAt: activeLead ? null : lead.firstContactAt,
+          serviceStartedAt: activeLead ? null : lead.serviceStartedAt,
+          serviceStartedBy: activeLead ? null : undefined,
+          status: activeLead ? "distributed" : lead.status,
+          distributionStatus: activeLead ? "assigned" : lead.distributionStatus,
+          assignmentSource: activeLead ? context.role === "director" ? "manual_director" : "manual_manager" : undefined,
+          assignmentStrategy: activeLead ? "manual" : undefined,
+          distributionUpdatedAt: activeLead ? assignedAt : undefined,
+          stageEnteredAt: activeLead ? assignedAt : undefined,
+        }).where(and(
           eq(schema.leads.tenantId, context.tenantId),
-          inArray(schema.leads.id, group.leadIds),
+          eq(schema.leads.id, lead.id),
           eq(schema.leads.corretorId, input.fromUserId),
-          source.branchId ? eq(schema.leads.branchId, source.branchId) : sql`true`,
+        )).returning({ id: schema.leads.id });
+        if (!transferred.length) continue;
+        if (activeLead) {
+          await tx.update(schema.leadAssignmentAttempts).set({ status: "released", releasedAt: assignedAt, releaseReason: "Transferência manual de carteira entre unidades; atendimento reiniciado." }).where(and(
+            eq(schema.leadAssignmentAttempts.tenantId, context.tenantId),
+            eq(schema.leadAssignmentAttempts.leadId, lead.id),
+            eq(schema.leadAssignmentAttempts.status, "open"),
+          ));
+          if (tenantPolicy?.feedbackRequiredEnabled !== false) await tx.insert(schema.leadAssignmentAttempts).values({
+            id: randomUUID(), tenantId: context.tenantId, leadId: lead.id, brokerId: input.toUserId, sequence: 1,
+            assignedAt, feedbackDueAt: new Date(assignedAt.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000),
+            status: "open", createdAt: assignedAt,
+          });
+        }
+        await tx.update(schema.leadOffers).set({ status: "CANCELLED", updatedAt: assignedAt }).where(and(
+          eq(schema.leadOffers.tenantId, context.tenantId),
+          eq(schema.leadOffers.leadId, lead.id),
+          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
         ));
+        await tx.insert(schema.leadDistributionEvents).values({
+          id: randomUUID(), tenantId: context.tenantId, leadId: lead.id, fromBranchId: lead.branchId,
+          toBranchId: target.branchId, fromQueueId: lead.queueId, toQueueId: targetQueueId,
+          previousOwnerId: input.fromUserId, newOwnerId: input.toUserId, action: "assigned",
+          source: context.role === "director" ? "manual_director" : "manual_manager", strategy: "manual",
+          reason: postSaleExemptQueueName
+            ? `Transferência manual de carteira com isenção da fila "${postSaleExemptQueueName}"; bloqueios de negócio dispensados (DEC-133).`
+            : "Transferência manual de carteira entre unidades; fila e campanha não restringem a atribuição.",
+          metadata: { assignmentScope: "manual_cross_unit_override", previousStatus: lead.status, serviceRestarted: activeLead },
+          actorId: context.userId, createdAt: assignedAt,
+        });
+        await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: postSaleExemptQueueName ? postSaleTransferAuditAction(postSaleExemptQueueName) : "lead.manual_cross_unit_transfer" });
+        if (activeLead) await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: "Atribuição transferida manualmente para outra unidade e corretor; atendimento e SLA reiniciados, com histórico preservado." });
       }
     });
 
     invalidateTenantContextCache(); // role/unit/status changes apply at once
+    void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId, branchIds: [source.branchId, target.branchId].filter((id): id is string => Boolean(id)), brokerIds: [input.fromUserId, input.toUserId] }).catch(() => undefined);
     return { success: true };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro desconhecido ao transferir leads.";

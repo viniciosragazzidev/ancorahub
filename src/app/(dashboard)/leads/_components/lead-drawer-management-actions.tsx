@@ -1,18 +1,17 @@
 "use client";
 
-import { useActionState, useCallback, useEffect, useState, type FormEvent } from "react";
+import { useActionState, useCallback, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
-import { ArrowRight, Buildings, ChatCircleText, RotateCcw, Sparkle, UserSwitch } from "@/components/huge-icons";
+import { ArrowRight, ChatCircleText, RotateCcw, Sparkle, UserSwitch } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
 import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle } from "@/components/ui/dialog";
-import { getLeadDutyReassignmentOptions, reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
-import { routeLeadToBranchAction } from "@/features/lead-distribution/actions";
+import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
@@ -20,14 +19,6 @@ import { LeadAttendanceFlowStarter } from "./lead-attendance-flow-starter";
 import { LeadDistributionRemoval, LeadDistributionRemovedTag } from "./lead-distribution-removal";
 
 type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null };
-type DutyRosterState = {
-  leadId: string;
-  queueId: string;
-  status: "ready" | "error";
-  hasActiveDuty: boolean;
-  brokers: Broker[];
-  error?: string;
-};
 type Branch = { id: string; name: string };
 type ManagementMode = "reassign" | "investigate";
 type ManagementCommit = {
@@ -47,7 +38,7 @@ export function LeadDrawerManagementActions({
   leadName,
   brokers,
   branches,
-  leadQueueId,
+  leadBranchId,
   contextRole,
   currentStatus,
   currentDistributionStatus,
@@ -65,7 +56,7 @@ export function LeadDrawerManagementActions({
   leadName?: string;
   brokers: Broker[];
   branches?: Branch[];
-  leadQueueId?: string | null;
+  leadBranchId?: string | null;
   contextRole?: string;
   currentStatus: string;
   currentDistributionStatus?: string;
@@ -89,8 +80,12 @@ export function LeadDrawerManagementActions({
   }, [leadId]);
   const [reason, setReason] = useState("");
   const [isAssuming, setIsAssuming] = useState(false);
-  const [assignBranchId, setAssignBranchId] = useState("");
-  const [dutyRosterState, setDutyRosterState] = useState<DutyRosterState | null>(null);
+  const [branchSelection, setBranchSelection] = useState({ leadId, branchId: leadBranchId ?? "" });
+  const assignBranchId = branchSelection.leadId === leadId ? branchSelection.branchId : leadBranchId ?? "";
+  const setAssignBranchId = useCallback((branchId: string) => {
+    setBranchSelection({ leadId, branchId });
+    setBrokerId("");
+  }, [leadId, setBrokerId]);
 
   const [openQualifyDialog, setOpenQualifyDialog] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
@@ -122,28 +117,7 @@ export function LeadDrawerManagementActions({
 
   const [reassignState, reassign, reassignPending] = useActionState(reassignLeadAction, {});
   const [assumeState, assume, assumePending] = useActionState(assumeLeadForInvestigationAction, {});
-  const [routeState, routeAction, routePending] = useActionState(
-    routeLeadToBranchAction,
-    {},
-  );
   const [removeAssignmentState, removeAssignment, removeAssignmentPending] = useActionState(removeLeadAssignmentAction, {});
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!leadQueueId) return () => { cancelled = true; };
-    void getLeadDutyReassignmentOptions(leadId).then((result) => {
-      if (cancelled) return;
-      if (!result.success) {
-        setDutyRosterState({ leadId, queueId: leadQueueId, status: "error", hasActiveDuty: false, brokers: [], error: result.error });
-        return;
-      }
-      setDutyRosterState({ leadId, queueId: leadQueueId, status: "ready", hasActiveDuty: result.hasActiveDuty, brokers: result.brokers });
-    }).catch(() => {
-      if (!cancelled) setDutyRosterState({ leadId, queueId: leadQueueId, status: "error", hasActiveDuty: false, brokers: [], error: "Não foi possível confirmar a escala ativa desta fila." });
-    });
-
-    return () => { cancelled = true; };
-  }, [leadId, leadQueueId]);
 
   const handleReassignSuccess = useCallback((result: typeof reassignState) => {
     toast.success(result.message ?? "Lead atribuído e aviso enviado ao corretor.");
@@ -181,19 +155,6 @@ export function LeadDrawerManagementActions({
     onError: handleAssumeError,
   });
 
-  const handleRouteSuccess = useCallback((result: typeof routeState) => {
-    toast.success(result.message ?? "Lead enviado para a unidade.");
-    onSuccess?.(result);
-  }, [onSuccess]);
-  const handleRouteError = useCallback((result: typeof routeState) => {
-    if (result.error) toast.error(result.error);
-  }, []);
-  useActionDialogLifecycle({
-    state: routeState,
-    pending: routePending,
-    onSuccess: handleRouteSuccess,
-    onError: handleRouteError,
-  });
   const handleRemoveAssignmentSuccess = useCallback((result: typeof removeAssignmentState) => {
     setRemoveAssignmentDialogOpen(false);
     toast.success("Atribuição removida. O lead aguardará uma nova ação manual.");
@@ -215,12 +176,7 @@ export function LeadDrawerManagementActions({
 
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";
-  const currentDutyState = dutyRosterState?.leadId === leadId && dutyRosterState.queueId === leadQueueId ? dutyRosterState : null;
-  const dutyRosterLoading = Boolean(leadQueueId) && !currentDutyState;
-  const activeQueueDuty = currentDutyState?.status === "ready" && currentDutyState.hasActiveDuty;
-  const dutyRosterError = currentDutyState?.status === "error" ? currentDutyState.error : null;
-  const assignmentBrokers = activeQueueDuty ? currentDutyState?.brokers ?? [] : brokers;
-  const canReassignUnit = !activeStatus && !activeQueueDuty && !dutyRosterLoading && !dutyRosterError && branches && branches.length > 0 && isDirectorOrManager;
+  const assignmentBrokers = brokers.filter((broker) => broker.branchId === assignBranchId);
   const canRemoveAssignment = isDirectorOrManager && Boolean(currentOwner) && currentDistributionStatus === "assigned" &&
     currentStatus !== "lost" && currentStatus !== "converted";
 
@@ -251,24 +207,23 @@ export function LeadDrawerManagementActions({
     ? "Transfira a responsabilidade para outro corretor elegível. O atendimento e o SLA de primeiro contato serão reiniciados, mantendo o histórico."
     : "Assuma este caso para apurar uma exceção. Registre o motivo para manter a operação auditável.";
 
-  const shouldAskAssignmentMode = manualAssignmentChoiceEnabled && !currentOwner;
+  const shouldAskAssignmentMode = manualAssignmentChoiceEnabled && !currentOwner && !activeStatus;
   function handleReassignSubmit(event: FormEvent<HTMLFormElement>) {
     if (shouldAskAssignmentMode) {
       event.preventDefault();
       setManualAssignmentDialogOpen(true);
       return;
     }
-    const canResolveOptimistically = !activeQueueDuty || brokers.some((broker) => broker.id === brokerId);
-    if (canResolveOptimistically) onReassignOptimistic?.(brokerId);
+    onReassignOptimistic?.(brokerId);
   }
 
   function submitManualAssignment(assignmentMode: "direct" | "offer") {
     const data = new FormData();
     data.set("leadId", leadId);
     data.set("brokerId", brokerId);
+    data.set("branchId", assignBranchId);
     data.set("assignmentMode", assignmentMode);
-    const canResolveOptimistically = !activeQueueDuty || assignmentBrokers.some((broker) => broker.id === brokerId);
-    if (canResolveOptimistically) onReassignOptimistic?.(brokerId);
+    onReassignOptimistic?.(brokerId);
     setManualAssignmentDialogOpen(false);
     reassign(data);
   }
@@ -318,42 +273,6 @@ export function LeadDrawerManagementActions({
       ) : null}
       {!currentOwner && isDirectorOrManager && !distributionRemovalReason ? <LeadAttendanceFlowStarter leadId={leadId} /> : null}
       {!currentOwner && isDirectorOrManager && !distributionRemovalReason ? <LeadDistributionRemoval leadId={leadId} leadName={leadName} onSuccess={onSuccess} /> : null}
-
-      {/* Atribuir unidade */}
-      {canReassignUnit && (
-        <div className="rounded-[var(--radius-card)] border border-primary/20 bg-primary/[0.02] p-3 space-y-3">
-          <div className="flex items-center gap-2">
-            <Buildings className="size-4 text-primary" />
-            <p className="text-xs font-semibold text-foreground">Reatribuir unidade</p>
-          </div>
-          <p className="text-xs text-muted-foreground leading-normal">
-            Selecione uma filial para enviar este lead à fila de distribuição. Só é permitido antes do início do atendimento.
-          </p>
-          <form action={routeAction} className="flex items-center gap-2">
-            <input name="leadId" type="hidden" value={leadId} />
-            <Select name="branchId" onValueChange={(value) => setAssignBranchId(value ?? "")} value={assignBranchId}>
-              <SelectTrigger className="h-9 flex-1 text-xs" aria-label="Selecionar unidade">
-                <SelectValue placeholder="Selecione a unidade" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id} className="text-xs">{branch.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button
-              size="sm"
-              disabled={!assignBranchId || routePending}
-              type="submit"
-              variant="default"
-              className="h-9 gap-1 text-xs shrink-0"
-            >
-              {routePending ? "Enviando..." : "Enviar"}
-              <ArrowRight className="size-3.5" />
-            </Button>
-          </form>
-        </div>
-      )}
 
       {/* Seção de assumir atendimento se já estiver ativo */}
       {activeStatus && (
@@ -423,46 +342,46 @@ export function LeadDrawerManagementActions({
 
       <p className="text-xs leading-normal text-muted-foreground">{selectedModeDescription}</p>
 
-      {mode === "reassign" && dutyRosterLoading ? (
-        <p className="rounded-[var(--radius-card)] border border-border/70 bg-muted/30 p-3 text-xs text-muted-foreground" role="status">
-          Verificando o plantão vinculado à fila do lead…
-        </p>
-      ) : mode === "reassign" && dutyRosterError ? (
-        <p className="rounded-[var(--radius-card)] border border-destructive/25 bg-destructive/[0.04] p-3 text-xs text-destructive" role="alert">
-          {dutyRosterError} Atualize o drawer para tentar novamente.
-        </p>
-      ) : mode === "reassign" ? (
+      {mode === "reassign" ? (
         <form action={reassign} className="space-y-3" onSubmit={handleReassignSubmit}>
           <input name="leadId" type="hidden" value={leadId} />
           <input name="brokerId" type="hidden" value={brokerId} />
+          <input name="branchId" type="hidden" value={assignBranchId} />
+          <div className="space-y-1.5">
+            <Label htmlFor="lead-reassign-branch-drawer" className="text-xs">Unidade de destino</Label>
+            <Select onValueChange={(value) => setAssignBranchId(value ?? "")} value={assignBranchId}>
+              <SelectTrigger id="lead-reassign-branch-drawer" className="h-9 text-xs" aria-label="Selecionar unidade de destino">
+                <SelectValue placeholder="Selecione uma unidade ativa" />
+              </SelectTrigger>
+              <SelectContent>
+                {branches?.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id} className="text-xs">{branch.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1.5">
             <Label htmlFor="lead-reassign-broker-drawer" className="text-xs">
-              {activeQueueDuty ? "Corretores escalados no plantão ativo" : "Novo responsável"}
+              Novo responsável
             </Label>
-            {activeQueueDuty && assignmentBrokers.length === 0 ? (
-              <p className="rounded-[var(--radius-card)] border border-warning/25 bg-warning/[0.04] p-3 text-xs text-muted-foreground" role="status">
-                Não há corretores ativos escalados neste plantão agora.
-              </p>
-            ) : (
             <Select name="brokerId" onValueChange={(value) => setBrokerId(value ?? "")} value={brokerId}>
               <SelectTrigger id="lead-reassign-broker-drawer" className="h-9 text-xs">
-                <SelectValue placeholder={activeQueueDuty ? "Selecione um corretor escalado" : "Selecione um corretor"} />
+                <SelectValue placeholder={assignBranchId ? "Selecione um corretor" : "Selecione primeiro a unidade"} />
               </SelectTrigger>
               <SelectContent>
                 {assignmentBrokers.length === 0 ? (
-                  <SelectItem value="_none" disabled>Nenhum corretor disponível nesta filial</SelectItem>
+                  <SelectItem value="_none" disabled>Nenhum corretor ativo nesta unidade</SelectItem>
                 ) : (
                   assignmentBrokers.map((broker) => (
                     <SelectItem key={broker.id} value={broker.id} className="text-xs">
-                      {broker.name}{activeQueueDuty && broker.branchName ? ` · ${broker.branchName}` : ""}
+                      {broker.name}
                     </SelectItem>
                   ))
                 )}
               </SelectContent>
             </Select>
-            )}
           </div>
-          <Button className="w-full justify-between h-9 text-xs" disabled={!brokerId || brokerId === "_none" || (activeQueueDuty && assignmentBrokers.length === 0) || reassignPending} type="submit" variant="success">
+          <Button className="w-full justify-between h-9 text-xs" disabled={!assignBranchId || !brokerId || brokerId === "_none" || reassignPending} type="submit" variant="success">
             {reassignPending ? "Reatribuindo..." : "Confirmar reatribuição"}<ArrowRight className="size-4" />
           </Button>
         </form>
