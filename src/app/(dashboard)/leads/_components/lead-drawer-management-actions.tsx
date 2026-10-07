@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useCallback, useState, type FormEvent } from "react";
+import { useActionState, useCallback, useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ConfirmDialog } from "@/components/foundations/confirm-dialog";
 import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle } from "@/components/ui/dialog";
-import { reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
+import { getLeadDutyReassignmentOptions, reassignLeadAction, assumeLeadForInvestigationAction, assumeLeadForMessagingAction, removeLeadAssignmentAction } from "@/features/leads/management-actions";
 import { manuallyChangeQualificationStageAction } from "@/features/leads/qualification-tab-actions";
 import { useActionDialogLifecycle } from "@/hooks/use-action-dialog-lifecycle";
 import { ManualQualificationDialog } from "./manual-qualification-dialog";
@@ -20,6 +20,12 @@ import { LeadDistributionRemoval, LeadDistributionRemovedTag } from "./lead-dist
 
 type Broker = { id: string; name: string; branchId: string | null; branchName?: string | null };
 type Branch = { id: string; name: string };
+type DutyReassignmentLookup = {
+  leadId: string;
+  status: "loading" | "ready" | "error";
+  hasActiveDuty: boolean;
+  brokers: Array<Broker & { scheduleId: string }>;
+};
 type ManagementMode = "reassign" | "investigate";
 type ManagementCommit = {
   entity?: {
@@ -91,6 +97,28 @@ export function LeadDrawerManagementActions({
   const [isReverting, setIsReverting] = useState(false);
   const [removeAssignmentDialogOpen, setRemoveAssignmentDialogOpen] = useState(false);
   const [manualAssignmentDialogOpen, setManualAssignmentDialogOpen] = useState(false);
+  const [dutyReassignment, setDutyReassignment] = useState<DutyReassignmentLookup>({ leadId, status: "loading", hasActiveDuty: false, brokers: [] });
+
+  useEffect(() => {
+    let current = true;
+    setDutyReassignment({ leadId, status: "loading", hasActiveDuty: false, brokers: [] });
+    void getLeadDutyReassignmentOptions(leadId).then((result) => {
+      if (!current) return;
+      if (!result.success) {
+        setDutyReassignment({ leadId, status: "error", hasActiveDuty: false, brokers: [] });
+        return;
+      }
+      setDutyReassignment({
+        leadId,
+        status: "ready",
+        hasActiveDuty: result.hasActiveDuty,
+        brokers: result.brokers,
+      });
+    }).catch(() => {
+      if (current) setDutyReassignment({ leadId, status: "error", hasActiveDuty: false, brokers: [] });
+    });
+    return () => { current = false; };
+  }, [leadId]);
 
   const isQualifiedOrDistributed =
     currentStatus === "distributed" ||
@@ -176,7 +204,17 @@ export function LeadDrawerManagementActions({
 
   const activeStatus = ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(currentStatus);
   const isDirectorOrManager = contextRole === "director" || contextRole === "manager";
-  const assignmentBrokers = brokers.filter((broker) => broker.branchId === assignBranchId);
+  const dutyLookup = dutyReassignment.leadId === leadId ? dutyReassignment : { leadId, status: "loading" as const, hasActiveDuty: false, brokers: [] };
+  const hasActiveDuty = dutyLookup.status === "ready" && dutyLookup.hasActiveDuty;
+  const assignmentBrokers = hasActiveDuty
+    ? dutyLookup.brokers
+    : dutyLookup.status === "ready"
+      ? brokers.filter((broker) => broker.branchId === assignBranchId)
+      : [];
+  const selectedDutyScheduleId = hasActiveDuty
+    ? dutyLookup.brokers.find((broker) => broker.id === brokerId)?.scheduleId
+    : undefined;
+  const canSubmitReassignment = dutyLookup.status === "ready" && Boolean(brokerId) && brokerId !== "_none" && !reassignPending;
   const canRemoveAssignment = isDirectorOrManager && Boolean(currentOwner) && currentDistributionStatus === "assigned" &&
     currentStatus !== "lost" && currentStatus !== "converted";
 
@@ -221,7 +259,11 @@ export function LeadDrawerManagementActions({
     const data = new FormData();
     data.set("leadId", leadId);
     data.set("brokerId", brokerId);
-    data.set("branchId", assignBranchId);
+    if (hasActiveDuty) {
+      if (selectedDutyScheduleId) data.set("dutyScheduleId", selectedDutyScheduleId);
+    } else {
+      data.set("branchId", assignBranchId);
+    }
     data.set("assignmentMode", assignmentMode);
     onReassignOptimistic?.(brokerId);
     setManualAssignmentDialogOpen(false);
@@ -346,31 +388,37 @@ export function LeadDrawerManagementActions({
         <form action={reassign} className="space-y-3" onSubmit={handleReassignSubmit}>
           <input name="leadId" type="hidden" value={leadId} />
           <input name="brokerId" type="hidden" value={brokerId} />
-          <input name="branchId" type="hidden" value={assignBranchId} />
-          <div className="space-y-1.5">
-            <Label htmlFor="lead-reassign-branch-drawer" className="text-xs">Unidade de destino</Label>
-            <Select onValueChange={(value) => setAssignBranchId(value ?? "")} value={assignBranchId}>
-              <SelectTrigger id="lead-reassign-branch-drawer" className="h-9 text-xs" aria-label="Selecionar unidade de destino">
-                <SelectValue placeholder="Selecione uma unidade ativa" />
-              </SelectTrigger>
-              <SelectContent>
-                {branches?.map((branch) => (
-                  <SelectItem key={branch.id} value={branch.id} className="text-xs">{branch.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {hasActiveDuty ? (
+            <input name="dutyScheduleId" type="hidden" value={selectedDutyScheduleId ?? ""} />
+          ) : dutyLookup.status === "ready" ? (
+            <>
+              <input name="branchId" type="hidden" value={assignBranchId} />
+              <div className="space-y-1.5">
+                <Label htmlFor="lead-reassign-branch-drawer" className="text-xs">Unidade de destino</Label>
+                <Select onValueChange={(value) => setAssignBranchId(value ?? "")} value={assignBranchId}>
+                  <SelectTrigger id="lead-reassign-branch-drawer" className="h-9 text-xs" aria-label="Selecionar unidade de destino">
+                    <SelectValue placeholder="Selecione uma unidade ativa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {branches?.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id} className="text-xs">{branch.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : null}
           <div className="space-y-1.5">
             <Label htmlFor="lead-reassign-broker-drawer" className="text-xs">
-              Novo responsável
+              {hasActiveDuty ? "Corretor do plantão" : "Novo responsável"}
             </Label>
-            <Select name="brokerId" onValueChange={(value) => setBrokerId(value ?? "")} value={brokerId}>
+            <Select disabled={dutyLookup.status !== "ready"} name="brokerId" onValueChange={(value) => setBrokerId(value ?? "")} value={brokerId}>
               <SelectTrigger id="lead-reassign-broker-drawer" className="h-9 text-xs">
-                <SelectValue placeholder={assignBranchId ? "Selecione um corretor" : "Selecione primeiro a unidade"} />
+                <SelectValue placeholder={dutyLookup.status === "loading" ? "Consultando a escala…" : dutyLookup.status === "error" ? "Não foi possível consultar a escala" : hasActiveDuty ? "Selecione um corretor do plantão" : assignBranchId ? "Selecione um corretor" : "Selecione primeiro a unidade"} />
               </SelectTrigger>
               <SelectContent>
                 {assignmentBrokers.length === 0 ? (
-                  <SelectItem value="_none" disabled>Nenhum corretor ativo nesta unidade</SelectItem>
+                  <SelectItem value="_none" disabled>{hasActiveDuty ? "Nenhum corretor elegível neste plantão" : "Nenhum corretor ativo nesta unidade"}</SelectItem>
                 ) : (
                   assignmentBrokers.map((broker) => (
                     <SelectItem key={broker.id} value={broker.id} className="text-xs">
@@ -381,7 +429,9 @@ export function LeadDrawerManagementActions({
               </SelectContent>
             </Select>
           </div>
-          <Button className="w-full justify-between h-9 text-xs" disabled={!assignBranchId || !brokerId || brokerId === "_none" || reassignPending} type="submit" variant="success">
+          {dutyLookup.status === "error" ? <p role="alert" className="text-xs text-destructive">Não foi possível confirmar a escala desta fila. Atualize o drawer e tente novamente.</p> : null}
+          {hasActiveDuty && assignmentBrokers.length === 0 ? <p className="text-xs text-muted-foreground">A fila está vinculada a um plantão ativo, mas não há corretores elegíveis agora.</p> : null}
+          <Button className="w-full justify-between h-9 text-xs" disabled={!canSubmitReassignment || (!hasActiveDuty && !assignBranchId)} type="submit" variant="success">
             {reassignPending ? "Reatribuindo..." : "Confirmar reatribuição"}<ArrowRight className="size-4" />
           </Button>
         </form>
@@ -405,10 +455,10 @@ export function LeadDrawerManagementActions({
             Escolha se {brokerId ? assignmentBrokers.find((broker) => broker.id === brokerId)?.name ?? "o corretor selecionado" : "o corretor selecionado"} deve receber uma oferta para aceitar ou se a atribuição deve ser imediata.
           </DialogDescription>
           <div className="grid gap-2 pt-2">
-            <Button type="button" disabled={reassignPending || !brokerId || brokerId === "_none"} onClick={() => submitManualAssignment("offer")}>
+            <Button type="button" disabled={!canSubmitReassignment || (!hasActiveDuty && !assignBranchId)} onClick={() => submitManualAssignment("offer")}>
               {reassignPending ? "Enviando oferta…" : "Sim, enviar oferta para aceite"}
             </Button>
-            <Button type="button" variant="outline" disabled={reassignPending || !brokerId || brokerId === "_none"} onClick={() => submitManualAssignment("direct")}>
+            <Button type="button" variant="outline" disabled={!canSubmitReassignment || (!hasActiveDuty && !assignBranchId)} onClick={() => submitManualAssignment("direct")}>
               Atribuir direto, sem mensagem de aceite
             </Button>
             <DialogClose render={<Button type="button" variant="ghost" disabled={reassignPending}>Cancelar</Button>} />

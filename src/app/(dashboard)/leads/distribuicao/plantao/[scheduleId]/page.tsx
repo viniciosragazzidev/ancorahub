@@ -189,7 +189,13 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // lead handed out in the other one is not this plantão's.
   const occurrence = getDutyWindowOnDate(schedule, dayKey.format(leadsUpcomingStartsAt ?? leadsUntil ?? now));
   const isAssigned = (lead: (typeof allLeads)[number]) => Boolean(lead.corretorId) && lead.distributionStatus === "assigned";
-  const assignedInOccurrence = (lead: (typeof allLeads)[number]) => !occurrence || !lead.assignedAt || (lead.assignedAt >= occurrence.startsAt && lead.assignedAt < occurrence.endsAt);
+  // An explicit dutyScheduleId is the persisted source of truth for which
+  // occurrence received the lead. Legacy inferred attribution still has to
+  // fall inside this occurrence's actual hours.
+  const assignedInOccurrence = (lead: (typeof allLeads)[number]) => lead.dutyScheduleId === schedule.id
+    || !occurrence
+    || !lead.assignedAt
+    || (lead.assignedAt >= occurrence.startsAt && lead.assignedAt < occurrence.endsAt);
   const isDistributed = (lead: (typeof allLeads)[number]) => isAssigned(lead) && assignedInOccurrence(lead);
   // Desqualificados ficam retidos fora da distribuição automática, inclusive
   // quando ainda estão sem corretor. Eles não devem aparecer nesta fila.

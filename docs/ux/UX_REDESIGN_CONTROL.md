@@ -1,5 +1,16 @@
 # Controle de Execução do Redesign
 
+## 2026-10-07 — Reatribuição pelo drawer dentro do plantão
+
+Correção funcional do drawer compartilhado de leads. Papel: Diretor/Gestor;
+ação: escolher um corretor escalado na fila do lead; estado: consulta da escala,
+roster disponível, vazio e erro. Com plantão ativo, o drawer esconde a seleção
+de unidade e restringe a lista ao roster elegível da fila; sem plantão ativo,
+preserva o fluxo genérico de transferência por unidade. Reutiliza Select, Label,
+Button e auditoria existentes, sem novo token, primitiva ou animação. Regra já
+aprovada em BR-024C/DEC-116. Registro:
+`docs/implementations/completed/2026-10-07-lead-drawer-duty-reassignment.md`.
+
 ## 2026-10-06 — Transferência manual entre unidades
 
 Refinamento funcional no drawer compartilhado de leads, sem avançar UX-M1.10.

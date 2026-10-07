@@ -20,7 +20,7 @@ import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob } from "@
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { DISTRIBUTION_REMOVAL_NOTE_MAX, DISTRIBUTION_REMOVAL_REASONS, type DistributionRemovalReason } from "@/features/lead-distribution/distribution-removal";
 
-const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable(), branchId: z.string().uuid().optional(), assignmentMode: z.enum(["direct", "offer"]).optional() });
+const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable(), branchId: z.string().uuid().optional(), dutyScheduleId: z.string().uuid().optional(), assignmentMode: z.enum(["direct", "offer"]).optional() });
 
 export type ManagementActionState = {
   success?: boolean;
@@ -341,14 +341,30 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
   return withServerActionTiming("/leads", "leads.reassign", async () => {
     const mutationId = randomUUID();
     try {
-      const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null, branchId: String(formData.get("branchId") || "") || undefined, assignmentMode: formData.get("assignmentMode") || undefined });
+      const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null, branchId: String(formData.get("branchId") || "") || undefined, dutyScheduleId: String(formData.get("dutyScheduleId") || "") || undefined, assignmentMode: formData.get("assignmentMode") || undefined });
       const { context, db, lead } = await getManagedLead(input.leadId);
       if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
       if (lead.archivedAt || lead.deletedAt) throw new Error("Não é possível reatribuir um lead arquivado ou excluído.");
       if (lead.status === "lost" || lead.status === "converted") throw new Error("Leads encerrados não podem ser reatribuídos.");
       if (input.brokerId && input.brokerId === lead.corretorId) throw new Error("Selecione outro corretor para reiniciar o atendimento.");
       if (!input.brokerId) throw new Error("Selecione um corretor para reatribuir o lead.");
-      const targetBranchId = input.branchId ?? lead.branchId;
+      const activeDutyRoster = lead.queueId ? await getActiveQueueDutyRoster({
+        tenantId: context.tenantId,
+        queueId: lead.queueId,
+        webhookCredentialId: lead.webhookCredentialId,
+      }) : { hasActiveDuty: false, brokers: [] };
+      const selectedDutyBroker = input.dutyScheduleId
+        ? activeDutyRoster.brokers.find((candidate) => candidate.id === input.brokerId && candidate.scheduleId === input.dutyScheduleId)
+        : undefined;
+      if (activeDutyRoster.hasActiveDuty && !selectedDutyBroker) {
+        throw new Error("Selecione um corretor escalado no plantão ativo desta fila.");
+      }
+      if (input.dutyScheduleId && !activeDutyRoster.hasActiveDuty) {
+        throw new Error("Este plantão não está ativo para a fila do lead. Atualize o drawer e tente novamente.");
+      }
+      const dutyScheduleId = selectedDutyBroker?.scheduleId ?? null;
+      const isDutyReassignment = Boolean(dutyScheduleId);
+      const targetBranchId = isDutyReassignment ? lead.branchId : input.branchId ?? lead.branchId;
       if (!targetBranchId) throw new Error("Selecione uma unidade para reatribuir o lead.");
       const accessContext = toEffectiveLeadAccessContext(context);
       const targetResourceScope = buildLeadResourceScope({ tenantId: context.tenantId, branchId: targetBranchId });
@@ -357,7 +373,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       if (!targetScopeAllowed) throw new AuthorizationError("A unidade de destino está fora do seu escopo autorizado.");
       const [targetBranch] = await db.select({ id: schema.branches.id, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, isDistributionHub: schema.branches.isDistributionHub })
         .from(schema.branches).where(and(eq(schema.branches.id, targetBranchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
-      if (!targetBranch || targetBranch.status !== "active" || !targetBranch.acceptingLeads || targetBranch.isDistributionHub) {
+      if (!isDutyReassignment && (!targetBranch || targetBranch.status !== "active" || !targetBranch.acceptingLeads || targetBranch.isDistributionHub)) {
         throw new Error("A unidade escolhida não está ativa e apta a receber leads.");
       }
       const assignmentChoiceEnabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
@@ -369,15 +385,18 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       const assignmentEventId = randomUUID();
       const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), eq(schema.tenantMemberships.branchId, targetBranchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
-      if (!broker) throw new Error("O corretor selecionado não está ativo nesta unidade.");
-      const targetQueueId = await ensureDefaultQueue(context.tenantId, targetBranchId, context.userId);
+        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), isDutyReassignment ? undefined : eq(schema.tenantMemberships.branchId, targetBranchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
+      if (!broker || (selectedDutyBroker && broker.branchId !== selectedDutyBroker.branchId)) throw new Error(isDutyReassignment ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor selecionado não está ativo nesta unidade.");
+      const targetQueueId = isDutyReassignment ? lead.queueId : await ensureDefaultQueue(context.tenantId, targetBranchId, context.userId);
+      if (!targetQueueId) throw new Error("A fila do lead não está mais disponível.");
       if (input.assignmentMode === "offer") {
-        const offered = await offerLeadToBrokerManually(context, lead.id, brokerId, { targetBranchId, targetQueueId });
+        const offered = await offerLeadToBrokerManually(context, lead.id, brokerId, { targetBranchId, targetQueueId, ...(dutyScheduleId ? { dutyScheduleId } : {}) });
         if (offered.status === "conflict") throw new Error(offered.reason);
         if (offered.status === "fallback") {
-          const routed = await routeLeadToBranch(context, lead.id, targetBranchId, "Fallback da oferta manual", true);
-          if (routed.status !== "routed") throw new Error("A oferta falhou e o lead não pôde ser encaminhado à unidade selecionada.");
+          if (!isDutyReassignment) {
+            const routed = await routeLeadToBranch(context, lead.id, targetBranchId, "Fallback da oferta manual", true);
+            if (routed.status !== "routed") throw new Error("A oferta falhou e o lead não pôde ser encaminhado à unidade selecionada.");
+          }
           await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId: lead.id, source: "manual_offer_delivery_failed" });
           return { success: true, message: offered.reason, mutationId, entity: { leadId: lead.id, branchId: targetBranchId, corretorId: null, status: lead.status, distributionStatus: "queued" } };
         }
@@ -392,7 +411,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
         const updated = await tx.update(schema.leads).set({
           branchId: targetBranchId,
           queueId: targetQueueId,
-          dutyScheduleId: null,
+          dutyScheduleId,
           corretorId: input.brokerId,
           status: "distributed",
           distributionStatus: "assigned",
@@ -446,9 +465,12 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           action: "assigned",
           source: context.role === "director" ? "manual_director" : "manual_manager",
           strategy: "manual",
-          reason: "Transferência manual entre unidades; fila e campanha não restringem a atribuição.",
+          reason: isDutyReassignment
+            ? "Reatribuição manual para corretor escalado no plantão ativo desta fila."
+            : "Transferência manual entre unidades; fila e campanha não restringem a atribuição.",
           metadata: {
-            assignmentScope: "manual_cross_unit_override",
+            assignmentScope: isDutyReassignment ? "active_duty_roster" : "manual_cross_unit_override",
+            ...(dutyScheduleId ? { dutyScheduleId } : {}),
             assignedBrokerBranchId: broker.branchId,
             previousStatus: lead.status,
             previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null,

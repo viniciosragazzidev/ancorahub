@@ -62,7 +62,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
   }
 
   // Fetch active distribution queues, campaign route, and ad sets/ads for this campaign
-  const [queues, currentRoutes, adSets, adLeadCounts, accountDefaults] = await Promise.all([
+  const [queues, currentRoutes, adLeadCounts, accountDefaults] = await Promise.all([
     db
       .select({
         id: schema.leadQueues.id,
@@ -86,10 +86,6 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
         ),
       )
       .limit(2),
-    db
-      .select({ adSetId: schema.metaAdSets.adSetId })
-      .from(schema.metaAdSets)
-      .where(and(eq(schema.metaAdSets.tenantId, context.tenantId), eq(schema.metaAdSets.campaignId, campaign.campaignId))),
     db
       .select({
         metaAdId: schema.leads.metaAdId,
@@ -119,21 +115,27 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
       .limit(1),
   ]);
 
-  const adSetIds = adSets.map((s) => s.adSetId);
-
-  const rawAds = adSetIds.length
-    ? await db
-        .select({
-          id: schema.metaAds.id,
-          adId: schema.metaAds.adId,
-          leadGenFormId: schema.metaAds.leadGenFormId,
-          name: schema.metaAds.name,
-          status: schema.metaAds.status,
-          adSetId: schema.metaAds.adSetId,
-        })
-        .from(schema.metaAds)
-        .where(and(eq(schema.metaAds.tenantId, context.tenantId), inArray(schema.metaAds.adSetId, adSetIds)))
-    : [];
+  // Join through the campaign instead of building a potentially large IN list
+  // from every ad set. Large campaigns can exceed the database parameter limit
+  // and crash the Server Component while smaller campaign pages still work.
+  const rawAds = await db
+    .select({
+      id: schema.metaAds.id,
+      adId: schema.metaAds.adId,
+      leadGenFormId: schema.metaAds.leadGenFormId,
+      name: schema.metaAds.name,
+      status: schema.metaAds.status,
+      adSetId: schema.metaAds.adSetId,
+    })
+    .from(schema.metaAds)
+    .innerJoin(schema.metaAdSets, and(
+      eq(schema.metaAds.tenantId, schema.metaAdSets.tenantId),
+      eq(schema.metaAds.adSetId, schema.metaAdSets.adSetId),
+    ))
+    .where(and(
+      eq(schema.metaAds.tenantId, context.tenantId),
+      eq(schema.metaAdSets.campaignId, campaign.campaignId),
+    ));
 
   const leadCountMap = new Map(adLeadCounts.map((r) => [r.metaAdId!, Number(r.total)]));
 
@@ -144,13 +146,23 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
 
   // Forms are related through actual lead attribution, since Meta forms can be
   // shared and the local campaign/ad snapshot does not claim ownership.
+  const campaignAdIds = db.select({ adId: schema.metaAds.adId })
+    .from(schema.metaAds)
+    .innerJoin(schema.metaAdSets, and(
+      eq(schema.metaAds.tenantId, schema.metaAdSets.tenantId),
+      eq(schema.metaAds.adSetId, schema.metaAdSets.adSetId),
+    ))
+    .where(and(
+      eq(schema.metaAds.tenantId, context.tenantId),
+      eq(schema.metaAdSets.campaignId, campaign.campaignId),
+    ));
   const campaignFormAttributions = await db.selectDistinct({ formId: schema.leads.metaFormId })
     .from(schema.leads)
     .where(and(
       eq(schema.leads.tenantId, context.tenantId),
       or(
         eq(schema.leads.metaCampaignId, campaign.campaignId),
-        campaignAds.length ? inArray(schema.leads.metaAdId, campaignAds.map((ad) => ad.adId)) : undefined,
+        inArray(schema.leads.metaAdId, campaignAdIds),
       ),
       isNotNull(schema.leads.metaFormId),
       isNull(schema.leads.deletedAt),

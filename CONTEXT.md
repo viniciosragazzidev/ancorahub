@@ -48,6 +48,8 @@
 - **Conexão de aquisição Meta**: conexão canônica, pertencente a uma corretora, que autoriza explicitamente os ativos de Marketing usados pelo CRM. Ela é a fonte de campanhas, atribuição e performance; tokens permanecem privados no servidor.
 - **Atribuição Meta**: conjunto imutável de IDs oficiais de Página, conta, campanha, conjunto, anúncio, formulário e leadgen que explica de qual ativo um lead entrou. Nomes servem apenas para leitura.
 - **Regra de entrada Meta**: configuração que resolve uma fila a partir da atribuição de mídia. Ela nunca escolhe um corretor; depois dela, o motor central de distribuição decide elegibilidade, capacidade e responsável.
+- **Elegibilidade de captura Meta**: autorização do CRM para receber leads de uma campanha ou ativo. Uma campanha elegível estende a regra aos anúncios e formulários atribuídos a ela; isso não altera a veiculação configurada na Meta.
+- **Status de veiculação Meta**: estado de entrega informado pela Meta para campanha/anúncio. É independente da elegibilidade de captura definida no CRM.
 - **Catálogo de integrações**: ponto de entrada administrativo que lista conectores disponíveis e planejados. Ele não concede acesso por si só: cada conector conserva sua própria autorização, configuração e controles de capacidade.
 - **Canal legado OpenWA**: conexão temporária por QR Code mantida apenas durante a migração. Não deve receber novas capacidades estruturais.
 - **Reativação de lead frio**: único reenvio do template Meta oficial FIRST_CONTACT para um lead que concluiu a qualificação, permanece sem corretor e não pediu opt-out; resposta retoma a qualificação somente enquanto não atribuído.

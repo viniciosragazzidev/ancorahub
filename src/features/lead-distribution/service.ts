@@ -1351,7 +1351,7 @@ export async function offerLeadToBrokerManually(
   context: TenantContext,
   leadId: string,
   brokerId: string,
-  target?: { targetBranchId: string; targetQueueId: string },
+  target?: { targetBranchId: string; targetQueueId: string; dutyScheduleId?: string },
 ) {
   if (!canManage(context)) throw new AuthorizationError("Apenas Gestores e Diretores podem oferecer leads.");
   const db = getDatabase();
@@ -1379,6 +1379,17 @@ export async function offerLeadToBrokerManually(
   const targetBranchId = target?.targetBranchId ?? lead.branchId;
   const targetQueueId = target?.targetQueueId ?? lead.queueId;
   assertBranchScope(context, targetBranchId);
+  const dutyRoster = target?.dutyScheduleId
+    ? await getActiveQueueDutyRoster({
+      tenantId: context.tenantId,
+      queueId: targetQueueId,
+      webhookCredentialId: lead.webhookCredentialId,
+    })
+    : null;
+  const dutyBroker = target?.dutyScheduleId
+    ? dutyRoster?.brokers.find((candidate) => candidate.id === brokerId && candidate.scheduleId === target.dutyScheduleId)
+    : undefined;
+  if (target?.dutyScheduleId && !dutyBroker) return { status: "conflict" as const, reason: "O corretor não está escalado no plantão ativo desta fila." };
   const [broker] = await db.select({
     id: schema.user.id,
     phone: schema.brokerProfiles.phone,
@@ -1398,7 +1409,7 @@ export async function offerLeadToBrokerManually(
       eq(schema.user.active, true),
       eq(schema.user.status, "active"),
     )).limit(1);
-  if (!broker || broker.branchId !== targetBranchId) return { status: "conflict" as const, reason: "O corretor não está ativo na unidade escolhida." };
+  if (!broker || (dutyBroker ? broker.branchId !== dutyBroker.branchId : broker.branchId !== targetBranchId)) return { status: "conflict" as const, reason: dutyBroker ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor não está ativo na unidade escolhida." };
   if (!broker.phone) return { status: "fallback" as const, reason: "O corretor não possui telefone para receber a oferta. O lead voltará à distribuição normal." };
 
   const [tenant] = await db.select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes })
@@ -1416,6 +1427,10 @@ export async function offerLeadToBrokerManually(
     queueId: targetQueueId,
     capacityPerBroker: null,
     assignmentSource: "manual_offer",
+    ...(dutyBroker ? {
+      dutyScheduleIds: [dutyBroker.scheduleId],
+      dutyScheduleIdByBroker: { [brokerId]: dutyBroker.scheduleId },
+    } : {}),
   });
   if (!result.created) {
     const [activeOffer] = await db.select({ id: schema.leadOffers.id, expiresAt: schema.leadOffers.expiresAt })
