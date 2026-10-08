@@ -12,6 +12,7 @@ import {
   Home,
   ListChecks,
   CalendarDays,
+  Calculator,
   MessageSquare,
   Users,
   Menu,
@@ -43,6 +44,7 @@ export type LightTopNavProps = {
   };
   showConversations?: boolean;
   showDutyCalendar?: boolean;
+  showQuoteSimulator?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
 };
 
@@ -51,6 +53,7 @@ export function LightTopNavBar({
   user,
   showConversations = true,
   showDutyCalendar = false,
+  showQuoteSimulator = false,
   initialAvailability = "available",
 }: LightTopNavProps) {
   const pathname = usePathname();
@@ -65,6 +68,7 @@ export function LightTopNavBar({
   const navItems = [
     { href: "/dashboard", label: "Início", icon: Home },
     { href: "/minha-fila", label: "Minha Fila", icon: ListChecks },
+    ...(showQuoteSimulator ? [{ href: "/cotacao", label: "Cotação", icon: Calculator }] : []),
     ...(showDutyCalendar ? [{ href: "/plantoes", label: "Plantões", icon: CalendarDays }] : []),
     ...(showConversations
       ? [{ href: "/conversas/broker", label: "Insights", icon: MessageSquare }]

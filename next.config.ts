@@ -32,7 +32,6 @@ const nextConfig: NextConfig = {
       { source: "/materiais-divulgacao", destination: "/marketing?tab=materiais", permanent: false },
       { source: "/configuracoes/comissoes", destination: "/settings?tab=comissoes", permanent: false },
       { source: "/financeiro", destination: "/distribuicao?view=resumo_dia", permanent: false },
-      { source: "/cotacao", destination: "/leads", permanent: false },
       { source: "/catalogo", destination: "/conversas", permanent: false },
       { source: "/inteligencia", destination: "/qualificacao", permanent: false },
       { source: "/agentes-ia", destination: "/qualificacao", permanent: false },
