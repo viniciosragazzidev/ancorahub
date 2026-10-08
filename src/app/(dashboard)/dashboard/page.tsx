@@ -1,10 +1,9 @@
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { withRequestTiming } from "@/shared/observability/request-timing";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
-import { LightDashboard } from "@/features/broker-workspace/components/light-dashboard";
-import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
-import { getDatabase, schema } from "@/shared/db";
-import { eq } from "drizzle-orm";
+import { Suspense } from "react";
+import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
+import { LightDashboardContent } from "@/features/broker-workspace/components/light-dashboard-content";
 import { getDashboardViewModel } from "@/features/dashboard/service";
 import { OperationalDashboard } from "@/features/dashboard/components/operational-dashboard";
 import { parsePeriod, type PeriodValue } from "@/shared/period";
@@ -43,16 +42,11 @@ export default async function DashboardPage({
     // before the shared reporting feature so the broker never falls through to
     // the management dashboard.
     if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
-      const [tenantRows, data] = await Promise.all([
-        getDatabase()
-          .select({ logoUrl: schema.tenants.logoUrl })
-          .from(schema.tenants)
-          .where(eq(schema.tenants.id, context.tenantId))
-          .limit(1),
-        getBrokerWorkspaceData(),
-      ]);
-
-      return <LightDashboard data={data} logoUrl={tenantRows[0]?.logoUrl ?? null} />;
+      return (
+        <Suspense fallback={<LightPageSkeleton variant="dashboard" />}>
+          <LightDashboardContent />
+        </Suspense>
+      );
     }
 
     const canReadQuality = await canAccessLeadQualityCenter(context);
