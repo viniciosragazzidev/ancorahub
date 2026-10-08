@@ -1,0 +1,123 @@
+/*
+ * Arc UI tokens scoped to the broker app (Light mode) and mapped to Venancor.
+ * Arc ships these on :root (foundation.css), which would restyle the whole CRM, and
+ * several names collide with the CRM tokens (--border, --accent, --radius-control...).
+ * Add the class "arc-venancor" to any element that renders Arc components (the Light
+ * shell, the bottom sheet panel) and the tokens apply only below it.
+ */
+.arc-venancor {
+  color-scheme: light;
+  --neutral-0: oklch(100% 0 0);
+  --neutral-1: oklch(99% 0 0);
+  --neutral-2: oklch(97.8% 0 0);
+  --neutral-3: oklch(95.8% 0 0);
+  --neutral-4: oklch(91.5% 0 0);
+  --neutral-5: oklch(84% 0 0);
+  --neutral-6: oklch(72% 0 0);
+  --neutral-7: oklch(59% 0 0);
+  --neutral-8: oklch(46% 0 0);
+  --neutral-9: oklch(34% 0 0);
+  --neutral-10: oklch(23% 0 0);
+  --neutral-11: oklch(15% 0 0);
+  --background: var(--neutral-0);
+  --surface: var(--neutral-0);
+  --surface-raised: var(--neutral-0);
+  --surface-muted: var(--neutral-2);
+  --foreground: var(--neutral-11);
+  --text-secondary: var(--neutral-8);
+  --text-muted: var(--neutral-7);
+  --border: oklch(93.5% 0 0);
+  --border-subtle: oklch(96.5% 0 0);
+  --border-strong: oklch(82% 0 0);
+  --accent: oklch(33% 0 0);
+  --accent-strong: oklch(24% 0 0);
+  --accent-subtle: oklch(33% 0 0 / .1);
+  --accent-foreground: var(--background);
+  /* Selection controls (switch, checkbox, radio, slider). --control-on fills a chosen control; --control-glyph is the check or dot drawn on it;
+     thumbs stay white in both states so they always read against the track. Tuned per accent below so white thumbs hold on every hue. */
+  --control-on: oklch(23% 0 0);
+  --control-glyph: oklch(100% 0 0);
+  --control-track: oklch(89.5% 0 0);
+  --control-track-hover: oklch(86% 0 0);
+  --control-thumb: oklch(100% 0 0);
+  --control-thumb-on: oklch(100% 0 0);
+  --control-thumb-shadow: 0 0 0 .5px oklch(0% 0 0 / .07), 0 1px 2px oklch(0% 0 0 / .14), 0 2px 6px oklch(0% 0 0 / .06);
+  --control-on-subtle: color-mix(in oklab, var(--control-on) 10%, transparent);
+  /* Slider fills. Same as --control-on except neutral dark, where a mid grey keeps the white thumb distinct. */
+  --control-fill: var(--control-on);
+  /* Pointer focus draws no ring (product decision). --focus-ring is the halo a few fields drew for any input method, so it stays transparent.
+     Keyboard focus uses the outline at the end of this file; tune it with --focus-outline, --focus-outline-width and --focus-outline-offset. */
+  --focus-ring: transparent;
+  --success: oklch(49% .19 150);
+  --warning: oklch(58% .18 75);
+  --danger: oklch(54% .21 25);
+  --shadow-resting: 0 1px 2px oklch(0% 0 0 / .035);
+  --shadow-raised: 0 6px 18px oklch(0% 0 0 / .065), 0 1px 3px oklch(0% 0 0 / .035);
+  --shadow-floating: 0 20px 48px oklch(0% 0 0 / .105), 0 3px 10px oklch(0% 0 0 / .045);
+  /* Brand gradient: soft lavender to warm peach. Light enough for dark text (--arc-gradient-foreground, >12:1). */
+  --arc-gradient-from: oklch(90% .045 300);
+  --arc-gradient-to: oklch(92% .045 65);
+  --arc-gradient: linear-gradient(100deg, var(--arc-gradient-from), var(--arc-gradient-to));
+  --arc-gradient-foreground: oklch(22% .01 300);
+  /* Faint wash for backgrounds and tinted panels. */
+  --arc-gradient-soft: linear-gradient(135deg, oklch(97.5% .016 300), oklch(98% .016 65));
+  /* Hairline borders and rules. */
+  --arc-gradient-line: linear-gradient(100deg, oklch(83% .06 300), oklch(86% .06 65));
+  /* Text-safe stops for gradient text and small marks (>4.5:1 on the surface). */
+  --arc-gradient-ink: linear-gradient(100deg, oklch(47% .1 300), oklch(50% .09 55));
+  --space-1: .25rem; --space-2: .5rem; --space-3: .75rem; --space-4: 1rem;
+  --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem;
+  --space-12: 3rem; --space-16: 4rem; --space-20: 5rem; --space-24: 6rem;
+  --radius-control: 1.125rem; --radius-panel: 1.625rem; --radius-surface: 2.125rem; --radius-pill: 9999px;
+  --control-height-sm: 2.25rem; --control-height-md: 2.75rem; --control-height-lg: 3.125rem;
+  --font-display: var(--font-geist, "Geist Variable"), sans-serif;
+  --font-body: var(--font-inter, "Inter Variable"), sans-serif;
+  --text-xs: .75rem; --text-sm: .875rem; --text-base: 1rem; --text-lg: 1.125rem;
+  --text-xl: 1.375rem; --text-2xl: 1.75rem; --text-3xl: 2.25rem;
+  --text-4xl: 3.25rem; --text-5xl: 4.5rem;
+  --tracking-display: -.03em; --tracking-body: -.01em;
+  --leading-display: 1.1; --leading-body: 1.4;
+  --ease-enter: cubic-bezier(.16,1,.3,1);
+  --ease-standard: cubic-bezier(.22,1,.36,1);
+  --ease-exit: cubic-bezier(.7,0,.84,0);
+  --ease-in-out: cubic-bezier(.65,0,.35,1);
+  /* Spring with a gentle settle (bounce .15). Pair with --duration-spring for transform transitions. */
+  --ease-spring: linear(0, 0.0258, 0.09, 0.1763, 0.2732, 0.3724, 0.4683, 0.5573, 0.6376, 0.7082, 0.7689, 0.8202, 0.8628, 0.8976, 0.9256, 0.9476, 0.9648, 0.9778, 0.9875, 0.9945, 0.9994, 1.0026, 1.0047, 1.0058, 1.0062, 1.0062, 1.0059, 1.0055, 1.0049, 1.0043, 1.0036, 1.0031, 1.0025, 1.002, 1.0016, 1.0013, 1);
+  --duration-instant: 120ms; --duration-fast: 160ms; --duration-standard: 240ms; --duration-considered: 480ms; --duration-spring: 580ms;
+
+  /* Venancor mapping (docs/design-system/venancor.md) */
+  --background: #f7f7f9;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-muted: #f1f1f5;
+  --foreground: #0b0b12;
+  --text-secondary: #4b4b59;
+  --text-muted: #666674;
+  --border: rgb(16 16 40 / 0.08);
+  --border-subtle: rgb(16 16 40 / 0.05);
+  --border-strong: rgb(16 16 40 / 0.18);
+  --accent: #3b2dff;
+  --accent-strong: #2a1fd1;
+  --accent-subtle: rgb(59 45 255 / 0.1);
+  --accent-foreground: #ffffff;
+  --control-on: #3b2dff;
+  --control-fill: #3b2dff;
+  --success: #0f7a4d;
+  --warning: #a15c00;
+  --danger: #d4263a;
+  --shadow-resting: 0 1px 2px rgb(16 16 40 / 0.04);
+  --shadow-raised: 0 1px 2px rgb(16 16 40 / 0.04), 0 8px 24px rgb(16 16 40 / 0.05);
+  --shadow-floating: 0 16px 40px rgb(16 16 40 / 0.14);
+  --radius-control: 9999px;
+  --radius-panel: 1.5rem;
+  --radius-surface: 1.75rem;
+  --font-body: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
+  --arc-gradient: none;
+  --arc-gradient-soft: none;
+}
+
+.arc-venancor :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
