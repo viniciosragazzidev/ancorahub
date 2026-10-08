@@ -37,7 +37,7 @@ export function LightChrome({
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
 }) {
-  const { pathname, tab } = useLightRoute();
+  const { pathname, tab, hidesTabBar } = useLightRoute();
   // The sheet belongs to the screen it was opened on: navigating closes it without an effect.
   const [moreSheet, setMoreSheet] = useState<{ open: boolean; path: string }>({ open: false, path: pathname });
   const moreOpen = moreSheet.open && moreSheet.path === pathname;
@@ -65,17 +65,23 @@ export function LightChrome({
         <main
           ref={mainRef}
           data-slot="app-content"
-          className="min-h-0 w-full flex-1 overflow-y-auto overscroll-contain pb-[calc(96px+var(--mobile-safe-bottom))] md:pb-0"
+          className={
+            hidesTabBar
+              ? "min-h-0 w-full flex-1 overflow-y-auto overscroll-contain"
+              : "min-h-0 w-full flex-1 overflow-y-auto overscroll-contain pb-[calc(96px+var(--mobile-safe-bottom))] md:pb-0"
+          }
         >
           {children}
         </main>
       </div>
-      <LightBottomNav
-        activeTab={tab}
-        queueBadgeCount={queueBadgeCount}
-        moreOpen={moreOpen}
-        onOpenMore={() => setMoreOpen(true)}
-      />
+      {hidesTabBar ? null : (
+        <LightBottomNav
+          activeTab={tab}
+          queueBadgeCount={queueBadgeCount}
+          moreOpen={moreOpen}
+          onOpenMore={() => setMoreOpen(true)}
+        />
+      )}
       <LightMoreSheet
         open={moreOpen}
         onOpenChange={setMoreOpen}

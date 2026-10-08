@@ -1,92 +1,72 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
+
 import { AiConversationInsightCard } from "@/features/conversation-intelligence/components/ai-conversation-insight-card";
-import { type LightLeadDetailData } from "./types";
+import { cn } from "@/lib/utils";
+
+import type { LightLeadDetailData } from "./types";
 import type { LeadDetailController } from "./use-lead-detail";
 
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-sm text-(--text-secondary)">{label}</dt>
+      <dd className="truncate text-sm font-medium text-(--foreground)">{value}</dd>
+    </div>
+  );
+}
+
+/** Collapsible lead facts, attendance summary and the AI conversation diagnostic. */
 export function DetailsZone({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
   const { detailsExpanded, setDetailsExpanded } = c;
+  const product = lead.planName || lead.carrierName || lead.clientInfo?.find((item) => item.key === "planType")?.value || "Não informado";
+  const leadType = lead.tipo === "PJ" || lead.tipo === "PME" ? "Pessoa jurídica (PJ ou PME)" : "Pessoa física (PF)";
+
   return (
     <>
-          {/* Zona C — Detalhes Colapsáveis */}
-          <div className="pt-2 border-t border-border/40">
-            <button
-              type="button"
-              onClick={() => setDetailsExpanded((prev) => !prev)}
-              aria-expanded={detailsExpanded}
-              className="flex w-full items-center justify-between py-1 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              <span>{detailsExpanded ? "Ocultar detalhes do lead" : "Ver detalhes do lead"}</span>
-              <span className="text-xs">{detailsExpanded ? "▲" : "▼"}</span>
-            </button>
-
-            {detailsExpanded && (
-              <div className="mt-3 space-y-3 animate-in fade-in duration-200">
-                <div className="grid grid-cols-2 gap-3 rounded-xl border border-border/70 bg-muted/20 p-3.5 text-xs">
-                  <div>
-                    <span className="text-muted-foreground block text-[11px]">Produto / Plano</span>
-                    <strong className="font-semibold text-foreground truncate block">
-                      {lead.planName || lead.carrierName || lead.clientInfo?.find((item) => item.key === "planType")?.value || "Não informado"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[11px]">Tipo de Lead</span>
-                    <strong className="font-semibold text-foreground truncate block">
-                      {lead.tipo === "PJ" || lead.tipo === "PME" ? "PJ / PME (Pessoa Jurídica)" : "PF (Pessoa Física)"}
-                    </strong>
-                  </div>
-                  {lead.tipoCnpj ? (
-                    <div>
-                      <span className="text-muted-foreground block text-[11px]">Tipo de CNPJ</span>
-                      <strong className="font-semibold text-foreground truncate block">{lead.tipoCnpj}</strong>
-                    </div>
-                  ) : null}
-
-                  <div>
-                    <span className="text-muted-foreground block text-[11px]">Origem / Campanha</span>
-                    <strong className="font-semibold text-foreground truncate block">
-                      {lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook / Meta")}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[11px]">Cidade / Filial</span>
-                    <strong className="font-semibold text-foreground truncate block">
-                      {lead.city || lead.branchName || "Não informada"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[11px]">Data de Entrada</span>
-                    <strong className="font-semibold text-foreground truncate block">
-                      {new Date(lead.createdAt).toLocaleDateString("pt-BR")}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[11px]">Consentimento LGPD</span>
-                    <strong className="font-semibold text-emerald-600 truncate block">
-                      ✓ Confirmado
-                    </strong>
-                  </div>
-                </div>
-
-                {lead.summary ? (
-                  <div className="rounded-xl border border-border/60 bg-card p-3 text-xs space-y-1">
-                    <span className="font-semibold text-primary uppercase text-[10px] tracking-wider block">
-                      Resumo do atendimento
-                    </span>
-                    <p className="text-muted-foreground leading-relaxed">{lead.summary}</p>
-                  </div>
-                ) : null}
-
-                {/* AI Conversation Diagnostic */}
-                <AiConversationInsightCard
-                  leadId={lead.id}
-                  assessment={lead.aiIntelligence}
-                  policyResult={lead.aiPolicyResult}
-                  canManage={lead.isCurrentBroker}
-                />
+      <section className="arc-venancor rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
+        <button
+          type="button"
+          onClick={() => setDetailsExpanded((previous) => !previous)}
+          aria-expanded={detailsExpanded}
+          aria-controls="lead-details-panel"
+          className="flex min-h-14 w-full items-center justify-between gap-3 px-5 text-left text-sm font-medium text-(--foreground)"
+        >
+          <span>{detailsExpanded ? "Ocultar detalhes do lead" : "Ver detalhes do lead"}</span>
+          <ChevronDown
+            className={cn("size-4 text-(--text-muted) transition-transform duration-(--duration-fast) motion-reduce:transition-none", detailsExpanded && "rotate-180")}
+            aria-hidden="true"
+          />
+        </button>
+        {detailsExpanded ? (
+          <div id="lead-details-panel" className="flex flex-col gap-4 border-t border-(--border) p-5">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <Fact label="Produto ou plano" value={product} />
+              <Fact label="Tipo de lead" value={leadType} />
+              {lead.tipoCnpj ? <Fact label="Tipo de CNPJ" value={lead.tipoCnpj} /> : null}
+              <Fact label="Origem ou campanha" value={lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook ou Meta")} />
+              <Fact label="Cidade ou filial" value={lead.city || lead.branchName || "Não informada"} />
+              <Fact label="Data de entrada" value={new Date(lead.createdAt).toLocaleDateString("pt-BR")} />
+              <Fact label="Consentimento LGPD" value={lead.consentimentoLgpd ? "Confirmado" : "Não registrado"} />
+            </dl>
+            {lead.summary ? (
+              <div>
+                <h3 className="text-sm font-semibold text-(--foreground)">Resumo do atendimento</h3>
+                <p className="mt-1 text-sm leading-relaxed text-(--text-secondary)">{lead.summary}</p>
               </div>
-            )}
+            ) : null}
           </div>
+        ) : null}
+      </section>
+      {detailsExpanded ? (
+        <AiConversationInsightCard
+          leadId={lead.id}
+          assessment={lead.aiIntelligence}
+          policyResult={lead.aiPolicyResult}
+          canManage={lead.isCurrentBroker}
+        />
+      ) : null}
     </>
   );
 }

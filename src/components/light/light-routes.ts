@@ -61,6 +61,8 @@ export type LightRoute = {
   isRoot: boolean;
   /** Where "back" goes when there is no usable history. */
   parentHref: string | null;
+  /** Detail screens with their own fixed action bar hide the floating tab bar. */
+  hidesTabBar?: boolean;
 };
 
 type RouteRule = { test: (path: string) => boolean; route: LightRoute };
@@ -74,7 +76,7 @@ const RULES: readonly RouteRule[] = [
   { test: under("/dashboard"), route: { title: "Detalhe", tab: "inicio", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/minha-fila"), route: { title: "Fila", tab: "fila", isRoot: true, parentHref: null } },
   { test: exact("/leads"), route: { title: "Fila", tab: "fila", isRoot: false, parentHref: "/minha-fila" } },
-  { test: under("/leads"), route: { title: "Lead", tab: "fila", isRoot: false, parentHref: "/minha-fila" } },
+  { test: under("/leads"), route: { title: "Lead", tab: "fila", isRoot: false, parentHref: "/minha-fila", hidesTabBar: true } },
   { test: exact("/conversas/broker"), route: { title: "Insights", tab: "insights", isRoot: true, parentHref: null } },
   { test: under("/conversas"), route: { title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },
   { test: exact("/conversas"), route: { title: "Insights", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },

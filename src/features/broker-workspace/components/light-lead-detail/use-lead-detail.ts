@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import { useSuccessOverlay } from "@/components/motion/success-overlay";
@@ -13,7 +13,7 @@ import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
-import { DECLINE_REASONS, STEP_OPTIONS, type ConfirmationDocument, type LightLeadDetailData, type LiteRequirement } from "./types";
+import { STEP_OPTIONS, type ConfirmationDocument, type LightLeadDetailData, type LiteRequirement } from "./types";
 
 /** All state and server-action handlers of the Light lead detail. Behavior is unchanged from the single-file version. */
 export function useLeadDetail({
@@ -33,7 +33,7 @@ export function useLeadDetail({
 
     const [accepting, startAcceptTransition] = useTransition();
     const [showDeclineModal, setShowDeclineModal] = useState(false);
-    const [declineReason, setDeclineReason] = useState(DECLINE_REASONS[0]);
+    const [declineReason, setDeclineReason] = useState<string>("");
     const [declining, startDeclineTransition] = useTransition();
 
     const [showUpdateSheet, setShowUpdateSheet] = useState(false);
@@ -43,7 +43,6 @@ export function useLeadDetail({
     const [observation, setObservation] = useState<string>("");
     const [lossReason, setLossReason] = useState<string>("preco");
     const [regressionJustification, setRegressionJustification] = useState<string>("");
-    const [saleSuccessAnim, setSaleSuccessAnim] = useState(false);
     const [updatingStep, startUpdateTransition] = useTransition();
 
     // SLA Live Countdown calculation
@@ -88,7 +87,6 @@ export function useLeadDetail({
     const [docFile, setDocFile] = useState<File | null>(null);
     const [docObservation, setDocObservation] = useState("");
     const [isSaleClosing, setIsSaleClosing] = useState(true);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const approvedDocument = useMemo(() => documents.find((d) => d.status === "approved"), [documents]);
     const rejectedDocument = useMemo(() => documents.find((d) => d.status === "rejected"), [documents]);
@@ -153,7 +151,7 @@ export function useLeadDetail({
 
     // Handle Decline Lead
     function handleConfirmDecline() {
-      if (declining) return;
+      if (declining || !declineReason) return;
       const formData = new FormData();
       formData.append("leadId", lead.id);
       formData.append("motivoRecusa", declineReason);
@@ -383,7 +381,6 @@ export function useLeadDetail({
     setLossReason,
     regressionJustification,
     setRegressionJustification,
-    saleSuccessAnim,
     updatingStep,
     slaRemainingMinutes,
     potentialSaleCheck,
@@ -406,7 +403,6 @@ export function useLeadDetail({
     setDocObservation,
     isSaleClosing,
     setIsSaleClosing,
-    fileInputRef,
     approvedDocument,
     rejectedDocument,
     isDistributed,

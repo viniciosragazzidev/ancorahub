@@ -1,79 +1,63 @@
 "use client";
 
-import { Clock, Share } from "@/components/huge-icons";
-import { Badge } from "@/components/ui/badge";
-import { type LightLeadDetailData } from "./types";
+import { Avatar } from "@/components/arc/avatar/avatar";
+import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
+
+import { stageLabel } from "./format";
+import type { LightLeadDetailData } from "./types";
 import type { LeadDetailController } from "./use-lead-detail";
 
-export function IdentityZone({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
-  const { accepted, slaRemainingMinutes, isDistributed } = c;
+/** Centered identity: avatar, name, stage chip and, for a new lead, the acceptance deadline. */
+export function IdentityHeader({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
+  const { isDistributed, leadStatus, slaRemainingMinutes } = c;
+  const tone: BadgeTone = isDistributed ? "info" : leadStatus === "converted" ? "success" : "neutral";
+
   return (
-    <>
-          {/* Zona A — Identidade e Status */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Badge
-              variant={isDistributed ? "warning" : accepted ? "outline" : "secondary"}
-              className="text-[11px] font-bold"
-            >
-              {isDistributed ? "NOVO LEAD" : accepted ? "EM ATENDIMENTO" : "AGUARDANDO"}
-            </Badge>
+    <header className="arc-venancor flex flex-col items-center gap-3 pt-2 text-center">
+      <Avatar name={lead.nome} size="xl" className="light-avatar" />
+      <div className="flex min-w-0 max-w-full flex-col items-center gap-1">
+        <h1 className="max-w-full break-words text-2xl font-bold tracking-tight text-(--foreground)">{lead.nome}</h1>
+        {isDistributed ? (
+          <p className="text-sm text-(--text-secondary)">Os dados de contato aparecem depois que você aceitar o lead.</p>
+        ) : lead.email ? (
+          <p className="max-w-full truncate text-sm text-(--text-secondary)">{lead.email}</p>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <Badge tone={tone}>{stageLabel(leadStatus)}</Badge>
+        {isDistributed && slaRemainingMinutes !== null ? (
+          <Badge tone={slaRemainingMinutes <= 5 ? "warning" : "neutral"}>
+            <span className="tabular-nums">
+              {slaRemainingMinutes <= 0
+                ? `Prazo vencido há ${Math.abs(slaRemainingMinutes)} min`
+                : `Aceite em até ${slaRemainingMinutes} min`}
+            </span>
+          </Badge>
+        ) : null}
+        {!isDistributed && lead.urgency ? <Badge tone="warning">{lead.urgency}</Badge> : null}
+      </div>
+    </header>
+  );
+}
 
-            {/* SLA Countdown ao vivo */}
-            {isDistributed && slaRemainingMinutes !== null && (
-              <Badge
-                variant={slaRemainingMinutes <= 0 ? "destructive" : slaRemainingMinutes <= 5 ? "warning" : "outline"}
-                className="text-[10px] font-semibold"
-              >
-                <Clock className="mr-1 size-3" />
-                {slaRemainingMinutes <= 0
-                  ? `SLA vencido há ${Math.abs(slaRemainingMinutes)} min`
-                  : `Aceite em até ${slaRemainingMinutes} min`}
-              </Badge>
-            )}
-
-            {!isDistributed && lead.urgency ? (
-              <Badge variant="destructive" className="text-[10px] font-semibold">
-                <Clock className="mr-1 size-3" />
-                {lead.urgency}
-              </Badge>
-            ) : null}
+/** Everything the client told us (AI qualification and form), before and after acceptance. */
+export function ClientInfoCard({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
+  // Contact data stays hidden until the broker accepts.
+  const info = (lead.clientInfo ?? []).filter((item) => !(c.isDistributed && item.key === "email"));
+  if (!info.length) return null;
+  return (
+    <section aria-labelledby="client-info-heading" className="arc-venancor rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+      <h2 id="client-info-heading" className="text-base font-semibold text-(--foreground)">
+        Informações do cliente
+      </h2>
+      <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+        {info.map((item) => (
+          <div key={item.key} className="min-w-0">
+            <dt className="text-sm text-(--text-secondary)">{item.label}</dt>
+            <dd className="break-words text-sm font-medium text-(--foreground)">{item.value}</dd>
           </div>
-
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">{lead.nome}</h1>
-
-            {isDistributed ? (
-              <p className="mt-1 text-xs text-muted-foreground italic">
-                O número do cliente não é exibido no computador. Aceite o lead e abra o atendimento pelo WhatsApp.
-              </p>
-            ) : null}
-
-            {!isDistributed && lead.email ? (
-              <p className="mt-1 text-xs text-muted-foreground flex items-center gap-1">
-                <Share className="size-3" />
-                {lead.email}
-              </p>
-            ) : null}
-          </div>
-
-          {/* Informações do cliente — tudo o que ele informou, antes e depois do aceite */}
-          {(() => {
-            // Contact data stays hidden until the broker accepts.
-            const info = (lead.clientInfo ?? []).filter((item) => !(isDistributed && item.key === "email"));
-            return info.length ? (
-              <section aria-labelledby="client-info-heading" className="rounded-xl border border-border p-3.5">
-                <h2 id="client-info-heading" className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Informações do cliente</h2>
-                <dl className="mt-2 grid grid-cols-1 gap-x-4 gap-y-2 text-xs sm:grid-cols-2">
-                  {info.map((item) => (
-                    <div key={item.key} className="min-w-0">
-                      <dt className="text-[11px] text-muted-foreground">{item.label}</dt>
-                      <dd className="break-words font-semibold text-foreground">{item.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            ) : null;
-          })()}
-    </>
+        ))}
+      </dl>
+    </section>
   );
 }
