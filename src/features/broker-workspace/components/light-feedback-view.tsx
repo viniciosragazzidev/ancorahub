@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { toast } from "@/components/ui/sonner";
-import { ArrowRight, CheckCircle, WhatsappLogo } from "@/components/huge-icons";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { CheckCircle, WhatsappLogo } from "@/components/huge-icons";
+import { ActionButton } from "@/components/arc/action-button/action-button";
+import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import "@/components/arc/venancor-scope.css";
 
 type FeedbackViewProps = {
   leadId: string;
@@ -25,17 +26,32 @@ const FEEDBACK_OPTIONS = [
   { label: "Sem interesse", status: "lost", lossReason: "sem_interesse" },
 ];
 
+const CARD_STYLE: React.CSSProperties = {
+  background: "var(--surface)",
+  borderRadius: "1.5rem",
+  boxShadow: "var(--shadow-resting)",
+};
+
+const OPTION_STYLE: React.CSSProperties = {
+  background: "var(--surface)",
+  color: "var(--foreground)",
+  border: "1px solid var(--border)",
+  minHeight: "3rem",
+  justifyContent: "space-between",
+  width: "100%",
+  fontWeight: 600,
+};
+
 export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: FeedbackViewProps) {
   const [submitted, setSubmitted] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState("");
-  const [pending, startTransition] = useTransition();
 
   const waUrl = buildWhatsAppUrl(phone);
 
-  function handleSelectOption(opt: typeof FEEDBACK_OPTIONS[number]) {
-    if (pending || submitted) return;
-
+  async function handleSelectOption(opt: typeof FEEDBACK_OPTIONS[number]) {
+    if (submitted) return;
     setSelectedLabel(opt.label);
+
     const formData = new FormData();
     formData.append("leadId", leadId);
     formData.append("newStatus", opt.status);
@@ -45,87 +61,105 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
       formData.append("lossReason", opt.lossReason);
     }
 
-    startTransition(async () => {
-      try {
-        const res = await changeLeadStatusAction({}, formData);
-        if (!res.success) {
-          toast.error(res.error ?? "Não foi possível registrar a atualização.");
-          return;
-        }
-        setSubmitted(true);
-        toast.success("Atualização registrada.");
-      } catch {
-        toast.error("Não foi possível registrar no momento.");
-      }
-    });
+    let res;
+    try {
+      res = await changeLeadStatusAction({}, formData);
+    } catch {
+      toast.error("Não foi possível registrar no momento.");
+      throw new Error("feedback-action-failed");
+    }
+
+    if (!res.success) {
+      toast.error(res.error ?? "Não foi possível registrar a atualização.");
+      throw new Error("feedback-action-failed");
+    }
+
+    setSubmitted(true);
+    toast.success("Atualização registrada.");
   }
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-5 px-4 py-8 pb-24 text-center">
-      <Card variant="subtle" className="p-6 bg-card/95 shadow-md space-y-4">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">Atualização Rápida</span>
-          <h1 className="text-xl font-bold tracking-tight text-foreground mt-1">{leadName}</h1>
-        </div>
+    <div
+      className="arc-venancor min-h-full flex flex-col"
+      style={{ background: "var(--background)", color: "var(--foreground)" }}
+    >
+      <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-8 pb-[max(120px,var(--mobile-safe-bottom,0px))]">
+        {/* Screen title */}
+        <header className="text-center">
+          <h1
+            className="text-[30px] leading-tight font-bold"
+            style={{ letterSpacing: "-0.03em" }}
+          >
+            {leadName}
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+            Como foi o contato?
+          </p>
+        </header>
 
         {submitted ? (
-          /* Confirmation Screen after feedback */
-          <div className="space-y-4 py-3 animate-in fade-in zoom-in duration-300">
-            <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-500/10 text-emerald-600">
-              <CheckCircle className="size-7" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-foreground">✓ Atualização registrada</h2>
-              <p className="text-xs text-muted-foreground mt-1">
-                Obrigado. O atendimento foi atualizado para <strong>{selectedLabel}</strong>.
-              </p>
-            </div>
-
-            <div className="pt-2 space-y-2">
-              {waUrl ? (
-                <a
-                  href={waUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full h-11 text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center rounded-lg shadow-sm"
-                >
-                  <WhatsappLogo className="size-4" />
-                  VOLTAR PARA O WHATSAPP
-                </a>
-              ) : null}
-
-              <Button
-                variant="outline"
-                size="sm"
-                render={<Link href="/minha-fila" />}
-                className="w-full text-xs font-semibold"
-              >
-                VER MEUS LEADS
-              </Button>
-            </div>
+          /* Final state after the feedback is registered */
+          <div style={CARD_STYLE}>
+            <EmptyState
+              label="Confirmação de atualização registrada"
+              icon={
+                <CheckCircle
+                  width={24}
+                  height={24}
+                  strokeWidth={1.5}
+                  style={{ color: "var(--success)" }}
+                />
+              }
+              title="Atualização registrada"
+              description={`Obrigado. O atendimento foi atualizado para ${selectedLabel}.`}
+              action={
+                <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:justify-center">
+                  {waUrl ? (
+                    <a
+                      href={waUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-xs font-bold text-white transition-opacity hover:opacity-90"
+                      style={{ background: "var(--foreground)" }}
+                    >
+                      <WhatsappLogo className="size-4" />
+                      VOLTAR PARA O WHATSAPP
+                    </a>
+                  ) : null}
+                  <Link
+                    href="/minha-fila"
+                    className="inline-flex h-11 items-center justify-center rounded-full px-5 text-xs font-semibold transition-colors"
+                    style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
+                  >
+                    VER MEUS LEADS
+                  </Link>
+                </div>
+              }
+            />
           </div>
         ) : (
-          /* Feedback Buttons Screen */
-          <div className="space-y-3 pt-1">
-            <p className="text-sm font-semibold text-foreground">Como ficou esse atendimento?</p>
-            
+          /* Feedback option buttons */
+          <div className="space-y-3 p-5" style={CARD_STYLE}>
+            <p className="text-sm font-semibold">Como ficou esse atendimento?</p>
             <div className="grid gap-2">
               {FEEDBACK_OPTIONS.map((opt) => (
-                <Button
+                <ActionButton
                   key={opt.label}
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() => handleSelectOption(opt)}
-                  className="h-11 justify-between px-4 text-xs font-semibold hover:border-primary hover:bg-primary/5 transition-colors"
-                >
-                  <span>{opt.label}</span>
-                  <ArrowRight className="size-3.5 text-muted-foreground" />
-                </Button>
+                  label={opt.label}
+                  pendingLabel="Registrando..."
+                  successLabel="Registrado"
+                  onAction={() => handleSelectOption(opt)}
+                  onActionError={() => {
+                    /* the error was already toasted in handleSelectOption */
+                  }}
+                  className="w-full"
+                  style={OPTION_STYLE}
+                />
               ))}
             </div>
           </div>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

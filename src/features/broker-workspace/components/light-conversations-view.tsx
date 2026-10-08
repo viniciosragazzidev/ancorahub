@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Activity, ArrowLeft, ArrowUpRight, Bot, CheckCircle2, Clock3, ExternalLink, MessageSquareText, Search, Smartphone } from "lucide-react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ArrowLeft, ArrowUpRight, Bot, MessageSquareText } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar } from "@/components/arc/avatar/avatar";
+import { Badge } from "@/components/arc/badge/badge";
+import { Button } from "@/components/arc/button/button";
+import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { SearchField } from "@/components/arc/search-field/search-field";
+import { motionTokens } from "@/components/arc/lib/motion-tokens";
+import "@/components/arc/venancor-scope.css";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,20 @@ export type BrokerConversationInsight = {
   latestMessage: BrokerInsightMessage | null; messages: BrokerInsightMessage[];
   intelligence?: { summary?: string | null; nextBestAction?: string | null; pendingFrom?: string | null; sentiment?: string | null; customerIntent?: string | null; risk?: string | null; lastAnalyzedAt?: string | null } | null;
 };
+
+const CARD_STYLE: React.CSSProperties = {
+  background: "var(--surface)",
+  borderRadius: "var(--radius-surface)",
+  boxShadow: "var(--shadow-resting)",
+};
+
+const SUBCARD_STYLE: React.CSSProperties = {
+  background: "var(--surface-muted)",
+  borderRadius: "var(--radius-panel)",
+};
+
+/** Refresh after realtime events at most once every 2s, grouped (trailing). */
+const REFRESH_DEBOUNCE_MS = 2000;
 
 function formatDateTime(value?: string | null) {
   if (!value) return "Ainda não registrado";
@@ -39,24 +55,41 @@ function isOutbound(direction: string) { return direction === "outgoing" || dire
 function pendingLabel(value?: string | null) {
   return ({ BROKER: "Você precisa responder", CUSTOMER: "Aguardando o cliente", INTERNAL: "Há uma pendência interna", NONE: "Sem pendência identificada" } as Record<string, string>)[value ?? ""] ?? "Análise pendente";
 }
-function healthVariant(item: BrokerConversationInsight): "success" | "warning" | "destructive" | "secondary" {
-  if (item.intelligence?.risk || item.intelligence?.sentiment === "NEGATIVE") return "destructive";
-  if (item.intelligence?.pendingFrom === "BROKER") return "warning";
-  if (item.intelligence?.sentiment === "POSITIVE" || ["HIGH", "VERY_HIGH"].includes(item.intelligence?.customerIntent ?? "")) return "success";
-  return "secondary";
+function intentLabel(value?: string | null) {
+  return ({ VERY_HIGH: "Muito alta", HIGH: "Alta", MEDIUM: "Média", LOW: "Baixa" } as Record<string, string>)[value ?? ""] ?? value ?? null;
 }
-function healthLabel(item: BrokerConversationInsight) {
-  return ({ destructive: "Exige atenção", warning: "Sua ação", success: "Bom avanço", secondary: "Acompanhar" } as const)[healthVariant(item)];
+type Temperature = { tone: "danger" | "warning" | "success" | "neutral"; label: string };
+function temperatureFor(item: BrokerConversationInsight): Temperature {
+  if (item.intelligence?.risk || item.intelligence?.sentiment === "NEGATIVE") return { tone: "danger", label: "Exige atenção" };
+  if (item.intelligence?.pendingFrom === "BROKER") return { tone: "warning", label: "Sua ação" };
+  if (item.intelligence?.sentiment === "POSITIVE" || ["HIGH", "VERY_HIGH"].includes(item.intelligence?.customerIntent ?? "")) return { tone: "success", label: "Bom avanço" };
+  return { tone: "neutral", label: "Acompanhar" };
+}
+const TEMPERATURE_ORDER: Record<Temperature["tone"], number> = { danger: 0, warning: 1, success: 2, neutral: 3 };
+
+function nextActionLabel(item: BrokerConversationInsight) {
+  return item.intelligence?.nextBestAction || pendingLabel(item.intelligence?.pendingFrom);
 }
 
-export function LightConversationsView({ insights, initialLeadId, whatsappConnected, connectionStatus }: { insights: BrokerConversationInsight[]; initialLeadId?: string; whatsappConnected: boolean; connectionStatus: string }) {
+export function LightConversationsView({
+  insights,
+  initialLeadId,
+  whatsappConnected,
+  connectionStatus,
+}: {
+  insights: BrokerConversationInsight[];
+  initialLeadId?: string;
+  whatsappConnected: boolean;
+  connectionStatus: string;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const reduceMotion = useReducedMotion();
   const [query, setQuery] = useState("");
 
   // Estado local para seleção instantânea (0ms) sem re-render do Server Component
-  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("leadId") ?? initialLeadId ?? insights[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("leadId") ?? initialLeadId ?? null);
 
   useEffect(() => {
     const urlLeadId = searchParams.get("leadId");
@@ -65,25 +98,43 @@ export function LightConversationsView({ insights, initialLeadId, whatsappConnec
     }
   }, [searchParams, selectedId]);
 
-  const selected = useMemo(() => {
-    return (selectedId ? insights.find((item) => item.id === selectedId) : null) ?? insights[0] ?? null;
-  }, [insights, selectedId]);
-
-  const filtered = useMemo(() => {
-    const term = query.trim().toLocaleLowerCase("pt-BR");
-    return term ? insights.filter((item) => `${item.name} ${item.phone} ${item.status}`.toLocaleLowerCase("pt-BR").includes(term)) : insights;
-  }, [insights, query]);
-
+  // Realtime: agrupa os eventos e atualiza a lista no máximo uma vez a cada 2s.
+  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     const onRealtime = (event: Event) => {
       const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.domain === "conversations" || detail?.domain === "whatsapp_connection") {
+      if (detail?.domain !== "conversations" && detail?.domain !== "whatsapp_connection") return;
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      refreshTimer.current = setTimeout(() => {
+        refreshTimer.current = null;
         router.refresh();
-      }
+      }, REFRESH_DEBOUNCE_MS);
     };
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
-    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+    return () => {
+      window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+    };
   }, [router]);
+
+  // Prioridade de atenção primeiro (exige atenção, sua ação, bom avanço, acompanhar), depois a mais recente.
+  const ordered = useMemo(
+    () => [...insights].sort((a, b) => {
+      const byTemperature = TEMPERATURE_ORDER[temperatureFor(a).tone] - TEMPERATURE_ORDER[temperatureFor(b).tone];
+      if (byTemperature !== 0) return byTemperature;
+      return Date.parse(b.latestMessage?.sentAt ?? "") - Date.parse(a.latestMessage?.sentAt ?? "");
+    }),
+    [insights],
+  );
+
+  const filtered = useMemo(() => {
+    const term = query.trim().toLocaleLowerCase("pt-BR");
+    return term ? ordered.filter((item) => `${item.name} ${item.phone} ${item.status}`.toLocaleLowerCase("pt-BR").includes(term)) : ordered;
+  }, [ordered, query]);
+
+  const selected = useMemo(() => {
+    return (selectedId ? insights.find((item) => item.id === selectedId) : null) ?? null;
+  }, [insights, selectedId]);
 
   const select = (item: BrokerConversationInsight) => {
     setSelectedId(item.id);
@@ -104,116 +155,277 @@ export function LightConversationsView({ insights, initialLeadId, whatsappConnec
     }
   };
 
-  return <section className="flex h-full min-h-0 flex-col bg-background" aria-label="Central de insights do WhatsApp">
-    <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(17rem,0.75fr)_minmax(0,1.75fr)]">
-      <aside className={cn("min-h-0 border-r border-border bg-card", selected ? "hidden lg:block" : "block")}>
-        <div className="border-b border-border p-3">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} className="pl-9" placeholder="Buscar na sua carteira" aria-label="Buscar lead ou cliente" />
-          </label>
-        </div>
-        <ScrollArea className="h-[calc(100%-4.1rem)]">
-          <div className="space-y-1 p-2">
-            {filtered.map((item) => {
-              const active = item.id === selected?.id;
-              return <button key={item.id} type="button" onClick={() => select(item)} className={cn("w-full rounded-lg border px-3 py-2.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring", active ? "border-primary/30 bg-primary/5" : "border-transparent hover:border-border hover:bg-muted/50")} aria-current={active ? "page" : undefined}>
-                <div className="flex items-start justify-between gap-2">
-                  <span className="truncate text-sm font-semibold">{item.name}</span>
-                  <Badge variant={healthVariant(item)} className="shrink-0 text-[10px]">{healthLabel(item)}</Badge>
+  return (
+    <div
+      className="arc-venancor flex min-h-full flex-col"
+      style={{ background: "var(--background)", color: "var(--foreground)" }}
+    >
+      <div className="mx-auto w-full max-w-6xl flex-1 px-4 pb-[max(120px,var(--mobile-safe-bottom,0px))] pt-6 sm:px-6">
+        <header className="space-y-1">
+          <h1 className="text-[30px] font-bold leading-tight" style={{ letterSpacing: "var(--tracking-display)" }}>
+            Insights
+          </h1>
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            {insights.length === 1 ? "1 conversa ativa" : `${insights.length} conversas ativas`}
+            <span className="mx-2" aria-hidden="true">·</span>
+            <span style={{ color: whatsappConnected ? "var(--success)" : "var(--text-muted)" }}>
+              {whatsappConnected ? "WhatsApp conectado" : `WhatsApp ${connectionStatus === "disconnected" ? "desconectado" : connectionStatus}`}
+            </span>
+          </p>
+        </header>
+
+        <div className="mt-6 grid gap-6 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-start">
+          <aside className={cn(selected ? "hidden md:block" : "block")} aria-label="Carteira de conversas">
+            <SearchField
+              label="Buscar conversa"
+              placeholder="Nome ou telefone..."
+              value={query}
+              onValueChange={setQuery}
+            />
+            {filtered.length > 0 ? (
+              <ul className="mt-4 space-y-3">
+                {filtered.map((item) => (
+                  <li key={item.id}>
+                    <InsightCard item={item} active={item.id === selected?.id} onSelect={() => select(item)} />
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="mt-4 px-4 py-10" style={CARD_STYLE}>
+                <EmptyState
+                  label="Nenhuma conversa encontrada"
+                  icon={<MessageSquareText width={24} height={24} strokeWidth={1.5} />}
+                  title={query.trim() ? `Nenhum resultado para "${query.trim()}"` : "Nenhum insight disponível"}
+                  description={query.trim()
+                    ? "Tente outro nome ou telefone."
+                    : "Assim que houver uma conversa vinculada a um lead ou cliente da sua carteira, ela aparecerá aqui."}
+                  action={query.trim() ? (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="inline-flex h-11 cursor-pointer items-center rounded-full px-4 text-xs font-semibold transition-opacity hover:opacity-90"
+                      style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
+                    >
+                      Limpar busca
+                    </button>
+                  ) : undefined}
+                />
+              </div>
+            )}
+          </aside>
+
+          <AnimatePresence initial={false} mode="wait">
+            {selected ? (
+              <motion.div
+                key={selected.id}
+                initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={reduceMotion ? undefined : { opacity: 0, y: -4, transition: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.exit] } }}
+                transition={reduceMotion ? { duration: motionTokens.duration.instant } : { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.enter] }}
+              >
+                <InsightDetail item={selected} onBack={handleBack} />
+              </motion.div>
+            ) : (
+              <motion.div key="empty" className="hidden md:block" initial={reduceMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={reduceMotion ? { duration: 0 } : { duration: motionTokens.duration.fast }}>
+                <div className="px-4 py-16" style={CARD_STYLE}>
+                  <EmptyState
+                    label="Selecione uma conversa"
+                    icon={<MessageSquareText width={24} height={24} strokeWidth={1.5} />}
+                    title="Escolha uma conversa"
+                    description="Toque em um item da lista para ver o resumo da IA e a próxima ação."
+                  />
                 </div>
-                <p className="mt-1 truncate text-xs text-muted-foreground">{item.latestMessage ? `${isOutbound(item.latestMessage.direction) ? "Você: " : "Cliente: "}${item.latestMessage.body}` : "Sem conversa sincronizada"}</p>
-                <p className="mt-1.5 text-[11px] text-muted-foreground">{item.latestMessage ? `Última interação ${formatDateTime(item.latestMessage.sentAt)}` : "Aguardando primeira interação"}</p>
-              </button>;
-            })}
-            {!filtered.length ? <EmptyPortfolioView /> : null}
-          </div>
-        </ScrollArea>
-      </aside>
-      {selected ? <InsightDetail item={selected} onBack={handleBack} /> : <EmptyPortfolioView />}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </div>
-  </section>;
+  );
+}
+
+function InsightCard({ item, active, onSelect }: { item: BrokerConversationInsight; active: boolean; onSelect: () => void }) {
+  const temperature = temperatureFor(item);
+  const intent = intentLabel(item.intelligence?.customerIntent);
+  const risk = item.intelligence?.risk ?? null;
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-current={active ? "true" : undefined}
+      className="w-full cursor-pointer p-4 text-left transition-transform active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100"
+      style={{
+        ...CARD_STYLE,
+        borderRadius: "var(--radius-panel)",
+        outline: active ? "2px solid var(--accent)" : undefined,
+        outlineOffset: active ? "-2px" : undefined,
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <Avatar name={item.name} size="lg" className="light-avatar shrink-0" style={{ fontWeight: 600 }} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <span className="min-w-0 truncate text-sm font-medium" style={{ color: "var(--foreground)" }}>{item.name}</span>
+            <Badge tone={temperature.tone} size="sm" className="shrink-0">{temperature.label}</Badge>
+          </div>
+          <p className="mt-1 truncate text-xs" style={{ color: "var(--text-muted)" }}>
+            {item.latestMessage
+              ? `${isOutbound(item.latestMessage.direction) ? "Você" : "Cliente"}: ${item.latestMessage.body}`
+              : "Sem conversa sincronizada"}
+          </p>
+          <p className="mt-1 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
+            {item.latestMessage ? `Última interação ${formatDateTime(item.latestMessage.sentAt)}` : "Aguardando primeira interação"}
+          </p>
+        </div>
+      </div>
+
+      {(intent || risk) && (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {intent && (
+            <div className="min-w-0 px-3 py-2" style={SUBCARD_STYLE}>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Intenção</p>
+              <p className="mt-0.5 truncate text-xs font-medium" style={{ color: "var(--foreground)" }}>{intent}</p>
+            </div>
+          )}
+          {risk && (
+            <div className="min-w-0 px-3 py-2" style={SUBCARD_STYLE}>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Atenção</p>
+              <p className="mt-0.5 line-clamp-2 text-xs font-medium" style={{ color: "var(--danger)" }}>{risk}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="mt-3 px-3 py-2" style={{ background: "var(--accent-subtle)", borderRadius: "var(--radius-panel)" }}>
+        <p className="text-xs font-medium" style={{ color: "var(--accent-strong)" }}>Próxima ação</p>
+        <p className="mt-0.5 line-clamp-2 text-xs" style={{ color: "var(--foreground)" }}>{nextActionLabel(item)}</p>
+      </div>
+    </button>
+  );
 }
 
 function InsightDetail({ item, onBack }: { item: BrokerConversationInsight; onBack: () => void }) {
   const messages = [...item.messages].sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt));
   const whatsappUrl = buildWhatsAppUrl(item.phone);
-  return <article className="flex min-h-0 flex-1 flex-col bg-muted/15">
-    <header className="flex items-start justify-between gap-3 border-b border-border bg-card px-4 py-3 sm:px-5">
-      <div className="flex min-w-0 items-center gap-3">
-        <Button variant="ghost" size="icon-sm" className="lg:hidden" onClick={onBack} aria-label="Voltar para carteira"><ArrowLeft className="size-4" /></Button>
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary">{item.name.slice(0, 1).toLocaleUpperCase("pt-BR")}</span>
-        <div className="min-w-0">
-          <h2 className="truncate text-sm font-bold">{item.name}</h2>
-          <p className="truncate text-xs text-muted-foreground">{item.kind === "lead" ? "Lead da sua carteira" : "Cliente da sua carteira"}</p>
+
+  return (
+    <article className="flex flex-col gap-4" aria-label={`Detalhe da conversa com ${item.name}`}>
+      <div className="p-4 sm:p-5" style={CARD_STYLE}>
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Voltar para a lista de conversas"
+            className="grid size-11 shrink-0 cursor-pointer place-items-center rounded-full md:hidden transition-transform active:scale-95 motion-reduce:transition-none motion-reduce:active:scale-100"
+            style={{ background: "var(--surface-muted)", color: "var(--foreground)" }}
+          >
+            <ArrowLeft className="size-5" aria-hidden="true" />
+          </button>
+          <Avatar name={item.name} size="xl" className="light-avatar shrink-0" style={{ fontWeight: 600 }} />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-lg font-semibold" style={{ color: "var(--foreground)" }}>{item.name}</h2>
+            <p className="truncate text-xs" style={{ color: "var(--text-muted)" }}>
+              {item.kind === "lead" ? "Lead da sua carteira" : "Cliente da sua carteira"}
+            </p>
+            <div className="mt-2 space-y-0.5">
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span style={{ color: "var(--text-muted)" }}>Último contato: </span>
+                <span className="tabular-nums">{formatDateTime(item.latestMessage?.sentAt)}</span>
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span style={{ color: "var(--text-muted)" }}>Início do atendimento: </span>
+                <span className="tabular-nums">{formatDateTime(item.serviceStartedAt ?? item.firstContactAt)}</span>
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
+                <span style={{ color: "var(--text-muted)" }}>Quem deve agir: </span>
+                {pendingLabel(item.intelligence?.pendingFrom)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          {whatsappUrl ? (
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => { if (item.kind === "lead") void recordWhatsAppOpenedAction(item.id); }}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ background: "var(--foreground)" }}
+            >
+              <MessageSquareText className="size-4" aria-hidden="true" />
+              Abrir WhatsApp
+              <ArrowUpRight className="size-3.5" aria-hidden="true" />
+            </a>
+          ) : (
+            <Button variant="primary" className="flex-1" disabled>
+              Telefone indisponível
+            </Button>
+          )}
+          <Link
+            href={item.href}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-1.5 rounded-full border px-4 text-xs font-semibold transition-colors hover:bg-[var(--surface-muted)]"
+            style={{ borderColor: "var(--border)", color: "var(--foreground)" }}
+          >
+            Ver lead
+          </Link>
+        </div>
+        <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
+          Para responder, use o WhatsApp no seu aparelho.
+        </p>
+      </div>
+
+      <div className="p-4 sm:p-5" style={CARD_STYLE}>
+        <div className="flex items-center gap-2">
+          <Bot className="size-4" style={{ color: "var(--accent)" }} aria-hidden="true" />
+          <h3 className="text-sm font-semibold">Leitura da IA</h3>
+        </div>
+        <p className="mt-2 text-sm leading-6" style={{ color: "var(--text-secondary)" }}>
+          {item.intelligence?.summary || "Ainda não há análise suficiente. Continue atendendo pelo WhatsApp; quando houver mensagens vinculadas a este lead, os insights serão atualizados."}
+        </p>
+        <div className="mt-3 px-3 py-2" style={{ background: "var(--accent-subtle)", borderRadius: "var(--radius-panel)" }}>
+          <p className="text-xs font-medium" style={{ color: "var(--accent-strong)" }}>Próxima ação</p>
+          <p className="mt-0.5 text-xs" style={{ color: "var(--foreground)" }}>{nextActionLabel(item)}</p>
+        </div>
+        {item.intelligence?.risk && (
+          <div className="mt-2 px-3 py-2" style={{ background: "color-mix(in srgb, var(--danger) 8%, var(--surface))", borderRadius: "var(--radius-panel)" }}>
+            <p className="text-xs font-medium" style={{ color: "var(--danger)" }}>Atenção</p>
+            <p className="mt-0.5 text-xs" style={{ color: "var(--foreground)" }}>{item.intelligence.risk}</p>
+          </div>
+        )}
+        <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
+          Análise baseada apenas nas mensagens sincronizadas desta conversa.
+        </p>
+      </div>
+
+      <div className="p-4 sm:p-5" style={CARD_STYLE}>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-semibold">Histórico sincronizado</h3>
+          <span className="text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>{messages.length} mensagens</span>
+        </div>
+        <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>Somente leitura. Conversas pessoais não são trazidas para o CRM.</p>
+        <div className="mt-3 space-y-2">
+          {messages.length ? messages.map((message) => (
+            <div key={message.id} className={cn("flex", isOutbound(message.direction) ? "justify-end" : "justify-start")}>
+              <div
+                className="max-w-[85%] px-3 py-2 text-sm"
+                style={isOutbound(message.direction)
+                  ? { background: "var(--accent)", color: "var(--accent-foreground)", borderRadius: "var(--radius-panel) var(--radius-panel) 6px var(--radius-panel)" }
+                  : { background: "var(--surface-muted)", color: "var(--foreground)", borderRadius: "var(--radius-panel) var(--radius-panel) var(--radius-panel) 6px" }}
+              >
+                <p className="whitespace-pre-wrap break-words">{message.body}</p>
+                <time className="mt-1 block text-right text-xs tabular-nums opacity-70" dateTime={message.sentAt}>{formatTime(message.sentAt)}</time>
+              </div>
+            </div>
+          )) : (
+            <p className="px-4 py-4 text-center text-xs" style={{ background: "var(--surface-muted)", borderRadius: "var(--radius-panel)", color: "var(--text-muted)" }}>
+              Nenhuma mensagem vinculada a este contato foi sincronizada ainda.
+            </p>
+          )}
         </div>
       </div>
-      <Link href={item.href} className={cn(buttonVariants({ variant: "outline", size: "xs" }), "gap-1.5")}><span>Ver ficha</span><ExternalLink className="size-3" /></Link>
-    </header>
-    <ScrollArea className="min-h-0 flex-1">
-      <div className="mx-auto w-full max-w-4xl space-y-4 p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Metric label="Último contato" value={formatDateTime(item.latestMessage?.sentAt)} icon={<Clock3 className="size-4" />} />
-          <Metric label="Início do atendimento" value={formatDateTime(item.serviceStartedAt ?? item.firstContactAt)} icon={<CheckCircle2 className="size-4" />} />
-          <Metric label="Quem deve agir" value={pendingLabel(item.intelligence?.pendingFrom)} icon={<Activity className="size-4" />} />
-        </div>
-        <Card className="border-border/60">
-          <CardHeader className="flex-row items-start gap-3 space-y-0 p-4 pb-2">
-            <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary"><Bot className="size-4" /></span>
-            <div>
-              <CardTitle className="text-sm">Leitura da IA</CardTitle>
-              <p className="mt-0.5 text-xs text-muted-foreground">Análise baseada apenas nas mensagens sincronizadas desta conversa.</p>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-3 p-4 pt-2">
-            <p className="text-sm leading-relaxed">{item.intelligence?.summary || "Ainda não há análise suficiente. Continue atendendo pelo WhatsApp; quando houver mensagens vinculadas a este lead, os insights serão atualizados."}</p>
-            {item.intelligence?.nextBestAction ? <div className="rounded-lg border border-primary/20 bg-primary/[0.06] p-3 text-sm"><span className="font-semibold text-primary">Próxima melhor ação: </span>{item.intelligence.nextBestAction}</div> : null}
-            {item.intelligence?.risk ? <div className="rounded-lg border border-destructive/20 bg-destructive/[0.06] p-3 text-sm text-destructive"><span className="font-semibold">Atenção: </span>{item.intelligence.risk}</div> : null}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex-row items-center justify-between space-y-0 p-4 pb-2">
-            <div>
-              <CardTitle className="text-sm">Histórico sincronizado</CardTitle>
-              <p className="mt-0.5 text-xs text-muted-foreground">Somente leitura. Conversas pessoais não são trazidas para o CRM.</p>
-            </div>
-            <Badge variant="outline">{messages.length} mensagens</Badge>
-          </CardHeader>
-          <CardContent className="space-y-2 p-4 pt-2">
-            {messages.length ? messages.map((message) => <div key={message.id} className={cn("flex", isOutbound(message.direction) ? "justify-end" : "justify-start")}><div className={cn("max-w-[85%] rounded-lg border px-3 py-2 text-sm", isOutbound(message.direction) ? "border-primary/20 bg-primary text-primary-foreground" : "border-border bg-card")}><p className="whitespace-pre-wrap break-words">{message.body}</p><time className={cn("mt-1 block text-right text-[10px]", isOutbound(message.direction) ? "text-primary-foreground/75" : "text-muted-foreground")} dateTime={message.sentAt}>{formatTime(message.sentAt)}</time></div></div>) : <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhuma mensagem vinculada a este contato foi sincronizada ainda.</p>}
-          </CardContent>
-        </Card>
-      </div>
-    </ScrollArea>
-    <footer className="border-t border-border bg-card p-3 sm:px-5">
-      <div className="mx-auto flex max-w-4xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="flex items-center gap-2 text-xs text-muted-foreground"><Smartphone className="size-4 text-primary" />Para responder, use o WhatsApp no seu aparelho.</p>
-        {whatsappUrl ? <a href={whatsappUrl} target="_blank" rel="noreferrer" onClick={() => { if (item.kind === "lead") void recordWhatsAppOpenedAction(item.id); }} className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}><MessageSquareText className="size-4" />Abrir WhatsApp<ArrowUpRight className="size-3.5" /></a> : <Button size="sm" disabled>Telefone indisponível</Button>}
-      </div>
-    </footer>
-  </article>;
-}
-
-function Metric({ label, value, icon }: { label: string; value: string; icon: ReactNode }) {
-  return (
-    <Card className="p-3">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        {icon}
-        <span className="text-xs">{label}</span>
-      </div>
-      <p className="mt-1.5 text-sm font-semibold leading-snug text-foreground">{value}</p>
-    </Card>
-  );
-}
-
-function EmptyPortfolioView() {
-  return (
-    <div className="flex min-h-64 flex-1 items-center justify-center p-6">
-      <EmptyState
-        icon={MessageSquareText}
-        title="Nenhum insight disponível"
-        description="Assim que houver uma conversa vinculada a um lead ou cliente da sua carteira, ela aparecerá aqui."
-      />
-    </div>
+    </article>
   );
 }
