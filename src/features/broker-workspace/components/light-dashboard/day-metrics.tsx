@@ -34,7 +34,7 @@ export function DayMetrics({ today }: { today: Today }) {
         </li>
         <li>
           {/* Orange only when there is something at risk; the number and the label carry the meaning. */}
-          <Link href="/minha-fila?filter=new" className={cn(linkClass, atRisk && "[--foreground:var(--warning)]")}>
+          <Link href="/minha-fila?filter=risk" className={cn(linkClass, atRisk && "[--foreground:var(--warning)]")}>
             <MetricCard label="Prazo em risco" value={today.slaAtRiskNow} context={atRisk ? "Peça atenção" : "Nenhum em risco"} />
           </Link>
         </li>

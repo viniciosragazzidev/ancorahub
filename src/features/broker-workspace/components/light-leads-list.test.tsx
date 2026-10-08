@@ -98,4 +98,23 @@ describe("LightLeadsList", () => {
     fireEvent.click(screen.getByRole("button", { name: "Limpar busca" }));
     expect(screen.getByText("Ana Novo")).toBeTruthy();
   });
+
+  it("adds an Em risco tab with every lead at SLA risk, accepted ones included", () => {
+    const withRisk: LightLeadItem[] = [
+      ...leads,
+      { ...base, id: "k1", name: "Gabi Sem Contato", status: "in_contact", isSlaAtRisk: true },
+    ];
+    render(<LightLeadsList leads={withRisk} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Em risco/ }));
+    const group = screen.getByRole("region", { name: /Precisa de você agora/ });
+    expect(within(group).getByText("Gabi Sem Contato")).toBeTruthy();
+    expect(within(group).getByText("Prazo em risco")).toBeTruthy();
+    expect(screen.queryByText("Carla Tranquila")).toBeNull();
+  });
+
+  it("hides the Em risco tab when nothing is at risk", () => {
+    render(<LightLeadsList leads={leads} />);
+    expect(screen.queryByRole("button", { name: /^Em risco/ })).toBeNull();
+  });
 });

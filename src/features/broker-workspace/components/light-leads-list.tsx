@@ -29,11 +29,13 @@ export type LightLeadItem = {
   isOverdue?: boolean;
   isAwaitingResponse?: boolean;
   isAwaitingAcceptance?: boolean;
+  /** First-contact SLA overdue or inside its last window (new or already accepted). */
+  isSlaAtRisk?: boolean;
   isLost?: boolean;
   lostReason?: string | null;
 };
 
-type FilterTab = "new" | "active" | "returns" | "closed";
+type FilterTab = "new" | "active" | "returns" | "risk" | "closed";
 
 const ACTIVE_STATUSES = ["in_contact", "quote_sent", "negotiation", "documentation_pending"];
 
@@ -44,22 +46,25 @@ const isWonLead = (lead: LightLeadItem) => lead.status === "converted" && !isLos
 const isActiveLead = (lead: LightLeadItem) => !isLostLead(lead) && ACTIVE_STATUSES.includes(lead.status);
 const isReturnLead = (lead: LightLeadItem) =>
   !isLostLead(lead) && !isWonLead(lead) && !isNewLead(lead) && (Boolean(lead.isOverdue) || Boolean(lead.dueAt));
+const isRiskLead = (lead: LightLeadItem) => !isLostLead(lead) && !isWonLead(lead) && Boolean(lead.isSlaAtRisk);
 const needsYouNow = (lead: LightLeadItem) =>
-  !isLostLead(lead) && !isWonLead(lead) && (isNewLead(lead) || Boolean(lead.isAwaitingResponse) || Boolean(lead.isOverdue));
+  !isLostLead(lead) && !isWonLead(lead) && (isNewLead(lead) || Boolean(lead.isAwaitingResponse) || Boolean(lead.isOverdue) || Boolean(lead.isSlaAtRisk));
 
 const TAB_FILTERS: Record<FilterTab, (lead: LightLeadItem) => boolean> = {
   new: isNewLead,
   active: isActiveLead,
   returns: isReturnLead,
+  risk: isRiskLead,
   closed: (lead) => isWonLead(lead) || isLostLead(lead),
 };
 
-const QUERY_FILTERS: Record<string, FilterTab> = { awaiting: "new", new: "new", active: "active", returns: "returns", closed: "closed", finished: "closed", lost: "closed" };
+const QUERY_FILTERS: Record<string, FilterTab> = { awaiting: "new", new: "new", active: "active", returns: "returns", risk: "risk", closed: "closed", finished: "closed", lost: "closed" };
 
 const EMPTY_COPY: Record<FilterTab, { title: string; description: string }> = {
   new: { title: "Nenhum lead novo", description: "Quando um lead chegar para você, ele aparece aqui." },
   active: { title: "Nenhum atendimento em andamento", description: "Leads aceitos ficam aqui até serem fechados." },
   returns: { title: "Nenhum retorno pendente", description: "Leads sem atualização há mais de 3 dias aparecem aqui." },
+  risk: { title: "Nenhum lead com prazo em risco", description: "Leads sem primeiro contato perto do limite aparecem aqui." },
   closed: { title: "Nada fechado ainda", description: "Vendas concluídas e leads perdidos aparecem aqui." },
 };
 
@@ -78,6 +83,7 @@ function describeLead(lead: LightLeadItem): LeadState {
   if (isWonLead(lead)) return { tone: "success", chip: "Venda concluída", context: "Venda concluída" };
   if (isNewLead(lead)) return { tone: "info", chip: "Novo", context: "Aguardando seu aceite" };
   if (lead.isAwaitingResponse) return { tone: "success", chip: "Respondeu", context: "O cliente respondeu e aguarda você" };
+  if (lead.isSlaAtRisk) return { tone: "warning", chip: "Prazo em risco", context: "Primeiro contato pendente" };
   if (lead.isOverdue) return { tone: "warning", chip: "Atrasado", context: "Sem atualização há mais de 3 dias" };
   const stage = STATUS_LABEL[lead.status] ?? "Em andamento";
   return { tone: "neutral", chip: stage, context: lead.productName ? `${lead.productName}${lead.city ? ` em ${lead.city}` : ""}` : stage };
@@ -151,6 +157,7 @@ export function LightLeadsList({
       new: leads.filter(TAB_FILTERS.new).length,
       active: leads.filter(TAB_FILTERS.active).length,
       returns: leads.filter(TAB_FILTERS.returns).length,
+      risk: leads.filter(TAB_FILTERS.risk).length,
       closed: leads.filter(TAB_FILTERS.closed).length,
     }),
     [leads],
@@ -173,9 +180,11 @@ export function LightLeadsList({
   const rest = filter === "closed" ? visible : visible.filter((lead) => !needsYouNow(lead));
   const searching = searchQuery.trim().length > 0;
 
-  const options = (["new", "active", "returns", "closed"] as const).map((value) => ({
+  // "Em risco" only takes room in the bar while there is something at risk (or the broker came from the Inicio card).
+  const tabs = (["new", "active", "returns", "risk", "closed"] as const).filter((value) => value !== "risk" || counts.risk > 0 || filter === "risk");
+  const options = tabs.map((value) => ({
     value,
-    label: { new: "Novos", active: "Atendendo", returns: "Retornos", closed: "Fechados" }[value],
+    label: { new: "Novos", active: "Atendendo", returns: "Retornos", risk: "Em risco", closed: "Fechados" }[value],
     accessory: counts[value] > 0 ? <span className="tabular-nums">{counts[value]}</span> : undefined,
   }));
 
@@ -183,7 +192,7 @@ export function LightLeadsList({
     <div className="flex min-h-full flex-col text-foreground">
       <LightAvailabilityBanner initialStatus={availabilityStatus} />
 
-      <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-8 pt-2 sm:px-6">
+      <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-6 pt-2 sm:px-6">
         <SearchField
           label="Buscar lead"
           placeholder="Nome, telefone ou produto"

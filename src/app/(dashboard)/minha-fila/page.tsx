@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 
 import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
+import { resolveSlaFirstContactState } from "@/features/broker-workspace/priority";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
@@ -134,6 +135,8 @@ async function MinhaFilaContent() {
       createdAt: schema.leads.createdAt,
       serviceStartedAt: schema.leads.serviceStartedAt,
       assignedAt: schema.leads.assignedAt,
+      firstContactAt: schema.leads.firstContactAt,
+      slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
       stageEnteredAt: schema.leads.stageEnteredAt,
     })
     .from(schema.leads)
@@ -389,6 +392,14 @@ async function MinhaFilaContent() {
         dueAt,
         isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
         isAwaitingAcceptance: awaitingAcceptance,
+        // Same first-contact SLA window the Inicio counter uses (overdue or in the last 20%).
+        isSlaAtRisk:
+          (activeLeadStatuses as readonly string[]).includes(l.status) &&
+          resolveSlaFirstContactState({
+            firstContactAt: l.firstContactAt,
+            assignedAt: l.assignedAt,
+            slaFirstContactMinutes: Number.parseInt(l.slaFirstContactMinutes ?? "15", 10) || 15,
+          }) !== null,
         isOverdue:
           ((activeLeadStatuses as readonly string[]).includes(l.status) &&
             l.stageEnteredAt != null &&

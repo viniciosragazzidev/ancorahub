@@ -134,7 +134,7 @@ describe("LightDashboard", () => {
 
     const day = screen.getByRole("region", { name: "Seu dia" });
     expect(within(day).getAllByRole("listitem")).toHaveLength(4);
-    expect(day.querySelector('a[href="/minha-fila?filter=new"]')).not.toBeNull();
+    expect(day.querySelector('a[href="/minha-fila?filter=risk"]')).not.toBeNull();
     expect(day.querySelectorAll('a[href="/minha-fila?filter=active"]')).toHaveLength(2);
     expect(within(day).getByText("Peça atenção")).toBeTruthy();
   });
