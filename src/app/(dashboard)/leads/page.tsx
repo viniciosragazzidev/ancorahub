@@ -181,7 +181,8 @@ async function LeadsPageContent({
       return {
         id: lead.id,
         name: lead.nome,
-        phone: lead.telefone,
+        // Contact data is searchable in the Light list, so it stays out of the payload for new leads.
+        phone: lead.status === "new" || lead.status === "distributed" ? null : lead.telefone,
         status: lead.status,
         qualificationStatus: lead.qualificationStatus,
         productName: lead.planName ?? null,

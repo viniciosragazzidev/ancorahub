@@ -1,4 +1,7 @@
+import { Suspense } from "react";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+
+import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +33,19 @@ const activeLeadStatuses = [
 export const dynamic = "force-dynamic";
 
 export default async function MinhaFilaPage() {
+  const context = await getRequiredTenantContext();
+  // The Light app streams its own skeleton while the queue loads; the Full screen is unchanged.
+  if ((await getExperienceMode(context)) === "LIGHT") {
+    return (
+      <Suspense fallback={<LightPageSkeleton variant="list" />}>
+        <MinhaFilaContent />
+      </Suspense>
+    );
+  }
+  return <MinhaFilaContent />;
+}
+
+async function MinhaFilaContent() {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
   const experienceMode = await getExperienceMode(context);
@@ -319,25 +335,72 @@ export default async function MinhaFilaPage() {
   ).length;
 
   if (experienceMode === "LIGHT") {
-    const activeLightLeads: LightLeadItem[] = leads.map((l) => ({
-      id: l.id,
-      name: l.name,
-      phone: l.phone,
-      status: l.status,
-      createdAt: l.createdAt,
-      updatedAt: l.stageEnteredAt,
-      isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
-      isAwaitingAcceptance: pendingOfferLeadIds.includes(l.id),
-      isOverdue:
-        (activeLeadStatuses as readonly string[]).includes(l.status) &&
-        l.stageEnteredAt != null &&
-        Date.now() - l.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000,
-    }));
+    // Cheap per-lead extras (product, city, summary, next follow-up), read only for the leads on screen.
+    const lightIds = leads.map((l) => l.id);
+    const [extraRows, dueRows] = lightIds.length
+      ? await Promise.all([
+        db.select({
+          id: schema.leads.id,
+          qualificationDetails: schema.leads.qualificationDetails,
+          planName: schema.carrierPlans.name,
+        })
+          .from(schema.leads)
+          .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
+          .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, lightIds))),
+        db.select({ leadId: schema.leadTasks.leadId, dueAt: schema.leadTasks.dueAt })
+          .from(schema.leadTasks)
+          .where(and(
+            eq(schema.leadTasks.tenantId, context.tenantId),
+            inArray(schema.leadTasks.leadId, lightIds),
+            isNull(schema.leadTasks.completedAt),
+            isNotNull(schema.leadTasks.dueAt),
+          )),
+      ])
+      : [[], []];
+    const extraById = new Map(extraRows.map((row) => [row.id, row]));
+    const nextDueById = new Map<string, Date>();
+    for (const row of dueRows) {
+      if (!row.leadId || !row.dueAt) continue;
+      const current = nextDueById.get(row.leadId);
+      if (!current || row.dueAt.getTime() < current.getTime()) nextDueById.set(row.leadId, row.dueAt);
+    }
+    const readDetail = (details: unknown, key: string) => {
+      if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+      const value = (details as Record<string, unknown>)[key];
+      return typeof value === "string" && value.trim() ? value : null;
+    };
+
+    const activeLightLeads: LightLeadItem[] = leads.map((l) => {
+      const extra = extraById.get(l.id);
+      const dueAt = nextDueById.get(l.id) ?? null;
+      const awaitingAcceptance = pendingOfferLeadIds.includes(l.id);
+      const isNew = awaitingAcceptance || l.status === "distributed" || l.status === "new";
+      return {
+        id: l.id,
+        name: l.name,
+        // The phone only reaches the client after acceptance (it is searchable, so it is a contact datum).
+        phone: isNew ? null : l.phone,
+        status: l.status,
+        productName: extra?.planName ?? null,
+        city: readDetail(extra?.qualificationDetails, "cidade") ?? readDetail(extra?.qualificationDetails, "city"),
+        summary: readDetail(extra?.qualificationDetails, "resumoAtendimento") ?? readDetail(extra?.qualificationDetails, "resumoNecessidade"),
+        createdAt: l.createdAt,
+        updatedAt: l.stageEnteredAt,
+        dueAt,
+        isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
+        isAwaitingAcceptance: awaitingAcceptance,
+        isOverdue:
+          ((activeLeadStatuses as readonly string[]).includes(l.status) &&
+            l.stageEnteredAt != null &&
+            Date.now() - l.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000) ||
+          (!isNew && dueAt != null && dueAt.getTime() < Date.now()),
+      };
+    });
 
     const lostLightLeads: LightLeadItem[] = lostLeadsFromDb.map((l) => ({
       id: l.id,
       name: l.name,
-      phone: l.phone,
+      phone: null,
       status: "lost",
       isLost: true,
       lostReason: "Redistribuído por inatividade / tempo limite estourado",

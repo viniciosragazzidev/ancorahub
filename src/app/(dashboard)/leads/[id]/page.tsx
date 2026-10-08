@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { and, desc, eq, isNull } from "drizzle-orm";
+import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
 import { buildLeadClientInfo } from "@/features/leads/client-info";
 import { notFound } from "next/navigation";
 
@@ -55,6 +57,19 @@ function getCurrentTimestamp() {
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const context = await getRequiredTenantContext();
+  // The Light app streams its own skeleton while the lead loads; the Full screen is unchanged.
+  if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
+    return (
+      <Suspense fallback={<LightPageSkeleton variant="detail" />}>
+        <LeadDetailContent id={id} />
+      </Suspense>
+    );
+  }
+  return <LeadDetailContent id={id} />;
+}
+
+async function LeadDetailContent({ id }: { id: string }) {
   const context = await getRequiredTenantContext();
   const isMarketing = context.jobTitle === "marketing";
   const brokerInternalChatEnabled =
