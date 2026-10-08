@@ -63,3 +63,14 @@ describe("classifyBrokerLiveOfferStatus", () => {
     expect(classifyBrokerLiveOfferStatus({ ...base, activeLeads: 7, offers }).status).toBe("capacity_full");
   });
 });
+
+describe("combineLiveStatusAcrossQueues", () => {
+  it("is ready only if a queue with waiting leads can offer now, else the soonest release", async () => {
+    const { combineLiveStatusAcrossQueues } = await import("./duty-roster-live-status");
+    const soon = new Date("2026-10-08T13:10:00.000Z");
+    const later = new Date("2026-10-08T13:40:00.000Z");
+    expect(combineLiveStatusAcrossQueues([{ status: "cooldown", nextEventAt: later }, { status: "ready", nextEventAt: null }]).status).toBe("ready");
+    expect(combineLiveStatusAcrossQueues([{ status: "cooldown", nextEventAt: later }, { status: "cooldown", nextEventAt: soon }])).toEqual({ status: "cooldown", nextEventAt: soon });
+    expect(combineLiveStatusAcrossQueues([{ status: "paused", nextEventAt: null }]).status).toBe("paused");
+  });
+});

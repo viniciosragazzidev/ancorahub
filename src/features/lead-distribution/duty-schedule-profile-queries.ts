@@ -10,7 +10,7 @@ import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
 import { normalizeOfferPacing } from "./offer-pacing";
 import { assignmentShift } from "./duty-shifts";
-import { classifyBrokerLiveOfferStatus } from "./duty-roster-live-status";
+import { classifyBrokerLiveOfferStatus, combineLiveStatusAcrossQueues } from "./duty-roster-live-status";
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
 import { inferLegacyLeadDutyScheduleId, selectLeadsForDutySchedule } from "./shared-duty-roster";
 
@@ -372,24 +372,40 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // Live offer status: offers in the pacing lookback window. The capacity
   // counter uses the leads each broker received in this plantão (see above).
   const brokerIds = roster.map((entry) => entry.brokerId);
-  const recentOfferRows = operatingQueue && brokerIds.length
-    ? await db.select({ brokerId: schema.leadOffers.brokerId, status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt })
+  // Each automatic queue paces its own offers (interval, pending limit). The
+  // status considers every queue of the plantão that has a lead waiting, the
+  // way the distribution does: reading only the first queue showed brokers
+  // "ready" while the queue with the waiting leads held them (45 min interval).
+  const automaticQueues = linkedQueues.filter((queue) => queue.assignmentMode === "automatic");
+  const pacedQueues = automaticQueues.length ? automaticQueues : operatingQueue ? [operatingQueue] : [];
+  const waitingQueueIds = new Set(leads
+    .filter((lead) => !lead.corretorId && ["queued", "unassigned", "returned_to_queue"].includes(lead.distributionStatus))
+    .map((lead) => lead.queueId)
+    .filter((queueId): queueId is string => Boolean(queueId)));
+  const statusQueues = pacedQueues.some((queue) => waitingQueueIds.has(queue.id))
+    ? pacedQueues.filter((queue) => waitingQueueIds.has(queue.id))
+    : pacedQueues;
+  const pacingByQueue = new Map(statusQueues.map((queue) => [queue.id, normalizeOfferPacing({ intervalMinutes: queue.offerIntervalMinutes, maxPending: queue.maxPendingOffersPerBroker })]));
+  const lookbackMinutes = Math.max(1, ...[...pacingByQueue.values()].map((config) => config.intervalMinutes));
+  const recentOfferRows = statusQueues.length && brokerIds.length
+    ? await db.select({ brokerId: schema.leadOffers.brokerId, queueId: schema.leads.queueId, status: schema.leadOffers.status, offeredAt: schema.leadOffers.offeredAt, expiresAt: schema.leadOffers.expiresAt })
       .from(schema.leadOffers)
       .innerJoin(schema.leads, eq(schema.leadOffers.leadId, schema.leads.id))
       .where(and(
         eq(schema.leadOffers.tenantId, context.tenantId),
-        eq(schema.leads.queueId, operatingQueue.id),
+        inArray(schema.leads.queueId, statusQueues.map((queue) => queue.id)),
         inArray(schema.leadOffers.brokerId, brokerIds),
         or(
-          gte(schema.leadOffers.offeredAt, new Date(now.getTime() - Math.max(pacing.intervalMinutes, 1) * 60_000)),
+          gte(schema.leadOffers.offeredAt, new Date(now.getTime() - lookbackMinutes * 60_000)),
           gt(schema.leadOffers.expiresAt, now),
         ),
       ))
     : [];
-  const offersByBroker = new Map<string, typeof recentOfferRows>();
+  const offersByBrokerQueue = new Map<string, typeof recentOfferRows>();
   for (const offer of recentOfferRows) {
-    const list = offersByBroker.get(offer.brokerId);
-    if (list) list.push(offer); else offersByBroker.set(offer.brokerId, [offer]);
+    const key = `${offer.brokerId}:${offer.queueId}`;
+    const list = offersByBrokerQueue.get(key);
+    if (list) list.push(offer); else offersByBrokerQueue.set(key, [offer]);
   }
 
   return {
@@ -407,15 +423,15 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       const blockedReason = presence?.status === "absent" ? "Falta registrada neste plantão" : !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : schedule.attendanceMode === "presencial" && (!presence || presence.status !== "confirmed" || !presence.confirmedBy) ? "Aguardando presença na unidade" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
       const absent = presence?.status === "absent";
       const onSitePending = schedule.attendanceMode === "presencial" && Boolean(occurrence && occurrence.startsAt <= new Date(now.getTime() + 30 * 60_000)) && (!presence || presence.status !== "confirmed" || !presence.confirmedBy);
-      const liveStatus = classifyBrokerLiveOfferStatus({
+      const liveStatus = combineLiveStatusAcrossQueues((statusQueues.length ? statusQueues : [null]).map((queue) => classifyBrokerLiveOfferStatus({
         paused: Boolean(entry.pausedAt) || onSitePending,
         blockedReason,
         capacity: operatingCapacity,
         activeLeads: leadsPerBroker.get(entry.brokerId) ?? 0,
-        pacing,
-        offers: offersByBroker.get(entry.brokerId) ?? [],
+        pacing: queue ? pacingByQueue.get(queue.id) ?? pacing : pacing,
+        offers: queue ? offersByBrokerQueue.get(`${entry.brokerId}:${queue.id}`) ?? [] : [],
         now,
-      });
+      })));
       return {
       ...entry,
       phone,

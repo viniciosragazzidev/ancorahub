@@ -37,3 +37,18 @@ export function classifyBrokerLiveOfferStatus(input: {
 
   return { status: "ready", nextEventAt: null };
 }
+
+/**
+ * A plantão fed by several queues (e.g. FILA TATIANA and FILA PF - RENAN):
+ * each queue paces its own offers. The broker is ready if any queue with
+ * leads waiting can offer them one now; otherwise the soonest release wins.
+ */
+export function combineLiveStatusAcrossQueues(states: BrokerLiveOfferState[]): BrokerLiveOfferState {
+  if (!states.length) return { status: "ready", nextEventAt: null };
+  const ready = states.find((state) => state.status === "ready");
+  if (ready) return ready;
+  const timed = states
+    .filter((state) => (state.status === "offer_pending" || state.status === "cooldown") && state.nextEventAt)
+    .sort((a, b) => a.nextEventAt!.getTime() - b.nextEventAt!.getTime());
+  return timed[0] ?? states[0];
+}
