@@ -795,7 +795,7 @@ async function LeadsPageContent({
               slaFirstContactMinutes={slaFirstContactMinutes}
               slaStagnantDays={slaStagnantDays}
               brokers={brokers}
-              branches={branches}
+              branches={branches.filter((branch) => (context.role === "director" || branch.id === context.branchId) && branch.status === "active" && branch.acceptingLeads && !branch.isDistributionHub)}
               manualAssignmentChoiceEnabled={systemSettings.get("feature_manual_lead_assignment_offer_choice_enabled") !== "false"}
               pageSize={pageSize}
               unassignedLeads={unassignedRows.map((lead) => ({

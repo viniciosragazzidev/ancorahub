@@ -94,7 +94,7 @@ export function MetaIntegrationView({
           {connected ? (
             <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-border bg-muted/20 px-3 py-2.5">
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <MetaSyncBadge logs={logs} lastSyncedAt={connection?.lastSyncedAt} />
+                <MetaSyncBadge logs={logs} lastSyncedAt={connection?.lastSyncedAt} canViewError={canConfigure} />
                 <Badge variant="outline" data-slot="capture-mode">
                   {CAPTURE_MODE_LABEL[connection?.globalCaptureMode ?? "selective"]}
                 </Badge>

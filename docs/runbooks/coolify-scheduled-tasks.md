@@ -30,7 +30,7 @@ curl --fail --silent --show-error \
 | `/api/internal/jobs/purge` | `* * * * *` | Expurgo agendado de dados | |
 | `/api/internal/sla` | `*/5 * * * *` | SLA de primeiro contato: avisa gestores e diretores | |
 | `/api/internal/reminders` | `*/5 * * * *` | Lembretes de notificações | |
-| `/api/internal/jobs/meta-sync` | `*/10 * * * *` | Sincronização com a Meta | |
+| `/api/internal/jobs/meta-sync` | `0 * * * *` | Sincronização com a Meta | O código também limita a sincronização automática a uma vez por hora e aplica espera progressiva quando a Meta retorna limite de chamadas. |
 | `/api/internal/jobs/situation-learning` | `*/30 * * * *` | Aprendizado de situações: agrupa com a IA as perguntas que nenhuma situação cobriu e gera as sugestões de Atendimento → Situações; anexa a resposta do corretor; apaga perguntas com mais de 90 dias | No máximo 12 chamadas de IA por empresa por dia. Modelo: Super-admin → IA → "Modelo das sugestões de situações" (vazio = modelos padrão) |
 | `/api/internal/jobs/waha-cadence` | `*/5 * * * *` | Cadências WAHA corporativas | Desligadas no código (`getWahaCadenceConfig`); a tarefa é opcional e hoje não envia nada |
 

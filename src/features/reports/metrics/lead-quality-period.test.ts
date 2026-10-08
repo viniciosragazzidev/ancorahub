@@ -5,6 +5,7 @@ import { leadQualityWindow, leadShiftOf, parseLeadQualityPeriod } from "./lead-q
 describe("lead quality period", () => {
   it("parses today and the shared day options", () => {
     expect(parseLeadQualityPeriod("today")).toBe("today");
+    expect(parseLeadQualityPeriod("3")).toBe(3);
     expect(parseLeadQualityPeriod("7")).toBe(7);
     expect(parseLeadQualityPeriod("13")).toBe(30);
     expect(parseLeadQualityPeriod(undefined)).toBe(30);
@@ -15,6 +16,14 @@ describe("lead quality period", () => {
     expect(leadQualityWindow("today", new Date("2026-10-02T13:00:00.000Z"))).toEqual({
       since: new Date("2026-10-01T22:00:00.000Z"),
       until: new Date("2026-10-02T22:00:00.000Z"),
+    });
+  });
+
+  it("the three-day window starts Friday at 19:00 when viewed on Monday", () => {
+    // Monday 05/10 at 12:00 in SÃ£o Paulo; include Friday after 19:00.
+    expect(leadQualityWindow(3, new Date("2026-10-05T15:00:00.000Z"))).toEqual({
+      since: new Date("2026-10-02T22:00:00.000Z"),
+      until: null,
     });
   });
 

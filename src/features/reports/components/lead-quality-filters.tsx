@@ -44,6 +44,7 @@ export function QualityQueueSelect({ queues, value }: { queues: Queue[]; value: 
 
 const PERIODS: { value: string; label: string }[] = [
   { value: "today", label: "Hoje (19h–19h)" },
+  { value: "3", label: "3 dias (segunda desde sexta às 19h)" },
   { value: "7", label: "7 dias" },
   { value: "14", label: "14 dias" },
   { value: "30", label: "30 dias" },

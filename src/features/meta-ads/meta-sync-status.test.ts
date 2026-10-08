@@ -22,6 +22,17 @@ describe("formatRelativeTime", () => {
 });
 
 describe("summarizeLastSync", () => {
+  it("shows a Meta rate limit as a wait, not as a CRM failure", () => {
+    const limited = (minutesAgo: number) => ({ ...log("error", minutesAgo, 0), errorDetails: "User request limit reached" });
+    const waiting = summarizeLastSync([limited(30), limited(200)], null, now);
+    expect(waiting).toMatchObject({ tone: "warning", label: "Limitada pela Meta" });
+    expect(waiting.detail).toMatch(/nova tentativa após \d{2}:\d{2}/);
+    const released = summarizeLastSync([limited(400)], null, now);
+    expect(released).toMatchObject({ tone: "warning", label: "Limitada pela Meta" });
+    expect(released.detail).toContain("liberada para tentar");
+    expect(summarizeLastSync([{ ...log("error", 30), errorDetails: "Token inválido" }], null, now)).toMatchObject({ label: "Falhou" });
+  });
+
   it("uses only the most recent log, whatever the array order", () => {
     const summary = summarizeLastSync([log("error", 300), log("success", 5), log("partial", 900)], null, now);
     expect(summary).toMatchObject({ tone: "success", label: "Concluída" });

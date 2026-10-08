@@ -214,7 +214,7 @@ export function LeadsWorkspace({
   slaFirstContactMinutes?: number;
   slaStagnantDays?: number;
   brokers?: Array<{ id: string; name: string; branchId: string | null }>;
-  branches?: Array<{ id: string; name: string }>;
+  branches?: Array<{ id: string; name: string; status?: string; acceptingLeads?: boolean; isDistributionHub?: boolean }>;
   manualAssignmentChoiceEnabled?: boolean;
   pageSize?: number;
   pagination?: {

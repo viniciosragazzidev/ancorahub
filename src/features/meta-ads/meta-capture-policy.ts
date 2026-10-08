@@ -10,9 +10,8 @@ export type MetaCaptureRoute = {
 
 /**
  * Single server-side policy for Meta Lead Ads intake and UI projections.
- * Asset rules are intentionally more specific than campaign rules; a disabled
- * child only blocks an asset in global mode and does not discard a campaign
- * explicitly authorized in selective mode.
+ * Campaigns are the single authority for capture and destination. Child assets
+ * inherit the campaign decision and never override it.
  */
 export function resolveMetaCapturePolicy(input: {
   adRoute?: MetaCaptureRoute;
@@ -29,38 +28,22 @@ export function resolveMetaCapturePolicy(input: {
     return { action: "ignore" as const, queueId: null };
   }
 
-  const mostSpecificRoute = input.adRoute ?? input.formRoute ?? input.campaignRoute;
-
-  if (mode === "all") {
-    if (mostSpecificRoute && !mostSpecificRoute.enabled) {
-      return { action: "ignore" as const, queueId: null };
-    }
-    if (mostSpecificRoute?.queueId && mostSpecificRoute.queueStatus === "active") {
-      return { action: "capture" as const, queueId: mostSpecificRoute.queueId };
-    }
-    return { action: "capture" as const, queueId: null };
-  }
-
+  // An enabled campaign is the only per-asset grant. Ads and forms inherit
+  // this queue so a shared form cannot redirect leads from another campaign.
   if (input.campaignRoute?.enabled) {
-    const enabledChild = input.adRoute?.enabled
-      ? input.adRoute
-      : input.formRoute?.enabled
-        ? input.formRoute
-        : input.campaignRoute;
-    if (enabledChild.queueId && enabledChild.queueStatus === "active") {
-      return { action: "capture" as const, queueId: enabledChild.queueId };
-    }
     if (input.campaignRoute.queueId && input.campaignRoute.queueStatus === "active") {
       return { action: "capture" as const, queueId: input.campaignRoute.queueId };
     }
-    return { action: "capture" as const, queueId: null };
-  }
-
-  if (!mostSpecificRoute || !mostSpecificRoute.enabled) {
+    // A campaign without an active destination must never fall through to
+    // direct intake or create an unqueued lead.
     return { action: "ignore" as const, queueId: null };
   }
-  if (mostSpecificRoute.queueId && mostSpecificRoute.queueStatus === "active") {
-    return { action: "capture" as const, queueId: mostSpecificRoute.queueId };
+
+  if (input.campaignRoute && !input.campaignRoute.enabled) {
+    return { action: "ignore" as const, queueId: null };
   }
-  return { action: "capture" as const, queueId: null };
+
+  // Global mode is a safety gate only. Each campaign must be enabled with
+  // its own active queue; ads and forms inherit that campaign rule.
+  return { action: "ignore" as const, queueId: null };
 }

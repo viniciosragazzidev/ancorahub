@@ -28,13 +28,16 @@ export function PeriodSelect({
   value,
   includeAll = false,
   includeToday = false,
+  includeThreeDays = false,
   label = "Período",
   triggerClassName,
 }: {
-  value: PeriodValue | "all" | "today";
+  value: PeriodValue | 3 | "all" | "today";
   includeAll?: boolean;
   /** "Hoje" option (`?period=today`) — the lead quality center's 18h-to-18h day. */
   includeToday?: boolean;
+  /** Add the lead quality center's three-day window (`?period=3`). */
+  includeThreeDays?: boolean;
   label?: string;
   /** Additive visual override — leave unset for the existing default look. */
   triggerClassName?: string;
@@ -44,7 +47,7 @@ export function PeriodSelect({
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  function select(period: PeriodValue | "all" | "today") {
+  function select(period: PeriodValue | 3 | "all" | "today") {
     const params = new URLSearchParams(searchParams.toString());
     if (period === "all" || period === DEFAULT_PERIOD) {
       params.delete("period");
@@ -68,6 +71,10 @@ export function PeriodSelect({
           return;
         }
         const num = Number.parseInt(val, 10);
+        if (includeThreeDays && val === "3") {
+          select(3);
+          return;
+        }
         if ((PERIOD_OPTIONS as readonly number[]).includes(num)) {
           select(num as PeriodValue);
         }
@@ -83,6 +90,7 @@ export function PeriodSelect({
       <SelectContent>
         {includeAll ? <SelectItem value="all">Geral</SelectItem> : null}
         {includeToday ? <SelectItem value="today">Hoje</SelectItem> : null}
+        {includeThreeDays ? <SelectItem value="3">3 dias</SelectItem> : null}
         {PERIOD_OPTIONS.map((p) => (
           <SelectItem key={p} value={String(p)}>
             {p} dias

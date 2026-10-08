@@ -5,6 +5,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
 import { resolveMetaCapturePolicy, type MetaCaptureMode } from "@/features/meta-ads/meta-capture-policy";
+import { resolveMetaCampaignQueueRoute } from "@/features/meta-ads/campaign-route-resolver";
 import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
@@ -45,18 +46,11 @@ async function resolveAdHierarchy(tenantId: string, adId: string): Promise<AdHie
   }
 }
 
-async function resolveCapture(tenantId: string, campaignId: string | null, adId: string) {
+async function resolveCapture(tenantId: string, campaignId: string | null) {
   const db = getDatabase();
-  const [campaignRoute] = campaignId ? await db.select({ queueId: schema.metaCampaignQueueRoutes.queueId, enabled: schema.metaCampaignQueueRoutes.enabled, queueStatus: schema.leadQueues.status })
-    .from(schema.metaCampaignQueueRoutes)
-    .leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
-    .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, campaignId)))
-    .limit(1) : [];
-  const [adRoute] = await db.select({ queueId: schema.metaAdQueueRoutes.queueId, enabled: schema.metaAdQueueRoutes.enabled, queueStatus: schema.leadQueues.status })
-    .from(schema.metaAdQueueRoutes)
-    .leftJoin(schema.leadQueues, eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id))
-    .where(and(eq(schema.metaAdQueueRoutes.tenantId, tenantId), eq(schema.metaAdQueueRoutes.adId, adId)))
-    .limit(1);
+  const campaignRoute = campaignId
+    ? await resolveMetaCampaignQueueRoute(tenantId, campaignId)
+    : undefined;
 
   const stored = await getSystemSetting(`meta_lead_capture_mode_${tenantId}`).catch(() => null);
   let globalMode: MetaCaptureMode;
@@ -64,11 +58,9 @@ async function resolveCapture(tenantId: string, campaignId: string | null, adId:
     globalMode = stored;
   } else {
     const [anyCampaign] = await db.select({ id: schema.metaCampaignQueueRoutes.id }).from(schema.metaCampaignQueueRoutes).where(eq(schema.metaCampaignQueueRoutes.tenantId, tenantId)).limit(1);
-    const [anyAd] = await db.select({ id: schema.metaAdQueueRoutes.id }).from(schema.metaAdQueueRoutes).where(eq(schema.metaAdQueueRoutes.tenantId, tenantId)).limit(1);
-    const [anyForm] = await db.select({ id: schema.metaFormQueueRoutes.id }).from(schema.metaFormQueueRoutes).where(eq(schema.metaFormQueueRoutes.tenantId, tenantId)).limit(1);
-    globalMode = anyCampaign || anyAd || anyForm ? "selective" : "all";
+    globalMode = anyCampaign ? "selective" : "all";
   }
-  return { decision: resolveMetaCapturePolicy({ adRoute, campaignRoute, globalMode }), adRoute, campaignRoute };
+  return { decision: resolveMetaCapturePolicy({ campaignRoute, globalMode }), campaignRoute, globalMode };
 }
 
 export type CtwaIntakeResult =
@@ -111,18 +103,17 @@ export async function ingestCtwaLead(input: {
   const actorUserId = source.actorUserId;
 
   const hierarchy = await resolveAdHierarchy(input.tenantId, input.referral.adId);
-  const capture = await resolveCapture(input.tenantId, hierarchy.campaignId, input.referral.adId);
-  const { adRoute } = capture;
-  let decision = capture.decision;
-  // No rule at all for this ad or its campaign (a "não registrar" rule is
-  // kept): a number dedicated to ads takes the lead into its own queue.
-  if (decision.action === "ignore" && !capture.adRoute && !capture.campaignRoute && input.channelIntake?.enabled) {
+  const capture = await resolveCapture(input.tenantId, hierarchy.campaignId);
+  let decision: { action: "capture"; queueId: string | null } | { action: "ignore"; queueId: null } = capture.decision;
+  // An attributed campaign owns routing. A channel-level default is allowed
+  // only for referrals whose campaign could not be identified.
+  if (decision.action === "ignore" && capture.globalMode !== "disabled" && !hierarchy.campaignId && input.channelIntake?.enabled) {
     decision = { action: "capture", queueId: input.channelIntake.queueId };
   }
   if (decision.action === "ignore") {
     await db.insert(schema.auditLogs).values({
-      id: randomUUID(), userId: actorUserId, entidade: adRoute ? "meta_ad_queue_route" : "meta_campaign_queue_route",
-      entidadeId: adRoute ? input.referral.adId : hierarchy.campaignId ?? input.referral.adId, acao: "meta_ctwa.ignored", createdAt: input.receivedAt,
+      id: randomUUID(), userId: actorUserId, entidade: "meta_campaign_queue_route",
+      entidadeId: hierarchy.campaignId ?? input.referral.adId, acao: "meta_ctwa.ignored", createdAt: input.receivedAt,
     });
     return { status: "ignored", reason: "policy" };
   }

@@ -1,5 +1,25 @@
 # Controle de Execução do Redesign
 
+## 2026-10-07 — Reatribuição pelo drawer dentro do plantão
+
+Correção funcional do drawer compartilhado de leads. Papel: Diretor/Gestor;
+ação: escolher um corretor escalado na fila do lead; estado: consulta da escala,
+roster disponível, vazio e erro. Com plantão ativo, o drawer esconde a seleção
+de unidade e restringe a lista ao roster elegível da fila; sem plantão ativo,
+preserva o fluxo genérico de transferência por unidade. Reutiliza Select, Label,
+Button e auditoria existentes, sem novo token, primitiva ou animação. Regra já
+aprovada em BR-024C/DEC-116. Registro:
+`docs/implementations/completed/2026-10-07-lead-drawer-duty-reassignment.md`.
+
+## 2026-10-06 — Transferência manual entre unidades
+
+Refinamento funcional no drawer compartilhado de leads, sem avançar UX-M1.10.
+Papel: Diretor/Gestor; ação principal: escolher unidade ativa de destino e um
+corretor ativo daquela unidade. Estados: seleção, envio, sucesso e erro. Os dados
+de origem/campanha permanecem visíveis como contexto; nenhuma nova primitive,
+token ou animação é necessária. O servidor conserva o escopo e a permissão, e a
+mudança segue auditável e governada pelo Super-admin. Contrato: DEC-133.
+
 ## 2026-10-02 — Inclusão de corretores desativados em plantões
 
 DEC-130 aprovada: gestão pode selecionar cadastros desativados para a escala,
@@ -140,6 +160,18 @@ ações existentes. Sem novo token ou primitiva; a regra de domínio é resolvid
 no servidor. Registro: `docs/implementations/completed/2026-09-29-management-investigation-statistics.md`.
 
 ## Estado atual
+
+Consolidação operacional da Meta (2026-10-07): Diretor/Gestor/Marketing autorizado
+configura captura e fila somente no detalhe da campanha; a ação principal é
+salvar destino e estado de captura. Estados: ativa com fila ativa, pausada,
+salvando e falha; anúncios sincronizados e formulários com atribuição real são
+listados e exibem herança da campanha, sem ações locais. A lista e a Central de Filas são leitura com link para a campanha; o
+hub Meta mantém conexão/sincronização e o controle mestre de segurança fica
+identificado como global. Foram reutilizados Card, Switch, AppSelect e Badge;
+nenhum token/primitive foi criado e a etapa UX-M1.10 não avançou. Evidências:
+`src/features/meta-ads/components/campaign-detail-view.tsx`,
+`src/features/meta-ads/components/campaigns-dashboard-view.tsx`,
+`src/app/(dashboard)/leads/distribuicao/_components/queues/meta-entries.tsx`.
 
 Hardening pontual da navegação mobile (2026-09-28): no Sheet da sidebar gerencial, Diretor/Gestor e demais papéis autorizados encontram a mesma lista de destinos em área rolável; marca e usuário ficam em uma linha, controles contextuais abaixo e Agente IA/perfil empilhados no rodapé. A ação principal é escolher uma rota. Abertura, fechamento, foco e alvos de toque seguem as primitivas compartilhadas. Não há novo token, rota ou regra de domínio; UX-M1.10 segue pendente em viewports autenticados. Registro: `docs/implementations/active/2026-09-28-mobile-sidebar-responsiveness.md`.
 

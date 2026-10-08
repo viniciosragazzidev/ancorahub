@@ -1,27 +1,69 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
 
-import { isMetaAdsReadPermissionError, isMetaPermissionError, isMetaRateLimitError, MetaGraphClient } from "./meta-graph-client";
+import { isMetaAdsReadPermissionError, isMetaPermissionError, isMetaRateLimitError, MetaGraphClient, type MetaGraphApiError } from "./meta-graph-client";
 import { decryptMetaToken } from "./meta-oauth";
 import { isMetaAdAccountId, isMetaPageId } from "./meta-id-validation";
 import type { MetaSyncWarning } from "./types";
 
 const MISSING_ADS_READ_MESSAGE = "A conexão Meta atual não recebeu leitura da conta de anúncios. Reconecte Marketing com um administrador da conta e conceda ads_read para sincronizar campanhas, anúncios e pixels.";
+const META_RATE_LIMIT_BASE_COOLDOWN_MS = 60 * 60 * 1000;
+const META_RATE_LIMIT_MAX_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+const META_SCHEDULED_SYNC_MIN_INTERVAL_MS = 60 * 60 * 1000;
+
+type MetaSyncOptions = { scheduled?: boolean };
+
+function isPersistedMetaRateLimit(errorDetails: string | null) {
+  return typeof errorDetails === "string"
+    && /user request limit reached|request limit reached|rate.?limit/i.test(errorDetails);
+}
+
+function formatBrasiliaTime(date: Date) {
+  return `${new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date)} (horário de Brasília)`;
+}
 
 function uniqueWarnings(warnings: MetaSyncWarning[]) {
   return [...new Map(warnings.map((warning) => [warning.code, warning])).values()];
+}
+
+function readLeadGenFormId(creative: { object_story_spec?: unknown } | undefined): string | null {
+  const pending: Array<{ value: unknown; depth: number }> = [{ value: creative?.object_story_spec, depth: 0 }];
+  while (pending.length) {
+    const current = pending.pop()!;
+    if (!current.value || typeof current.value !== "object" || current.depth > 8) continue;
+    for (const [key, value] of Object.entries(current.value)) {
+      if ((key === "lead_gen_form_id" || key === "lead_form_id") && (typeof value === "string" || typeof value === "number")) {
+        return String(value);
+      }
+      if (value && typeof value === "object") pending.push({ value, depth: current.depth + 1 });
+    }
+  }
+  return null;
+}
+
+/** Keeps "request limit reached" in the persisted message so the backoff keeps counting this failure. */
+function describeRateLimit(error: MetaGraphApiError) {
+  return /request limit reached/i.test(error.message) ? error.message : `Meta request limit reached (code ${error.code}): ${error.message}`;
 }
 
 function serializeSyncWarnings(warnings: MetaSyncWarning[]) {
   return warnings.length ? JSON.stringify({ warnings }) : null;
 }
 
-export async function runMetaTenantSync(tenantId: string, syncType: "full" | "campaigns" | "forms" = "full"): Promise<{
+export async function runMetaTenantSync(
+  tenantId: string,
+  syncType: "full" | "campaigns" | "forms" = "full",
+  options: MetaSyncOptions = {},
+): Promise<{
   success: boolean;
   itemsSynced: number;
   error?: string;
@@ -30,6 +72,49 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
   const db = getDatabase();
   const startTime = Date.now();
   const syncLogId = randomUUID();
+  let totalSynced = 0;
+
+  const recentLogs = await db.select({
+    status: schema.metaSyncLogs.status,
+    errorDetails: schema.metaSyncLogs.errorDetails,
+    startedAt: schema.metaSyncLogs.startedAt,
+    completedAt: schema.metaSyncLogs.completedAt,
+  }).from(schema.metaSyncLogs)
+    .where(eq(schema.metaSyncLogs.tenantId, tenantId))
+    .orderBy(desc(schema.metaSyncLogs.startedAt))
+    .limit(8);
+
+  const consecutiveRateLimitFailures = recentLogs.reduce((count, log, index) => {
+    if (index !== count || log.status !== "error" || !isPersistedMetaRateLimit(log.errorDetails)) return count;
+    return count + 1;
+  }, 0);
+  const latestLog = recentLogs[0];
+  if (consecutiveRateLimitFailures > 0 && latestLog) {
+    const backoffMs = Math.min(
+      META_RATE_LIMIT_MAX_COOLDOWN_MS,
+      META_RATE_LIMIT_BASE_COOLDOWN_MS * (2 ** (consecutiveRateLimitFailures - 1)),
+    );
+    const retryAt = new Date((latestLog.completedAt ?? latestLog.startedAt).getTime() + backoffMs);
+    if (retryAt.getTime() > startTime) {
+      return {
+        success: false,
+        itemsSynced: 0,
+        error: `A Meta limitou as chamadas. Para evitar novas falhas, a sincronização será liberada após ${formatBrasiliaTime(retryAt)}.`,
+      };
+    }
+  }
+
+  if (options.scheduled && latestLog && ["success", "partial"].includes(latestLog.status)) {
+    const lastCompletedAt = latestLog.completedAt ?? latestLog.startedAt;
+    const retryAt = new Date(lastCompletedAt.getTime() + META_SCHEDULED_SYNC_MIN_INTERVAL_MS);
+    if (retryAt.getTime() > startTime) {
+      return {
+        success: false,
+        itemsSynced: 0,
+        error: `A sincronização automática seguinte está prevista após ${formatBrasiliaTime(retryAt)}.`,
+      };
+    }
+  }
 
   await db.insert(schema.metaSyncLogs).values({
     id: syncLogId,
@@ -58,7 +143,6 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     const rawToken = decryptMetaToken(connection.accessTokenCiphertext);
     const client = new MetaGraphClient(rawToken);
     const warnings: MetaSyncWarning[] = [];
-    let totalSynced = 0;
 
     // Permission data stored by older connections can be empty. Refresh the
     // server-side grant without returning or logging the token.
@@ -75,6 +159,10 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
 
     const adAccounts = await db.select().from(schema.metaAdAccounts)
       .where(and(eq(schema.metaAdAccounts.tenantId, tenantId), eq(schema.metaAdAccounts.status, "active")));
+    const activeQueueIds = new Set((await db.select({ id: schema.leadQueues.id })
+      .from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.tenantId, tenantId), eq(schema.leadQueues.status, "active"))))
+      .map((queue) => queue.id));
 
     const validAdAccounts = [] as typeof adAccounts;
     for (const account of adAccounts) {
@@ -108,7 +196,9 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
     for (const account of canReadAds ? validAdAccounts : []) {
       try {
         const remoteCampaigns = await client.fetchCampaigns(account.adAccountId);
+        const remoteCampaignIds = new Set(remoteCampaigns.map((campaign) => campaign.id));
         for (const campaign of remoteCampaigns) {
+          const deliveryStatus = campaign.effective_status || campaign.status || "PAUSED";
           await db.insert(schema.metaCampaigns).values({
             id: randomUUID(),
             tenantId,
@@ -116,7 +206,7 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
             campaignId: campaign.id,
             name: campaign.name,
             objective: campaign.objective || null,
-            status: campaign.status || "PAUSED",
+            status: deliveryStatus,
             dailyBudget: campaign.daily_budget ? parseInt(campaign.daily_budget, 10) : null,
             lifetimeBudget: campaign.lifetime_budget ? parseInt(campaign.lifetime_budget, 10) : null,
             startTime: campaign.start_time ? new Date(campaign.start_time) : null,
@@ -129,45 +219,73 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
               adAccountId: account.adAccountId,
               name: campaign.name,
               objective: campaign.objective || null,
-              status: campaign.status || "PAUSED",
+              status: deliveryStatus,
               dailyBudget: campaign.daily_budget ? parseInt(campaign.daily_budget, 10) : null,
               lifetimeBudget: campaign.lifetime_budget ? parseInt(campaign.lifetime_budget, 10) : null,
               updatedAt: now,
             },
           });
+          if (account.defaultQueueId && activeQueueIds.has(account.defaultQueueId)) {
+            await db.insert(schema.metaCampaignQueueRoutes).values({
+              id: randomUUID(),
+              tenantId,
+              campaignId: campaign.id,
+              queueId: account.defaultQueueId,
+              enabled: true,
+              createdAt: now,
+              updatedAt: now,
+            }).onConflictDoNothing();
+          }
           totalSynced++;
+        }
 
+        const adSetIds = new Set<string>();
+        try {
+          const adSets = await client.fetchAdSetsForAccount(account.adAccountId);
+          for (const adSet of adSets) {
+            const campaignId = adSet.campaign_id;
+            if (!campaignId || !remoteCampaignIds.has(campaignId)) continue;
+            adSetIds.add(adSet.id);
+            await db.insert(schema.metaAdSets).values({
+              id: randomUUID(), tenantId, campaignId, adSetId: adSet.id,
+              name: adSet.name, status: adSet.status || "PAUSED", targeting: adSet.targeting || null,
+              createdAt: now, updatedAt: now,
+            }).onConflictDoUpdate({
+              target: [schema.metaAdSets.tenantId, schema.metaAdSets.adSetId],
+              // Targeting is no longer requested from Meta; keep whatever was stored before.
+              set: { campaignId, name: adSet.name, status: adSet.status || "PAUSED", ...(adSet.targeting ? { targeting: adSet.targeting } : {}), updatedAt: now },
+            });
+          }
+        } catch (adSetError) {
+          if (isMetaRateLimitError(adSetError)) throw adSetError;
+          console.error(`[meta-sync] Warning fetching adSets for account ${account.adAccountId}:`, adSetError);
+          warnings.push({
+            code: "asset_access_limited",
+            message: `Não foi possível sincronizar os conjuntos de anúncios da conta ${account.name || account.adAccountId}. ${adSetError instanceof Error ? adSetError.message : "Erro na API da Meta."}`,
+          });
+        }
+
+        if (adSetIds.size) {
           try {
-            const adSets = await client.fetchAdSets(campaign.id);
-            for (const adSet of adSets) {
-              await db.insert(schema.metaAdSets).values({
-                id: randomUUID(), tenantId, campaignId: campaign.id, adSetId: adSet.id,
-                name: adSet.name, status: adSet.status || "PAUSED", targeting: adSet.targeting || null,
-                createdAt: now, updatedAt: now,
+            const ads = await client.fetchAdsForAccount(account.adAccountId);
+            for (const ad of ads) {
+              if (!ad.adset_id || !adSetIds.has(ad.adset_id)) continue;
+              const leadGenFormId = readLeadGenFormId(ad.creative);
+              await db.insert(schema.metaAds).values({
+                id: randomUUID(), tenantId, adSetId: ad.adset_id, adId: ad.id, leadGenFormId,
+                name: ad.name, status: ad.status || "PAUSED", createdAt: now, updatedAt: now,
               }).onConflictDoUpdate({
-                target: [schema.metaAdSets.tenantId, schema.metaAdSets.adSetId],
-                set: { name: adSet.name, status: adSet.status || "PAUSED", updatedAt: now },
+                target: [schema.metaAds.tenantId, schema.metaAds.adId],
+                set: { adSetId: ad.adset_id, ...(leadGenFormId ? { leadGenFormId } : {}), name: ad.name, status: ad.status || "PAUSED", updatedAt: now },
               });
-
-              try {
-                const ads = await client.fetchAds(adSet.id);
-                for (const ad of ads) {
-                  await db.insert(schema.metaAds).values({
-                    id: randomUUID(), tenantId, adSetId: adSet.id, adId: ad.id,
-                    name: ad.name, status: ad.status || "PAUSED", createdAt: now, updatedAt: now,
-                  }).onConflictDoUpdate({
-                    target: [schema.metaAds.tenantId, schema.metaAds.adId],
-                    set: { name: ad.name, status: ad.status || "PAUSED", updatedAt: now },
-                  });
-                }
-              } catch (adError) {
-                if (isMetaRateLimitError(adError)) throw adError;
-                console.error(`[meta-sync] Warning fetching ads for adSet ${adSet.id}:`, adError);
-              }
             }
-          } catch (adSetError) {
-            if (isMetaRateLimitError(adSetError)) throw adSetError;
-            console.error(`[meta-sync] Warning fetching adSets for campaign ${campaign.id}:`, adSetError);
+          } catch (adError) {
+            if (isMetaRateLimitError(adError)) throw adError;
+            console.error(`[meta-sync] Warning fetching ads for account ${account.adAccountId}:`, adError);
+            warnings.push({
+              code: "asset_access_limited",
+              message: `Não foi possível sincronizar os anúncios da conta ${account.name || account.adAccountId}. ${adError instanceof Error ? adError.message : "Erro na API da Meta."}`,
+            });
           }
         }
 
@@ -321,13 +439,17 @@ export async function runMetaTenantSync(tenantId: string, syncType: "full" | "ca
 
     return { success: true, itemsSynced: totalSynced, warnings: normalizedWarnings };
   } catch (error) {
-    if (isMetaRateLimitError(error)) {
+    const rateLimited = isMetaRateLimitError(error);
+    if (rateLimited) {
       console.warn(`[meta-sync] Meta rate limit (code ${error.code}); aborting tenant ${tenantId} sync.`);
     }
-    const errorDetails = error instanceof Error ? error.message : "Erro desconhecido durante a sincronização Meta.";
+    const errorDetails = rateLimited
+      ? describeRateLimit(error)
+      : error instanceof Error ? error.message : "Erro desconhecido durante a sincronização Meta.";
+    // Everything upserted before the stop stays; only the log marks the run as failed.
     await db.update(schema.metaSyncLogs).set({
-      status: "error", errorDetails, durationMs: Date.now() - startTime, completedAt: new Date(),
+      status: "error", itemsSynced: totalSynced, errorDetails, durationMs: Date.now() - startTime, completedAt: new Date(),
     }).where(eq(schema.metaSyncLogs.id, syncLogId));
-    return { success: false, itemsSynced: 0, error: errorDetails };
+    return { success: false, itemsSynced: totalSynced, error: errorDetails };
   }
 }

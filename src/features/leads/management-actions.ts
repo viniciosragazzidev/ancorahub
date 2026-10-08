@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -12,17 +12,16 @@ import { notifyLeadReassigned } from "@/features/notifications/send-push-helper"
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { enqueueLeadEffectTx, runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { scheduleAfterResponse } from "@/shared/async/after-response";
-import { checkBrokerScheduleAvailability } from "@/features/leads/assignment";
 import { withServerActionTiming } from "@/shared/observability/request-timing";
 import { canRemoveLeadAssignment, getLeadAssignmentBlockedReason } from "./assignment-domain";
 import { getActiveQueueDutyRoster } from "@/features/lead-distribution/active-queue-duty-roster";
-import { canManuallyAssignLeadToBroker } from "@/features/lead-distribution/duty-roster-matching";
-import { offerLeadToBrokerManually } from "@/features/lead-distribution/service";
+import { findPostSaleExemptionQueueName, postSaleTransferAuditAction } from "@/features/lead-distribution/post-sale-transfer";
+import { ensureDefaultQueue, offerLeadToBrokerManually, routeLeadToBranch } from "@/features/lead-distribution/service";
 import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { DISTRIBUTION_REMOVAL_NOTE_MAX, DISTRIBUTION_REMOVAL_REASONS, type DistributionRemovalReason } from "@/features/lead-distribution/distribution-removal";
 
-const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable(), assignmentMode: z.enum(["direct", "offer"]).optional() });
+const inputSchema = z.object({ leadId: z.string().uuid(), brokerId: z.string().uuid().nullable(), branchId: z.string().uuid().optional(), dutyScheduleId: z.string().uuid().optional(), assignmentMode: z.enum(["direct", "offer"]).optional() });
 
 export type ManagementActionState = {
   success?: boolean;
@@ -80,13 +79,34 @@ async function getManagedLead(leadId: string) {
 export async function getLeadDutyReassignmentOptions(leadId: string) {
   try {
     const parsedLeadId = z.string().uuid().parse(leadId);
-    const { context, lead } = await getManagedLead(parsedLeadId);
+    const { context, db, lead } = await getManagedLead(parsedLeadId);
+    const postSaleQueueName = await findPostSaleExemptionQueueName({ tenantId: context.tenantId, originQueueId: lead.queueId });
+    if (postSaleQueueName) {
+      const brokers = await db.select({ id: schema.user.id, name: schema.user.name, branchId: schema.tenantMemberships.branchId })
+        .from(schema.tenantMemberships)
+        .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
+        .where(and(
+          eq(schema.tenantMemberships.tenantId, context.tenantId),
+          eq(schema.tenantMemberships.role, "broker"),
+          eq(schema.tenantMemberships.status, "active"),
+          eq(schema.user.active, true),
+          eq(schema.user.status, "active"),
+        )).orderBy(asc(schema.user.name));
+      // Livre movimentação (2026-10-08): qualquer unidade do tenant, sem exigir ativa/aceitando leads.
+      const branches = await db.select({ id: schema.branches.id, name: schema.branches.name })
+        .from(schema.branches)
+        .where(and(
+          eq(schema.branches.tenantId, context.tenantId),
+          context.role === "director" ? undefined : eq(schema.branches.isDistributionHub, false),
+        )).orderBy(asc(schema.branches.name));
+      return { success: true as const, leadId: parsedLeadId, isPostSale: true, hasActiveDuty: false, brokers, branches };
+    }
     const roster = await getActiveQueueDutyRoster({
       tenantId: context.tenantId,
       queueId: lead.queueId,
       webhookCredentialId: lead.webhookCredentialId,
     });
-    return { success: true as const, leadId: parsedLeadId, ...roster };
+    return { success: true as const, leadId: parsedLeadId, isPostSale: false, branches: [], ...roster };
   } catch (error) {
     return {
       success: false as const,
@@ -167,6 +187,11 @@ export async function removeLeadAssignmentAction(_prev: ManagementActionState, f
           eq(schema.leadAssignmentAttempts.leadId, lead.id),
           eq(schema.leadAssignmentAttempts.brokerId, currentBrokerId),
           eq(schema.leadAssignmentAttempts.status, "open"),
+        ));
+        await tx.update(schema.leadOffers).set({ status: "CANCELLED", updatedAt: now }).where(and(
+          eq(schema.leadOffers.tenantId, context.tenantId),
+          eq(schema.leadOffers.leadId, lead.id),
+          inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
         ));
         await tx.update(schema.leadDistributionJobs).set({
           status: "superseded",
@@ -338,73 +363,103 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
   return withServerActionTiming("/leads", "leads.reassign", async () => {
     const mutationId = randomUUID();
     try {
-      const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null, assignmentMode: formData.get("assignmentMode") || undefined });
+      const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null, branchId: String(formData.get("branchId") || "") || undefined, dutyScheduleId: String(formData.get("dutyScheduleId") || "") || undefined, assignmentMode: formData.get("assignmentMode") || undefined });
       const { context, db, lead } = await getManagedLead(input.leadId);
       if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
       if (lead.archivedAt || lead.deletedAt) throw new Error("Não é possível reatribuir um lead arquivado ou excluído.");
-      if (input.brokerId && input.brokerId === lead.corretorId) throw new Error("Selecione outro corretor para reiniciar o atendimento.");
+      // Pós Venda (2026-10-08): livre movimentação para qualquer unidade ou corretor,
+      // inclusive lead vendido/perdido (o status é preservado nesse caso).
+      const postSaleQueueName = await findPostSaleExemptionQueueName({ tenantId: context.tenantId, originQueueId: lead.queueId });
+      const isPostSale = Boolean(postSaleQueueName);
+      const isClosedLead = lead.status === "lost" || lead.status === "converted";
+      const keepsClosedStatus = isPostSale && isClosedLead;
+      if (isClosedLead && !isPostSale) throw new Error("Leads encerrados não podem ser reatribuídos.");
+      const changesBranch = Boolean(input.branchId && input.branchId !== lead.branchId);
+      if (input.brokerId && input.brokerId === lead.corretorId && !(isPostSale && changesBranch)) throw new Error("Selecione outro corretor para reiniciar o atendimento.");
       if (!input.brokerId) throw new Error("Selecione um corretor para reatribuir o lead.");
-      const assignmentChoiceEnabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
-      if (!lead.corretorId && assignmentChoiceEnabled && !input.assignmentMode) return { mutationId, needsAssignmentMode: true, error: "Escolha se deseja atribuir direto ou enviar uma oferta para aceite." };
-      if (input.assignmentMode && (!assignmentChoiceEnabled || lead.corretorId)) throw new Error("Esta escolha está disponível somente para leads sem corretor e quando habilitada pelo Super-admin.");
-      const brokerId = input.brokerId;
-      const assignmentEventId = randomUUID();
-      const dutyRoster = await getActiveQueueDutyRoster({
+      const activeDutyRoster = lead.queueId && !isPostSale ? await getActiveQueueDutyRoster({
         tenantId: context.tenantId,
         queueId: lead.queueId,
         webhookCredentialId: lead.webhookCredentialId,
-      });
+      }) : { hasActiveDuty: false, brokers: [] };
+      const selectedDutyBroker = input.dutyScheduleId
+        ? activeDutyRoster.brokers.find((candidate) => candidate.id === input.brokerId && candidate.scheduleId === input.dutyScheduleId)
+        : undefined;
+      if (activeDutyRoster.hasActiveDuty && !selectedDutyBroker) {
+        throw new Error("Selecione um corretor escalado no plantão ativo desta fila.");
+      }
+      if (input.dutyScheduleId && !activeDutyRoster.hasActiveDuty) {
+        throw new Error("Este plantão não está ativo para a fila do lead. Atualize o drawer e tente novamente.");
+      }
+      const dutyScheduleId = selectedDutyBroker?.scheduleId ?? null;
+      const isDutyReassignment = Boolean(dutyScheduleId);
+      const targetBranchId = isDutyReassignment ? lead.branchId : input.branchId ?? lead.branchId;
+      if (!targetBranchId) throw new Error("Selecione uma unidade para reatribuir o lead.");
+      const accessContext = toEffectiveLeadAccessContext(context);
+      const targetResourceScope = buildLeadResourceScope({ tenantId: context.tenantId, branchId: targetBranchId });
+      const targetScopeAllowed = context.role === "director" || accessContext.canAccessAllUnits ||
+        AuthorizationService.can(accessContext, "leads_reassign", targetResourceScope);
+      if (!targetScopeAllowed) throw new AuthorizationError("A unidade de destino está fora do seu escopo autorizado.");
+      const [targetBranch] = await db.select({ id: schema.branches.id, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, isDistributionHub: schema.branches.isDistributionHub })
+        .from(schema.branches).where(and(eq(schema.branches.id, targetBranchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
+      if (isPostSale && (!targetBranch || (targetBranch.isDistributionHub && context.role !== "director"))) {
+        throw new AuthorizationError("A unidade do lead não está disponível para esta operação.");
+      }
+      if (!isDutyReassignment && !isPostSale && (!targetBranch || targetBranch.status !== "active" || !targetBranch.acceptingLeads || targetBranch.isDistributionHub)) {
+        throw new Error("A unidade escolhida não está ativa e apta a receber leads.");
+      }
+      const assignmentChoiceEnabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
+      const serviceAlreadyStarted = Boolean(lead.firstContactAt || lead.serviceStartedAt) || ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status);
+      if (!lead.corretorId && assignmentChoiceEnabled && !input.assignmentMode && !serviceAlreadyStarted) return { mutationId, needsAssignmentMode: true, error: "Escolha se deseja atribuir direto ou enviar uma oferta para aceite." };
+      if (input.assignmentMode && (!assignmentChoiceEnabled || lead.corretorId)) throw new Error("Esta escolha está disponível somente para leads sem corretor e quando habilitada pelo Super-admin.");
+      if (input.assignmentMode === "offer" && serviceAlreadyStarted) throw new Error("Para transferir um atendimento iniciado, use a atribuição direta.");
+      const brokerId = input.brokerId;
+      const assignmentEventId = randomUUID();
       const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
-      if (!broker) throw new Error("O corretor selecionado não está ativo neste tenant.");
-      if (!canManuallyAssignLeadToBroker({
-        hasActiveQueueDuty: dutyRoster.hasActiveDuty,
-        brokerId: broker.id,
-        brokerBranchId: broker.branchId,
-        leadBranchId: lead.branchId,
-        activeDutyBrokerIds: dutyRoster.brokers.map((candidate) => candidate.id),
-      })) {
-        throw new Error(dutyRoster.hasActiveDuty
-          ? "O corretor selecionado não está escalado no plantão ativo desta fila."
-          : "O corretor selecionado não pertence à filial deste lead.");
-      }
+        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), isDutyReassignment || isPostSale ? undefined : eq(schema.tenantMemberships.branchId, targetBranchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
+      if (!broker || (selectedDutyBroker && broker.branchId !== selectedDutyBroker.branchId)) throw new Error(isPostSale ? "O corretor selecionado não está ativo neste tenant." : isDutyReassignment ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor selecionado não está ativo nesta unidade.");
+      // Pós Venda na mesma unidade continua na fila Pós Venda; mudando de unidade, vai para a fila padrão do destino.
+      const targetQueueId = isDutyReassignment || (isPostSale && targetBranchId === lead.branchId) ? lead.queueId : await ensureDefaultQueue(context.tenantId, targetBranchId, context.userId);
+      if (!targetQueueId) throw new Error("A fila do lead não está mais disponível.");
       if (input.assignmentMode === "offer") {
-        const offered = await offerLeadToBrokerManually(context, lead.id, brokerId);
+        const offered = await offerLeadToBrokerManually(context, lead.id, brokerId, { targetBranchId, targetQueueId, ...(dutyScheduleId ? { dutyScheduleId } : {}) });
         if (offered.status === "conflict") throw new Error(offered.reason);
         if (offered.status === "fallback") {
+          if (!isDutyReassignment && !isPostSale) {
+            const routed = await routeLeadToBranch(context, lead.id, targetBranchId, "Fallback da oferta manual", true);
+            if (routed.status !== "routed") throw new Error("A oferta falhou e o lead não pôde ser encaminhado à unidade selecionada.");
+          }
           await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId: lead.id, source: "manual_offer_delivery_failed" });
-          return { success: true, message: offered.reason, mutationId, entity: { leadId: lead.id, branchId: lead.branchId, corretorId: null, status: lead.status, distributionStatus: "queued" } };
+          return { success: true, message: offered.reason, mutationId, entity: { leadId: lead.id, branchId: targetBranchId, corretorId: null, status: lead.status, distributionStatus: "queued" } };
         }
         await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: lead.id, runAfter: offered.expiresAt });
-        void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId, branchIds: [lead.branchId, broker.branchId].filter((id): id is string => Boolean(id)), brokerIds: [brokerId] }).catch(() => undefined);
-        return { success: true, message: "Oferta enviada ao corretor. Se não houver aceite no prazo configurado, o lead volta à distribuição normal.", mutationId, entity: { leadId: lead.id, branchId: lead.branchId, corretorId: brokerId, status: "distributed", distributionStatus: "assigned" } };
+        void publishLeadInvalidation({ tenantId: context.tenantId, actorId: context.userId, branchIds: [lead.branchId, targetBranchId].filter((id): id is string => Boolean(id)), brokerIds: [brokerId] }).catch(() => undefined);
+        return { success: true, message: "Oferta enviada ao corretor. Se não houver aceite no prazo configurado, o lead volta à distribuição normal.", mutationId, entity: { leadId: lead.id, branchId: targetBranchId, corretorId: brokerId, status: "distributed", distributionStatus: "assigned" } };
       }
       const now = new Date();
       const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
 
-      const availabilityCheck = dutyRoster.hasActiveDuty
-        ? { isConfigured: false, isWithinSchedule: true }
-        : await checkBrokerScheduleAvailability(context.tenantId, brokerId);
-      let warning: string | undefined = undefined;
-      if (availabilityCheck.isConfigured && !availabilityCheck.isWithinSchedule) {
-        warning = "Aviso: O corretor está fora da agenda de atendimento configurada, mas a atribuição manual foi realizada com sucesso.";
-      }
-
       await db.transaction(async (tx) => {
         const updated = await tx.update(schema.leads).set({
+          branchId: targetBranchId,
+          queueId: targetQueueId,
+          dutyScheduleId,
           corretorId: input.brokerId,
-          status: "distributed",
           distributionStatus: "assigned",
           assignmentSource: context.role === "director" ? "manual_director" : "manual_manager",
           assignmentStrategy: "manual",
           distributionUpdatedAt: now,
           assignedAt: now,
-          firstContactAt: null,
-          serviceStartedAt: null,
-          serviceStartedBy: null,
-          stageEnteredAt: now,
-          motivoPerda: null,
+          // Lead vendido/perdido na Pós Venda só troca de dono/unidade; venda e histórico ficam.
+          ...(keepsClosedStatus ? {} : {
+            status: "distributed" as const,
+            firstContactAt: null,
+            serviceStartedAt: null,
+            serviceStartedBy: null,
+            stageEnteredAt: now,
+            motivoPerda: null,
+          }),
           // A manual assignment is the only way back from "removed from distribution".
           distributionRemovedAt: null,
           distributionRemovalReason: null,
@@ -413,6 +468,8 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
         }).where(and(
           eq(schema.leads.id, lead.id),
           eq(schema.leads.tenantId, context.tenantId),
+          lead.queueId ? eq(schema.leads.queueId, lead.queueId) : isNull(schema.leads.queueId),
+          isPostSale ? (lead.branchId ? eq(schema.leads.branchId, lead.branchId) : isNull(schema.leads.branchId)) : undefined,
           lead.corretorId ? eq(schema.leads.corretorId, lead.corretorId) : isNull(schema.leads.corretorId),
           eq(schema.leads.status, lead.status),
           lead.firstContactAt ? eq(schema.leads.firstContactAt, lead.firstContactAt) : isNull(schema.leads.firstContactAt),
@@ -430,30 +487,35 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           eq(schema.leadAssignmentAttempts.leadId, lead.id),
           eq(schema.leadAssignmentAttempts.status, "open"),
         ));
-        if (tenantPolicy?.feedbackRequiredEnabled !== false) await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: lead.tenantId, leadId: lead.id, brokerId, sequence: 1, assignedAt: now, feedbackDueAt: new Date(now.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000), status: "open", createdAt: now });
-        await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: `Lead reatribuído por ${context.role === "director" ? "Diretor" : "Gestor"}; atendimento e SLA reiniciados, com histórico preservado.` });
-        await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: "reatribuiu_lead" });
+        if (tenantPolicy?.feedbackRequiredEnabled !== false && !keepsClosedStatus) await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: lead.tenantId, leadId: lead.id, brokerId, sequence: 1, assignedAt: now, feedbackDueAt: new Date(now.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000), status: "open", createdAt: now });
+        await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: keepsClosedStatus ? `Lead da Pós Venda transferido por ${context.role === "director" ? "Diretor" : "Gestor"}; status e histórico preservados.` : `Lead reatribuído por ${context.role === "director" ? "Diretor" : "Gestor"}; atendimento e SLA reiniciados, com histórico preservado.` });
+        await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: isPostSale ? postSaleTransferAuditAction(postSaleQueueName) : "reatribuiu_lead" });
         await tx.insert(schema.leadDistributionEvents).values({
           id: assignmentEventId,
           tenantId: lead.tenantId,
           leadId: lead.id,
           fromBranchId: lead.branchId,
-          toBranchId: lead.branchId,
+          fromQueueId: lead.queueId,
+          toQueueId: targetQueueId,
+          toBranchId: targetBranchId,
           previousOwnerId: lead.corretorId,
           newOwnerId: brokerId,
           action: "assigned",
           source: context.role === "director" ? "manual_director" : "manual_manager",
           strategy: "manual",
-          reason: dutyRoster.hasActiveDuty
-            ? "Reatribuição manual para corretor escalado no plantão ativo da fila."
-            : "Reatribuição manual",
+          reason: isPostSale ? (changesBranch ? "Transferência livre da Pós Venda para outra unidade e corretor." : "Atribuição manual da Pós Venda; fila e unidade preservadas.")
+            : isDutyReassignment
+            ? "Reatribuição manual para corretor escalado no plantão ativo desta fila."
+            : "Transferência manual entre unidades; fila e campanha não restringem a atribuição.",
           metadata: {
-            assignmentScope: dutyRoster.hasActiveDuty ? "active_queue_duty" : "lead_branch",
+            assignmentScope: isPostSale ? "post_sale_transfer_exemption" : isDutyReassignment ? "active_duty_roster" : "manual_cross_unit_override",
+            ...(isPostSale ? { exemptionQueueName: postSaleQueueName } : {}),
+            ...(dutyScheduleId ? { dutyScheduleId } : {}),
             assignedBrokerBranchId: broker.branchId,
             previousStatus: lead.status,
             previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null,
             previousServiceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
-            serviceRestarted: true,
+            serviceRestarted: !keepsClosedStatus,
           },
           actorId: context.userId,
           createdAt: now,
@@ -464,7 +526,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           type: "NOTIFY_LEAD_ASSIGNED",
           idempotencyKey: `lead-assigned:${assignmentEventId}`,
           payload: {
-            branchId: lead.branchId,
+            branchId: targetBranchId,
             brokerId,
             leadName: lead.nome,
             isRedistribution: lead.corretorId ? "true" : "false",
@@ -478,7 +540,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       void publishLeadInvalidation({
         tenantId: context.tenantId,
         actorId: context.userId,
-        branchIds: Array.from(new Set([lead.branchId, broker.branchId].filter((branchId): branchId is string => Boolean(branchId)))),
+        branchIds: Array.from(new Set([lead.branchId, targetBranchId, broker.branchId].filter((branchId): branchId is string => Boolean(branchId)))),
         brokerIds: [lead.corretorId, input.brokerId],
       }).catch(() => undefined);
       scheduleAfterResponse("lead-assignment-effects", async () => {
@@ -490,9 +552,8 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       });
       return {
         success: true,
-        warning,
         mutationId,
-        entity: { leadId: lead.id, branchId: lead.branchId, corretorId: input.brokerId, status: "distributed", distributionStatus: "assigned" },
+        entity: { leadId: lead.id, branchId: targetBranchId, corretorId: input.brokerId, status: keepsClosedStatus ? lead.status : "distributed", distributionStatus: "assigned" },
       };
     } catch (error) {
       return { mutationId, error: error instanceof Error ? error.message : "Não foi possível reatribuir o lead." };

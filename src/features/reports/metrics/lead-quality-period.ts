@@ -5,7 +5,7 @@ import { PERIOD_OPTIONS, DEFAULT_PERIOD, periodStart, type PeriodValue } from "@
  * the operation's day, from 19:00 of the day before to 19:00 of today
  * (a lead at 19:30 already belongs to tomorrow's "today").
  */
-export type LeadQualityPeriod = PeriodValue | "today";
+export type LeadQualityPeriod = PeriodValue | 3 | "today";
 
 export const LEAD_QUALITY_TIMEZONE = "America/Sao_Paulo";
 /** The operation's day turns at 19:00; the first shift runs until 13:30. */
@@ -22,6 +22,7 @@ export function parseLeadQualityPeriod(raw: unknown): LeadQualityPeriod {
   if (raw === "today" || raw === "hoje") return "today";
   if (typeof raw !== "string") return DEFAULT_PERIOD;
   const days = Number.parseInt(raw, 10);
+  if (raw === "3") return 3;
   return (PERIOD_OPTIONS as readonly number[]).includes(days) ? (days as PeriodValue) : DEFAULT_PERIOD;
 }
 
@@ -45,7 +46,23 @@ function wallClockToUtc(year: number, month: number, day: number, clock: string,
 export type LeadQualityWindow = { since: Date; until: Date | null };
 
 export function leadQualityWindow(period: LeadQualityPeriod, now = new Date()): LeadQualityWindow {
-  if (period !== "today") return { since: periodStart(period, now), until: null };
+  if (period !== "today") {
+    if (period === 3) {
+      const local = zonedParts(now, LEAD_QUALITY_TIMEZONE);
+      const weekday = new Intl.DateTimeFormat("en-US", { timeZone: LEAD_QUALITY_TIMEZONE, weekday: "short" }).format(now);
+      if (weekday === "Mon") {
+        const friday = new Date(Date.UTC(local.year, local.month - 1, local.day - 3));
+        return {
+          since: wallClockToUtc(friday.getUTCFullYear(), friday.getUTCMonth() + 1, friday.getUTCDate(), OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE),
+          until: null,
+        };
+      }
+      const since = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      since.setDate(since.getDate() - 2);
+      return { since, until: null };
+    }
+    return { since: periodStart(period, now), until: null };
+  }
   const today = zonedParts(now, LEAD_QUALITY_TIMEZONE);
   const until = wallClockToUtc(today.year, today.month, today.day, OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
   return { since: new Date(until.getTime() - 24 * 60 * 60 * 1000), until };

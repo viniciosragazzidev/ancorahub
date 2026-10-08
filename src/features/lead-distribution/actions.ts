@@ -343,12 +343,13 @@ export async function routeLeadToBranchAction(
     return { mutationId, error: parsed.error.issues[0]?.message ?? "Selecione uma unidade válida." };
   try {
     const context = await getRequiredTenantContext();
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
     const result = await routeLeadToBranch(
       context,
       parsed.data.leadId,
       parsed.data.branchId,
       parsed.data.reason,
-      parsed.data.overrideCampaign,
+      true,
     );
     if (result.status === "campaign_conflict")
       return {
@@ -408,6 +409,7 @@ export async function assignLeadToBrokerAction(
     return { mutationId, error: parsed.error.issues[0]?.message ?? "Selecione um corretor válido." };
   try {
     const context = await getRequiredTenantContext();
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
     if (parsed.data.assignmentMode) {
       const enabled = (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false";
       if (!enabled) return { mutationId, error: "A escolha de oferta foi desativada pelo Super-admin. Atualize a página e tente novamente." };
@@ -488,6 +490,7 @@ export async function routeAndAssignLeadAction(
     const context = await getRequiredTenantContext();
     if (context.role !== "director")
       return { mutationId, error: "Apenas Diretores podem rotear e atribuir em uma única operação." };
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
     const result = await routeLeadToBranchAndAssignBroker(
       context,
       parsed.data.leadId,
@@ -872,12 +875,13 @@ export async function distributeLeadBatchAction(
   if (!branch.success) return { mutationId, error: "Selecione uma unidade." };
   try {
     const context = await getRequiredTenantContext();
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
     let processed = 0;
     let conflicts = 0;
     const processedLeadIds: string[] = [];
     const enqueuePromises: Promise<unknown>[] = [];
     for (const id of parsed.data) {
-      const result = await routeLeadToBranch(context, id, branch.data, "Distribuição em lote");
+      const result = await routeLeadToBranch(context, id, branch.data, "Distribuição em lote", true);
       if (result.status === "routed") {
         processed += 1;
         processedLeadIds.push(id);
@@ -928,6 +932,7 @@ export async function assignLeadBatchToBrokerAction(
   if (!branch.success) return { mutationId, error: "Selecione uma unidade." };
   try {
     const context = await getRequiredTenantContext();
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") return { mutationId, error: "As ações de gestão de leads estão desativadas pelo Super-admin." };
     const db = getDatabase();
     const leads = await db
       .select({ id: schema.leads.id, branchId: schema.leads.branchId })
@@ -941,7 +946,7 @@ export async function assignLeadBatchToBrokerAction(
     const processedLeadIds: string[] = [];
     for (const id of parsed.data) {
       const result = branchByLead.get(id)
-        ? await assignLeadToBroker(context, id, broker.data, undefined, "Atribuição em lote")
+        ? await assignLeadToBroker(context, id, broker.data, undefined, "Transferência manual em lote", undefined, branch.data, { manualTransferOverride: true })
         : await routeLeadToBranchAndAssignBroker(
             context,
             id,

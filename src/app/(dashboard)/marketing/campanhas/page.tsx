@@ -4,7 +4,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { ArrowRight } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { getMetaConnectionState } from "@/features/meta-ads/actions";
-import { MetaAssetCaptureCard, MetaMasterCaptureControl } from "@/features/meta-ads/components/meta-capture-controls";
+import { MetaMasterCaptureControl } from "@/features/meta-ads/components/meta-capture-controls";
 import { MetaSyncBadge } from "@/features/meta-ads/components/meta-sync-badge";
 import { CAPTURE_MODE_LABEL } from "@/features/meta-ads/meta-sync-status";
 import { getTenantMetaCampaignsPerformance } from "@/features/meta-ads/meta-analytics-service";
@@ -29,7 +29,6 @@ export default async function CampaignsPage() {
   ]);
   const canConfigure = context.role === "director" || context.jobTitle === "marketing" || context.role === "manager";
   const connection = marketing?.connection ?? null;
-  const assets = marketing?.assets ?? null;
   const connected = connection?.status === "connected";
 
   return (
@@ -39,7 +38,7 @@ export default async function CampaignsPage() {
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
           {connected && connection ? (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <MetaSyncBadge logs={marketing?.logs ?? []} lastSyncedAt={connection.lastSyncedAt} />
+              <MetaSyncBadge logs={marketing?.logs ?? []} lastSyncedAt={connection.lastSyncedAt} canViewError={canConfigure} />
               <Badge variant="outline" data-slot="capture-mode">
                 {CAPTURE_MODE_LABEL[connection.globalCaptureMode ?? "selective"]}
               </Badge>
@@ -60,10 +59,9 @@ export default async function CampaignsPage() {
 
         <CampaignsDashboardView campaigns={data.campaigns} totals={data.totals} />
 
-        {connected && connection && assets ? (
+        {connected && connection ? (
           <section aria-label="Controle de captura de leads" className="space-y-4">
             <MetaMasterCaptureControl globalMode={connection.globalCaptureMode ?? "selective"} canConfigure={canConfigure} />
-            <MetaAssetCaptureCard assets={assets} canConfigure={canConfigure} />
           </section>
         ) : null}
 

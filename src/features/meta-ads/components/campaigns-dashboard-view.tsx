@@ -2,9 +2,10 @@
 
 import { useState, useMemo, Fragment } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowRight, ChevronDownIcon, ChevronRightIcon, ChartBar, CheckCircle, Lightning, MagnifyingGlass, Phone, Users, Megaphone, Buildings } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,9 +13,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatCurrency } from "@/features/quotes/utils";
 import type { MetaCampaignItem } from "../types";
 
-import { useRouter } from "next/navigation";
-import { toast } from "@/components/ui/sonner";
-import { toggleMetaCampaignCaptureEligibilityAction } from "../actions";
 
 export function CampaignsDashboardView({
   campaigns,
@@ -32,7 +30,6 @@ export function CampaignsDashboardView({
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [expandedCampaignIds, setExpandedCampaignIds] = useState<Set<string>>(new Set());
-  const [togglingId, setTogglingId] = useState<string | null>(null);
 
   const toggleExpand = (campaignId: string) => {
     setExpandedCampaignIds((prev) => {
@@ -41,24 +38,6 @@ export function CampaignsDashboardView({
       else next.add(campaignId);
       return next;
     });
-  };
-
-  const handleToggleEligibility = async (campaignId: string, currentEnabled: boolean) => {
-    setTogglingId(campaignId);
-    try {
-      const res = await toggleMetaCampaignCaptureEligibilityAction({
-        campaignId,
-        enabled: !currentEnabled,
-      });
-      if (res.success) {
-        toast.success(!currentEnabled ? "Campanha ativada para captura no CRM!" : "Captura desativada para esta campanha.");
-        router.refresh();
-      } else {
-        toast.error(res.error || "Erro ao atualizar elegibilidade da campanha.");
-      }
-    } finally {
-      setTogglingId(null);
-    }
   };
 
   const filteredCampaigns = useMemo(() => {
@@ -175,7 +154,7 @@ export function CampaignsDashboardView({
                   <TableRow className="bg-muted/10 border-b border-border/30">
                     <TableHead className="pl-4"></TableHead>
                     <TableHead className="text-xs font-semibold">Campanha</TableHead>
-                    <TableHead className="text-xs font-semibold">Status</TableHead>
+                    <TableHead className="text-xs font-semibold">Veiculação Meta</TableHead>
                     <TableHead className="text-right text-xs font-semibold">Leads</TableHead>
                     <TableHead className="text-right text-xs font-semibold">Atendimento</TableHead>
                     <TableHead className="text-right text-xs font-semibold">Vendas</TableHead>
@@ -189,7 +168,7 @@ export function CampaignsDashboardView({
                     const isExpanded = expandedCampaignIds.has(camp.id);
                     const hasAds = (camp.ads?.length ?? 0) > 0;
                     const href = campaignDetailHref(camp);
-                    const isActive = camp.status === "ACTIVE" || camp.status === "active";
+                    const delivery = getCampaignDeliveryState(camp.status);
                     return (
                       <Fragment key={camp.id}>
                         <TableRow
@@ -251,8 +230,8 @@ export function CampaignsDashboardView({
                           </TableCell>
 
                           <TableCell className="py-3 align-top">
-                            <Badge variant={isActive ? "success" : "outline"} className="text-[10px]">
-                              {isActive ? "Ativa" : "Pausada"}
+                            <Badge variant={delivery.variant} className="text-[10px]" title={`Status de veiculação informado pela Meta: ${camp.status}`}>
+                              {delivery.label}
                             </Badge>
                           </TableCell>
                           <TableCell className="py-3 text-right align-top font-mono text-xs font-medium tabular-nums">{camp.leadsCount || 0}</TableCell>
@@ -264,18 +243,6 @@ export function CampaignsDashboardView({
                           <TableCell className="py-3 text-right align-top font-mono text-xs font-semibold tabular-nums text-chart-2">{camp.conversionRate || 0}%</TableCell>
                           <TableCell className="py-3 pr-4 align-top">
                             <div className="flex items-center justify-end gap-1.5">
-                              <Button
-                                size="sm"
-                                variant={camp.isEligibleForCapture ? "outline" : "default"}
-                                disabled={togglingId === camp.id}
-                                onClick={() => void handleToggleEligibility(camp.campaignId, Boolean(camp.isEligibleForCapture))}
-                                className={cn(
-                                  "h-7 whitespace-nowrap px-2 text-[11px] font-medium",
-                                  !camp.isEligibleForCapture && "bg-emerald-600 text-white hover:bg-emerald-700",
-                                )}
-                              >
-                                {togglingId === camp.id ? "…" : camp.isEligibleForCapture ? "Pausar captura" : "Capturar leads"}
-                              </Button>
                               <Link
                                 href={href}
                                 aria-label={`Ver detalhes de ${camp.name}`}
@@ -343,6 +310,22 @@ export function CampaignsDashboardView({
 
 function campaignDetailHref(campaign: MetaCampaignItem): string {
   return `/marketing/campanhas/${encodeURIComponent(campaign.id || campaign.campaignId)}`;
+}
+
+function getCampaignDeliveryState(status: string): { label: string; variant: "success" | "outline" | "warning" | "destructive" } {
+  switch (status.trim().toUpperCase()) {
+    case "ACTIVE": return { label: "Ativa", variant: "success" };
+    case "PAUSED":
+    case "CAMPAIGN_PAUSED": return { label: "Pausada", variant: "outline" };
+    case "ADSET_PAUSED": return { label: "Conjunto pausado", variant: "outline" };
+    case "ARCHIVED": return { label: "Arquivada", variant: "outline" };
+    case "DELETED": return { label: "Excluída", variant: "destructive" };
+    case "DISAPPROVED":
+    case "WITH_ISSUES": return { label: "Com problemas", variant: "warning" };
+    case "PENDING_REVIEW": return { label: "Em análise", variant: "warning" };
+    case "IN_PROCESS": return { label: "Em processamento", variant: "warning" };
+    default: return { label: status || "Indisponível", variant: "outline" };
+  }
 }
 
 function formatDistributionDestination(campaign: MetaCampaignItem): string {

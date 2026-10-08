@@ -22,7 +22,7 @@ export const getCachedLeadsBranches = (tenantId: string) =>
     async () => {
       const db = getDatabase();
       return db
-        .select({ id: schema.branches.id, name: schema.branches.name })
+        .select({ id: schema.branches.id, name: schema.branches.name, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, isDistributionHub: schema.branches.isDistributionHub })
         .from(schema.branches)
         .where(eq(schema.branches.tenantId, tenantId));
     },

@@ -8,6 +8,7 @@ import { generateWebhookToken, resolveRequestId } from "@/features/leads/webhook
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
+import { resolveMetaCampaignAttribution, resolveMetaCampaignQueueRoute } from "@/features/meta-ads/campaign-route-resolver";
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
 
@@ -204,6 +205,17 @@ export async function fetchMetaLead(leadgenId: string, tenantAccessToken: string
   return payload;
 }
 
+/**
+ * Limite de chamadas ou instabilidade da Meta ao buscar o lead: o webhook não pode
+ * confirmar a entrega, senão a Meta não reenvia e o lead se perde. Respondendo
+ * erro, a Meta reentrega; a chave de idempotência evita duplicar o lead.
+ */
+export function isRetryableMetaLeadLookupError(error: unknown): boolean {
+  if (!(error instanceof MetaCloudApiError)) return false;
+  const code = error.code ?? 0;
+  return [4, 17, 32, 613].includes(code) || (code >= 80000 && code <= 80014) || error.status === 429 || error.status >= 500;
+}
+
 /** Processes only this lead's durable work; the daily cron remains its recovery path. */
 async function processMetaLeadImmediately(input: { tenantId: string; leadId: string }) {
   await runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 3 });
@@ -304,6 +316,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
   const receivedAt = new Date();
   let processed = 0;
   let ignored = 0;
+  let retryable = 0;
   for (const entry of payload.entry ?? []) {
     if (!entry.id) { ignored += 1; continue; }
     console.log("[ingestMetaLeadAdsWebhook] Checking pageId", entry.id);
@@ -338,61 +351,42 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         if (!page?.accessTokenCiphertext) throw new Error("A Página Meta não possui uma credencial ativa. Reconecte a Página para receber novos formulários.");
         const leadRecord = await fetchMetaLead(leadgenId, decryptMetaToken(page.accessTokenCiphertext));
         const lead = normalizeMetaLead(leadRecord);
+        // If the payload omits campaign_id, recover it from this tenant's ad
+        // hierarchy or a uniquely attributed form; shared forms stay ambiguous.
+        const attribution = await resolveMetaCampaignAttribution({
+          tenantId: source.tenantId,
+          campaignId: lead.campaignId,
+          adId: lead.adId,
+          formId: lead.formId,
+        });
+        const campaignId = attribution.campaignId;
+        const adSetId = lead.adSetId ?? attribution.adSetId;
         console.log("[ingestMetaLeadAdsWebhook] Normalized lead:", { nome: lead.nome, telefone: lead.telefone, externalId: lead.externalId });
         if (!lead.nome || !lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe nome e telefone utilizáveis.");
-        const [campaignRoute] = lead.campaignId ? await db.select({
-          queueId: schema.metaCampaignQueueRoutes.queueId,
-          enabled: schema.metaCampaignQueueRoutes.enabled,
-          queueStatus: schema.leadQueues.status,
-        })
-          .from(schema.metaCampaignQueueRoutes)
-          .leftJoin(schema.leadQueues, eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id))
-          .where(and(eq(schema.metaCampaignQueueRoutes.tenantId, source.tenantId), eq(schema.metaCampaignQueueRoutes.campaignId, lead.campaignId)))
-          .limit(1) : [];
-        const [adRoute] = lead.adId ? await db.select({
-          queueId: schema.metaAdQueueRoutes.queueId,
-          enabled: schema.metaAdQueueRoutes.enabled,
-          queueStatus: schema.leadQueues.status,
-        })
-          .from(schema.metaAdQueueRoutes)
-          .leftJoin(schema.leadQueues, eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id))
-          .where(and(eq(schema.metaAdQueueRoutes.tenantId, source.tenantId), eq(schema.metaAdQueueRoutes.adId, lead.adId)))
-          .limit(1) : [];
-        const [formRoute] = lead.formId ? await db.select({
-          queueId: schema.metaFormQueueRoutes.queueId,
-          enabled: schema.metaFormQueueRoutes.enabled,
-          queueStatus: schema.leadQueues.status,
-        })
-          .from(schema.metaFormQueueRoutes)
-          .leftJoin(schema.leadQueues, eq(schema.metaFormQueueRoutes.queueId, schema.leadQueues.id))
-          .where(and(eq(schema.metaFormQueueRoutes.tenantId, source.tenantId), eq(schema.metaFormQueueRoutes.formId, lead.formId)))
-          .limit(1) : [];
-
+        const campaignRoute = campaignId
+          ? await resolveMetaCampaignQueueRoute(source.tenantId, campaignId)
+          : undefined;
         const [anyCampaignRoute] = await db.select({ id: schema.metaCampaignQueueRoutes.id })
           .from(schema.metaCampaignQueueRoutes)
           .where(eq(schema.metaCampaignQueueRoutes.tenantId, source.tenantId))
           .limit(1);
-        const [anyAdRoute] = await db.select({ id: schema.metaAdQueueRoutes.id })
-          .from(schema.metaAdQueueRoutes)
-          .where(eq(schema.metaAdQueueRoutes.tenantId, source.tenantId))
-          .limit(1);
-        const [anyFormRoute] = await db.select({ id: schema.metaFormQueueRoutes.id })
-          .from(schema.metaFormQueueRoutes)
-          .where(eq(schema.metaFormQueueRoutes.tenantId, source.tenantId))
-          .limit(1);
-
         const { getSystemSetting } = await import("@/features/system-settings/queries");
         const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${source.tenantId}`);
-        const hasTenantRules = Boolean(anyCampaignRoute || anyAdRoute || anyFormRoute);
+        const hasTenantRules = Boolean(anyCampaignRoute);
         const globalMode: "all" | "selective" | "disabled" = storedGlobalMode === "disabled" || storedGlobalMode === "all" || storedGlobalMode === "selective"
           ? storedGlobalMode
           : (hasTenantRules ? "selective" : "all");
 
-        const campaignIntake = resolveMetaCapturePolicy({ adRoute, campaignRoute, formRoute, globalMode, hasTenantRules });
+        const campaignIntake = resolveMetaCapturePolicy({ campaignRoute, globalMode, hasTenantRules });
         if (campaignIntake.action === "ignore") {
           await db.insert(schema.auditLogs).values({
-            id: randomUUID(), userId: credential.createdBy, entidade: adRoute ? "meta_ad_queue_route" : formRoute ? "meta_form_queue_route" : "meta_campaign_queue_route", entidadeId: lead.adId ?? lead.formId ?? lead.campaignId ?? lead.externalId,
-            acao: adRoute ? "meta_lead_ads.ad_ignored" : formRoute ? "meta_lead_ads.form_ignored" : "meta_lead_ads.campaign_ignored", createdAt: receivedAt,
+            id: randomUUID(), userId: credential.createdBy, entidade: "meta_campaign_queue_route", entidadeId: campaignId ?? lead.externalId,
+            acao: globalMode === "disabled"
+              ? "meta_lead_ads.capture_globally_paused"
+              : campaignRoute?.enabled
+                ? "meta_lead_ads.campaign_missing_active_queue"
+                : "meta_lead_ads.campaign_not_enabled",
+            createdAt: receivedAt,
           });
           ignored += 1;
           continue;
@@ -406,15 +400,16 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           leadSource: {
             channel: META_LEAD_ADS_SOURCE,
             externalId: lead.externalId,
-            campaign: lead.campaignId,
+            campaign: campaignId,
             ad: lead.adId,
             form: lead.formId,
-            adSet: lead.adSetId,
+            adSet: adSetId,
             page: lead.pageId ?? entry.id,
             capturedAt: lead.createdTime ? new Date(lead.createdTime) : receivedAt,
             ...(lead.leadType ? { leadType: lead.leadType } : {}),
             metadata: {
               pageId: lead.pageId ?? entry.id,
+              campaignResolution: attribution.resolvedBy,
               campaignName: lead.campaignName ?? null,
               tipoPlano: lead.tipoPlano ?? null,
               tipoPlanoStatus: lead.tipoPlano ? "provided" : "not_provided",
@@ -440,10 +435,15 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         processed += 1;
       } catch (error) {
         console.error("[ingestMetaLeadAdsWebhook] Error processing leadgenId:", error);
-        await db.update(schema.metaLeadAdSources).set({ lastError: error instanceof Error ? error.message.slice(0, 240) : "Falha no processamento do Lead Ads.", updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
-        ignored += 1;
+        const canRetry = isRetryableMetaLeadLookupError(error);
+        const lastError = canRetry
+          ? "A Meta limitou as chamadas ao buscar um lead; a entrega foi recusada para a Meta reenviar."
+          : error instanceof Error ? error.message.slice(0, 240) : "Falha no processamento do Lead Ads.";
+        await db.update(schema.metaLeadAdSources).set({ lastError, updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
+        if (canRetry) retryable += 1;
+        else ignored += 1;
       }
     }
   }
-  return { processed, ignored };
+  return { processed, ignored, retryable };
 }

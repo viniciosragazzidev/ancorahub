@@ -106,10 +106,24 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     .select({
       adAccountId: schema.metaAdAccounts.adAccountId,
       name: schema.metaAdAccounts.name,
+      defaultQueueId: schema.metaAdAccounts.defaultQueueId,
+      defaultQueueName: schema.leadQueues.name,
+      defaultQueueStatus: schema.leadQueues.status,
     })
     .from(schema.metaAdAccounts)
+    .leftJoin(schema.leadQueues, and(
+      eq(schema.leadQueues.id, schema.metaAdAccounts.defaultQueueId),
+      eq(schema.leadQueues.tenantId, schema.metaAdAccounts.tenantId),
+    ))
     .where(eq(schema.metaAdAccounts.tenantId, tenantId));
   const adAccountNameMap = new Map(adAccountsList.map((a) => [a.adAccountId, a.name]));
+  const accountRouteMap = new Map(adAccountsList
+    .filter((account) => account.defaultQueueId && account.defaultQueueStatus === "active")
+    .map((account) => [account.adAccountId, {
+      queueId: account.defaultQueueId!,
+      queueName: account.defaultQueueName,
+      queueStatus: account.defaultQueueStatus,
+    }]));
 
   // 4b. Buscar regras de elegibilidade por campanha
   const campaignRoutes = await db
@@ -123,24 +137,21 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     .from(schema.metaCampaignQueueRoutes)
     .leftJoin(schema.leadQueues, and(eq(schema.metaCampaignQueueRoutes.queueId, schema.leadQueues.id), eq(schema.metaCampaignQueueRoutes.tenantId, schema.leadQueues.tenantId)))
     .where(eq(schema.metaCampaignQueueRoutes.tenantId, tenantId));
-  const campaignRouteMap = new Map(campaignRoutes.map((r) => [r.campaignId, r.enabled]));
-  const [adRoutes, formRoutes, storedGlobalMode] = await Promise.all([
-    db.select({ adId: schema.metaAdQueueRoutes.adId, enabled: schema.metaAdQueueRoutes.enabled, queueId: schema.metaAdQueueRoutes.queueId, queueName: schema.leadQueues.name, queueStatus: schema.leadQueues.status })
-      .from(schema.metaAdQueueRoutes)
-      .leftJoin(schema.leadQueues, and(eq(schema.metaAdQueueRoutes.queueId, schema.leadQueues.id), eq(schema.metaAdQueueRoutes.tenantId, schema.leadQueues.tenantId)))
-      .where(eq(schema.metaAdQueueRoutes.tenantId, tenantId)),
-    db.select({ formId: schema.metaFormQueueRoutes.formId, enabled: schema.metaFormQueueRoutes.enabled, queueId: schema.metaFormQueueRoutes.queueId, queueName: schema.leadQueues.name })
-      .from(schema.metaFormQueueRoutes)
-      .leftJoin(schema.leadQueues, and(eq(schema.metaFormQueueRoutes.queueId, schema.leadQueues.id), eq(schema.metaFormQueueRoutes.tenantId, schema.leadQueues.tenantId)))
-      .where(eq(schema.metaFormQueueRoutes.tenantId, tenantId)),
-    getSystemSetting(`meta_lead_capture_mode_${tenantId}`).catch(() => null),
-  ]);
-  const adRouteMap = new Map(adRoutes.map((r) => [r.adId, r.enabled]));
-  const adRouteDetailMap = new Map(adRoutes.map((r) => [r.adId, r]));
-  const hasTenantRules = campaignRoutes.length > 0 || adRoutes.length > 0 || formRoutes.length > 0;
+  const campaignRouteMap = new Map(campaignRoutes.map((route) => [route.campaignId, route]));
+  for (const campaign of campaignsList) {
+    const defaultRoute = accountRouteMap.get(campaign.adAccountId);
+    if (!defaultRoute) continue;
+    const currentRoute = campaignRouteMap.get(campaign.campaignId) ?? campaignRouteMap.get(campaign.id);
+    if (!currentRoute) {
+      campaignRouteMap.set(campaign.campaignId, { campaignId: campaign.campaignId, enabled: true, ...defaultRoute });
+    } else if (!currentRoute.queueId) {
+      campaignRouteMap.set(campaign.campaignId, { ...currentRoute, ...defaultRoute });
+    }
+  }
+  const storedGlobalMode = await getSystemSetting(`meta_lead_capture_mode_${tenantId}`).catch(() => null);
   const globalMode = storedGlobalMode === "disabled" || storedGlobalMode === "all" || storedGlobalMode === "selective"
     ? storedGlobalMode
-    : (hasTenantRules ? "selective" : "all");
+    : "selective";
 
   // 5. Buscar anúncios vinculados às campanhas do tenant
   const adsWithCampaign = await db
@@ -243,29 +254,18 @@ export async function getTenantMetaCampaignsPerformance(tenantId: string): Promi
     const allAds = adsByCampaignMap.get(c.campaignId) || [];
     const visibleAds = allAds.filter((ad) => shouldDisplayAd(ad.status, ad.activeLeadsCount));
 
-    const campaignRoute = campaignRouteMap.has(c.campaignId)
-      ? { enabled: Boolean(campaignRouteMap.get(c.campaignId)), queueId: null, queueStatus: null }
-      : campaignRouteMap.has(c.id)
-        ? { enabled: Boolean(campaignRouteMap.get(c.id)), queueId: null, queueStatus: null }
-        : undefined;
-    const hasEnabledAdOverride = allAds.some((ad) => adRouteMap.get(ad.adId) === true);
-    const isEligibleForCapture = hasEnabledAdOverride || resolveMetaCapturePolicy({ campaignRoute, globalMode, hasTenantRules }).action === "capture";
-    const campaignRouteDetail = campaignRoutes.find((route) => route.campaignId === c.campaignId || route.campaignId === c.id);
-    const adRouteDetail = allAds
-      .map((ad) => adRouteDetailMap.get(ad.adId))
-      .find((route) => route?.enabled === true);
+    const campaignRouteDetail = campaignRouteMap.get(c.campaignId) ?? campaignRouteMap.get(c.id);
+    const campaignRoute = campaignRouteDetail
+      ? { enabled: campaignRouteDetail.enabled, queueId: campaignRouteDetail.queueId, queueStatus: campaignRouteDetail.queueStatus }
+      : undefined;
+    const isEligibleForCapture = resolveMetaCapturePolicy({ campaignRoute, globalMode }).action === "capture";
     const distributionRule: MetaCampaignItem["distributionRule"] = !isEligibleForCapture
       ? "none"
-      : adRouteDetail
-        ? "ad"
-        : campaignRouteDetail?.enabled
-          ? "campaign"
-          : "global";
-    const distributionQueueId = adRouteDetail?.queueId ?? campaignRouteDetail?.queueId ?? null;
-    // A deactivated queue receives nothing (the lead goes to the general distribution): say so.
-    const queueDetail = adRouteDetail?.queueName ? adRouteDetail : campaignRouteDetail;
+      : "campaign";
+    const distributionQueueId = campaignRouteDetail?.queueId ?? null;
+    const queueDetail = campaignRouteDetail;
     const distributionQueueName = queueDetail?.queueName
-      ? `${queueDetail.queueName}${queueDetail.queueStatus && queueDetail.queueStatus !== "active" ? " (fila desativada · vai para a distribuição geral)" : ""}`
+      ? queueDetail.queueName
       : null;
 
     return [{

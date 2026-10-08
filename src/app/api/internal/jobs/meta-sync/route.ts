@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const results: Array<{ tenantId: string; success: boolean; itemsSynced: number; error?: string }> = [];
 
   for (const conn of activeConnections) {
-    const res = await runMetaTenantSync(conn.tenantId, "full");
+    const res = await runMetaTenantSync(conn.tenantId, "full", { scheduled: true });
     results.push({ tenantId: conn.tenantId, ...res });
   }
 

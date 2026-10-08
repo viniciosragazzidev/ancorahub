@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lte, ne, or } from "drizzle-orm";
 import { operationDayStart } from "./broker-day-history";
 import { z } from "zod";
 
@@ -14,6 +14,7 @@ import { QUEUE_SINGLETON_SOURCE_IDS, QUEUE_SOURCE_OPTIONS } from "./routing-cata
 import { dutyFallbackPolicyValues, type DutyFallbackPolicy } from "./types";
 import { getLocalDutyParts } from "@/features/leads/assignment";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
+import { getSystemSetting, setSystemSetting } from "@/features/system-settings/queries";
 import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
 import { loadBrokerPacingOffers } from "./offers";
 import { evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type PacingOffer } from "./offer-pacing";
@@ -66,8 +67,6 @@ const campaignQueueRouteInput = z.object({
   campaignId: z.string().trim().min(1).max(100),
   queueId: z.string().uuid().nullable(),
   enabled: z.boolean().default(true),
-  /** Also drop the campaign's ad-level rules, so every ad follows the campaign. */
-  includeAds: z.boolean().default(false),
 }).superRefine((input, context) => {
   if (input.enabled && !input.queueId) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["queueId"], message: "Selecione a fila que receberá os leads desta campanha." });
@@ -461,7 +460,7 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
   const input = campaignQueueRouteInput.parse(rawInput);
   const db = getDatabase();
   const [[campaign], queueResult] = await Promise.all([
-    db.select({ campaignId: schema.metaCampaigns.campaignId }).from(schema.metaCampaigns)
+    db.select({ id: schema.metaCampaigns.id, campaignId: schema.metaCampaigns.campaignId }).from(schema.metaCampaigns)
       .where(and(eq(schema.metaCampaigns.tenantId, context.tenantId), eq(schema.metaCampaigns.campaignId, input.campaignId))).limit(1),
     input.queueId
       ? db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, status: schema.leadQueues.status }).from(schema.leadQueues)
@@ -470,9 +469,16 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
   ]);
   const queue = queueResult[0];
   if (!campaign) throw new AuthorizationError("Campanha Meta não encontrada na sua empresa.");
+  if (input.enabled && !input.queueId) throw new AuthorizationError("Selecione uma fila ativa antes de ativar a captura desta campanha.");
   if (input.enabled && input.queueId && (!queue || queue.status !== "active")) throw new AuthorizationError("Fila ativa não encontrada na sua empresa.");
   if (input.enabled && queue) assertManager(context, queue.branchId);
   if (!input.enabled && context.role !== "director") throw new AuthorizationError("Apenas o Diretor pode impedir a entrada de uma campanha no CRM.");
+  if (input.enabled) {
+    const captureMode = await getSystemSetting(`meta_lead_capture_mode_${context.tenantId}`).catch(() => null);
+    if (captureMode === "disabled" || !captureMode) {
+      await setSystemSetting(`meta_lead_capture_mode_${context.tenantId}`, "selective");
+    }
+  }
   // Choosing a new queue for a campaign that already has one moves it (both
   // screens make that choice explicit; the queues screen also confirms). A
   // manager can only take it from a queue of their own unit; the move is audited.
@@ -500,40 +506,37 @@ export async function saveMetaCampaignQueueRoute(context: TenantContext, rawInpu
     target: [schema.metaCampaignQueueRoutes.tenantId, schema.metaCampaignQueueRoutes.campaignId],
     set: { queueId: queue?.id ?? null, enabled: input.enabled, updatedAt: now },
   });
+  if (campaign.id !== campaign.campaignId) {
+    await db.delete(schema.metaCampaignQueueRoutes).where(and(
+      eq(schema.metaCampaignQueueRoutes.tenantId, context.tenantId),
+      eq(schema.metaCampaignQueueRoutes.campaignId, campaign.id),
+    ));
+  }
   await db.insert(schema.auditLogs).values({
     id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaign.campaignId,
     acao: movedFromQueueId
       ? `meta_campaign_queue_route.moved_from:${movedFromQueueId}`
       : input.enabled ? "meta_campaign_queue_route.saved" : "meta_campaign_queue_route.paused",
   });
-  // An ad rule wins over the campaign rule. "Bring the ads" removes the rules of
-  // this campaign's ads, so each of them follows the campaign again. An ad sent
-  // to another queue than its campaign's is always removed: an ad never sends
-  // leads to two queues (campaign one place, its ad another).
-  let adsBrought = 0;
-  if (input.includeAds || (input.enabled && queue)) {
-    const campaignAds = await db.select({ adId: schema.metaAds.adId }).from(schema.metaAds)
-      .innerJoin(schema.metaAdSets, and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)))
-      .where(and(eq(schema.metaAds.tenantId, context.tenantId), eq(schema.metaAdSets.campaignId, campaign.campaignId)));
-    const adIds = campaignAds.map((row) => row.adId);
-    if (adIds.length) {
-      const removed = await db.delete(schema.metaAdQueueRoutes)
-        .where(and(
-          eq(schema.metaAdQueueRoutes.tenantId, context.tenantId),
-          inArray(schema.metaAdQueueRoutes.adId, adIds),
-          input.includeAds || !queue ? undefined : and(isNotNull(schema.metaAdQueueRoutes.queueId), ne(schema.metaAdQueueRoutes.queueId, queue.id)),
-        ))
-        .returning({ adId: schema.metaAdQueueRoutes.adId });
-      adsBrought = removed.length;
-      if (adsBrought) {
-        await db.insert(schema.auditLogs).values({
-          id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaign.campaignId,
-          acao: `meta_campaign_queue_route.ads_follow_campaign:${adsBrought}`,
-        });
-      }
-    }
+  // Child ad routes are retired: ads and forms inherit the campaign queue.
+  const campaignAds = await db.select({ adId: schema.metaAds.adId }).from(schema.metaAds)
+    .innerJoin(schema.metaAdSets, and(eq(schema.metaAdSets.tenantId, schema.metaAds.tenantId), eq(schema.metaAdSets.adSetId, schema.metaAds.adSetId)))
+    .where(and(eq(schema.metaAds.tenantId, context.tenantId), eq(schema.metaAdSets.campaignId, campaign.campaignId)));
+  const adIds = campaignAds.map((row) => row.adId);
+  let removedAdRules = 0;
+  if (adIds.length) {
+    const removed = await db.delete(schema.metaAdQueueRoutes)
+      .where(and(eq(schema.metaAdQueueRoutes.tenantId, context.tenantId), inArray(schema.metaAdQueueRoutes.adId, adIds)))
+      .returning({ adId: schema.metaAdQueueRoutes.adId });
+    removedAdRules = removed.length;
   }
-  return { campaignId: campaign.campaignId, queueId: queue?.id ?? null, enabled: input.enabled, adsBrought };
+  if (removedAdRules) {
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(), userId: context.userId, entidade: "meta_campaign_queue_route", entidadeId: campaign.campaignId,
+      acao: `meta_campaign_queue_route.child_ad_rules_removed:${removedAdRules}`,
+    });
+  }
+  return { campaignId: campaign.campaignId, queueId: queue?.id ?? null, enabled: input.enabled, adsBrought: removedAdRules };
 }
 
 export async function saveMetaAdQueueRoute(context: TenantContext, rawInput: unknown) {

@@ -176,14 +176,12 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // Before dutyScheduleId was persisted, shared queues still have enough
   // context to restore assigned leads to one occurrence: the broker's roster,
   // branch and check-in. Exact new attributions always override this fallback.
-  const attributionSchedules = hasOverlappingSiblingSchedule
-    ? familySchedules.filter((candidate) => candidate.status === "active"
-      && candidate.validFrom <= occurrenceStart
-      && (!candidate.validUntil || candidate.validUntil > occurrenceStart)
-      && candidate.dayOfWeek === schedule.dayOfWeek
-      && candidate.startsAt < schedule.endsAt
-      && candidate.endsAt > schedule.startsAt)
-    : [];
+  const attributionSchedules = familySchedules.filter((candidate) => candidate.status === "active"
+    && candidate.validFrom <= occurrenceStart
+    && (!candidate.validUntil || candidate.validUntil > occurrenceStart)
+    && candidate.dayOfWeek === schedule.dayOfWeek
+    && candidate.startsAt < schedule.endsAt
+    && candidate.endsAt > schedule.startsAt);
   const attributionScheduleIds = attributionSchedules.map((candidate) => candidate.id);
   const siblingAssignmentRows = attributionScheduleIds.length
     ? await db.select({
@@ -327,7 +325,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     confirmedPresenceAssignmentIds: confirmedAssignmentIds,
     branchIdBySchedule,
   });
-  const leads = selectLeadsForDutySchedule(queriedLeads, scheduleId, !hasOverlappingSiblingSchedule, legacyScheduleForLead)
+  const leads = selectLeadsForDutySchedule(queriedLeads, scheduleId, false, legacyScheduleForLead)
     .filter((lead) => !isManagementInvestigation(lead, managementUserIds));
   const leadsByShift = countBrokerLeadsByShift(leads, schedule.shiftSplitAt);
 
