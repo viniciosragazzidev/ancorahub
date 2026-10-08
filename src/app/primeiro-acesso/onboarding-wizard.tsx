@@ -4,15 +4,11 @@ import { useEffect, useState, useTransition } from "react";
 import { toast } from "@/components/ui/sonner";
 import { useRouter } from "next/navigation";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarDays } from "lucide-react";
-import { ptBR } from "date-fns/locale";
-import { Fingerprint } from "@/components/huge-icons";
+import "@/components/arc/venancor-scope.css";
+import { Button } from "@/components/arc/button/button";
+import { Input } from "@/components/arc/input/input";
+import { PasswordField } from "@/components/arc/password-field/password-field";
+import { Stepper } from "@/components/arc/stepper/stepper";
 import { authClient } from "@/shared/auth/client";
 import { recordSecurityAuditAction } from "@/app/(dashboard)/settings/security-actions";
 import { completeOnboardingAction } from "./onboarding-actions";
@@ -33,6 +29,14 @@ type Props = {
   };
 };
 
+const STEPS = [
+  { id: "profile", label: "Perfil" },
+  { id: "identity", label: "Identidade" },
+  { id: "password", label: "Senha" },
+  { id: "terms", label: "Termos" },
+  { id: "biometrics", label: "Biometria" },
+];
+
 async function platformAuthenticatorAvailable(): Promise<boolean> {
   try {
     if (typeof window === "undefined" || !("PublicKeyCredential" in window)) return false;
@@ -42,12 +46,17 @@ async function platformAuthenticatorAvailable(): Promise<boolean> {
   }
 }
 
-function parseBirthDate(value: string): Date | undefined {
-  if (!value) return undefined;
-  const [year, month, day] = value.split("-").map(Number);
-  return new Date(year, month - 1, day);
+/** Local yyyy-mm-dd of today, used as the newest allowed birth date. */
+function todayKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+/**
+ * First access of a broker invited by the manager. It runs without the app chrome, so it brings its
+ * own canvas, a stepper and one fixed action bar. Token, activation, auto-login and passkey are the
+ * same as before.
+ */
 export function OnboardingWizard({ invitation, profile }: Props) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState(profile.professionalName);
@@ -55,7 +64,6 @@ export function OnboardingWizard({ invitation, profile }: Props) {
   const [phone, setPhone] = useState(profile.phone);
   const [cpfInput, setCpfInput] = useState("");
   const [birthDate, setBirthDate] = useState("");
-  const [birthDateOpen, setBirthDateOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -129,6 +137,7 @@ export function OnboardingWizard({ invitation, profile }: Props) {
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (step !== 4) return;
     if (!termsAccepted) {
       toast.error("Você precisa aceitar os termos de uso para continuar.");
       return;
@@ -182,150 +191,100 @@ export function OnboardingWizard({ invitation, profile }: Props) {
     });
   }
 
-  const totalSteps = 5;
-  const selectedBirthDate = parseBirthDate(birthDate);
+  const titles: Record<number, string> = {
+    1: "Confirme seu perfil profissional",
+    2: "Validação de identidade",
+    3: "Defina sua senha de acesso",
+    4: "Termos e consentimentos",
+    5: "Acesso com biometria",
+  };
+  const descriptions: Record<number, string> = {
+    1: `Vínculo com ${invitation.tenantName} · Unidade ${invitation.branchName}`,
+    2: "Confirme o CPF associado a este convite para validar sua segurança.",
+    3: "Crie uma senha forte e segura para seus acessos futuros.",
+    4: "Leia e dê o aceite nas políticas operacionais da plataforma.",
+    5: "Cadastre sua digital para entrar sem digitar senha, ou pule esta etapa.",
+  };
 
   return (
-    <Card className="w-full max-w-lg border border-border shadow-md bg-card">
-      <CardHeader className="border-b border-border pb-4">
-        <span className="text-[10px] font-semibold text-primary uppercase tracking-widest">
-          Passo {step} de {totalSteps} · Primeiro Acesso
-        </span>
-        <CardTitle className="mt-1 text-xl font-bold tracking-tight text-foreground">
-          {step === 1 && "Confirme seu Perfil Profissional"}
-          {step === 2 && "Validação de Identidade (CPF)"}
-          {step === 3 && "Defina sua Senha de Acesso"}
-          {step === 4 && "Termos e Consentimentos"}
-          {step === 5 && "Acesso com Biometria"}
-        </CardTitle>
-        <CardDescription>
-          {step === 1 && `Vínculo com ${invitation.tenantName} · Unidade ${invitation.branchName}`}
-          {step === 2 && "Confirme o CPF associado a este convite para validar sua segurança."}
-          {step === 3 && "Crie uma senha forte e segura para seus acessos futuros."}
-          {step === 4 && "Leia e dê o aceite nas políticas operacionais da plataforma."}
-          {step === 5 && "Cadastre sua digital para entrar sem digitar senha — ou pule esta etapa."}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="pt-6">
-        <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="arc-venancor light-canvas flex min-h-dvh w-full flex-col" style={{ color: "var(--foreground)" }}>
+      <form
+        id="onboarding-form"
+        onSubmit={handleSubmit}
+        className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pb-[calc(112px+var(--mobile-safe-bottom))] pt-[calc(24px+var(--mobile-safe-top))]"
+      >
+        <Stepper steps={STEPS} current={step - 1} label="Etapas do primeiro acesso" />
+
+        <header>
+          <h1 className="text-2xl font-bold tracking-tight text-(--foreground)">{titles[step]}</h1>
+          <p className="mt-1 text-sm text-(--text-secondary)">{descriptions[step]}</p>
+        </header>
+
+        <section aria-label={titles[step]} className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
           {step === 1 && (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="prof-name">Nome Profissional</Label>
-                <Input id="prof-name" value={name} onChange={(e) => setName(e.target.value)} required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prof-email">E-mail Corporativo</Label>
-                <Input
-                  id="prof-email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  disabled={Boolean(invitation.email)}
-                  required
-                  autoComplete="email"
-                  className={`border-border-strong dark:border-border-strong disabled:opacity-100 ${invitation.email ? "bg-muted text-muted-foreground cursor-not-allowed" : ""}`}
-                />
-                {!invitation.email ? <p className="text-xs text-muted-foreground">Defina o e-mail que será usado para entrar na plataforma.</p> : null}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prof-phone">Telefone</Label>
-                <Input id="prof-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(21) 99999-9999" required />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="prof-code">Código de Acesso Interno</Label>
-                <Input id="prof-code" value={profile.internalCode} disabled className="bg-muted text-muted-foreground font-mono cursor-not-allowed" />
-              </div>
-              <Button type="button" className="w-full mt-2" onClick={nextStep}>
-                Confirmar Dados
-              </Button>
-            </div>
+            <>
+              <Input label="Nome profissional" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Input
+                label="E-mail"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                disabled={Boolean(invitation.email)}
+                required
+                autoComplete="email"
+                description={invitation.email ? undefined : "Defina o e-mail que será usado para entrar na plataforma."}
+              />
+              <Input label="Telefone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(21) 99999-9999" required />
+              <Input label="Código de acesso interno" value={profile.internalCode} disabled readOnly />
+            </>
           )}
 
           {step === 2 && (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="user-cpf">Digite seu CPF <span className="text-muted-foreground">(opcional)</span></Label>
-                <Input id="user-cpf" value={cpfInput} onChange={(e) => setCpfInput(e.target.value)} placeholder="000.000.000-00" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="user-birth">Data de Nascimento</Label>
-                <Popover open={birthDateOpen} onOpenChange={setBirthDateOpen}>
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        id="user-birth"
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-start border-border-strong text-left font-normal dark:border-border-strong"
-                      />
-                    }
-                  >
-                    <CalendarDays className="size-4" aria-hidden="true" />
-                    <span className={selectedBirthDate ? "" : "text-muted-foreground"}>
-                      {selectedBirthDate ? selectedBirthDate.toLocaleDateString("pt-BR") : "Selecione sua data de nascimento"}
-                    </span>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      autoFocus
-                      mode="single"
-                      locale={ptBR}
-                      captionLayout="dropdown"
-                      startMonth={new Date(1900, 0)}
-                      endMonth={new Date()}
-                      defaultMonth={selectedBirthDate ?? new Date(new Date().getFullYear() - 25, 0)}
-                      disabled={{ after: new Date() }}
-                      selected={selectedBirthDate}
-                      formatters={{ formatMonthDropdown: (date) => date.toLocaleString("pt-BR", { month: "short" }) }}
-                      onSelect={(date) => {
-                        if (!date) return;
-                        const year = date.getFullYear();
-                        const month = String(date.getMonth() + 1).padStart(2, "0");
-                        const day = String(date.getDate()).padStart(2, "0");
-                        setBirthDate(`${year}-${month}-${day}`);
-                        setBirthDateOpen(false);
-                      }}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" type="button" className="flex-1" onClick={prevStep}>
-                  Voltar
-                </Button>
-                <Button type="button" className="flex-1" onClick={nextStep}>
-                  Validar Dados
-                </Button>
-              </div>
-            </div>
+            <>
+              <Input label="CPF (opcional)" value={cpfInput} onChange={(e) => setCpfInput(e.target.value)} placeholder="000.000.000-00" inputMode="numeric" />
+              {/* A native date field: the OS picker jumps to a year in two taps, which a month-by-month calendar cannot. */}
+              <Input
+                label="Data de nascimento"
+                type="date"
+                value={birthDate}
+                max={todayKey()}
+                min="1900-01-01"
+                onChange={(e) => setBirthDate(e.target.value)}
+              />
+            </>
           )}
 
           {step === 3 && (
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="user-pass">Senha de Acesso</Label>
-                <Input id="user-pass" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={`Mínimo ${ONBOARDING_PASSWORD_MIN_LENGTH} caracteres`} minLength={ONBOARDING_PASSWORD_MIN_LENGTH} maxLength={128} required autoComplete="new-password" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="user-pass-confirm">Confirme sua Senha</Label>
-                <Input id="user-pass-confirm" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repita a senha" minLength={ONBOARDING_PASSWORD_MIN_LENGTH} maxLength={128} required autoComplete="new-password" />
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" type="button" className="flex-1" onClick={prevStep}>
-                  Voltar
-                </Button>
-                <Button type="button" className="flex-1" onClick={nextStep}>
-                  Confirmar Senha
-                </Button>
-              </div>
-            </div>
+            <>
+              <PasswordField
+                label="Senha de acesso"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={`Mínimo ${ONBOARDING_PASSWORD_MIN_LENGTH} caracteres`}
+                minLength={ONBOARDING_PASSWORD_MIN_LENGTH}
+                maxLength={128}
+                required
+                autoComplete="new-password"
+                messages={{ showPassword: "Mostrar senha", hidePassword: "Ocultar senha" }}
+              />
+              <PasswordField
+                label="Confirme sua senha"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repita a senha"
+                minLength={ONBOARDING_PASSWORD_MIN_LENGTH}
+                maxLength={128}
+                required
+                autoComplete="new-password"
+                messages={{ showPassword: "Mostrar senha", hidePassword: "Ocultar senha" }}
+              />
+            </>
           )}
 
           {step === 4 && (
-            <div className="space-y-4">
-              <div className="rounded-lg border border-border bg-muted/40 p-4 text-xs text-muted-foreground max-h-60 overflow-y-auto space-y-3 leading-relaxed">
-                <p className="font-semibold text-foreground text-sm">Termos de Uso e Política de Privacidade</p>
+            <>
+              <div className="flex max-h-60 flex-col gap-3 overflow-y-auto rounded-2xl bg-(--surface-muted) p-4 text-sm leading-relaxed text-(--text-secondary)">
+                <p className="font-semibold text-(--foreground)">Termos de uso e política de privacidade</p>
                 <p>
                   Ao acessar esta plataforma, você declara estar ciente de que todos os dados de leads, clientes e cotações pertencem exclusivamente à corretora licenciante. É expressamente vedado o compartilhamento ou extração externa de informações protegidas sem autorização expressa da diretoria.
                 </p>
@@ -333,60 +292,61 @@ export function OnboardingWizard({ invitation, profile }: Props) {
                   O sistema atua sob a base de controlador e operador em estrita conformidade com as diretrizes da LGPD (Lei Geral de Proteção de Dados). Toda e qualquer operação executada pelo usuário gera registros de auditoria inalteráveis contendo dados de identificação, IP e timestamp.
                 </p>
               </div>
-              <div className="flex items-start gap-2.5">
+              <label htmlFor="user-terms" className="flex min-h-11 cursor-pointer items-start gap-3 text-sm text-(--foreground)">
                 <input
                   id="user-terms"
                   type="checkbox"
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-1 size-4 rounded border-gray-300 text-primary focus:ring-primary"
+                  className="mt-0.5 size-5 shrink-0 accent-(--accent)"
                   required
                   disabled={pending}
                 />
-                <Label htmlFor="user-terms" className="text-xs text-muted-foreground leading-normal cursor-pointer select-none">
-                  Li e aceito os termos de uso, a política de privacidade e de confidencialidade da plataforma.
-                </Label>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" type="button" className="flex-1" onClick={prevStep} disabled={pending}>
-                  Voltar
-                </Button>
-                <Button type="submit" className="flex-1" disabled={pending}>
-                  {pending ? "Ativando conta..." : "Concluir e Ativar"}
-                </Button>
-              </div>
-            </div>
+                <span>Li e aceito os termos de uso, a política de privacidade e de confidencialidade da plataforma.</span>
+              </label>
+            </>
           )}
 
           {step === 5 && (
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-4">
-                <Fingerprint className="size-6 shrink-0 text-primary" />
-                <div className="text-sm leading-relaxed text-muted-foreground">
-                  {passkeySupported
-                    ? "Use a biometria do seu dispositivo (digital ou Face ID) para entrar no CorreTop sem digitar senha. Você pode cadastrar ou gerenciar biometrias depois, em Configurações → Segurança."
-                    : "Este dispositivo não parece oferecer autenticador biométrico. Você pode cadastrar uma biometria depois, em Configurações → Segurança, a partir de um dispositivo compatível."}
-                </div>
-              </div>
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" type="button" className="flex-1" onClick={goToDashboard} disabled={passkeyBusy}>
-                  Fazer depois
-                </Button>
-                {passkeySupported && (
-                  <Button type="button" className="flex-1" onClick={() => void registerPasskey()} disabled={passkeyBusy}>
-                    {passkeyBusy ? "Aguardando biometria..." : "Ativar digital agora"}
-                  </Button>
-                )}
-                {!passkeySupported && (
-                  <Button type="button" className="flex-1" onClick={goToDashboard}>
-                    Ir para o painel
-                  </Button>
-                )}
-              </div>
-            </div>
+            <p className="text-sm leading-relaxed text-(--text-secondary)">
+              {passkeySupported
+                ? "Use a biometria do seu dispositivo (digital ou Face ID) para entrar no CorreTop sem digitar senha. Você pode cadastrar ou gerenciar biometrias depois, em Configurações, na seção Segurança."
+                : "Este dispositivo não parece oferecer autenticador biométrico. Você pode cadastrar uma biometria depois, em Configurações, na seção Segurança, a partir de um dispositivo compatível."}
+            </p>
           )}
-        </form>
-      </CardContent>
-    </Card>
+        </section>
+      </form>
+
+      <nav
+        aria-label="Ações do primeiro acesso"
+        className="fixed inset-x-4 bottom-[calc(22px+var(--mobile-safe-bottom))] z-40"
+      >
+        <div className="mx-auto flex max-w-md items-center gap-2 rounded-full bg-(--surface)/86 p-2 shadow-(--shadow-floating) backdrop-blur-xl backdrop-saturate-150">
+          {step > 1 && step < 5 ? (
+            <Button variant="secondary" onClick={prevStep} disabled={pending}>Voltar</Button>
+          ) : null}
+          {step === 1 ? <Button className="flex-1" onClick={nextStep}>Confirmar dados</Button> : null}
+          {step === 2 ? <Button className="flex-1" onClick={nextStep}>Validar dados</Button> : null}
+          {step === 3 ? <Button className="flex-1" onClick={nextStep}>Confirmar senha</Button> : null}
+          {step === 4 ? (
+            <Button className="flex-1" type="submit" form="onboarding-form" loading={pending} disabled={pending}>
+              Concluir e ativar
+            </Button>
+          ) : null}
+          {step === 5 ? (
+            <>
+              <Button variant="secondary" onClick={goToDashboard} disabled={passkeyBusy}>Fazer depois</Button>
+              {passkeySupported ? (
+                <Button className="flex-1" loading={passkeyBusy} disabled={passkeyBusy} onClick={() => void registerPasskey()}>
+                  Ativar digital agora
+                </Button>
+              ) : (
+                <Button className="flex-1" onClick={goToDashboard}>Ir para o painel</Button>
+              )}
+            </>
+          ) : null}
+        </div>
+      </nav>
+    </div>
   );
 }

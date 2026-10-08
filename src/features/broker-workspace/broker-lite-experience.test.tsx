@@ -4,10 +4,11 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const navigation = vi.hoisted(() => ({ pathname: "/dashboard", push: vi.fn(), back: vi.fn() }));
+const navigation = vi.hoisted(() => ({ pathname: "/dashboard", search: "", push: vi.fn(), back: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
+  useSearchParams: () => new URLSearchParams(navigation.search),
   useRouter: () => ({ push: navigation.push, back: navigation.back, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
 }));
 // The Arc sheet drives Motion springs that the global jsdom mock of motion/react does not implement.
@@ -58,6 +59,7 @@ function bottomBar() {
 afterEach(() => {
   cleanup();
   navigation.pathname = "/dashboard";
+  navigation.search = "";
   vi.clearAllMocks();
 });
 
@@ -101,7 +103,7 @@ describe("Corretor Lite experience contract", () => {
 
     const dialog = screen.getByRole("dialog");
     const destinations = within(dialog).getByRole("navigation", { name: "Mais destinos" });
-    for (const href of ["/cotacao", "/plantoes", "/clientes", "/settings"]) {
+    for (const href of ["/cotacao", "/plantoes", "/clientes", "/notificacoes", "/settings"]) {
       expect(destinations.querySelector(`a[href="${href}"]`)).not.toBeNull();
     }
     expect(within(dialog).getByText("Disponibilidade")).toBeTruthy();

@@ -54,7 +54,15 @@ export async function getPublishedDutyScheduleIds(tenantId: string, today: strin
 }
 
 /** Convenience for resolvers: filter rows loaded for `now` to the ones in force. */
-export async function resolveEffectiveDutyAssignments<T extends DutyRosterRow>(tenantId: string, rows: readonly T[], now: Date): Promise<T[]> {
-  const today = dateKey(now);
-  return selectEffectiveDutyAssignments(rows, today, await getPublishedDutyScheduleIds(tenantId, today));
+export async function resolveEffectiveDutyAssignments<T extends DutyRosterRow>(
+  tenantId: string,
+  rows: readonly T[],
+  now: Date,
+  options?: { dutyDate?: string; publishedScheduleIds?: ReadonlySet<string> | null },
+): Promise<T[]> {
+  const today = options?.dutyDate ?? dateKey(now);
+  const publishedScheduleIds = options && "publishedScheduleIds" in options
+    ? options.publishedScheduleIds ?? null
+    : await getPublishedDutyScheduleIds(tenantId, today);
+  return selectEffectiveDutyAssignments(rows, today, publishedScheduleIds);
 }

@@ -12,7 +12,7 @@ import { canGoBackInApp } from "./light-navigation";
  * the parent route. A deep link (push notification, shared URL) therefore never
  * "goes back" out of the app.
  */
-export function LightBackButton({ fallbackHref, className }: { fallbackHref: string; className?: string }) {
+export function LightBackButton({ fallbackHref, alwaysParent = false, className }: { fallbackHref: string; alwaysParent?: boolean; className?: string }) {
   const router = useRouter();
 
   return (
@@ -20,7 +20,7 @@ export function LightBackButton({ fallbackHref, className }: { fallbackHref: str
       type="button"
       aria-label="Voltar"
       onClick={() => {
-        if (canGoBackInApp()) router.back();
+        if (!alwaysParent && canGoBackInApp()) router.back();
         else router.push(fallbackHref);
       }}
       className={cn(

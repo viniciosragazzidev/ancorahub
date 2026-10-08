@@ -188,3 +188,24 @@ export function prioritizeBrokerWorkspace(input: BrokerWorkspacePriorityInput): 
 export function getNextBrokerWorkspaceAction(input: BrokerWorkspacePriorityInput) {
   return prioritizeBrokerWorkspace(input)[0] ?? null;
 }
+
+/**
+ * First-contact SLA state of one lead, with the same window the priority queue uses:
+ * "overdue" once the deadline passed, "risk" inside the last 20% of the SLA (at least 10 minutes).
+ * Only leads without a first contact and with an assignment date can be in either state.
+ */
+export function resolveSlaFirstContactState(input: {
+  firstContactAt: Date | null;
+  assignedAt: Date | null;
+  slaFirstContactMinutes: number;
+  now?: Date;
+}): { state: "overdue" | "risk"; slaAt: Date } | null {
+  if (input.firstContactAt || !input.assignedAt) return null;
+  const now = input.now ?? new Date();
+  const safeSlaMinutes = Math.max(1, input.slaFirstContactMinutes);
+  const slaRiskMs = Math.max(10 * 60 * 1000, Math.round(safeSlaMinutes * 0.2) * 60 * 1000);
+  const slaAt = new Date(input.assignedAt.getTime() + safeSlaMinutes * 60 * 1000);
+  if (slaAt.getTime() <= now.getTime()) return { state: "overdue", slaAt };
+  if (slaAt.getTime() - now.getTime() <= slaRiskMs) return { state: "risk", slaAt };
+  return null;
+}

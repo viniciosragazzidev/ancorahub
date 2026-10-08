@@ -2,12 +2,11 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { UserCheck, WhatsappLogo } from "@/components/huge-icons";
+
 import { Avatar } from "@/components/arc/avatar/avatar";
+import { Button } from "@/components/arc/button/button";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { SearchField } from "@/components/arc/search-field/search-field";
-import "@/components/arc/venancor-scope.css";
-
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 export type LightClientItem = {
@@ -18,117 +17,62 @@ export type LightClientItem = {
   convertedAt: Date | string;
 };
 
-const CARD_STYLE: React.CSSProperties = {
-  background: "var(--surface)",
-  borderRadius: "1.5rem",
-  boxShadow: "var(--shadow-resting)",
-};
+const secondaryAction =
+  "inline-flex h-11 items-center justify-center rounded-full bg-(--surface-muted) px-4 text-sm font-semibold text-(--foreground)";
 
-const AVATAR_STYLE: React.CSSProperties = {
-  background: "color-mix(in srgb, var(--accent) 12%, var(--surface))",
-  border: "none",
-  color: "var(--accent)",
-  fontWeight: 600,
-};
-
+/** Clientes of the broker: search, then one white card per client with WhatsApp and Abrir. */
 export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredClients = useMemo(() => {
     if (!searchQuery.trim()) return clients;
     const q = searchQuery.toLowerCase().trim();
-    return clients.filter(
-      (c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q))
-    );
+    return clients.filter((c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
   }, [clients, searchQuery]);
 
+  const searching = searchQuery.trim().length > 0;
+
   return (
-    <div
-      className="arc-venancor min-h-full flex flex-col"
-      style={{ background: "var(--background)", color: "var(--foreground)" }}
-    >
-      <div className="mx-auto w-full max-w-4xl space-y-5 px-4 pt-6 flex-1 pb-[max(120px,var(--mobile-safe-bottom,0px))] sm:px-6">
-        {/* Screen title */}
+    <div className="flex min-h-full flex-col text-foreground">
+      <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-6 pt-2 sm:px-6">
         <header>
-          <h1
-            className="text-[30px] leading-tight font-bold"
-            style={{ letterSpacing: "-0.03em" }}
-          >
-            Clientes
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+          <h1 className="sr-only">Clientes</h1>
+          <p className="text-sm text-(--text-secondary)">
             {clients.length === 1 ? "1 cliente conquistado" : `${clients.length} clientes conquistados`}
           </p>
         </header>
 
-        {/* Search */}
-        <SearchField
-          label="Buscar cliente"
-          placeholder="Nome ou telefone..."
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-        />
+        <SearchField label="Buscar cliente" placeholder="Nome ou telefone" value={searchQuery} onValueChange={setSearchQuery} />
 
-        {/* Clients List */}
         {filteredClients.length > 0 ? (
-          <ul className="space-y-3">
+          <ul className="flex flex-col gap-3">
             {filteredClients.map((client) => {
-              const convertedDateStr = new Date(client.convertedAt).toLocaleDateString("pt-BR", {
+              const convertedDate = new Date(client.convertedAt).toLocaleDateString("pt-BR", {
                 day: "2-digit",
                 month: "2-digit",
                 year: "numeric",
+                timeZone: "America/Sao_Paulo",
               });
               const waUrl = buildWhatsAppUrl(client.phone);
 
               return (
-                <li
-                  key={client.id}
-                  className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
-                  style={CARD_STYLE}
-                >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
-                    <Avatar name={client.name} size="lg" style={AVATAR_STYLE} />
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <h2
-                        className="text-base font-bold truncate"
-                        style={{ letterSpacing: "-0.01em" }}
-                      >
-                        {client.name}
-                      </h2>
-                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                        Venda concluída em {convertedDateStr}
-                      </p>
-                      {client.phone ? (
-                        <p
-                          className="text-xs font-mono font-medium"
-                          style={{ color: "var(--accent)" }}
-                        >
-                          {client.phone}
-                        </p>
-                      ) : null}
+                <li key={client.id} className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar name={client.name} size="lg" className="light-avatar" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-base font-semibold text-(--foreground)">{client.name}</p>
+                      <p className="text-sm tabular-nums text-(--text-secondary)">Venda concluída em {convertedDate}</p>
+                      {client.phone ? <p className="text-sm tabular-nums text-(--text-secondary)">{client.phone}</p> : null}
                     </div>
                   </div>
-
-                  {/* Actions are always visible (also the swipe-free path) */}
-                  <div className="flex shrink-0 items-center gap-2 pl-[52px] sm:pl-0">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     {waUrl ? (
-                      <a
-                        href={waUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                        style={{ background: "var(--success)" }}
-                      >
-                        <WhatsappLogo className="size-4" />
+                      <a href={waUrl} target="_blank" rel="noopener noreferrer" className={`${secondaryAction} sm:flex-1`}>
                         WhatsApp
                       </a>
                     ) : null}
-                    <Link
-                      href={`/clientes/${client.id}`}
-                      className="inline-flex h-11 items-center gap-1 rounded-full px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90"
-                      style={{ background: "var(--foreground)" }}
-                    >
-                      Abrir
+                    <Link href={`/clientes/${client.id}`} className={`${secondaryAction} sm:flex-1`}>
+                      Abrir cliente
                     </Link>
                   </div>
                 </li>
@@ -136,34 +80,12 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
             })}
           </ul>
         ) : (
-          <div style={CARD_STYLE}>
-            <EmptyState
-              label="Estado vazio da lista de clientes"
-              icon={<UserCheck width={24} height={24} strokeWidth={1.5} />}
-              title={
-                searchQuery.trim()
-                  ? `Nenhum resultado para "${searchQuery.trim()}"`
-                  : "Nenhum cliente encontrado"
-              }
-              description={
-                searchQuery.trim()
-                  ? "Tente outro nome ou telefone."
-                  : "Você ainda não tem clientes cadastrados."
-              }
-              action={
-                searchQuery.trim() ? (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery("")}
-                    className="inline-flex h-11 cursor-pointer items-center rounded-full px-4 text-xs font-semibold transition-colors hover:opacity-90"
-                    style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
-                  >
-                    Limpar busca
-                  </button>
-                ) : undefined
-              }
-            />
-          </div>
+          <EmptyState
+            label="Lista de clientes vazia"
+            title={searching ? `Nenhum resultado para "${searchQuery.trim()}"` : "Nenhum cliente ainda"}
+            description={searching ? "Tente outro nome ou telefone." : "Quando você concluir uma venda, o cliente aparece aqui."}
+            action={searching ? <Button variant="secondary" onClick={() => setSearchQuery("")}>Limpar busca</Button> : undefined}
+          />
         )}
       </div>
     </div>

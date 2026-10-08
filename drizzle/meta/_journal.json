@@ -932,6 +932,13 @@
                         "when":  1791417600000,
                         "tag":  "0185_meta_ad_account_default_queue",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  133,
+                        "version":  "7",
+                        "when":  1791475087000,
+                        "tag":  "0186_broker_workspace_metrics_indexes",
+                        "breakpoints":  true
                     }
                 ]
 }

@@ -45,6 +45,7 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/cotacao", label: "Cotação", requires: "quoteSimulator" },
   { href: "/plantoes", label: "Plantões", requires: "dutyCalendar" },
   { href: "/clientes", label: "Clientes" },
+  { href: "/notificacoes", label: "Notificações" },
   { href: "/settings", label: "Configurações" },
 ];
 
@@ -61,12 +62,29 @@ export type LightRoute = {
   isRoot: boolean;
   /** Where "back" goes when there is no usable history. */
   parentHref: string | null;
+  /** Detail screens with their own fixed action bar hide the floating tab bar. */
+  hidesTabBar?: boolean;
+  /** Back always goes to the parent (used when the screen state lives in the URL, not in history). */
+  backToParent?: boolean;
 };
 
-type RouteRule = { test: (path: string) => boolean; route: LightRoute };
+/** Query parameters a rule may read (URLSearchParams and Next ReadonlyURLSearchParams both fit). */
+export type LightSearchParams = { get(name: string): string | null };
+
+type RouteRule = { test: (path: string) => boolean; route: LightRoute | ((path: string, search: LightSearchParams | null) => LightRoute) };
 
 const exact = (target: string) => (path: string) => path === target;
 const under = (target: string) => (path: string) => path.startsWith(`${target}/`);
+
+const SETTINGS_SECTIONS: Record<string, { title: string; hidesTabBar?: boolean }> = {
+  conta: { title: "Minha conta" },
+  // The availability screen has its own save bar where the tab bar would be.
+  disponibilidade: { title: "Disponibilidade", hidesTabBar: true },
+  whatsapp: { title: "WhatsApp" },
+  seguranca: { title: "Segurança" },
+  passkey: { title: "Segurança" },
+  extensao: { title: "Extensão" },
+};
 
 // Order matters: first match wins, most specific first.
 const RULES: readonly RouteRule[] = [
@@ -74,23 +92,48 @@ const RULES: readonly RouteRule[] = [
   { test: under("/dashboard"), route: { title: "Detalhe", tab: "inicio", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/minha-fila"), route: { title: "Fila", tab: "fila", isRoot: true, parentHref: null } },
   { test: exact("/leads"), route: { title: "Fila", tab: "fila", isRoot: false, parentHref: "/minha-fila" } },
-  { test: under("/leads"), route: { title: "Lead", tab: "fila", isRoot: false, parentHref: "/minha-fila" } },
-  { test: exact("/conversas/broker"), route: { title: "Insights", tab: "insights", isRoot: true, parentHref: null } },
+  // Feedback is a short form with no action bar: it goes back to its lead and keeps the tab bar.
+  {
+    test: (path) => /^\/leads\/[^/]+\/feedback$/.test(path),
+    route: (path) => ({ title: "Atualização", tab: "fila", isRoot: false, parentHref: path.replace(/\/feedback$/, "") }),
+  },
+  { test: under("/leads"), route: { title: "Lead", tab: "fila", isRoot: false, parentHref: "/minha-fila", hidesTabBar: true } },
+  // Insights is a list; with ?leadId a conversation is open and back returns to the list.
+  {
+    test: exact("/conversas/broker"),
+    route: (_path, search) =>
+      search?.get("leadId")
+        ? { title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker", backToParent: true }
+        : { title: "Insights", tab: "insights", isRoot: true, parentHref: null },
+  },
   { test: under("/conversas"), route: { title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },
   { test: exact("/conversas"), route: { title: "Insights", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },
-  { test: exact("/cotacao"), route: { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/cotacao"), route: { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true } },
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
-  { test: exact("/settings"), route: { title: "Configurações", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  // Settings is a list of sections; ?tab opens one and back returns to the list.
+  {
+    test: exact("/settings"),
+    route: (_path, search) => {
+      const section = SETTINGS_SECTIONS[search?.get("tab") ?? ""];
+      return section
+        ? { title: section.title, tab: "mais", isRoot: false, parentHref: "/settings", backToParent: true, hidesTabBar: section.hidesTabBar }
+        : { title: "Configurações", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+    },
+  },
   { test: under("/settings"), route: { title: "Configurações", tab: "mais", isRoot: false, parentHref: "/settings" } },
   { test: exact("/notificacoes"), route: { title: "Notificações", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  // Onboarding: a single guided screen, no tabs and nowhere to go back to.
+  { test: exact("/primeiro-acesso"), route: { title: "Primeiro acesso", tab: "inicio", isRoot: true, parentHref: null, hidesTabBar: true } },
 ];
 
 const FALLBACK_ROUTE: LightRoute = { title: "Ancora", tab: "inicio", isRoot: false, parentHref: "/dashboard" };
 
-/** Resolves title, active tab and parent for a pathname (query string ignored). */
-export function resolveLightRoute(pathname: string): LightRoute {
+/** Resolves title, active tab and parent for a pathname; only a few rules read the query (Insights). */
+export function resolveLightRoute(pathname: string, search: LightSearchParams | null = null): LightRoute {
   const path = pathname.split("?")[0].replace(/(.)\/+$/, "$1");
-  return RULES.find((rule) => rule.test(path))?.route ?? FALLBACK_ROUTE;
+  const rule = RULES.find((candidate) => candidate.test(path));
+  if (!rule) return FALLBACK_ROUTE;
+  return typeof rule.route === "function" ? rule.route(path, search) : rule.route;
 }

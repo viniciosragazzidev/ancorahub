@@ -1,4 +1,8 @@
+import { Suspense } from "react";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
+
+import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
+import { resolveSlaFirstContactState } from "@/features/broker-workspace/priority";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +35,19 @@ export const dynamic = "force-dynamic";
 
 export default async function MinhaFilaPage() {
   const context = await getRequiredTenantContext();
+  // The Light app streams its own skeleton while the queue loads; the Full screen is unchanged.
+  if ((await getExperienceMode(context)) === "LIGHT") {
+    return (
+      <Suspense fallback={<LightPageSkeleton variant="list" />}>
+        <MinhaFilaContent />
+      </Suspense>
+    );
+  }
+  return <MinhaFilaContent />;
+}
+
+async function MinhaFilaContent() {
+  const context = await getRequiredTenantContext();
   const db = getDatabase();
   const experienceMode = await getExperienceMode(context);
 
@@ -40,7 +57,7 @@ export default async function MinhaFilaPage() {
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const [todayYear, todayMonth] = todayKey.split("-").map(Number);
   const horizonKey = new Date(Date.UTC(todayYear, todayMonth + 2, 0)).toISOString().slice(0, 10);
-  const myDutyAssignments = monthlyDutySchedulingEnabled
+  const myDutyAssignments = monthlyDutySchedulingEnabled && experienceMode !== "LIGHT"
     ? (await db.select({
       dutyDate: schema.dutyRosterAssignments.dutyDate,
       startsAt: schema.dutyRosterAssignments.startsAt,
@@ -118,6 +135,8 @@ export default async function MinhaFilaPage() {
       createdAt: schema.leads.createdAt,
       serviceStartedAt: schema.leads.serviceStartedAt,
       assignedAt: schema.leads.assignedAt,
+      firstContactAt: schema.leads.firstContactAt,
+      slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
       stageEnteredAt: schema.leads.stageEnteredAt,
     })
     .from(schema.leads)
@@ -319,25 +338,80 @@ export default async function MinhaFilaPage() {
   ).length;
 
   if (experienceMode === "LIGHT") {
-    const activeLightLeads: LightLeadItem[] = leads.map((l) => ({
-      id: l.id,
-      name: l.name,
-      phone: l.phone,
-      status: l.status,
-      createdAt: l.createdAt,
-      updatedAt: l.stageEnteredAt,
-      isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
-      isAwaitingAcceptance: pendingOfferLeadIds.includes(l.id),
-      isOverdue:
-        (activeLeadStatuses as readonly string[]).includes(l.status) &&
-        l.stageEnteredAt != null &&
-        Date.now() - l.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000,
-    }));
+    // Cheap per-lead extras (product, city, summary, next follow-up), read only for the leads on screen.
+    const lightIds = leads.map((l) => l.id);
+    const [extraRows, dueRows] = lightIds.length
+      ? await Promise.all([
+        db.select({
+          id: schema.leads.id,
+          qualificationDetails: schema.leads.qualificationDetails,
+          planName: schema.carrierPlans.name,
+        })
+          .from(schema.leads)
+          .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
+          .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, lightIds))),
+        db.select({ leadId: schema.leadTasks.leadId, dueAt: schema.leadTasks.dueAt })
+          .from(schema.leadTasks)
+          .where(and(
+            eq(schema.leadTasks.tenantId, context.tenantId),
+            inArray(schema.leadTasks.leadId, lightIds),
+            isNull(schema.leadTasks.completedAt),
+            isNotNull(schema.leadTasks.dueAt),
+          )),
+      ])
+      : [[], []];
+    const extraById = new Map(extraRows.map((row) => [row.id, row]));
+    const nextDueById = new Map<string, Date>();
+    for (const row of dueRows) {
+      if (!row.leadId || !row.dueAt) continue;
+      const current = nextDueById.get(row.leadId);
+      if (!current || row.dueAt.getTime() < current.getTime()) nextDueById.set(row.leadId, row.dueAt);
+    }
+    const readDetail = (details: unknown, key: string) => {
+      if (!details || typeof details !== "object" || Array.isArray(details)) return null;
+      const value = (details as Record<string, unknown>)[key];
+      return typeof value === "string" && value.trim() ? value : null;
+    };
+
+    const activeLightLeads: LightLeadItem[] = leads.map((l) => {
+      const extra = extraById.get(l.id);
+      const dueAt = nextDueById.get(l.id) ?? null;
+      const awaitingAcceptance = pendingOfferLeadIds.includes(l.id);
+      const isNew = awaitingAcceptance || l.status === "distributed" || l.status === "new";
+      return {
+        id: l.id,
+        name: l.name,
+        // The phone only reaches the client after acceptance (it is searchable, so it is a contact datum).
+        phone: isNew ? null : l.phone,
+        status: l.status,
+        productName: extra?.planName ?? null,
+        city: readDetail(extra?.qualificationDetails, "cidade") ?? readDetail(extra?.qualificationDetails, "city"),
+        summary: readDetail(extra?.qualificationDetails, "resumoAtendimento") ?? readDetail(extra?.qualificationDetails, "resumoNecessidade"),
+        createdAt: l.createdAt,
+        updatedAt: l.stageEnteredAt,
+        dueAt,
+        isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
+        isAwaitingAcceptance: awaitingAcceptance,
+        // Same first-contact SLA window the Inicio counter uses (overdue or in the last 20%).
+        isSlaAtRisk:
+          (activeLeadStatuses as readonly string[]).includes(l.status) &&
+          resolveSlaFirstContactState({
+            firstContactAt: l.firstContactAt,
+            assignedAt: l.assignedAt,
+            slaFirstContactMinutes: Number.parseInt(l.slaFirstContactMinutes ?? "15", 10) || 15,
+          }) !== null,
+        isOverdue:
+          ((activeLeadStatuses as readonly string[]).includes(l.status) &&
+            l.stageEnteredAt != null &&
+            Date.now() - l.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000) ||
+          (!isNew && dueAt != null && dueAt.getTime() < Date.now()),
+      };
+    });
 
     const lostLightLeads: LightLeadItem[] = lostLeadsFromDb.map((l) => ({
       id: l.id,
       name: l.name,
-      phone: l.phone,
+      phone: null,
       status: "lost",
       isLost: true,
       lostReason: "Redistribuído por inatividade / tempo limite estourado",
@@ -345,7 +419,7 @@ export default async function MinhaFilaPage() {
       updatedAt: lostLeadsMap.get(l.id)?.createdAt ?? l.stageEnteredAt,
     }));
 
-    return <LightLeadsList leads={[...activeLightLeads, ...lostLightLeads]} availabilityStatus={availabilityStatus} dutyAssignments={myDutyAssignments} showDutySchedule={monthlyDutySchedulingEnabled} />;
+    return <LightLeadsList leads={[...activeLightLeads, ...lostLightLeads]} availabilityStatus={availabilityStatus} />;
   }
 
   const enrichedActiveLeads = leads.map((lead) => ({

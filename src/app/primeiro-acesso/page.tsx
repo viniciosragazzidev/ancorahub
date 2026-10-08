@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { getDatabase, schema } from "@/shared/db";
 import { normalizeInvitationToken } from "@/features/team/invitation-token";
+import { OnboardingNotice } from "./onboarding-notice";
 import { OnboardingWizard } from "./onboarding-wizard";
 
 export default async function PrimeiroAcessoPage({
@@ -13,14 +14,7 @@ export default async function PrimeiroAcessoPage({
   const { token: rawToken } = await searchParams;
   const token = normalizeInvitationToken(rawToken);
   if (!token) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center bg-background">
-        <div className="max-w-md w-full rounded-xl border border-border p-6 shadow-sm bg-card">
-          <h1 className="text-xl font-bold text-destructive">Acesso Inválido</h1>
-          <p className="mt-2 text-sm text-muted-foreground">O token de convite não foi fornecido na URL de acesso.</p>
-        </div>
-      </div>
-    );
+    return <OnboardingNotice title="Acesso inválido" description="O token de convite não foi fornecido na URL de acesso." />;
   }
 
   const tokenHash = createHash("sha256").update(token).digest("hex");
@@ -54,12 +48,10 @@ export default async function PrimeiroAcessoPage({
 
   if (invitation.status !== "PENDING") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center bg-background">
-        <div className="max-w-md w-full rounded-xl border border-border p-6 shadow-sm bg-card">
-          <h1 className="text-xl font-bold text-destructive font-semibold">Convite Inválido ou Expirado</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Este link de ativação é de uso único, expirou ou foi revogado pelo gestor.</p>
-        </div>
-      </div>
+      <OnboardingNotice
+        title="Convite inválido ou expirado"
+        description="Este link de ativação é de uso único, expirou ou foi revogado pelo gestor."
+      />
     );
   }
 
@@ -71,21 +63,12 @@ export default async function PrimeiroAcessoPage({
 
   if (!profile) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 text-center bg-background">
-        <div className="max-w-md w-full rounded-xl border border-border p-6 shadow-sm bg-card">
-          <h1 className="text-xl font-bold text-destructive font-semibold">Perfil não encontrado</h1>
-          <p className="mt-2 text-sm text-muted-foreground">Não foi possível localizar o cadastro de perfil profissional associado.</p>
-        </div>
-      </div>
+      <OnboardingNotice
+        title="Perfil não encontrado"
+        description="Não foi possível localizar o cadastro de perfil profissional associado."
+      />
     );
   }
 
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/20 p-4">
-      <OnboardingWizard
-        invitation={invitation}
-        profile={profile}
-      />
-    </div>
-  );
+  return <OnboardingWizard invitation={invitation} profile={profile} />;
 }
