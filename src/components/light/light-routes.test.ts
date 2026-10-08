@@ -75,4 +75,14 @@ describe("Light routes", () => {
   it("hides the tab bar on the screens that carry their own action bar or no navigation", () => {
     for (const path of ["/leads/abc", "/cotacao", "/primeiro-acesso"]) expect(resolveLightRoute(path).hidesTabBar, path).toBe(true);
   });
+
+  it("opens a settings section as an internal screen that goes back to the list", () => {
+    expect(resolveLightRoute("/settings", new URLSearchParams(""))).toMatchObject({ title: "Configurações", parentHref: "/dashboard" });
+    expect(resolveLightRoute("/settings", new URLSearchParams("tab=seguranca"))).toMatchObject({
+      title: "Segurança", tab: "mais", isRoot: false, parentHref: "/settings", backToParent: true,
+    });
+    expect(resolveLightRoute("/settings", new URLSearchParams("tab=passkey")).title).toBe("Segurança");
+    expect(resolveLightRoute("/settings", new URLSearchParams("tab=disponibilidade")).hidesTabBar).toBe(true);
+    expect(resolveLightRoute("/settings", new URLSearchParams("tab=conta")).hidesTabBar).toBeFalsy();
+  });
 });

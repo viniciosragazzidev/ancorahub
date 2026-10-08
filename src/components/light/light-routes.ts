@@ -76,6 +76,16 @@ type RouteRule = { test: (path: string) => boolean; route: LightRoute | ((path: 
 const exact = (target: string) => (path: string) => path === target;
 const under = (target: string) => (path: string) => path.startsWith(`${target}/`);
 
+const SETTINGS_SECTIONS: Record<string, { title: string; hidesTabBar?: boolean }> = {
+  conta: { title: "Minha conta" },
+  // The availability screen has its own save bar where the tab bar would be.
+  disponibilidade: { title: "Disponibilidade", hidesTabBar: true },
+  whatsapp: { title: "WhatsApp" },
+  seguranca: { title: "Segurança" },
+  passkey: { title: "Segurança" },
+  extensao: { title: "Extensão" },
+};
+
 // Order matters: first match wins, most specific first.
 const RULES: readonly RouteRule[] = [
   { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null } },
@@ -102,7 +112,16 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
-  { test: exact("/settings"), route: { title: "Configurações", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  // Settings is a list of sections; ?tab opens one and back returns to the list.
+  {
+    test: exact("/settings"),
+    route: (_path, search) => {
+      const section = SETTINGS_SECTIONS[search?.get("tab") ?? ""];
+      return section
+        ? { title: section.title, tab: "mais", isRoot: false, parentHref: "/settings", backToParent: true, hidesTabBar: section.hidesTabBar }
+        : { title: "Configurações", tab: "mais", isRoot: false, parentHref: "/dashboard" };
+    },
+  },
   { test: under("/settings"), route: { title: "Configurações", tab: "mais", isRoot: false, parentHref: "/settings" } },
   { test: exact("/notificacoes"), route: { title: "Notificações", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   // Onboarding: a single guided screen, no tabs and nowhere to go back to.
