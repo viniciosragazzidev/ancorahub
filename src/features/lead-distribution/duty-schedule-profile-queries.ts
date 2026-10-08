@@ -380,9 +380,26 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     .filter((lead) => !lead.corretorId && ["queued", "unassigned", "returned_to_queue"].includes(lead.distributionStatus))
     .map((lead) => lead.queueId)
     .filter((queueId): queueId is string => Boolean(queueId)));
-  const statusQueues = pacedQueues.some((queue) => waitingQueueIds.has(queue.id))
-    ? pacedQueues.filter((queue) => waitingQueueIds.has(queue.id))
-    : pacedQueues;
+  // A plantão with no queue of its own (e.g. PRESENCIAL TARDE) still receives
+  // the leads of shared queues: their pacing is what holds the brokers, so
+  // read it from the queues of the leads waiting on this page.
+  const linkedWaitingQueues = pacedQueues.filter((queue) => waitingQueueIds.has(queue.id));
+  const unlinkedWaitingIds = [...waitingQueueIds].filter((queueId) => !linkedQueues.some((queue) => queue.id === queueId));
+  const sharedWaitingQueues = !linkedWaitingQueues.length && unlinkedWaitingIds.length
+    ? await db.select({
+      id: schema.leadQueues.id,
+      offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes,
+      maxPendingOffersPerBroker: schema.leadQueues.maxPendingOffersPerBroker,
+    }).from(schema.leadQueues).where(and(
+      eq(schema.leadQueues.tenantId, context.tenantId),
+      inArray(schema.leadQueues.id, unlinkedWaitingIds),
+      eq(schema.leadQueues.assignmentMode, "automatic"),
+      isNull(schema.leadQueues.deletedAt),
+    ))
+    : [];
+  const statusQueues: { id: string; offerIntervalMinutes: number | null; maxPendingOffersPerBroker: number | null }[] = linkedWaitingQueues.length
+    ? linkedWaitingQueues
+    : sharedWaitingQueues.length ? sharedWaitingQueues : pacedQueues;
   const pacingByQueue = new Map(statusQueues.map((queue) => [queue.id, normalizeOfferPacing({ intervalMinutes: queue.offerIntervalMinutes, maxPending: queue.maxPendingOffersPerBroker })]));
   const lookbackMinutes = Math.max(1, ...[...pacingByQueue.values()].map((config) => config.intervalMinutes));
   const recentOfferRows = statusQueues.length && brokerIds.length
@@ -460,6 +477,6 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     leadsSince: since,
     leadsUntil: until,
     leadsUpcomingStartsAt: upcomingStartsAt,
-    liveStatusEnabled: Boolean(operatingQueue),
+    liveStatusEnabled: Boolean(operatingQueue) || sharedWaitingQueues.length > 0,
   };
 }
