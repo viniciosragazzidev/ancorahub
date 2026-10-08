@@ -21,10 +21,10 @@ export function redactClientInfo(items: ClientInfo): ClientInfo {
 }
 
 /** Contact fields for the Light payload: real values after acceptance, null before. */
-export function lightContactFields<T extends { telefone: string | null; email: string | null }>(
+export function lightContactFields<T extends { telefone: string | null; email?: string | null }>(
   lead: T,
   state: { status: string; isCurrentBroker: boolean },
 ) {
   const reveal = canRevealLightContact(state);
-  return { reveal, telefone: reveal ? lead.telefone : null, email: reveal ? lead.email : null };
+  return { reveal, telefone: reveal ? lead.telefone : null, email: reveal ? (lead.email ?? null) : null };
 }

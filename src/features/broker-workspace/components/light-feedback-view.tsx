@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { toast } from "@/components/ui/sonner";
-import { CheckCircle, WhatsappLogo } from "@/components/huge-icons";
+
 import { ActionButton } from "@/components/arc/action-button/action-button";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { toast } from "@/components/ui/sonner";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
-import "@/components/arc/venancor-scope.css";
 
 type FeedbackViewProps = {
   leadId: string;
@@ -26,29 +25,27 @@ const FEEDBACK_OPTIONS = [
   { label: "Sem interesse", status: "lost", lossReason: "sem_interesse" },
 ];
 
-const CARD_STYLE: React.CSSProperties = {
-  background: "var(--surface)",
-  borderRadius: "1.5rem",
-  boxShadow: "var(--shadow-resting)",
-};
-
 const OPTION_STYLE: React.CSSProperties = {
-  background: "var(--surface)",
-  color: "var(--foreground)",
-  border: "1px solid var(--border)",
   minHeight: "3rem",
   justifyContent: "space-between",
   width: "100%",
-  fontWeight: 600,
 };
 
-export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: FeedbackViewProps) {
+const resultAction =
+  "inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-semibold";
+
+/**
+ * Quick status update opened from a WhatsApp link. It also renders outside the app chrome
+ * (/l/[id]/feedback), so it keeps its own canvas and the lead name as the screen title.
+ */
+export function LightFeedbackView({ leadId, leadName, phone }: FeedbackViewProps) {
   const [submitted, setSubmitted] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState("");
 
+  // The server sends the phone only after the broker accepted the lead.
   const waUrl = buildWhatsAppUrl(phone);
 
-  async function handleSelectOption(opt: typeof FEEDBACK_OPTIONS[number]) {
+  async function handleSelectOption(opt: (typeof FEEDBACK_OPTIONS)[number]) {
     if (submitted) return;
     setSelectedLabel(opt.label);
 
@@ -75,43 +72,22 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
     }
 
     setSubmitted(true);
-    toast.success("Atualização registrada.");
   }
 
   return (
-    <div
-      className="arc-venancor min-h-full flex flex-col"
-      style={{ background: "var(--background)", color: "var(--foreground)" }}
-    >
-      <div className="mx-auto w-full max-w-md space-y-5 px-4 pt-8 pb-[max(120px,var(--mobile-safe-bottom,0px))]">
-        {/* Screen title */}
+    <div className="arc-venancor light-canvas flex min-h-full flex-col" style={{ color: "var(--foreground)" }}>
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pb-6 pt-4">
         <header className="text-center">
-          <h1
-            className="text-[30px] leading-tight font-bold"
-            style={{ letterSpacing: "-0.03em" }}
-          >
-            {leadName}
-          </h1>
-          <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
-            Como foi o contato?
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight text-(--foreground)">{leadName}</h1>
+          <p className="mt-1 text-sm text-(--text-secondary)">Como foi o contato?</p>
         </header>
 
         {submitted ? (
-          /* Final state after the feedback is registered */
-          <div style={CARD_STYLE}>
+          <div className="rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
             <EmptyState
-              label="Confirmação de atualização registrada"
-              icon={
-                <CheckCircle
-                  width={24}
-                  height={24}
-                  strokeWidth={1.5}
-                  style={{ color: "var(--success)" }}
-                />
-              }
+              label="Atualização registrada"
               title="Atualização registrada"
-              description={`Obrigado. O atendimento foi atualizado para ${selectedLabel}.`}
+              description={`O atendimento foi atualizado para ${selectedLabel}.`}
               action={
                 <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:justify-center">
                   {waUrl ? (
@@ -119,28 +95,21 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
                       href={waUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-full px-5 text-xs font-bold text-white transition-opacity hover:opacity-90"
-                      style={{ background: "var(--foreground)" }}
+                      className={`${resultAction} bg-(--accent) text-(--accent-foreground)`}
                     >
-                      <WhatsappLogo className="size-4" />
-                      VOLTAR PARA O WHATSAPP
+                      Voltar para o WhatsApp
                     </a>
                   ) : null}
-                  <Link
-                    href="/minha-fila"
-                    className="inline-flex h-11 items-center justify-center rounded-full px-5 text-xs font-semibold transition-colors"
-                    style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
-                  >
-                    VER MEUS LEADS
+                  <Link href="/minha-fila" className={`${resultAction} bg-(--surface-muted) text-(--foreground)`}>
+                    Ver minha fila
                   </Link>
                 </div>
               }
             />
           </div>
         ) : (
-          /* Feedback option buttons */
-          <div className="space-y-3 p-5" style={CARD_STYLE}>
-            <p className="text-sm font-semibold">Como ficou esse atendimento?</p>
+          <section aria-labelledby="feedback-heading" className="flex flex-col gap-3 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+            <h2 id="feedback-heading" className="text-base font-semibold text-(--foreground)">Como ficou esse atendimento?</h2>
             <div className="grid gap-2">
               {FEEDBACK_OPTIONS.map((opt) => (
                 <ActionButton
@@ -157,7 +126,7 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
                 />
               ))}
             </div>
-          </div>
+          </section>
         )}
       </div>
     </div>

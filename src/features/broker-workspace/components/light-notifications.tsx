@@ -11,7 +11,6 @@ import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
-import "@/components/arc/venancor-scope.css";
 import { PushNotificationManager } from "@/features/notifications/components/push-notification-manager";
 import { LightLeadToastToggle } from "./light-lead-toast-toggle";
 import { loadMoreNotificationsAction, markAllNotificationsReadAction, markNotificationReadAction } from "@/app/(dashboard)/notificacoes/actions";
@@ -57,9 +56,9 @@ function priorityFor(type: string): Priority {
   return "info";
 }
 
-const PRIORITY_UI: Record<Priority, { color: string; tone: "danger" | "warning" | "info"; label: string }> = {
-  urgent: { color: "var(--danger)", tone: "danger", label: "Ação necessária" },
-  attention: { color: "var(--warning)", tone: "warning", label: "Acompanhar" },
+const PRIORITY_UI: Record<Priority, { color: string; tone: "warning" | "info"; label: string }> = {
+  urgent: { color: "var(--warning)", tone: "warning", label: "Ação necessária" },
+  attention: { color: "var(--text-secondary)", tone: "info", label: "Acompanhar" },
   info: { color: "var(--accent)", tone: "info", label: "Informativo" },
 };
 
@@ -73,23 +72,23 @@ function NotificationIcon({ type, className, style }: { type: string; className?
   return <Bell className={className} style={style} />;
 }
 
+const TIME_ZONE = "America/Sao_Paulo";
+const dayKey = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(date);
+const sameDay = (a: Date, b: Date) => dayKey(a) === dayKey(b);
+
 function formatTimestamp(value: string): string {
   const date = new Date(value);
   const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const time = date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE });
   if (sameDay(date, now)) return time;
   if (sameDay(date, yesterday)) return `Ontem ${time}`;
-  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", timeZone: TIME_ZONE });
 }
 
 function groupByDate(items: LightNotificationItem[]): Array<[string, LightNotificationItem[]]> {
   const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const sameDay = (a: Date, b: Date) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const groups = new Map<string, LightNotificationItem[]>([["Hoje", []], ["Ontem", []], ["Anteriores", []]]);
   for (const item of items) {
     const createdAt = new Date(item.createdAt);
@@ -174,16 +173,7 @@ function EmptyStateContent({ filter, onSeeAll }: { filter: FilterType; onSeeAll:
         icon={<Bell width={24} height={24} strokeWidth={1.5} />}
         title="Nada urgente"
         description="Não há alertas que exijam uma ação imediata."
-        action={
-          <button
-            type="button"
-            onClick={onSeeAll}
-            className="inline-flex h-11 cursor-pointer items-center rounded-full px-4 text-xs font-semibold transition-opacity hover:opacity-90"
-            style={{ background: "var(--accent-subtle)", color: "var(--accent)" }}
-          >
-            Ver todas
-          </button>
-        }
+        action={<Button variant="secondary" onClick={onSeeAll}>Ver todas</Button>}
       />
     );
   }
@@ -250,17 +240,12 @@ export function LightNotifications({
   }, [cursor, isPending]);
 
   return (
-    <div
-      className="arc-venancor min-h-full flex flex-col"
-      style={{ background: "var(--background)", color: "var(--foreground)" }}
-    >
-      <div className="mx-auto w-full max-w-3xl flex-1 space-y-6 px-4 pb-[max(120px,var(--mobile-safe-bottom,0px))] pt-6 sm:px-6">
+    <div className="arc-venancor flex min-h-full flex-col" style={{ color: "var(--foreground)" }}>
+      <div className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-4 pb-6 pt-2 sm:px-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="text-[30px] font-bold leading-tight" style={{ letterSpacing: "var(--tracking-display)" }}>
-              Notificações
-            </h1>
-            <p className="mt-1 text-sm" style={{ color: "var(--text-secondary)" }}>
+            <h1 className="sr-only">Notificações</h1>
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               {serverTotalCount} no total, {serverUnreadCount} não lidas
               {serverUrgentCount > 0 ? `, ${serverUrgentCount} ação necessária` : null}
             </p>
