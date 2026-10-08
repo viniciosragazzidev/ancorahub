@@ -6,6 +6,7 @@ import "@/components/arc/venancor-scope.css";
 import { useLightAvailability, type LightAvailability } from "@/components/light-top-nav";
 
 import { LightAppHeader } from "./light-app-header";
+import { LightAvailabilityProvider } from "./light-availability-context";
 import { LightBottomNav } from "./light-bottom-nav";
 import { useLightNavigationTracker } from "./light-navigation";
 import { LightMoreSheet } from "./light-more-sheet";
@@ -71,7 +72,7 @@ export function LightChrome({
               : "min-h-0 w-full flex-1 overflow-y-auto overscroll-contain pb-[calc(96px+var(--mobile-safe-bottom))] md:pb-0"
           }
         >
-          {children}
+          <LightAvailabilityProvider value={{ availability, isPending, setStatus }}>{children}</LightAvailabilityProvider>
         </main>
       </div>
       {hidesTabBar ? null : (
