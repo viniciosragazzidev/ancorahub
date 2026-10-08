@@ -349,8 +349,8 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
   const style = { y, opacity: presence, "--sheet-max": stops[top], "--sheet-extension": `${EXTENSION}px` } as unknown as CSSProperties;
 
   return <>
-    <DialogPrimitive.Overlay forceMount render={<motion.div className={styles.overlay} style={{ opacity: backdrop }} />}></DialogPrimitive.Overlay>
-    <DialogPrimitive.Content forceMount {...(description ? {} : { "aria-describedby": undefined })} onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }} onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }} render={<motion.div ref={sheetRef} className={[styles.sheet, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey} />}><div className={styles.header} onPointerDown={headerDown} onPointerMove={headerMove} onPointerUp={headerUp} onPointerCancel={headerUp}>
+    <DialogPrimitive.Overlay forceMount asChild><motion.div className={styles.overlay} style={{ opacity: backdrop }} /></DialogPrimitive.Overlay>
+    <DialogPrimitive.Content forceMount {...(description ? {} : { "aria-describedby": undefined })} onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }} onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }} asChild><motion.div ref={sheetRef} className={[styles.sheet, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey}><div className={styles.header} onPointerDown={headerDown} onPointerMove={headerMove} onPointerUp={headerUp} onPointerCancel={headerUp}>
                 <button type="button" className={styles.grabber} data-grabber="" aria-label={expanded ? "Collapse sheet" : "Expand sheet"} aria-expanded={expanded} onClick={grabberClick} onKeyDown={grabberKey}>
                   <span className={styles.grabberBar} aria-hidden="true" />
                 </button>
@@ -363,7 +363,7 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
                     <X size={16} strokeWidth={1.75} aria-hidden="true" />
                   </DialogPrimitive.Close>
                 </div>
-              </div><div ref={bodyRef} className={styles.body} onWheel={bodyWheel} onFocus={bodyFocus}>{children}</div><span className={styles.srOnly} role="status" aria-live="polite">{announcement}</span></DialogPrimitive.Content>
+              </div><div ref={bodyRef} className={styles.body} onWheel={bodyWheel} onFocus={bodyFocus}>{children}</div><span className={styles.srOnly} role="status" aria-live="polite">{announcement}</span></motion.div></DialogPrimitive.Content>
   </>;
 }
 
