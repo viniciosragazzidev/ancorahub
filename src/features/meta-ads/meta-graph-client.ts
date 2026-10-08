@@ -29,15 +29,112 @@ export function isMetaPermissionError(error: unknown) {
   return error instanceof MetaGraphApiError && [10, 100, 190, 200].includes(error.code ?? 0);
 }
 
+/** 4/17/32/613 are user, app and page limits; 80000-80014 are the Business Use Case limits (80004 = ads management). */
 export function isMetaRateLimitError(error: unknown): error is MetaGraphApiError {
-  return error instanceof MetaGraphApiError && [4, 17, 32, 613].includes(error.code ?? 0);
+  if (!(error instanceof MetaGraphApiError)) return false;
+  const code = error.code ?? 0;
+  return [4, 17, 32, 613].includes(code) || (code >= 80000 && code <= 80014);
 }
+
+/** Stop syncing once any usage meter passes this percentage, before Meta blocks the token. */
+export const META_USAGE_STOP_PERCENT = 75;
+const META_REQUEST_SPACING_MS = 200;
+const META_DEFAULT_PAGE_LIMIT = 50;
+const META_EXCLUDE_DELETED_FILTER = JSON.stringify([{ field: "effective_status", operator: "NOT_IN", value: ["ARCHIVED", "DELETED"] }]);
+
+export type MetaUsageReading = { percent: number; metric: string; regainMinutes: number | null };
+
+function parseJsonHeader(value: string | null): unknown {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function readPercent(source: unknown, label: string, fields: readonly string[], reading: MetaUsageReading) {
+  if (!source || typeof source !== "object") return;
+  const record = source as Record<string, unknown>;
+  for (const field of fields) {
+    const value = Number(record[field]);
+    if (Number.isFinite(value) && value > reading.percent) {
+      reading.percent = value;
+      reading.metric = `${label}.${field}`;
+    }
+  }
+  const regain = Number(record.estimated_time_to_regain_access);
+  if (Number.isFinite(regain) && regain > 0) reading.regainMinutes = Math.max(reading.regainMinutes ?? 0, regain);
+}
+
+/**
+ * Highest usage percentage across x-business-use-case-usage, x-app-usage and
+ * x-ad-account-usage, plus Meta's estimated_time_to_regain_access (minutes) when sent.
+ */
+export function readMetaUsageHeaders(headers: Headers): MetaUsageReading {
+  const reading: MetaUsageReading = { percent: 0, metric: "", regainMinutes: null };
+  const usageFields = ["call_count", "total_cputime", "total_time"] as const;
+
+  const businessUseCase = parseJsonHeader(headers.get("x-business-use-case-usage"));
+  if (businessUseCase && typeof businessUseCase === "object") {
+    for (const entries of Object.values(businessUseCase as Record<string, unknown>)) {
+      for (const entry of Array.isArray(entries) ? entries : []) readPercent(entry, "x-business-use-case-usage", usageFields, reading);
+    }
+  }
+  readPercent(parseJsonHeader(headers.get("x-app-usage")), "x-app-usage", usageFields, reading);
+  const adAccount = parseJsonHeader(headers.get("x-ad-account-usage"));
+  for (const entry of Array.isArray(adAccount) ? adAccount : [adAccount]) readPercent(entry, "x-ad-account-usage", ["acc_id_util_pct"], reading);
+  return reading;
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 export class MetaGraphClient {
   private accessToken: string;
+  private usage: MetaUsageReading = { percent: 0, metric: "", regainMinutes: null };
+  private lastRequestAt = 0;
 
   constructor(accessToken: string) {
     this.accessToken = accessToken;
+  }
+
+  /** Spaces consecutive Graph calls and stops before the usage meters reach Meta's block. */
+  private async beforeRequest() {
+    if (this.usage.percent > META_USAGE_STOP_PERCENT) {
+      const regain = this.usage.regainMinutes ? ` estimated_time_to_regain_access: ${this.usage.regainMinutes} min.` : "";
+      throw new MetaGraphApiError(
+        `Meta request limit reached (uso preventivo: ${this.usage.metric} em ${Math.round(this.usage.percent)}%, limite de segurança ${META_USAGE_STOP_PERCENT}%).${regain}`,
+        429,
+        17,
+      );
+    }
+    const wait = this.lastRequestAt + META_REQUEST_SPACING_MS - Date.now();
+    if (wait > 0) await sleep(wait);
+    this.lastRequestAt = Date.now();
+  }
+
+  private async readFailure(res: Response): Promise<MetaGraphApiError> {
+    const errorPayload = await res.json().catch(() => ({}));
+    const code: number | undefined = errorPayload?.error?.code;
+    const base = errorPayload?.error?.message || `Meta Graph API HTTP ${res.status}`;
+    const error = new MetaGraphApiError(base, res.status, code);
+    if (isMetaRateLimitError(error) && this.usage.regainMinutes) {
+      return new MetaGraphApiError(`${base} (estimated_time_to_regain_access: ${this.usage.regainMinutes} min)`, res.status, code);
+    }
+    return error;
+  }
+
+  /**
+   * Sync listing without ARCHIVED/DELETED objects. If Meta rejects the filter,
+   * the same listing is retried unfiltered (rate limits are never retried).
+   */
+  private async fetchAllPagesActive<T>(endpoint: string, params: Record<string, string>): Promise<T[]> {
+    try {
+      return await this.fetchAllPages<T>(endpoint, { ...params, filtering: META_EXCLUDE_DELETED_FILTER });
+    } catch (error) {
+      if (isMetaRateLimitError(error)) throw error;
+      return this.fetchAllPages<T>(endpoint, { ...params });
+    }
   }
 
   private assertMetaObjectId(value: string, label: string, validator: (candidate: string) => boolean = isMetaObjectId) {
@@ -54,17 +151,15 @@ export class MetaGraphClient {
       url.searchParams.append(key, value);
     }
 
+    await this.beforeRequest();
     const res = await fetch(url.toString(), {
       method: "GET",
       headers: { Accept: "application/json" },
       next: { revalidate: 0 },
     });
+    this.usage = readMetaUsageHeaders(res.headers);
 
-    if (!res.ok) {
-      const errorPayload = await res.json().catch(() => ({}));
-      const message = errorPayload?.error?.message || `Meta Graph API HTTP ${res.status}`;
-      throw new MetaGraphApiError(message, res.status, errorPayload?.error?.code);
-    }
+    if (!res.ok) throw await this.readFailure(res);
 
     return res.json() as Promise<T>;
   }
@@ -81,26 +176,25 @@ export class MetaGraphClient {
     const initialUrl = new URL(`${GRAPH_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`);
     initialUrl.searchParams.append("access_token", this.accessToken);
     if (!params.limit) {
-      params.limit = "100";
+      params.limit = String(META_DEFAULT_PAGE_LIMIT);
     }
+    const maxPages = Math.ceil(maxItems / Number(params.limit));
     for (const [key, value] of Object.entries(params)) {
       initialUrl.searchParams.append(key, value);
     }
     nextUrl = initialUrl.toString();
 
-    while (nextUrl && allData.length < maxItems && pageCount < 40) {
+    while (nextUrl && allData.length < maxItems && pageCount < maxPages) {
       pageCount++;
+      await this.beforeRequest();
       const res = await fetch(nextUrl, {
         method: "GET",
         headers: { Accept: "application/json" },
         cache: "no-store",
       });
+      this.usage = readMetaUsageHeaders(res.headers);
 
-      if (!res.ok) {
-        const errorPayload = await res.json().catch(() => ({}));
-        const message = errorPayload?.error?.message || `Meta Graph API HTTP ${res.status}`;
-        throw new MetaGraphApiError(message, res.status, errorPayload?.error?.code);
-      }
+      if (!res.ok) throw await this.readFailure(res);
 
       const payload = (await res.json()) as { data?: T[]; paging?: { next?: string } };
       if (Array.isArray(payload.data)) {
@@ -198,7 +292,7 @@ export class MetaGraphClient {
   }>> {
     this.assertMetaObjectId(adAccountId, "conta de anuncios", isMetaAdAccountId);
     const formattedAccountId = normalizeMetaAdAccountId(adAccountId);
-    return this.fetchAllPages<{
+    return this.fetchAllPagesActive<{
       id: string; name: string; objective?: string; status?: string; effective_status?: string; daily_budget?: string; lifetime_budget?: string; start_time?: string; stop_time?: string;
     }>(`/${formattedAccountId}/campaigns`, {
       fields: "id,name,objective,status,effective_status,daily_budget,lifetime_budget,start_time,stop_time",
@@ -215,10 +309,11 @@ export class MetaGraphClient {
   }>> {
     this.assertMetaObjectId(adAccountId, "conta de anuncios", isMetaAdAccountId);
     const formattedAccountId = normalizeMetaAdAccountId(adAccountId);
-    return this.fetchAllPages<{
+    // `targeting` is a heavy nested field and nothing reads it, so it is not requested.
+    return this.fetchAllPagesActive<{
       id: string; name: string; status?: string; targeting?: Record<string, unknown>; campaign_id?: string;
     }>(`/${formattedAccountId}/adsets`, {
-      fields: "id,name,status,targeting,campaign_id",
+      fields: "id,name,status,campaign_id",
     });
   }
 
@@ -235,14 +330,14 @@ export class MetaGraphClient {
     const formattedAccountId = normalizeMetaAdAccountId(adAccountId);
     const fields = "id,name,status,adset_id,campaign_id,creative{object_story_spec}";
     try {
-      return await this.fetchAllPages<{
+      return await this.fetchAllPagesActive<{
         id: string; name: string; status?: string; adset_id?: string; campaign_id?: string; creative?: { object_story_spec?: unknown };
       }>(`/${formattedAccountId}/ads`, { fields });
     } catch (error) {
       // Some Meta permissions/API versions reject creative expansion. Keep the
       // existing ad sync working and leave form linkage to captured attribution.
       if (isMetaRateLimitError(error)) throw error;
-      return this.fetchAllPages<{
+      return this.fetchAllPagesActive<{
         id: string; name: string; status?: string; adset_id?: string; campaign_id?: string; creative?: { object_story_spec?: unknown };
       }>(`/${formattedAccountId}/ads`, {
         fields: "id,name,status,adset_id,campaign_id",

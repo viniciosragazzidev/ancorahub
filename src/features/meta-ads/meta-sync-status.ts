@@ -42,13 +42,44 @@ function toDate(value: Date | string | null | undefined): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/** Espera progressiva após limite da Meta: 1 h, 2 h, 4 h… até 6 h (mesma regra do serviço de sincronização). */
+export const META_RATE_LIMIT_BASE_COOLDOWN_MS = 60 * 60 * 1000;
+export const META_RATE_LIMIT_MAX_COOLDOWN_MS = 6 * 60 * 60 * 1000;
+
+export function isMetaRateLimitMessage(errorDetails: string | null | undefined): boolean {
+  return typeof errorDetails === "string"
+    && /user request limit reached|request limit reached|rate.?limit/i.test(errorDetails);
+}
+
+type RateLimitLog = { status: string; errorDetails?: string | null; startedAt: Date | string; completedAt?: Date | string | null };
+
+/**
+ * Quando a Meta limitou as últimas sincronizações, devolve até quando o sistema
+ * espera antes de tentar de novo; null quando o último registro não é limite.
+ */
+export function getMetaRateLimitRetryAt(logs: readonly RateLimitLog[]): Date | null {
+  const ordered = [...logs]
+    .filter((log) => toDate(log.startedAt))
+    .sort((a, b) => toDate(b.startedAt)!.getTime() - toDate(a.startedAt)!.getTime());
+  let consecutive = 0;
+  while (consecutive < ordered.length && ordered[consecutive].status === "error" && isMetaRateLimitMessage(ordered[consecutive].errorDetails)) consecutive += 1;
+  if (!consecutive) return null;
+  const latest = ordered[0];
+  const backoffMs = Math.min(META_RATE_LIMIT_MAX_COOLDOWN_MS, META_RATE_LIMIT_BASE_COOLDOWN_MS * (2 ** (consecutive - 1)));
+  return new Date((toDate(latest.completedAt) ?? toDate(latest.startedAt)!).getTime() + backoffMs);
+}
+
+function formatBrasiliaClock(date: Date) {
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }).format(date);
+}
+
 /**
  * Resume a sincronização mais recente em UM estado, para o selo único da tela.
  * Estados gravados pelo serviço de sincronização: success | partial | error | in_progress.
  * Sem nenhum registro, cai para `lastSyncedAt` da conexão.
  */
 export function summarizeLastSync(
-  logs: readonly Pick<MetaSyncLogItem, "status" | "itemsSynced" | "startedAt" | "completedAt">[],
+  logs: readonly (Pick<MetaSyncLogItem, "status" | "itemsSynced" | "startedAt" | "completedAt"> & { errorDetails?: string | null })[],
   lastSyncedAt?: Date | string | null,
   now: Date = new Date(),
 ): MetaSyncSummary {
@@ -71,8 +102,19 @@ export function summarizeLastSync(
       return { tone: "success", label: "Concluída", detail: `${when} · ${items}`, at: at.toISOString() };
     case "partial":
       return { tone: "warning", label: "Parcial", detail: `${when} · ${items}`, at: at.toISOString() };
-    case "error":
+    case "error": {
+      // Limite da Meta não é falha do CRM: mostra até quando a sincronização espera.
+      const retryAt = getMetaRateLimitRetryAt(logs);
+      if (retryAt) {
+        return {
+          tone: "warning",
+          label: "Limitada pela Meta",
+          detail: retryAt.getTime() > now.getTime() ? `nova tentativa após ${formatBrasiliaClock(retryAt)}` : `${when} · liberada para tentar`,
+          at: at.toISOString(),
+        };
+      }
       return { tone: "destructive", label: "Falhou", detail: when, at: at.toISOString() };
+    }
     case "in_progress":
       return { tone: "info", label: "Em andamento", detail: `iniciada ${when}`, at: at.toISOString() };
     default:

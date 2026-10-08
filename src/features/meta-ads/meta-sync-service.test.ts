@@ -15,7 +15,7 @@ vi.mock("@/shared/db", async (importOriginal) => {
 describe("runMetaTenantSync rate limit", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("aborts the tenant after adSet rate limit without requesting later campaigns", async () => {
+  it("stops the tenant on an adSet rate limit, keeps what was synced and logs a backoff-compatible error", async () => {
     const connection = { id: "connection-1", accessTokenCiphertext: "ciphertext", permissions: ["ads_read"], businessId: "business-1" };
     const account = { adAccountId: "123456789", name: "Account" };
     const updates: Array<{ status?: string; errorDetails?: string }> = [];
@@ -30,7 +30,9 @@ describe("runMetaTenantSync rate limit", () => {
         from: (table: unknown) => ({
           where: () => table === schema.metaConnections
             ? { limit: async () => [connection] }
-            : Promise.resolve(table === schema.metaAdAccounts ? [account] : []),
+            : table === schema.metaSyncLogs
+              ? { orderBy: () => ({ limit: async () => [] }) }
+              : Promise.resolve(table === schema.metaAdAccounts ? [account] : []),
         }),
       }),
     };
@@ -40,19 +42,19 @@ describe("runMetaTenantSync rate limit", () => {
       { id: "campaign-1", name: "First" },
       { id: "campaign-2", name: "Second" },
     ]);
-    const fetchAdSets = vi.spyOn(MetaGraphClient.prototype, "fetchAdSets")
+    const fetchAdSets = vi.spyOn(MetaGraphClient.prototype, "fetchAdSetsForAccount")
       .mockRejectedValue(new MetaGraphApiError("Rate limit", 429, 17));
-    const fetchAds = vi.spyOn(MetaGraphClient.prototype, "fetchAds");
+    const fetchAds = vi.spyOn(MetaGraphClient.prototype, "fetchAdsForAccount");
     const fetchPixels = vi.spyOn(MetaGraphClient.prototype, "fetchPixels");
     const log = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const result = await runMetaTenantSync("tenant-1");
 
-    expect(result).toMatchObject({ success: false, error: "Rate limit" });
-    expect(fetchAdSets).toHaveBeenCalledExactlyOnceWith("campaign-1");
+    expect(result).toMatchObject({ success: false, itemsSynced: 2, error: "Meta request limit reached (code 17): Rate limit" });
+    expect(fetchAdSets).toHaveBeenCalledExactlyOnceWith("123456789");
     expect(fetchAds).not.toHaveBeenCalled();
     expect(fetchPixels).not.toHaveBeenCalled();
-    expect(updates).toContainEqual(expect.objectContaining({ status: "error", errorDetails: "Rate limit" }));
+    expect(updates).toContainEqual(expect.objectContaining({ status: "error", itemsSynced: 2, errorDetails: expect.stringMatching(/request limit reached/i) }));
     expect(log).toHaveBeenCalledExactlyOnceWith(expect.stringContaining("tenant tenant-1"));
   });
 });

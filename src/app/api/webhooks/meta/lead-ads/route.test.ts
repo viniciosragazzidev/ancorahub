@@ -62,4 +62,20 @@ describe("Meta Lead Ads webhook", () => {
     await expect(response.json()).resolves.toMatchObject({ accepted: true, created: 1 });
     expect(mocks.ingestMetaLeadAdsWebhook).toHaveBeenCalledWith({ object: "page", entry: [{ id: "page-1", changes: [] }] }, body, expect.any(Request));
   });
+
+  it("recusa a entrega quando a Meta limitou a busca do lead, para a Meta reenviar", async () => {
+    mocks.getMetaLeadAdsWebhookConfig.mockReturnValue({ appSecret: "app-secret", webhookVerifyToken: "verify-token" });
+    mocks.verifyMetaWebhookSignature.mockReturnValue(true);
+    mocks.ingestMetaLeadAdsWebhook.mockResolvedValue({ processed: 0, ignored: 0, retryable: 1 });
+    const body = JSON.stringify({ object: "page", entry: [{ id: "page-1", changes: [] }] });
+
+    const response = await POST(new Request("https://crm.example/api/webhooks/meta/lead-ads", {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/json", "x-hub-signature-256": "sha256=signed" },
+    }));
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toMatchObject({ accepted: false, retryable: 1 });
+  });
 });

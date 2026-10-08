@@ -65,6 +65,8 @@ export async function POST(request: Request) {
     console.log("[META_WEBHOOK_HTTP_RECEIVED]", summarizeWebhookPayload(payload));
     const result = await ingestMetaLeadAdsWebhook(payload, rawBody, request);
     console.log("[Meta Lead Ads Webhook POST ingest result]", result);
+    // Lead não carregado por limite da Meta: recusa a entrega para a Meta reenviar.
+    if ("retryable" in result && result.retryable) return NextResponse.json({ accepted: false, ...result }, { status: 503 });
     return NextResponse.json({ accepted: true, ...result });
   } catch (error) {
     console.error("[Meta Lead Ads webhook POST processing failed]", error instanceof Error ? error.stack || error.message : error);

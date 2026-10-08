@@ -205,6 +205,17 @@ export async function fetchMetaLead(leadgenId: string, tenantAccessToken: string
   return payload;
 }
 
+/**
+ * Limite de chamadas ou instabilidade da Meta ao buscar o lead: o webhook não pode
+ * confirmar a entrega, senão a Meta não reenvia e o lead se perde. Respondendo
+ * erro, a Meta reentrega; a chave de idempotência evita duplicar o lead.
+ */
+export function isRetryableMetaLeadLookupError(error: unknown): boolean {
+  if (!(error instanceof MetaCloudApiError)) return false;
+  const code = error.code ?? 0;
+  return [4, 17, 32, 613].includes(code) || (code >= 80000 && code <= 80014) || error.status === 429 || error.status >= 500;
+}
+
 /** Processes only this lead's durable work; the daily cron remains its recovery path. */
 async function processMetaLeadImmediately(input: { tenantId: string; leadId: string }) {
   await runLeadEffectOutboxProcessor({ tenantId: input.tenantId, leadId: input.leadId, limit: 3 });
@@ -305,6 +316,7 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
   const receivedAt = new Date();
   let processed = 0;
   let ignored = 0;
+  let retryable = 0;
   for (const entry of payload.entry ?? []) {
     if (!entry.id) { ignored += 1; continue; }
     console.log("[ingestMetaLeadAdsWebhook] Checking pageId", entry.id);
@@ -423,10 +435,15 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         processed += 1;
       } catch (error) {
         console.error("[ingestMetaLeadAdsWebhook] Error processing leadgenId:", error);
-        await db.update(schema.metaLeadAdSources).set({ lastError: error instanceof Error ? error.message.slice(0, 240) : "Falha no processamento do Lead Ads.", updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
-        ignored += 1;
+        const canRetry = isRetryableMetaLeadLookupError(error);
+        const lastError = canRetry
+          ? "A Meta limitou as chamadas ao buscar um lead; a entrega foi recusada para a Meta reenviar."
+          : error instanceof Error ? error.message.slice(0, 240) : "Falha no processamento do Lead Ads.";
+        await db.update(schema.metaLeadAdSources).set({ lastError, updatedAt: new Date() }).where(eq(schema.metaLeadAdSources.id, source.id));
+        if (canRetry) retryable += 1;
+        else ignored += 1;
       }
     }
   }
-  return { processed, ignored };
+  return { processed, ignored, retryable };
 }

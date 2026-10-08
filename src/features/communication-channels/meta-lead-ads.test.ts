@@ -5,7 +5,7 @@ vi.mock("./meta-cloud-config", () => ({
   getMetaLeadAdsWebhookConfig: () => ({ graphVersion: "v25.0" }),
 }));
 
-import { fetchMetaLead, normalizeMetaLead, resolveMetaCampaignIntake, resolveMetaLeadAdsSourceClaim, verifyMetaWebhookSignature } from "./meta-lead-ads";
+import { fetchMetaLead, isRetryableMetaLeadLookupError, normalizeMetaLead, resolveMetaCampaignIntake, resolveMetaLeadAdsSourceClaim, verifyMetaWebhookSignature } from "./meta-lead-ads";
 
 describe("Meta Lead Ads normalization", () => {
   it("allows an inactive Page mapping to be claimed by another tenant, but never an active mapping", () => {
@@ -197,6 +197,19 @@ describe("Meta Lead Ads normalization", () => {
       code: 100,
       message: "A Meta não permitiu carregar os detalhes deste lead. Ele não foi criado no CRM.",
     });
+  });
+
+  it("asks Meta to redeliver only when the lead lookup hit a rate limit or a Meta outage", async () => {
+    const lookup = async (status: number, code: number) => {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: { code, message: "x" } }), { status })));
+      return fetchMetaLead("leadgen_x", "page-token").catch((error: unknown) => error);
+    };
+    expect(isRetryableMetaLeadLookupError(await lookup(400, 17))).toBe(true);
+    expect(isRetryableMetaLeadLookupError(await lookup(400, 4))).toBe(true);
+    expect(isRetryableMetaLeadLookupError(await lookup(400, 80004))).toBe(true);
+    expect(isRetryableMetaLeadLookupError(await lookup(500, 2))).toBe(true);
+    expect(isRetryableMetaLeadLookupError(await lookup(404, 100))).toBe(false);
+    expect(isRetryableMetaLeadLookupError(new Error("O formulário não trouxe nome e telefone utilizáveis."))).toBe(false);
   });
 
   it("requests only supported Lead fields so a webhook can create the lead", async () => {

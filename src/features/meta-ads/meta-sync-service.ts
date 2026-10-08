@@ -6,7 +6,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
 
-import { isMetaAdsReadPermissionError, isMetaPermissionError, isMetaRateLimitError, MetaGraphClient } from "./meta-graph-client";
+import { isMetaAdsReadPermissionError, isMetaPermissionError, isMetaRateLimitError, MetaGraphClient, type MetaGraphApiError } from "./meta-graph-client";
 import { decryptMetaToken } from "./meta-oauth";
 import { isMetaAdAccountId, isMetaPageId } from "./meta-id-validation";
 import type { MetaSyncWarning } from "./types";
@@ -50,6 +50,11 @@ function readLeadGenFormId(creative: { object_story_spec?: unknown } | undefined
   return null;
 }
 
+/** Keeps "request limit reached" in the persisted message so the backoff keeps counting this failure. */
+function describeRateLimit(error: MetaGraphApiError) {
+  return /request limit reached/i.test(error.message) ? error.message : `Meta request limit reached (code ${error.code}): ${error.message}`;
+}
+
 function serializeSyncWarnings(warnings: MetaSyncWarning[]) {
   return warnings.length ? JSON.stringify({ warnings }) : null;
 }
@@ -67,6 +72,7 @@ export async function runMetaTenantSync(
   const db = getDatabase();
   const startTime = Date.now();
   const syncLogId = randomUUID();
+  let totalSynced = 0;
 
   const recentLogs = await db.select({
     status: schema.metaSyncLogs.status,
@@ -137,7 +143,6 @@ export async function runMetaTenantSync(
     const rawToken = decryptMetaToken(connection.accessTokenCiphertext);
     const client = new MetaGraphClient(rawToken);
     const warnings: MetaSyncWarning[] = [];
-    let totalSynced = 0;
 
     // Permission data stored by older connections can be empty. Refresh the
     // server-side grant without returning or logging the token.
@@ -247,7 +252,8 @@ export async function runMetaTenantSync(
               createdAt: now, updatedAt: now,
             }).onConflictDoUpdate({
               target: [schema.metaAdSets.tenantId, schema.metaAdSets.adSetId],
-              set: { campaignId, name: adSet.name, status: adSet.status || "PAUSED", targeting: adSet.targeting || null, updatedAt: now },
+              // Targeting is no longer requested from Meta; keep whatever was stored before.
+              set: { campaignId, name: adSet.name, status: adSet.status || "PAUSED", ...(adSet.targeting ? { targeting: adSet.targeting } : {}), updatedAt: now },
             });
           }
         } catch (adSetError) {
@@ -433,13 +439,17 @@ export async function runMetaTenantSync(
 
     return { success: true, itemsSynced: totalSynced, warnings: normalizedWarnings };
   } catch (error) {
-    if (isMetaRateLimitError(error)) {
+    const rateLimited = isMetaRateLimitError(error);
+    if (rateLimited) {
       console.warn(`[meta-sync] Meta rate limit (code ${error.code}); aborting tenant ${tenantId} sync.`);
     }
-    const errorDetails = error instanceof Error ? error.message : "Erro desconhecido durante a sincronização Meta.";
+    const errorDetails = rateLimited
+      ? describeRateLimit(error)
+      : error instanceof Error ? error.message : "Erro desconhecido durante a sincronização Meta.";
+    // Everything upserted before the stop stays; only the log marks the run as failed.
     await db.update(schema.metaSyncLogs).set({
-      status: "error", errorDetails, durationMs: Date.now() - startTime, completedAt: new Date(),
+      status: "error", itemsSynced: totalSynced, errorDetails, durationMs: Date.now() - startTime, completedAt: new Date(),
     }).where(eq(schema.metaSyncLogs.id, syncLogId));
-    return { success: false, itemsSynced: 0, error: errorDetails };
+    return { success: false, itemsSynced: totalSynced, error: errorDetails };
   }
 }
