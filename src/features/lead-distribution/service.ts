@@ -485,7 +485,6 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   const db = getDatabase();
   const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, queueId: schema.leads.queueId, webhookCredentialId: schema.leads.webhookCredentialId, corretorId: schema.leads.corretorId, distributionOrigin: schema.leads.distributionOrigin, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, archivedAt: schema.leads.archivedAt }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.archivedAt), isNull(schema.leads.deletedAt))).limit(1);
   if (!lead) return { status: "conflict", leadId, reason: "Lead não encontrado." };
-  if (options?.manualTransferOverride && ["lost", "converted"].includes(lead.status)) return { status: "conflict", leadId, reason: "Leads encerrados não podem ser reatribuídos." };
   if (options?.requireUnassigned && lead.corretorId) return { status: "conflict", leadId, reason: "Esta escolha só pode ser usada em leads sem corretor." };
   if (lead.corretorId === brokerId) return { status: "conflict", leadId, reason: "O lead já está atribuído a este corretor." };
   if (!lead.branchId && !targetBranchId) return { status: "conflict", leadId, reason: "Envie o lead para uma unidade antes de atribuir um corretor." };
@@ -509,6 +508,10 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
       ? targetDefaultQueueName
       : null;
   const postSaleExempt = postSaleExemptQueueName !== null;
+  // Pós Venda (2026-10-08): lead vendido/perdido também se move; o status é preservado.
+  const isClosedLead = ["lost", "converted"].includes(lead.status);
+  if (options?.manualTransferOverride && isClosedLead && !postSaleExempt) return { status: "conflict", leadId, reason: "Leads encerrados não podem ser reatribuídos." };
+  const keepsClosedStatus = postSaleExempt && isClosedLead;
   if (options?.manualTransferOverride) {
     const [branch] = await db.select({ id: schema.branches.id, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, isDistributionHub: schema.branches.isDistributionHub }).from(schema.branches)
       .where(and(eq(schema.branches.id, assignmentBranchId), eq(schema.branches.tenantId, context.tenantId))).limit(1);
@@ -517,7 +520,7 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   const assignmentQueueId = options?.manualTransferOverride
     ? await ensureDefaultQueue(context.tenantId, assignmentBranchId, context.userId)
     : lead.queueId;
-  const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), eq(schema.tenantMemberships.branchId, assignmentBranchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), !postSaleExempt && !options?.manualTransferOverride ? eq(schema.tenantMemberships.availabilityStatus, "available") : undefined, eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
+  const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), postSaleExempt ? undefined : eq(schema.tenantMemberships.branchId, assignmentBranchId), eq(schema.tenantMemberships.role, "broker"), postSaleExempt ? undefined : eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), !postSaleExempt && !options?.manualTransferOverride ? eq(schema.tenantMemberships.availabilityStatus, "available") : undefined, eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
   if (!broker) return { status: "conflict", leadId, reason: "O corretor não está elegível nesta unidade." };
   const activeDutyRoster = !options?.manualTransferOverride && !postSaleExempt && assignmentQueueId ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: assignmentQueueId, webhookCredentialId: lead.webhookCredentialId, respectDutyCap: false, includePaused: true }) : null;
   const dutyScheduleId = options?.manualTransferOverride ? null : activeDutyRoster?.brokers.find((candidate) => candidate.id === brokerId)?.scheduleId ?? null;
@@ -527,7 +530,7 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   const assignmentEventId = randomUUID();
   const feedbackDueAt = new Date(assignedAt.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000);
   const assigned = await db.transaction(async (tx) => {
-    const result = await tx.update(schema.leads).set({ branchId: assignmentBranchId, queueId: assignmentQueueId, corretorId: brokerId, dutyScheduleId, status: "distributed", distributionStatus: "assigned", distributionOrigin: source === "manual_director" ? "parent" : source === "manual_manager" ? "unit" : lead.distributionOrigin ?? (context.role === "director" ? "parent" : "unit"), assignedAt, assignmentSource: source ?? (context.role === "director" ? "manual_director" : "manual_manager"), assignmentStrategy: "manual", distributionUpdatedAt: assignedAt, firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null, stageEnteredAt: assignedAt, motivoPerda: null }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.archivedAt), lead.corretorId ? eq(schema.leads.corretorId, lead.corretorId) : isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
+    const result = await tx.update(schema.leads).set({ branchId: assignmentBranchId, queueId: assignmentQueueId, corretorId: brokerId, dutyScheduleId, ...(keepsClosedStatus ? {} : { status: "distributed" as const }), distributionStatus: "assigned", distributionOrigin: source === "manual_director" ? "parent" : source === "manual_manager" ? "unit" : lead.distributionOrigin ?? (context.role === "director" ? "parent" : "unit"), assignedAt, assignmentSource: source ?? (context.role === "director" ? "manual_director" : "manual_manager"), assignmentStrategy: "manual", distributionUpdatedAt: assignedAt, ...(keepsClosedStatus ? {} : { firstContactAt: null, serviceStartedAt: null, serviceStartedBy: null, stageEnteredAt: assignedAt, motivoPerda: null }) }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.archivedAt), lead.corretorId ? eq(schema.leads.corretorId, lead.corretorId) : isNull(schema.leads.corretorId))).returning({ id: schema.leads.id });
     if (!result.length) return false;
     if (options?.manualTransferOverride) await tx.update(schema.leadAssignmentAttempts).set({ status: "released", releasedAt: assignedAt, releaseReason: "Transferência manual entre unidade e corretor; atendimento reiniciado." }).where(and(
       eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), eq(schema.leadAssignmentAttempts.leadId, leadId), eq(schema.leadAssignmentAttempts.status, "open"),
@@ -535,11 +538,11 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     if (options?.manualTransferOverride) await tx.update(schema.leadOffers).set({ status: "CANCELLED", updatedAt: assignedAt }).where(and(
       eq(schema.leadOffers.tenantId, context.tenantId), eq(schema.leadOffers.leadId, leadId), inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
     ));
-    if (tenantPolicy?.feedbackRequiredEnabled !== false) {
+    if (tenantPolicy?.feedbackRequiredEnabled !== false && !keepsClosedStatus) {
       const [attemptCount] = await tx.select({ total: count(schema.leadAssignmentAttempts.id) }).from(schema.leadAssignmentAttempts).where(and(eq(schema.leadAssignmentAttempts.tenantId, context.tenantId), eq(schema.leadAssignmentAttempts.leadId, leadId)));
       await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: context.tenantId, leadId, brokerId, dutyScheduleId, sequence: Number(attemptCount?.total ?? 0) + 1, assignedAt, feedbackDueAt, status: "open", createdAt: assignedAt });
     }
-    await tx.insert(schema.leadDistributionEvents).values({ id: assignmentEventId, tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: assignmentBranchId, fromQueueId: lead.queueId, toQueueId: assignmentQueueId, previousOwnerId: lead.corretorId, newOwnerId: brokerId, action: "assigned", source: source ?? "manual_manager", strategy: "manual", reason, actorId: context.userId, metadata: postSaleExempt ? { assignmentScope: "post_sale_transfer_exemption", exemptionQueueName: postSaleExemptQueueName, manualTransferOverride: Boolean(options?.manualTransferOverride), previousStatus: lead.status, previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null, previousServiceStartedAt: lead.serviceStartedAt?.toISOString() ?? null, serviceRestarted: true } : options?.manualTransferOverride ? { assignmentScope: "manual_cross_unit_override", previousStatus: lead.status, previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null, previousServiceStartedAt: lead.serviceStartedAt?.toISOString() ?? null, serviceRestarted: true } : dutyScheduleId ? { dutyScheduleId } : null, createdAt: assignedAt });
+    await tx.insert(schema.leadDistributionEvents).values({ id: assignmentEventId, tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: assignmentBranchId, fromQueueId: lead.queueId, toQueueId: assignmentQueueId, previousOwnerId: lead.corretorId, newOwnerId: brokerId, action: "assigned", source: source ?? "manual_manager", strategy: "manual", reason, actorId: context.userId, metadata: postSaleExempt ? { assignmentScope: "post_sale_transfer_exemption", exemptionQueueName: postSaleExemptQueueName, manualTransferOverride: Boolean(options?.manualTransferOverride), previousStatus: lead.status, previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null, previousServiceStartedAt: lead.serviceStartedAt?.toISOString() ?? null, serviceRestarted: !keepsClosedStatus } : options?.manualTransferOverride ? { assignmentScope: "manual_cross_unit_override", previousStatus: lead.status, previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null, previousServiceStartedAt: lead.serviceStartedAt?.toISOString() ?? null, serviceRestarted: true } : dutyScheduleId ? { dutyScheduleId } : null, createdAt: assignedAt });
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_distribution", entidadeId: leadId, acao: postSaleExempt ? postSaleTransferAuditAction(postSaleExemptQueueName) : "lead.assigned" });
     await enqueueLeadEffectTx(tx, {
       tenantId: context.tenantId,
@@ -1379,6 +1382,9 @@ export async function offerLeadToBrokerManually(
   const targetBranchId = target?.targetBranchId ?? lead.branchId;
   const targetQueueId = target?.targetQueueId ?? lead.queueId;
   assertBranchScope(context, targetBranchId);
+  const postSaleQueueName = targetQueueId === lead.queueId && targetBranchId === lead.branchId
+    ? await findPostSaleExemptionQueueName({ tenantId: context.tenantId, originQueueId: lead.queueId })
+    : null;
   const dutyRoster = target?.dutyScheduleId
     ? await getActiveQueueDutyRoster({
       tenantId: context.tenantId,
@@ -1404,12 +1410,12 @@ export async function offerLeadToBrokerManually(
       eq(schema.tenantMemberships.tenantId, context.tenantId),
       eq(schema.tenantMemberships.userId, brokerId),
       eq(schema.tenantMemberships.role, "broker"),
-      eq(schema.tenantMemberships.jobTitle, "broker"),
+      postSaleQueueName ? undefined : eq(schema.tenantMemberships.jobTitle, "broker"),
       eq(schema.tenantMemberships.status, "active"),
       eq(schema.user.active, true),
       eq(schema.user.status, "active"),
     )).limit(1);
-  if (!broker || (dutyBroker ? broker.branchId !== dutyBroker.branchId : broker.branchId !== targetBranchId)) return { status: "conflict" as const, reason: dutyBroker ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor não está ativo na unidade escolhida." };
+  if (!broker || (!postSaleQueueName && (dutyBroker ? broker.branchId !== dutyBroker.branchId : broker.branchId !== targetBranchId))) return { status: "conflict" as const, reason: postSaleQueueName ? "O corretor não está ativo neste tenant." : dutyBroker ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor não está ativo na unidade escolhida." };
   if (!broker.phone) return { status: "fallback" as const, reason: "O corretor não possui telefone para receber a oferta. O lead voltará à distribuição normal." };
 
   const [tenant] = await db.select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes })
@@ -1427,6 +1433,7 @@ export async function offerLeadToBrokerManually(
     queueId: targetQueueId,
     capacityPerBroker: null,
     assignmentSource: "manual_offer",
+    ...(postSaleQueueName ? { postSaleExemptionQueueName: postSaleQueueName } : {}),
     ...(dutyBroker ? {
       dutyScheduleIds: [dutyBroker.scheduleId],
       dutyScheduleIdByBroker: { [brokerId]: dutyBroker.scheduleId },

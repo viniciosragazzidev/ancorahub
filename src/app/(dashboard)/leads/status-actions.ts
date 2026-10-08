@@ -317,7 +317,14 @@ export async function bulkReassignBranchAction(
         .filter(({ queueName }) => isPostSaleQueueName(queueName))
         .map(({ branchId }) => branchId),
     );
-    if (!branchIds.every((branchId) => postSaleBranchIds.has(branchId)) && branches.some((branch) => branch.status !== "active" || !branch.acceptingLeads)) {
+    // Pós Venda como origem (2026-10-08): leads que saem da fila Pós Venda vão para qualquer unidade.
+    const originQueueIds = Array.from(new Set((await db.select({ queueId: schema.leads.queueId }).from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds))))
+      .map(({ queueId }) => queueId).filter((queueId): queueId is string => Boolean(queueId))));
+    const originQueueNames = originQueueIds.length ? await db.select({ name: schema.leadQueues.name }).from(schema.leadQueues)
+      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.id, originQueueIds))) : [];
+    const allFromPostSale = originQueueNames.length > 0 && originQueueNames.every(({ name }) => isPostSaleQueueName(name));
+    if (!allFromPostSale && !branchIds.every((branchId) => postSaleBranchIds.has(branchId)) && branches.some((branch) => branch.status !== "active" || !branch.acceptingLeads)) {
       return { mutationId, error: "Selecione apenas unidades ativas e aptas a receber leads." };
     }
 

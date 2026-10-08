@@ -18,6 +18,7 @@ import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, isB
 import { formatLeadTypeLabel, readSourcePlanType } from "./lead-type-label";
 import { buildLeadClientInfo, buildLeadOfferSummary } from "@/features/leads/client-info";
 import { getRelevantDutyWindow, isDutyWindowActive } from "./duty-presence-domain";
+import { postSaleTransferAuditAction } from "./post-sale-transfer";
 
 /**
  * Tenants without an official (Meta) WhatsApp channel cannot deliver offers by
@@ -101,6 +102,8 @@ export async function createLeadOffersForBrokers(input: {
   /** Automatic offers only: interval / max-pending rules per broker (see offer-pacing.ts). */
   pacing?: OfferPacingConfig | null;
   assignmentSource?: "automatic_offer" | "manual_offer";
+  /** Resolved by the manual service from the lead's current queue, never client input. */
+  postSaleExemptionQueueName?: string;
   dutyScheduleIds?: string[];
   dutyScheduleIdByBroker?: Record<string, string>;
 }) {
@@ -175,13 +178,16 @@ export async function createLeadOffersForBrokers(input: {
       // Serialize offer creation per lead. This is the final guard against two
       // workers creating simultaneous active offers for different brokers.
       const [lockedLead] = await tx
-        .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, archivedAt: schema.leads.archivedAt, deletedAt: schema.leads.deletedAt, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt })
+        .select({ id: schema.leads.id, queueId: schema.leads.queueId, branchId: schema.leads.branchId, corretorId: schema.leads.corretorId, archivedAt: schema.leads.archivedAt, deletedAt: schema.leads.deletedAt, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt })
         .from(schema.leads)
         .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)))
         .for("update")
         .limit(1);
 
       if (!lockedLead || lockedLead.corretorId !== (input.expectedCurrentBrokerId ?? null)) return null;
+      if (input.postSaleExemptionQueueName && (lockedLead.queueId !== input.queueId || lockedLead.branchId !== input.targetBranchId)) {
+        throw new Error("A fila ou unidade do lead mudou. Atualize o drawer e tente novamente.");
+      }
       if (lockedLead.firstContactAt || lockedLead.serviceStartedAt || !["new", "distributed"].includes(lockedLead.status)) return null;
       if (input.assignmentSource === "manual_offer" && (
         lockedLead.archivedAt || lockedLead.deletedAt ||
@@ -314,7 +320,7 @@ export async function createLeadOffersForBrokers(input: {
             ? "Responsabilidade provisória transferida ao próximo corretor elegível."
             : "Responsabilidade provisória atribuída ao primeiro corretor elegível.",
           actorId: input.requestedBy ?? broker.id,
-          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true, offerId, ...(input.dutyScheduleIdByBroker?.[broker.id] ? { dutyScheduleId: input.dutyScheduleIdByBroker[broker.id] } : {}), ...(exactOccurrence ?? {}) },
+          metadata: { offeredBrokerId: broker.id, provisionalOwnership: true, offerId, ...(input.postSaleExemptionQueueName ? { assignmentScope: "post_sale_transfer_exemption", exemptionQueueName: input.postSaleExemptionQueueName } : {}), ...(input.dutyScheduleIdByBroker?.[broker.id] ? { dutyScheduleId: input.dutyScheduleIdByBroker[broker.id] } : {}), ...(exactOccurrence ?? {}) },
           createdAt: now,
         });
         if (input.requestedBy) {
@@ -323,7 +329,7 @@ export async function createLeadOffersForBrokers(input: {
             userId: input.requestedBy,
             entidade: "lead_distribution",
             entidadeId: input.leadId,
-            acao: input.assignmentSource === "manual_offer" ? "lead.manual_offer_provisional_owner_assigned" : "lead.provisional_owner_assigned",
+            acao: input.postSaleExemptionQueueName ? postSaleTransferAuditAction(input.postSaleExemptionQueueName) : input.assignmentSource === "manual_offer" ? "lead.manual_offer_provisional_owner_assigned" : "lead.provisional_owner_assigned",
           });
         }
       }

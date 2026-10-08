@@ -31,7 +31,7 @@ const state = vi.hoisted(() => {
     archivedAt: null as Date | null,
     deletedAt: null as Date | null,
   };
-  const controls = { enabled: true, conflict: false };
+  const controls = { enabled: true, conflict: false, postSale: false };
   const db = {
     select: vi.fn(() => ({
       from: vi.fn((table: unknown) => ({
@@ -93,6 +93,10 @@ vi.mock("drizzle-orm", () => ({
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: vi.fn(async () => state.controls.enabled ? "true" : "false") }));
 vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ getActiveQueueDutyRoster: vi.fn(async () => ({ hasActiveDuty: false, brokers: [] })) }));
 vi.mock("@/features/lead-distribution/service", () => ({ ensureDefaultQueue: vi.fn(async (_tenantId: string, branchId: string) => `queue-${branchId}`), offerLeadToBrokerManually: vi.fn(), routeLeadToBranch: vi.fn() }));
+vi.mock("@/features/lead-distribution/post-sale-transfer", () => ({
+  findPostSaleExemptionQueueName: vi.fn(async () => state.controls.postSale ? "Pós Venda" : null),
+  postSaleTransferAuditAction: (name: string) => `lead.post_sale_transfer:${name}`,
+}));
 vi.mock("@/features/lead-distribution/jobs", () => ({ enqueueAndProcessLeadDistribution: vi.fn(), enqueueLeadDistributionJob: vi.fn() }));
 
 import { removeLeadAssignmentAction, reassignLeadAction } from "./management-actions";
@@ -156,7 +160,7 @@ describe("manual service reassignment", () => {
     vi.clearAllMocks();
     state.updates.length = 0;
     state.inserts.length = 0;
-    Object.assign(state.controls, { enabled: true, conflict: false });
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false });
     Object.assign(state.lead, { corretorId: "00000000-0000-4000-8000-000000000002", status: "in_contact", distributionStatus: "assigned", firstContactAt: new Date("2026-09-25T10:00:00Z"), serviceStartedAt: new Date("2026-09-25T10:00:00Z"), archivedAt: null, deletedAt: null });
   });
   function reassignmentForm() {
@@ -178,6 +182,31 @@ describe("manual service reassignment", () => {
     expect(state.inserts.some(i => i.table === state.schema.leadInteractions)).toBe(true);
     expect(state.inserts.some(i => i.table === state.schema.auditLogs)).toBe(true);
     expect(state.updates.every(u => u.table === state.schema.leads || u.table === state.schema.leadAssignmentAttempts)).toBe(true);
+  });
+  it.each(["lost", "converted"])("rejects an ended lead (%s) outside Pós Venda", async (status) => {
+    state.lead.status = status;
+    expect(await reassignLeadAction({}, reassignmentForm())).toMatchObject({ error: expect.any(String) });
+    expect(state.inserts).toHaveLength(0);
+  });
+  it.each(["lost", "converted"])("moves an ended Pós Venda lead (%s) to another unit and broker, keeping its status", async (status) => {
+    state.controls.postSale = true;
+    state.lead.status = status;
+    const result = await reassignLeadAction({}, reassignmentForm());
+    expect(result).toMatchObject({ success: true, entity: { status, branchId: "00000000-0000-4000-8000-000000000004", corretorId: "00000000-0000-4000-8000-000000000003" } });
+    const leadUpdate = state.updates.find(u => u.table === state.schema.leads)?.values;
+    expect(leadUpdate).toMatchObject({ branchId: "00000000-0000-4000-8000-000000000004", queueId: "queue-00000000-0000-4000-8000-000000000004", corretorId: "00000000-0000-4000-8000-000000000003" });
+    expect(leadUpdate).not.toHaveProperty("status");
+    expect(leadUpdate).not.toHaveProperty("firstContactAt");
+    expect(state.inserts.some(i => i.table === state.schema.leadAssignmentAttempts)).toBe(false);
+    expect(state.inserts.find(i => i.table === state.schema.auditLogs)?.values).toMatchObject({ acao: "lead.post_sale_transfer:Pós Venda" });
+  });
+  it("keeps a Pós Venda lead in its queue when only the broker changes", async () => {
+    state.controls.postSale = true;
+    const data = reassignmentForm();
+    data.delete("branchId");
+    const result = await reassignLeadAction({}, data);
+    expect(result).toMatchObject({ success: true, entity: { branchId: "branch-test" } });
+    expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ branchId: "branch-test", queueId: "queue-test", status: "distributed" });
   });
   it.each(["disabled", "same owner", "archived", "deleted", "conflict"])("rejects %s without appending history or a new SLA", async (reason) => {
     const data = reassignmentForm();

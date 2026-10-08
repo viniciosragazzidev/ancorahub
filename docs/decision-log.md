@@ -1601,6 +1601,20 @@ pela atribuição recebida no webhook. Essa herança é avaliada por campanha no
 intake e não cria uma ativação global própria para um formulário que possa ser
 compartilhado por outras campanhas. Regras específicas de fila continuam
 resolvendo o destino. Elegibilidade do CRM e status de veiculação informado pela
+**Drawer Pós Venda (2026-10-07).** Confirmado pelo usuário: somente leads cuja
+fila atual seja Pós Venda permitem selecionar diretamente qualquer corretor ativo
+do tenant, sem escolher unidade. A seleção conserva a fila e a unidade do lead,
+não exige participação em plantão e revalida a fila no servidor. Permanecem
+autorização sobre o lead, identidade ativa, auditoria e controle global de gestão.
+
+**Livre movimentação Pós Venda (2026-10-08).** Pedido urgente do usuário: retirar
+todas as restrições de envio do lead da Pós Venda para outra unidade ou corretor.
+O drawer passa a oferecer qualquer unidade do tenant (Central só para Diretor);
+mudando de unidade, o lead vai para a fila padrão do destino. Leads vendidos ou
+perdidos também podem ser movidos e mantêm status, datas de contato e histórico,
+sem abrir nova tentativa de SLA. Transferência em lote aceita corretor de qualquer
+unidade e não exige unidade ativa quando os leads saem da Pós Venda.
+
 Meta são estados distintos; ativar captura no CRM nunca liga/desliga a campanha
 na Meta.
 
