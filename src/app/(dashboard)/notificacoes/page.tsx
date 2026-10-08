@@ -3,6 +3,8 @@ import { desc, and, eq, isNull, count, or } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { LightNotifications } from "@/features/broker-workspace/components/light-notifications";
 import { NotificationsClient } from "./notifications-client";
 
 const PAGE_SIZE = 20;
@@ -10,6 +12,8 @@ const PAGE_SIZE = 20;
 export default async function NotificationsPage() {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const experienceMode = await getExperienceMode(context);
+  const isLightBroker = experienceMode === "LIGHT" && context.role === "broker";
 
   const rows = await db
     .select({
@@ -78,6 +82,20 @@ export default async function NotificationsPage() {
       eq(schema.tenantMemberships.userId, context.userId),
     )).limit(1),
   ]);
+
+  if (isLightBroker) {
+    return (
+      <LightNotifications
+        initialNotifications={serializedNotifications}
+        initialNextCursor={nextCursor}
+        initialHasMore={hasMore}
+        totalCount={Number(totalResult?.total ?? 0)}
+        unreadCount={Number(unreadResult?.total ?? 0)}
+        urgentCount={Number(urgentResult?.total ?? 0)}
+        leadToastEnabled={membership?.leadToastEnabled ?? true}
+      />
+    );
+  }
 
   return (
     <>
