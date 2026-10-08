@@ -7,7 +7,7 @@ import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-
 import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { LightTopNavBar } from "@/components/light-top-nav";
+import { LightChrome } from "@/components/light/light-chrome";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
 
@@ -43,6 +43,7 @@ export function AppShell({
   showQuoteSimulator = false,
   initialAvailability = "available",
   cleanUiEnabled = false,
+  queueBadgeCount = 0,
 }: {
   children: ReactNode;
   branding?: Branding;
@@ -52,6 +53,8 @@ export function AppShell({
   showQuoteSimulator?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
   cleanUiEnabled?: boolean;
+  /** Leads waiting for the broker to accept; shown as the badge on the Fila tab (Light only). */
+  queueBadgeCount?: number;
 }) {
   const pathname = usePathname();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -135,18 +138,17 @@ export function AppShell({
           } as CSSProperties
         }
       >
-        <div className="flex h-dvh w-full flex-col bg-background selection:bg-primary/20 overflow-hidden">
-          <LightTopNavBar
-            branding={branding}
-            user={user}
-            showDutyCalendar={showDutyCalendar}
-            showQuoteSimulator={showQuoteSimulator}
-            initialAvailability={initialAvailability}
-          />
-          <main ref={canvasRef} className="flex-1 min-h-0 w-full overflow-y-auto">
-            {children}
-          </main>
-        </div>
+        <LightChrome
+          mainRef={canvasRef}
+          branding={branding}
+          user={user}
+          showDutyCalendar={showDutyCalendar}
+          showQuoteSimulator={showQuoteSimulator}
+          initialAvailability={initialAvailability}
+          queueBadgeCount={queueBadgeCount}
+        >
+          {children}
+        </LightChrome>
       </SidebarProvider>
     );
   }
