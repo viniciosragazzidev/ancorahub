@@ -136,6 +136,8 @@ export function useLeadDetail({
         setAccepted(true);
         celebrateSuccess("Lead aceito");
         setLeadStatus("in_contact");
+        // The phone is not in the payload before acceptance: reload so WhatsApp and Ligar get it.
+        router.refresh();
 
         const firstName = lead.nome.split(" ")[0] || lead.nome;
         toast.success(`Lead aceito! Agora inicie o atendimento com ${firstName}.`, {

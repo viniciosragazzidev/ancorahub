@@ -27,6 +27,7 @@ import { SupervisionPanel } from "./supervision-panel";
 import { DeleteLeadControl } from "./delete-lead-control";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-workspace/components/light-lead-detail";
+import { lightContactFields, redactClientInfo } from "@/features/broker-workspace/lead-contact-privacy";
 import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qualifying-lead-actions";
 import { AiConversationInsightCard } from "@/features/conversation-intelligence";
 
@@ -163,12 +164,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     ]);
 
     const lightFormData = readFormData(lead.formData);
+    // Phone and e-mail leave the server only after this broker accepted the lead.
+    const lightContact = lightContactFields(lead, { status: lead.status, isCurrentBroker: lead.corretorId === context.userId });
 
     const lightLead: LightLeadDetailData = {
       id: lead.id,
       nome: lead.nome,
-      telefone: lead.telefone,
-      email: lead.email,
+      telefone: lightContact.telefone,
+      email: lightContact.email,
       status: lead.status,
       qualificationStatus: lead.qualificationStatus,
       qualificationState: lead.qualificationState,
@@ -198,14 +201,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       consentimentoLgpd: lead.consentimentoLgpd,
       aiIntelligence: qualificationDetails?.aiIntelligence || null,
       aiPolicyResult: qualificationDetails?.aiPolicyResult || null,
-      clientInfo: buildLeadClientInfo({
-        email: lead.email,
-        tipo: lead.tipo,
-        sourceChannel: lead.sourceChannel,
-        sourceMetadata: lead.sourceMetadata,
-        qualificationDetails: lead.qualificationDetails,
-        formData: lead.formData,
-      }),
+      clientInfo: (() => {
+        const info = buildLeadClientInfo({
+          email: lightContact.email,
+          tipo: lead.tipo,
+          sourceChannel: lead.sourceChannel,
+          sourceMetadata: lead.sourceMetadata,
+          qualificationDetails: lead.qualificationDetails,
+          formData: lead.formData,
+        });
+        return lightContact.reveal ? info : redactClientInfo(info);
+      })(),
       redistributionNotice: redistributionNotice ? {
         reason: redistributionNotice.reason,
         createdAt: redistributionNotice.createdAt,
