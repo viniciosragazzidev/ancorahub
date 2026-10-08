@@ -94,10 +94,3 @@ export function resolveLightRoute(pathname: string): LightRoute {
   const path = pathname.split("?")[0].replace(/(.)\/+$/, "$1");
   return RULES.find((rule) => rule.test(path))?.route ?? FALLBACK_ROUTE;
 }
-
-/** Same-origin history is only trusted when the previous page is itself a Light route. */
-export function isLightReferrer(referrer: string, origin: string) {
-  if (!referrer || !(referrer === origin || referrer.startsWith(`${origin}/`) || referrer.startsWith(`${origin}?`))) return false;
-  const path = referrer.slice(origin.length).split(/[?#]/)[0] || "/";
-  return isLightRouteAllowed(path);
-}

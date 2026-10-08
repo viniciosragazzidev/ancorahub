@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   getLightMoreDestinations,
-  isLightReferrer,
   isLightRouteAllowed,
   LIGHT_TABS,
   resolveLightRoute,
@@ -40,14 +39,5 @@ describe("Light routes", () => {
     expect(getLightMoreDestinations({}).map((item) => item.href)).toEqual(["/clientes", "/settings"]);
     expect(getLightMoreDestinations({ quoteSimulator: true, dutyCalendar: true }).map((item) => item.href))
       .toEqual(["/cotacao", "/plantoes", "/clientes", "/settings"]);
-  });
-
-  it("trusts history only when the previous page is a Light route of this origin", () => {
-    const origin = "https://crm.ancorasaude.cloud";
-    expect(isLightReferrer(`${origin}/minha-fila?x=1`, origin)).toBe(true);
-    expect(isLightReferrer(`${origin}/equipe`, origin)).toBe(false);
-    expect(isLightReferrer("https://evil.example/minha-fila", origin)).toBe(false);
-    expect(isLightReferrer(`${origin}.evil.example/minha-fila`, origin)).toBe(false);
-    expect(isLightReferrer("", origin)).toBe(false);
   });
 });

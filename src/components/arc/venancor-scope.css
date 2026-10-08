@@ -54,17 +54,6 @@
   --shadow-resting: 0 1px 2px oklch(0% 0 0 / .035);
   --shadow-raised: 0 6px 18px oklch(0% 0 0 / .065), 0 1px 3px oklch(0% 0 0 / .035);
   --shadow-floating: 0 20px 48px oklch(0% 0 0 / .105), 0 3px 10px oklch(0% 0 0 / .045);
-  /* Brand gradient: soft lavender to warm peach. Light enough for dark text (--arc-gradient-foreground, >12:1). */
-  --arc-gradient-from: oklch(90% .045 300);
-  --arc-gradient-to: oklch(92% .045 65);
-  --arc-gradient: linear-gradient(100deg, var(--arc-gradient-from), var(--arc-gradient-to));
-  --arc-gradient-foreground: oklch(22% .01 300);
-  /* Faint wash for backgrounds and tinted panels. */
-  --arc-gradient-soft: linear-gradient(135deg, oklch(97.5% .016 300), oklch(98% .016 65));
-  /* Hairline borders and rules. */
-  --arc-gradient-line: linear-gradient(100deg, oklch(83% .06 300), oklch(86% .06 65));
-  /* Text-safe stops for gradient text and small marks (>4.5:1 on the surface). */
-  --arc-gradient-ink: linear-gradient(100deg, oklch(47% .1 300), oklch(50% .09 55));
   --space-1: .25rem; --space-2: .5rem; --space-3: .75rem; --space-4: 1rem;
   --space-5: 1.25rem; --space-6: 1.5rem; --space-8: 2rem; --space-10: 2.5rem;
   --space-12: 3rem; --space-16: 4rem; --space-20: 5rem; --space-24: 6rem;
@@ -105,19 +94,30 @@
   --success: #0f7a4d;
   --warning: #a15c00;
   --danger: #d4263a;
-  --shadow-resting: 0 1px 2px rgb(16 16 40 / 0.04);
-  --shadow-raised: 0 1px 2px rgb(16 16 40 / 0.04), 0 8px 24px rgb(16 16 40 / 0.05);
+  /* Cards rest on one soft shadow, no border. Only floating layers use --shadow-floating. */
+  --shadow-resting: 0 1px 2px rgb(16 16 40 / 0.04), 0 8px 24px rgb(16 16 40 / 0.05);
   --shadow-floating: 0 16px 40px rgb(16 16 40 / 0.14);
   --radius-control: 9999px;
   --radius-panel: 1.5rem;
   --radius-surface: 1.75rem;
   --font-body: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
-  --arc-gradient: none;
-  --arc-gradient-soft: none;
+  --control-height-sm: 2.75rem; /* touch targets are at least 44px */
 }
 
-.arc-venancor :focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
+/* Arc shared keyboard ring, scoped (foundation.css applies it to :root). Pointer focus draws nothing. */
+.arc-venancor :focus:not(:focus-visible) { outline: none; }
+.arc-venancor :focus-visible:not(input, textarea, [role="option"], [role="menuitem"], [tabindex="-1"]) {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, color-mix(in oklab, var(--accent-strong) 72%, transparent));
+  outline-offset: var(--focus-outline-offset, 2px);
 }
+
+/* Screen canvas behind the chrome (token layer: the only place the canvas color lives). */
+.light-canvas { background: #f7f7f9; }
+
+/* Avatar: flat accent tint with initials, no gradient. */
+.arc-venancor .light-avatar { border-color: transparent; background: var(--accent-subtle); color: var(--accent-strong); }
+
+/* Arc sheet close and grabber are smaller than 44px: extend the hit area without changing the look. */
+.arc-venancor button[aria-label="Fechar"], .arc-venancor [data-grabber] { position: relative; }
+.arc-venancor button[aria-label="Fechar"]::after, .arc-venancor [data-grabber]::after { position: absolute; inset: -8px; content: ""; }
