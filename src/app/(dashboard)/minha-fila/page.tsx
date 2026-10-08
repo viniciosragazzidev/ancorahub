@@ -40,7 +40,7 @@ export default async function MinhaFilaPage() {
   const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const [todayYear, todayMonth] = todayKey.split("-").map(Number);
   const horizonKey = new Date(Date.UTC(todayYear, todayMonth + 2, 0)).toISOString().slice(0, 10);
-  const myDutyAssignments = monthlyDutySchedulingEnabled
+  const myDutyAssignments = monthlyDutySchedulingEnabled && experienceMode !== "LIGHT"
     ? (await db.select({
       dutyDate: schema.dutyRosterAssignments.dutyDate,
       startsAt: schema.dutyRosterAssignments.startsAt,
@@ -345,7 +345,7 @@ export default async function MinhaFilaPage() {
       updatedAt: lostLeadsMap.get(l.id)?.createdAt ?? l.stageEnteredAt,
     }));
 
-    return <LightLeadsList leads={[...activeLightLeads, ...lostLightLeads]} availabilityStatus={availabilityStatus} dutyAssignments={myDutyAssignments} showDutySchedule={monthlyDutySchedulingEnabled} />;
+    return <LightLeadsList leads={[...activeLightLeads, ...lostLightLeads]} availabilityStatus={availabilityStatus} />;
   }
 
   const enrichedActiveLeads = leads.map((lead) => ({
