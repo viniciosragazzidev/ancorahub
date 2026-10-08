@@ -32,7 +32,7 @@ export function LightAppHeader({
   actions?: ReactNode;
   className?: string;
 }) {
-  const { title, isRoot, parentHref } = useLightRoute();
+  const { title, isRoot, parentHref, backToParent } = useLightRoute();
 
   return (
     <header
@@ -42,7 +42,7 @@ export function LightAppHeader({
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-4xl items-center gap-3 px-4 sm:px-6">
-        {!isRoot && parentHref ? <LightBackButton fallbackHref={parentHref} /> : null}
+        {!isRoot && parentHref ? <LightBackButton fallbackHref={parentHref} alwaysParent={backToParent} /> : null}
         <p
           className={cn(
             "min-w-0 flex-1 truncate tracking-tight text-(--foreground)",
