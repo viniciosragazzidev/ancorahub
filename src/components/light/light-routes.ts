@@ -80,7 +80,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/conversas/broker"), route: { title: "Insights", tab: "insights", isRoot: true, parentHref: null } },
   { test: under("/conversas"), route: { title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },
   { test: exact("/conversas"), route: { title: "Insights", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },
-  { test: exact("/cotacao"), route: { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/cotacao"), route: { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true } },
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
