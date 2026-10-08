@@ -86,12 +86,11 @@ export function LightConversationsView({
   const reduceMotion = useReducedMotion();
   const [query, setQuery] = useState("");
 
-  // Estado local para seleção instantânea (0ms) sem re-render do Server Component
-  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("leadId") ?? initialLeadId ?? null);
-
-  useEffect(() => {
-    setSelectedId(searchParams.get("leadId"));
-  }, [searchParams]);
+  // The open conversation follows ?leadId (the app header back button clears it). A pick is kept
+  // locally until the URL catches up, so selecting stays instant without a server render.
+  const urlLeadId = searchParams.get("leadId");
+  const [pick, setPick] = useState<{ url: string | null; id: string | null }>(() => ({ url: urlLeadId, id: urlLeadId ?? initialLeadId ?? null }));
+  const selectedId = pick.url === urlLeadId ? pick.id : urlLeadId;
 
   // Realtime: agrupa os eventos e atualiza a lista no máximo uma vez a cada 2s.
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -132,7 +131,7 @@ export function LightConversationsView({
   }, [insights, selectedId]);
 
   const select = (item: BrokerConversationInsight) => {
-    setSelectedId(item.id);
+    setPick({ url: urlLeadId, id: item.id });
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       params.set("leadId", item.id);

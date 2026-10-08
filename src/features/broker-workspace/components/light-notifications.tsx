@@ -199,7 +199,6 @@ export function LightNotifications({
   const [optimisticReads, addOptimisticRead] = useOptimistic<Set<string>, string>(new Set(), (state, id) => new Set(state).add(id));
 
   const localUnreadCount = useMemo(() => notifications.filter((item) => !item.readAt && !optimisticReads.has(item.id)).length, [notifications, optimisticReads]);
-  const localUrgentCount = useMemo(() => notifications.filter((item) => priorityFor(item.type) === "urgent" && !item.readAt && !optimisticReads.has(item.id)).length, [notifications, optimisticReads]);
   const visibleNotifications = useMemo(
     () => notifications.filter((item) => {
       const isRead = Boolean(item.readAt) || optimisticReads.has(item.id);
