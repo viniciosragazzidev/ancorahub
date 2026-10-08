@@ -150,6 +150,11 @@ export function LightConversationsView({
             <span style={{ color: whatsappConnected ? "var(--success)" : "var(--text-muted)" }}>
               {whatsappConnected ? "WhatsApp conectado" : `WhatsApp ${connectionStatus === "disconnected" ? "desconectado" : connectionStatus}`}
             </span>
+            {whatsappConnected ? null : (
+              <Link href="/settings?tab=whatsapp" className="ml-2 inline-flex min-h-11 items-center font-medium" style={{ color: "var(--accent-strong)" }}>
+                Conectar
+              </Link>
+            )}
           </p>
         </header>
 

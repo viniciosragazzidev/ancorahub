@@ -71,6 +71,12 @@ export default async function SettingsPage() {
 
   // Broker app (Light): sections as cards; managers and directors keep the desktop tabs below.
   if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
+    // Personal WhatsApp: the broker own connection, same query the Insights screen uses.
+    const [whatsappConnection] = await db
+      .select({ status: schema.whatsappConnections.status })
+      .from(schema.whatsappConnections)
+      .where(and(eq(schema.whatsappConnections.tenantId, context.tenantId), eq(schema.whatsappConnections.userId, context.userId)))
+      .limit(1);
     return (
       <LightSettings
         sections={[
@@ -81,7 +87,7 @@ export default async function SettingsPage() {
             description: "Pausa manual e horários para receber leads",
             node: brokerAvailability ? <LightAvailabilitySection windows={brokerAvailability.windows} schemaReady={brokerAvailability.availabilitySchemaReady} /> : <></>,
           },
-          { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection /> },
+          { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection connected={whatsappConnection?.status === "ready"} status={whatsappConnection?.status ?? "disconnected"} /> },
           { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
           { id: "extensao", title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension },
         ]}
