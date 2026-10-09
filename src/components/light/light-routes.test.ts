@@ -31,6 +31,11 @@ describe("Light routes", () => {
     expect(resolveLightRoute("/conversas/broker")).toMatchObject({ tab: "insights", isRoot: true });
     expect(resolveLightRoute("/leads/123")).toMatchObject({ title: "Lead", tab: "fila", isRoot: false, parentHref: "/minha-fila" });
     expect(resolveLightRoute("/leads/123").hidesTabBar).toBe(true);
+    // The lead is a chat; ?ficha=1 is the full record and goes back to the chat.
+    expect(resolveLightRoute("/leads/123").chat).toBe(true);
+    const ficha = resolveLightRoute("/leads/123", new URLSearchParams("ficha=1"));
+    expect(ficha.chat).toBeFalsy();
+    expect(ficha).toMatchObject({ parentHref: "/leads/123", backToParent: true });
     expect(resolveLightRoute("/minha-fila").hidesTabBar).toBeUndefined();
     expect(resolveLightRoute("/clientes")).toMatchObject({ tab: "mais", parentHref: "/dashboard" });
     expect(resolveLightRoute("/clientes/9")).toMatchObject({ parentHref: "/clientes" });

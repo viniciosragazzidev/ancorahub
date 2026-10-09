@@ -24,6 +24,7 @@ export type ChatServerActionName =
   | "lead.changeStep"
   | "lead.scheduleReturn"
   | "lead.markLost"
+  | "lead.addNote"
   | "duty.pause"
   | "duty.resume"
   | "notifications.markRead";

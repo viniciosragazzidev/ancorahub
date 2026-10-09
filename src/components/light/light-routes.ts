@@ -100,7 +100,14 @@ const RULES: readonly RouteRule[] = [
     test: (path) => /^\/leads\/[^/]+\/feedback$/.test(path),
     route: (path) => ({ title: "Atualização", tab: "fila", isRoot: false, parentHref: path.replace(/\/feedback$/, "") }),
   },
-  { test: under("/leads"), route: { title: "Lead", tab: "fila", isRoot: false, parentHref: "/minha-fila", hidesTabBar: true } },
+  // The lead is a chat (2026-10-09); ?ficha=1 is the full record with its own header.
+  {
+    test: under("/leads"),
+    route: (path, search) =>
+      search?.get("ficha") === "1"
+        ? { title: "Lead", tab: "fila", isRoot: false, parentHref: path, hidesTabBar: true, backToParent: true }
+        : { title: "Lead", tab: "fila", isRoot: false, parentHref: "/minha-fila", hidesTabBar: true, chat: true },
+  },
   // Insights is a list; with ?leadId a conversation is open and back returns to the list.
   {
     test: exact("/conversas/broker"),

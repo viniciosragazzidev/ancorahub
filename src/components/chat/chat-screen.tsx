@@ -104,7 +104,9 @@ export function ChatScreen({
     setShown((current) => [...current, reply]);
     const action = choice.action;
     if (action.kind === "href") {
-      router.push(action.href);
+      // WhatsApp and other external links open beside the app; the conversation stays.
+      if (/^https?:/.test(action.href)) window.open(action.href, "_blank", "noopener");
+      else router.push(action.href);
       return;
     }
     if (action.kind === "next") {

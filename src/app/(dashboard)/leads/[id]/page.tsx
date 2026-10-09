@@ -32,6 +32,10 @@ import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-wor
 import { lightContactFields, redactClientInfo } from "@/features/broker-workspace/lead-contact-privacy";
 import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qualifying-lead-actions";
 import { AiConversationInsightCard } from "@/features/conversation-intelligence";
+import { buildLeadConversationScript } from "@/features/broker-workspace/chat/lead-script";
+import { LeadConversation } from "@/features/broker-workspace/chat/lead-conversation";
+import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -55,21 +59,21 @@ function getCurrentTimestamp() {
   return Date.now();
 }
 
-export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+export default async function LeadDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ficha?: string }> }) {
+  const [{ id }, { ficha }] = await Promise.all([params, searchParams]);
   const context = await getRequiredTenantContext();
   // The Light app streams its own skeleton while the lead loads; the Full screen is unchanged.
   if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
     return (
       <Suspense fallback={<LightPageSkeleton variant="detail" />}>
-        <LeadDetailContent id={id} />
+        <LeadDetailContent id={id} ficha={ficha === "1"} />
       </Suspense>
     );
   }
   return <LeadDetailContent id={id} />;
 }
 
-async function LeadDetailContent({ id }: { id: string }) {
+async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: boolean }) {
   const context = await getRequiredTenantContext();
   const isMarketing = context.jobTitle === "marketing";
   const brokerInternalChatEnabled =
@@ -232,6 +236,41 @@ async function LeadDetailContent({ id }: { id: string }) {
         createdAt: redistributionNotice.createdAt,
       } : null,
     };
+
+    // Broker app (2026-10-09 chat redesign): the lead is a conversation; ?ficha=1 keeps the full record.
+    if (!ficha) {
+      const timeline = (await getLeadTimeline(id)) ?? [];
+      const now = new Date();
+      const script = buildLeadConversationScript({
+        lead: {
+          id: lead.id,
+          nome: lead.nome,
+          status: lead.status,
+          telefone: lightContact.telefone,
+          tipo: lead.tipo,
+          origem: lead.origem,
+          sourceCampaign: lead.sourceCampaign,
+          livesCount: lightLead.livesCount,
+          city: lightLead.city,
+          urgency: lightLead.urgency,
+          summary: lightLead.summary,
+          branchName: lead.branchNome,
+          motivoPerda: lead.motivoPerda,
+          createdAt: lead.createdAt,
+          assignedAt: lead.assignedAt,
+          slaFirstContactMinutes: lightLead.slaFirstContactMinutes ?? 15,
+          isCurrentBroker: lightLead.isCurrentBroker,
+          potentialSale: isAiPotentialSale(lead.qualificationDetails).isPotentialSale,
+          clientInfo: lightLead.clientInfo,
+        },
+        events: timeline.map((event) => ({ id: event.id, tipo: event.tipo, conteudo: event.conteudo ?? "", userId: event.userId, userName: event.userName, createdAt: event.createdAt })),
+        viewerId: context.userId,
+        now,
+        whatsappUrl: buildWhatsAppUrl(lightContact.telefone, `Olá, ${lead.nome.split(" ")[0] || lead.nome}! Sou seu corretor e vou seguir com seu atendimento por aqui.`),
+      });
+      const leadInitials = lead.nome.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("") || "?";
+      return <LeadConversation leadId={lead.id} name={lead.nome} initials={leadInitials} canWrite={lightLead.isCurrentBroker} script={script} />;
+    }
 
     return (
       <LightLeadDetail

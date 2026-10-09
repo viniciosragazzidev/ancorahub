@@ -123,10 +123,11 @@ describe("Corretor Lite experience contract", () => {
   });
 
   it("shows back and the screen title on internal screens, and no back on tab roots", () => {
-    navigation.pathname = "/leads/abc";
+    // The lead itself is a chat with its own header; its feedback form uses the app header.
+    navigation.pathname = "/leads/abc/feedback";
     const internal = renderChrome();
     expect(screen.getByRole("button", { name: "Voltar" })).toBeTruthy();
-    expect(screen.getByText("Lead")).toBeTruthy();
+    expect(screen.getByText("Atualização")).toBeTruthy();
     internal.unmount();
 
     navigation.pathname = "/minha-fila";
