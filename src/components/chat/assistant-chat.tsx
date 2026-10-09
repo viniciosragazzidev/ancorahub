@@ -20,7 +20,7 @@ export function AssistantChat({ identity, script }: { identity: { name: string; 
         const result = await runChatServerAction(action.name, action.payload);
         if (result.ok && result.href?.startsWith("http")) window.open(result.href, "_blank", "noopener");
         // An accepted lead continues in its own conversation: offer it as the next reply.
-        const followUp: ChatBlock[] = result.ok && result.href?.startsWith("/")
+        const followUp: ChatBlock[] = result.ok && result.href?.startsWith("/") && !result.href.startsWith("//")
           ? [{ type: "question", id: `after-${action.name}-${Date.now()}`, prompt: "Quer seguir com ele agora?", choices: [{ id: "open", label: "Abrir a conversa", action: { kind: "href", href: result.href } }] }]
           : [];
         return { ok: result.ok, message: result.message, warning: result.warning, followUp };
