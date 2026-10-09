@@ -239,7 +239,7 @@ function DutyFormSheet({
   const shiftsFit = fields.startsAt < DEFAULT_SHIFT_SPLIT_AT && fields.endsAt > DEFAULT_SHIFT_SPLIT_AT;
   // New plantões are one-day plantões by default: a range becomes one per date.
   const [mode, setMode] = useState<"dates" | "weekly">(() => (schedule && !isSingleDaySchedule(schedule) ? "weekly" : "dates"));
-  const [selectedDays, setSelectedDays] = useState<number[]>(() => (schedule ? [schedule.dayOfWeek] : [0, 1, 2, 3, 4, 5, 6]));
+  const [selectedDays, setSelectedDays] = useState<number[]>(() => (schedule ? [schedule.dayOfWeek] : [1, 2, 3, 4, 5]));
   const initialDate = schedule ? singleDutyDate(schedule) ?? dateInputValue(schedule.validFrom) : defaultStartDate ?? dateInputValue(new Date());
   const [rangeFrom, setRangeFrom] = useState(initialDate);
   const [rangeUntil, setRangeUntil] = useState(initialDate);

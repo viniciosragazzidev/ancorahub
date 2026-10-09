@@ -8,7 +8,7 @@ const pme23 = { id: "pme23", name: "PME 23/09", startsAt: "09:00", endsAt: "18:0
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
-  vi.setSystemTime(new Date("2026-09-26T13:00:00Z")); // Saturday 26/09
+  vi.setSystemTime(new Date("2026-09-25T13:00:00Z")); // Friday 25/09
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
@@ -40,6 +40,13 @@ describe("DutyMonthCalendar", () => {
   it("shows each plantão on its own day and highlights today", () => {
     renderSeptember();
     expect(screen.getByRole("gridcell", { name: /23\/09: 1 plantões/ }).textContent).toContain("PME 23/09");
-    expect(screen.getByRole("gridcell", { name: /26\/09/ }).textContent).toContain("hoje");
+    expect(screen.getByRole("gridcell", { name: /25\/09/ }).textContent).toContain("hoje");
+  });
+
+  it("shows Monday to Friday only", () => {
+    renderSeptember();
+    expect(screen.getAllByRole("columnheader").map((cell) => cell.textContent)).toEqual(["Seg", "Ter", "Qua", "Qui", "Sex"]);
+    expect(screen.queryByRole("gridcell", { name: /26\/09/ })).toBeNull();
+    expect(screen.queryByRole("gridcell", { name: /27\/09/ })).toBeNull();
   });
 });

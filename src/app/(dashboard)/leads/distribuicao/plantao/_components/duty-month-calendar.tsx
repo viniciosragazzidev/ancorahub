@@ -9,7 +9,8 @@ import { typeStripe } from "./duty-type-tag";
 type CalendarSchedule = { id: string; name: string; startsAt: string; endsAt: string; status: string; validFrom: Date; validUntil: Date | null; typeName?: string | null; typeHue?: number | null };
 type Progress = { dates: Array<{ date: string; done: boolean }> };
 
-const WEEKDAY_HEADERS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"] as const;
+// Plantões run on weekdays: the board shows Monday to Friday only.
+const WEEKDAY_HEADERS = ["Seg", "Ter", "Qua", "Qui", "Sex"] as const;
 
 function todayKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
@@ -43,7 +44,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
   onCreateOnDate: (date: string) => void;
 }) {
   const today = todayKey();
-  const { cells, byDate } = useMemo(() => {
+  const { cells, byDate, weekendCount } = useMemo(() => {
     const [year, monthNumber] = month.split("-").map(Number);
     const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
     const firstWeekday = (new Date(Date.UTC(year, monthNumber - 1, 1)).getUTCDay() + 6) % 7; // Monday first
@@ -63,13 +64,15 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
     // starts at the first week that still matters (never removes single days).
     const weeks: Array<Array<string | null>> = [];
     for (let index = 0; index < days.length; index += 7) weeks.push(days.slice(index, index + 7));
-    const visibleWeeks = weeks.filter((week) => week.some((date) => date && (date >= today || map.has(date))));
-    return { cells: visibleWeeks.flat(), byDate: map };
+    const visibleWeeks = weeks.filter((week) => week.slice(0, 5).some((date) => date && (date >= today || map.has(date))));
+    // Saturday and Sunday are left out of the board (count shown below if any).
+    const weekendCount = weeks.flatMap((week) => week.slice(5)).reduce((sum, date) => sum + (date ? map.get(date)?.length ?? 0 : 0), 0);
+    return { cells: visibleWeeks.flatMap((week) => week.slice(0, 5)), byDate: map, weekendCount };
   }, [month, progressById, schedules, today]);
 
   return (
     <div className="overflow-x-auto">
-      <div className="grid min-w-[840px] grid-cols-7 overflow-hidden rounded-[var(--radius-card)] border border-border bg-border gap-px" role="grid" aria-label="Calendário de plantões">
+      <div className="grid min-w-[640px] grid-cols-5 overflow-hidden rounded-[var(--radius-card)] border border-border bg-border gap-px" role="grid" aria-label="Calendário de plantões">
         {WEEKDAY_HEADERS.map((day) => (
           <div key={day} role="columnheader" className="bg-muted/40 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">{day}</div>
         ))}
@@ -134,6 +137,11 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
           );
         })}
       </div>
+      {weekendCount ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {weekendCount} {weekendCount === 1 ? "plantão cai" : "plantões caem"} no sábado ou domingo e não {weekendCount === 1 ? "aparece" : "aparecem"} no quadro.
+        </p>
+      ) : null}
     </div>
   );
 }

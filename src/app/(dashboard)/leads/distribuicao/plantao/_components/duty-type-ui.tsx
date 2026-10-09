@@ -214,7 +214,7 @@ export function DutyTypesSheet({ open, onOpenChange, types, branches }: { open: 
             <SheetTitle>Tipos de plantão</SheetTitle>
             <SheetDescription>Cada plantão pertence a um tipo. A cor do tipo aparece no calendário, na escala e no PDF.</SheetDescription>
           </SheetHeader>
-          <SheetBody contentClassName="grid gap-3">
+          <SheetBody contentClassName="grid content-start gap-3">
             <Button type="button" variant="outline" className="justify-self-start" onClick={() => setCreating(true)}><Plus className="size-3.5" /> Novo tipo</Button>
             {types.length ? (
               <ul className="divide-y divide-border/60 rounded-[var(--radius-card)] border border-border bg-card">

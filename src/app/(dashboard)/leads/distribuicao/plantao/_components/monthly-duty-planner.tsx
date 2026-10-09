@@ -395,7 +395,7 @@ export function MonthlyDutyPlanner({
                   : "Escolha os tipos de plantão e o período, defina as cadeiras de cada corretor e publique."}
             </SheetDescription>
           </SheetHeader>
-          <SheetBody contentClassName="grid grid-cols-[minmax(0,1fr)] gap-4">
+          <SheetBody contentClassName="grid grid-cols-[minmax(0,1fr)] content-start gap-4">
             {!enabled ? (
               <div className="rounded-[var(--radius-card)] border border-border/70 bg-muted/30 p-4">
                 <p className="text-sm font-medium">Escala mensal indisponível</p>
