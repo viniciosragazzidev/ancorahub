@@ -178,6 +178,10 @@ export function quoteSummaryText(answers: QuoteAnswers, result: QuoteResult) {
   return `Olá! Segue uma simulação de plano de saúde: ${result.plan.carrier.replace(" (exemplo)", "")} ${result.plan.name}, ${lifeLabel(answers.ages?.length ?? 0)}, ${ACCOMMODATION_LABEL[answers.accommodation ?? "ward"].toLocaleLowerCase("pt-BR")}, total estimado de ${money(result.monthly)} por mês. Valores sujeitos à análise da operadora.`;
 }
 
+export function quoteWhatsAppHref(answers: QuoteAnswers, result: QuoteResult) {
+  return `https://wa.me/?text=${encodeURIComponent(quoteSummaryText(answers, result))}`;
+}
+
 /** The chosen plan as a facts card and what to do with it. */
 export function chosenPlanBlocks(answers: QuoteAnswers, planId: string, round: number): ChatBlock[] {
   const result = quoteResults(answers).find(({ plan }) => plan.id === planId);
@@ -204,7 +208,7 @@ export function chosenPlanBlocks(answers: QuoteAnswers, planId: string, round: n
       id: `q-send-${round}`,
       prompt: "O que você quer fazer?",
       choices: [
-        { id: "whatsapp", label: "Enviar no WhatsApp", reply: "Envia no WhatsApp", action: local("send", "whatsapp") },
+        { id: "whatsapp", label: "Enviar no WhatsApp", hint: "Abre com o resumo pronto, é só escolher o cliente", reply: "Envia no WhatsApp", action: { kind: "href", href: quoteWhatsAppHref(answers, result) } },
         { id: "copy", label: "Copiar o resumo", action: local("send", "copy") },
         { id: "other", label: "Ver outro plano", action: local("back", "plans") },
         { id: "restart", label: "Refazer a cotação", action: local("restart", "1") },

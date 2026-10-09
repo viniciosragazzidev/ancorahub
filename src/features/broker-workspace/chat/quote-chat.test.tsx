@@ -27,7 +27,9 @@ describe("QuoteChat", () => {
     fireEvent.click(screen.getByRole("button", { name: /Família/ }));
 
     expect(await screen.findByText(/Quais as idades/)).toBeTruthy();
-    expect(screen.getByPlaceholderText("Ex.: 35, 32, 8")).toBeTruthy();
+    const ages = screen.getByPlaceholderText("Ex.: 35, 32, 8");
+    expect(ages.getAttribute("inputmode")).toBe("numeric");
+    expect(ages.getAttribute("aria-label")).toBe("Idades de quem vai entrar no plano, separadas por vírgula");
     send("trinta");
     expect(await screen.findByText(/Não achei nenhuma idade/)).toBeTruthy();
     send("35, 32, 8");

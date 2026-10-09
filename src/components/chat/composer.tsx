@@ -37,6 +37,8 @@ export function Composer({
   onSend,
   onMention,
   onStop,
+  inputMode,
+  inputLabel,
 }: {
   placeholder?: string;
   progress?: ChatProgress | null;
@@ -47,6 +49,10 @@ export function Composer({
   onSend: (text: string) => void | Promise<void>;
   onMention?: (mention: Mention) => void;
   onStop?: () => void;
+  /** Keyboard for the current answer (e.g. "numeric" for ages). */
+  inputMode?: "text" | "numeric";
+  /** Accessible name when the field answers a question ("Idades de quem vai entrar no plano"). */
+  inputLabel?: string;
 }) {
   const reduce = useReducedMotion();
   const [text, setText] = useState("");
@@ -110,7 +116,8 @@ export function Composer({
             rows={1}
             value={text}
             placeholder={placeholder}
-            aria-label={placeholder}
+            aria-label={inputLabel ?? placeholder}
+            inputMode={inputMode}
             disabled={disabled}
             onChange={(event) => {
               setText(event.target.value);

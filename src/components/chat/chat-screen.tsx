@@ -53,6 +53,7 @@ export function ChatScreen({
   onLocalChoice,
   progress: progressOverride,
   placeholder: placeholderOverride,
+  composerInput,
 }: {
   identity: Identity;
   backHref: string;
@@ -69,6 +70,8 @@ export function ChatScreen({
   progress?: ChatProgress | null;
   /** Composer placeholder chosen by the flow (wins over the default). */
   placeholder?: string;
+  /** Keyboard and accessible name of the composer when it answers a question. */
+  composerInput?: { inputMode?: "text" | "numeric"; label?: string };
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -196,6 +199,8 @@ export function ChatScreen({
         progressMascot={{ shape: identity.shape, hue: identity.hue }}
         working={working}
         disabled={composerDisabled}
+        inputMode={composerInput?.inputMode}
+        inputLabel={composerInput?.label}
         onSend={async (text) => {
           setShown((current) => [...current, { type: "user", id: `free-${Date.now()}`, text, at: nowLabel() }]);
           if (!onFreeText) return;

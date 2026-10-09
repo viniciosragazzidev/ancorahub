@@ -43,7 +43,7 @@ function QuoteConversation({ onRestart }: { onRestart: () => void }) {
     setAnswers(next);
   }, []);
 
-  const onLocalChoice = useCallback((_choice: unknown, value: string): ChatBlock[] => {
+  const onLocalChoice = useCallback(async (_choice: unknown, value: string): Promise<ChatBlock[]> => {
     const current = answersRef.current;
     round.current += 1;
     const [field, raw] = value.split(":");
@@ -60,12 +60,12 @@ function QuoteConversation({ onRestart }: { onRestart: () => void }) {
       const result = quoteResults(current).find(({ plan }) => plan.id === chosenRef.current);
       if (!result) return [];
       const text = quoteSummaryText(current, result);
-      if (raw === "whatsapp") {
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
-        return [{ type: "assistant", id: `a-sent-${round.current}`, text: "Abri o WhatsApp com o resumo. É só escolher o cliente e enviar." }];
-      }
-      void navigator.clipboard?.writeText(text).catch(() => undefined);
-      return [{ type: "assistant", id: `a-copied-${round.current}`, text: `Copiei: "${text}"` }];
+      const copied = await (navigator.clipboard?.writeText(text).then(() => true, () => false) ?? Promise.resolve(false));
+      return [{
+        type: "assistant",
+        id: `a-copied-${round.current}`,
+        text: copied ? `Copiei o resumo: "${text}"` : `Não consegui copiar sozinho. Segura o texto para copiar: "${text}"`,
+      }];
     }
     const next = applyQuoteChoice(current, value);
     if (!next) return [];
@@ -107,6 +107,9 @@ function QuoteConversation({ onRestart }: { onRestart: () => void }) {
         onFreeText={onFreeText}
         progress={waiting === "done" ? null : quoteProgress(answers)}
         placeholder={placeholder}
+        composerInput={waiting === "ages"
+          ? { inputMode: "numeric", label: "Idades de quem vai entrar no plano, separadas por vírgula" }
+          : waiting === "entity" ? { label: "Profissão e entidade de classe" } : undefined}
       />
     </div>
   );
