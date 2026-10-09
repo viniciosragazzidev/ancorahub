@@ -11,6 +11,7 @@ import { AssistantChat } from "@/components/chat/assistant-chat";
 import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
 import { buildInsightsScript } from "@/features/broker-workspace/chat/insights-script";
 import { readLeadIntelligence as readIntelligence } from "@/features/broker-workspace/chat/intelligence";
+import { canRevealLightContact } from "@/features/broker-workspace/lead-contact-privacy";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -72,7 +73,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
   const insights: BrokerConversationInsight[] = [
     ...leads.map((lead) => {
       const messages = (byLead.get(lead.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
-      return { id: lead.id, kind: "lead" as const, name: lead.nome, phone: lead.status === "new" || lead.status === "distributed" ? null : lead.telefone, status: lead.status, href: `/leads/${lead.id}`, firstContactAt: toIso(lead.firstContactAt), serviceStartedAt: toIso(lead.serviceStartedAt), latestMessage: messages.at(-1) ?? null, messages, intelligence: readIntelligence(lead.qualificationDetails) };
+      return { id: lead.id, kind: "lead" as const, name: lead.nome, phone: canRevealLightContact({ status: lead.status, isCurrentBroker: true }) ? lead.telefone : null, status: lead.status, href: `/leads/${lead.id}`, firstContactAt: toIso(lead.firstContactAt), serviceStartedAt: toIso(lead.serviceStartedAt), latestMessage: messages.at(-1) ?? null, messages, intelligence: readIntelligence(lead.qualificationDetails) };
     }),
     ...clients.map((client) => {
       const messages = (byClient.get(client.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
