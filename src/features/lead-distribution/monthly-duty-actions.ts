@@ -196,6 +196,19 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
   const problems = plan.status === "draft" ? findDraftProblems(occurrences, allAssignments) : [];
   // DEC-132: simultaneous occurrences are allowed; they surface as a warning.
   const warnings = plan.status === "draft" ? findDraftOverlaps(occurrences, allAssignments) : [];
+  // Plantões of the draft that no longer exist on their date: publishing leaves them out.
+  const staleLabels: string[] = [];
+  if (plan.status === "draft") {
+    const now = new Date();
+    const active = new Map((await loadActiveSchedules(db, context.tenantId)).map((schedule) => [schedule.id, schedule]));
+    for (const occurrence of occurrences) {
+      if (occurrenceEnded(occurrence, now)) continue;
+      const schedule = active.get(occurrence.scheduleId);
+      if (!schedule || !buildRangeOccurrences(occurrence.dutyDate, occurrence.dutyDate, [schedule], []).length) {
+        staleLabels.push(`${occurrence.scheduleName} ${occurrence.dutyDate.slice(8, 10)}/${occurrence.dutyDate.slice(5, 7)}`);
+      }
+    }
+  }
   const now = new Date();
   const [publishedBefore] = plan.status === "draft"
     ? await db.select({ id: schema.dutyScheduleMonthlyPlans.id }).from(schema.dutyScheduleMonthlyPlans)
@@ -241,7 +254,10 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
     belowMinimum: summary.belowMinimum,
     missingQuota: summary.missingQuota,
     problems: [...new Set(problems.map(describeDraftProblem))],
-    warnings: [...new Set(warnings.map(describeDraftProblem))],
+    warnings: [
+      ...new Set(warnings.map(describeDraftProblem)),
+      ...(staleLabels.length ? [`${staleLabels.length === 1 ? "Este plantão não existe mais" : "Estes plantões não existem mais"} (removido, inativo ou com outra data) e ${staleLabels.length === 1 ? "será ignorado" : "serão ignorados"} ao publicar: ${staleLabels.join(", ")}.`] : []),
+    ],
     canEdit: context.role === "director",
     /** Publishing this draft replaces a published escala on the dates that have not ended. */
     replacesPublished: Boolean(publishedBefore),
@@ -514,12 +530,14 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     const now = new Date();
     const occurrences: MonthlyPlanOccurrence[] = [];
     const endedIds = new Set<string>();
+    const staleIds = new Set<string>();
     let changed = false;
     for (const stored of asArray<MonthlyPlanOccurrence>(plan.occurrences)) {
       if (occurrenceEnded(stored, now)) { endedIds.add(stored.id); continue; }
       const schedule = scheduleById.get(stored.scheduleId);
       const [rebuilt] = schedule ? buildRangeOccurrences(stored.dutyDate, stored.dutyDate, [schedule], brokers) : [];
-      if (!rebuilt) continue; // unknown_occurrence below
+      // The plantão was removed, deactivated or moved to another date: that date is left out.
+      if (!rebuilt) { staleIds.add(stored.id); continue; }
       if (rebuilt.startsAt !== stored.startsAt || rebuilt.endsAt !== stored.endsAt) changed = true;
       // Brokers the Diretor confirmed outside the type's units stay allowed.
       const forced = (stored.forcedBrokerIds ?? []).filter((brokerId) => brokers.some((broker) => broker.id === brokerId));
@@ -532,8 +550,13 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
       });
     }
     // A draft can be days old: shifts that ended since then are dropped, never published.
-    const assignments = storedAssignments.filter((assignment) => !endedIds.has(assignment.occurrenceId));
-    if (!assignments.length) throw new Error("Todos os plantões desta proposta já passaram. Gere uma nova proposta.");
+    const assignments = storedAssignments.filter((assignment) => !endedIds.has(assignment.occurrenceId) && !staleIds.has(assignment.occurrenceId));
+    if (staleIds.size) await audit(tx, context.userId, planId, `duty_schedule_monthly_plan.stale_dropped:${staleIds.size}`);
+    if (!assignments.length) {
+      throw new Error(staleIds.size
+        ? "Os plantões desta proposta não existem mais (removidos, inativos ou com outra data). Gere uma nova proposta."
+        : "Todos os plantões desta proposta já passaram. Gere uma nova proposta.");
+    }
     // DEC-132: an overlap is a warning, never a publish blocker.
     // Weekly roster brokers are not published (no dated row): only the rest is revalidated.
     const problems = findDraftProblems(occurrences, assignments.filter((assignment) => assignment.origin !== "weekly")).filter((problem) => problem.kind !== "overlap");
@@ -609,7 +632,8 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
       insertedFor.push(assignment);
     }
     // What is left was in the published escala but not in this one: off the roster.
-    const removed = [...existingByKey.values()].map((row) => row.id);
+    // A plantão that already started keeps its brokers: nobody leaves the roster mid-shift.
+    const removed = [...existingByKey.values()].filter((row) => !occurrenceStarted({ dutyDate: row.dutyDate, startsAt: row.startsAt }, now)).map((row) => row.id);
     if (removed.length) {
       await tx.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: now })
         .where(inArray(schema.dutyRosterAssignments.id, removed));
