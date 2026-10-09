@@ -25,7 +25,7 @@ import postgres from "postgres";
 import * as XLSX from "xlsx";
 
 import * as schema from "../src/shared/db/schema";
-import { normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "../src/features/lead-distribution/duty-escala-import";
+import { matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "../src/features/lead-distribution/duty-escala-import";
 import {
   buildRangeOccurrences,
   dayOfWeekOf,
@@ -100,6 +100,20 @@ async function main() {
     const { type, brokers } = chosen!;
     const tenantId = type.tenantId;
     const brokerByCode = new Map(brokers.filter((broker) => broker.code).map((broker) => [normalizeBrokerCode(broker.code), broker]));
+    // The sheet may use another numbering: a code not in the CRM is looked up by name (single match only).
+    const sheetNames = new Map(parsed.days.flatMap((day) => day.brokers.map((broker) => [broker.code, broker.name] as const)));
+    const byName: Array<{ code: string; sheetName: string; crmName: string; crmCode: string | null }> = [];
+    const ambiguous: Array<{ code: string; sheetName: string; options: string[] }> = [];
+    for (const [code, sheetName] of sheetNames) {
+      if (brokerByCode.has(code)) continue;
+      const match = matchBrokerByName(sheetName, brokers);
+      if (match.kind === "match") {
+        brokerByCode.set(code, match.candidate);
+        byName.push({ code, sheetName, crmName: match.candidate.name, crmCode: match.candidate.code });
+      } else if (match.kind === "ambiguous") {
+        ambiguous.push({ code, sheetName, options: match.candidates.map((candidate) => `${candidate.name}${candidate.code ? ` (${candidate.code})` : ""}`) });
+      }
+    }
 
     // ---------- actor (who creates the plantões and the draft)
     const userEmail = option("--user");
@@ -150,6 +164,15 @@ async function main() {
     }
     const toCreate = plans.filter((plan) => plan.create);
     console.log(`\nPlantões a criar: ${toCreate.length}${toCreate.length ? ` (${toCreate.map((plan) => short(plan.date)).join(", ")})` : ""}`);
+    if (byName.length) {
+      console.log(`
+Encontrados PELO NOME (o código da planilha não é o do CRM): ${byName.length}. Confira:`);
+      for (const item of byName) console.log(`  ~ ${item.code} - ${item.sheetName}  =>  ${item.crmName} (código no CRM: ${item.crmCode ?? "sem código"})`);
+    }
+    if (ambiguous.length) {
+      console.log(`Nome com mais de um corretor possível (ficam de fora): ${ambiguous.length}`);
+      for (const item of ambiguous) console.log(`  ? ${item.code} - ${item.sheetName}: ${item.options.join(" | ")}`);
+    }
     if (unknownCodes.length) {
       console.log(`Corretores da planilha não encontrados pelo código (ficam de fora): ${unknownCodes.length}`);
       for (const code of unknownCodes) console.log(`  ? ${code} - ${nameOfCode.get(code) ?? ""}`);

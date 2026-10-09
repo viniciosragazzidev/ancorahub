@@ -62,3 +62,31 @@ export function seatsByBroker(days: readonly ImportedDay[]) {
   for (const day of days) for (const broker of day.brokers) seats.set(broker.code, (seats.get(broker.code) ?? 0) + 1);
   return seats;
 }
+
+const NAME_STOPWORDS = new Set(["da", "de", "do", "das", "dos", "e"]);
+const nameTokens = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z\s]/g, " ").split(/\s+/).filter((token) => token && !NAME_STOPWORDS.has(token));
+
+export type NameMatch<T> = { kind: "match"; candidate: T } | { kind: "ambiguous"; candidates: T[] } | { kind: "none" };
+
+/**
+ * Finds a broker by name when the sheet code is not the CRM code. Every word
+ * of the sheet name must start a word of the CRM name, in order (the sheet
+ * cuts long names: "ANGELA CRISTINA DOS SANTO" -> "Angela Cristina dos Santos").
+ * Only a single candidate counts as a match.
+ */
+export function matchBrokerByName<T extends { name: string }>(sheetName: string, candidates: readonly T[]): NameMatch<T> {
+  const wanted = nameTokens(sheetName);
+  if (wanted.length < 2) return { kind: "none" };
+  const hits = candidates.filter((candidate) => {
+    const tokens = nameTokens(candidate.name);
+    let position = 0;
+    for (const word of wanted) {
+      while (position < tokens.length && !tokens[position].startsWith(word)) position += 1;
+      if (position >= tokens.length) return false;
+      position += 1;
+    }
+    return true;
+  });
+  if (hits.length === 1) return { kind: "match", candidate: hits[0] };
+  return hits.length ? { kind: "ambiguous", candidates: hits } : { kind: "none" };
+}

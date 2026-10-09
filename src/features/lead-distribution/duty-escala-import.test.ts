@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { excelSerialToDate, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "./duty-escala-import";
+import { excelSerialToDate, matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "./duty-escala-import";
 
 // 2026-10-08 = 46303, 2026-10-09 = 46304 (Excel 1900 serials).
 const sheet: unknown[][] = [
@@ -42,5 +42,24 @@ describe("parseEscalaSheet", () => {
     expect(normalizeBrokerCode("0406")).toBe("406");
     expect(normalizeBrokerCode("0")).toBe("0");
     expect(() => parseEscalaSheet([["x"]])).toThrow(/Dias/);
+  });
+});
+
+describe("matchBrokerByName", () => {
+  const crm = [
+    { id: "a", name: "Angela Cristina dos Santos Lima" },
+    { id: "b", name: "Jorge Oscar Maia" },
+    { id: "c", name: "Cristiane Marques" },
+    { id: "d", name: "Cristiane Marques Souza" },
+    { id: "e", name: "Roberta Olímpio Ferreira" },
+  ];
+  it("matches a cut name, ignoring accents and connectors", () => {
+    expect(matchBrokerByName("ANGELA CRISTINA DOS SANTO", crm)).toEqual({ kind: "match", candidate: crm[0] });
+    expect(matchBrokerByName("ROBERTA OLIMPIO FERREIRA", crm)).toEqual({ kind: "match", candidate: crm[4] });
+  });
+  it("never guesses between two brokers or from a single word", () => {
+    expect(matchBrokerByName("CRISTIANE MARQUES", crm).kind).toBe("ambiguous");
+    expect(matchBrokerByName("JORGE", crm).kind).toBe("none");
+    expect(matchBrokerByName("JORGE SILVA", crm).kind).toBe("none");
   });
 });
