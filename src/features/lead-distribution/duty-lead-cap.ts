@@ -28,7 +28,7 @@ export async function countLeadsReceivedInDuty(db: Database, tenantId: string, c
   const rows = await db
     .select({ brokerId: schema.leads.corretorId, leadId: schema.leads.id, dutyScheduleId: schema.leads.dutyScheduleId })
     .from(schema.leads)
-    .innerJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
+    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, schema.leads.tenantId)))
     .where(and(
       eq(schema.leads.tenantId, tenantId),
       inArray(schema.leads.corretorId, [...brokerIds]),
@@ -37,8 +37,14 @@ export async function countLeadsReceivedInDuty(db: Database, tenantId: string, c
       lt(schema.leads.assignedAt, cap.endsAt),
       isNull(schema.leads.deletedAt),
       or(
-        eq(schema.leadQueues.exclusiveDutyScheduleId, cap.scheduleId),
-        sql`${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([cap.scheduleId])}::jsonb`,
+        eq(schema.leads.dutyScheduleId, cap.scheduleId),
+        and(
+          isNull(schema.leads.dutyScheduleId),
+          or(
+            eq(schema.leadQueues.exclusiveDutyScheduleId, cap.scheduleId),
+            sql`${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([cap.scheduleId])}::jsonb`,
+          ),
+        ),
       ),
     ));
   return countDutyLeadsByBroker(rows, cap.scheduleId);

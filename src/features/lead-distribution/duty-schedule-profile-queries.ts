@@ -69,6 +69,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`,
       brokerId: schema.dutyRosterAssignments.brokerId,
       brokerName: schema.user.name,
+      branchName: schema.branches.name,
       internalCode: schema.brokerProfiles.internalCode,
       phone: schema.brokerProfiles.phone,
       userActive: schema.user.active,
@@ -86,7 +87,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     .innerJoin(schema.user, eq(schema.dutyRosterAssignments.brokerId, schema.user.id))
     .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, context.tenantId)))
     .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.user.id), eq(schema.tenantMemberships.tenantId, context.tenantId)))
-    .where(and(eq(schema.dutyRosterAssignments.scheduleId, scheduleId), eq(schema.dutyRosterAssignments.status, "active")))
+    .leftJoin(schema.branches, and(eq(schema.branches.id, schema.tenantMemberships.branchId), eq(schema.branches.tenantId, context.tenantId)))
+    .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.scheduleId, scheduleId), eq(schema.dutyRosterAssignments.status, "active")))
     .orderBy(asc(schema.user.name));
 
   const linkedQueues = await db
@@ -252,8 +254,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
 
   // Every lead routed through this plantão's queues — waiting, offered,
   // distributed or in service — not only the ones already with a rostered broker.
-  const queriedLeads = queueIds.length
-    ? await db
+  const queriedLeads = await db
       .select({
         id: schema.leads.id,
         externalId: schema.leads.externalId,
@@ -292,8 +293,13 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       .leftJoin(schema.leadQueues, eq(schema.leads.queueId, schema.leadQueues.id))
       .where(and(
         eq(schema.leads.tenantId, context.tenantId),
-        inArray(schema.leads.queueId, queueIds),
-        hasOverlappingSiblingSchedule ? or(eq(schema.leads.dutyScheduleId, scheduleId), isNull(schema.leads.dutyScheduleId)) : undefined,
+        or(
+          and(
+            queueIds.length ? inArray(schema.leads.queueId, queueIds) : sql`false`,
+            hasOverlappingSiblingSchedule ? or(eq(schema.leads.dutyScheduleId, scheduleId), isNull(schema.leads.dutyScheduleId)) : undefined,
+          ),
+          eq(schema.leads.dutyScheduleId, scheduleId),
+        ),
         or(
           and(gte(schema.leads.createdAt, since), until ? lte(schema.leads.createdAt, until) : undefined),
           and(gte(schema.leads.assignedAt, since), until ? lte(schema.leads.assignedAt, until) : undefined),
@@ -305,7 +311,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       ))
       .orderBy(desc(schema.leads.createdAt))
       .limit(DUTY_PROFILE_LEADS_LIMIT)
-    : [];
+    ;
 
   // Leads taken "para investigação" by a director/manager leave the plantão list.
   const investigationOwnerIds = [...new Set(queriedLeads.filter((lead) => lead.status === "under_analysis" && lead.corretorId).map((lead) => lead.corretorId!))];
@@ -416,6 +422,25 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         ),
       ))
     : [];
+  const recentAssignmentRows = brokerIds.length
+    ? await db.select({ brokerId: schema.leads.corretorId, assignedAt: schema.leads.assignedAt })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        inArray(schema.leads.corretorId, brokerIds),
+        or(statusQueues.length ? inArray(schema.leads.queueId, statusQueues.map((queue) => queue.id)) : sql`false`, eq(schema.leads.dutyScheduleId, scheduleId)),
+        gte(schema.leads.assignedAt, new Date(now.getTime() - lookbackMinutes * 60_000)),
+        lte(schema.leads.assignedAt, now),
+        isNull(schema.leads.deletedAt),
+        isNull(schema.leads.archivedAt),
+      ))
+    : [];
+  const assignmentAtByBroker = new Map<string, Date>();
+  for (const row of recentAssignmentRows) {
+    if (!row.brokerId || !row.assignedAt) continue;
+    const current = assignmentAtByBroker.get(row.brokerId);
+    if (!current || row.assignedAt > current) assignmentAtByBroker.set(row.brokerId, row.assignedAt);
+  }
   const offersByBrokerQueue = new Map<string, typeof recentOfferRows>();
   for (const offer of recentOfferRows) {
     const key = `${offer.brokerId}:${offer.queueId}`;
@@ -445,6 +470,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
         activeLeads: leadsPerBroker.get(entry.brokerId) ?? 0,
         pacing: queue ? pacingByQueue.get(queue.id) ?? pacing : pacing,
         offers: queue ? offersByBrokerQueue.get(`${entry.brokerId}:${queue.id}`) ?? [] : [],
+        lastAssignedAt: assignmentAtByBroker.get(entry.brokerId) ?? null,
         now,
       })));
       return {

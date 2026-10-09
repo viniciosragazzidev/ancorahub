@@ -22,8 +22,10 @@ export async function getDutyOccurrenceHistory(
     brokerId: schema.dutyRosterAssignments.brokerId,
     brokerName: schema.user.name,
     branchId: schema.dutyRosterAssignments.branchId,
+    branchName: schema.branches.name,
   }).from(schema.dutyRosterAssignments)
     .innerJoin(schema.user, eq(schema.dutyRosterAssignments.brokerId, schema.user.id))
+    .leftJoin(schema.branches, and(eq(schema.branches.id, schema.dutyRosterAssignments.branchId), eq(schema.branches.tenantId, context.tenantId)))
     .where(and(
       eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
       eq(schema.dutyRosterAssignments.scheduleId, scheduleId),
@@ -171,10 +173,38 @@ export async function getDutyOccurrenceHistory(
     })),
   ].sort((first, second) => first.assignedAt.getTime() - second.assignedAt.getTime()).slice(0, HISTORY_LIMIT);
 
+  // Leads per broker in this occurrence (each lead once per broker), with the
+  // broker's unit. Who received a lead without being on the roster still shows.
+  const leadsByBroker = new Map<string, Set<string>>();
+  for (const entry of distributions) leadsByBroker.set(entry.brokerId, (leadsByBroker.get(entry.brokerId) ?? new Set()).add(entry.leadId));
+  const rosterIds = new Set(roster.map((entry) => entry.brokerId));
+  const outsiders = [...leadsByBroker.keys()].filter((brokerId) => !rosterIds.has(brokerId));
+  const outsiderRows = outsiders.length
+    ? await db.select({ brokerId: schema.tenantMemberships.userId, branchName: schema.branches.name })
+      .from(schema.tenantMemberships)
+      .leftJoin(schema.branches, and(eq(schema.branches.id, schema.tenantMemberships.branchId), eq(schema.branches.tenantId, context.tenantId)))
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), inArray(schema.tenantMemberships.userId, outsiders)))
+    : [];
+  const outsiderBranch = new Map(outsiderRows.map((row) => [row.brokerId, row.branchName]));
+  const seenBrokers = new Set<string>();
+  const brokers = [
+    ...roster.filter((entry) => !seenBrokers.has(entry.brokerId) && seenBrokers.add(entry.brokerId)).map((entry) => ({
+      brokerId: entry.brokerId, brokerName: entry.brokerName, branchName: entry.branchName ?? null,
+      leads: leadsByBroker.get(entry.brokerId)?.size ?? 0, onRoster: true,
+    })),
+    ...outsiders.map((brokerId) => ({
+      brokerId,
+      brokerName: distributions.find((entry) => entry.brokerId === brokerId)?.brokerName ?? "Corretor",
+      branchName: outsiderBranch.get(brokerId) ?? null,
+      leads: leadsByBroker.get(brokerId)?.size ?? 0,
+      onRoster: false,
+    })),
+  ].sort((a, b) => b.leads - a.leads || a.brokerName.localeCompare(b.brokerName, "pt-BR"));
+
   await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_occurrence", entidadeId: `${scheduleId}:${window.dutyDate}`, acao: "duty_occurrence_history.viewed" });
 
   return {
-    roster, distributions,
+    roster, distributions, brokers,
     offers: { total: offers.length, accepted: offers.filter((row) => row.status === "ACCEPTED").length, declined: offers.filter((row) => row.status === "DECLINED").length, expired: offers.filter((row) => row.status === "EXPIRED").length },
     confirmations: { total: presenceRows.length, confirmed: presenceRows.filter((row) => row.status === "confirmed").length },
     truncated: offers.length > HISTORY_LIMIT || manualEvents.length > HISTORY_LIMIT || offerEvents.length > HISTORY_LIMIT,

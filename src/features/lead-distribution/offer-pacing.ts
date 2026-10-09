@@ -46,7 +46,7 @@ export function isOfferPacingEnabled(config: OfferPacingConfig) {
  * `offers` are the broker's offers in the queue. CANCELLED offers never count:
  * they are technical failures (no phone, send error), not contact with the broker.
  */
-export function evaluateBrokerOfferPacing(offers: PacingOffer[], config: OfferPacingConfig, now: Date = new Date()): OfferPacingDecision {
+export function evaluateBrokerOfferPacing(offers: PacingOffer[], config: OfferPacingConfig, now: Date = new Date(), lastAssignedAt: Date | null = null): OfferPacingDecision {
   let retryAt: Date | null = null;
   let rule: "interval" | "pending" | null = null;
   const keepLater = (candidate: Date, candidateRule: "interval" | "pending") => {
@@ -58,8 +58,9 @@ export function evaluateBrokerOfferPacing(offers: PacingOffer[], config: OfferPa
 
   const counted = offers.filter((offer) => offer.status !== "CANCELLED");
 
-  if (config.intervalMinutes > 0 && counted.length) {
-    const newest = counted.reduce((latest, offer) => (offer.offeredAt > latest ? offer.offeredAt : latest), counted[0].offeredAt);
+  if (config.intervalMinutes > 0 && (counted.length || lastAssignedAt)) {
+    const newestOfferAt = counted.reduce<Date | null>((latest, offer) => !latest || offer.offeredAt > latest ? offer.offeredAt : latest, null);
+    const newest = lastAssignedAt && (!newestOfferAt || lastAssignedAt > newestOfferAt) ? lastAssignedAt : newestOfferAt!;
     const releasedAt = new Date(newest.getTime() + config.intervalMinutes * 60_000);
     if (releasedAt > now) keepLater(releasedAt, "interval");
   }

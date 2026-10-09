@@ -88,6 +88,15 @@ describe("evaluateBrokerOfferPacing", () => {
     expect(evaluateBrokerOfferPacing(offers, { intervalMinutes: 0, maxPending: 0 }, now).allowed).toBe(true);
   });
 
+  it("applies cooldown after a manual assignment without an offer row", () => {
+    expect(evaluateBrokerOfferPacing([], config, now, minutes(-1))).toEqual({ allowed: false, retryAt: minutes(4), rule: "interval" });
+  });
+
+  it("uses the latest of an offer and a manual assignment", () => {
+    expect(evaluateBrokerOfferPacing([{ status: "ACCEPTED", offeredAt: minutes(-5), expiresAt: minutes(-4) }], config, now, minutes(-2)))
+      .toEqual({ allowed: false, retryAt: minutes(3), rule: "interval" });
+  });
+
   it("simulates a released backlog: 5 brokers receive one lead per interval, never a burst", () => {
     const brokers = ["a", "b", "c", "d", "e"];
     const history = new Map<string, Array<{ status: string; offeredAt: Date; expiresAt: Date }>>(brokers.map((id) => [id, []]));

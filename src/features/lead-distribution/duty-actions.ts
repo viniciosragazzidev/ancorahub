@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -15,6 +15,8 @@ import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history
 import { getRelevantDutyWindow } from "./duty-presence-domain";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
+import { assignLeadToBroker } from "./service";
+import { getSystemSetting } from "@/features/system-settings/queries";
 
 export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
 
@@ -619,7 +621,6 @@ export async function getBrokerOccurrenceLeadsAction(scheduleId: string, brokerI
     const profile = await getDutyScheduleProfile(context, parsedScheduleId);
     if (!profile.roster.some((entry) => entry.brokerId === parsedBrokerId)) return { ok: false as const, reason: "Corretor não está nesta ocorrência." };
     const queueIds = profile.linkedQueues.map((queue) => queue.id);
-    if (!queueIds.length) return { ok: true as const, leads: [] };
     const now = new Date();
     const reference = profile.leadsUpcomingStartsAt ?? profile.leadsUntil ?? now;
     const dutyDate = new Intl.DateTimeFormat("en-CA", { timeZone: profile.schedule.timezone }).format(reference);
@@ -635,11 +636,97 @@ export async function getBrokerOccurrenceLeadsAction(scheduleId: string, brokerI
       .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, parsedBrokerId), or(
         eq(schema.leads.dutyScheduleId, parsedScheduleId),
         inferredLegacyLeadIds.length ? inArray(schema.leads.id, inferredLegacyLeadIds) : sql`false`,
-      ), inArray(schema.leads.queueId, queueIds), gte(schema.leads.assignedAt, lower), upper ? lt(schema.leads.assignedAt, upper) : undefined, isNull(schema.leads.deletedAt)))
+      ), or(
+        eq(schema.leads.dutyScheduleId, parsedScheduleId),
+        queueIds.length ? and(inArray(schema.leads.queueId, queueIds), inferredLegacyLeadIds.length ? inArray(schema.leads.id, inferredLegacyLeadIds) : sql`false`) : sql`false`,
+      ), gte(schema.leads.assignedAt, lower), upper ? lt(schema.leads.assignedAt, upper) : undefined, isNull(schema.leads.deletedAt)))
       .orderBy(schema.leads.assignedAt);
     return { ok: true as const, leads: rows.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null })) };
   } catch (error) {
     return { ok: false as const, reason: error instanceof Error ? error.message : "Não foi possível carregar os leads." };
+  }
+}
+
+function availableDutyLeadConditions(context: Awaited<ReturnType<typeof getRequiredTenantContext>>, queueIds: string[]) {
+  return and(
+    eq(schema.leads.tenantId, context.tenantId),
+    inArray(schema.leads.queueId, queueIds),
+    isNull(schema.leads.corretorId),
+    inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
+    or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
+    or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "meta_blocked")),
+    or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
+    or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
+    isNull(schema.leads.distributionRemovedAt),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
+    context.role === "manager" ? context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false` : undefined,
+  );
+}
+
+export async function getDutyAvailableLeadsAction(scheduleId: string): Promise<
+  | { ok: true; leads: Array<{ id: string; name: string; phone: string | null; queueName: string | null; temperature: string | null; createdAt: string }> }
+  | { ok: false; reason: string }
+> {
+  try {
+    const parsedScheduleId = z.string().uuid().safeParse(scheduleId);
+    if (!parsedScheduleId.success) return { ok: false, reason: "Plantão inválido." };
+    const { context, db, schedule } = await findScheduleForMutation(parsedScheduleId.data);
+    if (schedule.status !== "active") return { ok: false, reason: "Plantão inativo." };
+    const profile = await getDutyScheduleProfile(context, parsedScheduleId.data);
+    const queueIds = profile.linkedQueues.map((queue) => queue.id);
+    if (!queueIds.length) return { ok: true, leads: [] };
+    const rows = await db.select({
+      id: schema.leads.id,
+      name: schema.leads.nome,
+      phone: schema.leads.telefone,
+      queueName: schema.leadQueues.name,
+      temperature: schema.leads.qualificationStatus,
+      createdAt: schema.leads.createdAt,
+    }).from(schema.leads)
+      .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
+      .where(availableDutyLeadConditions(context, queueIds))
+      .orderBy(asc(schema.leads.createdAt))
+      .limit(100);
+    return { ok: true, leads: rows.map((lead) => ({
+      ...lead,
+      temperature: ["hot", "warm", "cold"].includes(lead.temperature ?? "") ? lead.temperature : null,
+      createdAt: lead.createdAt.toISOString(),
+    })) };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível carregar os leads." };
+  }
+}
+
+export async function assignDutyLeadToBrokerAction(scheduleId: string, brokerId: string, leadId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const parsed = z.object({ scheduleId: z.string().uuid(), brokerId: z.string().uuid(), leadId: z.string().uuid() }).safeParse({ scheduleId, brokerId, leadId });
+    if (!parsed.success) return { ok: false, reason: "Seleção inválida." };
+    const { context, db, schedule } = await findScheduleForMutation(parsed.data.scheduleId);
+    if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") {
+      return { ok: false, reason: "Ações de gestão desativadas pelo Super-admin." };
+    }
+    if (schedule.status !== "active") return { ok: false, reason: "Plantão inativo." };
+    const profile = await getDutyScheduleProfile(context, parsed.data.scheduleId);
+    const rosterEntry = profile.roster.find((entry) => entry.brokerId === parsed.data.brokerId);
+    if (!rosterEntry) return { ok: false, reason: "Corretor fora da escala." };
+    // A manual lead never goes around the occurrence: absent or paused brokers do not receive.
+    if (rosterEntry.absent) return { ok: false, reason: "Corretor com falta neste plantão." };
+    if (rosterEntry.pausedAt || rosterEntry.onSitePending) return { ok: false, reason: "Corretor pausado neste plantão. Retome antes de atribuir." };
+    const queueIds = profile.linkedQueues.map((queue) => queue.id);
+    if (!queueIds.length) return { ok: false, reason: "Plantão sem fila vinculada." };
+    const [lead] = await db.select({ id: schema.leads.id }).from(schema.leads)
+      .where(and(eq(schema.leads.id, parsed.data.leadId), availableDutyLeadConditions(context, queueIds)))
+      .limit(1);
+    if (!lead) return { ok: false, reason: "Lead não está disponível neste plantão." };
+    const result = await assignLeadToBroker(context, parsed.data.leadId, parsed.data.brokerId, undefined, "Atribuição manual no plantão", undefined, undefined, {
+      skipBrokerWhatsApp: true,
+      requireUnassigned: true,
+      dutyScheduleId: parsed.data.scheduleId,
+    });
+    return result.status === "assigned" ? { ok: true } : { ok: false, reason: result.reason };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível atribuir o lead." };
   }
 }
 

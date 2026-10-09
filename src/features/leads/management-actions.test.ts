@@ -31,7 +31,7 @@ const state = vi.hoisted(() => {
     archivedAt: null as Date | null,
     deletedAt: null as Date | null,
   };
-  const controls = { enabled: true, conflict: false, postSale: false };
+  const controls = { enabled: true, conflict: false, postSale: false, dutyRoster: false };
   const db = {
     select: vi.fn(() => ({
       from: vi.fn((table: unknown) => ({
@@ -91,7 +91,7 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: vi.fn(async () => state.controls.enabled ? "true" : "false") }));
-vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ getActiveQueueDutyRoster: vi.fn(async () => ({ hasActiveDuty: false, brokers: [] })) }));
+vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ getActiveQueueDutyRoster: vi.fn(async () => state.controls.dutyRoster ? ({ hasActiveDuty: true, brokers: [{ id: "00000000-0000-4000-8000-000000000003", scheduleId: "00000000-0000-4000-8000-000000000009", branchId: "00000000-0000-4000-8000-000000000004" }] }) : ({ hasActiveDuty: false, brokers: [] })) }));
 vi.mock("@/features/lead-distribution/service", () => ({ ensureDefaultQueue: vi.fn(async (_tenantId: string, branchId: string) => `queue-${branchId}`), offerLeadToBrokerManually: vi.fn(), routeLeadToBranch: vi.fn() }));
 vi.mock("@/features/lead-distribution/post-sale-transfer", () => ({
   findPostSaleExemptionQueueName: vi.fn(async () => state.controls.postSale ? "Pós Venda" : null),
@@ -160,7 +160,7 @@ describe("manual service reassignment", () => {
     vi.clearAllMocks();
     state.updates.length = 0;
     state.inserts.length = 0;
-    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false });
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false });
     Object.assign(state.lead, { corretorId: "00000000-0000-4000-8000-000000000002", status: "in_contact", distributionStatus: "assigned", firstContactAt: new Date("2026-09-25T10:00:00Z"), serviceStartedAt: new Date("2026-09-25T10:00:00Z"), archivedAt: null, deletedAt: null });
   });
   function reassignmentForm() {
@@ -182,6 +182,17 @@ describe("manual service reassignment", () => {
     expect(state.inserts.some(i => i.table === state.schema.leadInteractions)).toBe(true);
     expect(state.inserts.some(i => i.table === state.schema.auditLogs)).toBe(true);
     expect(state.updates.every(u => u.table === state.schema.leads || u.table === state.schema.leadAssignmentAttempts)).toBe(true);
+  });
+  it("persists dutyScheduleId on the new assignment attempt for a duty reassignment", async () => {
+    state.controls.dutyRoster = true;
+    const data = reassignmentForm();
+    data.set("dutyScheduleId", "00000000-0000-4000-8000-000000000009");
+
+    const result = await reassignLeadAction({}, data);
+
+    expect(result).toMatchObject({ success: true });
+    expect(state.inserts.find((insert) => insert.table === state.schema.leadAssignmentAttempts)?.values)
+      .toMatchObject({ dutyScheduleId: "00000000-0000-4000-8000-000000000009" });
   });
   it.each(["lost", "converted"])("rejects an ended lead (%s) outside Pós Venda", async (status) => {
     state.lead.status = status;

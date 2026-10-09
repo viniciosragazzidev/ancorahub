@@ -480,7 +480,7 @@ export async function routeLeadToBranchAndAssignBroker(
     : { status: "conflict", leadId, reason: "Este lead já foi atribuído. Atualize a fila." };
 }
 
-export async function assignLeadToBroker(context: TenantContext, leadId: string, brokerId: string, source?: AssignmentSource, reason = "Atribuição manual", excludeBrokerId?: string | null, targetBranchId?: string, options?: { skipBrokerWhatsApp?: boolean; requireUnassigned?: boolean; manualTransferOverride?: boolean }): Promise<LeadAssignmentResult> {
+export async function assignLeadToBroker(context: TenantContext, leadId: string, brokerId: string, source?: AssignmentSource, reason = "Atribuição manual", excludeBrokerId?: string | null, targetBranchId?: string, options?: { skipBrokerWhatsApp?: boolean; requireUnassigned?: boolean; manualTransferOverride?: boolean; dutyScheduleId?: string }): Promise<LeadAssignmentResult> {
   if (!canManage(context)) throw new AuthorizationError("Apenas Gestores e Diretores podem atribuir leads.");
   const db = getDatabase();
   const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, branchId: schema.leads.branchId, queueId: schema.leads.queueId, webhookCredentialId: schema.leads.webhookCredentialId, corretorId: schema.leads.corretorId, distributionOrigin: schema.leads.distributionOrigin, status: schema.leads.status, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, archivedAt: schema.leads.archivedAt }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.archivedAt), isNull(schema.leads.deletedAt))).limit(1);
@@ -520,10 +520,18 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
   const assignmentQueueId = options?.manualTransferOverride
     ? await ensureDefaultQueue(context.tenantId, assignmentBranchId, context.userId)
     : lead.queueId;
-  const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), postSaleExempt ? undefined : eq(schema.tenantMemberships.branchId, assignmentBranchId), eq(schema.tenantMemberships.role, "broker"), postSaleExempt ? undefined : eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), !postSaleExempt && !options?.manualTransferOverride ? eq(schema.tenantMemberships.availabilityStatus, "available") : undefined, eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
+  const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id)).where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, brokerId), postSaleExempt || options?.dutyScheduleId ? undefined : eq(schema.tenantMemberships.branchId, assignmentBranchId), eq(schema.tenantMemberships.role, "broker"), postSaleExempt || options?.dutyScheduleId ? undefined : eq(schema.tenantMemberships.jobTitle, "broker"), eq(schema.tenantMemberships.status, "active"), !postSaleExempt && !options?.manualTransferOverride && !options?.dutyScheduleId ? eq(schema.tenantMemberships.availabilityStatus, "available") : undefined, eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
   if (!broker) return { status: "conflict", leadId, reason: "O corretor não está elegível nesta unidade." };
+  if (options?.dutyScheduleId) {
+    const [roster] = await db.select({ assignmentId: schema.dutyRosterAssignments.id, legacyQueueId: schema.unitDutySchedules.queueId }).from(schema.dutyRosterAssignments)
+      .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
+      .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.scheduleId, options.dutyScheduleId), eq(schema.dutyRosterAssignments.brokerId, brokerId), eq(schema.dutyRosterAssignments.status, "active"), eq(schema.unitDutySchedules.tenantId, context.tenantId), eq(schema.unitDutySchedules.status, "active"))).limit(1);
+    const [linkedQueue] = lead.queueId ? await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt), or(eq(schema.leadQueues.exclusiveDutyScheduleId, options.dutyScheduleId), sql`${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([options.dutyScheduleId])}::jsonb`))).limit(1) : [];
+    if (!roster) return { status: "conflict", leadId, reason: "Corretor fora da escala." };
+    if (!linkedQueue && roster.legacyQueueId !== lead.queueId) return { status: "conflict", leadId, reason: "A fila não está vinculada ao plantão." };
+  }
   const activeDutyRoster = !options?.manualTransferOverride && !postSaleExempt && assignmentQueueId ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: assignmentQueueId, webhookCredentialId: lead.webhookCredentialId, respectDutyCap: false, includePaused: true }) : null;
-  const dutyScheduleId = options?.manualTransferOverride ? null : activeDutyRoster?.brokers.find((candidate) => candidate.id === brokerId)?.scheduleId ?? null;
+  const dutyScheduleId = options?.manualTransferOverride ? null : options?.dutyScheduleId ?? activeDutyRoster?.brokers.find((candidate) => candidate.id === brokerId)?.scheduleId ?? null;
   if (excludeBrokerId && brokerId === excludeBrokerId) return { status: "conflict", leadId, reason: "O corretor que perdeu o SLA não pode receber este lead novamente." };
   const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
   const assignedAt = new Date();
@@ -1240,7 +1248,23 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (pacing && lead.queueId && isOfferPacingEnabled(pacing)) {
     const pacingNow = new Date();
     const recentOffers = await loadBrokerPacingOffers(db, { tenantId: context.tenantId, queueId: lead.queueId, brokerIds: ids, intervalMinutes: pacing.intervalMinutes, now: pacingNow });
-    for (const brokerId of ids) pacingDecisions.set(brokerId, evaluateBrokerOfferPacing(recentOffers.get(brokerId) ?? [], pacing, pacingNow));
+    const scheduleIds = [...new Set(scheduleIdByBroker.values())];
+    const recentAssignments = await db.select({ brokerId: schema.leads.corretorId, dutyScheduleId: schema.leads.dutyScheduleId, queueId: schema.leads.queueId, assignedAt: schema.leads.assignedAt }).from(schema.leads).where(and(
+      eq(schema.leads.tenantId, context.tenantId),
+      inArray(schema.leads.corretorId, ids),
+      or(lead.queueId ? eq(schema.leads.queueId, lead.queueId) : sql`false`, scheduleIds.length ? inArray(schema.leads.dutyScheduleId, scheduleIds) : sql`false`),
+      gte(schema.leads.assignedAt, new Date(pacingNow.getTime() - pacing.intervalMinutes * 60_000)),
+      lte(schema.leads.assignedAt, pacingNow),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+    ));
+    const lastAssignedAtByBroker = new Map<string, Date>();
+    for (const row of recentAssignments) {
+      if (!row.brokerId || !row.assignedAt || (row.queueId !== lead.queueId && row.dutyScheduleId !== scheduleIdByBroker.get(row.brokerId))) continue;
+      const current = lastAssignedAtByBroker.get(row.brokerId);
+      if (!current || row.assignedAt > current) lastAssignedAtByBroker.set(row.brokerId, row.assignedAt);
+    }
+    for (const brokerId of ids) pacingDecisions.set(brokerId, evaluateBrokerOfferPacing(recentOffers.get(brokerId) ?? [], pacing, pacingNow, lastAssignedAtByBroker.get(brokerId) ?? null));
   }
   const pacedOut = candidates.filter((candidate) => pacingDecisions.get(candidate.id)?.allowed === false);
   const paceableCandidates = pacedOut.length ? candidates.filter((candidate) => pacingDecisions.get(candidate.id)?.allowed !== false) : candidates;

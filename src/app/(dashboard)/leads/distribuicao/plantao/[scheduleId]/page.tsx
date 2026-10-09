@@ -52,8 +52,9 @@ const historyDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZo
 function historyDateLabel(value: string) { return historyDate.format(new Date(`${value}T12:00:00Z`)); }
 
 function DutyProfileHeader({
-  name, state, stateTone, description, details,
+  name, state, stateTone, description, details, actions,
 }: {
+  actions?: React.ReactNode;
   name: string;
   state: string;
   stateTone: "success" | "info" | "secondary" | "outline";
@@ -64,6 +65,7 @@ function DutyProfileHeader({
     <div className="flex flex-wrap items-center gap-2">
       <h1 className="min-w-0 text-xl font-semibold tracking-tight sm:text-2xl">{name}</h1>
       <Badge variant={stateTone}>{state}</Badge>
+      {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
     </div>
     <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">{description}</p>
     <div className="mt-4 flex flex-wrap gap-2" aria-label="Informações do plantão">
@@ -103,6 +105,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     ? await getDutyOccurrenceHistory(context, schedule.id, linkedQueues.map((queue) => queue.id), historicalWindow)
     : null;
   if (historicalWindow && occurrenceHistory) {
+    const canExportHistory = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
     return <>
       <DashboardHeader breadcrumb="Distribuição · Plantões" title={schedule.name} rightSlot={<Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>} />
       <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
@@ -111,6 +114,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
           state="Terminado"
           stateTone="secondary"
           description="Este turno foi encerrado. Consulte a distribuição, as ofertas e os corretores escalados sem alterar o plantão."
+          actions={canExportHistory ? <Button render={<a href={`/api/reports/duty-schedule/${schedule.id}?data=${historicalWindow.dutyDate}`} download />} size="sm" variant="outline" className="gap-1.5"><Download className="size-3.5" aria-hidden="true" /> Gerar relatório</Button> : null}
           details={[
             historyDateLabel(historicalWindow.dutyDate),
             `${timeOnly.format(historicalWindow.startsAt)}–${timeOnly.format(historicalWindow.endsAt)}`,
@@ -151,9 +155,17 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             icon={<Users />}
             title="Corretores escalados"
             badge={<Badge variant="secondary">{occurrenceHistory.roster.length}</Badge>}
-            description="Vínculos válidos nesta data; alterações posteriores podem limitar a reconstituição de turnos antigos."
+            description="Leads recebidos por corretor neste turno. Vínculos válidos nesta data; alterações posteriores podem limitar a reconstituição de turnos antigos."
           />
-          <CardContent className="flex flex-wrap gap-2 pt-4">{occurrenceHistory.roster.length ? occurrenceHistory.roster.map((entry) => <span key={entry.id} className="rounded-[var(--radius-card)] border border-border px-2.5 py-1"><BrokerDayHistoryTrigger scheduleId={schedule.id} brokerId={entry.brokerId} brokerName={entry.brokerName} dutyDate={historicalWindow.dutyDate} /></span>) : <p className="text-sm text-muted-foreground">Nenhum vínculo de escala encontrado para esta data.</p>}</CardContent>
+          <CardContent className="pt-4">{occurrenceHistory.brokers.length ? <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">{occurrenceHistory.brokers.map((entry) => (
+            <div key={entry.brokerId} className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 px-3 py-2">
+              <div className="min-w-0">
+                <BrokerDayHistoryTrigger scheduleId={schedule.id} brokerId={entry.brokerId} brokerName={entry.brokerName} dutyDate={historicalWindow.dutyDate} />
+                <p className="truncate text-xs text-muted-foreground">{entry.branchName ?? "Sem unidade"}{entry.onRoster ? "" : " · fora da escala (recebeu lead)"}</p>
+              </div>
+              <Badge variant={entry.leads ? "info" : "outline"} className="shrink-0 tabular-nums" title="Leads recebidos neste turno">{entry.leads} {entry.leads === 1 ? "lead" : "leads"}</Badge>
+            </div>
+          ))}</div> : <p className="text-sm text-muted-foreground">Nenhum vínculo de escala encontrado para esta data.</p>}</CardContent>
         </Card>
       </main>
     </>;
@@ -514,7 +526,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 ]).map((group) => <section key={group.key} aria-label={group.label} className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground">{group.label} <Badge variant="outline">{group.entries.length}</Badge></h4>
                   {group.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{group.entries.map((entry) => (
-              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={schedule.attendanceMode} onSitePending={entry.onSitePending}>
+              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={schedule.attendanceMode} onSitePending={entry.onSitePending} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting === "true"}>
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-sm font-medium">{entry.brokerName}</span>
@@ -524,7 +536,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                     {(presenceEnabled || schedule.attendanceMode === "presencial") && entry.presenceStatus === "pending" && !entry.absent ? <BrokerPresenceReleaseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} inUnit={schedule.attendanceMode === "presencial"} /> : null}
                     {!entry.absent && !entry.onSitePending ? <BrokerPauseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} paused={Boolean(entry.pausedAt)} /> : null}
                   </div>
-                  <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.availabilityStatus ?? "—"}{shiftSections && entry.shift === "dia" ? " · Dia todo" : ""}{presenceEnabled && entry.releasedByName ? ` · Liberado por ${entry.releasedByName}` : ""}</p>
+                  <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.branchName ?? "Sem unidade"} · {entry.availabilityStatus ?? "—"}{shiftSections && entry.shift === "dia" ? " · Dia todo" : ""}{presenceEnabled && entry.releasedByName ? ` · Liberado por ${entry.releasedByName}` : ""}</p>
                   {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}
                   <div className="mt-1.5">
                     <BrokerLiveStatus status={entry.liveStatus} nextEventAt={entry.nextEventAt ? entry.nextEventAt.toISOString() : null} />

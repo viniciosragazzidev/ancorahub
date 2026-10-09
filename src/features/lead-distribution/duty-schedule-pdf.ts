@@ -9,7 +9,8 @@ export type DutyScheduleReportBroker = {
   /** Situation is a problem (blocked / inactive) and is drawn in the warning tone. */
   situationAlert: boolean;
   leadsInWindow: number;
-  activeLeads: number;
+  /** Null in a finished occurrence: there is no live portfolio to show. */
+  activeLeads: number | null;
   capacity: number | null;
 };
 
@@ -189,7 +190,7 @@ export async function encodeDutySchedulePdf(input: DutyScheduleReportInput) {
       { text: broker.presence },
       { text: broker.situation, color: broker.situationAlert ? colors.warning : undefined },
       { text: String(broker.leadsInWindow) },
-      { text: broker.capacity === null ? String(broker.activeLeads) : `${broker.activeLeads} / ${broker.capacity}` },
+      { text: broker.activeLeads === null ? "-" : broker.capacity === null ? String(broker.activeLeads) : `${broker.activeLeads} / ${broker.capacity}` },
     ]),
     "Nenhum corretor escalado neste plantão.",
   );

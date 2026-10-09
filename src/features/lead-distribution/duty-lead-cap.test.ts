@@ -55,6 +55,7 @@ describe.skipIf(!enabled)("per-plantão lead cap count (real schema, rolled back
       await tx.insert(s.leads).values([
         lead(brokerA, queueId, new Date("2026-09-28T12:30:00Z")),
         lead(brokerA, queueId, new Date("2026-09-28T15:00:00Z")),
+        { ...lead(brokerA, otherQueueId, new Date("2026-09-28T16:00:00Z")), dutyScheduleId: scheduleId },
         lead(brokerB, queueId, new Date("2026-09-28T13:00:00Z")),
         // Before this occurrence, from another plantão's queue, and one that moved to nobody: none count.
         lead(brokerA, queueId, new Date("2026-09-27T15:00:00Z")),
@@ -62,7 +63,7 @@ describe.skipIf(!enabled)("per-plantão lead cap count (real schema, rolled back
         lead(null, queueId, new Date("2026-09-28T14:00:00Z")),
       ] as Array<typeof s.leads.$inferInsert>);
       const counts = await countLeadsReceivedInDuty(tx as never, tenantId, { scheduleId, limit: 2, startsAt, endsAt }, [brokerA, brokerB]);
-      expect(counts.get(brokerA)).toBe(2);
+      expect(counts.get(brokerA)).toBe(3);
       expect(counts.get(brokerB)).toBe(1);
       throw new Rollback();
     }).catch((error) => { if (!(error instanceof Rollback)) throw error; });

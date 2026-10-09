@@ -43,6 +43,10 @@ describe("classifyBrokerLiveOfferStatus", () => {
     expect(classifyBrokerLiveOfferStatus({ ...base, offers })).toEqual({ status: "cooldown", nextEventAt: minutes(3) });
   });
 
+  it("starts the live cooldown after a manual assignment without an offer", () => {
+    expect(classifyBrokerLiveOfferStatus({ ...base, lastAssignedAt: minutes(-1) })).toEqual({ status: "cooldown", nextEventAt: minutes(4) });
+  });
+
   it("is ready with no offers and capacity to spare", () => {
     expect(classifyBrokerLiveOfferStatus(base)).toEqual({ status: "ready", nextEventAt: null });
   });

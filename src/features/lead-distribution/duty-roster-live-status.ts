@@ -22,6 +22,7 @@ export function classifyBrokerLiveOfferStatus(input: {
   activeLeads: number;
   pacing: OfferPacingConfig;
   offers: PacingOffer[];
+  lastAssignedAt?: Date | null;
   now: Date;
 }): BrokerLiveOfferState {
   if (input.paused) return { status: "paused", nextEventAt: null };
@@ -32,7 +33,7 @@ export function classifyBrokerLiveOfferStatus(input: {
   const activeOffer = input.offers.find((offer) => ACTIVE_STATUSES.has(offer.status) && offer.expiresAt > input.now);
   if (activeOffer) return { status: "offer_pending", nextEventAt: activeOffer.expiresAt };
 
-  const pacingDecision = evaluateBrokerOfferPacing(input.offers, input.pacing, input.now);
+  const pacingDecision = evaluateBrokerOfferPacing(input.offers, input.pacing, input.now, input.lastAssignedAt);
   if (!pacingDecision.allowed) return { status: "cooldown", nextEventAt: pacingDecision.retryAt };
 
   return { status: "ready", nextEventAt: null };
