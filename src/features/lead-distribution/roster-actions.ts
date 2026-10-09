@@ -254,6 +254,7 @@ export async function removeRosterAssignmentAction(_previous: RosterActionState,
     await db.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.removed" });
     // A weekly row leaves the weekly roster only: dates of the published escala keep the broker.
+    let message: string | null = null;
     if (assignment.dutyDate === null) {
       const dated = await db.select({ dutyDate: sql<string>`${schema.dutyRosterAssignments.dutyDate}::text` })
         .from(schema.dutyRosterAssignments)
@@ -266,10 +267,10 @@ export async function removeRosterAssignmentAction(_previous: RosterActionState,
           sql`${schema.dutyRosterAssignments.dutyDate} >= ${spDateKey(new Date())}::date`,
         ));
       if (dated.length) {
-        return { success: true, message: `Nas datas da escala publicada (${dated.map((row) => shortDate(row.dutyDate)).sort().join(", ")}) ele continua. Para tirar dessas datas, remova pela Escala (etapa 3) e publique.` };
+        message = `Nas datas da escala publicada (${dated.map((row) => row.dutyDate).sort().map(shortDate).join(", ")}) ele continua. Para tirar dessas datas, remova pela Escala (etapa 3) e publique.`;
       }
     }
-    return { success: true };
+    return message ? { success: true, message } : { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível remover a escala." };
   }
