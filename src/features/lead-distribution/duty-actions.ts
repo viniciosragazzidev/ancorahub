@@ -252,6 +252,30 @@ async function activeQueueIds(db: ReturnType<typeof getDatabase>, tenantId: stri
 function revalidateDutyWorkspace() {
 }
 
+/** "Qual tempo vai prevalecer": the receiving queues share one interval between offers. */
+function parseUnifiedInterval(formData: FormData) {
+  const raw = formData.get("unifyOfferIntervalMinutes");
+  if (raw === null || raw === "") return null;
+  return z.coerce.number().int().min(0).max(1440).parse(raw);
+}
+
+async function unifyQueueOfferInterval(
+  tx: Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0],
+  context: { tenantId: string; userId: string },
+  queueIds: readonly string[],
+  minutes: number,
+) {
+  if (!queueIds.length) return;
+  const changed = await tx.update(schema.leadQueues).set({ offerIntervalMinutes: minutes, updatedAt: new Date() })
+    .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.id, [...queueIds]), ne(schema.leadQueues.offerIntervalMinutes, minutes)))
+    .returning({ id: schema.leadQueues.id });
+  if (changed.length) {
+    await tx.insert(schema.auditLogs).values(changed.map((queue) => ({
+      id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queue.id, acao: `queue.offer_interval_unified:${minutes}`,
+    })));
+  }
+}
+
 export async function createDutyScheduleAction(_previous: DutyActionState, formData: FormData): Promise<DutyActionState> {
   const parsed = parseCreateDutyScheduleInput(formData);
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Revise os dados do plantão." };
@@ -298,6 +322,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       for (const queueId of receivingQueueIds) for (const warning of await assertNoScheduleConflict(db, { ...schedule, responsibleQueueId: queueId }, context.tenantId)) sharedWarnings.add(warning);
     }
     const scheduleIds = schedules.map(() => randomUUID());
+    const unifiedInterval = parseUnifiedInterval(formData);
     const now = new Date();
     const typeId = await resolveDutyTypeId(db, context.tenantId, context.userId, parsed.data.typeName, parsed.data.typeId);
     await db.transaction(async (tx) => {
@@ -329,6 +354,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
       })));
       if (receivingQueueIds.length) {
         for (const scheduleId of scheduleIds) await relinkScheduleQueues(tx, context, scheduleId, receivingQueueIds);
+        if (unifiedInterval !== null) await unifyQueueOfferInterval(tx, context, receivingQueueIds, unifiedInterval);
       }
     });
     revalidateDutyWorkspace();
@@ -428,6 +454,8 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
         id: randomUUID(), userId: context.userId, entidade: "unit_duty_schedule", entidadeId: schedule.id, acao: "duty_schedule.updated",
       });
       if (receivingQueueIds !== undefined) await relinkScheduleQueues(tx, context, schedule.id, receivingQueueIds);
+      const unifiedInterval = parseUnifiedInterval(formData);
+      if (receivingQueueIds?.length && unifiedInterval !== null) await unifyQueueOfferInterval(tx, context, receivingQueueIds, unifiedInterval);
     });
     revalidateDutyWorkspace();
     return { success: true, scheduleId: schedule.id, message: [...sharedWarnings].join(" ") || "Plantão atualizado." };

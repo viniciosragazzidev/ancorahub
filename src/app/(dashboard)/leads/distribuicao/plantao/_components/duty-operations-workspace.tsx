@@ -252,6 +252,12 @@ function DutyFormSheet({
   const [splitOn, setSplitOn] = useState(Boolean(schedule?.shiftSplitAt));
   const [splitAt, setSplitAt] = useState(schedule?.shiftSplitAt ?? DEFAULT_SHIFT_SPLIT_AT);
   const toggleQueue = (id: string, checked: boolean) => setQueueIds((current) => (checked ? [...new Set([...current, id])] : current.filter((item) => item !== id)));
+  // Queues with different "tempo entre ofertas": the Diretor picks the one that prevails.
+  const chosenQueues = queues.filter((queue) => queueIds.includes(queue.id) && typeof queue.offerIntervalMinutes === "number");
+  const intervals = [...new Set(chosenQueues.map((queue) => queue.offerIntervalMinutes as number))].sort((a, b) => a - b);
+  const intervalConflict = intervals.length > 1;
+  const [intervalChoice, setIntervalChoice] = useState<number | null>(null);
+  const prevailingInterval = intervalConflict && intervalChoice !== null && intervals.includes(intervalChoice) ? intervalChoice : null;
   // A linked queue that is no longer active still shows by name.
   const queueChoices = [
     ...queues,
@@ -259,7 +265,7 @@ function DutyFormSheet({
   ];
   const tooManyDates = plannedDates.length > 93;
   const needsType = !schedule && !typeId;
-  const canSubmit = !needsType && (!twoShifts || shiftsFit) && (mode === "dates" && !schedule ? plannedDates.length > 0 && !tooManyDates : selectedDays.length > 0);
+  const canSubmit = !needsType && (!intervalConflict || prevailingInterval !== null) && (!twoShifts || shiftsFit) && (mode === "dates" && !schedule ? plannedDates.length > 0 && !tooManyDates : selectedDays.length > 0);
   const createdCount = (mode === "dates" ? plannedDates.length : selectedDays.length) * (twoShifts ? 2 : 1);
   const title = schedule ? "Editar plantão" : "Novo plantão";
 
@@ -267,6 +273,7 @@ function DutyFormSheet({
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     if (typeId) formData.set("typeId", typeId);
+    if (prevailingInterval !== null) formData.set("unifyOfferIntervalMinutes", String(prevailingInterval));
     if (!schedule && twoShifts) formData.set("splitIntoShifts", "true");
     if (schedule) {
       formData.set("scheduleId", schedule.id);
@@ -614,6 +621,30 @@ function DutyFormSheet({
               ) : (
                 <p className="text-xs text-muted-foreground">Nenhuma fila ativa.</p>
               )}
+              {intervalConflict ? (
+                <div role="alert" className="grid gap-2 rounded-[var(--radius-card)] border border-warning/40 bg-warning/5 p-3">
+                  <p className="text-xs font-medium text-foreground">
+                    As filas escolhidas têm tempos diferentes entre ofertas: {chosenQueues.map((queue) => `${queue.name} (${queue.offerIntervalMinutes} min)`).join(", ")}. Qual tempo vai prevalecer?
+                  </p>
+                  <div role="radiogroup" aria-label="Tempo entre ofertas que prevalece" className="flex flex-wrap gap-1.5">
+                    {intervals.map((minutes) => (
+                      <button
+                        key={minutes}
+                        type="button"
+                        role="radio"
+                        aria-checked={prevailingInterval === minutes}
+                        onClick={() => setIntervalChoice(minutes)}
+                        className={cn("rounded-full border px-2.5 py-1 text-xs", prevailingInterval === minutes ? "border-foreground/40 bg-muted text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground")}
+                      >
+                        {minutes === 0 ? "Sem intervalo" : `${minutes} min`}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {prevailingInterval === null ? "Escolha um para salvar." : `Ao salvar, todas as filas escolhidas passam a usar ${prevailingInterval} min entre ofertas (vale para essas filas também fora deste plantão).`}
+                  </p>
+                </div>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 {queueIds.length === 0
                   ? schedule ? "Nenhuma fila: o plantão não recebe leads de fila." : "Nenhuma agora: dá para vincular depois."
@@ -1218,7 +1249,7 @@ function DutyInspector({
   );
 }
 
-type QueueOption = { id: string; name: string };
+type QueueOption = { id: string; name: string; offerIntervalMinutes?: number | null };
 
 function shiftMonth(key: string, offset: number) {
   const [year, month] = key.split("-").map(Number);

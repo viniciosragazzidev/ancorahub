@@ -752,7 +752,7 @@ export default async function LeadDistributionPage({
                 initialMonthlyScheduleMonth={view === "plantao" && /^\d{4}-(0[1-9]|1[0-2])$/.test(params.escalaMes ?? "") ? params.escalaMes : null}
                 queues={queuesForControl
                   .filter((queue) => queue.status === "active")
-                  .map((queue) => ({ id: queue.id, name: queue.name }))}
+                  .map((queue) => ({ id: queue.id, name: queue.name, offerIntervalMinutes: queue.offerIntervalMinutes }))}
               />
             }
             saudeHistoricoContent={

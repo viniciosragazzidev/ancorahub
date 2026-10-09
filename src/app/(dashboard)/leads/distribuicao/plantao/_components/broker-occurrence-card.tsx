@@ -100,7 +100,7 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
         loadAvailable();
         return;
       }
-      toast.success(`${lead.name} atribuído a ${brokerName}.`);
+      toast.success(`${lead.name} enviado para ${brokerName}.`);
       setAvailable((current) => current?.filter((item) => item.id !== lead.id) ?? null);
       loadReceived();
       loadOffers();
@@ -165,8 +165,8 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
             <p className="text-xs text-muted-foreground">Entrou {dateTime.format(new Date(lead.createdAt))} · Fila: {lead.queueName ?? "—"}{lead.temperature ? ` · ${lead.temperature}` : ""}</p>
           </div>
           {canAssignLeads && !absent && !paused && !onSitePending ? (
-            <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={saving} onClick={() => assign(lead)} aria-label={`Atribuir ${lead.name} a ${brokerName}`}>
-              {assigningId === lead.id ? "Atribuindo…" : "Atribuir"}
+            <Button type="button" size="sm" variant="outline" className="shrink-0" disabled={saving} onClick={() => assign(lead)} aria-label={`Enviar ${lead.name} para ${brokerName}`}>
+              {assigningId === lead.id ? "Enviando…" : "Enviar ao corretor"}
             </Button>
           ) : null}
         </li>)}</ul> : available ? <p className="text-sm text-muted-foreground">Nenhum lead aguardando corretor nas filas deste plantão.</p> : null}

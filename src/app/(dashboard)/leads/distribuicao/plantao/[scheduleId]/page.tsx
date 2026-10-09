@@ -526,7 +526,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 ]).map((group) => <section key={group.key} aria-label={group.label} className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground">{group.label} <Badge variant="outline">{group.entries.length}</Badge></h4>
                   {group.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{group.entries.map((entry) => (
-              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={schedule.attendanceMode} onSitePending={entry.onSitePending} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting === "true"}>
+              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={schedule.attendanceMode} onSitePending={entry.onSitePending} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting !== "false"}>
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-sm font-medium">{entry.brokerName}</span>
