@@ -125,8 +125,14 @@ export async function processDutyPresenceReminders(now = new Date()) {
     ));
 
   const scheduleById = new Map(schedules.map((schedule) => [schedule.id, schedule]));
-  // A published monthly occurrence replaces the weekly roster of its plantão on
-  // that date: only whoever is actually in force gets a reminder.
+  // Weekly and published add up (2026-10-09). A broker on both keeps only the
+  // published row, so the check sees all his rows of the plantão at once:
+  // one reminder per broker and shift, on the row distribution actually uses.
+  const sameBrokerRows = new Map<string, typeof assignments>();
+  for (const row of assignments) {
+    const key = `${row.tenantId}|${row.scheduleId}|${row.brokerId}`;
+    sameBrokerRows.set(key, [...(sameBrokerRows.get(key) ?? []), row]);
+  }
   const publishedByTenantDate = new Map<string, Promise<Set<string> | null>>();
   const publishedFor = (tenantId: string, day: string) => {
     const key = `${tenantId}:${day}`;
@@ -149,7 +155,8 @@ export async function processDutyPresenceReminders(now = new Date()) {
     const reminderOpensAt = new Date(window.startsAt.getTime() - 30 * 60_000);
     if (now < reminderOpensAt || now >= window.endsAt) continue;
     const shiftDay = getSaoPauloDateKey(window.startsAt);
-    if (!selectEffectiveDutyAssignments([assignment], shiftDay, await publishedFor(assignment.tenantId, shiftDay)).length) continue;
+    const group = sameBrokerRows.get(`${assignment.tenantId}|${assignment.scheduleId}|${assignment.brokerId}`) ?? [assignment];
+    if (!selectEffectiveDutyAssignments(group, shiftDay, await publishedFor(assignment.tenantId, shiftDay)).some((row) => row.id === assignment.id)) continue;
     considered += 1;
     const confirmationId = randomUUID();
     const [inserted] = await db.insert(schema.dutyPresenceConfirmations).values({
