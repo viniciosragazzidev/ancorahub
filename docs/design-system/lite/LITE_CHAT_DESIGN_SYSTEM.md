@@ -266,6 +266,27 @@ Decisão do Vinicios (2026-10-09): **este é o único design system do CRM**, e 
 | Movimento | entrada de tela 8px + fade 180ms `ease-enter` no conteúdo do shell; durações 160/240ms |
 | Cores fixas em telas | trocadas por tokens (login, 2FA, badges neutros, assistente de IA); ficam de fora QR codes (precisam de branco), logo, seletor de cor e a página de erro isolada |
 
+### 10.1b Conversão componente a componente (pele dos componentes do Lite/Arc, mesma API)
+Os primitivos do modo normal (`src/components/ui/*`, inclusive `ds-*`) mantêm nome e props; muda só a aparência, copiada dos módulos Arc (`src/components/arc/*/*.module.css`).
+
+| Componente do modo normal | Pele (spec Arc) |
+|---|---|
+| Button (`button-variants.ts`, `ds-button-variants.ts`) | pílula; altura sm 36 / md 44 (padrão) / lg 50; texto 14/500; padding 16 (sm 12, lg 20). **primary = fundo `--foreground` (quase preto), texto `--background`**, hover opacidade .91 + sombra resting, press .84 · secondary/outline = `--surface` + borda `--border`, hover `--surface-muted` · ghost = texto `--text-secondary`, hover fundo muted · destructive = `--surface` + texto `--danger` + borda, hover borda danger · desabilitado: secundários ficam muted com texto muted |
+| Input, Select trigger, Combobox, SearchField, Textarea | altura 44; pílula (textarea: raio pílula, min 110px, padding 12); borda `--border-strong`; fundo `--surface`; texto 14; placeholder muted; hover e foco = borda `--foreground` (sem anel); inválido = borda `--danger`; desabilitado fundo muted .5 |
+| Label | 14/500, 8px acima do campo; descrição 12 muted; erro 12 danger |
+| Badge | pílula 26px (sm 22), padding 10 (sm 8), 12/500 (sm 11); borda + fundo tingidos: neutral (`--text-secondary` sobre `--surface-muted`), success/warning/danger/info com `color-mix` 10 a 11% no fundo e 25 a 27% na borda |
+| Tabs / Segmented (`ds-segmented-control`, tabs) | trilho pílula com borda `--border` e fundo `--surface-muted`, padding 3, gap 2; item 36px, 14/500, muted → ativo `--foreground` sobre seleção `--surface` + borda + sombra resting (desliza) |
+| Switch | trilho 42×24 `--control-track` (hover `--control-track-hover`), ligado `--control-on` (índigo), polegar 18 branco com sombra |
+| Checkbox / Radio | preenchido `--control-on`, marca branca, borda `--border-strong` |
+| Dialog | fundo `--surface-raised`, raio `--radius-surface` (28px), sem borda, `--shadow-floating`; overlay `oklch(16% 0 0 / .34)` |
+| Sheet / Drawer | idem dialog; cabeçalho ganha linha só ao rolar |
+| Popover / Dropdown / Select content | `--surface`, raio `--radius-panel` (24px), borda `--border`, `--shadow-floating`; item pílula, hover `--surface-muted` |
+| Table | cabeçalho 12/500 muted sem fundo; linhas com divisória `--border-subtle`; hover `--surface-muted`; células 14 |
+| Empty state | ícone em caixa 48 (borda + fundo muted, raio 24) que assenta com escala .92→1; título 16/500; texto 14 secondary, máx 18rem |
+| Skeleton | blocos pílula `color-mix(--border-strong 38%, --surface)`, pulso 1.8s finito (11 ciclos) |
+| Títulos de página / seção | título 22 a 28 /500, `--tracking-display`; subtítulo 14 secondary |
+| Sidebar (item) | pílula; hover `--surface-muted`; ativo texto `--foreground` 500 com fundo `--surface-muted` |
+
 ### 10.2 Regras para telas novas ou alteradas no modo normal
 - Tokens só da §2; cards como na §5 (sem borda, sombra resting, 24px); controles pílula; pesos 400/500.
 - Mesma linguagem (§7) e acessibilidade (§8).
