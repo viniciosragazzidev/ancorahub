@@ -138,7 +138,7 @@ function dateLabel(value: Date | null) {
   }).format(value);
 }
 
-type RosterEntry = { id: string; brokerId: string; brokerName: string; dayOfWeek: number; startsAt: string; endsAt: string; published: boolean };
+type RosterEntry = { id: string; brokerId: string; brokerName: string; dayOfWeek: number; startsAt: string; endsAt: string; published: boolean; ignored?: boolean };
 
 /**
  * Everyone on the plantão, as one list: the brokers added here plus the ones
@@ -154,12 +154,18 @@ function plantaoRoster(snapshot: Snapshot, scheduleId: string): RosterEntry[] {
       ...row, published: true, dayOfWeek: plantao?.dayOfWeek ?? 0, startsAt: plantao?.startsAt ?? "", endsAt: plantao?.endsAt ?? "",
     })),
   ].map((row) => ({ id: row.id, brokerId: row.brokerId, brokerName: row.brokerName, dayOfWeek: row.dayOfWeek, startsAt: row.startsAt, endsAt: row.endsAt, published: row.published }));
+  // On dates with a published escala, distribution uses only the published brokers (DEC-123):
+  // a weekly-only broker there does not receive leads, so he is shown apart, not as on duty.
+  const hasPublished = entries.some((entry) => entry.published);
+  const publishedBrokers = new Set(entries.filter((entry) => entry.published).map((entry) => entry.brokerId));
   const seen = new Set<string>();
-  return entries.filter((entry) => !seen.has(entry.brokerId) && seen.add(entry.brokerId));
+  return entries
+    .filter((entry) => !seen.has(entry.brokerId) && seen.add(entry.brokerId))
+    .map((entry) => (!entry.published && hasPublished && !publishedBrokers.has(entry.brokerId) ? { ...entry, ignored: true } : entry));
 }
 
 function coverageLabel(schedule: Schedule, snapshot: Snapshot) {
-  return getDutyCoverage(plantaoRoster(snapshot, schedule.id).length, schedule.minimumBrokers);
+  return getDutyCoverage(plantaoRoster(snapshot, schedule.id).filter((entry) => !entry.ignored).length, schedule.minimumBrokers);
 }
 
 function actionLabel(action: string) {
@@ -847,7 +853,8 @@ function DutyInspector({
         return;
       }
       router.refresh();
-      toast.success("Corretor removido da escala.");
+      if (result.message) toast.warning(result.message);
+      else toast.success("Corretor removido da escala.");
     });
   }
 
@@ -1054,8 +1061,8 @@ function DutyInspector({
                             <span className="block truncate text-sm font-medium">
                               {assignment.brokerName}
                             </span>
-                            <span className="block text-xs text-muted-foreground">
-                              {shifts ? (shifts.find((shift) => shift.key === assignmentShift(schedule, assignment))?.label ?? `${assignment.startsAt.slice(0, 5)}–${assignment.endsAt.slice(0, 5)}`) : "Escalado neste horário"}
+                            <span className={assignment.ignored ? "block text-xs text-warning" : "block text-xs text-muted-foreground"}>
+                              {assignment.ignored ? "Não recebe leads: vale a escala publicada. Adicione pela Escala (etapa 3)." : shifts ? (shifts.find((shift) => shift.key === assignmentShift(schedule, assignment))?.label ?? `${assignment.startsAt.slice(0, 5)}–${assignment.endsAt.slice(0, 5)}`) : "Escalado neste horário"}
                             </span>
                           </span>
                           {shifts && !assignment.published ? (

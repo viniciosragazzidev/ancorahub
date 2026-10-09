@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ChatBlock } from "@/components/chat/types";
 import type { BrokerConversationInsight } from "@/features/broker-workspace/components/light-conversations-view";
 
-import { buildInsightsScript, isWaitingForBroker } from "./insights-script";
+import { buildInsightThreads, buildInsightsScript, isWaitingForBroker } from "./insights-script";
 
 const now = new Date("2026-10-09T15:00:00.000Z"); // 12:00 in São Paulo
 
@@ -46,7 +46,8 @@ describe("buildInsightsScript", () => {
     expect(script.blocks.find((block) => block.id === "i-last")).toMatchObject({ type: "system", text: expect.stringContaining("quanto fica o plano") });
     const choices = question(script.blocks).choices;
     expect(choices[0]).toMatchObject({ id: "reply", action: { kind: "href", href: "https://wa.me/5521999998888" } });
-    expect(choices[1]?.action).toEqual({ kind: "href", href: "/conversas/broker?leadId=a" });
+    expect(choices[1]?.action).toEqual({ kind: "href", href: "/leads/a" });
+    expect(choices).toHaveLength(2);
     expect(script.blocks.find((block) => block.id === "i-others")).toMatchObject({ items: [{ id: "b", trailing: "10 min" }] });
     expect(script.status?.tone).toBe("waiting");
   });
@@ -67,5 +68,15 @@ describe("buildInsightsScript", () => {
   it("asks to connect WhatsApp when there is nothing to read", () => {
     const script = buildInsightsScript({ now, whatsappConnected: false, insights: [] });
     expect(question(script.blocks).choices[0]?.action).toEqual({ kind: "href", href: "/settings/whatsapp" });
+  });
+
+  it("lists every conversation as chat rows, who waits for you first, each opening the lead chat", () => {
+    const threads = buildInsightThreads([
+      conversation("old", { outbound: true, inboundAt: "2026-10-09T10:00:00.000Z" }),
+      conversation("wait", { inboundAt: "2026-10-09T09:00:00.000Z", intelligence: { pendingFrom: "BROKER", nextBestAction: "Mandar a cotação" } }),
+    ]);
+    expect(threads.map((thread) => thread.id)).toEqual(["insight:wait", "insight:old"]);
+    expect(threads[0]).toMatchObject({ waitingYou: true, preview: "Sugestão: Mandar a cotação", href: "/leads/wait", initials: "CW" });
+    expect(threads[1]?.preview.startsWith("Você: ")).toBe(true);
   });
 });

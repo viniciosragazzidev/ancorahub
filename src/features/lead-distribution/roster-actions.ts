@@ -249,10 +249,26 @@ export async function removeRosterAssignmentAction(_previous: RosterActionState,
     const context = await getRequiredTenantContext();
     if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
     const db = getDatabase();
-    const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id, branchId: schema.dutyRosterAssignments.branchId }).from(schema.dutyRosterAssignments).where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"))).limit(1);
+    const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id, branchId: schema.dutyRosterAssignments.branchId, scheduleId: schema.dutyRosterAssignments.scheduleId, brokerId: schema.dutyRosterAssignments.brokerId, dutyDate: schema.dutyRosterAssignments.dutyDate }).from(schema.dutyRosterAssignments).where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"))).limit(1);
     if (!assignment || (context.role === "manager" && context.branchId !== assignment.branchId)) throw new Error("Escala fora do seu escopo.");
     await db.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.removed" });
+    // A weekly row leaves the weekly roster only: dates of the published escala keep the broker.
+    if (assignment.dutyDate === null) {
+      const dated = await db.select({ dutyDate: sql<string>`${schema.dutyRosterAssignments.dutyDate}::text` })
+        .from(schema.dutyRosterAssignments)
+        .where(and(
+          eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+          eq(schema.dutyRosterAssignments.scheduleId, assignment.scheduleId),
+          eq(schema.dutyRosterAssignments.brokerId, assignment.brokerId),
+          eq(schema.dutyRosterAssignments.status, "active"),
+          isNotNull(schema.dutyRosterAssignments.monthlyPlanId),
+          sql`${schema.dutyRosterAssignments.dutyDate} >= ${spDateKey(new Date())}::date`,
+        ));
+      if (dated.length) {
+        return { success: true, message: `Nas datas da escala publicada (${dated.map((row) => shortDate(row.dutyDate)).sort().join(", ")}) ele continua. Para tirar dessas datas, remova pela Escala (etapa 3) e publique.` };
+      }
+    }
     return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível remover a escala." };

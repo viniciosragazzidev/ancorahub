@@ -602,6 +602,9 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
       // Weekly roster brokers get a dated row too: on a date with published brokers the
       // distribution uses only the published rows (DEC-123), so without it they would be
       // left out of a plantão that mixes weekly and generated brokers (fixed 2026-10-09).
+      // A weekly broker who left the planning policy (inactive, out of scope) is not
+      // revalidated above: skip him instead of failing the whole publication.
+      if (assignment.origin === "weekly" && !brokerById.has(assignment.brokerId)) continue;
       const existing = existingByKey.get(`${assignment.occurrenceId}|${assignment.brokerId}`);
       if (existing) {
         kept.push({ assignment, rowId: existing.id });

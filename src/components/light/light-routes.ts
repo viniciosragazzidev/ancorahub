@@ -117,7 +117,7 @@ const RULES: readonly RouteRule[] = [
       search?.get("leadId")
         ? { title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker?todas=1", backToParent: true }
         : search?.get("todas") === "1"
-          ? { title: "Conversas", tab: "insights", isRoot: false, parentHref: "/conversas/broker", backToParent: true }
+          ? { title: "Conversas", tab: "insights", isRoot: false, parentHref: "/conversas/broker", backToParent: true, chat: true, hidesTabBar: true }
           // The Insights assistant is a chat (2026-10-09) with its own header.
           : { title: "Insights", tab: "insights", isRoot: true, parentHref: null, chat: true, hidesTabBar: true },
   },

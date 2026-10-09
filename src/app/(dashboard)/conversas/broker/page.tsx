@@ -9,7 +9,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
-import { buildInsightsScript } from "@/features/broker-workspace/chat/insights-script";
+import { buildInsightThreads, buildInsightsScript } from "@/features/broker-workspace/chat/insights-script";
+import { ThreadListScreen } from "@/components/chat/thread-list-screen";
 import { readLeadIntelligence as readIntelligence } from "@/features/broker-workspace/chat/intelligence";
 import { canRevealLightContact } from "@/features/broker-workspace/lead-contact-privacy";
 
@@ -94,6 +95,23 @@ export default async function BrokerConversationsPage({ searchParams }: { search
         identity={{ name: insightsAssistant.name, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
         script={buildInsightsScript({ insights, whatsappConnected: connection?.status === "ready", now: new Date() })}
       />
+    );
+  }
+  // All conversations: the same chat rows as the Início; each opens the lead's chat.
+  if (todas === "1") {
+    const threads = buildInsightThreads(insights);
+    const waiting = threads.filter((thread) => thread.waitingYou).length;
+    return (
+      <div className="arc-venancor">
+        <ThreadListScreen
+          title="Conversas"
+          subtitle={waiting ? `${waiting} esperando sua resposta` : "Ninguém esperando você"}
+          backHref="/conversas/broker"
+          threads={threads}
+          nowIso={new Date().toISOString()}
+          emptyText={connection?.status === "ready" ? "Nenhuma conversa ainda." : "Conecte seu WhatsApp para ver suas conversas aqui."}
+        />
+      </div>
     );
   }
   return (

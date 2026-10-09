@@ -1,4 +1,4 @@
-import type { ChatBlock, ChatChoice, ChatScript } from "@/components/chat/types";
+import type { ChatBlock, ChatChoice, ChatScript, ThreadSummary } from "@/components/chat/types";
 import type { BrokerConversationInsight } from "@/features/broker-workspace/components/light-conversations-view";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
@@ -45,8 +45,41 @@ function lastInbound(item: BrokerConversationInsight) {
   return [...item.messages].reverse().find((message) => !isOutboundMessage(message.direction)) ?? null;
 }
 
+/** The conversation opens as the lead's chat (WhatsApp mirror included); clients open their record. */
 function detailHref(item: BrokerConversationInsight) {
-  return `/conversas/broker?leadId=${encodeURIComponent(item.id)}`;
+  return item.href;
+}
+
+function initialsOf(name: string) {
+  return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("") || "?";
+}
+
+/** All conversations as chat rows: who waits for you first, then the most recent. */
+export function buildInsightThreads(insights: BrokerConversationInsight[]): ThreadSummary[] {
+  return insights
+    .map((item) => {
+      const waiting = isWaitingForBroker(item);
+      const last = item.latestMessage;
+      const preview = waiting && item.intelligence?.nextBestAction
+        ? `Sugestão: ${item.intelligence.nextBestAction}`
+        : last ? `${isOutboundMessage(last.direction) ? "Você: " : ""}${clip(last.body, 90)}` : item.status;
+      return {
+        id: `insight:${item.id}`,
+        kind: "lead" as const,
+        leadId: item.kind === "lead" ? item.id : undefined,
+        name: item.name,
+        preview,
+        at: last?.sentAt ?? null,
+        unread: waiting,
+        waitingYou: waiting,
+        href: detailHref(item),
+        shape: "mochi" as const,
+        hue: null,
+        initials: initialsOf(item.name),
+        temperature: null,
+      };
+    })
+    .sort((left, right) => (left.waitingYou === right.waitingYou ? (Date.parse(right.at ?? "") || 0) - (Date.parse(left.at ?? "") || 0) : left.waitingYou ? -1 : 1));
 }
 
 /**
@@ -99,8 +132,7 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
   const whatsapp = buildWhatsAppUrl(first.phone);
   const choices: ChatChoice[] = [
     ...(whatsapp ? [{ id: "reply", label: `Responder ${name} no WhatsApp`, reply: `Vou responder ${name}`, action: { kind: "href" as const, href: whatsapp } }] : []),
-    { id: "detail", label: "Ver a conversa inteira", action: { kind: "href", href: detailHref(first) } },
-    { id: "lead", label: first.kind === "client" ? "Abrir a ficha do cliente" : "Abrir o lead", action: { kind: "href", href: first.href } },
+    { id: "detail", label: first.kind === "client" ? "Abrir o cliente" : "Ver a conversa inteira", action: { kind: "href", href: detailHref(first) } },
   ];
   blocks.push({ type: "question", id: "i-choice", prompt: "Como quer seguir?", choices });
 
