@@ -95,7 +95,8 @@ const RULES: readonly RouteRule[] = [
   { test: under("/dashboard"), route: { title: "Detalhe", tab: "inicio", isRoot: false, parentHref: "/dashboard" } },
   // No tab bar since the chat redesign: the queue goes back to Início (the conversations).
   { test: exact("/minha-fila"), route: { title: "Fila", tab: "fila", isRoot: false, parentHref: "/dashboard", hidesTabBar: true } },
-  { test: exact("/leads"), route: { title: "Fila", tab: "fila", isRoot: false, parentHref: "/minha-fila" } },
+  // Always to Início: going back through history here could return to the lead it was opened from.
+  { test: exact("/leads"), route: { title: "Fila", tab: "fila", isRoot: false, parentHref: "/dashboard", backToParent: true, hidesTabBar: true } },
   // Feedback is a short form with no action bar: it goes back to its lead and keeps the tab bar.
   {
     test: (path) => /^\/leads\/[^/]+\/feedback$/.test(path),

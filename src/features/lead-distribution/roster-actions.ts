@@ -1,13 +1,15 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, lt, ne, or, sql, isNull } from "drizzle-orm";
+import { and, eq, gt, inArray, isNotNull, lt, ne, or, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
+import { publishNotification } from "@/features/notifications/send-push-helper";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 export type RosterActionState = { success?: boolean; error?: string; message?: string };
 
@@ -32,7 +34,7 @@ async function assertRosterScope(scheduleId: string, brokerId: string) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") throw new Error("Apenas Gestores e Diretores podem editar a escala.");
   const db = getDatabase();
-  const [schedule] = await db.select({ id: schema.unitDutySchedules.id, branchId: schema.unitDutySchedules.branchId, validFrom: schema.unitDutySchedules.validFrom, validUntil: schema.unitDutySchedules.validUntil, status: schema.unitDutySchedules.status, maximumBrokers: schema.unitDutySchedules.maximumBrokers })
+  const [schedule] = await db.select({ id: schema.unitDutySchedules.id, name: schema.unitDutySchedules.name, branchId: schema.unitDutySchedules.branchId, validFrom: schema.unitDutySchedules.validFrom, validUntil: schema.unitDutySchedules.validUntil, status: schema.unitDutySchedules.status, maximumBrokers: schema.unitDutySchedules.maximumBrokers })
     .from(schema.unitDutySchedules)
     .where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
     .limit(1);
@@ -121,6 +123,46 @@ async function assertScheduleCapacity(db: DatabaseOrTransaction, tenantId: strin
   if (occupied.length >= maximumBrokers) throw new Error("Este plantão atingiu o máximo de corretores definido.");
 }
 
+const WEEKDAYS = ["domingo", "segunda", "terça", "quarta", "quinta", "sexta", "sábado"];
+const ROSTER_LOOKAHEAD_DAYS = 56;
+
+function spDateKey(date: Date) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+}
+
+function shortDate(key: string) {
+  return `${key.slice(8, 10)}/${key.slice(5, 7)}`;
+}
+
+/**
+ * Upcoming dates this weekly row would cover, and which of them already have a
+ * published escala for the plantão. On those dates distribution uses only the
+ * published brokers (DEC-123, selectEffectiveDutyAssignments), so a weekly row
+ * there is ignored: the caller blocks or warns instead of saving it silently.
+ */
+async function publishedCoverage(db: Database, tenantId: string, schedule: { id: string; validFrom: Date; validUntil: Date | null }, dayOfWeek: number, now: Date) {
+  if ((await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) !== "true") return { dates: [] as string[], published: [] as string[] };
+  const fromKey = [spDateKey(now), spDateKey(schedule.validFrom)].sort()[1];
+  const untilKey = schedule.validUntil ? spDateKey(schedule.validUntil) : null;
+  const dates: string[] = [];
+  for (let offset = 0; offset <= ROSTER_LOOKAHEAD_DAYS; offset += 1) {
+    const key = spDateKey(new Date(Date.parse(`${fromKey}T12:00:00-03:00`) + offset * 86_400_000));
+    if (untilKey && key >= untilKey) break;
+    if (new Date(`${key}T12:00:00Z`).getUTCDay() === dayOfWeek) dates.push(key);
+  }
+  if (!dates.length) return { dates, published: [] as string[] };
+  const rows = await db.selectDistinct({ dutyDate: sql<string>`${schema.dutyRosterAssignments.dutyDate}::text` })
+    .from(schema.dutyRosterAssignments)
+    .where(and(
+      eq(schema.dutyRosterAssignments.tenantId, tenantId),
+      eq(schema.dutyRosterAssignments.scheduleId, schedule.id),
+      eq(schema.dutyRosterAssignments.status, "active"),
+      isNotNull(schema.dutyRosterAssignments.monthlyPlanId),
+      inArray(schema.dutyRosterAssignments.dutyDate, dates),
+    ));
+  return { dates, published: rows.map((row) => row.dutyDate).sort() };
+}
+
 export async function createRosterAssignmentAction(_previous: RosterActionState, formData: FormData): Promise<RosterActionState> {
   try {
     const input = parseInput(formData);
@@ -128,6 +170,10 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
     const now = new Date();
     if (!broker.branchId) throw new Error("O corretor não está vinculado a uma unidade ativa.");
     const brokerBranchId = broker.branchId;
+    const coverage = await publishedCoverage(db, context.tenantId, schedule, input.dayOfWeek, now);
+    if (coverage.dates.length > 0 && coverage.published.length === coverage.dates.length) {
+      throw new Error(`O plantão "${schedule.name}" já tem escala publicada em ${coverage.published.map(shortDate).join(", ")}. Nessas datas valem só os corretores da escala: adicione-o pela Escala (etapa 3) e publique.`);
+    }
     const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
@@ -139,9 +185,24 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
       return overlap;
     });
     await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
-    return overlapWarning
-      ? { success: true, message: `Corretor também está no plantão "${overlapWarning.name}" das ${overlapWarning.startsAt} às ${overlapWarning.endsAt}; ele ficará nos dois plantões neste horário.` }
-      : { success: true };
+    const firstDate = coverage.dates.find((date) => !coverage.published.includes(date));
+    void publishNotification({
+      capability: "duty_assignment",
+      tenantId: context.tenantId,
+      recipientUserId: input.brokerId,
+      type: "duty_assignment",
+      title: `Você foi escalado no plantão ${schedule.name}`,
+      message: `${WEEKDAYS[input.dayOfWeek]}, das ${input.startsAt} às ${input.endsAt}${firstDate ? `. Começa em ${shortDate(firstDate)}` : ""}.`,
+      pushTitle: "Novo plantão na sua escala",
+      pushBody: `${schedule.name}: ${WEEKDAYS[input.dayOfWeek]}, ${input.startsAt} às ${input.endsAt}`,
+      url: "/plantoes",
+      tag: `duty-${schedule.id}-${input.dayOfWeek}`,
+    }).catch(() => false);
+    const messages = [
+      overlapWarning ? `Corretor também está no plantão "${overlapWarning.name}" das ${overlapWarning.startsAt} às ${overlapWarning.endsAt}; ele ficará nos dois plantões neste horário.` : null,
+      coverage.published.length ? `Em ${coverage.published.map(shortDate).join(", ")} vale a escala publicada: nessas datas ele só entra pela Escala (etapa 3).` : null,
+    ].filter(Boolean);
+    return messages.length ? { success: true, message: messages.join(" ") } : { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível adicionar o corretor à escala." };
   }

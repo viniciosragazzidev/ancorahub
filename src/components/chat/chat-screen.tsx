@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import Link from "next/link";
+import { canGoBackInApp } from "@/components/light/light-navigation";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, useReducedMotion } from "motion/react";
 
@@ -55,6 +55,7 @@ export function ChatScreen({
   placeholder: placeholderOverride,
   composerInput,
   onButtonOpen,
+  instant = false,
 }: {
   identity: Identity;
   backHref: string;
@@ -75,6 +76,8 @@ export function ChatScreen({
   composerInput?: { inputMode?: "text" | "numeric"; label?: string };
   /** A button block was tapped (e.g. record that WhatsApp was opened). */
   onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>) => void;
+  /** History-like threads (Âncora): show everything at once, already scrolled to the newest. */
+  instant?: boolean;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -82,8 +85,9 @@ export function ChatScreen({
   const initial = useMemo(() => script.blocks.filter((block) => !hidden.has(block.id)), [hidden, script.blocks]);
 
   // Blocks already on screen, and the queue still to be "typed".
-  const [shown, setShown] = useState<ChatBlock[]>(() => (reduce ? initial : initial.slice(0, 1)));
-  const [queue, setQueue] = useState<ChatBlock[]>(() => (reduce ? [] : initial.slice(1)));
+  const [shown, setShown] = useState<ChatBlock[]>(() => (reduce || instant ? initial : initial.slice(0, 1)));
+  const [queue, setQueue] = useState<ChatBlock[]>(() => (reduce || instant ? [] : initial.slice(1)));
+  const firstScroll = useRef(true);
   const [typing, setTyping] = useState(false);
   const [working, setWorking] = useState(false);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -107,7 +111,9 @@ export function ChatScreen({
   // Sticks to the newest message.
   useEffect(() => {
     const node = scrollRef.current;
-    node?.scrollTo?.({ top: node.scrollHeight, behavior: reduce ? "auto" : "smooth" });
+    // The first jump is instant (opening at the newest message); later ones glide.
+    node?.scrollTo?.({ top: node.scrollHeight, behavior: reduce || firstScroll.current ? "auto" : "smooth" });
+    firstScroll.current = false;
   }, [shown.length, typing, reduce]);
 
   const enqueue = useCallback((blocks: ChatBlock[]) => setQueue((current) => [...current, ...blocks]), []);
@@ -164,9 +170,10 @@ export function ChatScreen({
   return (
     <div className={`${styles.root} ${styles.screen}`}>
       <header className={styles.header}>
-        <Link href={backHref} className={styles.iconButton} aria-label="Voltar">
+        {/* History first (never stacks a new entry, so back never loops between two screens); parent when opened from outside. */}
+        <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => { if (canGoBackInApp()) router.back(); else router.push(backHref); }}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </Link>
+        </button>
         <div className={styles.headerIdentity}>
           <AssistantAvatar shape={identity.shape} hue={identity.hue} size={32} state={working ? "working" : "idle"} initials={identity.initials} temperature={identity.temperature} />
           <div style={{ minWidth: 0 }}>

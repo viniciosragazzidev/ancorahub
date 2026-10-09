@@ -9,13 +9,14 @@ import type { Mention } from "./composer";
 import type { ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript }) {
+export function AssistantChat({ identity, script, instant = false }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean }) {
   const router = useRouter();
   return (
     <ChatScreen
       identity={identity}
       backHref="/dashboard"
       script={script}
+      instant={instant}
       runAction={async (action) => {
         const result = await runChatServerAction(action.name, action.payload);
         // An accepted lead continues in its own conversation: offer it as the next reply.

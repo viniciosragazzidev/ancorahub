@@ -22,6 +22,8 @@ const branchId = "22222222-2222-4222-8222-222222222222";
 const scheduleId = "33333333-3333-4333-8333-333333333333";
 const context: TenantContext = { tenantId, branchId: null, userId: "director", role: "director", jobTitle: "director" };
 const queries: { sql: string; params: unknown[] }[] = [];
+let scheduleRow: unknown[];
+let publishedDates: string[];
 let broker: { tenantId: string; branchId: string; id: string; role: string; jobTitle: string; active: boolean; status: string; membershipStatus: string };
 
 // In-memory executor of the predicates used by the real Drizzle query. No DB connection.
@@ -33,6 +35,8 @@ function equalsMatch(query: string, params: unknown[], table: string, column: st
 beforeEach(() => {
   vi.clearAllMocks();
   queries.length = 0;
+  scheduleRow = [scheduleId, "Plantão sintético", branchId, "2026-10-01T00:00:00Z", null, "active", null];
+  publishedDates = [];
   broker = { tenantId, branchId, id: "broker-disabled", role: "broker", jobTitle: "broker", active: false, status: "disabled", membershipStatus: "inactive" };
   mocks.context.mockResolvedValue(context);
   mocks.flag.mockResolvedValue("true");
@@ -41,8 +45,9 @@ beforeEach(() => {
     queries.push({ sql: query, params });
     if (query.includes('from "unit_duty_schedules"') && !query.includes('join')) {
       return { rows: query.includes('"maximum_brokers"')
-        ? [[scheduleId, branchId, "2026-10-01T00:00:00Z", null, "active", null]] : [] };
+        ? [scheduleRow] : [] };
     }
+    if (query.startsWith("select distinct") && query.includes('"monthly_plan_id" is not null')) return { rows: publishedDates.map((date) => [date]) };
     if (query.includes('from "branches"')) return { rows: [[branchId, "Unidade sintética", false]] };
     if (query.includes('from "tenant_memberships"')) {
       const allowed = [
@@ -103,6 +108,18 @@ describe("inactive brokers in duty planning", () => {
     if (scenario === "pending") broker.status = "pending";
     expect((await createRosterAssignmentAction({}, assignment())).error).toBeTruthy();
     expect(queries.some((q) => q.sql.startsWith("insert"))).toBe(false);
+  });
+
+  it("blocks a weekly add on a plantão whose only date already has a published escala (it would be ignored)", async () => {
+    // One-day plantão next Monday (dayOfWeek 1 in the form) with a published escala that day.
+    const today = new Date();
+    const monday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + ((8 - today.getUTCDay()) % 7 || 7)));
+    const key = monday.toISOString().slice(0, 10);
+    scheduleRow = [scheduleId, "PRESENCIAL TARDE", branchId, `${key}T03:00:00Z`, new Date(Date.parse(`${key}T03:00:00Z`) + 86_400_000).toISOString(), "active", null];
+    publishedDates = [key];
+    const result = await createRosterAssignmentAction({}, assignment());
+    expect(result.error).toMatch(/já tem escala publicada em .*Escala \(etapa 3\)/);
+    expect(queries.some((q) => q.sql.startsWith('insert into "duty_roster_assignments"'))).toBe(false);
   });
 
   it("keeps broker users from managing the roster", async () => {

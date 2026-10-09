@@ -34,7 +34,7 @@ export function LeadConversation({
     <div className="arc-venancor">
       <ChatScreen
         identity={{ name, shape: "mochi", hue: null, initials }}
-        backHref="/minha-fila"
+        backHref="/dashboard"
         script={script}
         composerDisabled={!canWrite}
         onButtonOpen={(block) => { if (block.tone === "whatsapp") void recordWhatsAppOpenedAction(leadId); }}
