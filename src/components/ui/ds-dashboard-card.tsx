@@ -17,7 +17,7 @@ export const DsDashboardCard = React.forwardRef<
       ref={ref}
       data-slot="ds-dashboard-card"
       className={cn(
-        "rounded-ds-cards border border-transparent bg-ds-canvas-white p-ds-8 font-ds-inter text-ds-body text-ds-charcoal shadow-[var(--shadow-card)] transition-shadow duration-150 ease-out",
+        "rounded-ds-cards border border-[var(--card-border)] bg-ds-canvas-white p-ds-8 font-ds-inter text-ds-body text-ds-charcoal shadow-[var(--shadow-card)] transition-shadow duration-150 ease-out",
         className,
       )}
       {...props}

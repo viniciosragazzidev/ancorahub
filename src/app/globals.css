@@ -10,6 +10,7 @@
 @import "../styles/design-system/tokens.css";
 @import "../styles/design-system/motion.css";
 @import "../styles/interface-motion.css";
+@import "../styles/lite-motion.css";
 
 
 @custom-variant dark (&:is(.dark *));
@@ -213,6 +214,7 @@
   --shadow-xl: 0 16px 40px rgb(16 16 40 / 0.14);
   --shadow-action: none;
   /* Cards rest on one soft shadow, no border (Lite). Floating layers use --shadow-dialog. */
+  --card-border: transparent;
   --shadow-card: 0 1px 2px rgb(16 16 40 / 0.04), 0 8px 24px rgb(16 16 40 / 0.05);
   --shadow-raised: 0 6px 18px rgb(16 16 40 / 0.065), 0 1px 3px rgb(16 16 40 / 0.035);
   --shadow-dialog: 0 16px 40px rgb(16 16 40 / 0.14);
@@ -392,6 +394,9 @@
   --chart-4: #10b981;
   --chart-5: #94a3b8;
   --radius: 1rem;
+  /* Lite cards have no border in light mode; in dark the shadow disappears, so the contour comes back. */
+  --card-border: var(--border);
+  --shadow-card: none;
 }
 
 /* Contrast guardrails for legacy status utilities. The light theme must keep
@@ -434,11 +439,12 @@ body {
   background: var(--background);
 }
 
-/* Lite motion (docs/design-system/lite §3): each screen enters rising 8px with a fade, 180ms.
-   The page root remounts on navigation, so this replays per route. */
+/* Lite motion (docs/design-system/lite §3): each screen fades in (180ms); cards and rows inside
+   rise (styles/lite-motion.css). Opacity only here: a transform on the page root would make
+   fixed bars inside the page jump. The page root remounts on navigation, so this replays per route. */
 @keyframes lite-screen-enter {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 .app-shell-canvas > [data-slot="app-content"] > * {
   animation: lite-screen-enter 180ms cubic-bezier(.16, 1, .3, 1) both;

@@ -8,11 +8,11 @@ const cardVariants = cva(
   {
     variants: {
       variant: {
-        default: "gap-[var(--size-spacing-04)] rounded-[var(--radius-card)] border border-transparent bg-card p-[var(--size-spacing-05)] shadow-[var(--shadow-card)]",
+        default: "gap-[var(--size-spacing-04)] rounded-[var(--radius-card)] border border-[var(--card-border)] bg-card p-[var(--size-spacing-05)] shadow-[var(--shadow-card)]",
         subtle: "gap-[var(--size-spacing-04)] rounded-[var(--radius-card)] border border-transparent bg-[var(--surface-secondary)] p-[var(--size-spacing-05)] shadow-none",
-        overview: "gap-0 overflow-hidden rounded-[var(--radius-card)] border border-transparent bg-card p-0 shadow-[var(--shadow-card)]",
-        compact: "gap-[var(--size-spacing-03)] rounded-[var(--radius-card)] border border-transparent bg-card p-[var(--size-spacing-04)] shadow-[var(--shadow-card)]",
-        kanban: "gap-0 overflow-hidden rounded-[var(--radius-card)] border border-transparent bg-card p-0 shadow-[var(--shadow-card)]",
+        overview: "gap-0 overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-card p-0 shadow-[var(--shadow-card)]",
+        compact: "gap-[var(--size-spacing-03)] rounded-[var(--radius-card)] border border-[var(--card-border)] bg-card p-[var(--size-spacing-04)] shadow-[var(--shadow-card)]",
+        kanban: "gap-0 overflow-hidden rounded-[var(--radius-card)] border border-[var(--card-border)] bg-card p-0 shadow-[var(--shadow-card)]",
       },
     },
     defaultVariants: {

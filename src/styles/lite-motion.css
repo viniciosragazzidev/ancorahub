@@ -1,0 +1,78 @@
+/*
+ * Lite motion in every route of the normal mode (docs/design-system/lite §3).
+ * Structure is untouched: these rules only animate what is already there.
+ * Off when the super-admin turns interface motion off, and under reduced motion.
+ * Every entrance plays once on mount (navigation, new rows); nothing loops.
+ */
+
+@keyframes lite-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lite-rise-sm {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lite-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Cards arrive in a short cascade (35ms per step, at most 8 steps). */
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="card"], [data-slot="ds-dashboard-card"]) {
+    animation: lite-rise 180ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="card"]):nth-child(2) { animation-delay: 35ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="card"]):nth-child(3) { animation-delay: 70ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="card"]):nth-child(4) { animation-delay: 105ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="card"]):nth-child(5) { animation-delay: 140ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="card"]):nth-child(6) { animation-delay: 175ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="card"]):nth-child(7) { animation-delay: 210ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="card"]):nth-child(n+8) { animation-delay: 245ms; }
+
+  /* Table rows rise in like the conversation list (35ms, at most 8 steps). */
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr {
+    animation: lite-rise-sm 180ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr:nth-child(2) { animation-delay: 35ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr:nth-child(3) { animation-delay: 70ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr:nth-child(4) { animation-delay: 105ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr:nth-child(5) { animation-delay: 140ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr:nth-child(6) { animation-delay: 175ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr:nth-child(7) { animation-delay: 210ms; }
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr:nth-child(n+8) { animation-delay: 245ms; }
+
+  /* Clickable cards lift a little and gain the raised shadow; press settles back. */
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is(a[data-slot="card"], button[data-slot="card"], [data-slot="card"][role="button"], a:has(> [data-slot="card"]) > [data-slot="card"], [data-slot="card"]:has(> a.absolute.inset-0)) {
+    transition: transform 160ms cubic-bezier(.22, 1, .36, 1), box-shadow 160ms cubic-bezier(.22, 1, .36, 1);
+  }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is(a[data-slot="card"], button[data-slot="card"], [data-slot="card"][role="button"], a:has(> [data-slot="card"]) > [data-slot="card"], [data-slot="card"]:has(> a.absolute.inset-0)):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgb(16 16 40 / .065), 0 1px 3px rgb(16 16 40 / .035);
+  }
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is(a[data-slot="card"], button[data-slot="card"], [data-slot="card"][role="button"], a:has(> [data-slot="card"]) > [data-slot="card"]):active {
+    transform: translateY(0) scale(.99);
+  }
+
+  /* Rows answer the pointer like the Lite thread rows. */
+  html:not([data-interface-motion="off"]) .app-shell-canvas tbody > tr {
+    transition: background-color 160ms cubic-bezier(.22, 1, .36, 1);
+  }
+
+  /* Sidebar items: soft background and a 2px nudge of the icon on hover, like the Lite rows. */
+  html:not([data-interface-motion="off"]) [data-sidebar="menu-button"] {
+    transition: background-color 160ms cubic-bezier(.22, 1, .36, 1), color 160ms cubic-bezier(.22, 1, .36, 1);
+  }
+  html:not([data-interface-motion="off"]) [data-sidebar="menu-button"] > svg {
+    transition: transform 160ms cubic-bezier(.22, 1, .36, 1);
+  }
+  html:not([data-interface-motion="off"]) [data-sidebar="menu-button"]:hover > svg {
+    transform: translateX(2px);
+  }
+
+  /* Empty states and skeleton-to-content swaps fade in. */
+  html:not([data-interface-motion="off"]) .app-shell-canvas :is([data-slot="empty-state"], [data-slot="empty"]) {
+    animation: lite-fade 240ms cubic-bezier(.16, 1, .3, 1) both;
+  }
+}

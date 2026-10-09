@@ -14,9 +14,9 @@
   /* ----- Colors (aligned to the Lite visual on 2026-10-09: docs/design-system/lite) ----- */
   --color-ds-canvas-white: #ffffff;
   --color-ds-paper-mist: #f1f1f5;
-  --color-ds-ash: rgb(16 16 40 / 0.08);
-  --color-ds-smoke: rgb(16 16 40 / 0.12);
-  --color-ds-pebble: rgb(16 16 40 / 0.18);
+  --color-ds-ash: #ebebef;
+  --color-ds-smoke: #e1e1e6;
+  --color-ds-pebble: #d2d2da;
   --color-ds-midnight-ink: #0b0b12;
   --color-ds-charcoal: #0b0b12;
   --color-ds-graphite: #262626;
