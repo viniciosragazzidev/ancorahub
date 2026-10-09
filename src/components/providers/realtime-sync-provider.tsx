@@ -365,9 +365,21 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   }, [currentIncoming, leadNoticeStyle]);
 
   const noticeItem: DynamicNoticeItem | null = currentIncoming
-    ? { id: currentIncoming.notificationId, app: "Leads", title: currentIncoming.title, message: currentIncoming.message, actionLabel: "Atender", shape: "mochi", hue: 212 }
+    ? { id: currentIncoming.notificationId, app: "Leads", title: currentIncoming.title, message: currentIncoming.message, actionLabel: "Atender", shape: "mochi", hue: 212, pillLabel: "Lead novo" }
     : null;
-  const findIncoming = (notice: DynamicNoticeItem) => incomingLeads.queue.find((item) => item.notificationId === notice.id) ?? null;
+  const incomingQueue = incomingLeads.queue;
+  const findIncoming = useCallback((notice: DynamicNoticeItem) => incomingQueue.find((item) => item.notificationId === notice.id) ?? null, [incomingQueue]);
+  const openNotice = useCallback((notice: DynamicNoticeItem) => {
+    const incoming = findIncoming(notice);
+    if (!incoming) return;
+    resolveIncoming(incoming);
+    router.push(`/leads/${incoming.leadId}`);
+  }, [findIncoming, resolveIncoming, router]);
+  // Only an explicit swipe resolves the lead; the card closing on its own does not.
+  const dismissNotice = useCallback((notice: DynamicNoticeItem) => {
+    const incoming = findIncoming(notice);
+    if (incoming) resolveIncoming(incoming);
+  }, [findIncoming, resolveIncoming]);
 
   return (
     <>
@@ -375,16 +387,8 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
         <DynamicNotice
           item={noticeItem}
           queuedCount={Math.max(0, incomingLeads.queue.length - 1)}
-          onOpen={(notice) => {
-            const incoming = findIncoming(notice);
-            if (!incoming) return;
-            resolveIncoming(incoming);
-            router.push(`/leads/${incoming.leadId}`);
-          }}
-          onDismiss={(notice) => {
-            const incoming = findIncoming(notice);
-            if (incoming) resolveIncoming(incoming);
-          }}
+          onOpen={openNotice}
+          onDismiss={dismissNotice}
         />
       ) : null}
       {isEligibleForLeadNotifications && leadToastEnabled && leadNoticeStyle === "toast" ? (

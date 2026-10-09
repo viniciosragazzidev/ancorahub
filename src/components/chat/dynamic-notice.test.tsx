@@ -26,16 +26,24 @@ describe("DynamicNotice", () => {
     expect(onOpen).toHaveBeenCalledTimes(2);
   });
 
-  it("leaves by itself, but not while the broker holds it", () => {
+  it("rests as a pill on its own without resolving the lead, and a tap opens the card again", () => {
     const onDismiss = vi.fn();
-    render(<DynamicNotice item={item} onOpen={vi.fn()} onDismiss={onDismiss} />);
+    const onOpen = vi.fn();
+    render(<DynamicNotice item={{ ...item, pillLabel: "Lead novo" }} onOpen={onOpen} onDismiss={onDismiss} />);
     const notice = screen.getByRole("status");
     fireEvent.pointerDown(notice);
     act(() => { vi.advanceTimersByTime(NOTICE_DURATION_MS + 500); });
-    expect(onDismiss).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Atender" })).toBeTruthy();
     fireEvent.pointerUp(notice);
+    fireEvent.mouseLeave(notice);
     act(() => { vi.advanceTimersByTime(NOTICE_DURATION_MS); });
-    expect(onDismiss).toHaveBeenCalledWith(item);
+    // Resting: the card closed, nothing was resolved or marked as read.
+    expect(screen.queryByRole("button", { name: "Atender" })).toBeNull();
+    expect(screen.getByText("Lead novo")).toBeTruthy();
+    expect(onDismiss).not.toHaveBeenCalled();
+    fireEvent.click(notice);
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Atender" })).toBeTruthy();
   });
 
   it("renders nothing without an item", () => {

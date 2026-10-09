@@ -16,9 +16,11 @@ export type DynamicNoticeItem = {
   actionLabel: string;
   shape: MascotShape;
   hue: number | null;
+  /** Text of the resting pill after the card closes on its own ("Lead novo"). */
+  pillLabel?: string;
 };
 
-/** How long a notice stays before leaving on its own (paused while pressed). */
+/** How long the card stays open before resting as a pill (paused while pressed). */
 export const NOTICE_DURATION_MS = 6000;
 const DISMISS_DRAG_PX = -28;
 const SPRING = { type: "spring" as const, stiffness: 420, damping: 34, mass: 0.9 };
@@ -26,8 +28,9 @@ const SPRING = { type: "spring" as const, stiffness: 420, damping: 34, mass: 0.9
 /**
  * iPhone-like notice: drops from the top as a black pill, opens into a card
  * with the assistant's mascot, the text and one action. Tap opens, drag up
- * dismisses, it leaves by itself after a few seconds. One at a time; the rest
- * wait in the queue (count shown on the card).
+ * dismisses. After a few seconds the card rests as a small pill at the top
+ * (nothing is marked as read): a tap opens the card again. One at a time; the
+ * rest wait in the queue (count shown on the card).
  */
 export function DynamicNotice({
   item,
@@ -52,7 +55,9 @@ export function DynamicNotice({
 
 function Notice({ item, queuedCount, reduce, onOpen, onDismiss }: { item: DynamicNoticeItem; queuedCount: number; reduce: boolean; onOpen: (item: DynamicNoticeItem) => void; onDismiss: (item: DynamicNoticeItem) => void }) {
   const [held, setHeld] = useState(false);
-  const [expanded, setExpanded] = useState(reduce);
+  const [landed, setLanded] = useState(reduce);
+  const [resting, setResting] = useState(false);
+  const expanded = landed && !resting;
   const remaining = useRef(NOTICE_DURATION_MS);
   const startedAt = useRef(0);
   const dragged = useRef(false);
@@ -60,20 +65,20 @@ function Notice({ item, queuedCount, reduce, onOpen, onDismiss }: { item: Dynami
   // The pill opens into the card right after it lands.
   useEffect(() => {
     if (reduce) return;
-    const timer = setTimeout(() => setExpanded(true), 260);
+    const timer = setTimeout(() => setLanded(true), 260);
     return () => clearTimeout(timer);
   }, [reduce]);
 
-  // Leaves by itself; pressing (or hovering with a mouse) pauses the clock.
+  // Rests as a pill by itself (never resolves the lead); pressing or hovering pauses the clock.
   useEffect(() => {
     if (held || !expanded) return;
     startedAt.current = Date.now();
-    const timer = setTimeout(() => onDismiss(item), remaining.current);
+    const timer = setTimeout(() => setResting(true), remaining.current);
     return () => {
       clearTimeout(timer);
       remaining.current = Math.max(800, remaining.current - (Date.now() - startedAt.current));
     };
-  }, [expanded, held, item, onDismiss]);
+  }, [expanded, held]);
 
   function onDragEnd(_event: unknown, info: PanInfo) {
     if (info.offset.y < DISMISS_DRAG_PX || info.velocity.y < -400) onDismiss(item);
@@ -82,7 +87,7 @@ function Notice({ item, queuedCount, reduce, onOpen, onDismiss }: { item: Dynami
 
   // Numbers (not CSS functions) so the pill can morph into the card.
   const [cardWidth] = useState(() => (typeof window === "undefined" ? 420 : Math.min(420, window.innerWidth - 16)));
-  const pill = { width: 126, height: 36, borderRadius: 20 };
+  const pill = { width: resting ? 156 : 126, height: 36, borderRadius: 20 };
   const card = { width: cardWidth, height: "auto", borderRadius: 28 };
 
   return (
@@ -105,7 +110,15 @@ function Notice({ item, queuedCount, reduce, onOpen, onDismiss }: { item: Dynami
       onPointerCancel={() => setHeld(false)}
       onMouseEnter={() => setHeld(true)}
       onMouseLeave={() => setHeld(false)}
-      onClick={() => { if (!dragged.current) onOpen(item); }}
+      onClick={() => {
+        if (dragged.current) return;
+        if (resting) {
+          remaining.current = NOTICE_DURATION_MS;
+          setResting(false);
+          return;
+        }
+        onOpen(item);
+      }}
     >
       <AnimatePresence>
         {expanded ? (
@@ -128,6 +141,11 @@ function Notice({ item, queuedCount, reduce, onOpen, onDismiss }: { item: Dynami
               <button type="button" className={styles.action} onClick={(event) => { event.stopPropagation(); onOpen(item); }}>{item.actionLabel}</button>
             </div>
             {queuedCount > 0 ? <span className={styles.queued}>+{queuedCount}</span> : null}
+          </motion.div>
+        ) : resting ? (
+          <motion.div key="pill" className={styles.pill} initial={reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18, delay: reduce ? 0 : 0.12 }}>
+            <AssistantAvatar shape={item.shape} hue={item.hue} size={22} state="waiting" />
+            <span>{queuedCount > 0 ? `${queuedCount + 1} novos` : item.pillLabel ?? item.app}</span>
           </motion.div>
         ) : null}
       </AnimatePresence>
