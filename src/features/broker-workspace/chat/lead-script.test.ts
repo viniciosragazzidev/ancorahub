@@ -131,6 +131,26 @@ describe("WhatsApp in the lead conversation", () => {
   });
 });
 
+describe("block ids", () => {
+  // A "next" reply hides its target by id: two blocks with the same id would both stay hidden.
+  it("are unique in every stage of the lead", () => {
+    for (const status of ["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "converted", "lost"]) {
+      for (const potentialSale of [false, true]) {
+        const { blocks } = buildLeadConversationScript({
+          lead: lead({ status, potentialSale, telefone: "(21) 99999-9999" }),
+          events: [{ id: "e1", tipo: "note", conteudo: "x", userId: "me", userName: "Eu", createdAt: new Date("2026-10-09T14:52:00.000Z") }],
+          viewerId: "me",
+          now,
+          whatsappUrl: "https://wa.me/5521999999999",
+          messages: [{ id: "w1", body: "Oi", direction: "incoming", sentAt: new Date("2026-10-09T14:53:00.000Z") }],
+        });
+        const ids = blocks.map((block) => block.id);
+        expect(new Set(ids).size, `${status} ${potentialSale}`).toBe(ids.length);
+      }
+    }
+  });
+});
+
 describe("dateLabel", () => {
   it("says today, yesterday or the date", () => {
     expect(dateLabel(new Date("2026-10-08T22:00:00.000Z"), now)).toBe("Ontem, 19:00");
