@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 /**
  * The app's own history since the page was loaded (path + query), kept in step
@@ -47,7 +47,8 @@ export function goBackInApp(router: BackRouter, parentHref: string, alwaysParent
     router.back();
     return;
   }
-  pending = "replace";
+  // Replacing with the screen already shown changes nothing: leave no pending step behind.
+  pending = entries[entries.length - 1] === parentHref ? null : "replace";
   router.replace(parentHref);
 }
 
@@ -60,20 +61,23 @@ export function resetLightNavigationForTests(initial: string[] = []) {
 /** Mount once in the Light chrome. */
 export function useLightNavigationTracker() {
   const pathname = usePathname();
+  const search = useSearchParams()?.toString() ?? "";
+  // Path + query: a change of query alone (Insights ?todas=1, ?ficha=1) is a navigation too.
+  const href = search ? `${pathname}?${search}` : pathname;
   const previous = useRef<string | null>(null);
 
   useEffect(() => {
-    const href = `${window.location.pathname}${window.location.search}`;
     if (previous.current === null) {
-      previous.current = pathname;
+      previous.current = href;
       if (!entries.length) entries = [href];
+      pending = null;
       return;
     }
-    if (previous.current === pathname) return;
-    previous.current = pathname;
+    if (previous.current === href) return;
+    previous.current = href;
     entries = nextEntries(entries, pending ?? "push", href);
     pending = null;
-  }, [pathname]);
+  }, [href]);
 
   useEffect(() => {
     // Browser or gesture back (not our button): the next change is a pop.
