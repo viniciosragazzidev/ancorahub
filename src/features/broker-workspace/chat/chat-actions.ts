@@ -12,7 +12,8 @@ import { declineLeadAction } from "@/features/leads/decline-action";
 import { MOTIVOS_PERDA } from "@/features/leads/lead-status-constants";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
 
-export type ChatServerActionResult = { ok: boolean; message: string; href?: string };
+/** warning: it worked, but part of it did not (shown as an alert, not as success). */
+export type ChatServerActionResult = { ok: boolean; message: string; href?: string; warning?: boolean };
 
 const leadPayload = z.object({ leadId: z.string().min(1) });
 const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead"]);
@@ -73,7 +74,7 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
         const reminder = await scheduleReturn(leadId, when);
         return reminder.success
           ? { ok: true, message: `Pronto, etapa: ${stage}. Te lembro de acompanhar ${RETURN_TEXT[when]}.` }
-          : { ok: true, message: `Etapa: ${stage}. Mas não consegui criar o lembrete: ${reminder.error ?? "tente pela ficha"}.` };
+          : { ok: true, warning: true, message: `Etapa: ${stage}. Mas não consegui criar o lembrete: ${reminder.error ?? "tente pela ficha"}.` };
       }
       case "lead.scheduleReturn": {
         const { leadId, when } = leadPayload.extend({ when: whenPreset }).parse(payload);

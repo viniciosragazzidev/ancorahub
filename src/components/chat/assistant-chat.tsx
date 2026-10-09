@@ -19,7 +19,7 @@ export function AssistantChat({ identity, script }: { identity: { name: string; 
       runAction={async (action) => {
         const result = await runChatServerAction(action.name, action.payload);
         if (result.ok && result.href?.startsWith("http")) window.open(result.href, "_blank", "noopener");
-        return { ok: result.ok, message: result.message };
+        return { ok: result.ok, message: result.message, warning: result.warning };
       }}
       onMention={(mention: Mention): ChatBlock[] => {
         router.push(mention.handle === "cotacao" ? "/cotacao" : `/dashboard/c/${mention.handle}`);

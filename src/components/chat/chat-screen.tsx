@@ -12,7 +12,7 @@ import styles from "./chat.module.css";
 import type { ChatAction, ChatBlock, ChatChoice, ChatScript, MascotShape } from "./types";
 
 /** Result of a server action run from a reply. A message is shown as the assistant's answer. */
-export type ChatActionResult = { ok: boolean; message?: string; followUp?: ChatBlock[] };
+export type ChatActionResult = { ok: boolean; message?: string; followUp?: ChatBlock[]; warning?: boolean };
 export type ChatActionRunner = (action: Extract<ChatAction, { kind: "server" }>, choice: ChatChoice) => Promise<ChatActionResult>;
 
 type Identity = { name: string; shape: MascotShape; hue: number | null; initials?: string; temperature?: "hot" | "warm" | "cold" | null };
@@ -123,7 +123,7 @@ export function ChatScreen({
         ...(result.message ? [{ type: "assistant" as const, id: `result-${question.id}`, text: result.message, at: nowLabel() }] : []),
         ...(result.followUp ?? []),
       ]);
-      setStatus(result.ok ? { label: "Pronto", tone: "idle" } : { label: "Esperando você", tone: "waiting" });
+      setStatus(result.ok && !result.warning ? { label: "Pronto", tone: "idle" } : { label: result.ok ? "Precisa de atenção" : "Esperando você", tone: "waiting" });
       if (result.ok) router.refresh();
     } catch {
       enqueue([{ type: "assistant", id: `error-${question.id}`, text: "Não consegui concluir agora. Tente de novo em instantes." }]);

@@ -76,6 +76,14 @@ describe("ChatScreen", () => {
     await waitFor(() => expect(runAction).toHaveBeenCalledWith(expect.objectContaining({ name: "lead.decline" }), expect.objectContaining({ id: "busy" })));
   });
 
+  it("shows a partial success as an alert, not as done", async () => {
+    renderChat(vi.fn().mockResolvedValue({ ok: true, warning: true, message: "Etapa mudou, lembrete falhou." }));
+    fireEvent.click(screen.getByRole("button", { name: /Aceitar/ }));
+    expect(await screen.findByText("Etapa mudou, lembrete falhou.")).toBeTruthy();
+    expect(screen.getByText("Precisa de atenção")).toBeTruthy();
+    expect(screen.queryByText("Pronto")).toBeNull();
+  });
+
   it("navigates for link replies", () => {
     renderChat();
     fireEvent.click(screen.getByRole("button", { name: /Ver a ficha/ }));

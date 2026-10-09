@@ -45,7 +45,7 @@ export function LeadConversation({
           // Registering the first contact returns the WhatsApp link: open it beside the app.
           if (result.ok && result.href?.startsWith("http")) window.open(result.href, "_blank", "noopener");
           if (result.ok && action.name === "lead.decline") router.push("/minha-fila");
-          return { ok: result.ok, message: result.message };
+          return { ok: result.ok, message: result.message, warning: result.warning };
         }}
         onFreeText={async (text): Promise<ChatBlock[]> => {
           const result = await runChatServerAction("lead.addNote", { leadId, content: text });
