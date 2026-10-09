@@ -16,7 +16,7 @@ describe("typed duty plan generation", () => {
       occurrences: [occurrence("a", "type-a"), occurrence("b", "type-b")],
       settings: settings([{ brokerId: "broker", modality: "any", seats: { "type-a": 1 }, forcedTypeKeys: [] }], ["type-a", "type-b"]),
     });
-    expect(assignments).toEqual([{ occurrenceId: "a", brokerId: "broker" }]);
+    expect(assignments).toEqual([{ occurrenceId: "a", brokerId: "broker", origin: "generated" }]);
   });
 
   it("does not assign an online-only broker to an in-person occurrence", () => {
@@ -43,7 +43,7 @@ describe("typed duty plan generation", () => {
       settings: settings([{ brokerId: "broker", modality: "any", seats: { "type-a": 1 }, forcedTypeKeys: [] }]),
       commitments: [{ brokerId: "broker", dutyDate: "2026-10-28", startsAt: "08:30", endsAt: "09:30" }],
     });
-    expect(assignments).toEqual([{ occurrenceId: "free", brokerId: "broker" }]);
+    expect(assignments).toEqual([{ occurrenceId: "free", brokerId: "broker", origin: "generated" }]);
   });
 
   it("builds occurrences across the month boundary and respects type units", () => {
@@ -54,5 +54,22 @@ describe("typed duty plan generation", () => {
     }], [{ id: "broker-a", branchId: "branch-a" }, { id: "broker-b", branchId: "branch-b" }]);
     expect(occurrences.map((item) => item.dutyDate)).toEqual(["2026-10-28", "2026-11-04"]);
     expect(occurrences.map((item) => item.allowedBrokerIds)).toEqual([["broker-a"], ["broker-a"]]);
+  });
+
+  it("keeps brokers already on the roster, counts their seats and fills only the rest", () => {
+    const two = (id: string, startsAt: string, endsAt: string) => ({ ...occurrence(id, "type-a", startsAt, endsAt, ["kept", "new"]), maximumBrokers: 1 });
+    const assignments = generateTypedAssignments({
+      occurrences: [two("full", "09:00", "10:00"), two("open", "10:00", "11:00"), two("later", "11:00", "12:00")],
+      settings: settings([
+        { brokerId: "kept", modality: "any", seats: { "type-a": 1 }, forcedTypeKeys: [] },
+        { brokerId: "new", modality: "any", seats: { "type-a": 2 }, forcedTypeKeys: [] },
+      ]),
+      existingByOccurrence: new Map([["full", ["kept"]]]),
+    });
+    // "full" is already at its maximum; "kept" used its only seat there.
+    expect(assignments).toEqual([
+      { occurrenceId: "open", brokerId: "new", origin: "generated" },
+      { occurrenceId: "later", brokerId: "new", origin: "generated" },
+    ]);
   });
 });

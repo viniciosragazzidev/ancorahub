@@ -41,9 +41,17 @@ export type MonthlyPlanOccurrence = {
   attendanceMode?: "online" | "presencial";
   /** Brokers outside the type's units the Diretor confirmed anyway. */
   forcedBrokerIds?: string[];
+  /** Brokers already on the real roster of this occurrence when the draft was generated. */
+  keptBrokerIds?: string[];
 };
 
-export type MonthlyPlanAssignment = { occurrenceId: string; brokerId: string };
+/**
+ * Where an assignment came from: already on the published escala ("existing"),
+ * on the weekly roster ("weekly", never re-published), drawn by this
+ * generation ("generated") or added by hand ("manual").
+ */
+export type AssignmentOrigin = "existing" | "weekly" | "generated" | "manual";
+export type MonthlyPlanAssignment = { occurrenceId: string; brokerId: string; origin?: AssignmentOrigin };
 
 export const MONTH_KEY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
@@ -281,6 +289,8 @@ export type PlanSettings = {
   rangeFrom: string;
   rangeUntil: string;
   typeKeys: string[];
+  /** Types chosen in the latest generation (the escala step shows these). */
+  generatedTypeKeys?: string[];
   brokers: PlanBrokerSetting[];
 };
 
@@ -292,6 +302,7 @@ export function parsePlanSettings(value: unknown): PlanSettings | null {
     rangeFrom: raw.rangeFrom,
     rangeUntil: raw.rangeUntil,
     typeKeys: raw.typeKeys.filter((key): key is string => typeof key === "string"),
+    generatedTypeKeys: Array.isArray(raw.generatedTypeKeys) ? raw.generatedTypeKeys.filter((key): key is string => typeof key === "string") : undefined,
     brokers: (Array.isArray(raw.brokers) ? raw.brokers : []).filter((item): item is PlanBrokerSetting => Boolean(item && typeof item.brokerId === "string")).map((item) => ({
       brokerId: item.brokerId,
       modality: item.modality === "online" || item.modality === "presencial" ? item.modality : "any",

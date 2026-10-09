@@ -65,7 +65,7 @@ const draft: MonthlyDutyPlanView = {
   occurrences: [{
     id: "11111111-1111-4111-8111-111111111111:2026-12-07", scheduleId: "11111111-1111-4111-8111-111111111111", scheduleName: "PME · Manhã", dutyDate: "2026-12-07", startsAt: "09:00", endsAt: "13:30",
     minimumBrokers: 2, maximumBrokers: 3, allowedBrokerIds: ["broker-1"], typeId: PME, attendanceMode: "online",
-    brokers: [{ id: "broker-1", name: "Corretor Exemplo", code: "C101", branchId: "branch-1", branchName: "Unidade Centro", forced: false }],
+    brokers: [{ id: "broker-1", name: "Corretor Exemplo", code: "C101", branchId: "branch-1", branchName: "Unidade Centro", forced: false, origin: "generated" }],
     assignedCount: 1, ended: false,
   }],
   totalAssigned: 1,
@@ -238,5 +238,31 @@ describe("monthly duty planner", () => {
     expect(await screen.findByText("PME · Manhã")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Remover/ })).toBeNull();
     expect(screen.queryByRole("button", { name: "Publicar escala" })).toBeNull();
+  });
+
+  it("shows only the generated types and tells kept brokers from new ones", async () => {
+    const other = { ...draft.occurrences[0], id: "other:2026-12-09", scheduleId: schedules[1].id, scheduleName: "Presencial", dutyDate: "2026-12-09", typeId: PRESENCIAL, attendanceMode: "presencial" as const };
+    vi.mocked(getMonthlyDutyPlanAction).mockResolvedValue({
+      ...draft,
+      settings: { ...draft.settings!, typeKeys: [PME, PRESENCIAL], generatedTypeKeys: [PME] },
+      occurrences: [
+        { ...draft.occurrences[0], brokers: [
+          { ...draft.occurrences[0].brokers[0], origin: "existing" },
+          { id: "broker-2", name: "Segunda Pessoa", code: "C202", branchId: "branch-2", branchName: "Unidade Barra", forced: false, origin: "generated" },
+        ], assignedCount: 2 },
+        other,
+      ],
+    });
+    render(<Harness />);
+
+    expect(await screen.findByText("PME · Manhã")).toBeTruthy();
+    expect(screen.getAllByRole("article")).toHaveLength(1);
+    expect(screen.getByText(/Já escalados · 1/)).toBeTruthy();
+    expect(screen.getByText(/Novos nesta geração · 1/)).toBeTruthy();
+    expect(screen.getByText("Corretor Exemplo").closest("li")?.getAttribute("data-origin")).toBe("kept");
+    expect(screen.getByText("Segunda Pessoa").closest("li")?.getAttribute("data-origin")).toBe("new");
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Ver os outros tipos da escala/ }));
+    await waitFor(() => expect(screen.getAllByRole("article")).toHaveLength(2));
   });
 });

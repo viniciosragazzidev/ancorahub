@@ -227,7 +227,12 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
     brokers: brokerIds.filter(visible).map(brokerView),
     occurrences: occurrences.map((occurrence) => ({
       ...occurrence,
-      brokers: assignments.filter((item) => item.occurrenceId === occurrence.id).map((item) => ({ ...brokerView(item.brokerId), forced: Boolean(occurrence.forcedBrokerIds?.includes(item.brokerId)) })),
+      brokers: assignments.filter((item) => item.occurrenceId === occurrence.id).map((item) => ({
+        ...brokerView(item.brokerId),
+        forced: Boolean(occurrence.forcedBrokerIds?.includes(item.brokerId)),
+        /** Already on the roster before this generation (kept), or new now. */
+        origin: (item.origin ?? (plan.status === "draft" ? "generated" : "existing")) as "existing" | "weekly" | "generated" | "manual",
+      })),
       assignedCount: summary.assignedByOccurrence.get(occurrence.id) ?? 0,
       /** Shift already over: read-only in a draft and never published. */
       ended: occurrenceEnded(occurrence, now),
@@ -276,6 +281,7 @@ function mergeSettings(previous: PlanSettings | null, input: Omit<PlanSettings, 
     rangeFrom: previous && previous.rangeFrom < input.rangeFrom ? previous.rangeFrom : input.rangeFrom,
     rangeUntil: previous && previous.rangeUntil > input.rangeUntil ? previous.rangeUntil : input.rangeUntil,
     typeKeys: [...new Set([...(previous?.typeKeys ?? []), ...input.typeKeys])],
+    generatedTypeKeys: [...input.typeKeys],
     brokers: [...byBroker.values()].filter((broker) => Object.keys(broker.seats).length > 0),
   };
 }
@@ -339,22 +345,64 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
       !running.has(occurrence.id) && (freshIds.has(occurrence.id) || (chosenKeys.has(typeKeyOf(occurrence.typeId)) && occurrence.dutyDate >= rangeFrom && occurrence.dutyDate <= rangeUntil));
     const keptOccurrences = previousOccurrences.filter((occurrence) => !regenerated(occurrence) && !occurrenceEnded(occurrence, now));
     const keptIds = new Set(keptOccurrences.map((occurrence) => occurrence.id));
-    const keptAssignments = previousAssignments
+    const keptAssignments: StoredAssignment[] = previousAssignments
       .filter((item) => keptIds.has(item.occurrenceId))
-      .map((item) => ({ occurrenceId: item.occurrenceId, brokerId: item.brokerId }));
+      .map((item) => ({ occurrenceId: item.occurrenceId, brokerId: item.brokerId, ...(item.origin ? { origin: item.origin } : {}) }));
     const keptById = new Map(keptOccurrences.map((occurrence) => [occurrence.id, occurrence]));
+
+    // Who is already on the real roster of each plantão being drawn: the
+    // published escala (one row per date) and the weekly roster. They stay
+    // and the draw only fills the remaining places (a draft is redrawn).
+    const brokerIdSet = new Set(brokers.map((broker) => broker.id));
+    const rosterRows = toDraw.length
+      ? await tx.select({
+        scheduleId: schema.dutyRosterAssignments.scheduleId,
+        brokerId: schema.dutyRosterAssignments.brokerId,
+        dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`,
+        dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+        validFrom: schema.dutyRosterAssignments.validFrom,
+        validUntil: schema.dutyRosterAssignments.validUntil,
+      }).from(schema.dutyRosterAssignments)
+        .where(and(
+          eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+          eq(schema.dutyRosterAssignments.status, "active"),
+          inArray(schema.dutyRosterAssignments.scheduleId, [...new Set(toDraw.map((occurrence) => occurrence.scheduleId))]),
+        ))
+      : [];
+    const existing: StoredAssignment[] = [];
+    const existingByOccurrence = new Map<string, string[]>();
+    for (const occurrence of toDraw) {
+      const midnight = zonedMidnight(occurrence.dutyDate, "America/Sao_Paulo").getTime();
+      const seen = new Set<string>();
+      for (const row of rosterRows) {
+        if (row.scheduleId !== occurrence.scheduleId || !brokerIdSet.has(row.brokerId) || seen.has(row.brokerId)) continue;
+        const dated = row.dutyDate === occurrence.dutyDate;
+        const weekly = row.dutyDate === null && row.dayOfWeek === dayOfWeekOf(occurrence.dutyDate)
+          && row.validFrom.getTime() <= midnight && (!row.validUntil || row.validUntil.getTime() > midnight);
+        if (!dated && !weekly) continue;
+        seen.add(row.brokerId);
+        existing.push({ occurrenceId: occurrence.id, brokerId: row.brokerId, origin: dated ? "existing" : "weekly" });
+      }
+      if (seen.size) existingByOccurrence.set(occurrence.id, [...seen]);
+    }
+    // Already on the roster = allowed on it, whatever the units of the type say.
+    const drawn = toDraw.map((occurrence) => {
+      const kept = existingByOccurrence.get(occurrence.id);
+      return kept ? { ...occurrence, allowedBrokerIds: [...new Set([...occurrence.allowedBrokerIds, ...kept])], keptBrokerIds: kept } : occurrence;
+    });
 
     const windowsByBroker = new Map<string, typeof windows>();
     for (const window of windows) windowsByBroker.set(window.brokerId, [...(windowsByBroker.get(window.brokerId) ?? []), window]);
     const generated = generateTypedAssignments({
-      occurrences: toDraw,
+      occurrences: drawn,
       settings: settingsInput,
       windowsByBroker,
       commitments: keptAssignments.map((item) => ({ brokerId: item.brokerId, ...keptById.get(item.occurrenceId)! })),
+      existingByOccurrence,
     });
 
     const settings = mergeSettings(parsePlanSettings(latest?.settings), settingsInput);
-    const occurrences = [...keptOccurrences, ...toDraw].sort((a, b) => a.dutyDate.localeCompare(b.dutyDate) || a.startsAt.localeCompare(b.startsAt) || a.id.localeCompare(b.id));
+    const occurrences = [...keptOccurrences, ...drawn].sort((a, b) => a.dutyDate.localeCompare(b.dutyDate) || a.startsAt.localeCompare(b.startsAt) || a.id.localeCompare(b.id));
     const id = randomUUID();
     await tx.insert(schema.dutyScheduleMonthlyPlans).values({
       id,
@@ -364,7 +412,7 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
       status: "draft",
       quotas: settings.brokers.map((broker) => ({ brokerId: broker.brokerId, quota: Object.values(broker.seats).reduce((sum, seats) => sum + seats, 0) })),
       occurrences,
-      assignments: [...keptAssignments, ...generated],
+      assignments: [...keptAssignments, ...existing, ...generated],
       settings,
       generatedBy: context.userId,
     });
@@ -396,8 +444,10 @@ export async function updateMonthlyDutyDraftAction(input: unknown): Promise<Mont
     const current = asArray<StoredAssignment>(plan.assignments);
     let next: StoredAssignment[];
     if (operation === "remove") {
-      next = current.filter((item) => !(item.occurrenceId === occurrenceId && item.brokerId === brokerId));
-      if (next.length === current.length) throw new Error("Este corretor não está neste plantão.");
+      const target = current.find((item) => item.occurrenceId === occurrenceId && item.brokerId === brokerId);
+      if (!target) throw new Error("Este corretor não está neste plantão.");
+      if (target.origin === "weekly") throw new Error("Este corretor está na escala semanal do plantão. Remova-o pelo próprio plantão.");
+      next = current.filter((item) => item !== target);
     } else {
       const planningIds = new Set((await loadPlanningBrokers(tx, context.tenantId)).map((broker) => broker.id));
       if (!planningIds.has(brokerId)) throw new Error("Este corretor está fora da corretora ou da política de inclusão na escala.");
@@ -410,7 +460,7 @@ export async function updateMonthlyDutyDraftAction(input: unknown): Promise<Mont
           ? { ...occurrence, allowedBrokerIds: [...occurrence.allowedBrokerIds, brokerId], forcedBrokerIds: [...new Set([...(occurrence.forcedBrokerIds ?? []), brokerId])] }
           : occurrence);
       }
-      next = [...current, { occurrenceId, brokerId }];
+      next = [...current, { occurrenceId, brokerId, origin: "manual" }];
       // DEC-132: an overlap with the broker's other occurrences no longer blocks the add.
       const problems = findDraftProblems(occurrences, next).filter((problem) => problem.occurrenceId === occurrenceId && problem.kind !== "overlap");
       if (problems.length) throw new Error(describeDraftProblem(problems[0]));
@@ -473,13 +523,20 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
       if (rebuilt.startsAt !== stored.startsAt || rebuilt.endsAt !== stored.endsAt) changed = true;
       // Brokers the Diretor confirmed outside the type's units stay allowed.
       const forced = (stored.forcedBrokerIds ?? []).filter((brokerId) => brokers.some((broker) => broker.id === brokerId));
-      occurrences.push({ ...rebuilt, allowedBrokerIds: [...new Set([...rebuilt.allowedBrokerIds, ...forced])], forcedBrokerIds: forced.length ? forced : undefined });
+      const kept = (stored.keptBrokerIds ?? []).filter((brokerId) => brokers.some((broker) => broker.id === brokerId));
+      occurrences.push({
+        ...rebuilt,
+        allowedBrokerIds: [...new Set([...rebuilt.allowedBrokerIds, ...forced, ...kept])],
+        forcedBrokerIds: forced.length ? forced : undefined,
+        keptBrokerIds: kept.length ? kept : undefined,
+      });
     }
     // A draft can be days old: shifts that ended since then are dropped, never published.
     const assignments = storedAssignments.filter((assignment) => !endedIds.has(assignment.occurrenceId));
     if (!assignments.length) throw new Error("Todos os plantões desta proposta já passaram. Gere uma nova proposta.");
     // DEC-132: an overlap is a warning, never a publish blocker.
-    const problems = findDraftProblems(occurrences, assignments).filter((problem) => problem.kind !== "overlap");
+    // Weekly roster brokers are not published (no dated row): only the rest is revalidated.
+    const problems = findDraftProblems(occurrences, assignments.filter((assignment) => assignment.origin !== "weekly")).filter((problem) => problem.kind !== "overlap");
     if (changed || problems.length) {
       throw new Error(`A proposta ficou desatualizada: ${changed ? "o horário de um plantão mudou." : describeDraftProblem(problems[0])} Gere uma nova proposta.`);
     }
@@ -519,6 +576,8 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     const inserts: Array<typeof schema.dutyRosterAssignments.$inferInsert> = [];
     const insertedFor: StoredAssignment[] = [];
     for (const assignment of assignments) {
+      // Weekly roster brokers are already on duty: no dated row for them.
+      if (assignment.origin === "weekly") continue;
       const existing = existingByKey.get(`${assignment.occurrenceId}|${assignment.brokerId}`);
       if (existing) {
         kept.push({ assignment, rowId: existing.id });
@@ -572,7 +631,7 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     ]);
     const [flipped] = await tx.update(schema.dutyScheduleMonthlyPlans).set({
       status: "published",
-      assignments: assignments.map((assignment) => ({ occurrenceId: assignment.occurrenceId, brokerId: assignment.brokerId, rosterAssignmentId: rowIdByAssignment.get(assignment) })),
+      assignments: assignments.map((assignment) => ({ occurrenceId: assignment.occurrenceId, brokerId: assignment.brokerId, origin: assignment.origin, rosterAssignmentId: rowIdByAssignment.get(assignment) })),
       occurrences,
       publishedBy: context.userId,
       publishedAt: now,

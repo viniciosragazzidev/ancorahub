@@ -188,6 +188,8 @@ export function MonthlyDutyPlanner({
   const [filterSearch, setFilterSearch] = useState("");
   const [onlyShort, setOnlyShort] = useState(false);
   const [reviewView, setReviewView] = useState<"days" | "brokers">("days");
+  // The escala step shows the types of the latest generation; the rest on demand.
+  const [showAllTypes, setShowAllTypes] = useState(false);
 
   useEffect(() => {
     if (open) queueMicrotask(() => { void load(month); });
@@ -339,11 +341,14 @@ export function MonthlyDutyPlanner({
   }
 
   // ---- review data
+  const generatedKeys = useMemo(() => new Set(plan?.settings?.generatedTypeKeys ?? []), [plan]);
+  const limitToGenerated = generatedKeys.size > 0 && !showAllTypes;
   const reviewOccurrences = useMemo(() => {
     if (!plan) return [];
     const needle = filterSearch.trim().toLocaleLowerCase("pt-BR");
     return plan.occurrences.filter((occurrence) => {
       const key = typeKeyOfOccurrence(occurrence);
+      if (limitToGenerated && !generatedKeys.has(key)) return false;
       if (filterTypes.length && !filterTypes.includes(key)) return false;
       if (filterModality && (occurrence.attendanceMode ?? schedules.find((schedule) => schedule.id === occurrence.scheduleId)?.attendanceMode ?? "online") !== filterModality) return false;
       if (onlyShort && (occurrence.ended || occurrence.assignedCount >= occurrence.minimumBrokers)) return false;
@@ -351,9 +356,20 @@ export function MonthlyDutyPlanner({
       if (filterBranch && !occurrence.brokers.some((broker) => broker.branchId === filterBranch) && !onlyShort) return false;
       return true;
     });
-  }, [filterBranch, filterModality, filterSearch, filterTypes, onlyShort, plan, schedules, typeKeyOfOccurrence]);
+  }, [filterBranch, filterModality, filterSearch, filterTypes, generatedKeys, limitToGenerated, onlyShort, plan, schedules, typeKeyOfOccurrence]);
+  // Brokers already on the roster vs. new in this generation (shown in two colors).
+  const originCounts = useMemo(() => {
+    let kept = 0;
+    let added = 0;
+    for (const occurrence of reviewOccurrences) for (const broker of occurrence.brokers) {
+      if (broker.origin === "existing" || broker.origin === "weekly") kept += 1;
+      else added += 1;
+    }
+    return { kept, added };
+  }, [reviewOccurrences]);
   const reviewDates = [...new Set(reviewOccurrences.map((occurrence) => occurrence.dutyDate))];
-  const planTypeKeys = useMemo(() => [...new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence))].sort((a, b) => (a === NO_TYPE_KEY ? 1 : b === NO_TYPE_KEY ? -1 : (typeInfo.get(a)?.name ?? "").localeCompare(typeInfo.get(b)?.name ?? "", "pt-BR"))), [plan, typeInfo, typeKeyOfOccurrence]);
+  const planTypeKeys = useMemo(() => [...new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence))].filter((key) => !limitToGenerated || generatedKeys.has(key)).sort((a, b) => (a === NO_TYPE_KEY ? 1 : b === NO_TYPE_KEY ? -1 : (typeInfo.get(a)?.name ?? "").localeCompare(typeInfo.get(b)?.name ?? "", "pt-BR"))), [generatedKeys, limitToGenerated, plan, typeInfo, typeKeyOfOccurrence]);
+  const hiddenTypes = generatedKeys.size ? new Set((plan?.occurrences ?? []).map(typeKeyOfOccurrence).filter((key) => !generatedKeys.has(key))).size : 0;
   const brokerRows = useMemo(() => {
     if (!plan) return [];
     const rows = new Map<string, { broker: MonthlyDutyPlanView["brokers"][number]; byType: Map<string, number>; total: number }>();
@@ -600,6 +616,15 @@ export function MonthlyDutyPlanner({
                         <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
                           <Checkbox checked={onlyShort} onCheckedChange={(checked) => setOnlyShort(checked === true)} /> Só com falta
                         </label>
+                        {hiddenTypes ? (
+                          <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <Checkbox checked={showAllTypes} onCheckedChange={(checked) => setShowAllTypes(checked === true)} /> Ver os outros tipos da escala ({hiddenTypes})
+                          </label>
+                        ) : null}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground" aria-label="Legenda dos corretores">
+                        <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2.5 rounded-full border border-border bg-muted" /> Já escalados · {originCounts.kept}</span>
+                        <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="size-2.5 rounded-full border border-success/50 bg-success/15" /> {published ? "Escalados nesta escala" : "Novos nesta geração"} · {originCounts.added}</span>
                       </div>
                       {planTypeKeys.length > 1 ? (
                         <div role="group" aria-label="Filtrar por tipo" className="flex flex-wrap items-center gap-1.5">
@@ -695,18 +720,30 @@ export function MonthlyDutyPlanner({
                                 )}
                               </div>
                               <ul className="mt-2 flex flex-wrap gap-1.5">
-                                {shown.map((broker) => (
-                                  <li key={broker.id} title={broker.branchName ?? undefined} className={cn("inline-flex items-center gap-1 rounded-full border bg-muted/40 py-0.5 pl-2.5 pr-1 text-xs", broker.forced ? "border-warning/50" : "border-border")}>
+                                {shown.map((broker) => {
+                                  const kept = broker.origin === "existing" || broker.origin === "weekly";
+                                  return (
+                                  <li
+                                    key={broker.id}
+                                    title={`${kept ? (broker.origin === "weekly" ? "Já escalado (escala semanal)" : "Já escalado") : "Novo nesta geração"}${broker.branchName ? ` · ${broker.branchName}` : ""}${broker.forced ? " · fora da unidade do tipo" : ""}`}
+                                    data-origin={kept ? "kept" : "new"}
+                                    className={cn(
+                                      "inline-flex items-center gap-1 rounded-full border py-0.5 pl-2.5 pr-1 text-xs",
+                                      kept ? "border-border bg-muted text-muted-foreground" : "border-success/50 bg-success/15 text-foreground",
+                                      broker.forced && "ring-1 ring-warning/60",
+                                    )}
+                                  >
                                     {broker.code ? <span className="font-semibold tabular-nums">{broker.code}</span> : null}
                                     <span>{broker.name}</span>
                                     {!filterBranch && broker.branchName ? <span className="text-muted-foreground">· {broker.branchName}</span> : null}
-                                    {editable ? (
+                                    {editable && broker.origin !== "weekly" ? (
                                       <button type="button" aria-label={`Remover ${broker.name} de ${occurrence.scheduleName} em ${dateLabel(date)}`} disabled={pending} onClick={() => editDraft(occurrence.id, broker.id, "remove")} className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50">
                                         {busyKey === `remove:${occurrence.id}:${broker.id}` ? <Loader2Icon className="size-3 animate-spin" /> : <X className="size-3" />}
                                       </button>
                                     ) : <span className="w-1" />}
                                   </li>
-                                ))}
+                                  );
+                                })}
                                 {!shown.length ? <li className="text-xs text-muted-foreground">{filterBranch && occurrence.brokers.length ? "Ninguém desta unidade" : "Ninguém escalado"}</li> : null}
                                 {editable && !full ? (
                                   <li>
