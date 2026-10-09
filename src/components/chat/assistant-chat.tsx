@@ -18,11 +18,13 @@ export function AssistantChat({ identity, script }: { identity: { name: string; 
       script={script}
       runAction={async (action) => {
         const result = await runChatServerAction(action.name, action.payload);
-        if (result.ok && result.href?.startsWith("http")) window.open(result.href, "_blank", "noopener");
         // An accepted lead continues in its own conversation: offer it as the next reply.
         const followUp: ChatBlock[] = result.ok && result.href?.startsWith("/") && !result.href.startsWith("//")
           ? [{ type: "question", id: `after-${action.name}-${Date.now()}`, prompt: "Quer seguir com ele agora?", choices: [{ id: "open", label: "Abrir a conversa", action: { kind: "href", href: result.href } }] }]
-          : [];
+          // External links (WhatsApp) become a button: opened by the tap, never blocked as a popup.
+          : result.ok && result.href?.startsWith("https://")
+            ? [{ type: "button", id: `after-${action.name}-${Date.now()}`, label: "Abrir WhatsApp", href: result.href, tone: "whatsapp" }]
+            : [];
         return { ok: result.ok, message: result.message, warning: result.warning, followUp };
       }}
       onMention={(mention: Mention): ChatBlock[] => {

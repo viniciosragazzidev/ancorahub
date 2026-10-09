@@ -17,7 +17,7 @@ export type ChatActionRunner = (action: Extract<ChatAction, { kind: "server" }>,
 
 type Identity = { name: string; shape: MascotShape; hue: number | null; initials?: string; temperature?: "hot" | "warm" | "cold" | null };
 
-/** Questions opened by a "next" action stay hidden until that reply is chosen. */
+/** Blocks opened by a "next" action (questions, buttons) stay hidden until that reply is chosen. */
 function hiddenQuestionIds(blocks: ChatBlock[]) {
   const ids = new Set<string>();
   for (const block of blocks) {
@@ -54,6 +54,7 @@ export function ChatScreen({
   progress: progressOverride,
   placeholder: placeholderOverride,
   composerInput,
+  onButtonOpen,
 }: {
   identity: Identity;
   backHref: string;
@@ -72,11 +73,13 @@ export function ChatScreen({
   placeholder?: string;
   /** Keyboard and accessible name of the composer when it answers a question. */
   composerInput?: { inputMode?: "text" | "numeric"; label?: string };
+  /** A button block was tapped (e.g. record that WhatsApp was opened). */
+  onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>) => void;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
   const hidden = useMemo(() => hiddenQuestionIds(script.blocks), [script.blocks]);
-  const initial = useMemo(() => script.blocks.filter((block) => !(block.type === "question" && hidden.has(block.id))), [hidden, script.blocks]);
+  const initial = useMemo(() => script.blocks.filter((block) => !hidden.has(block.id)), [hidden, script.blocks]);
 
   // Blocks already on screen, and the queue still to be "typed".
   const [shown, setShown] = useState<ChatBlock[]>(() => (reduce ? initial : initial.slice(0, 1)));
@@ -122,7 +125,7 @@ export function ChatScreen({
       return;
     }
     if (action.kind === "next") {
-      const target = script.blocks.find((block) => block.type === "question" && block.id === action.questionId);
+      const target = script.blocks.find((block) => block.id === action.questionId);
       if (target) enqueue([target]);
       return;
     }
@@ -185,7 +188,7 @@ export function ChatScreen({
             <MessageEnter key={block.id}>
               {block.type === "question"
                 ? <ChoiceList block={block} chosenId={answers[block.id] ?? null} disabled={working} onChoose={(choice) => { void choose(block, choice); }} />
-                : <ChatBlockView block={block} onSystemAction={(system) => { if (system.action) void choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
+                : <ChatBlockView block={block} onButtonOpen={onButtonOpen} onSystemAction={(system) => { if (system.action) void choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
             </MessageEnter>
           ))}
           <AnimatePresence>{typing ? <MessageEnter key="typing"><TypingIndicator /></MessageEnter> : null}</AnimatePresence>

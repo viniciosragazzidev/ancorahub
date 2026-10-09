@@ -7,8 +7,10 @@ import { ChatScreen } from "@/components/chat/chat-screen";
 import styles from "@/components/chat/chat.module.css";
 import type { Mention } from "@/components/chat/composer";
 import type { ChatBlock, ChatScript } from "@/components/chat/types";
+import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
 
 import { runChatServerAction } from "./chat-actions";
+import { whatsappButton } from "./lead-script";
 
 /**
  * A lead as a conversation: the script plays, replies run the broker's lead
@@ -35,6 +37,7 @@ export function LeadConversation({
         backHref="/minha-fila"
         script={script}
         composerDisabled={!canWrite}
+        onButtonOpen={(block) => { if (block.tone === "whatsapp") void recordWhatsAppOpenedAction(leadId); }}
         headerAction={
           <Link href={`/leads/${leadId}?ficha=1`} className={styles.iconButton} aria-label="Ver ficha completa">
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2.5" width="10" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
@@ -42,10 +45,10 @@ export function LeadConversation({
         }
         runAction={async (action) => {
           const result = await runChatServerAction(action.name, action.payload);
-          // Registering the first contact returns the WhatsApp link: open it beside the app.
-          if (result.ok && result.href?.startsWith("http")) window.open(result.href, "_blank", "noopener");
           if (result.ok && action.name === "lead.decline") router.push("/minha-fila");
-          return { ok: result.ok, message: result.message, warning: result.warning };
+          // Registering the first contact returns the WhatsApp link: a button right below opens it.
+          const followUp: ChatBlock[] = result.ok && result.href?.startsWith("http") ? [whatsappButton(`b-whatsapp-${Date.now()}`, result.href)] : [];
+          return { ok: result.ok, message: result.message, warning: result.warning, followUp };
         }}
         onFreeText={async (text): Promise<ChatBlock[]> => {
           const result = await runChatServerAction("lead.addNote", { leadId, content: text });

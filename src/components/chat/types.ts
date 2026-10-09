@@ -14,6 +14,7 @@ export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "sal
 export type ChatAction =
   | { kind: "href"; href: string }
   | { kind: "server"; name: ChatServerActionName; payload: Record<string, string | number | boolean | null> }
+  /** Reveals a block of the script that stays hidden until this reply (a question or a button). */
   | { kind: "next"; questionId: string }
   /** Handled in the browser by the screen's onLocalChoice (guided flows like the quote). */
   | { kind: "local"; value: string };
@@ -53,7 +54,9 @@ export type ChatBlock =
   | { type: "list"; id: string; title: string; subtitle?: string; items: ChatListItem[]; emptyText?: string }
   | { type: "bars"; id: string; title: string; subtitle?: string; values: Array<{ label: string; value: number; highlight?: boolean }>; format?: "count" | "currency" }
   | { type: "steps"; id: string; title: string; steps: Array<{ id: string; text: string; done: boolean }> }
-  | { type: "question"; id: string; prompt: string; choices: ChatChoice[] };
+  | { type: "question"; id: string; prompt: string; choices: ChatChoice[] }
+  /** A real link as a button (WhatsApp): opened by the tap itself, so phones never block it. */
+  | { type: "button"; id: string; text?: string; label: string; href: string; tone?: "whatsapp" | "action" };
 
 /** A guided flow ("Combinando a função · 0 de 5"). */
 export type ChatProgress = { title: string; done: number; total: number };

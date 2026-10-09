@@ -167,8 +167,15 @@ function fichaChoice(lead: LeadConversationLead, label = "Ver a ficha completa",
   return { id: `ficha${hash}`, label, action: { kind: "href", href: `/leads/${lead.id}?ficha=1${hash}` } };
 }
 
+const WHATSAPP_BUTTON_ID = "b-whatsapp";
+
+/** "Chamar no WhatsApp" answers with a button right below (a real link the phone never blocks). */
 function whatsappChoice(whatsappUrl: string | null): ChatChoice[] {
-  return whatsappUrl ? [{ id: "whatsapp", label: "Chamar no WhatsApp", reply: "Vou chamar no WhatsApp", action: { kind: "href", href: whatsappUrl } }] : [];
+  return whatsappUrl ? [{ id: "whatsapp", label: "Chamar no WhatsApp", reply: "Vou chamar no WhatsApp", action: { kind: "next", questionId: WHATSAPP_BUTTON_ID } }] : [];
+}
+
+export function whatsappButton(id: string, href: string, text?: string): ChatBlock {
+  return { type: "button", id, text, label: "Abrir WhatsApp", href, tone: "whatsapp" };
 }
 
 /** The suggested replies for where the attendance is now. */
@@ -303,6 +310,8 @@ export function buildLeadConversationScript({
   }
 
   blocks.push(...nextStep(lead, now, whatsappUrl, advice));
+  const offersWhatsApp = blocks.some((block) => block.type === "question" && block.choices.some((choice) => choice.action.kind === "next" && choice.action.questionId === WHATSAPP_BUTTON_ID));
+  if (offersWhatsApp && whatsappUrl) blocks.push(whatsappButton(WHATSAPP_BUTTON_ID, whatsappUrl, "A mensagem de apresentação já vai pronta. É só tocar:"));
 
   const waiting = lead.isCurrentBroker && (lead.status === "distributed" || lead.status === "new" || IN_SERVICE.has(lead.status));
   return {

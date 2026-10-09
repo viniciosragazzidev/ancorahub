@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import type { ReactNode } from "react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -36,24 +37,24 @@ vi.mock("@/features/leads/availability-action", () => ({
 
 import { LightBackButton } from "@/components/light/light-back-button";
 import { LightChrome } from "@/components/light/light-chrome";
-import { LIGHT_TABS } from "@/components/light/light-routes";
+import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 
-function renderChrome(props: Partial<Parameters<typeof LightChrome>[0]> = {}) {
+function renderChrome(props: Partial<Parameters<typeof LightChrome>[0]> = {}, content: ReactNode = <p>conteúdo da tela</p>) {
   return render(
     <LightChrome
       branding={{ tenantName: "Corretora", logoUrl: null }}
       user={{ name: "Corretor Teste", email: "corretor@example.test" }}
       {...props}
     >
-      <p>conteúdo da tela</p>
+      {content}
     </LightChrome>,
   );
 }
 
-function bottomBar() {
-  // The rail (md+) and the floating bar share the landmark name; the bar is the last one in the DOM.
-  const bars = screen.getAllByRole("navigation", { name: "Navegação principal" });
-  return bars[bars.length - 1];
+/** The chat home's avatar button opens the Mais sheet through the shell context. */
+function MoreOpener() {
+  const shell = useLightAvailabilityContext();
+  return <button type="button" onClick={() => shell?.openMore?.()}>Abrir Mais</button>;
 }
 
 afterEach(() => {
@@ -80,27 +81,16 @@ describe("Corretor Lite experience contract", () => {
     expect(reportingLookup).toBeGreaterThan(lightDashboard);
   });
 
-  it("shows Início, Fila, Insights and Mais in the floating bottom bar with the active tab marked", () => {
-    renderChrome();
-
-    const bar = bottomBar();
-    for (const tab of LIGHT_TABS) {
-      expect(bar.querySelector(`a[href="${tab.href}"]`)).not.toBeNull();
-    }
-    expect(within(bar).getByRole("button", { name: "Mais" })).toBeTruthy();
-    expect(bar.querySelector('a[aria-current="page"]')?.getAttribute("href")).toBe("/minha-fila");
-  });
-
-  it("badges the Fila tab with the number of leads waiting for acceptance", () => {
+  it("has no side rail or bottom bar on any screen: Início (the conversations) is the navigation", () => {
     renderChrome({ queueBadgeCount: 3 });
-
-    expect(within(bottomBar()).getByRole("link", { name: "Fila, 3 pendentes" })).toBeTruthy();
+    expect(screen.queryByRole("navigation", { name: "Navegação principal" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /Fila, 3 pendentes/ })).toBeNull();
   });
 
-  it("opens the Mais sheet with the secondary destinations, availability and sign out", () => {
-    renderChrome({ showQuoteSimulator: true, showDutyCalendar: true });
+  it("opens the Mais sheet (from the chat home avatar) with the destinations, availability and sign out", () => {
+    renderChrome({ showQuoteSimulator: true, showDutyCalendar: true }, <MoreOpener />);
 
-    fireEvent.click(within(bottomBar()).getByRole("button", { name: "Mais" }));
+    fireEvent.click(screen.getByRole("button", { name: "Abrir Mais" }));
 
     const dialog = screen.getByRole("dialog");
     const destinations = within(dialog).getByRole("navigation", { name: "Mais destinos" });
@@ -112,9 +102,9 @@ describe("Corretor Lite experience contract", () => {
   });
 
   it("hides Cotação and Plantões from Mais when their capabilities are off", () => {
-    renderChrome();
+    renderChrome({}, <MoreOpener />);
 
-    fireEvent.click(within(bottomBar()).getByRole("button", { name: "Mais" }));
+    fireEvent.click(screen.getByRole("button", { name: "Abrir Mais" }));
 
     const destinations = within(screen.getByRole("dialog")).getByRole("navigation", { name: "Mais destinos" });
     expect(destinations.querySelector('a[href="/cotacao"]')).toBeNull();
@@ -122,7 +112,7 @@ describe("Corretor Lite experience contract", () => {
     expect(destinations.querySelector('a[href="/clientes"]')).not.toBeNull();
   });
 
-  it("shows back and the screen title on internal screens, and no back on tab roots", () => {
+  it("shows back and the screen title on internal screens, the queue included", () => {
     // The lead itself is a chat with its own header; its feedback form uses the app header.
     navigation.pathname = "/leads/abc/feedback";
     const internal = renderChrome();
@@ -132,7 +122,7 @@ describe("Corretor Lite experience contract", () => {
 
     navigation.pathname = "/minha-fila";
     renderChrome();
-    expect(screen.queryByRole("button", { name: "Voltar" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Voltar" })).toBeTruthy();
   });
 
   it("goes to the parent route when there is no in-app history", () => {
@@ -144,7 +134,7 @@ describe("Corretor Lite experience contract", () => {
     expect(navigation.back).not.toHaveBeenCalled();
   });
 
-  it("replaces the hamburger menu with the bottom bar in the Light shell", () => {
+  it("keeps the Light shell free of the hamburger menu, the bottom bar and the side rail", () => {
     const shellSource = readFileSync(join(process.cwd(), "src/components/app-shell.tsx"), "utf8");
     const topNavSource = readFileSync(join(process.cwd(), "src/components/light-top-nav.tsx"), "utf8");
     const chromeSource = readFileSync(join(process.cwd(), "src/components/light/light-chrome.tsx"), "utf8");
@@ -152,8 +142,8 @@ describe("Corretor Lite experience contract", () => {
     expect(shellSource).toContain("<LightChrome");
     expect(shellSource).not.toContain("LightTopNavBar");
     expect(topNavSource).not.toContain("Menu mobile");
-    expect(chromeSource).toContain("<LightBottomNav");
-    expect(chromeSource).toContain("<LightSideRail");
+    expect(chromeSource).not.toContain("<LightBottomNav");
+    expect(chromeSource).not.toContain("<LightSideRail");
   });
 
   it("draws no tab bar or app header on the chat home: the conversation list is the navigation", () => {

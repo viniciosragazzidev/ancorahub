@@ -27,7 +27,8 @@ describe("Light routes", () => {
 
   it("treats tab roots as first level and everything else as internal with a parent", () => {
     expect(resolveLightRoute("/dashboard")).toMatchObject({ title: "Início", tab: "inicio", isRoot: true, parentHref: null });
-    expect(resolveLightRoute("/minha-fila?filter=awaiting")).toMatchObject({ tab: "fila", isRoot: true });
+    // No tab bar since the chat redesign: the queue goes back to Início.
+    expect(resolveLightRoute("/minha-fila?filter=awaiting")).toMatchObject({ tab: "fila", isRoot: false, parentHref: "/dashboard" });
     expect(resolveLightRoute("/conversas/broker")).toMatchObject({ tab: "insights", isRoot: true });
     expect(resolveLightRoute("/leads/123")).toMatchObject({ title: "Lead", tab: "fila", isRoot: false, parentHref: "/minha-fila" });
     expect(resolveLightRoute("/leads/123").hidesTabBar).toBe(true);
@@ -36,7 +37,7 @@ describe("Light routes", () => {
     const ficha = resolveLightRoute("/leads/123", new URLSearchParams("ficha=1"));
     expect(ficha.chat).toBeFalsy();
     expect(ficha).toMatchObject({ parentHref: "/leads/123", backToParent: true });
-    expect(resolveLightRoute("/minha-fila").hidesTabBar).toBeUndefined();
+    expect(resolveLightRoute("/minha-fila").hidesTabBar).toBe(true);
     expect(resolveLightRoute("/clientes")).toMatchObject({ tab: "mais", parentHref: "/dashboard" });
     expect(resolveLightRoute("/clientes/9")).toMatchObject({ parentHref: "/clientes" });
     expect(resolveLightRoute("/algo-desconhecido")).toMatchObject({ isRoot: false, parentHref: "/dashboard" });
@@ -51,7 +52,7 @@ describe("Light routes", () => {
   it("gives every Light destination a title, a parent and the right tab", () => {
     const table: Array<[string, { title: string; tab: string; isRoot: boolean; parentHref: string | null }]> = [
       ["/dashboard", { title: "Início", tab: "inicio", isRoot: true, parentHref: null }],
-      ["/minha-fila", { title: "Fila", tab: "fila", isRoot: true, parentHref: null }],
+      ["/minha-fila", { title: "Fila", tab: "fila", isRoot: false, parentHref: "/dashboard" }],
       ["/conversas/broker", { title: "Insights", tab: "insights", isRoot: true, parentHref: null }],
       ["/notificacoes", { title: "Notificações", tab: "mais", isRoot: false, parentHref: "/dashboard" }],
       ["/clientes", { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" }],

@@ -61,6 +61,9 @@ describe("buildLeadConversationScript", () => {
     const main = question(blocks, "q-main");
     expect(main.choices.map((choice) => choice.id)).toEqual(["whatsapp", "quote", "negotiation", "return", "ficha#venda", "lost"]);
     expect(question(blocks, "q-quote").choices[0].action).toEqual({ kind: "server", name: "lead.changeStep", payload: { leadId: "l1", status: "quote_sent", when: "tomorrow" } });
+    // "Chamar no WhatsApp" reveals a real link button right below (never a blocked popup).
+    expect(main.choices[0]?.action).toEqual({ kind: "next", questionId: "b-whatsapp" });
+    expect(blocks.find((block) => block.id === "b-whatsapp")).toMatchObject({ type: "button", label: "Abrir WhatsApp", href: "https://wa.me/5521999999999", tone: "whatsapp" });
     expect(question(blocks, "q-return").choices.map((choice) => choice.action)).toContainEqual({ kind: "server", name: "lead.scheduleReturn", payload: { leadId: "l1", when: "today" } });
     expect(question(blocks, "q-lost").choices[0].action).toEqual({ kind: "server", name: "lead.markLost", payload: { leadId: "l1", reason: "sem_contato" } });
   });

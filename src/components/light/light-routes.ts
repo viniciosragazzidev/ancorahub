@@ -93,7 +93,8 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null, chat: true, hidesTabBar: true } },
   { test: under("/dashboard/c"), route: { title: "Conversa", tab: "inicio", isRoot: false, parentHref: "/dashboard", chat: true, hidesTabBar: true } },
   { test: under("/dashboard"), route: { title: "Detalhe", tab: "inicio", isRoot: false, parentHref: "/dashboard" } },
-  { test: exact("/minha-fila"), route: { title: "Fila", tab: "fila", isRoot: true, parentHref: null } },
+  // No tab bar since the chat redesign: the queue goes back to Início (the conversations).
+  { test: exact("/minha-fila"), route: { title: "Fila", tab: "fila", isRoot: false, parentHref: "/dashboard", hidesTabBar: true } },
   { test: exact("/leads"), route: { title: "Fila", tab: "fila", isRoot: false, parentHref: "/minha-fila" } },
   // Feedback is a short form with no action bar: it goes back to its lead and keeps the tab bar.
   {

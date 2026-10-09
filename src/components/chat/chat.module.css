@@ -22,6 +22,19 @@
   --chat-unread: oklch(70% 0.17 255);
 }
 
+/* ---------- button block (real link: WhatsApp) ---------- */
+.buttonBlock { display: grid; gap: 10px; justify-items: start; }
+.linkButton {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 46px; padding: 0 20px; border-radius: 999px;
+  background: var(--chat-action); color: white; font-weight: 500; font-size: var(--text-base); text-decoration: none;
+  box-shadow: var(--shadow-resting); transition: transform var(--duration-fast) var(--ease-standard), filter var(--duration-fast) var(--ease-standard);
+}
+.linkButton:hover { filter: brightness(1.05); }
+.linkButton:active { transform: scale(0.98); }
+/* WhatsApp's own green: the broker recognizes where the tap goes. */
+.linkButtonWhatsapp { background: oklch(64% 0.17 150); }
+@media (prefers-reduced-motion: reduce) { .linkButton:active { transform: none; } }
+
 /* ---------- thread list ---------- */
 .threadList { list-style: none; margin: 0; padding: 0; display: grid; }
 .thread {

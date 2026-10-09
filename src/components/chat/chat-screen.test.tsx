@@ -84,6 +84,28 @@ describe("ChatScreen", () => {
     expect(screen.queryByText("Pronto")).toBeNull();
   });
 
+  it("reveals a hidden button block below the reply and reports the tap", async () => {
+    const onButtonOpen = vi.fn();
+    render(
+      <ChatScreen
+        identity={{ name: "Maria", shape: "mochi", hue: null }}
+        backHref="/minha-fila"
+        onButtonOpen={onButtonOpen}
+        script={{ blocks: [
+          { type: "question", id: "q", prompt: "E aí?", choices: [{ id: "wa", label: "Chamar no WhatsApp", action: { kind: "next", questionId: "b" } }] },
+          { type: "button", id: "b", label: "Abrir WhatsApp", href: "https://wa.me/5521999999999", tone: "whatsapp" },
+        ] }}
+      />,
+    );
+    expect(screen.queryByRole("link", { name: /Abrir WhatsApp/ })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Chamar no WhatsApp/ }));
+    const link = await screen.findByRole("link", { name: /Abrir WhatsApp/ });
+    expect(link.getAttribute("href")).toBe("https://wa.me/5521999999999");
+    expect(link.getAttribute("target")).toBe("_blank");
+    fireEvent.click(link);
+    expect(onButtonOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }));
+  });
+
   it("navigates for link replies", () => {
     renderChat();
     fireEvent.click(screen.getByRole("button", { name: /Ver a ficha/ }));

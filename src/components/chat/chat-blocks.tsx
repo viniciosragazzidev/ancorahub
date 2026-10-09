@@ -121,9 +121,35 @@ function AssistantText({ block }: { block: Extract<ChatBlock, { type: "assistant
 }
 
 /** Renders one block of a conversation. Questions are rendered by the screen (they need state). */
-export function ChatBlockView({ block, onSystemAction }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void }) {
+function WhatsAppGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18">
+      <path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.7.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.2 2.2 2.2 0 0 0 .1-1.3c0-.1-.2-.2-.5-.3Z" />
+    </svg>
+  );
+}
+
+export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>) => void }) {
   const reduce = useReducedMotion();
   switch (block.type) {
+    case "button": {
+      const external = /^https?:/.test(block.href);
+      return (
+        <div className={styles.buttonBlock}>
+          {block.text ? <p className={styles.assistant}>{block.text}</p> : null}
+          <a
+            href={block.href}
+            target={external ? "_blank" : undefined}
+            rel={external ? "noopener noreferrer" : undefined}
+            className={`${styles.linkButton} ${block.tone === "whatsapp" ? styles.linkButtonWhatsapp : ""}`}
+            onClick={() => onButtonOpen?.(block)}
+          >
+            {block.tone === "whatsapp" ? <WhatsAppGlyph /> : null}
+            {block.label}
+          </a>
+        </div>
+      );
+    }
     case "date":
       return <p className={styles.date}>{block.label}</p>;
     case "system":
