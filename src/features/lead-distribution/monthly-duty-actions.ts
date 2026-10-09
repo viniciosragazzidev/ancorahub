@@ -599,8 +599,9 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
     const inserts: Array<typeof schema.dutyRosterAssignments.$inferInsert> = [];
     const insertedFor: StoredAssignment[] = [];
     for (const assignment of assignments) {
-      // Weekly roster brokers are already on duty: no dated row for them.
-      if (assignment.origin === "weekly") continue;
+      // Weekly roster brokers get a dated row too: on a date with published brokers the
+      // distribution uses only the published rows (DEC-123), so without it they would be
+      // left out of a plantão that mixes weekly and generated brokers (fixed 2026-10-09).
       const existing = existingByKey.get(`${assignment.occurrenceId}|${assignment.brokerId}`);
       if (existing) {
         kept.push({ assignment, rowId: existing.id });
