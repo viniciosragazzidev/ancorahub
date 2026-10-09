@@ -2,13 +2,11 @@ import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
 
 import { LightConversationsView, type BrokerConversationInsight, type BrokerInsightMessage } from "@/features/broker-workspace/components/light-conversations-view";
-import { ConnectionBadge } from "@/features/broker-workspace/components/connection-badge";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
-import { DashboardHeader } from "@/components/dashboard-header";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -87,7 +85,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
   const insights: BrokerConversationInsight[] = [
     ...leads.map((lead) => {
       const messages = (byLead.get(lead.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
-      return { id: lead.id, kind: "lead" as const, name: lead.nome, phone: lead.telefone, status: lead.status, href: `/leads/${lead.id}`, firstContactAt: toIso(lead.firstContactAt), serviceStartedAt: toIso(lead.serviceStartedAt), latestMessage: messages.at(-1) ?? null, messages, intelligence: readIntelligence(lead.qualificationDetails) };
+      return { id: lead.id, kind: "lead" as const, name: lead.nome, phone: lead.status === "new" || lead.status === "distributed" ? null : lead.telefone, status: lead.status, href: `/leads/${lead.id}`, firstContactAt: toIso(lead.firstContactAt), serviceStartedAt: toIso(lead.serviceStartedAt), latestMessage: messages.at(-1) ?? null, messages, intelligence: readIntelligence(lead.qualificationDetails) };
     }),
     ...clients.map((client) => {
       const messages = (byClient.get(client.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
@@ -101,25 +99,11 @@ export default async function BrokerConversationsPage({ searchParams }: { search
 
   const connection = connectionRows[0];
   return (
-    <>
-      <DashboardHeader
-        breadcrumb="Comunicação"
-        title="Conversas"
-        rightSlot={
-          <ConnectionBadge
-            connected={connection?.status === "ready"}
-            status={connection?.status ?? "disconnected"}
-          />
-        }
-      />
-      <main className="flex h-[calc(100dvh-var(--header-height))] min-h-0 w-full flex-col overflow-hidden bg-background">
-        <LightConversationsView
-          insights={insights}
-          initialLeadId={leadId}
-          whatsappConnected={connection?.status === "ready"}
-          connectionStatus={connection?.status ?? "disconnected"}
-        />
-      </main>
-    </>
+    <LightConversationsView
+      insights={insights}
+      initialLeadId={leadId}
+      whatsappConnected={connection?.status === "ready"}
+      connectionStatus={connection?.status ?? "disconnected"}
+    />
   );
 }

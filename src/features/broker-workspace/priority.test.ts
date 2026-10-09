@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { prioritizeBrokerWorkspace, type BrokerWorkspacePriorityLead, type BrokerWorkspacePriorityTask } from "./priority";
+import { prioritizeBrokerWorkspace, resolveSlaFirstContactState, type BrokerWorkspacePriorityLead, type BrokerWorkspacePriorityTask } from "./priority";
 
 const now = new Date("2026-08-03T12:00:00.000Z");
 
@@ -70,5 +70,31 @@ describe("prioritizeBrokerWorkspace", () => {
     });
 
     expect(result.filter((item) => item.kind === "new_lead").map((item) => item.leadId)).toEqual(["lead-a", "lead-b"]);
+  });
+});
+
+describe("resolveSlaFirstContactState", () => {
+  const sla = 15;
+  const at = (minutesAgo: number) => new Date(now.getTime() - minutesAgo * 60 * 1000);
+
+  it("is overdue after the deadline, at risk inside the last window and null otherwise", () => {
+    expect(resolveSlaFirstContactState({ firstContactAt: null, assignedAt: at(20), slaFirstContactMinutes: sla, now })?.state).toBe("overdue");
+    expect(resolveSlaFirstContactState({ firstContactAt: null, assignedAt: at(10), slaFirstContactMinutes: sla, now })?.state).toBe("risk");
+    expect(resolveSlaFirstContactState({ firstContactAt: null, assignedAt: at(1), slaFirstContactMinutes: 60, now })).toBeNull();
+  });
+
+  it("ignores leads that already had a first contact or have no assignment date", () => {
+    expect(resolveSlaFirstContactState({ firstContactAt: at(5), assignedAt: at(20), slaFirstContactMinutes: sla, now })).toBeNull();
+    expect(resolveSlaFirstContactState({ firstContactAt: null, assignedAt: null, slaFirstContactMinutes: sla, now })).toBeNull();
+  });
+
+  it("agrees with the priority queue about which leads are overdue or at risk", () => {
+    for (const minutesAgo of [1, 5, 10, 13, 15, 16, 40]) {
+      const candidate = lead({ status: "in_contact", firstContactAt: null, assignedAt: at(minutesAgo), createdAt: at(minutesAgo) });
+      const queue = prioritizeBrokerWorkspace({ leads: [candidate], tasks: [], now, slaFirstContactMinutes: sla });
+      const fromQueue = queue.some((item) => item.kind === "sla_overdue" || item.kind === "sla_risk");
+      const fromHelper = resolveSlaFirstContactState({ firstContactAt: null, assignedAt: candidate.assignedAt, slaFirstContactMinutes: sla, now }) !== null;
+      expect(fromHelper, `${minutesAgo} min`).toBe(fromQueue);
+    }
   });
 });

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import Link from "next/link";
+
+import { ActionButton } from "@/components/arc/action-button/action-button";
+import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { toast } from "@/components/ui/sonner";
-import { ArrowRight, CheckCircle, WhatsappLogo } from "@/components/huge-icons";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
@@ -25,17 +25,30 @@ const FEEDBACK_OPTIONS = [
   { label: "Sem interesse", status: "lost", lossReason: "sem_interesse" },
 ];
 
-export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: FeedbackViewProps) {
+const OPTION_STYLE: React.CSSProperties = {
+  minHeight: "3rem",
+  justifyContent: "space-between",
+  width: "100%",
+};
+
+const resultAction =
+  "inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-semibold";
+
+/**
+ * Quick status update opened from a WhatsApp link. It also renders outside the app chrome
+ * (/l/[id]/feedback), so it keeps its own canvas and the lead name as the screen title.
+ */
+export function LightFeedbackView({ leadId, leadName, phone }: FeedbackViewProps) {
   const [submitted, setSubmitted] = useState(false);
   const [selectedLabel, setSelectedLabel] = useState("");
-  const [pending, startTransition] = useTransition();
 
+  // The server sends the phone only after the broker accepted the lead.
   const waUrl = buildWhatsAppUrl(phone);
 
-  function handleSelectOption(opt: typeof FEEDBACK_OPTIONS[number]) {
-    if (pending || submitted) return;
-
+  async function handleSelectOption(opt: (typeof FEEDBACK_OPTIONS)[number]) {
+    if (submitted) return;
     setSelectedLabel(opt.label);
+
     const formData = new FormData();
     formData.append("leadId", leadId);
     formData.append("newStatus", opt.status);
@@ -45,87 +58,77 @@ export function LightFeedbackView({ leadId, leadName, phone, currentStatus }: Fe
       formData.append("lossReason", opt.lossReason);
     }
 
-    startTransition(async () => {
-      try {
-        const res = await changeLeadStatusAction({}, formData);
-        if (!res.success) {
-          toast.error(res.error ?? "Não foi possível registrar a atualização.");
-          return;
-        }
-        setSubmitted(true);
-        toast.success("Atualização registrada.");
-      } catch {
-        toast.error("Não foi possível registrar no momento.");
-      }
-    });
+    let res;
+    try {
+      res = await changeLeadStatusAction({}, formData);
+    } catch {
+      toast.error("Não foi possível registrar no momento.");
+      throw new Error("feedback-action-failed");
+    }
+
+    if (!res.success) {
+      toast.error(res.error ?? "Não foi possível registrar a atualização.");
+      throw new Error("feedback-action-failed");
+    }
+
+    setSubmitted(true);
   }
 
   return (
-    <div className="mx-auto w-full max-w-md space-y-5 px-4 py-8 pb-24 text-center">
-      <Card variant="subtle" className="p-6 bg-card/95 shadow-md space-y-4">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-primary">Atualização Rápida</span>
-          <h1 className="text-xl font-bold tracking-tight text-foreground mt-1">{leadName}</h1>
-        </div>
+    <div className="arc-venancor light-canvas flex min-h-full flex-col" style={{ color: "var(--foreground)" }}>
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pb-6 pt-4">
+        <header className="text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-(--foreground)">{leadName}</h1>
+          <p className="mt-1 text-sm text-(--text-secondary)">Como foi o contato?</p>
+        </header>
 
         {submitted ? (
-          /* Confirmation Screen after feedback */
-          <div className="space-y-4 py-3 animate-in fade-in zoom-in duration-300">
-            <div className="mx-auto grid size-12 place-items-center rounded-full bg-emerald-500/10 text-emerald-600">
-              <CheckCircle className="size-7" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-foreground">✓ Atualização registrada</h2>
-              <p className="text-xs text-muted-foreground mt-1">
-                Obrigado. O atendimento foi atualizado para <strong>{selectedLabel}</strong>.
-              </p>
-            </div>
-
-            <div className="pt-2 space-y-2">
-              {waUrl ? (
-                <a
-                  href={waUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full h-11 text-xs font-bold gap-2 bg-emerald-600 hover:bg-emerald-700 text-white flex items-center justify-center rounded-lg shadow-sm"
-                >
-                  <WhatsappLogo className="size-4" />
-                  VOLTAR PARA O WHATSAPP
-                </a>
-              ) : null}
-
-              <Button
-                variant="outline"
-                size="sm"
-                render={<Link href="/minha-fila" />}
-                className="w-full text-xs font-semibold"
-              >
-                VER MEUS LEADS
-              </Button>
-            </div>
+          <div className="rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
+            <EmptyState
+              label="Atualização registrada"
+              title="Atualização registrada"
+              description={`O atendimento foi atualizado para ${selectedLabel}.`}
+              action={
+                <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:justify-center">
+                  {waUrl ? (
+                    <a
+                      href={waUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`${resultAction} bg-(--accent) text-(--accent-foreground)`}
+                    >
+                      Voltar para o WhatsApp
+                    </a>
+                  ) : null}
+                  <Link href="/minha-fila" className={`${resultAction} bg-(--surface-muted) text-(--foreground)`}>
+                    Ver minha fila
+                  </Link>
+                </div>
+              }
+            />
           </div>
         ) : (
-          /* Feedback Buttons Screen */
-          <div className="space-y-3 pt-1">
-            <p className="text-sm font-semibold text-foreground">Como ficou esse atendimento?</p>
-            
+          <section aria-labelledby="feedback-heading" className="flex flex-col gap-3 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+            <h2 id="feedback-heading" className="text-base font-semibold text-(--foreground)">Como ficou esse atendimento?</h2>
             <div className="grid gap-2">
               {FEEDBACK_OPTIONS.map((opt) => (
-                <Button
+                <ActionButton
                   key={opt.label}
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() => handleSelectOption(opt)}
-                  className="h-11 justify-between px-4 text-xs font-semibold hover:border-primary hover:bg-primary/5 transition-colors"
-                >
-                  <span>{opt.label}</span>
-                  <ArrowRight className="size-3.5 text-muted-foreground" />
-                </Button>
+                  label={opt.label}
+                  pendingLabel="Registrando..."
+                  successLabel="Registrado"
+                  onAction={() => handleSelectOption(opt)}
+                  onActionError={() => {
+                    /* the error was already toasted in handleSelectOption */
+                  }}
+                  className="w-full"
+                  style={OPTION_STYLE}
+                />
               ))}
             </div>
-          </div>
+          </section>
         )}
-      </Card>
+      </div>
     </div>
   );
 }

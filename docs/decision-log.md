@@ -1667,3 +1667,26 @@ escala, em datas que não terminaram. Linhas de outra escala nas mesmas
 ocorrências são substituídas. Escritas da escala usam um lock por tenant.
 O PDF do quadro sai em `/api/reports/duty-escala/[planId]` (geral, por unidade
 ou por tipo; Gestor só a própria unidade). Migração aditiva 0187.
+
+## DEC-137 — App do corretor (Light): barra inferior flutuante substitui o menu sanduíche
+
+**Estado:** Aceita
+**Data:** 2026-10-08
+
+O modo Light do corretor passa a ter casca de app: no celular, barra inferior flutuante em
+pílula (Início, Fila, Insights e Mais; a aba ativa é uma pílula preta com ícone e rótulo, a
+Fila mostra a contagem de leads aguardando aceite); a partir de `md`, trilho lateral de
+72px com os mesmos destinos. "Mais" abre um bottom sheet com Cotação, Plantões (flag),
+Clientes, Configurações, disponibilidade e Sair. Telas internas ganham header com voltar
+(histórico do app quando existe, senão a rota pai) e título.
+
+Isto foi **aprovado pelo Vinicios em 2026-10-08** e substitui o menu sanduíche do
+commit 485ddbb6 ("restore lite shell navigation"). O contrato de
+`broker-lite-experience.test.tsx` foi reescrito para a barra inferior.
+
+Implementação: `src/components/light/` (`light-routes.ts` é a fonte única de rotas
+permitidas, abas, títulos e rotas pai; o `layout.tsx` usa `isLightRouteAllowed`). Os
+componentes vêm do Arc UI (bottom-sheet, segmented-control, skeleton, avatar, button),
+com os tokens do Arc escopados na classe `.arc-venancor` (`arc/venancor-scope.css`) e
+mapeados para o Venancor, para não alterar o resto do CRM. Sem gradiente, sem sombra
+empilhada, pesos 400 a 700, sentence case, alvos de 44px.

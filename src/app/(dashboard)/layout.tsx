@@ -1,9 +1,10 @@
 ﻿import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
+import { isLightRouteAllowed } from "@/components/light/light-routes";
 import { getDatabase, schema } from "@/shared/db";
 import { TenantOnboardingDialogLoader } from "@/features/onboarding/components/tenant-onboarding-dialog-loader";
 import { DirectorWizardLoader } from "@/features/onboarding/components/director-wizard-loader";
@@ -102,9 +103,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const pathname = headersList.get("x-pathname") || "";
 
   if (isLightBroker) {
-    const allowedLightPrefixes = ["/dashboard", "/minha-fila", "/cotacao", "/plantoes", "/leads", "/clientes", "/conversas", "/l/", "/settings", "/notificacoes", "/primeiro-acesso"];
-    const isAllowed = allowedLightPrefixes.some(prefix => pathname === prefix || pathname.startsWith(prefix));
-    if (!isAllowed && pathname !== "") {
+    if (!isLightRouteAllowed(pathname) && pathname !== "") {
       redirect("/dashboard");
     }
   }
@@ -136,6 +135,20 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     if (!canAccessRoute) redirect("/access-denied");
   }
 
+  // Leads waiting for this broker to accept: badge on the Fila tab of the app shell.
+  const queueBadgeCount = isLightBroker
+    ? Number((await getDatabase()
+      .select({ total: count() })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        eq(schema.leads.corretorId, context.userId),
+        inArray(schema.leads.status, ["distributed", "new"]),
+        isNull(schema.leads.archivedAt),
+        isNull(schema.leads.deletedAt),
+      )))[0]?.total ?? 0)
+    : 0;
+
   const [tenant] = tenantRows;
   const [currentUser] = userRows;
   const [membership] = membershipRows;
@@ -150,6 +163,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       <AppShell
         cleanUiEnabled={cleanUiEnabled}
         isLightBroker={isLightBroker}
+        queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         branding={{

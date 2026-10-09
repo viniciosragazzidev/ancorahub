@@ -18,6 +18,10 @@ import { getIntegrationsData } from "./integrations-actions";
 import { ExtensionTab } from "./extension/extension-tab";
 import { getBrokerAvailabilityProfile } from "@/features/broker-availability/service";
 import { BrokerAvailabilitySettings } from "@/features/broker-availability/components/broker-availability-settings";
+import { LightAvailabilitySection } from "@/features/broker-availability/components/light-availability-section";
+import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { LightSettings } from "./_components/light-settings";
+import { LightWhatsappSection } from "./_components/light-whatsapp-section";
 
 import { RelatedActions } from "@/components/related-actions";
 
@@ -64,6 +68,32 @@ export default async function SettingsPage() {
   const account = <MinhaContaTab name={user[0]?.name ?? "Usuário"} email={user[0]?.email ?? ""} role={context.role} />;
   const company = <EmpresaTab canEdit tenant={{ name: tenant[0]?.name ?? "", legalName: tenant[0]?.legalName ?? null, cnpj: tenant[0]?.cnpj ?? null, logoUrl: tenant[0]?.logoUrl ?? null, brandColor: tenant[0]?.brandColor ?? null }} />;
   const extension = <ExtensionTab />;
+
+  // Broker app (Light): sections as cards; managers and directors keep the desktop tabs below.
+  if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
+    // Personal WhatsApp: the broker own connection, same query the Insights screen uses.
+    const [whatsappConnection] = await db
+      .select({ status: schema.whatsappConnections.status })
+      .from(schema.whatsappConnections)
+      .where(and(eq(schema.whatsappConnections.tenantId, context.tenantId), eq(schema.whatsappConnections.userId, context.userId)))
+      .limit(1);
+    return (
+      <LightSettings
+        sections={[
+          { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: account },
+          {
+            id: "disponibilidade",
+            title: "Disponibilidade",
+            description: "Pausa manual e horários para receber leads",
+            node: brokerAvailability ? <LightAvailabilitySection windows={brokerAvailability.windows} schemaReady={brokerAvailability.availabilitySchemaReady} /> : <></>,
+          },
+          { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection connected={whatsappConnection?.status === "ready"} status={whatsappConnection?.status ?? "disconnected"} /> },
+          { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
+          { id: "extensao", title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension },
+        ]}
+      />
+    );
+  }
 
   return (
     <>

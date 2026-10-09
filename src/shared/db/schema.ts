@@ -447,6 +447,7 @@ export const leads = pgTable(
     index("leads_webhook_credential_idx").on(table.webhookCredentialId),
     index("leads_tenant_deleted_idx").on(table.tenantId, table.deletedAt),
     index("leads_tenant_archived_idx").on(table.tenantId, table.archivedAt),
+    index("leads_corretor_assigned_at_live_idx").on(table.corretorId, table.assignedAt).where(sql`${table.deletedAt} is null`),
     uniqueIndex("leads_credential_external_id_unique").on(table.webhookCredentialId, table.externalId).where(sql`${table.externalId} IS NOT NULL`),
     uniqueIndex("leads_tenant_source_external_id_unique").on(table.tenantId, table.sourceChannel, table.externalId).where(sql`${table.externalId} IS NOT NULL AND ${table.sourceChannel} <> 'landing_page'`),
   ],
@@ -3234,6 +3235,7 @@ export const leadOffers = pgTable(
   (table) => [
     index("lead_offers_tenant_lead_status_idx").on(table.tenantId, table.leadId, table.status),
     index("lead_offers_broker_status_expires_idx").on(table.brokerId, table.status, table.expiresAt),
+    index("lead_offers_broker_accepted_at_partial_idx").on(table.brokerId, table.acceptedAt).where(sql`${table.acceptedAt} is not null`),
     index("lead_offers_whatsapp_msg_idx").on(table.whatsappMessageId),
   ],
 );

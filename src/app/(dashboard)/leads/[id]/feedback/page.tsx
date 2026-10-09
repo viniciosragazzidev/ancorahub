@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { LightFeedbackView } from "@/features/broker-workspace/components/light-feedback-view";
+import { lightContactFields } from "@/features/broker-workspace/lead-contact-privacy";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export default async function DashboardFeedbackPage({ params }: { params: Promis
       id: schema.leads.id,
       nome: schema.leads.nome,
       telefone: schema.leads.telefone,
+      corretorId: schema.leads.corretorId,
       status: schema.leads.status,
     })
     .from(schema.leads)
@@ -29,7 +31,8 @@ export default async function DashboardFeedbackPage({ params }: { params: Promis
     <LightFeedbackView
       leadId={lead.id}
       leadName={lead.nome}
-      phone={lead.telefone}
+      // Phone only after this broker accepted the lead (same rule as the lead screen).
+      phone={lightContactFields(lead, { status: lead.status, isCurrentBroker: lead.corretorId === context.userId }).telefone}
       currentStatus={lead.status}
     />
   );
