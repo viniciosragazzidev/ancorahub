@@ -9,7 +9,7 @@ import { AssistantAvatar } from "./assistant-avatar";
 import { ChatBlockView, ChoiceList, MessageEnter, TypingIndicator } from "./chat-blocks";
 import { Composer, type Mention } from "./composer";
 import styles from "./chat.module.css";
-import type { ChatAction, ChatBlock, ChatChoice, ChatScript, MascotShape } from "./types";
+import type { ChatAction, ChatBlock, ChatChoice, ChatProgress, ChatScript, MascotShape } from "./types";
 
 /** Result of a server action run from a reply. A message is shown as the assistant's answer. */
 export type ChatActionResult = { ok: boolean; message?: string; followUp?: ChatBlock[]; warning?: boolean };
@@ -50,6 +50,9 @@ export function ChatScreen({
   onMention,
   headerAction,
   composerDisabled = false,
+  onLocalChoice,
+  progress: progressOverride,
+  placeholder: placeholderOverride,
 }: {
   identity: Identity;
   backHref: string;
@@ -60,6 +63,12 @@ export function ChatScreen({
   onMention?: (mention: Mention) => Promise<ChatBlock[]> | ChatBlock[];
   headerAction?: ReactNode;
   composerDisabled?: boolean;
+  /** Replies with a "local" action: returns the blocks that answer it (next question, result...). */
+  onLocalChoice?: (choice: ChatChoice, value: string) => Promise<ChatBlock[]> | ChatBlock[];
+  /** Guided flows control their own progress instead of counting answered questions. */
+  progress?: ChatProgress | null;
+  /** Composer placeholder chosen by the flow (wins over the default). */
+  placeholder?: string;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -114,6 +123,10 @@ export function ChatScreen({
       if (target) enqueue([target]);
       return;
     }
+    if (action.kind === "local") {
+      if (onLocalChoice) enqueue(await onLocalChoice(choice, action.value));
+      return;
+    }
     if (!runAction) return;
     setWorking(true);
     setStatus({ label: "Trabalhando...", tone: "working" });
@@ -132,12 +145,15 @@ export function ChatScreen({
     } finally {
       setWorking(false);
     }
-  }, [answers, enqueue, router, runAction, script.blocks]);
+  }, [answers, enqueue, onLocalChoice, router, runAction, script.blocks]);
 
   const answeredCount = Object.keys(answers).length;
-  const progress = script.progress ? { ...script.progress, done: Math.min(script.progress.total, script.progress.done + answeredCount) } : null;
+  const progress = progressOverride !== undefined
+    ? progressOverride
+    : script.progress ? { ...script.progress, done: Math.min(script.progress.total, script.progress.done + answeredCount) } : null;
   const lastQuestion = [...shown].reverse().find((block) => block.type === "question");
-  const placeholder = lastQuestion && !answers[lastQuestion.id] ? "Responda aqui ou escolha uma opção acima" : script.composerPlaceholder ?? `Escreva para ${identity.name}`;
+  const placeholder = placeholderOverride
+    ?? (lastQuestion && !answers[lastQuestion.id] ? "Responda aqui ou escolha uma opção acima" : script.composerPlaceholder ?? `Escreva para ${identity.name}`);
 
   return (
     <div className={`${styles.root} ${styles.screen}`}>

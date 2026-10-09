@@ -14,7 +14,9 @@ export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "sal
 export type ChatAction =
   | { kind: "href"; href: string }
   | { kind: "server"; name: ChatServerActionName; payload: Record<string, string | number | boolean | null> }
-  | { kind: "next"; questionId: string };
+  | { kind: "next"; questionId: string }
+  /** Handled in the browser by the screen's onLocalChoice (guided flows like the quote). */
+  | { kind: "local"; value: string };
 
 /** Server actions a reply may trigger (each maps to an existing broker action). */
 export type ChatServerActionName =

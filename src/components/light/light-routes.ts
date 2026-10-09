@@ -118,7 +118,14 @@ const RULES: readonly RouteRule[] = [
   },
   { test: under("/conversas"), route: { title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },
   { test: exact("/conversas"), route: { title: "Insights", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },
-  { test: exact("/cotacao"), route: { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true } },
+  // The quote is a guided chat (2026-10-09); ?completo=1 is the full simulator.
+  {
+    test: exact("/cotacao"),
+    route: (_path, search) =>
+      search?.get("completo") === "1"
+        ? { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/cotacao", hidesTabBar: true, backToParent: true }
+        : { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true, chat: true },
+  },
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
