@@ -25,7 +25,7 @@ import postgres from "postgres";
 import * as XLSX from "xlsx";
 
 import * as schema from "../src/shared/db/schema";
-import { matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "../src/features/lead-distribution/duty-escala-import";
+import { codesInName, matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "../src/features/lead-distribution/duty-escala-import";
 import {
   buildRangeOccurrences,
   dayOfWeekOf,
@@ -100,6 +100,15 @@ async function main() {
     const { type, brokers } = chosen!;
     const tenantId = type.tenantId;
     const brokerByCode = new Map(brokers.filter((broker) => broker.code).map((broker) => [normalizeBrokerCode(broker.code), broker]));
+    // The sheet code usually lives in the CRM name ("Dandhara Lima 6580"): use it when it points to one broker.
+    const byNameCode = new Map<string, typeof brokers>();
+    for (const broker of brokers) for (const code of codesInName(broker.name)) byNameCode.set(code, [...(byNameCode.get(code) ?? []), broker]);
+    const viaNameCode: Array<{ code: string; crmName: string }> = [];
+    for (const code of new Set(parsed.days.flatMap((day) => day.brokers.map((broker) => broker.code)))) {
+      if (brokerByCode.has(code)) continue;
+      const owners = byNameCode.get(code) ?? [];
+      if (owners.length === 1) { brokerByCode.set(code, owners[0]); viaNameCode.push({ code, crmName: owners[0].name }); }
+    }
     // The sheet may use another numbering: a code not in the CRM is looked up by name (single match only).
     const sheetNames = new Map(parsed.days.flatMap((day) => day.brokers.map((broker) => [broker.code, broker.name] as const)));
     const byName: Array<{ code: string; sheetName: string; crmName: string; crmCode: string | null }> = [];
@@ -164,6 +173,11 @@ async function main() {
     }
     const toCreate = plans.filter((plan) => plan.create);
     console.log(`\nPlantões a criar: ${toCreate.length}${toCreate.length ? ` (${toCreate.map((plan) => short(plan.date)).join(", ")})` : ""}`);
+    if (viaNameCode.length) {
+      console.log(`
+Encontrados pelo código escrito no NOME do CRM: ${viaNameCode.length}`);
+      for (const item of viaNameCode) console.log(`  = ${item.code} => ${item.crmName}`);
+    }
     if (byName.length) {
       console.log(`
 Encontrados PELO NOME (o código da planilha não é o do CRM): ${byName.length}. Confira:`);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { excelSerialToDate, matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "./duty-escala-import";
+import { codesInName, excelSerialToDate, matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "./duty-escala-import";
 
 // 2026-10-08 = 46303, 2026-10-09 = 46304 (Excel 1900 serials).
 const sheet: unknown[][] = [
@@ -61,5 +61,13 @@ describe("matchBrokerByName", () => {
     expect(matchBrokerByName("CRISTIANE MARQUES", crm).kind).toBe("ambiguous");
     expect(matchBrokerByName("JORGE", crm).kind).toBe("none");
     expect(matchBrokerByName("JORGE SILVA", crm).kind).toBe("none");
+  });
+});
+
+describe("codesInName", () => {
+  it("reads the sheet code kept in the CRM name", () => {
+    expect(codesInName("Dandhara Lima 6580")).toEqual(["6580"]);
+    expect(codesInName("Jorge Maia 0406")).toEqual(["406"]);
+    expect(codesInName("Maria Souza")).toEqual([]);
   });
 });

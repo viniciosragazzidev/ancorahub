@@ -90,3 +90,11 @@ export function matchBrokerByName<T extends { name: string }>(sheetName: string,
   if (hits.length === 1) return { kind: "match", candidate: hits[0] };
   return hits.length ? { kind: "ambiguous", candidates: hits } : { kind: "none" };
 }
+
+/**
+ * Codes written inside a CRM name ("Dandhara Lima 6580" -> 6580): the Âncora
+ * keeps the sheet code in the broker name, not in the CRM code field.
+ */
+export function codesInName(name: string) {
+  return [...name.matchAll(/(?:^|\D)(\d{2,6})(?=\D|$)/g)].map((match) => normalizeBrokerCode(match[1]));
+}
