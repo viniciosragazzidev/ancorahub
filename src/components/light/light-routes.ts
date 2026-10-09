@@ -66,6 +66,8 @@ export type LightRoute = {
   hidesTabBar?: boolean;
   /** Back always goes to the parent (used when the screen state lives in the URL, not in history). */
   backToParent?: boolean;
+  /** Chat screens (2026-10-09 chat redesign) draw their own header and need no tab bar, header or rail. */
+  chat?: boolean;
 };
 
 /** Query parameters a rule may read (URLSearchParams and Next ReadonlyURLSearchParams both fit). */
@@ -88,7 +90,8 @@ const SETTINGS_SECTIONS: Record<string, { title: string; hidesTabBar?: boolean }
 
 // Order matters: first match wins, most specific first.
 const RULES: readonly RouteRule[] = [
-  { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null } },
+  { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null, chat: true, hidesTabBar: true } },
+  { test: under("/dashboard/c"), route: { title: "Conversa", tab: "inicio", isRoot: false, parentHref: "/dashboard", chat: true, hidesTabBar: true } },
   { test: under("/dashboard"), route: { title: "Detalhe", tab: "inicio", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/minha-fila"), route: { title: "Fila", tab: "fila", isRoot: true, parentHref: null } },
   { test: exact("/leads"), route: { title: "Fila", tab: "fila", isRoot: false, parentHref: "/minha-fila" } },

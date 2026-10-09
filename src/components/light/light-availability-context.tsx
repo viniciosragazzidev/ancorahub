@@ -8,6 +8,8 @@ export type LightAvailabilityValue = {
   availability: LightAvailability;
   isPending: boolean;
   setStatus: (next: "available" | "paused") => void;
+  /** Opens the "Mais" sheet (chat screens have no tab bar of their own). */
+  openMore?: () => void;
 };
 
 const LightAvailabilityContext = createContext<LightAvailabilityValue | null>(null);

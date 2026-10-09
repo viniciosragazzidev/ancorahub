@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const navigation = vi.hoisted(() => ({ pathname: "/dashboard", search: "", push: vi.fn(), back: vi.fn() }));
+const navigation = vi.hoisted(() => ({ pathname: "/minha-fila", search: "", push: vi.fn(), back: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
@@ -58,7 +58,8 @@ function bottomBar() {
 
 afterEach(() => {
   cleanup();
-  navigation.pathname = "/dashboard";
+  // The home (/dashboard) is a chat screen without the tab bar since the 2026-10-09 redesign.
+  navigation.pathname = "/minha-fila";
   navigation.search = "";
   vi.clearAllMocks();
 });
@@ -71,7 +72,7 @@ describe("Corretor Lite experience contract", () => {
     );
 
     const modeLookup = source.indexOf("getExperienceMode(context)");
-    const lightDashboard = source.indexOf("<LightDashboard");
+    const lightDashboard = source.indexOf("<ChatHomeContent");
     const reportingLookup = source.indexOf("getCommandCenterData(context)");
 
     expect(modeLookup).toBeGreaterThan(-1);
@@ -87,7 +88,7 @@ describe("Corretor Lite experience contract", () => {
       expect(bar.querySelector(`a[href="${tab.href}"]`)).not.toBeNull();
     }
     expect(within(bar).getByRole("button", { name: "Mais" })).toBeTruthy();
-    expect(bar.querySelector('a[aria-current="page"]')?.getAttribute("href")).toBe("/dashboard");
+    expect(bar.querySelector('a[aria-current="page"]')?.getAttribute("href")).toBe("/minha-fila");
   });
 
   it("badges the Fila tab with the number of leads waiting for acceptance", () => {
@@ -152,5 +153,11 @@ describe("Corretor Lite experience contract", () => {
     expect(topNavSource).not.toContain("Menu mobile");
     expect(chromeSource).toContain("<LightBottomNav");
     expect(chromeSource).toContain("<LightSideRail");
+  });
+
+  it("draws no tab bar or app header on the chat home: the conversation list is the navigation", () => {
+    navigation.pathname = "/dashboard";
+    renderChrome();
+    expect(screen.queryByRole("navigation", { name: "Navegação principal" })).toBeNull();
   });
 });

@@ -38,13 +38,38 @@ export function LightChrome({
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
 }) {
-  const { pathname, tab, hidesTabBar } = useLightRoute();
+  const { pathname, tab, hidesTabBar, chat } = useLightRoute();
   // The sheet belongs to the screen it was opened on: navigating closes it without an effect.
   const [moreSheet, setMoreSheet] = useState<{ open: boolean; path: string }>({ open: false, path: pathname });
   const moreOpen = moreSheet.open && moreSheet.path === pathname;
   const setMoreOpen = (open: boolean) => setMoreSheet({ open, path: pathname });
   const { availability, isPending, setStatus } = useLightAvailability(initialAvailability);
   useLightNavigationTracker();
+
+  const sheet = (
+    <LightMoreSheet
+      open={moreOpen}
+      onOpenChange={setMoreOpen}
+      user={user}
+      showQuoteSimulator={showQuoteSimulator}
+      showDutyCalendar={showDutyCalendar}
+      availability={availability}
+      availabilityPending={isPending}
+      onChangeAvailability={setStatus}
+    />
+  );
+
+  // Chat screens draw their own header; the conversation list is the navigation.
+  if (chat) {
+    return (
+      <div className="arc-venancor h-dvh w-full overflow-hidden bg-[var(--surface)]">
+        <main ref={mainRef} data-slot="app-content" className="h-full w-full overflow-y-auto overscroll-contain">
+          <LightAvailabilityProvider value={{ availability, isPending, setStatus, openMore: () => setMoreOpen(true) }}>{children}</LightAvailabilityProvider>
+        </main>
+        {sheet}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-dvh w-full overflow-hidden light-canvas selection:bg-primary/20">
@@ -72,7 +97,7 @@ export function LightChrome({
               : "min-h-0 w-full flex-1 overflow-y-auto overscroll-contain pb-[calc(96px+var(--mobile-safe-bottom))] md:pb-0"
           }
         >
-          <LightAvailabilityProvider value={{ availability, isPending, setStatus }}>{children}</LightAvailabilityProvider>
+          <LightAvailabilityProvider value={{ availability, isPending, setStatus, openMore: () => setMoreOpen(true) }}>{children}</LightAvailabilityProvider>
         </main>
       </div>
       {hidesTabBar ? null : (
@@ -83,16 +108,7 @@ export function LightChrome({
           onOpenMore={() => setMoreOpen(true)}
         />
       )}
-      <LightMoreSheet
-        open={moreOpen}
-        onOpenChange={setMoreOpen}
-        user={user}
-        showQuoteSimulator={showQuoteSimulator}
-        showDutyCalendar={showDutyCalendar}
-        availability={availability}
-        availabilityPending={isPending}
-        onChangeAvailability={setStatus}
-      />
+      {sheet}
     </div>
   );
 }

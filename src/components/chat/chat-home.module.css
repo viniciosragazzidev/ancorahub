@@ -1,0 +1,39 @@
+.page { min-height: 100dvh; background: var(--surface); }
+.sidebar { display: grid; align-content: start; gap: 4px; padding-bottom: 160px; }
+.header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 10px; }
+.me { width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; box-shadow: var(--shadow-resting); }
+.hello { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: var(--text-xl); letter-spacing: var(--tracking-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.headerTools { display: flex; gap: 8px; }
+.tabs { padding: 4px 20px 8px; max-width: 320px; }
+.count { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; margin-left: 6px; border-radius: 999px; background: oklch(62% 0.2 255); color: white; font-size: 11px; font-variant-numeric: tabular-nums; }
+.search { padding: 0 20px 8px; }
+.searchInput { width: 100%; height: 42px; border: 1px solid var(--border); border-radius: var(--radius-control); padding: 0 14px; font: inherit; font-size: var(--text-sm); background: var(--surface-muted); color: var(--foreground); outline: none; }
+.center { display: none; }
+
+.newList { list-style: none; margin: 0; padding: 0 0 12px; display: grid; gap: 4px; }
+.newItem { width: 100%; display: grid; gap: 2px; padding: 12px 14px; border: 0; border-radius: var(--radius-control); background: none; text-align: left; font: inherit; color: var(--foreground); text-decoration: none; cursor: pointer; }
+.newItem:hover { background: var(--surface-muted); }
+.newItem strong { font-weight: 500; font-size: var(--text-base); }
+.newItem span { font-size: var(--text-sm); color: var(--text-muted); }
+
+/* Computers: the list on the side, the team at the center (reference: desktop home). */
+@media (min-width: 1024px) {
+  .page { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: 100dvh; }
+  .sidebar { border-right: 1px solid var(--border); background: var(--surface-muted); overflow-y: auto; padding-bottom: 24px; }
+  .center { display: grid; place-items: center; overflow-y: auto; padding: 48px 32px; }
+  .centerInner { width: 100%; max-width: 760px; display: grid; justify-items: center; gap: 6px; }
+  .centerTitle { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: var(--text-3xl); letter-spacing: var(--tracking-display); }
+  .centerSubtitle { margin: 0 0 28px; color: var(--text-muted); font-size: var(--text-sm); }
+  .cards { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .card { height: 100%; display: grid; align-content: start; gap: 6px; padding: 20px; border-radius: var(--radius-panel); background: var(--surface-muted); text-decoration: none; color: inherit; transition: background-color var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
+  .card:hover { background: var(--neutral-3); transform: translateY(-1px); }
+  .cardName { margin-top: 10px; font-weight: 500; font-size: var(--text-base); }
+  .cardPreview { font-size: var(--text-sm); color: var(--text-muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .cardWaiting { display: inline-flex; align-items: center; gap: 6px; font-size: var(--text-xs); color: oklch(62% 0.2 255); font-weight: 500; }
+  .page [data-mobile-only] { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { transition: none; }
+  .card:hover { transform: none; }
+}

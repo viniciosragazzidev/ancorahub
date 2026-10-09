@@ -3,7 +3,7 @@ import { withRequestTiming } from "@/shared/observability/request-timing";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { Suspense } from "react";
 import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
-import { LightDashboardContent } from "@/features/broker-workspace/components/light-dashboard-content";
+import { ChatHomeContent } from "@/features/broker-workspace/components/chat-home-content";
 import { getCommandCenterData } from "@/features/dashboard/today";
 import { CommandCenter } from "@/features/dashboard/components/command-center";
 import { canAccessLeadQualityCenter, getLeadQualityReport, parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
@@ -42,7 +42,7 @@ export default async function DashboardPage({
     if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
       return (
         <Suspense fallback={<LightPageSkeleton variant="dashboard" />}>
-          <LightDashboardContent />
+          <ChatHomeContent />
         </Suspense>
       );
     }
