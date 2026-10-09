@@ -102,13 +102,13 @@ export default function LoginPage() {
   return (
     <div className="space-y-6">
       <div className="text-center space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Acesse sua conta</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Entre com seu e-mail e senha de acesso</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Acesse sua conta</h1>
+        <p className="text-sm text-muted-foreground">Entre com seu e-mail e senha de acesso</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="email" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">E-mail</Label>
+          <Label htmlFor="email" className="text-xs font-semibold text-[var(--text-secondary)]">E-mail</Label>
           <Input
             id="email"
             type="email"
@@ -122,7 +122,7 @@ export default function LoginPage() {
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="password" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">Senha</Label>
+          <Label htmlFor="password" className="text-xs font-semibold text-[var(--text-secondary)]">Senha</Label>
           <div className="relative">
             <Input
               id="password"
@@ -138,7 +138,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-0 top-0 h-full px-3 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-[var(--text-secondary)]"
               disabled={loading}
               aria-label={showPassword ? "Ocultar senha" : "Exibir senha"}
             >
@@ -150,7 +150,7 @@ export default function LoginPage() {
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2">
             <Checkbox id="remember" disabled={loading} />
-            <Label htmlFor="remember" className="text-xs font-normal text-zinc-500 dark:text-zinc-400 cursor-pointer">
+            <Label htmlFor="remember" className="text-xs font-normal text-muted-foreground cursor-pointer">
               Lembrar de mim
             </Label>
           </div>
@@ -234,11 +234,11 @@ export default function LoginPage() {
         {passkeyLoading ? "Autenticando..." : "Entrar com passkey"}
       </Button>
 
-      <p className="text-center text-[10px] leading-relaxed text-zinc-400 dark:text-zinc-500">
+      <p className="text-center text-[10px] leading-relaxed text-muted-foreground">
         Ao acessar a plataforma, você concorda com os nossos{" "}
-        <Link href="/termos" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">Termos de Uso</Link>
+        <Link href="/termos" className="underline hover:text-[var(--text-secondary)]">Termos de Uso</Link>
         {" "}e{" "}
-        <Link href="/termos#privacidade" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">Política de Privacidade</Link>.
+        <Link href="/termos#privacidade" className="underline hover:text-[var(--text-secondary)]">Política de Privacidade</Link>.
       </p>
 
       <LoginTransition active={showTransition} onComplete={handleTransitionComplete} />

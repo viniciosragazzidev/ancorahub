@@ -32,7 +32,7 @@ export const DsTrendStatCard = React.forwardRef<HTMLDivElement, DsTrendStatCardP
         ref={ref}
         data-slot="ds-trend-stat-card"
         className={cn(
-          "flex flex-col rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-ds-16 font-ds-inter transition-colors duration-150 ease-out hover:border-ds-smoke",
+          "flex flex-col rounded-ds-cards border border-transparent bg-ds-canvas-white p-ds-16 font-ds-inter shadow-[var(--shadow-card)] transition-shadow duration-150 ease-out",
           className,
         )}
         {...props}

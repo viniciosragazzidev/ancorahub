@@ -171,7 +171,7 @@ const navigationItems: NavItemConfig[] = [
     url: "/settings",
     permission: "acessar_configuracoes_pessoais",
     section: "Administração",
-    iconTone: "text-slate-600 dark:text-slate-300",
+    iconTone: "text-[var(--text-secondary)]",
   },
 ];
 

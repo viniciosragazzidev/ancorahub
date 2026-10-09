@@ -45,6 +45,9 @@ components:
     background: "Use primary or accent colors for the main action"
     radius: "Use the control or pill radius based on the source HTML"
 ---
+
+> **DESCONTINUADO (2026-10-09).** O único design system do CRM é o do modo Lite: [`docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md`](/docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md). Este documento fica só como histórico; não use seus valores.
+
 # Nexus Analytics Dashboard
 Source: Neuform Featured templates from top creators. Author: Sourasith Phomhome (@madebysourasith). Views: 52; favorites: 22; remixes: 5.
 Tags: dashboard, animated, webgl, threejs, cta, bento, charts, security.

@@ -38,13 +38,13 @@ export default function TwoFactorPage() {
   return (
     <div className="space-y-6">
       <div className="text-center space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Confirme sua identidade</h1>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">Digite o código do seu aplicativo autenticador.</p>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Confirme sua identidade</h1>
+        <p className="text-sm text-muted-foreground">Digite o código do seu aplicativo autenticador.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="two-factor-code" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+          <Label htmlFor="two-factor-code" className="text-xs font-semibold text-[var(--text-secondary)]">
             {useBackup ? "Código de recuperação" : "Código de 6 dígitos"}
           </Label>
           <Input
@@ -69,7 +69,7 @@ export default function TwoFactorPage() {
             onCheckedChange={(checked) => setTrustDevice(Boolean(checked))}
             disabled={busy}
           />
-          <Label htmlFor="trust-device" className="text-xs font-normal text-zinc-500 dark:text-zinc-400 cursor-pointer">
+          <Label htmlFor="trust-device" className="text-xs font-normal text-muted-foreground cursor-pointer">
             Confiar neste dispositivo por 30 dias
           </Label>
         </div>
@@ -88,7 +88,7 @@ export default function TwoFactorPage() {
       <button
         type="button"
         onClick={() => { setUseBackup((current) => !current); setCode(""); setError(""); }}
-        className="flex w-full items-center justify-center gap-2 text-xs text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+        className="flex w-full items-center justify-center gap-2 text-xs text-muted-foreground hover:text-[var(--text-secondary)]"
       >
         <Key size={14} />
         {useBackup ? "Usar código do autenticador" : "Usar código de recuperação"}

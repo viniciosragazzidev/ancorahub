@@ -1,6 +1,6 @@
 # Design System "Conversa" (modo Lite) · v1.0
 
-Status: **ATIVO no modo Lite (corretor)** desde 2026-10-09 · alvo: **adoção 1:1 no modo normal (diretor/gestor)**.
+Status: **ÚNICO design system do CRM** desde 2026-10-09 · ativo no modo Lite (corretor) e, na camada visual, no modo normal (diretor/gestor). Os demais documentos de design estão descontinuados.
 Dono: Vinicios. Registro feito a partir do código em produção da branch `feat/corretor-chat`; **o código é a fonte da verdade** e este documento descreve exatamente o que está nele. Se divergir, o código vence e este arquivo se corrige.
 
 Fontes no código:
@@ -250,47 +250,39 @@ Regras de roteiro (conteúdo gerado): funções puras sobre os dados (`build*Scr
 
 ---
 
-## 10. Guia de adoção 1:1 no modo normal (diretor e gestor)
+## 10. Adoção no modo normal (diretor e gestor): só a camada visual
 
-Objetivo: o diretor usar o CRM com o mesmo visual, movimento, navegação e linguagem do Lite.
+Decisão do Vinicios (2026-10-09): **este é o único design system do CRM**, e o modo normal recebe **o visual** do Lite mantendo **a estrutura** (sidebar, páginas, tabelas, drawers, fluxos). O modo normal **não vira chat**.
 
-### 10.1 Mapa de telas (proposta para validar com o Vinicios)
-| Tela atual do diretor | Padrão alvo | Assistentes / conteúdo |
-|---|---|---|
-| `/dashboard` (central de ações) | Home de conversas | **Distribuição** (leads parados, filas sem corretor), **Plantões** (cobertura de hoje, quem está pausado, presença a liberar), **Equipe** (quem está online, desempenho), **Leads** (novos, SLA), **Vendas** (aprovações pendentes), **Âncora** (avisos) |
-| `/leads` (lista) | Lista em tela cheia + filtros em segmented | linhas = leads com prévia da próxima ação |
-| `/leads/{id}` | Conversa de entidade | mesma do Lite + ações de gestão (reatribuir, mudar unidade, supervisão) como opções |
-| `/leads/distribuicao` e plantões | Conversa de assistente + Ficha completa | resumo e próximas ações na conversa; editor de escala e quadros continuam como "ficha completa" |
-| `/equipe/{id}` | Conversa de entidade (pessoa) | ficha do corretor, números, plantões |
-| Relatórios, configurações | Ficha completa dentro da moldura nova | sem sidebar; acesso pelo "Mais" |
-| Toasts de evento | DynamicNotice | lead chegou, venda para aprovar, plantão sem cobertura |
+### 10.1 O que muda e onde
+| Camada | Como foi aplicado (branch `feat/diretor-visual-lite`) |
+|---|---|
+| Cores, fundo, bordas, texto, semânticas | `src/app/globals.css` `:root` com os valores da §2.2 (fundo `#f7f7f9`, cards `#fff`, bordas `rgb(16 16 40 / .08)`, texto `#0b0b12 / #4b4b59 / #666674`, success/warning/danger Venancor) |
+| Tokens "ds-*" legados | `src/styles/design-system/tokens.css` apontado para os mesmos valores (cinzas, raio de card 24px) |
+| Card | `components/ui/card.tsx` e cards `ds-*`: sem borda, `--shadow-card` (resting), raio 24px |
+| Sombras | `shadow-xs/sm/md/lg/xl` do Tailwind e `--shadow-*` mapeados para resting/raised/floating (§2.4) |
+| Tipografia | Plus Jakarta Sans; `font-semibold` e `font-bold` resolvem para 500 no tema (§2.3) |
+| Raios utilitários | `rounded-md/lg/xl` mantêm o tamanho anterior (peças pequenas continuam pequenas); cards usam `--radius-card: 1.5rem` |
+| Movimento | entrada de tela 8px + fade 180ms `ease-enter` no conteúdo do shell; durações 160/240ms |
+| Cores fixas em telas | trocadas por tokens (login, 2FA, badges neutros, assistente de IA); ficam de fora QR codes (precisam de branco), logo, seletor de cor e a página de erro isolada |
 
-### 10.2 Ordem de implantação
-1. **Tokens e moldura:** aplicar `.arc-venancor` na moldura do modo normal; remover sidebar/abas; Início como hub; "Mais" em sheet; `goBackInApp` em todos os voltar.
-2. **Kit:** reutilizar `src/components/chat/*` sem bifurcar (nada de cópia para o diretor). Novos assistentes = novos roteiros em `features/<área>/chat/` + novos nomes em `ChatServerActionName`.
-3. **Home do diretor** (padrão Home de conversas) com os assistentes de 10.1.
-4. **Conversa do lead** com ações de gestão.
-5. **Assistentes de Distribuição e Plantões** com saída para os editores existentes (ficha completa).
-6. **DynamicNotice** para eventos de gestão.
-7. Telas densas restantes dentro da moldura nova (sem refazer agora).
+### 10.2 Regras para telas novas ou alteradas no modo normal
+- Tokens só da §2; cards como na §5 (sem borda, sombra resting, 24px); controles pílula; pesos 400/500.
+- Mesma linguagem (§7) e acessibilidade (§8).
+- Estrutura e densidade continuam as do modo normal (tabelas, drawer lateral, menus).
 
-### 10.3 O que o Lite ainda não tem e o diretor precisa (gaps)
-- **G3 Tabelas densas:** não há padrão de tabela no estilo conversa. Até decidir, tabelas ficam como "ficha completa" (Arc `sortable-data-table` dentro da moldura).
-- **G4 Filtros e período:** o Lite não filtra por unidade/período. Proposta: segmented + sheet de filtros.
-- **G5 Permissões na conversa:** opções de gestão precisam esconder o que o papel não pode (a ação de servidor já checa; a UI deve omitir).
-- **G1 / G2:** ver §2.2 (dois azuis; tema escuro não validado).
+### 10.3 Gaps
+- G1: dois azuis (ação do chat e índigo dos controles). No modo normal o primário continua o índigo `#3b2dff`.
+- G2: tema escuro não validado tela a tela (Lite e normal).
+- G3: componentes `ds-*` e shadcn convivem; consolidar num conjunto único é trabalho futuro.
 
-### 10.4 Checklist de cada tela migrada
-- [ ] Abre dizendo a próxima ação em 1 frase; primeira opção = ação mais provável.
-- [ ] Tokens só da tabela §2; sem cor solta, sem peso 600/700, sem caixa alta.
-- [ ] Movimento conforme §3 e reduced motion testado.
-- [ ] Voltar com `goBackInApp`; sem loop.
-- [ ] Alvos ≥ 44px; teste em 390px; leitor de tela nos blocos novos.
-- [ ] Sem travessão no texto; pt-BR.
-- [ ] Roteiro puro com testes; ações de servidor por nome com zod.
-- [ ] Saída para a tela completa quando a tarefa não cabe em conversa.
-
----
+### 10.4 Checklist por tela
+- [ ] Sem cor, sombra, raio ou peso fora dos tokens.
+- [ ] Cards sem borda com sombra leve; nada de borda preta ou 12px.
+- [ ] Fundo da página é o canvas `#f7f7f9` (não branco).
+- [ ] Movimento conforme §3, reduced motion ok.
+- [ ] Texto pt-BR sem travessão.
 
 ## 11. Histórico
+- 2026-10-09 · v1.1 · vira o único design system; §10 reescrita: no modo normal só a camada visual.
 - 2026-10-09 · v1.0 · registro inicial a partir do modo Lite (fases F0 a F6 + ajustes do mesmo dia: sem sidebar, voltar sem loop, aviso dinâmico em pílula, balões do WhatsApp).

@@ -11,18 +11,18 @@
  * --------------------------------------------------------------------------- */
 
 @theme {
-  /* ----- Colors --------------------------------------------------------- */
+  /* ----- Colors (aligned to the Lite visual on 2026-10-09: docs/design-system/lite) ----- */
   --color-ds-canvas-white: #ffffff;
-  --color-ds-paper-mist: #f4f3f0;
-  --color-ds-ash: #e4e4e7;
-  --color-ds-smoke: #d4d4d4;
-  --color-ds-pebble: #c8c8c8;
-  --color-ds-midnight-ink: #0a0a0a;
-  --color-ds-charcoal: #171717;
+  --color-ds-paper-mist: #f1f1f5;
+  --color-ds-ash: rgb(16 16 40 / 0.08);
+  --color-ds-smoke: rgb(16 16 40 / 0.12);
+  --color-ds-pebble: rgb(16 16 40 / 0.18);
+  --color-ds-midnight-ink: #0b0b12;
+  --color-ds-charcoal: #0b0b12;
   --color-ds-graphite: #262626;
-  --color-ds-slate: #404040;
-  --color-ds-steel: #525252;
-  --color-ds-fog: #71717a;
+  --color-ds-slate: #4b4b59;
+  --color-ds-steel: #4b4b59;
+  --color-ds-fog: #666674;
   --color-ds-silver: #a3a3a3;
   --color-ds-electric-blue: #3b2dff;
   --color-ds-deep-sapphire: #2f22d9;
@@ -97,7 +97,7 @@
    * large (16px) → feature surfaces, inputs get their own 6px step.
    * ------------------------------------------------------------------- */
   --radius-ds-tags: 9999px;
-  --radius-ds-cards: 12px;
+  --radius-ds-cards: 1.5rem;
   --radius-ds-inputs: 6px;
   --radius-ds-buttons: 8px;
   --radius-ds-large-cards: 16px;

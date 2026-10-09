@@ -1,3 +1,5 @@
+> **DESCONTINUADO (2026-10-09).** O único design system do CRM é o do modo Lite: [`docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md`](/docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md). Este documento fica só como histórico; não use seus valores.
+
 # Design System
 
 Status: **ACTIVE** · versão `1.0.0` · fonte inicial: [`../../design.md`](../../design.md).
@@ -11,10 +13,6 @@ Este diretório transforma a referência visual em contrato operacional. Ele nã
 3. [COMPONENT_RULES.md](./COMPONENT_RULES.md) e `components/`
 4. [PAGE_PATTERNS.md](./PAGE_PATTERNS.md), [RESPONSIVE_RULES.md](./RESPONSIVE_RULES.md), [ACCESSIBILITY_RULES.md](./ACCESSIBILITY_RULES.md) e [MOTION_RULES.md](./MOTION_RULES.md)
 5. [DESIGN_GAPS.md](./DESIGN_GAPS.md), quando não houver regra aplicável.
-
-## Design system "Conversa" (modo Lite)
-
-O modo Lite (corretor) usa o design system de conversa registrado em [lite/LITE_CHAT_DESIGN_SYSTEM.md](./lite/LITE_CHAT_DESIGN_SYSTEM.md) (tokens, movimento, navegação, componentes, padrões e guia de adoção 1:1 no modo diretor). Para telas do Lite e para a migração do modo normal, ele prevalece sobre os documentos abaixo.
 
 ## Vocabulário canônico
 

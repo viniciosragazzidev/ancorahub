@@ -61,7 +61,7 @@ const CATEGORY_LABELS: Record<string, { label: string; color: string }> = {
   followup: { label: "Reengajamento", color: "bg-purple-500/10 text-purple-500 border-purple-500/20" },
   handoff: { label: "Handoff Humano", color: "bg-rose-500/10 text-rose-500 border-rose-500/20" },
   timing: { label: "Horários", color: "bg-sky-500/10 text-sky-500 border-sky-500/20" },
-  custom: { label: "Customizado", color: "bg-slate-500/10 text-slate-500 border-slate-500/20" },
+  custom: { label: "Customizado", color: "bg-muted text-muted-foreground border-transparent" },
 };
 
 const AVAILABLE_VARIABLES = [
