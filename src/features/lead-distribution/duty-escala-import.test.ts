@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { codesInName, excelSerialToDate, matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "./duty-escala-import";
+import { codesInName, excelSerialToDate, matchBrokerByName, parseSlotsSheet, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "./duty-escala-import";
 
 // 2026-10-08 = 46303, 2026-10-09 = 46304 (Excel 1900 serials).
 const sheet: unknown[][] = [
@@ -69,5 +69,25 @@ describe("codesInName", () => {
     expect(codesInName("Dandhara Lima 6580")).toEqual(["6580"]);
     expect(codesInName("Jorge Maia 0406")).toEqual(["406"]);
     expect(codesInName("Maria Souza")).toEqual([]);
+  });
+});
+
+describe("parseSlotsSheet", () => {
+  const slots: unknown[][] = [
+    ["Destino", "Tipo", "Turno", "Data", "Vaga", "Capacidade", "Ativo", "DiaIndex", "Spread", "Slot local", "Chave", "Corretor alocado"],
+    ["Matriz", "Presencial", "Manhã", 46303, 1, 4, 1, 1, 1, 1, "Matriz|1", "12156-WALLACE LUIZ DE OLIVEIRA"],
+    ["Matriz", "Presencial", "Tarde", 46303, 1, 3, 1, 1, 1, 2, "Matriz|2", "7185-EDINALDO LUIZ DA SILVA"],
+    ["Caxias", "Presencial", "Manhã", 46303, 1, 1, 1, 1, 1, 1, "Caxias|1", "1418-ISABEL CRISTINA DA COSTA"],
+    ["Matriz", "Presencial", "Manhã", 46303, 2, 4, 1, 1, 1, 3, "Matriz|3", 0],
+    ["ONLINE", "Online", "Único", 46303, 1, 5, 1, 1, 1, 1, "ONLINE|1", "406-JORGE OSCAR MAIA"],
+  ];
+  it("groups the seats of one type by date and shift, across units", () => {
+    expect(parseSlotsSheet(slots, "Presencial").days).toEqual([
+      { date: "2026-10-08", shift: "manha", brokers: [{ code: "12156", name: "WALLACE LUIZ DE OLIVEIRA" }, { code: "1418", name: "ISABEL CRISTINA DA COSTA" }] },
+      { date: "2026-10-08", shift: "tarde", brokers: [{ code: "7185", name: "EDINALDO LUIZ DA SILVA" }] },
+    ]);
+  });
+  it("refuses a tab without the expected columns", () => {
+    expect(() => parseSlotsSheet([["x"]], "Presencial")).toThrow(/SLOTS/);
   });
 });

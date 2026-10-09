@@ -6,7 +6,9 @@
  */
 
 export type ImportedBroker = { code: string; name: string };
-export type ImportedDay = { date: string; brokers: ImportedBroker[] };
+export type ImportedShift = "manha" | "tarde";
+/** One date (and, for split plantões, one shift) with its brokers. */
+export type ImportedDay = { date: string; shift?: ImportedShift | null; brokers: ImportedBroker[] };
 export type ParsedEscala = { days: ImportedDay[]; unreadable: Array<{ date: string; text: string }> };
 
 const BROKER_CELL = /^\s*0*(\d+)\s*-\s*(.+?)\s*$/;
@@ -97,4 +99,49 @@ export function matchBrokerByName<T extends { name: string }>(sheetName: string,
  */
 export function codesInName(name: string) {
   return [...name.matchAll(/(?:^|\D)(\d{2,6})(?=\D|$)/g)].map((match) => normalizeBrokerCode(match[1]));
+}
+
+const fold = (value: unknown) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLocaleLowerCase("pt-BR");
+
+/**
+ * Reads the "SLOTS" tab of the Âncora automatic escala: one row per seat with
+ * Destino (unit), Tipo, Turno (Manhã/Tarde), Data and "Corretor alocado".
+ * Only rows of `tipo` (e.g. "Presencial") with a broker are read; seats are
+ * grouped by date and shift. The unit is not needed: one plantão per shift
+ * serves every unit (each broker works at their own unit).
+ */
+export function parseSlotsSheet(rows: unknown[][], tipo: string): ParsedEscala {
+  const header = (rows[0] ?? []).map(fold);
+  const column = (name: string) => header.findIndex((cell) => cell === fold(name));
+  const tipoAt = column("Tipo");
+  const turnoAt = column("Turno");
+  const dataAt = column("Data");
+  const corretorAt = column("Corretor alocado");
+  if ([tipoAt, turnoAt, dataAt, corretorAt].some((index) => index < 0)) throw new Error("A aba SLOTS precisa das colunas Tipo, Turno, Data e Corretor alocado.");
+  const byKey = new Map<string, ImportedDay>();
+  const unreadable: ParsedEscala["unreadable"] = [];
+  for (const row of rows.slice(1)) {
+    if (fold(row?.[tipoAt]) !== fold(tipo)) continue;
+    const raw = row?.[corretorAt];
+    if (raw === undefined || raw === null || String(raw).trim() === "" || String(raw).trim() === "0") continue;
+    const date = cellDate(row?.[dataAt]);
+    if (!date) continue;
+    const turno = fold(row?.[turnoAt]);
+    const shift: ImportedShift | null = turno.startsWith("manh") ? "manha" : turno.startsWith("tard") ? "tarde" : null;
+    const match = BROKER_CELL.exec(String(raw));
+    if (!match) {
+      unreadable.push({ date, text: String(raw).trim() });
+      continue;
+    }
+    const key = `${date}|${shift ?? ""}`;
+    const day = byKey.get(key) ?? { date, shift, brokers: [] };
+    const code = normalizeBrokerCode(match[1]);
+    if (!day.brokers.some((broker) => broker.code === code)) day.brokers.push({ code, name: match[2].replace(/\s+/g, " ") });
+    byKey.set(key, day);
+  }
+  const order = { manha: 0, tarde: 1 } as const;
+  return {
+    days: [...byKey.values()].sort((a, b) => a.date.localeCompare(b.date) || (a.shift ? order[a.shift] : 2) - (b.shift ? order[b.shift] : 2)),
+    unreadable,
+  };
 }

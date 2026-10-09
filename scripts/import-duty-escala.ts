@@ -25,7 +25,7 @@ import postgres from "postgres";
 import * as XLSX from "xlsx";
 
 import * as schema from "../src/shared/db/schema";
-import { codesInName, matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, seatsByBroker } from "../src/features/lead-distribution/duty-escala-import";
+import { codesInName, matchBrokerByName, normalizeBrokerCode, parseEscalaSheet, parseSlotsSheet, seatsByBroker, type ImportedShift } from "../src/features/lead-distribution/duty-escala-import";
 import {
   buildRangeOccurrences,
   dayOfWeekOf,
@@ -48,12 +48,18 @@ const option = (name: string) => {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : undefined;
 };
-const VALUE_OPTIONS = new Set(["--sheet", "--type", "--tenant", "--user", "--name-prefix"]);
+const VALUE_OPTIONS = new Set(["--sheet", "--type", "--tenant", "--user", "--name-prefix", "--slot-type", "--manha", "--tarde"]);
 const file = args.find((arg, index) => !arg.startsWith("--") && !VALUE_OPTIONS.has(args[index - 1] ?? ""));
 const apply = args.includes("--apply");
 const sheetName = option("--sheet") ?? "Planilha1";
 const typeName = option("--type") ?? "PME";
 const namePrefix = option("--name-prefix") ?? typeName;
+// Split plantões (SLOTS tab): the morning and afternoon shifts, always cut at 13:30.
+const parseRange = (value: string) => { const [startsAt, endsAt] = value.split("-"); return { startsAt, endsAt }; };
+const SHIFTS: Record<ImportedShift, { label: string; startsAt: string; endsAt: string }> = {
+  manha: { label: "Manhã", ...parseRange(option("--manha") ?? "09:00-13:30") },
+  tarde: { label: "Tarde", ...parseRange(option("--tarde") ?? "13:30-19:00") },
+};
 const TZ = "America/Sao_Paulo";
 
 const databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim() || "";
@@ -69,7 +75,8 @@ async function main() {
   const book = XLSX.readFile(file!);
   const sheet = book.Sheets[sheetName];
   if (!sheet) throw new Error(`A aba "${sheetName}" não existe. Abas: ${book.SheetNames.join(", ")}`);
-  const parsed = parseEscalaSheet(XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" }) as unknown[][]);
+  const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" }) as unknown[][];
+  const parsed = sheetName.toUpperCase() === "SLOTS" ? parseSlotsSheet(matrix, option("--slot-type") ?? typeName) : parseEscalaSheet(matrix);
 
   const client = postgres(databaseUrl, { prepare: false, max: 1, connect_timeout: 15 });
   const db = drizzle(client, { schema });
@@ -149,30 +156,40 @@ async function main() {
     const existing = scheduleRows.map(asPlanSchedule);
 
     // ---------- per date: past / existing plantão / to create
-    type Plan = { date: string; scheduleIds: string[]; create: boolean; codes: string[] };
+    type Plan = { date: string; shift: ImportedShift | null; startsAt: string; endsAt: string; scheduleIds: string[]; create: boolean; codes: string[]; others: string[] };
     const plans: Plan[] = [];
     const skipped: string[] = [];
+    const hhmm = (time: string) => time.slice(0, 5);
     for (const day of parsed.days) {
       if (!day.brokers.length) continue;
+      const shift = day.shift ? SHIFTS[day.shift] : null;
       const onDate = existing.filter((schedule) => schedule.dayOfWeek === dayOfWeekOf(day.date) && isValidOn(schedule, day.date));
-      const end = shiftEnd(onDate[0] ?? { startsAt: template.startsAt, endsAt: template.endsAt, timezone: template.timezone }, day.date);
-      if (day.date < today || end.getTime() <= now.getTime()) { skipped.push(day.date); continue; }
-      plans.push({ date: day.date, scheduleIds: onDate.map((schedule) => schedule.id), create: onDate.length === 0, codes: day.brokers.map((broker) => broker.code) });
+      // A shift uses the plantão of the type with exactly its hours; others that day are only reported.
+      const matching = shift ? onDate.filter((schedule) => hhmm(schedule.startsAt) === shift.startsAt && hhmm(schedule.endsAt) === shift.endsAt) : onDate;
+      const others = shift ? onDate.filter((schedule) => !matching.includes(schedule)).map((schedule) => `${schedule.name} ${hhmm(schedule.startsAt)}–${hhmm(schedule.endsAt)}`) : [];
+      const startsAt = shift?.startsAt ?? template.startsAt;
+      const endsAt = shift?.endsAt ?? template.endsAt;
+      const end = shiftEnd(matching[0] ?? { startsAt, endsAt, timezone: template.timezone }, day.date);
+      const label = `${short(day.date)}${shift ? ` ${shift.label}` : ""}`;
+      if (day.date < today || end.getTime() <= now.getTime()) { skipped.push(label); continue; }
+      plans.push({ date: day.date, shift: day.shift ?? null, startsAt, endsAt, scheduleIds: matching.map((schedule) => schedule.id), create: matching.length === 0, codes: day.brokers.map((broker) => broker.code), others });
     }
+    const planLabel = (plan: Plan) => `${short(plan.date)}${plan.shift ? ` ${SHIFTS[plan.shift].label} ${plan.startsAt}–${plan.endsAt}` : ""}`;
     const unknownCodes = [...new Set(plans.flatMap((plan) => plan.codes))].filter((code) => !brokerByCode.has(code));
     const nameOfCode = new Map(parsed.days.flatMap((day) => day.brokers.map((broker) => [broker.code, broker.name] as const)));
 
     // ---------- report
     console.log(`Planilha: ${parsed.days.length} datas na aba "${sheetName}". Empresa: ${tenantId}. Tipo: ${type.name}. Diretor: ${actor.name} <${actor.email}>.`);
     console.log(`Modelo dos plantões novos: "${template.name}" ${template.startsAt.slice(0, 5)}–${template.endsAt.slice(0, 5)}, ${template.attendanceMode}, mín. ${template.minimumBrokers}${template.maximumBrokers ? `, máx. ${template.maximumBrokers}` : ""}, filas: ${templateQueues.map((queue) => queue.name).join(", ") || "nenhuma"}.`);
-    if (skipped.length) console.log(`Ignoradas (já passaram): ${skipped.map(short).join(", ")}`);
+    if (skipped.length) console.log(`Ignoradas (já passaram): ${skipped.join(", ")}`);
     console.log(`\nDatas a importar: ${plans.length}`);
     for (const plan of plans) {
       const found = plan.codes.filter((code) => brokerByCode.has(code)).length;
-      console.log(`  ${short(plan.date)} ${plan.create ? "CRIAR plantão" : `já existe (${plan.scheduleIds.length})`} · ${found}/${plan.codes.length} corretores: ${plan.codes.map((code) => `${code}${brokerByCode.has(code) ? "" : "?"}`).join(", ")}`);
+      console.log(`  ${planLabel(plan)} ${plan.create ? "CRIAR plantão" : `já existe (${plan.scheduleIds.length})`} · ${found}/${plan.codes.length} corretores: ${plan.codes.map((code) => `${code}${brokerByCode.has(code) ? "" : "?"}`).join(", ")}`);
+      if (plan.others.length) console.log(`      atenção: nesse dia também existe ${plan.others.join("; ")} (não será usado nem alterado)`);
     }
     const toCreate = plans.filter((plan) => plan.create);
-    console.log(`\nPlantões a criar: ${toCreate.length}${toCreate.length ? ` (${toCreate.map((plan) => short(plan.date)).join(", ")})` : ""}`);
+    console.log(`\nPlantões a criar: ${toCreate.length}${toCreate.length ? ` (${toCreate.map(planLabel).join(", ")})` : ""}`);
     if (viaNameCode.length) {
       console.log(`
 Encontrados pelo código escrito no NOME do CRM: ${viaNameCode.length}`);
@@ -215,10 +232,11 @@ Encontrados PELO NOME (o código da planilha não é o do CRM): ${byName.length}
       for (const plan of toCreate) {
         const id = randomUUID();
         const validity = occurrenceValidity(plan.date, template.timezone);
+        const name = `${namePrefix} ${short(plan.date)}${plan.shift ? ` · ${SHIFTS[plan.shift].label}` : ""}`;
         await tx.insert(schema.unitDutySchedules).values({
           id, tenantId, branchId: null, queueId: null,
-          name: `${namePrefix} ${short(plan.date)}`,
-          typeId: type.id, dayOfWeek: dayOfWeekOf(plan.date), startsAt: template.startsAt, endsAt: template.endsAt,
+          name,
+          typeId: type.id, dayOfWeek: dayOfWeekOf(plan.date), startsAt: plan.startsAt, endsAt: plan.endsAt,
           priority: template.priority, minimumBrokers: template.minimumBrokers, maximumBrokers: template.maximumBrokers,
           maxLeadsPerBroker: template.maxLeadsPerBroker, shiftSplitAt: null, attendanceMode: template.attendanceMode,
           status: "active", timezone: template.timezone, validFrom: validity.validFrom, validUntil: validity.validUntil,
@@ -226,7 +244,7 @@ Encontrados PELO NOME (o código da planilha não é o do CRM): ${byName.length}
         });
         await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: actor.id, entidade: "unit_duty_schedule", entidadeId: id, acao: "duty_schedule.created_by_import" });
         plan.scheduleIds = [id];
-        created.push({ ...asPlanSchedule({ ...template, id, name: `${namePrefix} ${short(plan.date)}`, dayOfWeek: dayOfWeekOf(plan.date), validFrom: validity.validFrom, validUntil: validity.validUntil }) });
+        created.push({ ...asPlanSchedule({ ...template, id, name, startsAt: plan.startsAt, endsAt: plan.endsAt, dayOfWeek: dayOfWeekOf(plan.date), validFrom: validity.validFrom, validUntil: validity.validUntil }) });
       }
       // The new plantões receive the same queues as the template.
       if (created.length) {
@@ -262,7 +280,7 @@ Encontrados PELO NOME (o código da planilha não é o do CRM): ${byName.length}
         .where(and(eq(schema.dutyRosterAssignments.tenantId, tenantId), eq(schema.dutyRosterAssignments.status, "active"), inArray(schema.dutyRosterAssignments.scheduleId, [...importedScheduleIds])));
       const assignments: StoredAssignment[] = [];
       const occurrences = fresh.map((occurrence) => {
-        const plan = plans.find((item) => item.date === occurrence.dutyDate)!;
+        const plan = plans.find((item) => item.date === occurrence.dutyDate && item.scheduleIds.includes(occurrence.scheduleId))!;
         const forced: string[] = [];
         const add = (brokerId: string, origin: StoredAssignment["origin"]) => {
           if (assignments.some((item) => item.occurrenceId === occurrence.id && item.brokerId === brokerId)) return;
