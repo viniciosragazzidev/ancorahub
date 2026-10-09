@@ -1,11 +1,13 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { buildMemberDutyDays, getMemberDutyDateWindow, type DutyLeadCount, type DutyOfferCount, type DutyPresenceCount } from "./member-duty-days";
+import { addDays, zonedMidnight } from "@/features/lead-distribution/monthly-duty-plan";
 
 import type { TenantRole } from "@/shared/db/schema";
 
@@ -140,11 +142,18 @@ export async function getTeamMemberProfile(memberUserId: string) {
     context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
   );
 
-  const [leadMetrics, salesMetrics, taskMetrics, quoteMetrics, interactionMetrics, redistributionMetrics, offerStatusMetrics, recentLeads, recentRedistributions] = await Promise.all([
+  const dutyDateWindow = getMemberDutyDateWindow(new Date());
+  const dutyFromAt = zonedMidnight(dutyDateWindow.fromDateKey, "America/Sao_Paulo");
+  const dutyThroughAt = zonedMidnight(addDays(dutyDateWindow.throughDateKey, 1), "America/Sao_Paulo");
+  const [leadMetrics, salesMetrics, taskMetrics, quoteMetrics, interactionMetrics, redistributionMetrics, offerStatusMetrics, recentLeads, recentRedistributions, dutyRosterRows] = await Promise.all([
     db.select({
       total: sql<number>`count(*)::int`,
       active: sql<number>`count(*) filter (where ${schema.leads.status} in ('distributed', 'in_contact', 'quote_sent', 'negotiation', 'documentation_pending', 'under_analysis'))::int`,
       qualified: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} in ('qualified', 'hot', 'warm'))::int`,
+      hot: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} = 'hot')::int`,
+      warm: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} = 'warm')::int`,
+      cold: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} = 'cold')::int`,
+      unknown: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} is null or ${schema.leads.qualificationStatus} not in ('hot', 'warm', 'cold'))::int`,
       lost: sql<number>`count(*) filter (where ${schema.leads.status} = 'lost')::int`,
       withoutFirstContact: sql<number>`count(*) filter (where ${schema.leads.firstContactAt} is null and ${schema.leads.status} not in ('lost', 'converted'))::int`,
       converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')::int`,
@@ -183,12 +192,64 @@ export async function getTeamMemberProfile(memberUserId: string) {
       ))
       .where(offerScope)
       .groupBy(schema.leadOffers.status, sql`${schema.leadOffers.expiresAt} <= now()`),
-    db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, assignedAt: schema.leads.assignedAt, firstContactAt: schema.leads.firstContactAt, createdAt: schema.leads.createdAt })
+    db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, assignedAt: schema.leads.assignedAt, firstContactAt: schema.leads.firstContactAt, createdAt: schema.leads.createdAt, temperature: schema.leads.qualificationStatus, queueName: schema.leadQueues.name })
       // The whole portfolio, newest handed-out first (it used to stop at the 6 last updated).
-      .from(schema.leads).where(leadScope).orderBy(sql`${schema.leads.assignedAt} desc nulls last`, desc(schema.leads.createdAt)).limit(MEMBER_PROFILE_LEADS_LIMIT),
+      .from(schema.leads).leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId))).where(leadScope).orderBy(sql`${schema.leads.assignedAt} desc nulls last`, desc(schema.leads.createdAt)).limit(MEMBER_PROFILE_LEADS_LIMIT),
     db.select({ id: schema.leadDistributionEvents.id, leadName: schema.leads.nome, action: schema.leadDistributionEvents.action, reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt })
       .from(schema.leadDistributionEvents).innerJoin(schema.leads, eq(schema.leadDistributionEvents.leadId, schema.leads.id)).where(redistributionScope).orderBy(desc(schema.leadDistributionEvents.createdAt)).limit(6),
+    member.role === "broker" ? db.select({
+      assignmentId: schema.dutyRosterAssignments.id,
+      assignmentStatus: schema.dutyRosterAssignments.status,
+      assignmentDayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+      assignmentStartsAt: schema.dutyRosterAssignments.startsAt,
+      assignmentEndsAt: schema.dutyRosterAssignments.endsAt,
+      assignmentValidFrom: schema.dutyRosterAssignments.validFrom,
+      assignmentValidUntil: schema.dutyRosterAssignments.validUntil,
+      dutyDate: schema.dutyRosterAssignments.dutyDate,
+      scheduleId: schema.unitDutySchedules.id,
+      scheduleName: schema.unitDutySchedules.name,
+      scheduleDayOfWeek: schema.unitDutySchedules.dayOfWeek,
+      scheduleStartsAt: schema.unitDutySchedules.startsAt,
+      scheduleTimezone: schema.unitDutySchedules.timezone,
+      scheduleValidFrom: schema.unitDutySchedules.validFrom,
+      scheduleValidUntil: schema.unitDutySchedules.validUntil,
+      scheduleStatus: schema.unitDutySchedules.status,
+      attendanceMode: schema.unitDutySchedules.attendanceMode,
+      typeName: schema.dutyScheduleTypes.name,
+      typeHue: schema.dutyScheduleTypes.colorHue,
+    }).from(schema.dutyRosterAssignments)
+      .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
+      .leftJoin(schema.dutyScheduleTypes, and(eq(schema.dutyScheduleTypes.id, schema.unitDutySchedules.typeId), eq(schema.dutyScheduleTypes.tenantId, context.tenantId)))
+      .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.brokerId, member.userId), eq(schema.dutyRosterAssignments.status, "active"), ne(schema.unitDutySchedules.status, "archived"), or(isNull(schema.dutyRosterAssignments.dutyDate), and(gte(schema.dutyRosterAssignments.dutyDate, dutyDateWindow.fromDateKey), lte(schema.dutyRosterAssignments.dutyDate, dutyDateWindow.throughDateKey))))) : Promise.resolve([]),
   ]);
+
+  let dutyDays: ReturnType<typeof buildMemberDutyDays> = [];
+  if (member.role === "broker" && dutyRosterRows.length) {
+    const scheduleIds = [...new Set(dutyRosterRows.map((row) => row.scheduleId))];
+    const dutyDateKeys: string[] = [];
+    for (let date = dutyDateWindow.fromDateKey; date <= dutyDateWindow.throughDateKey; date = addDays(date, 1)) dutyDateKeys.push(date);
+    const assignedDate = sql<string>`to_char(${schema.leads.assignedAt} at time zone 'America/Sao_Paulo', 'YYYY-MM-DD')`;
+    const offeredDate = sql<string>`to_char(${schema.leadOffers.offeredAt} at time zone 'America/Sao_Paulo', 'YYYY-MM-DD')`;
+    let leadDutyCounts: DutyLeadCount[] = [];
+    let offerDutyCounts: DutyOfferCount[] = [];
+    let presenceCounts: DutyPresenceCount[] = [];
+    if (scheduleIds.length) {
+      [leadDutyCounts, offerDutyCounts, presenceCounts] = await Promise.all([
+        db.select({ scheduleId: schema.leads.dutyScheduleId, date: assignedDate, total: sql<number>`count(*)::int` }).from(schema.leads)
+          .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, member.userId), gte(schema.leads.assignedAt, dutyFromAt), lt(schema.leads.assignedAt, dutyThroughAt), or(inArray(schema.leads.dutyScheduleId, scheduleIds), isNull(schema.leads.dutyScheduleId)), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
+          .groupBy(schema.leads.dutyScheduleId, assignedDate),
+        db.select({ scheduleId: schema.leadOffers.dutyScheduleId, date: offeredDate, sent: sql<number>`count(*)::int`, accepted: sql<number>`count(*) filter (where ${schema.leadOffers.status} = 'ACCEPTED')::int` })
+          .from(schema.leadOffers).innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, context.tenantId)))
+          .where(and(eq(schema.leadOffers.tenantId, context.tenantId), eq(schema.leadOffers.brokerId, member.userId), inArray(schema.leadOffers.dutyScheduleId, scheduleIds), ne(schema.leadOffers.status, "CANCELLED"), gte(schema.leadOffers.offeredAt, dutyFromAt), lt(schema.leadOffers.offeredAt, dutyThroughAt), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
+          .groupBy(schema.leadOffers.dutyScheduleId, offeredDate),
+        db.select({ scheduleId: schema.dutyPresenceConfirmations.scheduleId, date: sql<string>`${schema.dutyPresenceConfirmations.dutyDate}::text`, status: schema.dutyPresenceConfirmations.status, total: sql<number>`count(*)::int` })
+          .from(schema.dutyPresenceConfirmations)
+          .where(and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), eq(schema.dutyPresenceConfirmations.brokerId, member.userId), inArray(schema.dutyPresenceConfirmations.scheduleId, scheduleIds), inArray(schema.dutyPresenceConfirmations.dutyDate, dutyDateKeys)))
+          .groupBy(schema.dutyPresenceConfirmations.scheduleId, schema.dutyPresenceConfirmations.dutyDate, schema.dutyPresenceConfirmations.status),
+      ]);
+    }
+    dutyDays = buildMemberDutyDays({ ...dutyDateWindow, rosterRows: dutyRosterRows, leadCounts: leadDutyCounts, offerCounts: offerDutyCounts, presenceCounts });
+  }
 
   await db.insert(schema.auditLogs).values({
     id: randomUUID(), userId: context.userId, entidade: "team_member_profile", entidadeId: member.userId, acao: "team_member_profile.viewed",
@@ -198,11 +259,16 @@ export async function getTeamMemberProfile(memberUserId: string) {
     member.brokerCode = null;
   }
   const offerPerformance = summarizeLeadOfferPerformance(offerStatusMetrics);
+  const normalizedRecentLeads = recentLeads.map((lead) => ({
+    ...lead,
+    temperature: lead.temperature === "hot" || lead.temperature === "warm" || lead.temperature === "cold" ? lead.temperature : null,
+  }));
 
   return {
     member,
     metrics: {
       leads: leadMetrics[0] ?? { total: 0, active: 0, qualified: 0, lost: 0, withoutFirstContact: 0, converted: 0 },
+      temperature: { hot: leadMetrics[0]?.hot ?? 0, warm: leadMetrics[0]?.warm ?? 0, cold: leadMetrics[0]?.cold ?? 0, unknown: leadMetrics[0]?.unknown ?? 0 },
       sales: salesMetrics[0] ?? { total: 0, active: 0, cancelled: 0, volume: "0" },
       tasks: taskMetrics[0] ?? { total: 0, completed: 0, overdue: 0, open: 0 },
       quotes: quoteMetrics[0] ?? { total: 0, sent: 0, accepted: 0 },
@@ -211,7 +277,8 @@ export async function getTeamMemberProfile(memberUserId: string) {
       redistributions: redistributionMetrics[0]?.total ?? 0,
       redistributionsWithoutFirstContact: redistributionMetrics[0]?.withoutFirstContact ?? 0,
     },
-    recentLeads,
+    recentLeads: normalizedRecentLeads,
     recentRedistributions,
+    dutyDays,
   };
 }
