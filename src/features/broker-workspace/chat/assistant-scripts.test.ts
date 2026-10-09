@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerWorkspacePriority } from "@/features/broker-workspace/priority";
 import type { ChatBlock, ChatScript } from "@/components/chat/types";
-import { ASSISTANTS, buildAssistantScript, buildAssistantThreads, buildLeadThreads } from "./assistant-scripts";
+import { ASSISTANTS, buildAncoraScript, buildAssistantScript, buildAssistantThreads, buildLeadThreads } from "./assistant-scripts";
 
 const now = new Date("2026-10-09T12:00:00-03:00");
 
@@ -92,7 +92,7 @@ function questionBlocks(script: ChatScript) {
 describe("broker chat assistant scripts", () => {
   it("declares assistant identities, mascots, hues and routes from the contract", () => {
     expect(ASSISTANTS).toMatchObject({
-      ancora: { name: "Âncora", shape: "logo", verified: true, href: "/notificacoes" },
+      ancora: { name: "Âncora", shape: "logo", verified: true, href: "/dashboard/c/ancora" },
       leads: { name: "Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
       plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
       agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
@@ -176,8 +176,8 @@ describe("broker chat assistant scripts", () => {
     expect(questions[0]?.choices[1]?.action).toEqual({ kind: "href", href: "/leads/lead-1" });
     expect(questions[0]?.choices[2]?.action).toEqual({ kind: "next", questionId: "decline-lead-1" });
     expect(questions[1]?.id).toBe("decline-lead-1");
-    expect(questions[1]?.choices.map(({ label }) => label)).toEqual(["Não atendo PME", "Sem horário", "Outro"]);
-    expect(questions[1]?.choices[2]?.action).toEqual({ kind: "server", name: "lead.decline", payload: { leadId: "lead-1", reason: "Outro" } });
+    expect(questions[1]?.choices.map(({ label }) => label)).toEqual(["Estou sem disponibilidade", "Estou com muitos atendimentos", "Lead fora do meu perfil", "Não consigo atender agora", "Outro"]);
+    expect(questions[1]?.choices[4]?.action).toEqual({ kind: "server", name: "lead.decline", payload: { leadId: "lead-1", reason: "Outro" } });
     expect(script.status).toEqual({ label: "Esperando você", tone: "waiting" });
     expectNoEmDash(script);
   });
@@ -215,10 +215,9 @@ describe("broker chat assistant scripts", () => {
         { label: "Unidade", value: "Centro" },
       ]),
     });
-    expect(questionBlocks(active)[0]?.choices.map(({ label }) => label)).toEqual(["Pausar 15 min", "Pausar até eu voltar", "Ver escala"]);
-    expect(questionBlocks(active)[0]?.choices[0]?.action).toEqual({ kind: "server", name: "duty.pause", payload: { minutes: 15 } });
-    expect(questionBlocks(active)[0]?.choices[1]?.action).toEqual({ kind: "server", name: "duty.pause", payload: { minutes: null } });
-    expect(questionBlocks(active)[0]?.choices[2]?.action).toEqual({ kind: "href", href: "/plantoes" });
+    expect(questionBlocks(active)[0]?.choices.map(({ label }) => label)).toEqual(["Pausar agora", "Ver minha escala"]);
+    expect(questionBlocks(active)[0]?.choices[0]?.action).toEqual({ kind: "server", name: "duty.pause", payload: {} });
+    expect(questionBlocks(active)[0]?.choices[1]?.action).toEqual({ kind: "href", href: "/plantoes" });
 
     const paused = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty({ paused: true }), next: null, readyToReceive: false } }), now });
     expect(questionBlocks(paused)[0]?.choices[0]?.action).toEqual({ kind: "server", name: "duty.resume", payload: {} });
@@ -226,10 +225,10 @@ describe("broker chat assistant scripts", () => {
 
     const pending = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty({ presenceStatus: "pending" }), next: null, readyToReceive: false } }), now });
     expect(pending.blocks).toContainEqual({ type: "system", id: "duty-presence-schedule-1", text: "Aguardando o gestor liberar sua presença." });
-    expect(questionBlocks(pending)).toHaveLength(0);
+    expect(questionBlocks(pending)[0]?.choices.map(({ id }) => id)).toEqual(["schedule"]);
 
     const next = buildAssistantScript("plantao", { data: workspace({ duty: { active: null, next: { scheduleName: "PME Centro", queueName: "Fila PME", dutyDate: "2026-10-10", startsAt: new Date("2026-10-10T09:00:00-03:00"), endsAt: new Date("2026-10-10T18:00:00-03:00"), paused: false }, readyToReceive: false } }), now });
-    expect(next.blocks[0]).toMatchObject({ type: "facts", title: "Próximo plantão" });
+    expect(next.blocks[1]).toMatchObject({ type: "facts", title: "Próximo plantão" });
     expect(buildAssistantScript("plantao", { data: workspace(), now }).blocks).toContainEqual({ type: "assistant", id: "duty-empty", text: "Nenhum plantão agendado." });
     expectNoEmDash([active, paused, pending, next]);
   });
@@ -240,15 +239,24 @@ describe("broker chat assistant scripts", () => {
       now,
     });
     expect(script.blocks.find((block) => block.type === "list")).toMatchObject({ items: [{ id: "task-1", lead: "Clara Souza", trailing: "15:30" }] });
-    expect(questionBlocks(script)[0]?.choices.map(({ label }) => label)).toEqual(["Começar pelo primeiro", "Ver todos"]);
-    expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/leads/lead-1#tarefas" });
-    expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "href", href: "/minha-fila?aba=retornos" });
+    expect(questionBlocks(script)[0]?.choices.map(({ label }) => label)).toEqual(["Falar com Clara", "Reagendar Clara", "Ver todos"]);
+    expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/leads/lead-1" });
+    expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "next", questionId: "agenda-reschedule" });
+    expect(questionBlocks(script)[0]?.choices[2]?.action).toEqual({ kind: "href", href: "/minha-fila?aba=retornos" });
+    expect(questionBlocks(script)[1]?.choices[1]?.action).toEqual({ kind: "server", name: "lead.scheduleReturn", payload: { leadId: "lead-1", when: "tomorrow" } });
 
     const empty = buildAssistantScript("agenda", { data: workspace(), now });
     expect(empty.blocks).toContainEqual({ type: "assistant", id: "agenda-empty", text: "Sem retornos hoje." });
-    expect(script.status?.tone).toBe("waiting");
+    // Nothing overdue yet (15:30 > 12:00): no pressure.
+    expect(script.status?.tone).toBe("idle");
     expect(empty.status?.tone).toBe("idle");
-    expectNoEmDash([script, empty]);
+    const overdue = buildAssistantScript("agenda", {
+      data: workspace({ agenda: [{ id: "task-2", leadId: "lead-1", leadName: "Clara Souza", title: "Retorno", dueAt: new Date("2026-10-09T09:00:00-03:00"), priority: "urgent", href: "/leads/lead-1#tarefas" }] }),
+      now,
+    });
+    expect(overdue.status?.tone).toBe("waiting");
+    expect(overdue.blocks).toContainEqual(expect.objectContaining({ id: "agenda-summary", text: "Você tem 1 item na agenda, 1 já venceu." }));
+    expectNoEmDash([script, empty, overdue]);
   });
 
   it("shows performance facts and optional goal details with useful links", () => {
@@ -268,5 +276,54 @@ describe("broker chat assistant scripts", () => {
 
     const withoutGoal = buildAssistantScript("desempenho", { data: workspace(), now });
     expect(withoutGoal.blocks.some((block) => block.id === "performance-goal")).toBe(false);
+  });
+
+  it("opens any other pending action in the lead conversation and lists who else waits", () => {
+    const awaiting = { kind: "awaiting_response", leadId: "lead-9", title: "Bruno Melo", description: "", referenceAt: new Date("2026-10-09T11:50:00-03:00"), dueAt: null } as unknown as BrokerWorkspacePriority;
+    const other = { ...awaiting, leadId: "lead-8", title: "Carla Dias" } as BrokerWorkspacePriority;
+    const script = buildAssistantScript("leads", {
+      data: workspace({ nextAction: awaiting, queue: [
+        { id: "lead-9", name: "Bruno Melo", status: "in_contact", source: "meta", nextAction: awaiting },
+        { id: "lead-8", name: "Carla Dias", status: "in_contact", source: "meta", nextAction: other },
+      ] }),
+      now,
+    });
+    expect(questionBlocks(script)[0]?.choices[0]).toMatchObject({ label: "Abrir a conversa de Bruno", action: { kind: "href", href: "/leads/lead-9" } });
+    expect(script.blocks.find((block) => block.id === "leads-also-waiting")).toMatchObject({ items: [{ id: "lead-8", primary: "Carla Dias" }] });
+    expect(script.status?.tone).toBe("waiting");
+  });
+});
+
+describe("buildAncoraScript", () => {
+  const notification = (id: string, at: string, read: boolean, leadId: string | null = null) => ({
+    id, title: `Aviso ${id}`, message: `Detalhe ${id}`, type: "info", readAt: read ? new Date(at) : null, createdAt: new Date(at), leadId,
+  });
+
+  it("shows the notifications by day, marks where the unread start and offers to mark them read", () => {
+    const script = buildAncoraScript({
+      now,
+      notifications: [
+        notification("3", "2026-10-09T10:00:00-03:00", false, "lead-7"),
+        notification("1", "2026-10-08T09:00:00-03:00", true),
+        notification("2", "2026-10-09T08:00:00-03:00", false),
+      ],
+    });
+    const ids = script.blocks.map((block) => block.id);
+    expect(ids).toEqual(["ancora-day-2026-10-08", "ancora-1", "ancora-day-2026-10-09", "ancora-unread", "ancora-2", "ancora-3", "ancora-choice"]);
+    expect(script.blocks[0]).toMatchObject({ label: "Ontem" });
+    expect(script.blocks.find((block) => block.id === "ancora-unread")).toMatchObject({ text: "2 avisos novos" });
+    expect(script.blocks.find((block) => block.id === "ancora-3")).toMatchObject({ text: "Aviso 3. Detalhe 3", at: "10:00" });
+    expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["open-lead", "mark-all", "settings"]);
+    expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/leads/lead-7" });
+    expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "server", name: "notifications.markRead", payload: {} });
+    expect(script.status).toMatchObject({ label: "2 avisos novos", tone: "waiting" });
+    expectNoEmDash([script]);
+  });
+
+  it("explains the thread when there is nothing yet and stays calm when all is read", () => {
+    expect(buildAncoraScript({ now, notifications: [] }).blocks[0]).toMatchObject({ id: "ancora-empty" });
+    const read = buildAncoraScript({ now, notifications: [notification("1", "2026-10-09T08:00:00-03:00", true)] });
+    expect(questionBlocks(read)[0]?.choices.map(({ id }) => id)).toEqual(["settings"]);
+    expect(read.status?.tone).toBe("idle");
   });
 });

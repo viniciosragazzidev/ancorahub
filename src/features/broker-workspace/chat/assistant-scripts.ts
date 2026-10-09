@@ -8,6 +8,7 @@ import type {
   ThreadSummary,
 } from "@/components/chat/types";
 import type { BrokerWorkspacePriority } from "@/features/broker-workspace/priority";
+import { DECLINE_REASONS } from "@/features/broker-workspace/components/light-lead-detail/types";
 
 const TIME_ZONE = "America/Sao_Paulo";
 
@@ -20,7 +21,7 @@ type AssistantDefinition = {
 };
 
 export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
-  ancora: { name: "Âncora", shape: "logo", hue: null, verified: true, href: "/notificacoes" },
+  ancora: { name: "Âncora", shape: "logo", hue: null, verified: true, href: "/dashboard/c/ancora" },
   leads: { name: "Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
   plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
   agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
@@ -299,11 +300,12 @@ function leadScript(data: BrokerWorkspaceData, now: Date): ChatScript {
       { id: "view", label: "Ver a ficha", action: { kind: "href", href: `/leads/${leadId}` } },
       { id: "decline", label: "Recusar", action: { kind: "next", questionId: `decline-${leadId}` } },
     ]));
-    blocks.push(question(`decline-${leadId}`, "Por que você quer recusar?", [
-      { id: "not-pme", label: "Não atendo PME", action: { kind: "server", name: "lead.decline", payload: { leadId, reason: "Não atendo PME" } } },
-      { id: "no-time", label: "Sem horário", action: { kind: "server", name: "lead.decline", payload: { leadId, reason: "Sem horário" } } },
-      { id: "other", label: "Outro", action: { kind: "server", name: "lead.decline", payload: { leadId, reason: "Outro" } } },
-    ]));
+    blocks.push(question(`decline-${leadId}`, "Por que você quer recusar?", DECLINE_REASONS.map((reason, index) => ({
+      id: `decline-${index}`,
+      label: reason,
+      action: { kind: "server" as const, name: "lead.decline" as const, payload: { leadId, reason } },
+    }))));
+    pushAlsoWaiting(blocks, data, now, leadId);
     return { blocks, status: { label: "Esperando você", tone: "waiting" } };
   }
 
@@ -314,7 +316,20 @@ function leadScript(data: BrokerWorkspaceData, now: Date): ChatScript {
       { id: "open", label: "Abrir conversa", action: { kind: "href", href: `/leads/${leadId}` } },
       { id: "register-contact", label: "Registrar contato", action: { kind: "server", name: "lead.registerContact", payload: { leadId } } },
     ]));
+    pushAlsoWaiting(blocks, data, now, leadId);
     return { blocks, status: { label: "Esperando você", tone: "waiting" } };
+  }
+
+  // Replies, returns, tasks, quotes, documents and stalled deals: the lead conversation handles each one.
+  if (action) {
+    const leadId = action.leadId;
+    blocks.push(assistantMessage("leads-next", actionPreview(action, now)));
+    blocks.push(question("leads-next-choice", "Vamos resolver?", [
+      { id: "open", label: `Abrir a conversa de ${action.title.split(" ")[0]}`, action: { kind: "href", href: `/leads/${leadId}` } },
+      { id: "queue", label: "Ver todos os meus leads", action: { kind: "href", href: "/minha-fila" } },
+    ]));
+    pushAlsoWaiting(blocks, data, now, leadId);
+    return { blocks, status: isWaitingPriority(action, now) ? { label: "Esperando você", tone: "waiting" } : { label: "Em dia", tone: "idle" } };
   }
 
   blocks.push(assistantMessage("leads-all-clear", "Tudo em dia por aqui."));
@@ -324,6 +339,15 @@ function leadScript(data: BrokerWorkspaceData, now: Date): ChatScript {
     .map((lead) => ({ id: lead.id, lead: lead.name, primary: lead.name, secondary: statusLabel(lead.status), href: `/leads/${lead.id}` }));
   blocks.push({ type: "list", id: "leads-in-service", title: "Em atendimento", items: inService, emptyText: "Nenhum lead em atendimento." });
   return { blocks, status: { label: "Tudo em dia", tone: "idle" } };
+}
+
+/** Other leads waiting for the broker, after the main one. */
+function pushAlsoWaiting(blocks: ChatBlock[], data: BrokerWorkspaceData, now: Date, exceptLeadId: string) {
+  const items = data.queue
+    .filter((lead) => lead.id !== exceptLeadId && isWaitingPriority(lead.nextAction, now))
+    .slice(0, 5)
+    .map((lead) => ({ id: lead.id, lead: lead.name, primary: lead.name, secondary: lead.nextAction ? actionPreview(lead.nextAction, now) : statusLabel(lead.status), href: `/leads/${lead.id}` }));
+  if (items.length) blocks.push({ type: "list", id: "leads-also-waiting", title: "Também esperando você", items });
 }
 
 function statusLabel(status: string) {
@@ -353,6 +377,10 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
     const blocks: ChatBlock[] = [dutyFacts(active)];
     if (active.presenceStatus === "pending") {
       blocks.push({ type: "system", id: `duty-presence-${active.scheduleId}`, text: "Aguardando o gestor liberar sua presença." });
+      blocks.push(assistantMessage(`duty-presence-hint-${active.scheduleId}`, "Assim que o gestor confirmar que você está na unidade, os leads começam a chegar. Não precisa fazer nada."));
+      blocks.push(question("duty-presence-choice", "Enquanto isso:", [
+        { id: "schedule", label: "Ver minha escala", action: { kind: "href", href: "/plantoes" } },
+      ]));
       return { blocks, status: { label: "Aguardando liberação", tone: "idle" } };
     }
     if (active.paused) {
@@ -364,9 +392,8 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
     }
     blocks.push(assistantMessage(`duty-active-${active.scheduleId}`, `Você está no ${active.scheduleName}, pronto para receber.`));
     blocks.push(question("duty-active-choice", "O que você quer fazer?", [
-      { id: "pause-15", label: "Pausar 15 min", action: { kind: "server", name: "duty.pause", payload: { minutes: 15 } } },
-      { id: "pause-return", label: "Pausar até eu voltar", action: { kind: "server", name: "duty.pause", payload: { minutes: null } } },
-      { id: "schedule", label: "Ver escala", action: { kind: "href", href: "/plantoes" } },
+      { id: "pause", label: "Pausar agora", hint: "Você volta quando quiser, por aqui", reply: "Pausa, por favor", action: { kind: "server", name: "duty.pause", payload: {} } },
+      { id: "schedule", label: "Ver minha escala", action: { kind: "href", href: "/plantoes" } },
     ]));
     return { blocks, status: { label: "Esperando você", tone: "waiting" } };
   }
@@ -379,10 +406,26 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
     { label: "Horário", value: `${formatTime(next.startsAt)} às ${formatTime(next.endsAt)}` },
     ...(next.queueName ? [{ label: "Fila", value: next.queueName }] : []),
   ];
-  return { blocks: [factSheet(`duty-next-${localDateKey(next.startsAt)}-${next.scheduleName}`, "Próximo plantão", rows)], status: { label: "Plantão futuro", tone: "idle" } };
+  return {
+    blocks: [
+      assistantMessage("duty-next-intro", "Você não está de plantão agora. O próximo é este:"),
+      factSheet(`duty-next-${localDateKey(next.startsAt)}-${next.scheduleName}`, "Próximo plantão", rows),
+      question("duty-next-choice", "Quer ver mais?", [
+        { id: "schedule", label: "Ver minha escala", action: { kind: "href", href: "/plantoes" } },
+      ]),
+    ],
+    status: { label: "Plantão futuro", tone: "idle" },
+  };
 }
 
-function agendaScript(data: BrokerWorkspaceData): ChatScript {
+const RESCHEDULE_CHOICES = [
+  { value: "today", label: "Hoje às 18h" },
+  { value: "tomorrow", label: "Amanhã de manhã" },
+  { value: "in_2_days", label: "Em 2 dias" },
+  { value: "in_3_days", label: "Em 3 dias" },
+] as const;
+
+function agendaScript(data: BrokerWorkspaceData, now: Date): ChatScript {
   if (data.agenda.length === 0) {
     return { blocks: [assistantMessage("agenda-empty", "Sem retornos hoje.")], status: { label: "Agenda livre", tone: "idle" } };
   }
@@ -395,21 +438,39 @@ function agendaScript(data: BrokerWorkspaceData): ChatScript {
     trailing: item.dueAt ? formatTime(item.dueAt) : undefined,
     href: item.href,
   }));
+  const overdue = data.agenda.filter((item) => item.dueAt && item.dueAt.getTime() <= now.getTime()).length;
+  const summary = `Você tem ${items.length} ${items.length === 1 ? "item" : "itens"} na agenda${overdue ? `, ${overdue} já ${overdue === 1 ? "venceu" : "venceram"}` : ""}.`;
+  const firstName = first.leadName.split(" ")[0] || first.leadName;
   return {
     blocks: [
-      assistantMessage("agenda-summary", `Você tem ${items.length} ${items.length === 1 ? "item" : "itens"} na agenda.`),
+      assistantMessage("agenda-summary", summary),
       { type: "list", id: "agenda-items", title: "Seus retornos", items },
       question("agenda-choice", "Por onde quer começar?", [
-        { id: "start-first", label: "Começar pelo primeiro", action: { kind: "href", href: first.href } },
+        { id: "start-first", label: `Falar com ${firstName}`, hint: first.title, action: { kind: "href", href: `/leads/${first.leadId}` } },
+        { id: "reschedule-first", label: `Reagendar ${firstName}`, action: { kind: "next", questionId: "agenda-reschedule" } },
         { id: "view-all", label: "Ver todos", action: { kind: "href", href: "/minha-fila?aba=retornos" } },
       ]),
+      question("agenda-reschedule", `Para quando passo o retorno de ${firstName}?`, RESCHEDULE_CHOICES.map((option) => ({
+        id: `reschedule-${option.value}`,
+        label: option.label,
+        action: { kind: "server" as const, name: "lead.scheduleReturn" as const, payload: { leadId: first.leadId, when: option.value } },
+      }))),
     ],
-    status: { label: "Esperando você", tone: "waiting" },
+    status: overdue ? { label: "Esperando você", tone: "waiting" } : { label: "Em dia", tone: "idle" },
   };
+}
+
+function performanceComment(data: BrokerWorkspaceData) {
+  const { receivedToday, acceptedToday, slaAtRiskNow } = data.today;
+  if (slaAtRiskNow > 0) return `Atenção: ${slaAtRiskNow} ${slaAtRiskNow === 1 ? "lead está" : "leads estão"} com o primeiro contato atrasando.`;
+  if (receivedToday === 0) return "Nenhum lead hoje ainda. Assim que chegar, eu te aviso.";
+  if (acceptedToday >= receivedToday) return "Você aceitou tudo o que chegou hoje. Bom ritmo.";
+  return `Hoje chegaram ${receivedToday} e você aceitou ${acceptedToday}.`;
 }
 
 function performanceScript(data: BrokerWorkspaceData): ChatScript {
   const blocks: ChatBlock[] = [
+    assistantMessage("performance-comment", performanceComment(data)),
     factSheet("performance-today", "Seu dia", [
       { label: "Recebidos hoje", value: String(data.today.receivedToday) },
       { label: "Aceitos hoje", value: String(data.today.acceptedToday) },
@@ -438,7 +499,61 @@ export function buildAssistantScript(
   switch (id) {
     case "leads": return leadScript(input.data, input.now);
     case "plantao": return dutyScript(input.data);
-    case "agenda": return agendaScript(input.data);
+    case "agenda": return agendaScript(input.data, input.now);
     case "desempenho": return performanceScript(input.data);
   }
+}
+
+/** One notification of the broker (notifications table). */
+export type AncoraNotification = { id: string; title: string; message: string; type: string; readAt: Date | null; createdAt: Date; leadId: string | null };
+
+function dayLabel(date: Date, now: Date) {
+  const key = localDateKey(date);
+  if (key === localDateKey(now)) return "Hoje";
+  if (key === localDateKey(new Date(now.getTime() - 86_400_000))) return "Ontem";
+  return formatDate(date);
+}
+
+/**
+ * The Âncora thread: the broker's notifications as messages from the company,
+ * oldest first and grouped by day, with a marker before the unread ones.
+ */
+export function buildAncoraScript(input: { notifications: AncoraNotification[]; now: Date }): ChatScript {
+  const { now } = input;
+  const items = [...input.notifications].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  if (!items.length) {
+    return {
+      blocks: [assistantMessage("ancora-empty", "Por aqui chegam os avisos da Âncora: escala publicada, recados da gestão e alertas dos seus leads. Nada novo por enquanto.")],
+      status: { label: "Sem avisos novos", tone: "idle" },
+    };
+  }
+  const blocks: ChatBlock[] = [];
+  const unread = items.filter((item) => !item.readAt);
+  let lastDay = "";
+  let markedUnread = false;
+  for (const item of items) {
+    const day = localDateKey(item.createdAt);
+    if (day !== lastDay) {
+      blocks.push({ type: "date", id: `ancora-day-${day}`, label: dayLabel(item.createdAt, now) });
+      lastDay = day;
+    }
+    if (!item.readAt && !markedUnread) {
+      blocks.push({ type: "system", id: "ancora-unread", text: unread.length === 1 ? "1 aviso novo" : `${unread.length} avisos novos` });
+      markedUnread = true;
+    }
+    const text = item.message && item.message !== item.title ? `${item.title}. ${item.message}` : item.title;
+    blocks.push({ type: "assistant", id: `ancora-${item.id}`, text, at: formatTime(item.createdAt) });
+  }
+
+  const latestLead = [...unread].reverse().find((item) => item.leadId);
+  const choices: ChatChoice[] = [];
+  if (latestLead?.leadId) choices.push({ id: "open-lead", label: "Abrir o lead do último aviso", action: { kind: "href", href: `/leads/${latestLead.leadId}` } });
+  if (unread.length) choices.push({ id: "mark-all", label: "Marcar tudo como lido", reply: "Já vi, pode marcar como lido", action: { kind: "server", name: "notifications.markRead", payload: {} } });
+  choices.push({ id: "settings", label: "Configurar avisos", hint: "Notificações no celular e pop-up de lead", action: { kind: "href", href: "/notificacoes" } });
+  blocks.push(question("ancora-choice", unread.length ? "O que você quer fazer?" : "Tudo lido. Quer ajustar seus avisos?", choices));
+
+  return {
+    blocks,
+    status: unread.length ? { label: unread.length === 1 ? "1 aviso novo" : `${unread.length} avisos novos`, tone: "waiting" } : { label: "Tudo lido", tone: "idle" },
+  };
 }

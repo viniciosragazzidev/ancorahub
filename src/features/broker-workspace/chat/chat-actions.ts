@@ -3,6 +3,7 @@
 import { z } from "zod";
 
 import { startLeadServiceAction } from "@/app/(dashboard)/leads/[id]/service-action";
+import { markAllNotificationsReadAction } from "@/app/(dashboard)/notificacoes/actions";
 import { changeLeadStatusAction } from "@/app/(dashboard)/leads/status-actions";
 import type { ChatServerActionName } from "@/components/chat/types";
 import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
@@ -103,6 +104,10 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
       case "duty.resume": {
         await updateBrokerAvailabilityAction("available");
         return { ok: true, message: "Pronto, você voltou a receber leads." };
+      }
+      case "notifications.markRead": {
+        await markAllNotificationsReadAction();
+        return { ok: true, message: "Pronto, marquei todos os avisos como lidos." };
       }
       default:
         return { ok: false, message: "Isso se faz na conversa do lead. Abra o lead para continuar." };
