@@ -68,7 +68,7 @@ describe("broker Lite duty calendar", () => {
     expect(result.occurrences.filter(({ dutyDate }) => dutyDate === "2026-10-07")).toHaveLength(1);
   });
 
-  it("does not show the weekly rule when a published date assigns that schedule to someone else", () => {
+  it("keeps the weekly rule on a date whose published escala lists other brokers (weekly and published add up)", () => {
     const result = buildBrokerDutyCalendar({
       now,
       horizonMonths: 2,
@@ -78,7 +78,7 @@ describe("broker Lite duty calendar", () => {
       monthlySchedulingEnabled: true,
     });
 
-    expect(result.occurrences.some(({ dutyDate }) => dutyDate === "2026-10-07")).toBe(false);
+    expect(result.occurrences.some(({ dutyDate }) => dutyDate === "2026-10-07")).toBe(true);
   });
 
   it("ignores monthly rows and overrides while monthly scheduling is disabled", () => {

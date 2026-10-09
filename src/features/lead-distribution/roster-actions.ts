@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNotNull, lt, ne, or, sql, isNull } from "drizzle-orm";
+import { and, eq, gt, lt, ne, or, sql, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -9,7 +9,6 @@ import { isValidDutyWindow } from "./domain";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 import { publishNotification } from "@/features/notifications/send-push-helper";
-import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 export type RosterActionState = { success?: boolean; error?: string; message?: string };
 
@@ -134,14 +133,8 @@ function shortDate(key: string) {
   return `${key.slice(8, 10)}/${key.slice(5, 7)}`;
 }
 
-/**
- * Upcoming dates this weekly row would cover, and which of them already have a
- * published escala for the plantão. On those dates distribution uses only the
- * published brokers (DEC-123, selectEffectiveDutyAssignments), so a weekly row
- * there is ignored: the caller blocks or warns instead of saving it silently.
- */
-async function publishedCoverage(db: Database, tenantId: string, schedule: { id: string; validFrom: Date; validUntil: Date | null }, dayOfWeek: number, now: Date) {
-  if ((await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) !== "true") return { dates: [] as string[], published: [] as string[] };
+/** Next dates (up to 8 weeks, inside the plantão's validity) a weekly row covers: for the broker's notification. */
+function upcomingDates(schedule: { validFrom: Date; validUntil: Date | null }, dayOfWeek: number, now: Date) {
   const fromKey = [spDateKey(now), spDateKey(schedule.validFrom)].sort()[1];
   const untilKey = schedule.validUntil ? spDateKey(schedule.validUntil) : null;
   const dates: string[] = [];
@@ -150,17 +143,7 @@ async function publishedCoverage(db: Database, tenantId: string, schedule: { id:
     if (untilKey && key >= untilKey) break;
     if (new Date(`${key}T12:00:00Z`).getUTCDay() === dayOfWeek) dates.push(key);
   }
-  if (!dates.length) return { dates, published: [] as string[] };
-  const rows = await db.selectDistinct({ dutyDate: sql<string>`${schema.dutyRosterAssignments.dutyDate}::text` })
-    .from(schema.dutyRosterAssignments)
-    .where(and(
-      eq(schema.dutyRosterAssignments.tenantId, tenantId),
-      eq(schema.dutyRosterAssignments.scheduleId, schedule.id),
-      eq(schema.dutyRosterAssignments.status, "active"),
-      isNotNull(schema.dutyRosterAssignments.monthlyPlanId),
-      inArray(schema.dutyRosterAssignments.dutyDate, dates),
-    ));
-  return { dates, published: rows.map((row) => row.dutyDate).sort() };
+  return dates;
 }
 
 export async function createRosterAssignmentAction(_previous: RosterActionState, formData: FormData): Promise<RosterActionState> {
@@ -170,10 +153,7 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
     const now = new Date();
     if (!broker.branchId) throw new Error("O corretor não está vinculado a uma unidade ativa.");
     const brokerBranchId = broker.branchId;
-    const coverage = await publishedCoverage(db, context.tenantId, schedule, input.dayOfWeek, now);
-    if (coverage.dates.length > 0 && coverage.published.length === coverage.dates.length) {
-      throw new Error(`O plantão "${schedule.name}" já tem escala publicada em ${coverage.published.map(shortDate).join(", ")}. Nessas datas valem só os corretores da escala: adicione-o pela Escala (etapa 3) e publique.`);
-    }
+    const firstDate = upcomingDates(schedule, input.dayOfWeek, now)[0];
     const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
@@ -185,7 +165,6 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
       return overlap;
     });
     await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
-    const firstDate = coverage.dates.find((date) => !coverage.published.includes(date));
     void publishNotification({
       capability: "duty_assignment",
       tenantId: context.tenantId,
@@ -198,11 +177,9 @@ export async function createRosterAssignmentAction(_previous: RosterActionState,
       url: "/plantoes",
       tag: `duty-${schedule.id}-${input.dayOfWeek}`,
     }).catch(() => false);
-    const messages = [
-      overlapWarning ? `Corretor também está no plantão "${overlapWarning.name}" das ${overlapWarning.startsAt} às ${overlapWarning.endsAt}; ele ficará nos dois plantões neste horário.` : null,
-      coverage.published.length ? `Em ${coverage.published.map(shortDate).join(", ")} vale a escala publicada: nessas datas ele só entra pela Escala (etapa 3).` : null,
-    ].filter(Boolean);
-    return messages.length ? { success: true, message: messages.join(" ") } : { success: true };
+    return overlapWarning
+      ? { success: true, message: `Corretor também está no plantão "${overlapWarning.name}" das ${overlapWarning.startsAt} às ${overlapWarning.endsAt}; ele ficará nos dois plantões neste horário.` }
+      : { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível adicionar o corretor à escala." };
   }
@@ -219,11 +196,6 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
       .where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), isNull(schema.dutyRosterAssignments.dutyDate)))
       .limit(1);
     if (!assignment || assignment.brokerId !== input.brokerId) throw new Error("A alocação não pertence a este corretor.");
-    // Same guard as adding: moving onto days that all have a published escala would leave the row ignored.
-    const coverage = await publishedCoverage(db, context.tenantId, schedule, input.dayOfWeek, new Date());
-    if (coverage.dates.length > 0 && coverage.published.length === coverage.dates.length) {
-      throw new Error(`O plantão "${schedule.name}" já tem escala publicada em ${coverage.published.map(shortDate).join(", ")}. Nessas datas valem só os corretores da escala: ajuste pela Escala (etapa 3) e publique.`);
-    }
     const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
@@ -253,24 +225,7 @@ export async function removeRosterAssignmentAction(_previous: RosterActionState,
     if (!assignment || (context.role === "manager" && context.branchId !== assignment.branchId)) throw new Error("Escala fora do seu escopo.");
     await db.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.removed" });
-    // A weekly row leaves the weekly roster only: dates of the published escala keep the broker.
-    let message: string | null = null;
-    if (assignment.dutyDate === null) {
-      const dated = await db.select({ dutyDate: sql<string>`${schema.dutyRosterAssignments.dutyDate}::text` })
-        .from(schema.dutyRosterAssignments)
-        .where(and(
-          eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
-          eq(schema.dutyRosterAssignments.scheduleId, assignment.scheduleId),
-          eq(schema.dutyRosterAssignments.brokerId, assignment.brokerId),
-          eq(schema.dutyRosterAssignments.status, "active"),
-          isNotNull(schema.dutyRosterAssignments.monthlyPlanId),
-          sql`${schema.dutyRosterAssignments.dutyDate} >= ${spDateKey(new Date())}::date`,
-        ));
-      if (dated.length) {
-        message = `Nas datas da escala publicada (${dated.map((row) => row.dutyDate).sort().map(shortDate).join(", ")}) ele continua. Para tirar dessas datas, remova pela Escala (etapa 3) e publique.`;
-      }
-    }
-    return message ? { success: true, message } : { success: true };
+    return { success: true };
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível remover a escala." };
   }

@@ -104,9 +104,11 @@ export function buildBrokerDutyCalendar(input: {
   const todayKey = dateKeyInTimezone(input.now, DEFAULT_TIMEZONE);
   const firstMonthKey = monthKey(todayKey);
   const endExclusiveKey = addDutyCalendarMonths(firstMonthKey, monthCount);
+  // Weekly and published add up (2026-10-09): a weekly occurrence is skipped only when
+  // the broker is also on the published escala of that plantão and date (one entry).
   const publishedDates = new Set(
     input.monthlySchedulingEnabled
-      ? (input.publishedScheduleDates ?? []).map(({ scheduleId, dutyDate }) => `${scheduleId}:${dutyDate}`)
+      ? input.publishedAssignments.map(({ scheduleId, dutyDate }) => `${scheduleId}:${dutyDate}`)
       : [],
   );
   const occurrences: Array<BrokerDutyCalendarOccurrence & { sortAt: number }> = [];

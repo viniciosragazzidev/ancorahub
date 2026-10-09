@@ -110,18 +110,6 @@ describe("inactive brokers in duty planning", () => {
     expect(queries.some((q) => q.sql.startsWith("insert"))).toBe(false);
   });
 
-  it("blocks a weekly add on a plantão whose only date already has a published escala (it would be ignored)", async () => {
-    // One-day plantão next Monday (dayOfWeek 1 in the form) with a published escala that day.
-    const today = new Date();
-    const monday = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + ((8 - today.getUTCDay()) % 7 || 7)));
-    const key = monday.toISOString().slice(0, 10);
-    scheduleRow = [scheduleId, "PRESENCIAL TARDE", branchId, `${key}T03:00:00Z`, new Date(Date.parse(`${key}T03:00:00Z`) + 86_400_000).toISOString(), "active", null];
-    publishedDates = [key];
-    const result = await createRosterAssignmentAction({}, assignment());
-    expect(result.error).toMatch(/já tem escala publicada em .*Escala \(etapa 3\)/);
-    expect(queries.some((q) => q.sql.startsWith('insert into "duty_roster_assignments"'))).toBe(false);
-  });
-
   it("keeps broker users from managing the roster", async () => {
     mocks.context.mockResolvedValue({ ...context, role: "broker", jobTitle: "broker" });
     expect((await createRosterAssignmentAction({}, assignment())).error).toMatch(/Gestores e Diretores/);

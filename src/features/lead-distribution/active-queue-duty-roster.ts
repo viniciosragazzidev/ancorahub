@@ -143,7 +143,8 @@ export async function getActiveQueueDutyRoster(input: {
     ))
     .orderBy(asc(schema.user.name));
 
-  const effectiveBrokers = await resolveEffectiveDutyAssignments(input.tenantId, brokers, now);
+  // brokerId: weekly and published rows of the same broker count once (they add up per broker).
+  const effectiveBrokers = await resolveEffectiveDutyAssignments(input.tenantId, brokers.map((broker) => ({ ...broker, brokerId: broker.id })), now);
   const effectiveAssignmentIds = new Set(effectiveBrokers.map((assignment) => assignment.assignmentId));
   const presence = await getPresenceEligibleAssignments({
     tenantId: input.tenantId,

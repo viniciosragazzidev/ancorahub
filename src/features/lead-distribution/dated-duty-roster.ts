@@ -3,7 +3,7 @@ import { and, eq, isNotNull } from "drizzle-orm";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
-type DutyRosterRow = { scheduleId: string; dutyDate: string | null };
+type DutyRosterRow = { scheduleId: string; dutyDate: string | null; brokerId?: string };
 
 function dateKey(date: Date) {
   const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(date);
@@ -16,12 +16,14 @@ export function getSaoPauloDateKey(date: Date) {
 }
 
 /**
- * Roster rows in force on `today` (DEC-123).
+ * Roster rows in force on `today` (DEC-123, changed 2026-10-09).
  * - `publishedScheduleIds` null (monthly scheduling off): weekly rows only;
  *   published rows never leak into distribution.
- * - Otherwise a plantão with published brokers today uses exactly those
- *   (in every unit, it is one global occurrence) and ignores its weekly rows;
- *   every other plantão keeps its weekly roster.
+ * - Otherwise the weekly roster and the published escala of today ADD UP: a
+ *   broker added to the plantão by hand receives even on a date with a
+ *   published escala (decision of the Vinicios: the "published replaces
+ *   weekly" rule hid people who were on the plantão). A broker on both keeps
+ *   one row (the published one).
  */
 export function selectEffectiveDutyAssignments<T extends DutyRosterRow>(
   rows: readonly T[],
@@ -29,9 +31,11 @@ export function selectEffectiveDutyAssignments<T extends DutyRosterRow>(
   publishedScheduleIds: ReadonlySet<string> | null,
 ): T[] {
   if (!publishedScheduleIds) return rows.filter((row) => row.dutyDate === null);
-  return rows.filter((row) => row.dutyDate === null
-    ? !publishedScheduleIds.has(row.scheduleId)
-    : row.dutyDate === today && publishedScheduleIds.has(row.scheduleId));
+  const published = rows.filter((row) => row.dutyDate === today && publishedScheduleIds.has(row.scheduleId));
+  // Rows without brokerId come from one-broker callers (the broker's own rows): the key is the plantão.
+  const key = (row: T) => `${row.scheduleId}|${row.brokerId ?? ""}`;
+  const publishedKeys = new Set(published.map(key));
+  return rows.filter((row) => (row.dutyDate === null ? !publishedKeys.has(key(row)) : published.includes(row)));
 }
 
 /**

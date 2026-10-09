@@ -138,7 +138,7 @@ function dateLabel(value: Date | null) {
   }).format(value);
 }
 
-type RosterEntry = { id: string; brokerId: string; brokerName: string; dayOfWeek: number; startsAt: string; endsAt: string; published: boolean; ignored?: boolean; ignoredDates?: string[] };
+type RosterEntry = { id: string; brokerId: string; brokerName: string; dayOfWeek: number; startsAt: string; endsAt: string; published: boolean };
 
 /**
  * Everyone on the plantão, as one list: the brokers added here plus the ones
@@ -154,25 +154,13 @@ function plantaoRoster(snapshot: Snapshot, scheduleId: string): RosterEntry[] {
       ...row, published: true, dayOfWeek: plantao?.dayOfWeek ?? 0, startsAt: plantao?.startsAt ?? "", endsAt: plantao?.endsAt ?? "",
     })),
   ].map((row) => ({ id: row.id, brokerId: row.brokerId, brokerName: row.brokerName, dayOfWeek: row.dayOfWeek, startsAt: row.startsAt, endsAt: row.endsAt, published: row.published }));
-  // On dates with a published escala, distribution uses only the published brokers (DEC-123):
-  // a weekly-only broker there does not receive leads, so he is shown apart, not as on duty.
-  // A one-day plantão is ignored outright; a recurring one only on its published dates.
-  const publishedRows = snapshot.publishedAssignments.filter((row) => row.scheduleId === scheduleId && row.dutyDate >= today);
-  const publishedDates = [...new Set(publishedRows.map((row) => row.dutyDate))].sort();
-  const singleDay = plantao ? isSingleDaySchedule(plantao) : false;
+  // Weekly and published add up (2026-10-09): everyone listed is on duty.
   const seen = new Set<string>();
-  return entries
-    .filter((entry) => !seen.has(entry.brokerId) && seen.add(entry.brokerId))
-    .map((entry) => {
-      if (entry.published || !publishedDates.length) return entry;
-      const missing = publishedDates.filter((date) => !publishedRows.some((row) => row.dutyDate === date && row.brokerId === entry.brokerId));
-      if (!missing.length) return entry;
-      return singleDay ? { ...entry, ignored: true } : { ...entry, ignoredDates: missing };
-    });
+  return entries.filter((entry) => !seen.has(entry.brokerId) && seen.add(entry.brokerId));
 }
 
 function coverageLabel(schedule: Schedule, snapshot: Snapshot) {
-  return getDutyCoverage(plantaoRoster(snapshot, schedule.id).filter((entry) => !entry.ignored).length, schedule.minimumBrokers);
+  return getDutyCoverage(plantaoRoster(snapshot, schedule.id).length, schedule.minimumBrokers);
 }
 
 function actionLabel(action: string) {
@@ -860,8 +848,7 @@ function DutyInspector({
         return;
       }
       router.refresh();
-      if (result.message) toast.warning(result.message);
-      else toast.success("Corretor removido da escala.");
+      toast.success("Corretor removido da escala.");
     });
   }
 
@@ -1068,8 +1055,8 @@ function DutyInspector({
                             <span className="block truncate text-sm font-medium">
                               {assignment.brokerName}
                             </span>
-                            <span className={assignment.ignored || assignment.ignoredDates?.length ? "block text-xs text-warning" : "block text-xs text-muted-foreground"}>
-                              {assignment.ignored ? "Não recebe leads: vale a escala publicada. Adicione pela Escala (etapa 3)." : assignment.ignoredDates?.length ? `Não recebe em ${assignment.ignoredDates.map((date) => `${date.slice(8, 10)}/${date.slice(5, 7)}`).join(", ")} (escala publicada)` : shifts ? (shifts.find((shift) => shift.key === assignmentShift(schedule, assignment))?.label ?? `${assignment.startsAt.slice(0, 5)}–${assignment.endsAt.slice(0, 5)}`) : "Escalado neste horário"}
+                            <span className="block text-xs text-muted-foreground">
+                              {shifts ? (shifts.find((shift) => shift.key === assignmentShift(schedule, assignment))?.label ?? `${assignment.startsAt.slice(0, 5)}–${assignment.endsAt.slice(0, 5)}`) : "Escalado neste horário"}
                             </span>
                           </span>
                           {shifts && !assignment.published ? (
