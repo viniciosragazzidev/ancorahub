@@ -19,7 +19,7 @@
 import { randomUUID } from "node:crypto";
 
 import { loadEnvConfig } from "@next/env";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as XLSX from "xlsx";
@@ -48,7 +48,7 @@ const option = (name: string) => {
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : undefined;
 };
-const VALUE_OPTIONS = new Set(["--sheet", "--type", "--tenant", "--user", "--name-prefix", "--slot-type", "--manha", "--tarde"]);
+const VALUE_OPTIONS = new Set(["--sheet", "--type", "--tenant", "--user", "--name-prefix", "--slot-type", "--manha", "--tarde", "--modalidade"]);
 const file = args.find((arg, index) => !arg.startsWith("--") && !VALUE_OPTIONS.has(args[index - 1] ?? ""));
 const apply = args.includes("--apply");
 const sheetName = option("--sheet") ?? "Planilha1";
@@ -143,10 +143,21 @@ async function main() {
     const scheduleRows = await db.select().from(schema.unitDutySchedules)
       .where(and(eq(schema.unitDutySchedules.tenantId, tenantId), eq(schema.unitDutySchedules.typeId, type.id), eq(schema.unitDutySchedules.status, "active")));
     if (!scheduleRows.length) throw new Error(`Não há nenhum plantão ativo do tipo ${type.name} para servir de modelo.`);
-    const template = [...scheduleRows].sort((a, b) => b.validFrom.getTime() - a.validFrom.getTime())[0];
-    const templateQueues = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, ids: schema.leadQueues.exclusiveDutyScheduleIds, single: schema.leadQueues.exclusiveDutyScheduleId })
+    const newestFirst = [...scheduleRows].sort((a, b) => b.validFrom.getTime() - a.validFrom.getTime());
+    const template = newestFirst[0];
+    // Each shift copies the newest plantão with its own hours (morning from a morning one).
+    const templateFor = (startsAt: string, endsAt: string) => newestFirst.find((row) => row.startsAt.slice(0, 5) === startsAt && row.endsAt.slice(0, 5) === endsAt) ?? template;
+    const shiftTemplates = Object.values(SHIFTS).map((shift) => templateFor(shift.startsAt, shift.endsAt));
+    const templateIds = [...new Set([template.id, ...shiftTemplates.map((row) => row.id)])];
+    const queueRows = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name, ids: schema.leadQueues.exclusiveDutyScheduleIds, single: schema.leadQueues.exclusiveDutyScheduleId })
       .from(schema.leadQueues)
-      .where(and(eq(schema.leadQueues.tenantId, tenantId), sql`(${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([template.id])}::jsonb OR ${schema.leadQueues.exclusiveDutyScheduleId} = ${template.id})`));
+      .where(and(eq(schema.leadQueues.tenantId, tenantId), or(
+        ...templateIds.map((id) => sql`${schema.leadQueues.exclusiveDutyScheduleIds} @> ${JSON.stringify([id])}::jsonb`),
+        inArray(schema.leadQueues.exclusiveDutyScheduleId, templateIds),
+      )));
+    const queuesOf = (templateId: string) => queueRows.filter((queue) => (queue.ids ?? []).includes(templateId) || queue.single === templateId);
+    const modalidade = option("--modalidade");
+    if (modalidade && modalidade !== "presencial" && modalidade !== "online") throw new Error("--modalidade aceita presencial ou online.");
     const typeBranchIds = Array.isArray(type.branchIds) ? type.branchIds : [];
     const asPlanSchedule = (row: typeof scheduleRows[number]): MonthlyPlanSchedule => ({
       id: row.id, name: row.name, branchId: row.branchId, dayOfWeek: row.dayOfWeek, startsAt: row.startsAt, endsAt: row.endsAt,
@@ -166,7 +177,8 @@ async function main() {
       const onDate = existing.filter((schedule) => schedule.dayOfWeek === dayOfWeekOf(day.date) && isValidOn(schedule, day.date));
       // A shift uses the plantão of the type with exactly its hours; others that day are only reported.
       const matching = shift ? onDate.filter((schedule) => hhmm(schedule.startsAt) === shift.startsAt && hhmm(schedule.endsAt) === shift.endsAt) : onDate;
-      const others = shift ? onDate.filter((schedule) => !matching.includes(schedule)).map((schedule) => `${schedule.name} ${hhmm(schedule.startsAt)}–${hhmm(schedule.endsAt)}`) : [];
+      const isOtherShift = (schedule: MonthlyPlanSchedule) => Object.values(SHIFTS).some((other) => hhmm(schedule.startsAt) === other.startsAt && hhmm(schedule.endsAt) === other.endsAt);
+      const others = shift ? onDate.filter((schedule) => !matching.includes(schedule) && !isOtherShift(schedule)).map((schedule) => `${schedule.name} ${hhmm(schedule.startsAt)}–${hhmm(schedule.endsAt)}`) : [];
       const startsAt = shift?.startsAt ?? template.startsAt;
       const endsAt = shift?.endsAt ?? template.endsAt;
       const end = shiftEnd(matching[0] ?? { startsAt, endsAt, timezone: template.timezone }, day.date);
@@ -180,7 +192,14 @@ async function main() {
 
     // ---------- report
     console.log(`Planilha: ${parsed.days.length} datas na aba "${sheetName}". Empresa: ${tenantId}. Tipo: ${type.name}. Diretor: ${actor.name} <${actor.email}>.`);
-    console.log(`Modelo dos plantões novos: "${template.name}" ${template.startsAt.slice(0, 5)}–${template.endsAt.slice(0, 5)}, ${template.attendanceMode}, mín. ${template.minimumBrokers}${template.maximumBrokers ? `, máx. ${template.maximumBrokers}` : ""}, filas: ${templateQueues.map((queue) => queue.name).join(", ") || "nenhuma"}.`);
+    const describeTemplate = (row: typeof template) => `"${row.name}" ${row.startsAt.slice(0, 5)}–${row.endsAt.slice(0, 5)}, modalidade ${modalidade ?? row.attendanceMode}${modalidade && modalidade !== row.attendanceMode ? ` (o modelo é ${row.attendanceMode})` : ""}, mín. ${row.minimumBrokers}${row.maximumBrokers ? `, máx. ${row.maximumBrokers}` : ""}, filas: ${queuesOf(row.id).map((queue) => queue.name).join(", ") || "nenhuma"}`;
+    if (parsed.days.some((day) => day.shift)) {
+      for (const [key, shift] of Object.entries(SHIFTS)) console.log(`Modelo dos plantões novos (${shift.label}): ${describeTemplate(shiftTemplates[Object.keys(SHIFTS).indexOf(key)])}.`);
+    } else {
+      console.log(`Modelo dos plantões novos: ${describeTemplate(template)}.`);
+    }
+    const existingModes = [...new Set(scheduleRows.map((row) => row.attendanceMode))];
+    if (existingModes.length === 1 && type.attendanceMode !== existingModes[0]) console.log(`Atenção: os plantões ${type.name} existentes estão como modalidade ${existingModes[0]}.`);
     if (skipped.length) console.log(`Ignoradas (já passaram): ${skipped.join(", ")}`);
     console.log(`\nDatas a importar: ${plans.length}`);
     for (const plan of plans) {
@@ -229,28 +248,33 @@ Encontrados PELO NOME (o código da planilha não é o do CRM): ${byName.length}
       const stamp = new Date();
       // 1) Missing plantões, copied from the template.
       const created: MonthlyPlanSchedule[] = [];
+      const createdBy = new Map<string, string>();
       for (const plan of toCreate) {
         const id = randomUUID();
-        const validity = occurrenceValidity(plan.date, template.timezone);
+        const model = plan.shift ? templateFor(plan.startsAt, plan.endsAt) : template;
+        createdBy.set(id, model.id);
+        const validity = occurrenceValidity(plan.date, model.timezone);
         const name = `${namePrefix} ${short(plan.date)}${plan.shift ? ` · ${SHIFTS[plan.shift].label}` : ""}`;
         await tx.insert(schema.unitDutySchedules).values({
           id, tenantId, branchId: null, queueId: null,
           name,
           typeId: type.id, dayOfWeek: dayOfWeekOf(plan.date), startsAt: plan.startsAt, endsAt: plan.endsAt,
-          priority: template.priority, minimumBrokers: template.minimumBrokers, maximumBrokers: template.maximumBrokers,
-          maxLeadsPerBroker: template.maxLeadsPerBroker, shiftSplitAt: null, attendanceMode: template.attendanceMode,
-          status: "active", timezone: template.timezone, validFrom: validity.validFrom, validUntil: validity.validUntil,
-          webhookCredentialId: template.webhookCredentialId, createdBy: actor.id, createdAt: stamp, updatedAt: stamp,
+          priority: model.priority, minimumBrokers: model.minimumBrokers, maximumBrokers: model.maximumBrokers,
+          maxLeadsPerBroker: model.maxLeadsPerBroker, shiftSplitAt: null, attendanceMode: modalidade ?? model.attendanceMode,
+          status: "active", timezone: model.timezone, validFrom: validity.validFrom, validUntil: validity.validUntil,
+          webhookCredentialId: model.webhookCredentialId, createdBy: actor.id, createdAt: stamp, updatedAt: stamp,
         });
         await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: actor.id, entidade: "unit_duty_schedule", entidadeId: id, acao: "duty_schedule.created_by_import" });
         plan.scheduleIds = [id];
-        created.push({ ...asPlanSchedule({ ...template, id, name, startsAt: plan.startsAt, endsAt: plan.endsAt, dayOfWeek: dayOfWeekOf(plan.date), validFrom: validity.validFrom, validUntil: validity.validUntil }) });
+        created.push({ ...asPlanSchedule({ ...model, id, name, startsAt: plan.startsAt, endsAt: plan.endsAt, attendanceMode: modalidade ?? model.attendanceMode, dayOfWeek: dayOfWeekOf(plan.date), validFrom: validity.validFrom, validUntil: validity.validUntil }) });
       }
-      // The new plantões receive the same queues as the template.
+      // Each new plantão receives the same queues as its own template.
       if (created.length) {
-        for (const queue of templateQueues) {
+        for (const queue of queueRows) {
+          const joining = created.filter((schedule) => queuesOf(createdBy.get(schedule.id)!).some((item) => item.id === queue.id)).map((schedule) => schedule.id);
+          if (!joining.length) continue;
           const current = [...new Set([...(queue.ids ?? []), ...(queue.single ? [queue.single] : [])])];
-          const next = [...new Set([...current, ...created.map((schedule) => schedule.id)])];
+          const next = [...new Set([...current, ...joining])];
           await tx.update(schema.leadQueues).set({ exclusiveDutyScheduleIds: next, exclusiveDutyScheduleId: next[0] ?? null, updatedAt: stamp })
             .where(and(eq(schema.leadQueues.id, queue.id), eq(schema.leadQueues.tenantId, tenantId)));
         }
