@@ -288,15 +288,15 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
           and ${schema.leads.corretorId} = ${context.userId}
           and ${schema.leads.deletedAt} is null
           and ${schema.leads.archivedAt} is null
-          and ${schema.leads.assignedAt} >= ${todayStart}
-          and ${schema.leads.assignedAt} < ${tomorrowStart}
+          and ${schema.leads.assignedAt} >= ${todayStart.toISOString()}
+          and ${schema.leads.assignedAt} < ${tomorrowStart.toISOString()}
       )`,
       acceptedToday: sql<number>`(
         select count(*)::int from ${schema.leadOffers}
         where ${schema.leadOffers.tenantId} = ${context.tenantId}
           and ${schema.leadOffers.brokerId} = ${context.userId}
-          and ${schema.leadOffers.acceptedAt} >= ${todayStart}
-          and ${schema.leadOffers.acceptedAt} < ${tomorrowStart}
+          and ${schema.leadOffers.acceptedAt} >= ${todayStart.toISOString()}
+          and ${schema.leadOffers.acceptedAt} < ${tomorrowStart.toISOString()}
       )`,
       inServiceNow: sql<number>`(
         select count(*)::int from ${schema.leads}
