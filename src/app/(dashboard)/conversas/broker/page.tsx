@@ -7,6 +7,10 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { AssistantChat } from "@/components/chat/assistant-chat";
+import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
+import { buildInsightsScript } from "@/features/broker-workspace/chat/insights-script";
+import { readLeadIntelligence as readIntelligence } from "@/features/broker-workspace/chat/intelligence";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -22,30 +26,13 @@ function toTimestamp(value: Date | string | null | undefined) {
   return iso ? Date.parse(iso) : 0;
 }
 
-function readIntelligence(value: unknown) {
-  const details = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  const assessment = details.aiIntelligence && typeof details.aiIntelligence === "object"
-    ? details.aiIntelligence as Record<string, unknown>
-    : {};
-  const read = (key: string) => typeof assessment[key] === "string" ? assessment[key] : null;
-  return {
-    summary: read("summary"),
-    nextBestAction: read("nextBestAction"),
-    pendingFrom: read("pendingFrom"),
-    sentiment: read("sentiment"),
-    customerIntent: read("customerIntent"),
-    risk: read("risk"),
-    lastAnalyzedAt: typeof details.aiLastAnalyzedAt === "string" ? details.aiLastAnalyzedAt : null,
-  };
-}
-
 /**
  * Corretor Lite: a conexão WAHA é um espelho operacional read-only.
  * A resposta ocorre no WhatsApp do corretor; esta rota só revela a própria
  * carteira e os insights já persistidos pelo CRM.
  */
-export default async function BrokerConversationsPage({ searchParams }: { searchParams: Promise<{ leadId?: string }> }) {
-  const { leadId } = await searchParams;
+export default async function BrokerConversationsPage({ searchParams }: { searchParams: Promise<{ leadId?: string; todas?: string }> }) {
+  const { leadId, todas } = await searchParams;
   const context = await getRequiredTenantContext();
   if (!hasPermission(context.role, "acessar_conversas")) redirect("/minha-fila");
   if (context.role !== "broker" || (await getExperienceMode(context)) !== "LIGHT") redirect("/conversas");
@@ -98,6 +85,16 @@ export default async function BrokerConversationsPage({ searchParams }: { search
     .sort((a, b) => toTimestamp(b.latestMessage?.sentAt) - toTimestamp(a.latestMessage?.sentAt));
 
   const connection = connectionRows[0];
+  // Broker chat (2026-10-09): Insights opens with who is waiting for an answer; the mirror stays one tap away.
+  if (!leadId && todas !== "1") {
+    const insightsAssistant = ASSISTANTS.insights;
+    return (
+      <AssistantChat
+        identity={{ name: insightsAssistant.name, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
+        script={buildInsightsScript({ insights, whatsappConnected: connection?.status === "ready", now: new Date() })}
+      />
+    );
+  }
   return (
     <LightConversationsView
       insights={insights}

@@ -66,9 +66,11 @@ describe("Light routes", () => {
 
   it("opens a conversation as an internal screen that goes back to the Insights list", () => {
     expect(resolveLightRoute("/conversas/broker", new URLSearchParams("leadId=abc"))).toMatchObject({
-      title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker",
+      title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker?todas=1",
     });
-    expect(resolveLightRoute("/conversas/broker", new URLSearchParams("")).isRoot).toBe(true);
+    // Without a conversation, Insights is the assistant chat; ?todas=1 is the full list.
+    expect(resolveLightRoute("/conversas/broker", new URLSearchParams(""))).toMatchObject({ isRoot: true, chat: true });
+    expect(resolveLightRoute("/conversas/broker", new URLSearchParams("todas=1"))).toMatchObject({ isRoot: false, parentHref: "/conversas/broker" });
   });
 
   it("sends the feedback form back to its lead and keeps the tab bar", () => {

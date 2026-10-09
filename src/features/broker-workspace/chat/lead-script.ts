@@ -2,6 +2,8 @@ import type { ChatBlock, ChatChoice, ChatFactRow, ChatScript } from "@/component
 import { DECLINE_REASONS } from "@/features/broker-workspace/components/light-lead-detail/types";
 import { LEAD_STATUS_LABELS, MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
 
+import { isOutboundMessage } from "./intelligence";
+
 const TIME_ZONE = "America/Sao_Paulo";
 
 /** What the lead conversation needs from the lead (already redacted for privacy by the page). */
@@ -38,7 +40,14 @@ export type LeadConversationEvent = {
   createdAt: Date;
 };
 
+/** A WhatsApp message mirrored by the CRM (client on the left, broker on the right). */
+export type LeadConversationMessage = { id: string; body: string; direction: string; sentAt: Date };
+
+/** What the AI read in the WhatsApp conversation. */
+export type LeadConversationAdvice = { nextBestAction: string | null; pendingFrom: string | null };
+
 const HISTORY_LIMIT = 15;
+const MESSAGES_LIMIT = 20;
 const IN_SERVICE = new Set(["in_contact", "quote_sent", "negotiation"]);
 const LOSS_CHOICES: MotivoPerda[] = ["sem_contato", "sem_interesse", "preco", "ja_contratou", "encontrou_mais_barato", "desistiu", "outro"];
 const RETURN_CHOICES = [
@@ -163,7 +172,7 @@ function whatsappChoice(whatsappUrl: string | null): ChatChoice[] {
 }
 
 /** The suggested replies for where the attendance is now. */
-function nextStep(lead: LeadConversationLead, now: Date, whatsappUrl: string | null): ChatBlock[] {
+function nextStep(lead: LeadConversationLead, now: Date, whatsappUrl: string | null, advice: LeadConversationAdvice | null): ChatBlock[] {
   const name = firstName(lead.nome);
   if (!lead.isCurrentBroker) {
     return [
@@ -204,8 +213,11 @@ function nextStep(lead: LeadConversationLead, now: Date, whatsappUrl: string | n
         ? { ...fichaChoice(lead, "Não deu certo", "#etapa"), hint: "A IA marcou como venda provável: justifique na ficha" }
         : { id: "lost", label: "Não deu certo", action: { kind: "next", questionId: "q-lost" } },
     );
+    const owesAnswer = advice?.pendingFrom === "BROKER";
+    const lead_ = owesAnswer ? `${name} está esperando sua resposta.` : `Etapa atual: ${stage}. Me conta como está e eu registro.`;
     const blocks: ChatBlock[] = [
-      { type: "assistant", id: "a-next", text: `Etapa atual: ${stage}. Me conta como está e eu registro.` },
+      { type: "assistant", id: "a-next", text: lead_ },
+      ...(advice?.nextBestAction ? [{ type: "assistant" as const, id: "a-advice", text: `Sugestão: ${advice.nextBestAction}` }] : []),
       { type: "question", id: "q-main", prompt: `E aí, como está o ${name}?`, choices },
       returnQuestion(lead),
     ];
@@ -246,16 +258,32 @@ export function buildLeadConversationScript({
   viewerId,
   now,
   whatsappUrl,
+  messages = [],
+  advice = null,
 }: {
   lead: LeadConversationLead;
   events: LeadConversationEvent[];
   viewerId: string;
   now: Date;
   whatsappUrl: string | null;
+  /** WhatsApp mirror, only for the lead's own broker. */
+  messages?: LeadConversationMessage[];
+  advice?: LeadConversationAdvice | null;
 }): ChatScript {
   const origin = originLabel(lead);
   const rows = factRows(lead);
-  const history = [...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT);
+  // History and WhatsApp in one timeline: the latest of each, in time order.
+  type Entry = { at: Date; block: ChatBlock; id: string };
+  const history: Entry[] = [
+    ...[...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT).map((event) => ({ at: event.createdAt, id: event.id, block: eventBlock(event, viewerId) })),
+    ...[...messages].sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-MESSAGES_LIMIT).map((message) => ({
+      at: message.sentAt,
+      id: `wa-${message.id}`,
+      block: isOutboundMessage(message.direction)
+        ? { type: "user" as const, id: `wa-${message.id}`, text: message.body, at: time(message.sentAt) }
+        : { type: "assistant" as const, id: `wa-${message.id}`, text: message.body, at: time(message.sentAt) },
+    })),
+  ].sort((a, b) => a.at.getTime() - b.at.getTime());
 
   const blocks: ChatBlock[] = [
     { type: "date", id: "d-created", label: dateLabel(lead.createdAt, now) },
@@ -265,16 +293,16 @@ export function buildLeadConversationScript({
   if (lead.summary) blocks.push({ type: "assistant", id: "a-summary", text: lead.summary });
 
   let lastDay = dayKey(lead.createdAt);
-  for (const event of history) {
-    const key = dayKey(event.createdAt);
+  for (const entry of history) {
+    const key = dayKey(entry.at);
     if (key !== lastDay) {
-      blocks.push({ type: "date", id: `d-${event.id}`, label: dateLabel(event.createdAt, now) });
+      blocks.push({ type: "date", id: `d-${entry.id}`, label: dateLabel(entry.at, now) });
       lastDay = key;
     }
-    blocks.push(eventBlock(event, viewerId));
+    blocks.push(entry.block);
   }
 
-  blocks.push(...nextStep(lead, now, whatsappUrl));
+  blocks.push(...nextStep(lead, now, whatsappUrl, advice));
 
   const waiting = lead.isCurrentBroker && (lead.status === "distributed" || lead.status === "new" || IN_SERVICE.has(lead.status));
   return {

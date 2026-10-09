@@ -36,6 +36,7 @@ import { buildLeadConversationScript } from "@/features/broker-workspace/chat/le
 import { LeadConversation } from "@/features/broker-workspace/chat/lead-conversation";
 import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import { readLeadIntelligence } from "@/features/broker-workspace/chat/intelligence";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -239,7 +240,19 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
 
     // Broker app (2026-10-09 chat redesign): the lead is a conversation; ?ficha=1 keeps the full record.
     if (!ficha) {
-      const timeline = (await getLeadTimeline(id)) ?? [];
+      // WhatsApp mirror only for the lead's own broker, after accepting it (same rule as the phone).
+      const [timelineRows, waMessages] = await Promise.all([
+        getLeadTimeline(id),
+        lightContact.reveal
+          ? db.select({ id: schema.whatsappMessages.id, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt })
+            .from(schema.whatsappMessages)
+            .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id)))
+            .orderBy(desc(schema.whatsappMessages.sentAt))
+            .limit(20)
+          : Promise.resolve([]),
+      ]);
+      const timeline = timelineRows ?? [];
+      const intelligence = readLeadIntelligence(lead.qualificationDetails);
       const now = new Date();
       const script = buildLeadConversationScript({
         lead: {
@@ -267,6 +280,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         viewerId: context.userId,
         now,
         whatsappUrl: buildWhatsAppUrl(lightContact.telefone, `Olá, ${lead.nome.split(" ")[0] || lead.nome}! Sou seu corretor e vou seguir com seu atendimento por aqui.`),
+        messages: waMessages.filter((message) => message.body && message.sentAt).map((message) => ({ id: message.id, body: message.body ?? "", direction: message.direction, sentAt: new Date(message.sentAt as Date | string) })),
+        advice: lightContact.reveal ? { nextBestAction: intelligence.nextBestAction, pendingFrom: intelligence.pendingFrom } : null,
       });
       const leadInitials = lead.nome.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("") || "?";
       return <LeadConversation leadId={lead.id} name={lead.nome} initials={leadInitials} canWrite={lightLead.isCurrentBroker} script={script} />;
