@@ -118,14 +118,16 @@ describe("WhatsApp in the lead conversation", () => {
       messages: [
         { id: "w2", body: "Quanto fica?", direction: "incoming", sentAt: new Date("2026-10-09T14:56:00.000Z") },
         { id: "w1", body: "Oi Maria!", direction: "outgoing", sentAt: new Date("2026-10-09T14:53:00.000Z") },
+        { id: "w0", body: "Quantas vidas?", direction: "outbound", senderRole: "assistant", sentAt: new Date("2026-10-09T14:52:30.000Z") },
       ],
       advice: { pendingFrom: "BROKER", nextBestAction: "Mandar a cotação PME" },
     });
     const ids = script.blocks.map((block) => block.id);
     expect(ids.indexOf("ev-e1")).toBeLessThan(ids.indexOf("wa-w1"));
     expect(ids.indexOf("wa-w1")).toBeLessThan(ids.indexOf("wa-w2"));
-    expect(script.blocks.find((block) => block.id === "wa-w1")).toMatchObject({ type: "user" });
-    expect(script.blocks.find((block) => block.id === "wa-w2")).toMatchObject({ type: "assistant", text: "Quanto fica?" });
+    expect(script.blocks.find((block) => block.id === "wa-w1")).toMatchObject({ type: "whatsapp", from: "broker" });
+    expect(script.blocks.find((block) => block.id === "wa-w2")).toMatchObject({ type: "whatsapp", from: "client", text: "Quanto fica?" });
+    expect(script.blocks.find((block) => block.id === "wa-w0")).toMatchObject({ type: "whatsapp", from: "qualification" });
     expect(script.blocks.find((block) => block.id === "a-next")).toMatchObject({ text: "Maria está esperando sua resposta." });
     expect(ids.indexOf("a-advice")).toBeLessThan(ids.indexOf("q-main"));
   });

@@ -41,7 +41,7 @@ export type LeadConversationEvent = {
 };
 
 /** A WhatsApp message mirrored by the CRM (client on the left, broker on the right). */
-export type LeadConversationMessage = { id: string; body: string; direction: string; sentAt: Date };
+export type LeadConversationMessage = { id: string; body: string; direction: string; sentAt: Date; senderRole?: string | null };
 
 /** What the AI read in the WhatsApp conversation. */
 export type LeadConversationAdvice = { nextBestAction: string | null; pendingFrom: string | null };
@@ -286,9 +286,14 @@ export function buildLeadConversationScript({
     ...[...messages].sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-MESSAGES_LIMIT).map((message) => ({
       at: message.sentAt,
       id: `wa-${message.id}`,
-      block: isOutboundMessage(message.direction)
-        ? { type: "user" as const, id: `wa-${message.id}`, text: message.body, at: time(message.sentAt) }
-        : { type: "assistant" as const, id: `wa-${message.id}`, text: message.body, at: time(message.sentAt) },
+      block: {
+        type: "whatsapp" as const,
+        id: `wa-${message.id}`,
+        text: message.body,
+        at: time(message.sentAt),
+        // Outbound with senderRole "assistant" is the AI qualification; other outbound is the broker.
+        from: !isOutboundMessage(message.direction) ? "client" as const : message.senderRole === "assistant" ? "qualification" as const : "broker" as const,
+      },
     })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());
 

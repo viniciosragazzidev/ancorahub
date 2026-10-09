@@ -163,6 +163,16 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: 
       return <AssistantText block={block} />;
     case "user":
       return <p className={styles.user} style={{ margin: 0 }}>{block.text}</p>;
+    case "whatsapp": {
+      const label = block.from === "client" ? "Cliente" : block.from === "qualification" ? "Qualificação" : "Você";
+      const tone = block.from === "client" ? styles.bubbleClient : block.from === "qualification" ? styles.bubbleQualification : styles.bubbleBroker;
+      return (
+        <div className={`${styles.bubble} ${tone}`}>
+          <span className={styles.bubbleLabel}>{label}{block.at ? ` · ${block.at}` : ""}</span>
+          <p className={styles.bubbleText}>{block.text}</p>
+        </div>
+      );
+    }
     case "facts":
       return (
         <section className={styles.card} aria-label={block.title}>

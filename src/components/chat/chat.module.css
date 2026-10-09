@@ -22,6 +22,14 @@
   --chat-unread: oklch(70% 0.17 255);
 }
 
+/* ---------- WhatsApp mirror: light bubbles tell the client from the qualification and the broker ---------- */
+.bubble { max-width: 82%; display: grid; gap: 2px; padding: 8px 12px 9px; border-radius: 16px; }
+.bubbleClient { justify-self: start; background: var(--surface-muted); border-bottom-left-radius: 6px; }
+.bubbleQualification { justify-self: end; background: var(--chat-action-soft); border-bottom-right-radius: 6px; }
+.bubbleBroker { justify-self: end; background: oklch(64% 0.17 150 / 0.12); border-bottom-right-radius: 6px; }
+.bubbleLabel { font-size: var(--text-xs); color: var(--text-muted); }
+.bubbleText { margin: 0; font-size: var(--text-base); line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
+
 /* ---------- button block (real link: WhatsApp) ---------- */
 .buttonBlock { display: grid; gap: 10px; justify-items: start; }
 .linkButton {

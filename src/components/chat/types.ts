@@ -50,6 +50,8 @@ export type ChatBlock =
   | { type: "system"; id: string; text: string; strong?: string; action?: { label: string; choiceAction: ChatAction } }
   | { type: "assistant"; id: string; text: string; at?: string }
   | { type: "user"; id: string; text: string; at?: string }
+  /** A mirrored WhatsApp message: the client, the AI qualification or the broker, each with its own light bubble. */
+  | { type: "whatsapp"; id: string; text: string; at?: string; from: "client" | "qualification" | "broker" }
   | { type: "facts"; id: string; title: string; subtitle?: string; rows: ChatFactRow[]; href?: string; hrefLabel?: string }
   | { type: "list"; id: string; title: string; subtitle?: string; items: ChatListItem[]; emptyText?: string }
   | { type: "bars"; id: string; title: string; subtitle?: string; values: Array<{ label: string; value: number; highlight?: boolean }>; format?: "count" | "currency" }
