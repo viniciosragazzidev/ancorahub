@@ -16,6 +16,11 @@ export type MonthlyPlanSchedule = {
   timezone: string;
   validFrom: Date;
   validUntil: Date | null;
+  /** Group of the plantão (PME, Premium...); null = no type. */
+  typeId?: string | null;
+  attendanceMode?: string | null;
+  /** Units that take part in the plantão's type; empty/undefined = every unit. */
+  typeBranchIds?: readonly string[] | null;
 };
 
 export type MonthlyPlanBroker = { id: string; branchId: string };
@@ -31,6 +36,11 @@ export type MonthlyPlanOccurrence = {
   minimumBrokers: number;
   maximumBrokers: number | null;
   allowedBrokerIds: string[];
+  /** Absent on escalas generated before plantão types (DEC-138). */
+  typeId?: string | null;
+  attendanceMode?: "online" | "presencial";
+  /** Brokers outside the type's units the Diretor confirmed anyway. */
+  forcedBrokerIds?: string[];
 };
 
 export type MonthlyPlanAssignment = { occurrenceId: string; brokerId: string };
@@ -195,10 +205,39 @@ export function shiftEnd(schedule: Pick<MonthlyPlanSchedule, "startsAt" | "endsA
  */
 export function buildMonthOccurrences(monthKey: string, schedules: readonly MonthlyPlanSchedule[], brokers: readonly MonthlyPlanBroker[], options: { from?: Date } = {}) {
   const [year, month] = monthKey.split("-").map(Number);
-  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const lastDay = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+  return buildRangeOccurrences(`${monthKey}-01`, lastDay, schedules, brokers, options);
+}
+
+export const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+/** An escala may run past the end of its month (plantões that end days later), up to this many days. */
+export const MAX_PLAN_RANGE_DAYS = 62;
+
+export function addDays(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+}
+
+export function daysBetween(from: string, until: string) {
+  return Math.round((Date.parse(`${until}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000);
+}
+
+/** Whether a broker's unit takes part in the plantão (its own unit, then its type's units). */
+export function unitAllowed(schedule: Pick<MonthlyPlanSchedule, "branchId" | "typeBranchIds">, branchId: string | null) {
+  if (schedule.branchId) return branchId === schedule.branchId;
+  return !schedule.typeBranchIds?.length || (branchId !== null && schedule.typeBranchIds.includes(branchId));
+}
+
+/**
+ * Every occurrence in [from, until] (both included): one per plantão per
+ * matching date. With `from` in options, shifts that already ended at that
+ * instant are left out: a plantão that is over can never be staffed (one
+ * running now still counts).
+ */
+export function buildRangeOccurrences(fromKey: string, untilKey: string, schedules: readonly MonthlyPlanSchedule[], brokers: readonly MonthlyPlanBroker[], options: { from?: Date } = {}) {
   const occurrences: MonthlyPlanOccurrence[] = [];
-  for (let day = 1; day <= lastDay; day += 1) {
-    const dutyDate = `${monthKey}-${String(day).padStart(2, "0")}`;
+  if (!DATE_KEY_PATTERN.test(fromKey) || !DATE_KEY_PATTERN.test(untilKey) || untilKey < fromKey) return occurrences;
+  for (let dutyDate = fromKey; dutyDate <= untilKey; dutyDate = addDays(dutyDate, 1)) {
     const weekday = dayOfWeekOf(dutyDate);
     for (const schedule of schedules) {
       if (schedule.dayOfWeek !== weekday || !isValidOn(schedule, dutyDate)) continue;
@@ -212,12 +251,59 @@ export function buildMonthOccurrences(monthKey: string, schedules: readonly Mont
         endsAt: schedule.endsAt,
         minimumBrokers: schedule.minimumBrokers,
         maximumBrokers: schedule.maximumBrokers,
-        // Global plantão: anyone active; unit plantão: that unit's brokers.
-        allowedBrokerIds: brokers.filter((broker) => !schedule.branchId || broker.branchId === schedule.branchId).map((broker) => broker.id),
+        // Unit plantão: that unit's brokers; global: the units of its type (all when none).
+        allowedBrokerIds: brokers.filter((broker) => unitAllowed(schedule, broker.branchId)).map((broker) => broker.id),
+        typeId: schedule.typeId ?? null,
+        attendanceMode: schedule.attendanceMode === "presencial" ? "presencial" : "online",
       });
     }
   }
   return occurrences.sort((a, b) => a.dutyDate.localeCompare(b.dutyDate) || a.startsAt.localeCompare(b.startsAt) || a.id.localeCompare(b.id));
+}
+
+/** Key used for plantões without a type in the planner's settings. */
+export const NO_TYPE_KEY = "__none";
+export const typeKeyOf = (typeId: string | null | undefined) => typeId ?? NO_TYPE_KEY;
+
+export type PlanBrokerModality = "any" | "online" | "presencial";
+
+/** One qualified broker of an escala: modality, the types they take and their seats per type. */
+export type PlanBrokerSetting = {
+  brokerId: string;
+  modality: PlanBrokerModality;
+  /** Seats (plantões) per type key; a type the broker does not take is absent or 0. */
+  seats: Record<string, number>;
+  /** Type keys the Diretor confirmed although the broker's unit is outside the type. */
+  forcedTypeKeys: string[];
+};
+
+export type PlanSettings = {
+  rangeFrom: string;
+  rangeUntil: string;
+  typeKeys: string[];
+  brokers: PlanBrokerSetting[];
+};
+
+export function parsePlanSettings(value: unknown): PlanSettings | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Partial<PlanSettings>;
+  if (typeof raw.rangeFrom !== "string" || typeof raw.rangeUntil !== "string" || !Array.isArray(raw.typeKeys)) return null;
+  return {
+    rangeFrom: raw.rangeFrom,
+    rangeUntil: raw.rangeUntil,
+    typeKeys: raw.typeKeys.filter((key): key is string => typeof key === "string"),
+    brokers: (Array.isArray(raw.brokers) ? raw.brokers : []).filter((item): item is PlanBrokerSetting => Boolean(item && typeof item.brokerId === "string")).map((item) => ({
+      brokerId: item.brokerId,
+      modality: item.modality === "online" || item.modality === "presencial" ? item.modality : "any",
+      seats: Object.fromEntries(Object.entries(item.seats ?? {}).filter(([, seats]) => Number.isFinite(seats) && seats > 0).map(([key, seats]) => [key, Math.trunc(seats)])),
+      forcedTypeKeys: Array.isArray(item.forcedTypeKeys) ? item.forcedTypeKeys.filter((key) => typeof key === "string") : [],
+    })),
+  };
+}
+
+/** Whether a broker with this modality may take an occurrence of this attendance mode. */
+export function modalityAllows(modality: PlanBrokerModality, attendanceMode: string | null | undefined) {
+  return modality === "any" || modality === (attendanceMode === "presencial" ? "presencial" : "online");
 }
 
 function overlaps(a: Pick<MonthlyPlanOccurrence, "dutyDate" | "startsAt" | "endsAt">, b: Pick<MonthlyPlanOccurrence, "dutyDate" | "startsAt" | "endsAt">) {
@@ -278,7 +364,7 @@ function findDraftIssues(occurrences: readonly MonthlyPlanOccurrence[], assignme
 
 export function describeDraftProblem(problem: DraftProblem) {
   switch (problem.kind) {
-    case "unknown_occurrence": return "A proposta tem um plantão que não existe mais neste mês.";
+    case "unknown_occurrence": return "A proposta tem um plantão que não existe mais neste período.";
     case "not_eligible": return "Um corretor da proposta não pode atuar neste plantão.";
     case "duplicate": return "Um corretor aparece duas vezes no mesmo plantão.";
     case "over_capacity": return "Um plantão passou do máximo de corretores.";

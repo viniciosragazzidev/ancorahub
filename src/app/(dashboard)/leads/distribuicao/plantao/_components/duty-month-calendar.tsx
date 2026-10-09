@@ -4,8 +4,9 @@ import { useMemo } from "react";
 
 import { Plus } from "@/components/huge-icons";
 import { cn } from "@/lib/utils";
+import { typeStripe } from "./duty-type-tag";
 
-type CalendarSchedule = { id: string; name: string; startsAt: string; endsAt: string; status: string; validFrom: Date; validUntil: Date | null };
+type CalendarSchedule = { id: string; name: string; startsAt: string; endsAt: string; status: string; validFrom: Date; validUntil: Date | null; typeName?: string | null; typeHue?: number | null };
 type Progress = { dates: Array<{ date: string; done: boolean }> };
 
 const WEEKDAY_HEADERS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"] as const;
@@ -108,9 +109,10 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                     key={schedule.id}
                     type="button"
                     onClick={() => onOpen(schedule)}
-                    title={`${schedule.name} · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}${repeatingScheduleIds.has(schedule.id) ? " · repete toda semana" : ""}${done ? " · encerrado" : ""}`}
+                    title={`${schedule.typeName ? `${schedule.typeName} · ` : ""}${schedule.name} · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}${repeatingScheduleIds.has(schedule.id) ? " · repete toda semana" : ""}${done ? " · encerrado" : ""}`}
+                    style={schedule.typeName ? typeStripe(schedule.typeHue) : undefined}
                     className={cn(
-                      "w-full min-w-0 rounded-full border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      "w-full min-w-0 rounded-md border px-1.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                       done
                         ? "border-dashed border-border bg-transparent py-0.5 text-muted-foreground hover:bg-muted/60"
                         : cn("bg-card py-1 hover:border-foreground/30", gap ? "border-warning/50" : "border-border", published && "border-success/50"),

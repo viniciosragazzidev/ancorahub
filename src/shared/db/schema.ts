@@ -739,11 +739,23 @@ export const dutyScheduleTypes = pgTable(
     tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     status: text("status").notNull().default("active"),
+    /** Modality the type's plantões are created with (each plantão keeps its own). */
+    attendanceMode: text("attendance_mode").notNull().default("online"),
+    /** Color of the type in the calendar, the escala and the PDF (0-359 hue). */
+    colorHue: integer("color_hue"),
+    /** Units that take part in the type; empty = every unit. */
+    branchIds: jsonb("branch_ids").$type<string[]>().notNull().default([]),
+    defaultStartsAt: text("default_starts_at").notNull().default("09:00"),
+    defaultEndsAt: text("default_ends_at").notNull().default("19:00"),
+    defaultMinimumBrokers: integer("default_minimum_brokers").notNull().default(1),
+    defaultMaximumBrokers: integer("default_maximum_brokers"),
     createdBy: text("created_by").notNull().references(() => user.id),
+    updatedBy: text("updated_by").references(() => user.id),
     createdAt,
     updatedAt,
   },
   (table) => [
+    check("duty_schedule_types_attendance_mode_check", sql`${table.attendanceMode} in ('online', 'presencial')`),
     uniqueIndex("duty_schedule_types_tenant_name_unique").on(table.tenantId, sql`lower(${table.name})`),
     index("duty_schedule_types_tenant_status_idx").on(table.tenantId, table.status, table.name),
   ],
@@ -797,6 +809,8 @@ export const dutyScheduleMonthlyPlans = pgTable(
     quotas: jsonb("quotas").notNull().default([]),
     occurrences: jsonb("occurrences").notNull().default([]),
     assignments: jsonb("assignments").notNull().default([]),
+    /** What the planner chose: period, plantão types and each broker's seats (DEC-138). */
+    settings: jsonb("settings").notNull().default({}),
     generatedBy: text("generated_by").notNull().references(() => user.id),
     publishedBy: text("published_by").references(() => user.id),
     publishedAt: timestamp("published_at", { withTimezone: true }),

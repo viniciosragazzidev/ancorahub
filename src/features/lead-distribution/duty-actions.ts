@@ -7,7 +7,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { isValidDutyWindow } from "./domain";
 import { buildDuplicateDutyScheduleValues, dutyScheduleInput, getAttendanceModeUpdate, parseCreateDutyScheduleInput, parseDutyScheduleInput } from "./duty-schedule-input";
-import { retimeAssignmentForSplit, validShiftSplit } from "./duty-shifts";
+import { DEFAULT_SHIFT_SPLIT_AT, retimeAssignmentForSplit, validShiftSplit } from "./duty-shifts";
 import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
@@ -170,7 +170,13 @@ async function findScheduleForMutation(scheduleId: string) {
   return { context, db, schedule };
 }
 
-async function resolveDutyTypeId(tx: ReturnType<typeof getDatabase>, tenantId: string, userId: string, typeName: string | null | undefined) {
+async function resolveDutyTypeId(tx: ReturnType<typeof getDatabase>, tenantId: string, userId: string, typeName: string | null | undefined, typeId?: string | null) {
+  if (typeId) {
+    const [type] = await tx.select({ id: schema.dutyScheduleTypes.id }).from(schema.dutyScheduleTypes)
+      .where(and(eq(schema.dutyScheduleTypes.id, typeId), eq(schema.dutyScheduleTypes.tenantId, tenantId))).limit(1);
+    if (!type) throw new Error("Tipo de plantão não encontrado.");
+    return type.id;
+  }
   if (!typeName?.trim()) return null;
   const normalizedName = typeName.trim().replace(/\s+/g, " ");
   return tx.transaction(async (dbtx) => {
@@ -263,9 +269,20 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
     };
     // "Datas": one plantão per chosen date, valid only on that day.
     // "Toda semana": one weekly rule per weekday over the whole period.
-    const schedules = parsed.data.dates?.length
+    const perDay = parsed.data.dates?.length
       ? parsed.data.dates.map((dutyDate) => ({ ...base, dayOfWeek: dayOfWeekOf(dutyDate), ...occurrenceValidity(dutyDate, "America/Sao_Paulo") }))
       : parsed.data.daysOfWeek.map((dayOfWeek) => ({ ...base, dayOfWeek, validFrom: parsed.data.validFrom, validUntil: parsed.data.validUntil }));
+    // "Possui turnos" (DEC-138): two plantões of the same type and modality per
+    // day, cut at 13:30. Each one has its own escala and presence call.
+    if (parsed.data.splitIntoShifts && !validShiftSplit(base, DEFAULT_SHIFT_SPLIT_AT)) {
+      throw new Error(`Para dividir em turnos, o plantão precisa começar antes das ${DEFAULT_SHIFT_SPLIT_AT} e terminar depois.`);
+    }
+    const schedules = parsed.data.splitIntoShifts
+      ? perDay.flatMap((schedule) => [
+        { ...schedule, name: `${schedule.name} · Manhã`, endsAt: DEFAULT_SHIFT_SPLIT_AT, shiftSplitAt: null },
+        { ...schedule, name: `${schedule.name} · Tarde`, startsAt: DEFAULT_SHIFT_SPLIT_AT, shiftSplitAt: null },
+      ])
+      : perDay;
     for (const schedule of schedules) validateSchedule(schedule);
     const { context, db } = await assertBatchDutyAccess();
     const receivingQueueIds = await activeQueueIds(db, context.tenantId, [
@@ -280,7 +297,7 @@ export async function createDutyScheduleAction(_previous: DutyActionState, formD
     }
     const scheduleIds = schedules.map(() => randomUUID());
     const now = new Date();
-    const typeId = await resolveDutyTypeId(db, context.tenantId, context.userId, parsed.data.typeName);
+    const typeId = await resolveDutyTypeId(db, context.tenantId, context.userId, parsed.data.typeName, parsed.data.typeId);
     await db.transaction(async (tx) => {
       await tx.insert(schema.unitDutySchedules).values(schedules.map((schedule, index) => ({
         id: scheduleIds[index],
@@ -346,7 +363,7 @@ export async function updateDutyScheduleAction(_previous: DutyActionState, formD
     } else {
       for (const warning of await assertNoScheduleConflict(db, parsed.data, context.tenantId, schedule.id)) sharedWarnings.add(warning);
     }
-    const typeId = await resolveDutyTypeId(db, context.tenantId, context.userId, parsed.data.typeName);
+    const typeId = await resolveDutyTypeId(db, context.tenantId, context.userId, parsed.data.typeName, parsed.data.typeId);
     await db.transaction(async (tx) => {
       for (let dayOfWeek = 0; dayOfWeek < 7; dayOfWeek += 1) {
         await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${dayOfWeek}`}))`);

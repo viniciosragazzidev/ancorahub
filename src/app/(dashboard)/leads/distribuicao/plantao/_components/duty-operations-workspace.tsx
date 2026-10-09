@@ -60,9 +60,10 @@ import {
 } from "@/features/lead-distribution/roster-actions";
 import { cn } from "@/lib/utils";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
-import { buildMonthOccurrences, monthCoverage, monthShiftProgress, summarizeDutyDays } from "@/features/lead-distribution/monthly-duty-plan";
+import { monthCoverage, monthShiftProgress, summarizeDutyDays } from "@/features/lead-distribution/monthly-duty-plan";
 import { DutyMonthCalendar } from "./duty-month-calendar";
-import { MonthlyDutyPlanner, monthLabel, useMonthlyDutyPlans, type MonthSchedule } from "./monthly-duty-planner";
+import { MonthlyDutyPlanner, monthLabel, useMonthlyDutyPlans } from "./monthly-duty-planner";
+import { DutyTypeDialog, DutyTypesSheet, DutyTypeTag, MODALITY_LABEL, typeUnitsLabel } from "./duty-type-ui";
 import { getOperationalMonthKey } from "./duty-schedule-month-groups";
 
 type Snapshot = DutyRosterSnapshot;
@@ -198,6 +199,44 @@ function DutyFormSheet({
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const activeTypes = snapshot.types.filter((type) => type.status === "active" || type.id === schedule?.typeId);
+  // The type comes first (DEC-138): it fills name, modality, hours and coverage.
+  const [typeId, setTypeId] = useState<string>(() => schedule?.typeId ?? "");
+  const [typeDialogOpen, setTypeDialogOpen] = useState(false);
+  const selectedType = snapshot.types.find((type) => type.id === typeId) ?? null;
+  const [fields, setFields] = useState(() => ({
+    name: schedule?.name ?? "",
+    attendanceMode: (schedule?.attendanceMode === "presencial" ? "presencial" : "online") as "online" | "presencial",
+    startsAt: schedule?.startsAt.slice(0, 5) ?? "09:00",
+    endsAt: schedule?.endsAt.slice(0, 5) ?? "19:00",
+    minimumBrokers: String(schedule?.minimumBrokers ?? 1),
+    maximumBrokers: schedule?.maximumBrokers == null ? "" : String(schedule.maximumBrokers),
+  }));
+  const setField = (patch: Partial<typeof fields>) => setFields((current) => ({ ...current, ...patch }));
+  function chooseType(id: string) {
+    setTypeId(id);
+    const type = snapshot.types.find((item) => item.id === id);
+    if (!type || schedule) return;
+    setFields((current) => ({
+      name: !current.name || snapshot.types.some((item) => item.name === current.name) ? type.name : current.name,
+      attendanceMode: type.attendanceMode,
+      startsAt: type.defaultStartsAt,
+      endsAt: type.defaultEndsAt,
+      minimumBrokers: String(type.defaultMinimumBrokers),
+      maximumBrokers: type.defaultMaximumBrokers == null ? "" : String(type.defaultMaximumBrokers),
+    }));
+  }
+  // A type just created shows up after the refresh: select it then.
+  const [pendingTypeId, setPendingTypeId] = useState<string | null>(null);
+  useEffect(() => {
+    if (pendingTypeId && snapshot.types.some((type) => type.id === pendingTypeId)) {
+      const id = pendingTypeId;
+      queueMicrotask(() => { setPendingTypeId(null); chooseType(id); });
+    }
+  });
+  // "Possui turnos": two plantões per day (start-13:30 and 13:30-end).
+  const [twoShifts, setTwoShifts] = useState(false);
+  const shiftsFit = fields.startsAt < DEFAULT_SHIFT_SPLIT_AT && fields.endsAt > DEFAULT_SHIFT_SPLIT_AT;
   // New plantões are one-day plantões by default: a range becomes one per date.
   const [mode, setMode] = useState<"dates" | "weekly">(() => (schedule && !isSingleDaySchedule(schedule) ? "weekly" : "dates"));
   const [selectedDays, setSelectedDays] = useState<number[]>(() => (schedule ? [schedule.dayOfWeek] : [0, 1, 2, 3, 4, 5, 6]));
@@ -219,12 +258,16 @@ function DutyFormSheet({
     ...(schedule?.linkedQueues ?? []).filter((linked) => !queues.some((queue) => queue.id === linked.id)),
   ];
   const tooManyDates = plannedDates.length > 93;
-  const canSubmit = mode === "dates" && !schedule ? plannedDates.length > 0 && !tooManyDates : selectedDays.length > 0;
+  const needsType = !schedule && !typeId;
+  const canSubmit = !needsType && (!twoShifts || shiftsFit) && (mode === "dates" && !schedule ? plannedDates.length > 0 && !tooManyDates : selectedDays.length > 0);
+  const createdCount = (mode === "dates" ? plannedDates.length : selectedDays.length) * (twoShifts ? 2 : 1);
   const title = schedule ? "Editar plantão" : "Novo plantão";
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    if (typeId) formData.set("typeId", typeId);
+    if (!schedule && twoShifts) formData.set("splitIntoShifts", "true");
     if (schedule) {
       formData.set("scheduleId", schedule.id);
       formData.set("receivingQueueIds", JSON.stringify(queueIds));
@@ -259,7 +302,7 @@ function DutyFormSheet({
           ? "Plantão atualizado."
           : queueIds.length
             ? `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s) e vinculado(s) a ${queueIds.length === 1 ? "1 fila" : `${queueIds.length} filas`}.`
-            : `${result.scheduleIds?.length ?? 1} plantão(ões) criado(s).`,
+            : `${result.scheduleIds?.length ?? 1} plantão(ões) ${selectedType?.name ?? ""} criado(s).`.replace("  ", " "),
       );
       if (result.message?.startsWith("Esta fila também está no plantão")) toast.info(result.message);
       router.refresh();
@@ -268,6 +311,7 @@ function DutyFormSheet({
   }
 
   return (
+    <>
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
         <SheetHeader>
@@ -275,26 +319,66 @@ function DutyFormSheet({
           <SheetDescription>
             {schedule
               ? "Edite a data, o horário, a fila que recebe e a cobertura deste plantão."
-              : "Escolha o período e os dias da semana: cada dia vira um plantão de um dia, para todas as unidades."}
+              : "Escolha o tipo, o período e os dias da semana: cada dia vira um plantão daquele tipo."}
           </SheetDescription>
         </SheetHeader>
         <SheetBody>
           <form className="grid gap-5" onSubmit={submit}>
             <div className="grid gap-2">
+              <Label htmlFor="duty-type">Tipo de plantão</Label>
+              <div className="flex items-center gap-2">
+                <AppSelect
+                  id="duty-type"
+                  className="min-w-0 flex-1"
+                  value={typeId}
+                  onValueChange={chooseType}
+                  placeholder={activeTypes.length ? "Escolha o tipo" : "Nenhum tipo ainda"}
+                  options={[
+                    ...(schedule && !schedule.typeId ? [{ value: "", label: "Sem tipo" }] : []),
+                    ...activeTypes.map((type) => ({ value: type.id, label: <DutyTypeTag name={type.name} hue={type.colorHue} /> })),
+                  ]}
+                />
+                <Button type="button" variant="outline" size="sm" className="shrink-0" onClick={() => setTypeDialogOpen(true)}>
+                  <Plus className="size-3.5" /> Novo tipo
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {selectedType
+                  ? `${MODALITY_LABEL[selectedType.attendanceMode]} · ${typeUnitsLabel(selectedType, snapshot.branches)}`
+                  : "O tipo é o grupo do plantão (PME, Premium, Extra). Não existe? Crie em Novo tipo."}
+              </p>
+            </div>
+            {/* Legacy free-text type: kept for plantões saved before types had their own record. */}
+            {!typeId ? <input type="hidden" name="typeName" value={schedule?.typeName ?? ""} /> : null}
+            <div className="grid gap-2">
               <Label htmlFor="duty-name">Nome</Label>
               <Input
                 id="duty-name"
                 name="name"
-                defaultValue={schedule?.name ?? ""}
-                placeholder="Ex.: Plantão comercial"
+                value={fields.name}
+                onChange={(event) => setField({ name: event.target.value })}
+                placeholder="Ex.: PME"
                 required
               />
+              {!schedule && twoShifts ? <p className="text-xs text-muted-foreground">Vira {fields.name || "Nome"} · Manhã e {fields.name || "Nome"} · Tarde.</p> : null}
             </div>
-            {/* Type stays in the data (kept on save) but is not part of the form. */}
-            <input type="hidden" name="typeName" value={schedule?.typeName ?? ""} />
             <div className="grid gap-2">
-              <Label htmlFor="duty-attendance-mode">Tipo de plantão</Label>
-              <AppSelect id="duty-attendance-mode" name="attendanceMode" defaultValue={schedule?.attendanceMode ?? "online"} options={[{ value: "online", label: "Online" }, { value: "presencial", label: "Presencial" }]} />
+              <p className="text-sm font-medium">Modalidade</p>
+              <input type="hidden" name="attendanceMode" value={fields.attendanceMode} />
+              <div role="radiogroup" aria-label="Modalidade" className="grid grid-cols-2 rounded-[var(--radius-card)] border border-border bg-muted/40 p-0.5">
+                {(["presencial", "online"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    role="radio"
+                    aria-checked={fields.attendanceMode === item}
+                    onClick={() => setField({ attendanceMode: item })}
+                    className={cn("rounded-full px-2 py-1.5 text-xs font-medium", fields.attendanceMode === item ? "bg-background text-foreground" : "text-muted-foreground hover:text-foreground")}
+                  >
+                    {MODALITY_LABEL[item]}
+                  </button>
+                ))}
+              </div>
               <p className="text-xs text-muted-foreground">No presencial, o gestor confirma cada corretor na unidade antes de ele receber leads.</p>
             </div>
             <div className="grid gap-3 rounded-[var(--radius-card)] border border-border p-3">
@@ -423,7 +507,8 @@ function DutyFormSheet({
                   id="duty-start"
                   name="startsAt"
                   type="time"
-                  defaultValue={schedule?.startsAt.slice(0, 5) ?? "09:00"}
+                  value={fields.startsAt}
+                  onChange={(event) => setField({ startsAt: event.target.value })}
                   required
                 />
               </div>
@@ -433,11 +518,27 @@ function DutyFormSheet({
                   id="duty-end"
                   name="endsAt"
                   type="time"
-                  defaultValue={schedule?.endsAt.slice(0, 5) ?? "18:00"}
+                  value={fields.endsAt}
+                  onChange={(event) => setField({ endsAt: event.target.value })}
                   required
                 />
               </div>
             </div>
+            {!schedule ? (
+              <div className="grid gap-1.5 rounded-[var(--radius-card)] border border-border p-3">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Checkbox checked={twoShifts} onCheckedChange={(checked) => setTwoShifts(checked === true)} aria-label="Possui turnos" />
+                  Possui turnos (manhã e tarde)
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  {twoShifts
+                    ? shiftsFit
+                      ? `Cada dia vira 2 plantões do mesmo tipo e modalidade: ${fields.startsAt}–${DEFAULT_SHIFT_SPLIT_AT} e ${DEFAULT_SHIFT_SPLIT_AT}–${fields.endsAt}. Cada turno tem a própria escala.`
+                      : `Para ter turnos, o plantão precisa começar antes das ${DEFAULT_SHIFT_SPLIT_AT} e terminar depois.`
+                    : `O corte entre os turnos é sempre às ${DEFAULT_SHIFT_SPLIT_AT}.`}
+                </p>
+              </div>
+            ) : null}
             <div className="grid gap-2">
               <Label htmlFor="duty-minimum">Mínimo de corretores</Label>
               <Input
@@ -446,7 +547,8 @@ function DutyFormSheet({
                 type="number"
                 min={1}
                 max={99}
-                defaultValue={schedule?.minimumBrokers ?? 1}
+                value={fields.minimumBrokers}
+                onChange={(event) => setField({ minimumBrokers: event.target.value })}
                 required
               />
               <p className="text-xs text-muted-foreground">
@@ -461,7 +563,8 @@ function DutyFormSheet({
                 type="number"
                 min={1}
                 max={99}
-                defaultValue={schedule?.maximumBrokers ?? ""}
+                value={fields.maximumBrokers}
+                onChange={(event) => setField({ maximumBrokers: event.target.value })}
               />
               <p className="text-xs text-muted-foreground">Deixe em branco para não limitar a capacidade. Quando definido, não pode ser menor que o mínimo.</p>
             </div>
@@ -479,6 +582,7 @@ function DutyFormSheet({
                 Quantos leads cada corretor pode receber em cada dia deste plantão. Quem atinge o limite para de receber até o próximo dia do plantão; oferta expirada ou recusada não conta. Em branco, sem limite.
               </p>
             </div>
+            {schedule?.shiftSplitAt ? (
             <div className="grid gap-2">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <Checkbox checked={splitOn} onCheckedChange={(checked) => setSplitOn(checked === true)} aria-label="Dividir em turnos" />
@@ -495,6 +599,7 @@ function DutyFormSheet({
                 </div>
               ) : null}
             </div>
+            ) : null}
             <fieldset className="grid gap-2">
               <legend className="text-sm font-medium">Filas que recebem este plantão</legend>
               {queueChoices.length ? (
@@ -540,30 +645,45 @@ function DutyFormSheet({
                 Resumo da criação
               </h3>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {selectedDays.length} regra(s) global(is) serão criadas para todas as unidades e corretores. O plantão só concorre enquanto horário, vigência e origem corresponderem.
+                {schedule
+                  ? "As mudanças valem para este plantão. Editar o tipo não muda os plantões já criados."
+                  : `${createdCount} ${createdCount === 1 ? "plantão será criado" : "plantões serão criados"}${selectedType ? ` do tipo ${selectedType.name}` : ""}. Na escala, só entram corretores das unidades do tipo.`}
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
-                <Badge variant="outline">{selectedDays.length} dia(s)</Badge>
-                <Badge variant="outline">Todas as unidades</Badge>
+                {selectedType ? <Badge variant="outline"><DutyTypeTag name={selectedType.name} hue={selectedType.colorHue} /></Badge> : null}
+                <Badge variant="outline">{MODALITY_LABEL[fields.attendanceMode]}</Badge>
+                {twoShifts && !schedule ? <Badge variant="outline">2 turnos por dia</Badge> : null}
+                <Badge variant="outline">{selectedType ? typeUnitsLabel(selectedType, snapshot.branches) : "Todas as unidades"}</Badge>
               </div>
             </section>
             <p className="rounded-[var(--radius-card)] border border-muted bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
               Fuso operacional: America/Sao_Paulo. A fila de entrada seleciona os leads; a escala
               do plantão reúne corretores de todas as unidades.
             </p>
+            {needsType ? <p className="text-xs text-warning">Escolha o tipo do plantão para continuar.</p> : null}
             <Button type="submit" disabled={pending || !canSubmit}>
               {pending
                 ? "Salvando…"
                 : schedule
                   ? "Salvar alterações"
                   : mode === "dates"
-                    ? `Criar ${plannedDates.length || ""} ${plannedDates.length === 1 ? "plantão" : "plantões"}`.replace("  ", " ")
-                    : "Criar plantão semanal"}
+                    ? `Criar ${createdCount || ""} ${createdCount === 1 ? "plantão" : "plantões"}`.replace("  ", " ")
+                    : twoShifts ? "Criar plantões semanais" : "Criar plantão semanal"}
             </Button>
           </form>
         </SheetBody>
       </SheetContent>
     </Sheet>
+    {typeDialogOpen ? (
+      <DutyTypeDialog
+        open
+        onOpenChange={setTypeDialogOpen}
+        branches={snapshot.branches}
+        usedHues={snapshot.types.map((type) => type.colorHue)}
+        onSaved={(id) => setPendingTypeId(id)}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -594,6 +714,7 @@ function DutyInspector({
   const assignments = schedule ? plantaoRoster(snapshot, schedule.id) : [];
   const shifts = schedule ? dutyShifts(schedule) : null;
   const [addShift, setAddShift] = useState<DutyShiftKey>("manha");
+  // Every broker can be found; one whose unit is outside the type asks for a confirmation.
   const eligibleBrokers = schedule
     ? snapshot.brokers.filter(
         (broker) =>
@@ -601,6 +722,8 @@ function DutyInspector({
           !assignments.some((assignment) => assignment.brokerId === broker.id),
       )
     : [];
+  const outsideType = (broker: { branchId: string | null }) => Boolean(schedule?.typeBranchIds.length) && !schedule!.typeBranchIds.includes(broker.branchId ?? "");
+  const [confirmOutside, setConfirmOutside] = useState<{ id: string; name: string; branchName: string | null } | null>(null);
   const filteredEligibleBrokers = eligibleBrokers.filter((broker) => {
     const query = brokerSearch.trim().toLocaleLowerCase("pt-BR");
     if (!query) return true;
@@ -705,9 +828,11 @@ function DutyInspector({
           <SheetHeader>
             {schedule && (
               <>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <StatusBadge status={schedule.status} />
-                  <span className="text-xs text-muted-foreground">{schedule.branchName ?? "Todas as unidades"}</span>
+                  <DutyTypeTag name={schedule.typeName} hue={schedule.typeHue} />
+                  <Badge variant="outline">{MODALITY_LABEL[schedule.attendanceMode === "presencial" ? "presencial" : "online"]}</Badge>
+                  <span className="text-xs text-muted-foreground">{schedule.typeBranchIds.length ? typeUnitsLabel({ branchIds: schedule.typeBranchIds }, snapshot.branches) : schedule.branchName ?? "Todas as unidades"}</span>
                 </div>
                 <SheetTitle className="flex flex-wrap items-center gap-2">
                   {schedule.name}
@@ -850,7 +975,9 @@ function DutyInspector({
                                     <p className="truncate text-sm font-medium">{broker.name}</p>
                                     <p className="truncate text-[11px] text-muted-foreground">
                                       {broker.internalCode ? `${broker.internalCode} · ` : ""}
+                                      {broker.branchName ? `${broker.branchName} · ` : ""}
                                       {broker.availabilityStatus === "available" ? "Disponível" : "Pausado"}
+                                      {outsideType(broker) ? <span className="text-warning"> · fora das unidades do tipo</span> : null}
                                     </p>
                                   </div>
                                   <Button
@@ -861,7 +988,7 @@ function DutyInspector({
                                     aria-label={`Adicionar ${broker.name} a este plantão`}
                                     title={`Adicionar ${broker.name}`}
                                     disabled={pending}
-                                    onClick={() => assignBroker(broker.id)}
+                                    onClick={() => (outsideType(broker) ? setConfirmOutside({ id: broker.id, name: broker.name, branchName: broker.branchName }) : assignBroker(broker.id))}
                                   >
                                     {addingBrokerId === broker.id ? (
                                       <Loader2Icon className="size-4 animate-spin" />
@@ -1036,6 +1163,20 @@ function DutyInspector({
           )}
         </SheetContent>
       </Sheet>
+      <Dialog open={Boolean(confirmOutside)} onOpenChange={(next) => { if (!next) setConfirmOutside(null); }}>
+        <DialogPopup>
+          <DialogHeader>
+            <DialogTitle>Escalar {confirmOutside?.name} mesmo assim?</DialogTitle>
+            <DialogDescription>
+              A unidade dele ({confirmOutside?.branchName ?? "sem unidade"}) não participa do tipo {schedule?.typeName ?? "deste plantão"}. Ele vai receber os leads do plantão normalmente.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmOutside(null)} disabled={pending}>Cancelar</Button>
+            <Button onClick={() => { if (confirmOutside) assignBroker(confirmOutside.id); setConfirmOutside(null); }} disabled={pending}>Escalar mesmo assim</Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
       <Dialog open={confirmArchive} onOpenChange={setConfirmArchive}>
         <DialogPopup>
           <DialogHeader>
@@ -1104,6 +1245,9 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
   const [month, setMonth] = useState(() => initialMonthlyScheduleMonth ?? currentMonthKey);
   const [plannerOpen, setPlannerOpen] = useState(Boolean(initialMonthlyScheduleMonth));
   const [showArchived, setShowArchived] = useState(false);
+  const [typesOpen, setTypesOpen] = useState(false);
+  // Calendar filter by plantão type (empty = all).
+  const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [selectedSchedule, setSelectedSchedule] = useState<Schedule | null>(null);
   const [formSchedule, setFormSchedule] = useState<Schedule | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -1135,9 +1279,17 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
     return { firstMonth: first, lastMonth: last > cap ? cap : last };
   }, [currentMonthKey, snapshot.schedules]);
   const visibleSchedules = useMemo(
-    () => snapshot.schedules.filter((schedule) => showArchived || schedule.status !== "archived"),
-    [showArchived, snapshot.schedules],
+    () => snapshot.schedules.filter((schedule) => (showArchived || schedule.status !== "archived") && (!typeFilter.length || typeFilter.includes(schedule.typeId ?? "__none"))),
+    [showArchived, snapshot.schedules, typeFilter],
   );
+  // Types that have a plantão (for the legend), "Sem tipo" last.
+  const legendTypes = useMemo(() => {
+    const used = new Set(snapshot.schedules.filter((schedule) => schedule.status !== "archived").map((schedule) => schedule.typeId ?? "__none"));
+    return [
+      ...snapshot.types.filter((type) => used.has(type.id)).map((type) => ({ key: type.id, name: type.name as string | null, hue: type.colorHue })),
+      ...(used.has("__none") ? [{ key: "__none", name: null as string | null, hue: null as number | null }] : []),
+    ];
+  }, [snapshot.schedules, snapshot.types]);
   const coverageById = useMemo(
     () => new Map(visibleSchedules.map((schedule) => [schedule.id, monthCoverage(schedule, month)])),
     [month, visibleSchedules],
@@ -1148,31 +1300,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
     return new Map(monthSchedules.map((schedule) => [schedule.id, monthShiftProgress(schedule, month, now)]));
   }, [month, monthSchedules]);
   const outsideSchedules = visibleSchedules.filter((schedule) => !coverageById.get(schedule.id)?.covered && schedule.status !== "archived");
-  const plannerSchedules = useMemo<MonthSchedule[]>(() => {
-    const now = new Date();
-    return snapshot.schedules
-    .filter((schedule) => schedule.status === "active")
-    .map((schedule) => {
-      const coverage = monthCoverage(schedule, month);
-      // Only dates that have not ended can still be staffed.
-      const upcoming = coverage.covered ? buildMonthOccurrences(month, [schedule], [], { from: now }).length : 0;
-      return {
-        id: schedule.id,
-        name: schedule.name,
-        dayOfWeek: schedule.dayOfWeek,
-        startsAt: schedule.startsAt,
-        endsAt: schedule.endsAt,
-        minimumBrokers: schedule.minimumBrokers,
-        maximumBrokers: schedule.maximumBrokers,
-        dates: upcoming,
-        finished: coverage.covered && upcoming === 0,
-        queueId: schedule.linkedQueueId ?? null,
-        queueName: schedule.linkedQueueId ? schedule.queueName : null,
-        queues: schedule.linkedQueues ?? [],
-        outside: coverage.covered ? null : { reason: coverage.reason, label: outsideLabel(schedule, coverage.reason) },
-      };
-    });
-  }, [month, snapshot.schedules]);
+  const plannerSchedules = useMemo(() => snapshot.schedules.filter((schedule) => schedule.status === "active"), [snapshot.schedules]);
   const plan = plansState.plans[month];
   const publishedScheduleIds = useMemo(
     () => new Set(plan?.status === "published" ? plan.occurrences.filter((occurrence) => occurrence.assignedCount > 0).map((occurrence) => occurrence.scheduleId) : []),
@@ -1223,6 +1351,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
     formData.set("scheduleId", schedule.id);
     formData.set("name", schedule.name);
     formData.set("typeName", schedule.typeName ?? "");
+    if (schedule.typeId) formData.set("typeId", schedule.typeId);
     formData.set("dayOfWeek", String(schedule.dayOfWeek));
     formData.set("startsAt", schedule.startsAt);
     formData.set("endsAt", schedule.endsAt);
@@ -1252,7 +1381,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
         <div>
           <h2 className="text-base font-semibold tracking-tight text-foreground">Plantões</h2>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
-            Cada plantão vale no dia escolhido, para todas as unidades. ↻ marca os que repetem toda semana.
+            Cada plantão tem um tipo (a cor) e vale no dia escolhido. ↻ marca os que repetem toda semana.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1260,6 +1389,11 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
             <Button variant="outline" onClick={() => setPlanner(true)}>
               <CalendarCheck className="size-4" />
               Escala de {monthLabel(month).replace(/ de \d{4}$/, "")}
+            </Button>
+          ) : null}
+          {canPlanMonthlySchedule ? (
+            <Button variant="outline" onClick={() => setTypesOpen(true)}>
+              Tipos de plantão
             </Button>
           ) : null}
           <Button onClick={() => openCreate()}>
@@ -1297,6 +1431,26 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
           </div>
         </CardHeader>
         <CardContent className="grid gap-3 p-4">
+          {legendTypes.length > 1 ? (
+            <div role="group" aria-label="Filtrar por tipo de plantão" className="flex flex-wrap items-center gap-1.5">
+              <span className="mr-0.5 text-xs text-muted-foreground">Tipo</span>
+              {legendTypes.map((type) => {
+                const active = typeFilter.includes(type.key);
+                return (
+                  <button
+                    key={type.key}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setTypeFilter((current) => (active ? current.filter((key) => key !== type.key) : [...current, type.key]))}
+                    className={cn("rounded-full border px-2.5 py-1 transition-colors", active ? "border-foreground/40 bg-muted" : "border-border bg-card hover:border-foreground/30")}
+                  >
+                    <DutyTypeTag name={type.name} hue={type.hue} />
+                  </button>
+                );
+              })}
+              {typeFilter.length ? <button type="button" className="text-xs text-muted-foreground underline-offset-2 hover:underline" onClick={() => setTypeFilter([])}>Limpar</button> : null}
+            </div>
+          ) : null}
           {monthSchedules.length ? (
             <DutyMonthCalendar
               month={month}
@@ -1354,6 +1508,8 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
       {monthlySchedulingEnabled ? (
         <MonthlyDutyPlanner
           brokers={snapshot.brokers}
+          branches={snapshot.branches}
+          types={snapshot.types}
           enabled={monthlySchedulingEnabled}
           canEdit={canPlanMonthlySchedule}
           month={month}
@@ -1366,9 +1522,9 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
             setPlannerOpen(false);
             openCreate(null);
           }}
-          onExtendSchedule={extendSchedule}
         />
       ) : null}
+      {typesOpen ? <DutyTypesSheet open onOpenChange={setTypesOpen} types={snapshot.types} branches={snapshot.branches} /> : null}
       <DutyInspector
         key={`${selectedSchedule?.id ?? "closed"}-${selectedSchedule ? "open" : "closed"}`}
         schedule={selectedSchedule}

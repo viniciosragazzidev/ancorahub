@@ -22,6 +22,8 @@ const dutyScheduleFields = z.object({
   queueId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
   name: z.string().trim().min(2).max(100),
   typeName: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().trim().min(2).max(60).nullable().optional()),
+  /** Saved plantão type (DEC-138). Wins over the legacy free-text typeName. */
+  typeId: z.preprocess((value) => value === "" || value === undefined ? null : value, z.string().uuid().nullable().optional()),
   attendanceMode: z.enum(["online", "presencial"]).default("online"),
   dayOfWeek: z.coerce.number().int().min(0).max(6),
   startsAt: z.string(),
@@ -80,6 +82,8 @@ const createDutyScheduleInput = dutyScheduleFields.omit({ branchId: true, queueI
     if (typeof value !== "string") return value;
     try { return JSON.parse(value); } catch { return value; }
   }, z.array(z.string().uuid()).max(30).optional()),
+  /** "Possui turnos": each date becomes two plantões, start–13:30 and 13:30–end. */
+  splitIntoShifts: z.preprocess((value) => value === "true" || value === true, z.boolean()).optional(),
   // "Datas" mode: each date becomes a plantão valid only on that day.
   dates: z.preprocess((value) => {
     if (typeof value !== "string") return value;

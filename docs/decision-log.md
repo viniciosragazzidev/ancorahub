@@ -1646,3 +1646,24 @@ configuração específica, e campanhas pausadas no CRM permanecem pausadas.
 Intake, sincronização e associação de leads são isolados pelo tenant e cada
 alteração de destino registra auditoria. O padrão da conta pode ser alterado
 ou removido por configuração autorizada.
+
+## DEC-138 — Escala por tipo de plantão, período e cadeiras por corretor
+O tipo de plantão (`duty_schedule_types`) passa a ser o grupo do plantão (PME,
+Premium, Presencial...): guarda modalidade padrão, cor, unidades que participam
+(vazio = todas) e horário/cobertura padrão. A modalidade (Online/Presencial)
+continua sendo de cada plantão. "Possui turnos" na criação gera dois plantões do
+mesmo tipo e modalidade por dia, cortados às 13:30.
+
+A escala mensal é montada por tipos e por período (`settings.rangeFrom/rangeUntil`,
+até 62 dias, pode entrar no mês seguinte). Cada corretor qualificado tem
+modalidade, tipos permitidos e cadeiras por tipo; o alocador roda um tipo por vez.
+Gerar uma nova revisão só refaz os tipos escolhidos: o resto da revisão anterior
+é mantido. Corretor fora das unidades do tipo só entra com confirmação explícita
+(`forcedBrokerIds`), que vale também na publicação.
+
+Ao publicar, quem continua no mesmo plantão e data mantém a linha da escala
+(presença, pausa e falta preservadas); só saem as linhas que não estão mais na
+escala, em datas que não terminaram. Linhas de outra escala nas mesmas
+ocorrências são substituídas. Escritas da escala usam um lock por tenant.
+O PDF do quadro sai em `/api/reports/duty-escala/[planId]` (geral, por unidade
+ou por tipo; Gestor só a própria unidade). Migração aditiva 0187.

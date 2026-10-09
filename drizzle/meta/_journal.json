@@ -932,6 +932,13 @@
                         "when":  1791417600000,
                         "tag":  "0185_meta_ad_account_default_queue",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  134,
+                        "version":  "7",
+                        "when":  1791561600000,
+                        "tag":  "0187_duty_schedule_type_groups",
+                        "breakpoints":  true
                     }
                 ]
 }

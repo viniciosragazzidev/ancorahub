@@ -18,9 +18,9 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     .where(branchCondition)
     .orderBy(asc(schema.branches.name));
   const branchIds = branches.map((branch) => branch.id);
-  if (!branchIds.length) return { branches: [], queues: [], credentials: [], schedules: [], brokers: [], assignments: [], publishedAssignments: [], history: [] };
+  if (!branchIds.length) return { branches: [], queues: [], credentials: [], types: [], schedules: [], brokers: [], assignments: [], publishedAssignments: [], history: [] };
 
-  const [queues, credentials, schedules, brokers, assignments, campaignOrigins] = await Promise.all([
+  const [queues, credentials, schedules, brokers, assignments, campaignOrigins, typeRows] = await Promise.all([
     db.select({ id: schema.leadQueues.id, branchId: schema.leadQueues.branchId, name: schema.leadQueues.name })
       .from(schema.leadQueues)
       .where(and(eq(schema.leadQueues.tenantId, context.tenantId), inArray(schema.leadQueues.branchId, branchIds), eq(schema.leadQueues.status, "active")))
@@ -47,7 +47,9 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       queueId: schema.unitDutySchedules.queueId,
       queueName: schema.leadQueues.name,
       name: schema.unitDutySchedules.name,
+      typeId: schema.unitDutySchedules.typeId,
       typeName: schema.dutyScheduleTypes.name,
+      typeHue: schema.dutyScheduleTypes.colorHue,
       dayOfWeek: schema.unitDutySchedules.dayOfWeek,
       startsAt: schema.unitDutySchedules.startsAt,
       endsAt: schema.unitDutySchedules.endsAt,
@@ -143,7 +145,29 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
         isNotNull(schema.leads.metaCampaignId),
       ))
       .groupBy(schema.leads.webhookCredentialId, schema.leads.metaCampaignId, schema.metaCampaigns.name),
+    // Plantão types (DEC-138): the group of each plantão, with color and units.
+    db.select({
+      id: schema.dutyScheduleTypes.id,
+      name: schema.dutyScheduleTypes.name,
+      status: schema.dutyScheduleTypes.status,
+      attendanceMode: schema.dutyScheduleTypes.attendanceMode,
+      colorHue: schema.dutyScheduleTypes.colorHue,
+      branchIds: schema.dutyScheduleTypes.branchIds,
+      defaultStartsAt: schema.dutyScheduleTypes.defaultStartsAt,
+      defaultEndsAt: schema.dutyScheduleTypes.defaultEndsAt,
+      defaultMinimumBrokers: schema.dutyScheduleTypes.defaultMinimumBrokers,
+      defaultMaximumBrokers: schema.dutyScheduleTypes.defaultMaximumBrokers,
+    })
+      .from(schema.dutyScheduleTypes)
+      .where(eq(schema.dutyScheduleTypes.tenantId, context.tenantId))
+      .orderBy(asc(schema.dutyScheduleTypes.name)),
   ]);
+  const types = typeRows.map((type) => ({
+    ...type,
+    attendanceMode: (type.attendanceMode === "presencial" ? "presencial" : "online") as "online" | "presencial",
+    branchIds: Array.isArray(type.branchIds) ? type.branchIds : [],
+  }));
+  const typeById = new Map(types.map((type) => [type.id, type]));
 
   const campaignNamesByCredential = new Map<string, string[]>();
   for (const origin of campaignOrigins) {
@@ -186,6 +210,8 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
     linkedQueueId: linkedQueuesBySchedule.get(schedule.id)?.[0]?.id ?? null,
     queueName: linkedQueuesBySchedule.get(schedule.id)?.map((queue) => queue.name).join(", ") || schedule.queueName || "Sem fila vinculada",
     credentialName: displayCredentialName(schedule.webhookCredentialId, schedule.credentialName),
+    /** Units of the plantão's type; empty = every unit. */
+    typeBranchIds: (schedule.typeId ? typeById.get(schedule.typeId)?.branchIds : null) ?? [],
   }));
 
   const scheduleIds = schedules.map((schedule) => schedule.id);
@@ -227,5 +253,5 @@ export async function getDutyRosterSnapshot(context: TenantContext) {
       .orderBy(asc(schema.dutyRosterAssignments.dutyDate), asc(schema.user.name))
     : [];
 
-  return { branches, queues, credentials: displayCredentials, schedules: displaySchedules, brokers, assignments, publishedAssignments, history };
+  return { branches, queues, credentials: displayCredentials, types, schedules: displaySchedules, brokers, assignments, publishedAssignments, history };
 }
