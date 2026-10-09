@@ -1290,7 +1290,8 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
   const { load: loadPlan } = plansState;
 
   useEffect(() => {
-    if (monthlySchedulingEnabled) queueMicrotask(() => { void loadPlan(month); });
+    // The previous month's escala may run into this month (a period that crosses it).
+    if (monthlySchedulingEnabled) queueMicrotask(() => { void loadPlan(month); void loadPlan(shiftMonth(month, -1)); });
   }, [loadPlan, month, monthlySchedulingEnabled]);
 
   // Month arrows stop at the first and last month that have a plantão
@@ -1333,10 +1334,21 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
   const outsideSchedules = visibleSchedules.filter((schedule) => !coverageById.get(schedule.id)?.covered && schedule.status !== "archived");
   const plannerSchedules = useMemo(() => snapshot.schedules.filter((schedule) => schedule.status === "active"), [snapshot.schedules]);
   const plan = plansState.plans[month];
-  const publishedScheduleIds = useMemo(
-    () => new Set(plan?.status === "published" ? plan.occurrences.filter((occurrence) => occurrence.assignedCount > 0).map((occurrence) => occurrence.scheduleId) : []),
-    [plan],
-  );
+  const previousPlan = plansState.plans[shiftMonth(month, -1)];
+  // Plantões with brokers in an escala of this month or of the previous one (when its period runs into this one).
+  const { publishedScheduleIds, draftScheduleIds } = useMemo(() => {
+    const published = new Set<string>();
+    const draft = new Set<string>();
+    for (const item of [plan, previousPlan]) {
+      if (!item) continue;
+      for (const occurrence of item.occurrences) {
+        if (occurrence.assignedCount <= 0 || !occurrence.dutyDate.startsWith(month)) continue;
+        (item.status === "published" ? published : draft).add(occurrence.scheduleId);
+      }
+    }
+    for (const id of published) draft.delete(id);
+    return { publishedScheduleIds: published, draftScheduleIds: draft };
+  }, [month, plan, previousPlan]);
 
   const repeatingScheduleIds = useMemo(
     () => new Set(monthSchedules.filter((schedule) => !isSingleDaySchedule(schedule)).map((schedule) => schedule.id)),
@@ -1488,6 +1500,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
               schedules={monthSchedules}
               progressById={progressById}
               publishedScheduleIds={publishedScheduleIds}
+              draftScheduleIds={draftScheduleIds}
               gapScheduleIds={gapScheduleIds}
               repeatingScheduleIds={repeatingScheduleIds}
               canCreate

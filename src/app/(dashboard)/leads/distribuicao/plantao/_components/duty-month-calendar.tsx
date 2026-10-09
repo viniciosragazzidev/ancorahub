@@ -25,6 +25,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
   schedules,
   progressById,
   publishedScheduleIds,
+  draftScheduleIds,
   gapScheduleIds,
   repeatingScheduleIds,
   canCreate,
@@ -35,6 +36,8 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
   schedules: T[];
   progressById: ReadonlyMap<string, Progress>;
   publishedScheduleIds: ReadonlySet<string>;
+  /** In an escala that is still a draft (not covering yet, but not missing either). */
+  draftScheduleIds?: ReadonlySet<string>;
   /** Weekly plantões below their minimum (upcoming dates get a warning). */
   gapScheduleIds: ReadonlySet<string>;
   /** Weekly rules (more than one date): shown with ↻. */
@@ -106,7 +109,8 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
               </div>
               {items.map(({ schedule, done }) => {
                 const published = publishedScheduleIds.has(schedule.id);
-                const gap = !done && !published && gapScheduleIds.has(schedule.id);
+                const inDraft = !published && Boolean(draftScheduleIds?.has(schedule.id));
+                const gap = !done && !published && !inDraft && gapScheduleIds.has(schedule.id);
                 return (
                   <button
                     key={schedule.id}
@@ -127,7 +131,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                     </span>
                     {done ? null : (
                       <span className="block truncate text-[10px] text-muted-foreground">
-                        {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}{published ? " · escala publicada" : gap ? " · falta corretor" : ""}
+                        {schedule.startsAt.slice(0, 5)}–{schedule.endsAt.slice(0, 5)}{published ? " · escala publicada" : inDraft ? " · na escala (rascunho)" : gap ? " · falta corretor" : ""}
                       </span>
                     )}
                   </button>
