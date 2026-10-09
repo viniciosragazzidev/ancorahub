@@ -5,12 +5,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const navigation = vi.hoisted(() => ({ pathname: "/minha-fila", search: "", push: vi.fn(), back: vi.fn() }));
+const navigation = vi.hoisted(() => ({ pathname: "/minha-fila", search: "", push: vi.fn(), back: vi.fn(), replace: vi.fn() }));
 
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
   useSearchParams: () => new URLSearchParams(navigation.search),
-  useRouter: () => ({ push: navigation.push, back: navigation.back, replace: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({ push: navigation.push, back: navigation.back, replace: navigation.replace, refresh: vi.fn(), prefetch: vi.fn() }),
 }));
 // The Arc sheet drives Motion springs that the global jsdom mock of motion/react does not implement.
 vi.mock("@/components/arc/bottom-sheet/bottom-sheet", () => ({
@@ -130,7 +130,8 @@ describe("Corretor Lite experience contract", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
 
-    expect(navigation.push).toHaveBeenCalledWith("/minha-fila");
+    // Replace, not push: a later back never returns to the screen we left.
+    expect(navigation.replace).toHaveBeenCalledWith("/minha-fila");
     expect(navigation.back).not.toHaveBeenCalled();
   });
 

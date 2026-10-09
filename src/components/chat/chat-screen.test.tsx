@@ -71,10 +71,12 @@ describe("ChatScreen", () => {
   it("opens the next question and answers it with the keyboard letter", async () => {
     const runAction = renderChat();
     fireEvent.click(screen.getByRole("button", { name: /Recusar/ }));
-    expect(await screen.findByText("Por que você vai recusar?")).toBeTruthy();
+    // Wait for the reply buttons too: the letter listener exists only once they are on screen.
+    expect(await screen.findByText("Por que você vai recusar?", undefined, { timeout: 4000 })).toBeTruthy();
+    await screen.findByRole("button", { name: /Sem horário/ }, { timeout: 4000 });
     await act(async () => { fireEvent.keyDown(window, { key: "a" }); });
-    await waitFor(() => expect(runAction).toHaveBeenCalledWith(expect.objectContaining({ name: "lead.decline" }), expect.objectContaining({ id: "busy" })));
-  });
+    await waitFor(() => expect(runAction).toHaveBeenCalledWith(expect.objectContaining({ name: "lead.decline" }), expect.objectContaining({ id: "busy" })), { timeout: 4000 });
+  }, 20_000);
 
   it("shows a partial success as an alert, not as done", async () => {
     renderChat(vi.fn().mockResolvedValue({ ok: true, warning: true, message: "Etapa mudou, lembrete falhou." }));

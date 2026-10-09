@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { canGoBackInApp } from "@/components/light/light-navigation";
+import { goBackInApp } from "@/components/light/light-navigation";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, useReducedMotion } from "motion/react";
 
@@ -171,7 +171,7 @@ export function ChatScreen({
     <div className={`${styles.root} ${styles.screen}`}>
       <header className={styles.header}>
         {/* History first (never stacks a new entry, so back never loops between two screens); parent when opened from outside. */}
-        <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => { if (canGoBackInApp()) router.back(); else router.push(backHref); }}>
+        <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => goBackInApp(router, backHref)}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <div className={styles.headerIdentity}>

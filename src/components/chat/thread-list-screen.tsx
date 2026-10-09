@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { canGoBackInApp } from "@/components/light/light-navigation";
+import { goBackInApp } from "@/components/light/light-navigation";
 
 import styles from "./chat.module.css";
 import home from "./chat-home.module.css";
@@ -41,7 +41,7 @@ export function ThreadListScreen({
   return (
     <div className={`${styles.root} ${styles.screen}`}>
       <header className={styles.header}>
-        <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => { if (canGoBackInApp()) router.back(); else router.push(backHref); }}>
+        <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => goBackInApp(router, backHref)}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </button>
         <div className={styles.headerIdentity}>
