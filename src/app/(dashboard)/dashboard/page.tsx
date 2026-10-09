@@ -5,9 +5,8 @@ import { LightDashboard } from "@/features/broker-workspace/components/light-das
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
-import { getDashboardViewModel } from "@/features/dashboard/service";
-import { OperationalDashboard } from "@/features/dashboard/components/operational-dashboard";
-import { parsePeriod, type PeriodValue } from "@/shared/period";
+import { getCommandCenterData } from "@/features/dashboard/today";
+import { CommandCenter } from "@/features/dashboard/components/command-center";
 import { canAccessLeadQualityCenter, getLeadQualityReport, parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
 import { parseLeadQualityPeriod } from "@/features/reports/metrics/lead-quality-period";
 import { listLeadQualityQueues } from "@/features/reports/metrics/lead-quality-export";
@@ -34,7 +33,6 @@ export default async function DashboardPage({
   searchParams: Promise<DashboardSearchParams>;
 }) {
   const resolvedSearchParams = await searchParams;
-  const period = parsePeriod(singleParam(resolvedSearchParams.period));
   const activeTab = singleParam(resolvedSearchParams.tab);
   const { result } = await withRequestTiming("/dashboard", async () => {
     const context = await getRequiredTenantContext();
@@ -69,12 +67,13 @@ export default async function DashboardPage({
       return <LeadQualityCenter report={report} showQualityTab={report.enabled} queues={queues} />;
     }
 
-    const [model, reportingEnabled] = await Promise.all([
-      getDashboardViewModel(context, period),
+    const [data, reportingEnabled] = await Promise.all([
+      getCommandCenterData(context),
       canReadQuality ? getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER) : Promise.resolve("false"),
     ]);
     const showQualityTab = canReadQuality && reportingEnabled !== "false";
-    return <OperationalDashboard model={model} period={period as PeriodValue} showQualityTab={showQualityTab} />;
+    // The dashboard is the command center of the day; the period reports live in Relatórios.
+    return <CommandCenter data={data} showQualityTab={showQualityTab} canManage={context.role === "director" || context.role === "manager"} />;
   });
 
   return result;
