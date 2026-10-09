@@ -219,6 +219,11 @@ export async function moveRosterAssignmentAction(_previous: RosterActionState, f
       .where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"), isNull(schema.dutyRosterAssignments.dutyDate)))
       .limit(1);
     if (!assignment || assignment.brokerId !== input.brokerId) throw new Error("A alocação não pertence a este corretor.");
+    // Same guard as adding: moving onto days that all have a published escala would leave the row ignored.
+    const coverage = await publishedCoverage(db, context.tenantId, schedule, input.dayOfWeek, new Date());
+    if (coverage.dates.length > 0 && coverage.published.length === coverage.dates.length) {
+      throw new Error(`O plantão "${schedule.name}" já tem escala publicada em ${coverage.published.map(shortDate).join(", ")}. Nessas datas valem só os corretores da escala: ajuste pela Escala (etapa 3) e publique.`);
+    }
     const overlapWarning = await db.transaction(async (tx): Promise<BrokerOverlapWarning> => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-capacity:${schedule.id}:${input.dayOfWeek}`}))`);
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${context.tenantId}), hashtext(${`duty-broker:${input.brokerId}:${input.dayOfWeek}`}))`);
