@@ -307,7 +307,12 @@ export function MonthlyDutyPlanner({
         after?.();
         toast.success(success);
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível concluir a ação.");
+        const message = error instanceof Error ? error.message : "Não foi possível concluir a ação.";
+        // Another revision was created or published meanwhile (another tab, an import): show the current one.
+        if (/não está mais em rascunho|proposta mais nova|publicada por outra pessoa/.test(message)) {
+          toast.error(`${message} Carreguei a versão atual da escala.`);
+          void load(month, true);
+        } else toast.error(message);
       } finally {
         setBusyKey(null);
       }
