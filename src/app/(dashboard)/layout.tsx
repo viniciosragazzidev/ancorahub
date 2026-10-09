@@ -189,6 +189,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           role={context.role}
           syncTopic={syncTopic}
           leadToastEnabled={membership?.leadToastEnabled ?? true}
+          leadNoticeStyle={isLightBroker ? "dynamic" : "toast"}
         >
           <NotificationCountProvider userId={context.userId}>
             <FeedbackToastHandler userId={context.userId} />

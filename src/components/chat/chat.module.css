@@ -15,6 +15,13 @@
   font-family: var(--font-body);
 }
 
+:global(.dark) .root {
+  --chat-action: oklch(70% 0.17 255);
+  --chat-action-strong: oklch(76% 0.15 255);
+  --chat-action-soft: oklch(70% 0.17 255 / 0.16);
+  --chat-unread: oklch(70% 0.17 255);
+}
+
 /* ---------- thread list ---------- */
 .threadList { list-style: none; margin: 0; padding: 0; display: grid; }
 .thread {
@@ -93,7 +100,7 @@
 .prompt { font-weight: 500; font-size: var(--text-base); margin: 0 0 6px; padding-inline: 4px; }
 .choices { list-style: none; margin: 0; padding: 0; display: grid; }
 .choice {
-  width: 100%; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  width: 100%; min-height: 44px; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: center; gap: 8px;
   padding: 11px 6px; border: 0; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer;
   border-radius: var(--radius-control); transition: background-color var(--duration-fast) var(--ease-standard);
 }
@@ -133,7 +140,7 @@
 .typingDot { width: 6px; height: 6px; border-radius: 999px; background: var(--neutral-6); }
 
 /* ---------- floating pill ---------- */
-.pillWrap { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 88px); display: flex; justify-content: center; pointer-events: none; z-index: 20; }
+.pillWrap { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); display: flex; justify-content: center; pointer-events: none; z-index: 20; }
 .pill {
   pointer-events: auto; display: inline-flex; align-items: center; gap: 8px; height: 50px; padding: 0 22px; border: 0; border-radius: 999px;
   background: linear-gradient(180deg, var(--chat-action), var(--chat-action-strong)); color: white; font: inherit; font-weight: 500; font-size: var(--text-base);

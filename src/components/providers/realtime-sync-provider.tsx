@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
+import { DynamicNotice, type DynamicNoticeItem } from "@/components/chat/dynamic-notice";
+import { playSound } from "@/lib/sounds/player";
+import { notificationSound } from "@/lib/sounds/recipes";
 import {
   createIncomingLeadQueueState,
   enqueueIncomingLead,
@@ -24,6 +27,8 @@ interface RealtimeSyncProviderProps {
   syncTopic: string | null;
   /** The person's "Novo lead recebido" pop-up preference (default on). */
   leadToastEnabled?: boolean;
+  /** "dynamic": the broker app's iPhone-like notice from the top (2026-10-09); "toast" elsewhere. */
+  leadNoticeStyle?: "toast" | "dynamic";
 }
 
 type RecentNotification = {
@@ -94,7 +99,7 @@ export function shouldDelayRealtimeUnavailable(status: string): boolean {
 /** Fired by the /notificacoes switch so the open shell follows it without a reload. */
 export const LEAD_TOAST_PREFERENCE_EVENT = "ancora:lead-toast-preference";
 
-export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic, leadToastEnabled: initialLeadToastEnabled = true }: RealtimeSyncProviderProps) {
+export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic, leadToastEnabled: initialLeadToastEnabled = true, leadNoticeStyle = "toast" }: RealtimeSyncProviderProps) {
   const router = useRouter();
   const localBroadcastRef = useRef<BroadcastChannel | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
@@ -349,9 +354,40 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     }).catch(() => undefined);
   }, []);
 
+  const currentIncoming = incomingLeads.queue[0] ?? null;
+
+  // The dynamic notice plays the same sound as the toast, once per lead.
+  const soundedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (leadNoticeStyle !== "dynamic" || !currentIncoming || soundedRef.current === currentIncoming.notificationId) return;
+    soundedRef.current = currentIncoming.notificationId;
+    try { playSound(notificationSound, { volume: 0.8 }); } catch { /* the browser may need a gesture first */ }
+  }, [currentIncoming, leadNoticeStyle]);
+
+  const noticeItem: DynamicNoticeItem | null = currentIncoming
+    ? { id: currentIncoming.notificationId, app: "Leads", title: currentIncoming.title, message: currentIncoming.message, actionLabel: "Atender", shape: "mochi", hue: 212 }
+    : null;
+  const findIncoming = (notice: DynamicNoticeItem) => incomingLeads.queue.find((item) => item.notificationId === notice.id) ?? null;
+
   return (
     <>
-      {isEligibleForLeadNotifications && leadToastEnabled ? (
+      {isEligibleForLeadNotifications && leadToastEnabled && leadNoticeStyle === "dynamic" ? (
+        <DynamicNotice
+          item={noticeItem}
+          queuedCount={Math.max(0, incomingLeads.queue.length - 1)}
+          onOpen={(notice) => {
+            const incoming = findIncoming(notice);
+            if (!incoming) return;
+            resolveIncoming(incoming);
+            router.push(`/leads/${incoming.leadId}`);
+          }}
+          onDismiss={(notice) => {
+            const incoming = findIncoming(notice);
+            if (incoming) resolveIncoming(incoming);
+          }}
+        />
+      ) : null}
+      {isEligibleForLeadNotifications && leadToastEnabled && leadNoticeStyle === "toast" ? (
         <IncomingLeadCard
           item={incomingLeads.queue[0] ?? null}
           queuedCount={Math.max(0, incomingLeads.queue.length - 1)}
