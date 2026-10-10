@@ -10,6 +10,10 @@ import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-da
 import { loadChatRailAction } from "@/features/broker-workspace/chat/chat-rail-actions";
 import { REALTIME_SYNC_BROWSER_EVENT } from "@/components/providers/realtime-events";
 
+import { A11yPrefsProvider } from "@/features/assist/a11y-prefs";
+import { AssistHelpButton, AssistLayer } from "@/features/assist/components/assist-layer";
+import { CelebrationHost } from "@/features/journey/components/celebration-host";
+
 import { LightAppHeader } from "./light-app-header";
 import { LightAvailabilityProvider } from "./light-availability-context";
 import { useLightNavigationTracker } from "./light-navigation";
@@ -31,6 +35,7 @@ export function LightChrome({
   showQuoteSimulator = false,
   showDutyCalendar = false,
   showRelationship = false,
+  journeyEnabled = false,
   audience = "broker",
   initialAvailability = "available",
 }: {
@@ -41,6 +46,7 @@ export function LightChrome({
   showQuoteSimulator?: boolean;
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
+  journeyEnabled?: boolean;
   audience?: "broker" | "supervisor";
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
@@ -61,6 +67,7 @@ export function LightChrome({
       showQuoteSimulator={showQuoteSimulator}
       showDutyCalendar={showDutyCalendar}
       showRelationship={showRelationship}
+      journeyEnabled={journeyEnabled}
       audience={audience}
       availability={availability}
       availabilityPending={isPending}
@@ -69,10 +76,14 @@ export function LightChrome({
   );
 
   const chatRail = useDesktopChatRail();
+  // Broker assistance ("Onde fica?" and the "?" of each screen) over the whole Lite.
+  const withAssist = (content: ReactNode) => <A11yPrefsProvider>{audience === "broker"
+    ? <AssistLayer pathname={pathname} capabilities={{ journey: journeyEnabled, quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship }}>{content}</AssistLayer>
+    : content}</A11yPrefsProvider>;
   const shell = { availability, isPending, setStatus, openMore: () => setMoreOpen(true), audience };
   // Computers: the conversation list stays on the left and the screen opens at the center
   // (CSS .lite-split, venancor-scope.css); phones keep one screen at a time.
-  const withRail = (content: ReactNode) => (
+  const withRail = (content: ReactNode) => withAssist(
     <LightAvailabilityProvider value={shell}>
       <div className="lite-split">
         <aside className="lite-rail arc-venancor" aria-label="Conversas" aria-busy={!chatRail}>
@@ -86,6 +97,8 @@ export function LightChrome({
         </aside>
         <div className="lite-main">{content}</div>
       </div>
+      {/* Points, missions and achievements of the broker show up here, never over a lead offer. */}
+      {journeyEnabled && audience === "broker" ? <CelebrationHost /> : null}
     </LightAvailabilityProvider>
   );
 
@@ -109,6 +122,7 @@ export function LightChrome({
           availabilityPending={isPending}
           onToggleAvailability={() => setStatus(availability === "available" ? "paused" : "available")}
           hideAvailability={audience === "supervisor"}
+          actions={audience === "broker" ? <AssistHelpButton /> : undefined}
           onOpenMore={() => setMoreOpen(true)}
         />
         <main

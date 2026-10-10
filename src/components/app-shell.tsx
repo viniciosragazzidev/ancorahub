@@ -41,6 +41,7 @@ export function AppShell({
   isLightBroker = false,
   showDutyCalendar = false,
   showRelationship = false,
+  journeyEnabled = false,
   liteAudience = "broker",
   showQuoteSimulator = false,
   initialAvailability = "available",
@@ -53,6 +54,7 @@ export function AppShell({
   isLightBroker?: boolean;
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
+  journeyEnabled?: boolean;
   /** Who uses the Lite chrome (supervisor Lite, 2026-10-10). */
   liteAudience?: "broker" | "supervisor";
   showQuoteSimulator?: boolean;
@@ -149,6 +151,7 @@ export function AppShell({
           user={user}
           showDutyCalendar={showDutyCalendar}
           showRelationship={showRelationship}
+          journeyEnabled={journeyEnabled}
           audience={liteAudience}
           showQuoteSimulator={showQuoteSimulator}
           initialAvailability={initialAvailability}

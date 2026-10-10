@@ -5,6 +5,8 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 
 import BottomSheet from "@/components/arc/bottom-sheet/bottom-sheet";
+import type { MissionProgress } from "@/features/engagement/journey-types";
+import { motionTokens } from "@/components/arc/lib/motion-tokens";
 
 import css from "./week-ranking.module.css";
 
@@ -16,7 +18,7 @@ export type HomeHighlights = {
   ranks: WeekRank[];
   /** Median time to accept the offers of the week ("1 min 20 s"). */
   acceptTime: string | null;
-  mission: { title: string; detail: string; href: string } | null;
+  mission: { title: string; detail: string; href: string; progress?: MissionProgress } | null;
   /** The numbers of the week shown in the sheet. */
   stats?: WeekStat[];
   /** One concrete way to climb, from the weakest number. */
@@ -66,6 +68,7 @@ export function WeekRanking({ data, className }: { data: HomeHighlights; classNa
           <span className={css.cardText}>
             <span className={css.missionTitle}>{data.mission.title}</span>
             <span className={css.cardDetail}>{data.mission.detail}</span>
+            {data.mission.progress ? <MissionBar progress={data.mission.progress} /> : null}
           </span>
           <svg viewBox="0 0 16 16" aria-hidden className={css.chevron}><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
         </Link>
@@ -125,6 +128,7 @@ export function WeekRanking({ data, className }: { data: HomeHighlights; classNa
               <span className={css.cardText}>
                 <span className={css.missionTitle}>{data.mission.title}</span>
                 <span className={css.cardDetail}>{data.mission.detail}</span>
+                {data.mission.progress ? <MissionBar progress={data.mission.progress} /> : null}
               </span>
             </Link>
           ) : null}
@@ -132,4 +136,11 @@ export function WeekRanking({ data, className }: { data: HomeHighlights; classNa
       </BottomSheet>
     </div>
   );
+}
+
+function MissionBar({ progress }: { progress: MissionProgress }) {
+  const reduce = useReducedMotion();
+  return <span className={css.track} role="progressbar" aria-label="Etapas registradas" aria-valuemin={0} aria-valuemax={progress.target} aria-valuenow={Math.min(progress.progress, progress.target)} aria-valuetext={`${progress.progress} de ${progress.target} leads com etapa`}>
+    <motion.span className={css.fill} initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: progress.percentage / 100 }} transition={reduce ? { duration: 0 } : motionTokens.spring.snappy} />
+  </span>;
 }

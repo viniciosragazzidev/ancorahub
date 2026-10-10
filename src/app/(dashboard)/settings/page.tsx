@@ -1,3 +1,4 @@
+import { AccessibilityPreferences } from "@/features/assist/components/accessibility-preferences";
 import { and, eq } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
@@ -26,6 +27,9 @@ import { LightWhatsappSection } from "./_components/light-whatsapp-section";
 import { RelatedActions } from "@/components/related-actions";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { SupervisorLiteSettings } from "@/features/supervisor-workspace/supervisor-lite-settings";
+import { RankingPreferences } from "@/features/journey/ranking-preferences";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
+import type { LightSettingsSection } from "./_components/light-settings";
 
 export default async function SettingsPage() {
   const context = await getRequiredTenantContext();
@@ -85,9 +89,14 @@ export default async function SettingsPage() {
       .from(schema.whatsappConnections)
       .where(and(eq(schema.whatsappConnections.tenantId, context.tenantId), eq(schema.whatsappConnections.userId, context.userId)))
       .limit(1);
+    const journeyEnabled = await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false") === "true";
+    const rankingMember = journeyEnabled ? await db.select({ optedOut: schema.tenantMemberships.rankingOptOut }).from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, context.userId), eq(schema.tenantMemberships.status, "active"))).limit(1).catch(() => []) : [];
+    const rankingSections: LightSettingsSection[] = journeyEnabled ? [{ id: "placar", title: "Placar", description: "Sua presença no placar da unidade", node: <RankingPreferences initialOptOut={rankingMember[0]?.optedOut ?? false} schemaReady={Boolean(rankingMember[0])} /> }] : [];
     return (
       <LightSettings
         sections={[
+          ...rankingSections,
           { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: account },
           {
             id: "disponibilidade",
@@ -98,6 +107,7 @@ export default async function SettingsPage() {
           { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection connected={whatsappConnection?.status === "ready"} status={whatsappConnection?.status ?? "disconnected"} /> },
           { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
           { id: "extensao", title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension },
+          { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, menos animação e alto contraste", node: <AccessibilityPreferences /> },
         ]}
       />
     );

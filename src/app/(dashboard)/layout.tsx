@@ -46,6 +46,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const brokerDutyCalendarFlagPromise = context.role === "broker"
     ? getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR)
     : Promise.resolve("false");
+  const brokerJourneyFlagPromise = context.role === "broker"
+    ? getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false")
+    : Promise.resolve("false");
   const relationshipFlagPromise = context.role === "broker" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")
     : Promise.resolve("false");
@@ -93,6 +96,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     membershipRows,
     cleanUiEnabled,
     brokerDutyCalendarFlag,
+    brokerJourneyFlag,
     relationshipFlag,
     supervisorLiteAvailable,
   ] = await Promise.all([
@@ -103,6 +107,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     membershipPromise,
     cleanUiPromise,
     brokerDutyCalendarFlagPromise,
+    brokerJourneyFlagPromise,
     relationshipFlagPromise,
     supervisorLitePromise,
   ]);
@@ -114,6 +119,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   const pathname = headersList.get("x-pathname") || "";
 
+  if (isLightBroker && brokerJourneyFlag !== "true" && (pathname === "/jornada" || pathname === "/dashboard/c/jornada")) redirect("/dashboard");
   if (isLightBroker || isLightSupervisor) {
     if (!isLightRouteAllowed(pathname, liteAudience) && pathname !== "") {
       redirect("/dashboard");
@@ -178,6 +184,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         liteAudience={liteAudience}
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
+        journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         showRelationship={(isLightBroker || isLightSupervisor) && relationshipFlag === "true"}
         branding={{

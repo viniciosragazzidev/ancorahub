@@ -14,6 +14,7 @@ vi.mock("motion/react", () => ({
   LayoutGroup: ({ children }: { children: React.ReactNode }) => children,
   useAnimation: () => ({ start: vi.fn(), stop: vi.fn(), set: vi.fn() }),
   useReducedMotion: () => false,
+  useReducedMotionConfig: () => false,
   useMotionValue: (initial: unknown) => ({
     get: () => initial,
     set: vi.fn(),

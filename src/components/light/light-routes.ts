@@ -8,6 +8,7 @@
 export const LIGHT_ALLOWED_PREFIXES = [
   "/dashboard",
   "/minha-fila",
+  "/jornada",
   "/cotacao",
   "/plantoes",
   "/leads",
@@ -76,10 +77,11 @@ export type LightMoreDestination = {
   href: string;
   label: string;
   /** Hidden unless the matching capability is on. */
-  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter";
+  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter" | "journey";
 };
 
 export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
+  { href: "/jornada", label: "Minha jornada", requires: "journey" },
   { href: "/cotacao", label: "Cotação", requires: "quoteSimulator" },
   { href: "/plantoes", label: "Plantões", requires: "dutyCalendar" },
   { href: "/clientes", label: "Clientes" },
@@ -88,7 +90,7 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/settings", label: "Configurações" },
 ];
 
-export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean }, audience: "broker" | "supervisor" = "broker") {
+export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean }, audience: "broker" | "supervisor" = "broker") {
   const list = audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : LIGHT_MORE_DESTINATIONS;
   return list.filter((item) => !item.requires || capabilities[item.requires]);
 }
@@ -119,6 +121,8 @@ const exact = (target: string) => (path: string) => path === target;
 const under = (target: string) => (path: string) => path.startsWith(`${target}/`);
 
 const SETTINGS_SECTIONS: Record<string, { title: string; hidesTabBar?: boolean }> = {
+  placar: { title: "Placar" },
+  acessibilidade: { title: "Acessibilidade" },
   conta: { title: "Minha conta" },
   // The availability screen has its own save bar where the tab bar would be.
   disponibilidade: { title: "Disponibilidade", hidesTabBar: true },
@@ -130,6 +134,7 @@ const SETTINGS_SECTIONS: Record<string, { title: string; hidesTabBar?: boolean }
 
 // Order matters: first match wins, most specific first.
 const RULES: readonly RouteRule[] = [
+  { test: exact("/jornada"), route: { title: "Minha jornada", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true } },
   { test: exact("/dashboard"), route: { title: "Início", tab: "inicio", isRoot: true, parentHref: null, chat: true, hidesTabBar: true } },
   { test: under("/dashboard/c"), route: { title: "Conversa", tab: "inicio", isRoot: false, parentHref: "/dashboard", chat: true, hidesTabBar: true } },
   { test: under("/dashboard"), route: { title: "Detalhe", tab: "inicio", isRoot: false, parentHref: "/dashboard" } },

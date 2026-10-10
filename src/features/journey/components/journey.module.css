@@ -1,0 +1,150 @@
+/* Journey (Lite): broker missions, level, unit board, achievements, ledger.
+   Spacing on a 4px grid; tokens from the Lite (arc-venancor). */
+
+.page { min-height: 100%; background: var(--surface); color: var(--foreground); }
+.inner { width: 100%; max-width: 640px; margin: 0 auto; padding: 24px 16px 56px; display: grid; gap: 28px; }
+
+.pageHeader h1 { margin: 0; font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); }
+.pageHeader p { margin: 6px 0 0; color: var(--text-muted); font-size: var(--text-sm); }
+
+.section { display: grid; gap: 12px; }
+.sectionHead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sectionHead h2 { margin: 0; font-size: var(--text-base); font-weight: 500; }
+.sectionNote { color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.quiet { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+
+/* Hero: level ring + week. */
+.hero {
+  position: relative; overflow: hidden;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 20px;
+  padding: 20px;
+  border-radius: var(--radius-panel);
+  background:
+    radial-gradient(120% 140% at 0% 0%, hsl(var(--level-hue) 80% 94%) 0%, transparent 60%),
+    linear-gradient(135deg, hsl(var(--level-hue) 60% 97%), var(--surface-muted));
+  box-shadow: inset 0 0 0 1px hsl(var(--level-hue) 40% 90%);
+}
+.heroText { min-width: 0; display: grid; gap: 4px; }
+.heroLevel { color: hsl(var(--level-hue) 45% 34%); font-size: var(--text-sm); font-weight: 500; }
+.heroPoints { display: flex; align-items: baseline; gap: 8px; font-size: 32px; font-weight: 500; line-height: 1.1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.heroPoints small { color: var(--text-muted); font-size: var(--text-sm); font-weight: 400; letter-spacing: 0; }
+.heroChips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.heroNext { margin-top: 4px; color: var(--text-muted); font-size: var(--text-xs); }
+.heroNext strong { color: var(--foreground); font-weight: 500; }
+
+.chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 10px; border-radius: 99px; background: var(--surface); color: var(--text-muted); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chip[data-tone="up"] { color: oklch(52% .14 150); }
+.chip[data-tone="down"] { color: var(--text-muted); }
+.chip[data-tone="streak"] { color: oklch(58% .19 40); }
+
+.levelRing { position: relative; display: grid; place-items: center; flex: 0 0 auto; }
+.levelRing svg { position: absolute; inset: 0; }
+.levelTrack { fill: none; stroke: hsl(var(--level-hue) 40% 88%); stroke-width: 7; }
+.levelValue { fill: none; stroke: hsl(var(--level-hue) 70% 48%); stroke-width: 7; stroke-linecap: round; }
+.levelCore { position: relative; display: grid; justify-items: center; line-height: 1; }
+.levelCore small { color: var(--text-muted); font-size: 11px; }
+.levelCore strong { margin-top: 2px; color: hsl(var(--level-hue) 50% 30%); font-size: 28px; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* Missions. */
+.missionList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mission { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 12px; padding: 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-panel); background: var(--surface); transition: border-color 200ms ease, background-color 200ms ease; }
+.mission[data-state="done"] { border-color: oklch(85% .08 150); background: linear-gradient(90deg, oklch(97% .03 150), var(--surface) 60%); }
+.mission[data-state="muted"] { opacity: .62; }
+.missionIcon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; background: color-mix(in oklch, var(--chat-action) 12%, var(--surface)); color: var(--chat-action-text); }
+.mission[data-state="done"] .missionIcon { background: oklch(62% .15 150); color: white; }
+.mission[data-kind="campaign"] .missionIcon { background: oklch(95% .05 300); color: oklch(52% .18 300); }
+.mission[data-kind="team"] .missionIcon { background: oklch(95% .05 200); color: oklch(50% .12 200); }
+.missionBody { min-width: 0; display: grid; gap: 4px; }
+.missionTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.missionTop strong { font-size: var(--text-sm); font-weight: 500; line-height: 1.35; }
+.bonus { flex: 0 0 auto; height: 22px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 99px; background: oklch(96% .04 85); color: oklch(48% .12 70); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bonus[data-done="true"] { background: oklch(95% .05 150); color: oklch(45% .13 150); }
+.campaignTag { justify-self: start; height: 20px; display: inline-flex; align-items: center; padding: 0 8px; border-radius: 99px; background: oklch(95% .05 300); color: oklch(48% .18 300); font-size: 11px; font-weight: 500; }
+.campaignTag[data-team="true"] { background: oklch(95% .05 200); color: oklch(45% .12 200); }
+.missionDetail { color: var(--text-muted); font-size: var(--text-xs); line-height: 1.45; }
+.progressRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; margin-top: 6px; }
+.progressText { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.mission[data-state="done"] .progressText { color: oklch(45% .13 150); font-weight: 500; }
+
+.bar { position: relative; display: block; height: 8px; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }
+.bar > i { position: absolute; inset: 0 auto 0 0; display: block; border-radius: inherit; background: linear-gradient(90deg, color-mix(in oklch, var(--chat-action) 70%, white), var(--chat-action)); }
+.mission[data-state="done"] .bar > i { background: linear-gradient(90deg, oklch(72% .14 150), oklch(60% .15 150)); }
+
+/* Unit board. */
+.board { display: grid; gap: 12px; }
+.podium { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px; margin: 0; padding: 16px 12px 0; overflow: hidden; list-style: none; border-radius: var(--radius-panel); background: var(--surface-muted); }
+.place { min-width: 0; display: grid; justify-items: center; gap: 2px; }
+.placeAvatar { position: relative; display: grid; margin-bottom: 4px; border-radius: 50%; box-shadow: 0 0 0 3px var(--surface-muted), 0 0 0 5px var(--medal); }
+.placeMedal { position: absolute; right: -6px; bottom: -4px; width: 20px; height: 20px; display: grid; place-items: center; border: 2px solid var(--surface-muted); border-radius: 50%; background: var(--medal); color: oklch(25% .02 80); font-size: 11px; font-weight: 600; }
+.placeName { max-width: 100%; overflow: hidden; font-size: var(--text-xs); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.place[data-self="true"] .placeName { color: var(--chat-action-text); }
+.placeName[data-full="true"] { display: -webkit-box; white-space: normal; text-align: center; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.placePoints { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.placeStep { width: 100%; margin-top: 6px; border-radius: 12px 12px 0 0; background: linear-gradient(180deg, color-mix(in oklch, var(--medal) 55%, white), color-mix(in oklch, var(--medal) 25%, var(--surface))); }
+.podiumEmpty { min-height: 1px; }
+
+.selfRow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid color-mix(in oklch, var(--chat-action) 25%, var(--border-subtle)); border-radius: var(--radius-panel); background: color-mix(in oklch, var(--chat-action) 5%, var(--surface)); }
+.selfRow[data-top="true"] { border-color: oklch(85% .1 85); background: oklch(98% .03 85); }
+.selfPosition { min-width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; background: var(--chat-action-strong); color: white; font-size: var(--text-lg); font-weight: 500; font-variant-numeric: tabular-nums; }
+.selfRow[data-top="true"] .selfPosition { background: oklch(70% .14 80); }
+.selfText { min-width: 0; display: grid; gap: 2px; }
+.selfText strong { font-size: var(--text-sm); font-weight: 500; }
+.selfText small { color: var(--text-muted); font-size: var(--text-xs); }
+.selfText b { color: var(--foreground); font-weight: 500; }
+.move { color: var(--text-muted); font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.move[data-up="true"] { color: oklch(52% .14 150); }
+
+/* Achievements. */
+.badges { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.badge { width: 100%; display: grid; justify-items: center; gap: 4px; padding: 12px 4px 10px; border: 0; border-radius: 18px; background: var(--surface-muted); color: inherit; cursor: pointer; transition: transform 150ms ease, background-color 150ms ease; }
+.badge:hover { background: color-mix(in oklch, var(--foreground) 5%, var(--surface-muted)); }
+.badge:active { transform: scale(.97); }
+.badgeName { max-width: 100%; min-height: 30px; display: -webkit-box; overflow: hidden; padding: 0 4px; font-size: 12px; font-weight: 500; line-height: 1.25; text-align: center; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; hyphens: auto; }
+.badge[data-earned="false"] .badgeName { color: var(--text-muted); }
+.badgeProgress { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.badge[data-earned="true"] .badgeProgress { color: oklch(48% .13 150); }
+.badgeArt { display: block; overflow: visible; }
+.badgeArt[data-earned="true"] { filter: drop-shadow(0 4px 8px hsl(var(--badge-hue) 70% 50% / .28)); }
+.badgeSheet { display: grid; justify-items: center; gap: 12px; padding: 8px 4px 24px; text-align: center; }
+.badgeSheet p { max-width: 32ch; margin: 0; font-size: var(--text-sm); }
+.badgeWhen { color: oklch(48% .13 150); font-size: var(--text-xs); font-weight: 500; }
+.badgeMeter { width: min(280px, 100%); display: grid; gap: 6px; }
+.badgeMeter small { color: var(--text-muted); font-size: var(--text-xs); }
+
+/* Ledger. */
+.ledger { display: grid; gap: 12px; }
+.ledgerDay { overflow: hidden; border-radius: var(--radius-panel); background: var(--surface-muted); }
+.ledgerDayHead { display: flex; justify-content: space-between; padding: 10px 14px 6px; color: var(--text-muted); font-size: var(--text-xs); }
+.ledgerDayHead span::first-letter { text-transform: uppercase; }
+.ledgerDayHead strong { color: oklch(48% .13 150); font-weight: 500; font-variant-numeric: tabular-nums; }
+.ledgerDay ul { margin: 0; padding: 0 6px 6px; list-style: none; }
+.ledgerDay li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 10px 8px; border-radius: 12px; background: var(--surface); }
+.ledgerDay li + li { margin-top: 4px; }
+.ledgerDay li[data-reversed="true"] { opacity: .55; }
+.ledgerText { min-width: 0; display: grid; gap: 1px; font-size: var(--text-sm); }
+.ledgerText small { overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+.ledgerDay time { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.ledgerPoints { min-width: 40px; color: oklch(48% .13 150); font-size: var(--text-sm); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
+.ledgerDay li[data-reversed="true"] .ledgerPoints { color: var(--text-muted); font-size: 12px; font-weight: 400; }
+.more { justify-self: center; height: 36px; padding: 0 16px; border: 0; border-radius: 99px; background: transparent; color: var(--chat-action-text); font-size: var(--text-sm); font-weight: 500; cursor: pointer; }
+.more:hover { background: color-mix(in oklch, var(--chat-action) 8%, transparent); }
+
+/* Confetti (shared with celebrations). */
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 2; }
+.confetti > span { position: absolute; top: 0; display: block; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mission, .badge { transition: none; }
+  .badge:active { transform: none; }
+}
+
+@media (max-width: 380px) {
+  .hero { grid-template-columns: 1fr; justify-items: start; }
+  .badges { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 720px) {
+  .inner { padding: 32px 24px 64px; gap: 32px; }
+  .hero { padding: 24px; gap: 24px; }
+}
+.anchor { scroll-margin-top: 72px; }

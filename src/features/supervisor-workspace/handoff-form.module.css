@@ -8,13 +8,14 @@
 .optionOn { border-color: var(--chat-action); background: color-mix(in oklch, var(--chat-action) 8%, var(--surface)); }
 .optionName { font-size: var(--text-base); font-weight: 500; }
 .empty { margin: 0; padding: 16px; border-radius: var(--radius-panel); background: var(--surface-muted); font-size: var(--text-sm); color: var(--text-muted); }
+.brokerPicker { display: grid; gap: 8px; }
 .field { display: grid; gap: 6px; }
 .label { font-size: var(--text-sm); font-weight: 500; }
 .textarea { width: 100%; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-control); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); resize: vertical; }
 .error { margin: 0; font-size: var(--text-sm); color: var(--danger, oklch(55% 0.2 25)); }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .primary, .secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; border-radius: 999px; font: inherit; font-size: var(--text-base); font-weight: 500; text-decoration: none; cursor: pointer; }
-.primary { border: 0; background: var(--chat-action); color: white; }
+.primary { border: 0; background: var(--chat-action-strong); color: white; }
 .primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .secondary { border: 1px solid var(--border); background: var(--surface); color: var(--foreground); }
 @media (prefers-reduced-motion: reduce) { .option { transition: none; } }

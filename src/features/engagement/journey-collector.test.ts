@@ -81,6 +81,20 @@ describe("journey collector", () => {
     await collectJourneyBatch({ tenantId: "tenant", brokerIds: [], candidates: [], now, slaMinutes: 15, rules: resolveRules(undefined) });
     expect(mocks.db.select).not.toHaveBeenCalled();
   });
+  it("queues one end-of-day summary after 19h and cannot duplicate it on replay", async () => {
+    const late = new Date("2026-10-10T22:00:00Z");
+    mocks.facts.mockResolvedValue(facts.map((f) => ({ ...f, pointsByDay: { "2026-10-10": 85 } })));
+    const input = { tenantId: "tenant", brokerIds: ["broker-text"], candidates: [], now: late, slaMinutes: 15, rules: resolveRules(undefined) };
+    await collectJourneyBatch(input);
+    const summary = writes.find((w) => w.table === schema.engagementCelebrations)?.rows.find((r) => r.kind === "daily_summary");
+    expect(summary).toMatchObject({ userId: "broker-text", tenantId: "tenant", idempotencyKey: "daily_summary:broker-text:2026-10-10", payload: { date: "2026-10-10", received: 20, onTimeContacts: 20, points: 125 } });
+    const count = keys.size;
+    await collectJourneyBatch(input); expect(keys.size).toBe(count);
+  });
+  it("never queues a daily summary before 19h", async () => {
+    await collect();
+    expect(writes.find((w) => w.table === schema.engagementCelebrations)?.rows.some((r) => r.kind === "daily_summary")).toBe(false);
+  });
   it("only revisits the just-closed periods instead of sweeping old unfinished missions", async () => {
     const monday = new Date("2026-10-12T03:10:00Z");
     await touchedJourneyBrokers("tenant", new Date("2026-10-12T03:00:00Z"), monday, 15);

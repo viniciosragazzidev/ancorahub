@@ -1,4 +1,5 @@
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
+import type { BrokerJourneyData, JourneyCelebration } from "@/features/engagement/journey-types";
 import type {
   AssistantId,
   ChatBlock,
@@ -28,6 +29,7 @@ export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
   cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },
   desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/dashboard/c/desempenho" },
   insights: { name: "Insights", shape: "salte", hue: 200, href: "/conversas/broker" },
+  jornada: { name: "Jornada", shape: "favo", hue: 85, href: "/dashboard/c/jornada" },
   equipe: { name: "Equipe", shape: "mochi", hue: 150, href: "/dashboard/c/equipe" },
   "equipe-leads": { name: "Leads da equipe", shape: "cubo", hue: 212, href: "/dashboard/c/equipe-leads" },
   "equipe-plantao": { name: "Plantão da equipe", shape: "onigiri", hue: 28, href: "/dashboard/c/equipe-plantao" },
@@ -197,7 +199,8 @@ function threadSort(left: ThreadSummary, right: ThreadSummary) {
 
 export function buildAssistantThreads(input: {
   data: BrokerWorkspaceData;
-  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean };
+  capabilities: { quoteSimulator: boolean; dutyCalendar: boolean; journey?: boolean };
+  journey?: BrokerJourneyData | null;
   now: Date;
 }): ThreadSummary[] {
   const { data, capabilities, now } = input;
@@ -273,6 +276,15 @@ export function buildAssistantThreads(input: {
     }));
   }
 
+  if (capabilities.journey) {
+    const journey = input.journey;
+    const open = journey?.missions.filter((m) => m.progress.eligible && !m.progress.completed).length ?? 0;
+    threads.push(assistantThread("jornada", {
+      preview: journey?.available ? `${journey.level.level.name}, ${journey.week.points} pts na semana. ${open} missões abertas.` : "Sua jornada está sendo preparada.",
+      at: latestIso([...(journey?.ledger.map((e) => new Date(e.occurredAt)) ?? []), ...(journey?.celebrations.map((e) => new Date(e.createdAt)) ?? [])]),
+      unread: Boolean(journey?.celebrations.length), waitingYou: false,
+    }));
+  }
   return threads.sort(threadSort);
 }
 
@@ -504,14 +516,46 @@ function performanceScript(data: BrokerWorkspaceData): ChatScript {
 
 export function buildAssistantScript(
   id: ScriptAssistantId,
-  input: { data: BrokerWorkspaceData; now: Date },
+  input: { data: BrokerWorkspaceData; now: Date; journey?: BrokerJourneyData | null; dailySummaries?: JourneyCelebration[] },
 ): ChatScript {
   switch (id) {
     case "leads": return leadScript(input.data, input.now);
     case "plantao": return dutyScript(input.data);
     case "agenda": return agendaScript(input.data, input.now);
     case "desempenho": return performanceScript(input.data);
+    case "jornada": return buildJourneyScript({ journey: input.journey ?? null, dailySummaries: input.dailySummaries ?? [], now: input.now });
   }
+}
+
+export function buildJourneyScript(input: { journey: BrokerJourneyData | null; dailySummaries: JourneyCelebration[]; now: Date }): ChatScript {
+  const { journey, now } = input;
+  const blocks: ChatBlock[] = [];
+  for (const summary of [...input.dailySummaries].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id))) {
+    if (summary.payload.kind !== "daily_summary") continue;
+    const { date, received, onTimeContacts, points } = summary.payload;
+    blocks.push({ type: "date", id: `journey-day-${summary.id}`, label: dayLabel(new Date(`${date}T12:00:00Z`), now) });
+    blocks.push(assistantMessage(`journey-summary-${summary.id}`, `Seu dia: ${received} leads, ${onTimeContacts} contatos no prazo, ${points >= 0 ? "+" : ""}${points} pts.`));
+  }
+  if (!journey?.available) {
+    blocks.push(assistantMessage("journey-unavailable", "Sua jornada está sendo preparada. Volte daqui a pouco."));
+    return { blocks, status: { label: "Preparando", tone: "idle" } };
+  }
+  const open = journey.missions.filter((m) => m.progress.eligible && !m.progress.completed);
+  blocks.push(assistantMessage("journey-greeting", `${greeting(now)}. Vamos ver sua jornada?`));
+  blocks.push(factSheet("journey-current", "Sua jornada", [
+    { label: "Nível", value: journey.level.level.name },
+    { label: "Pontos na semana", value: String(journey.week.points) },
+    { label: "Missões abertas", value: String(open.length) },
+  ]));
+  for (const mission of open.slice(0, 3)) {
+    blocks.push(assistantMessage(`journey-mission-${mission.id}`, `${mission.title}: ${mission.progress.progress} de ${mission.progress.target}. Bônus de ${mission.bonusPoints} pts.`));
+  }
+  if (!open.length) blocks.push(assistantMessage("journey-no-missions", "Nenhuma missão aberta por aqui."));
+  blocks.push(question("journey-choice", "O que você quer consultar?", [
+    { id: "journey", label: "Ver minha jornada", action: { kind: "href", href: "/jornada" } },
+    { id: "ledger", label: "Ver extrato", action: { kind: "href", href: "/jornada#extrato" } },
+  ]));
+  return { blocks, status: { label: "Sua jornada", tone: "waiting" } };
 }
 
 /** One notification of the broker (notifications table). */

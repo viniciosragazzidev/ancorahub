@@ -3,9 +3,54 @@ import { describe, expect, it } from "vitest";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerWorkspacePriority } from "@/features/broker-workspace/priority";
 import type { ChatBlock, ChatScript } from "@/components/chat/types";
+import type { BrokerJourneyData, JourneyCelebration } from "@/features/engagement/journey-types";
+import { evaluateLevel } from "@/features/engagement/levels";
 import { ASSISTANTS, buildAncoraScript, buildAssistantScript, buildAssistantThreads, buildLeadThreads } from "./assistant-scripts";
 
 const now = new Date("2026-10-09T12:00:00-03:00");
+
+function journey(): BrokerJourneyData {
+  return { available: true, optedOut: false, ledger: [], week: { periodKey: "2026-10-05", startsAt: "2026-10-05", endsAt: "2026-10-12", brokerId: "broker-1", points: 85, previousPoints: 0, pointsChange: 85, totalPoints: 550 }, level: evaluateLevel(550), streak: { current: 0, best: 0, lastDutyDate: null }, missions: [], achievements: [], leaderboard: null, celebrations: [] };
+}
+const dailySummary: JourneyCelebration = { id: "summary-1", userId: "broker-1", kind: "daily_summary", payload: { kind: "daily_summary", date: "2026-10-08", received: 6, onTimeContacts: 5, points: 85 }, priority: 10, createdAt: "2026-10-08T22:00:00Z", seenAt: "2026-10-08T22:10:00Z" };
+
+describe("Jornada assistant", () => {
+  it("only appears with the journey capability and uses its own identity", () => {
+    const input = { data: workspace(), now, journey: journey(), capabilities: { quoteSimulator: false, dutyCalendar: false } };
+    expect(buildAssistantThreads(input).some((t) => t.assistant === "jornada")).toBe(false);
+    const thread = buildAssistantThreads({ ...input, capabilities: { ...input.capabilities, journey: true } }).find((t) => t.assistant === "jornada");
+    expect(thread).toMatchObject({ name: "Jornada", hue: 85, href: "/dashboard/c/jornada", waitingYou: false, preview: "Consultor, 85 pts na semana. 0 missões abertas." });
+  });
+  it("keeps pending leads ahead of new celebrations and timestamps the latest event", () => {
+    const data = journey(); data.celebrations = [{ ...dailySummary, seenAt: null }];
+    data.ledger = [{ id: "points", ruleKey: "contact.first", label: "Contato", detail: null, points: 15, occurredAt: now.toISOString(), reversed: false }];
+    const threads = buildAssistantThreads({ data: workspace({ queue: [lead()] }), now, journey: data, capabilities: { quoteSimulator: false, dutyCalendar: false, journey: true } });
+    expect(threads[0]?.assistant).toBe("leads");
+    expect(threads.find((t) => t.assistant === "jornada")).toMatchObject({ unread: true, at: now.toISOString() });
+  });
+  it("summarizes level, points and open missions with exact journey and ledger links", () => {
+    const data = journey();
+    data.missions = [{ id: "steps", kind: "daily", title: "Registrar etapas", description: "", metric: "steps.coverage", target: 1, bonusPoints: 10, period: "daily", audience: {}, startsAt: null, endsAt: null, status: "active", progress: { missionId: "steps", subjectId: "broker-1", periodKey: "2026-10-09", progress: 3, target: 5, percentage: 60, remaining: 2, eligible: true, completed: false, completedAt: null } }];
+    const script = buildAssistantScript("jornada", { data: workspace(), now, journey: data });
+    expect(JSON.stringify(script)).toContain("Registrar etapas: 3 de 5");
+    expect(JSON.stringify(script)).toContain("Consultor");
+    const question = script.blocks.find((b) => b.type === "question");
+    expect(question).toMatchObject({ choices: [{ label: "Ver minha jornada", action: { kind: "href", href: "/jornada" } }, { label: "Ver extrato", action: { kind: "href", href: "/jornada#extrato" } }] });
+    expect(script.status?.tone).toBe("waiting");
+  });
+  it("keeps a seen end-of-day summary as a conversation message, with stable ids and no em dash", () => {
+    const input = { data: workspace(), now, journey: journey(), dailySummaries: [dailySummary] };
+    const script = buildAssistantScript("jornada", input);
+    expect(JSON.stringify(script)).toContain("Seu dia: 6 leads, 5 contatos no prazo, +85 pts.");
+    expect(JSON.stringify(script)).toContain("Nenhuma missão aberta");
+    expect(JSON.stringify(script)).not.toContain("—");
+    expect(buildAssistantScript("jornada", input)).toEqual(script);
+  });
+  it("degrades gracefully if data is not ready", () => {
+    const script = buildAssistantScript("jornada", { data: workspace(), now });
+    expect(script.status?.tone).toBe("idle"); expect(JSON.stringify(script)).toContain("Sua jornada está sendo preparada");
+  });
+});
 
 function workspace(overrides: Partial<BrokerWorkspaceData> = {}): BrokerWorkspaceData {
   return {

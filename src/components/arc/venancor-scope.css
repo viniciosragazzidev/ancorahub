@@ -108,6 +108,8 @@
   --chat-action: oklch(62% 0.2 255);
   --chat-action-strong: oklch(55% 0.21 258);
   --chat-action-soft: oklch(62% 0.2 255 / 0.1);
+  /* Blue for text (links, highlights): 4.5:1 or more on --surface and --surface-muted. */
+  --chat-action-text: oklch(48% 0.2 258);
 }
 
 /* Arc shared keyboard ring, scoped (foundation.css applies it to :root). Pointer focus draws nothing. */
@@ -141,3 +143,17 @@
 .lite-rail-skeleton > span:nth-child(2n) { animation-delay: 90ms; }
 @keyframes lite-rail-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .52; } }
 @media (prefers-reduced-motion: reduce) { .lite-rail-skeleton > span { animation: none; } }
+
+/* Accessibility preferences of the Lite (features/assist/a11y-prefs.tsx), applied on <html>. */
+html[data-text-scale="115"] { font-size: 115%; }
+html[data-text-scale="130"] { font-size: 130%; }
+html[data-reduce-motion="1"] .arc-venancor *,
+html[data-reduce-motion="1"] .arc-venancor *::before,
+html[data-reduce-motion="1"] .arc-venancor *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+html[data-contrast="high"] .arc-venancor {
+  --text-muted: var(--neutral-9, #3f3f46);
+  --text-secondary: var(--neutral-10, #27272a);
+  --border-subtle: var(--neutral-6, #a1a1aa);
+  --border: var(--neutral-7, #71717a);
+  --chat-action-text: oklch(40% 0.2 258);
+}

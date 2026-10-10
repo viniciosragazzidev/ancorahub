@@ -9,6 +9,7 @@ const navigation = vi.hoisted(() => ({ pathname: "/minha-fila", search: "", push
 
 // The rail list is a server action: the chrome only calls it on computers.
 vi.mock("@/features/broker-workspace/chat/chat-rail-actions", () => ({ loadChatRailAction: vi.fn().mockResolvedValue(null) }));
+vi.mock("@/features/journey/actions", () => ({ markJourneyCelebrationsSeenAction: vi.fn().mockResolvedValue({ ok: true }), setRankingOptOutAction: vi.fn() }));
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
   useSearchParams: () => new URLSearchParams(navigation.search),

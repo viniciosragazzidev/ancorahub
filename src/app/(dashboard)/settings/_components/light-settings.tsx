@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 
 export type LightSettingsSection = {
-  id: "conta" | "disponibilidade" | "whatsapp" | "seguranca" | "extensao";
+  id: "conta" | "disponibilidade" | "whatsapp" | "seguranca" | "extensao" | "placar" | "acessibilidade";
   title: string;
   description: string;
   node: ReactNode;

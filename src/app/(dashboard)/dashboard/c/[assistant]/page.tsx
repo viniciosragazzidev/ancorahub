@@ -4,14 +4,16 @@ import { notFound, redirect } from "next/navigation";
 
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import type { AssistantId } from "@/components/chat/types";
-import { ASSISTANTS, SUPERVISOR_ASSISTANTS, buildAncoraScript, buildAssistantScript } from "@/features/broker-workspace/chat/assistant-scripts";
-import { getCachedSupervisorWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
+import { ASSISTANTS, SUPERVISOR_ASSISTANTS, buildAncoraScript, buildAssistantScript, buildJourneyScript } from "@/features/broker-workspace/chat/assistant-scripts";
+import { getCachedSupervisorWorkspaceData, getCachedBrokerJourneyData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { buildSupervisorScript, type SupervisorScriptId } from "@/features/supervisor-workspace/chat";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { getJourneyDailySummaries } from "@/features/engagement/journey-queries";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import chatStyles from "@/components/chat/chat.module.css";
 
 export const dynamic = "force-dynamic";
@@ -54,6 +56,14 @@ export default async function AssistantConversationPage({ params }: { params: Pr
   if (audience === "supervisor") {
     const data = await getCachedSupervisorWorkspaceData();
     return <AssistantChat identity={identity} script={buildSupervisorScript(assistant as SupervisorScriptId, data, new Date())} />;
+  }
+  if (assistant === "jornada") {
+    if (await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false") !== "true") redirect("/dashboard");
+    const [journey, dailySummaries] = await Promise.all([
+      getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null),
+      getJourneyDailySummaries(context.tenantId, context.userId),
+    ]);
+    return <AssistantChat identity={identity} script={buildJourneyScript({ journey, dailySummaries, now: new Date() })} />;
   }
   // Cotação and Insights have their own screens.
   if (!SCRIPTED.includes(assistant as Scripted)) redirect(definition.href);

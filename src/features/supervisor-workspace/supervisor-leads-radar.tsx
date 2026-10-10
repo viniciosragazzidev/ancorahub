@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { motion, useReducedMotion, type Transition } from "motion/react";
+import { motion, useReducedMotionConfig, type Transition } from "motion/react";
 
 import { Button } from "@/components/ui/button";
 import { SearchField } from "@/components/arc/search-field/search-field";
@@ -85,7 +85,7 @@ function SlaRing({ percent, bucket }: { percent: number; bucket: Bucket }) {
 }
 
 export function SupervisorLeadsRadar({ data, now, search = "" }: { data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string }) {
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionConfig();
   const [query, setQuery] = useState(search);
   const [brokerId, setBrokerId] = useState<string | null>(null);
   const [stage, setStage] = useState<keyof RadarFunnel | null>(null);

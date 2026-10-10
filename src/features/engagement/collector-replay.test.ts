@@ -5,7 +5,7 @@ vi.mock("@/shared/db", async () => ({ schema: await import("@/shared/db/schema")
 vi.mock("@/features/system-settings/queries", () => ({ FEATURE_FLAGS: { BROKER_JOURNEY: "journey", BROKER_ENGAGEMENT: "engagement" }, getFeatureFlag: mocks.flags }));
 vi.mock("./journey-collector", () => ({ collectJourneyBatch: vi.fn(), touchedJourneyBrokers: vi.fn() }));
 import { schema } from "@/shared/db";
-import { collectTenantPoints } from "./collector";
+import { collectTenantPoints, runEngagementCollector } from "./collector";
 const now = new Date("2026-10-10T15:00:00Z");
 const completedAt = new Date("2026-10-10T14:50:00Z");
 const written: Record<string, unknown>[] = [];
@@ -37,4 +37,12 @@ it("does not spend the next daily cap slot on the already scored overlap", async
   expect(result.inserted).toBe(1);
   expect(written.map((r) => r.idempotencyKey)).toEqual(["return.on_time:new:broker"]);
   expect(written[0]?.tenantId).toBe("tenant");
+});
+it("starts the cron with the new journey flag alone, and skips with both flags off", async () => {
+  expect(await runEngagementCollector(now)).toEqual({ skipped: "flag_off" });
+  expect(mocks.db.select).not.toHaveBeenCalled();
+  mocks.flags.mockImplementation(async (flag: string) => flag === "journey" ? "true" : "false");
+  mocks.db.select.mockReturnValue({ from: async () => [] });
+  expect(await runEngagementCollector(now)).toEqual({ tenants: 0, results: [] });
+  expect(mocks.db.select).toHaveBeenCalledTimes(1);
 });

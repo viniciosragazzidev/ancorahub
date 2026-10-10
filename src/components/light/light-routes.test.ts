@@ -8,6 +8,15 @@ import {
 } from "./light-routes";
 
 describe("Light routes", () => {
+  it("gates Minha jornada in Mais, keeps it broker-only and gives Placar its own title", () => {
+    expect(isLightRouteAllowed("/jornada")).toBe(true);
+    expect(isLightRouteAllowed("/jornada", "supervisor")).toBe(false);
+    expect(getLightMoreDestinations({ journey: false }).some((d) => d.href === "/jornada")).toBe(false);
+    expect(getLightMoreDestinations({ journey: true })).toContainEqual({ href: "/jornada", label: "Minha jornada", requires: "journey" });
+    expect(getLightMoreDestinations({ journey: true }, "supervisor").some((d) => d.href === "/jornada")).toBe(false);
+    expect(resolveLightRoute("/jornada")).toMatchObject({ title: "Minha jornada", parentHref: "/dashboard" });
+    expect(resolveLightRoute("/settings", new URLSearchParams("tab=placar"))).toMatchObject({ title: "Placar", parentHref: "/settings" });
+  });
   it("keeps the allowed route list used by the dashboard layout", () => {
     for (const path of ["/dashboard", "/minha-fila", "/leads/abc", "/conversas/broker", "/clientes/1", "/l/token", "/settings", "/notificacoes"]) {
       expect(isLightRouteAllowed(path)).toBe(true);

@@ -1,3 +1,7 @@
+## 2026-10-10: T54, ligações da Jornada no corretor Lite
+
+Papel: corretor no Lite; escopo autorizado pela Onda B do plano de Jornada. Ação principal em Configurações, Placar: escolher presença no placar da unidade. Switch Arc instalado, finalidade da exposição, estados pendente/sucesso/erro/indisponibilidade, confirmação no controle e foco de teclado compartilhado. Divulgação progressiva: seção no índice de Configurações, conversa Jornada e detalhes em `/jornada`. Sem token ou primitive nova. A missão de etapa reutiliza a barra e os tokens de movimento existentes, com reduced motion. Diretor/Gestor mantêm suas configurações normais. Registro: `docs/implementations/active/2026-10-10-jornada-ranking-v2-onda-b-ligacoes.md`.
+
 ## 2026-10-06 — Simulador demonstrativo de cotação do Corretor Lite
 
 ## 2026-10-10 - Pedido de transferencia entre equipes do supervisor

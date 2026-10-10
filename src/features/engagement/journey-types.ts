@@ -8,6 +8,7 @@ export type MissionMetric =
   | "contacts.fast_coverage"
   | "returns.cleared"
   | "notes.coverage"
+  | "steps.coverage"
   | "offers.fast_coverage"
   | "contacts.days_on_time"
   | "contacts.evidenced"
@@ -53,6 +54,9 @@ export type JourneyDayFacts = {
   overdueReturns: number;
   slaBreaches: number;
   confirmedPresence: boolean;
+  /** Leads assigned that day, accepted for at least 30 minutes and still in the portfolio. */
+  stageEligibleLeads?: number;
+  stagedLeads?: number;
 };
 
 export type MissionProgress = {

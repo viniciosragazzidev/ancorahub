@@ -27,6 +27,20 @@ export async function getPendingJourneyCelebrations(tenantId: string, brokerId: 
 }
 
 /** Internal server query. Callers supply the tenant and broker from authenticated context. */
+export async function getJourneyDailySummaries(tenantId: string, brokerId: string): Promise<JourneyCelebration[]> {
+  brokerId = journeyUserIdSchema.parse(brokerId);
+  if (await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false") !== "true") return [];
+  // Seen summaries stay in the conversation; the polling endpoint still reads only unseen items.
+  const rows = await getDatabase().select().from(schema.engagementCelebrations)
+    .where(and(eq(schema.engagementCelebrations.tenantId, tenantId), eq(schema.engagementCelebrations.userId, brokerId), eq(schema.engagementCelebrations.kind, "daily_summary")))
+    .orderBy(desc(schema.engagementCelebrations.createdAt), schema.engagementCelebrations.id).limit(7).catch(() => []);
+  return rows.flatMap((row) => {
+    const payload = row.payload as JourneyCelebrationPayload;
+    return payload.kind === "daily_summary" ? [{ id: row.id, userId: row.userId, kind: payload.kind, payload, priority: row.priority, createdAt: row.createdAt.toISOString(), seenAt: row.seenAt?.toISOString() ?? null }] : [];
+  });
+}
+
+/** Internal server query. Callers supply the tenant and broker from authenticated context. */
 export async function getBrokerJourneyData(tenantId: string, brokerId: string, now = new Date()): Promise<BrokerJourneyData> {
   brokerId = journeyUserIdSchema.parse(brokerId);
   const week = journeyWeek(now);

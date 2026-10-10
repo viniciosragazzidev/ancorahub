@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotionConfig } from "motion/react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/arc/input/input";
@@ -53,7 +53,7 @@ const CameraIcon = () => (
 );
 
 export function SupervisorTeamSettings({ initialTeam }: { initialTeam: TeamProfile }) {
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionConfig();
   const fileInput = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(initialTeam?.name ?? "");
   const [description, setDescription] = useState(initialTeam?.description ?? "");

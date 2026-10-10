@@ -98,6 +98,8 @@ export function shouldDelayRealtimeUnavailable(status: string): boolean {
 
 /** Fired by the /notificacoes switch so the open shell follows it without a reload. */
 export const LEAD_TOAST_PREFERENCE_EVENT = "ancora:lead-toast-preference";
+/** Fired with { active } when a lead offer notice appears or leaves (journey celebrations wait for it). */
+export const LEAD_OFFER_STATE_EVENT = "ancora:lead-offer-state";
 
 export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTopic, leadToastEnabled: initialLeadToastEnabled = true, leadNoticeStyle = "toast" }: RealtimeSyncProviderProps) {
   const router = useRouter();
@@ -363,6 +365,13 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     soundedRef.current = currentIncoming.notificationId;
     try { playSound(notificationSound, { volume: 0.8 }); } catch { /* the browser may need a gesture first */ }
   }, [currentIncoming, leadNoticeStyle]);
+
+  // Journey celebrations wait while an offer is on screen (an offer always wins).
+  const offerActive = Boolean(currentIncoming);
+  useEffect(() => {
+    document.documentElement.dataset.leadOffer = offerActive ? "1" : "0";
+    window.dispatchEvent(new CustomEvent(LEAD_OFFER_STATE_EVENT, { detail: { active: offerActive } }));
+  }, [offerActive]);
 
   const noticeItem: DynamicNoticeItem | null = currentIncoming
     ? { id: currentIncoming.notificationId, app: "Leads", title: currentIncoming.title, message: currentIncoming.message, actionLabel: "Atender", shape: "mochi", hue: 212, pillLabel: "Lead novo" }

@@ -3,8 +3,9 @@ import { getBrokerHighlights, type BrokerHighlights } from "@/features/engagemen
 import { formatDuration, RANK_LABEL } from "@/features/engagement/ranking";
 import { shortName } from "@/features/ai-gateway/privacy";
 import { LightDashboardUnavailable } from "@/features/broker-workspace/components/light-dashboard";
-import { getCachedBrokerWorkspaceData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
+import { getCachedBrokerWorkspaceData, getCachedBrokerJourneyData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
+import type { BrokerJourneyData } from "@/features/engagement/journey-types";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const time = (date: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
@@ -53,18 +54,20 @@ function tipOf(data: BrokerHighlights) {
   return "continue assim: responder rápido e registrar cada atendimento mantém você no topo.";
 }
 
-function highlightsOf(data: BrokerHighlights | null): HomeHighlights | null {
-  if (!data) return null;
+function highlightsOf(data: BrokerHighlights | null, journey: BrokerJourneyData | null): HomeHighlights | null {
+  const step = journey?.missions.find((m) => m.metric === "steps.coverage" && m.progress.eligible);
+  if (!data && !step) return null;
   return {
-    ranks: data.ranks.map((rank) => ({ key: rank.key, position: rank.position, label: RANK_LABEL[rank.key], total: rank.total })),
-    acceptTime: data.stats?.medianAcceptSeconds !== null && data.stats?.medianAcceptSeconds !== undefined ? formatDuration(data.stats.medianAcceptSeconds) : null,
-    stats: weekStats(data),
-    tip: tipOf(data),
-    mission: data.stepMission
+    ranks: data?.ranks.map((rank) => ({ key: rank.key, position: rank.position, label: RANK_LABEL[rank.key], total: rank.total })) ?? [],
+    acceptTime: data?.stats?.medianAcceptSeconds !== null && data?.stats?.medianAcceptSeconds !== undefined ? formatDuration(data.stats.medianAcceptSeconds) : null,
+    stats: data ? weekStats(data) : [],
+    tip: data ? tipOf(data) : null,
+    mission: step
       ? {
-        title: `Registre a etapa de ${shortName(data.stepMission.leadName)}`,
-        detail: data.stepMission.remaining > 1 ? `${data.stepMission.remaining} leads ainda sem etapa. Assim seu funil fica certinho.` : "Último lead sem etapa. Assim seu funil fica certinho.",
-        href: `/leads/${data.stepMission.leadId}`,
+        title: step.progress.remaining ? data?.stepMission ? `Registre a etapa de ${shortName(data.stepMission.leadName)}` : "Registre as etapas dos leads" : "Etapas do dia em dia",
+        detail: `${step.progress.progress} de ${step.progress.target} leads com etapa. Bônus de ${step.bonusPoints} pts ao fechar o dia.`,
+        href: step.progress.remaining ? data?.stepMission ? `/leads/${data.stepMission.leadId}` : "/minha-fila" : "/jornada",
+        progress: step.progress,
       }
       : null,
   };
@@ -77,7 +80,10 @@ function highlightsOf(data: BrokerHighlights | null): HomeHighlights | null {
 export async function ChatHomeContent() {
   const [rail, data] = await Promise.all([getChatRailData(), getCachedBrokerWorkspaceData().catch(() => null)]);
   if (!rail || !data) return <LightDashboardUnavailable />;
-  const highlights = await getBrokerHighlights(data.viewer.tenantId, data.viewer.userId).catch(() => null);
+  const [highlights, journey] = await Promise.all([
+    getBrokerHighlights(data.viewer.tenantId, data.viewer.userId).catch(() => null),
+    getCachedBrokerJourneyData(data.viewer.tenantId, data.viewer.userId).catch(() => null),
+  ]);
   return (
     <ChatHome
       viewerName={rail.viewerName}
@@ -86,7 +92,7 @@ export async function ChatHomeContent() {
       nowIso={rail.nowIso}
       canQuote={rail.canQuote}
       summary={summaryOf(data)}
-      highlights={highlightsOf(highlights)}
+      highlights={highlightsOf(highlights, journey)}
     />
   );
 }

@@ -5,7 +5,7 @@
  * or opens the next question.
  */
 
-export type AssistantId = "ancora" | "leads" | "plantao" | "agenda" | "cotacao" | "desempenho" | "insights"
+export type AssistantId = "ancora" | "leads" | "plantao" | "agenda" | "cotacao" | "desempenho" | "insights" | "jornada"
   /** Supervisor Lite (2026-10-10): the team instead of the broker's own work. */
   | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho";
 

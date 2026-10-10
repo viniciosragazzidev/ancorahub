@@ -1,0 +1,2 @@
+.page { max-width: 688px; margin-inline: auto; padding: var(--space-6); }
+.title { margin: 0 0 var(--space-4); font-size: var(--text-xl); font-weight: 500; color: var(--foreground); }

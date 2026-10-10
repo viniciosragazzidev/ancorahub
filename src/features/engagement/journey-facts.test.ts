@@ -28,6 +28,7 @@ beforeEach(() => {
     if (q.sql.includes("as service")) return [{ broker: "broker-text", day: "2026-10-10", service: 12 }];
     if (q.sql.includes("with normalized")) return [{ broker: "broker-text", day: "2026-10-10", notes: 12 }];
     if (q.sql.includes("as offers")) return [{ broker: "broker-text", day: "2026-10-10", offers: 1, accepted: 1 }];
+    if (q.sql.includes("as staged")) return [{ broker: "broker-text", day: "2026-10-10", eligible: 5, staged: 3 }];
     return [];
   });
 });
@@ -49,6 +50,16 @@ it("counts a duty today even after the shift ended, using its own roster query",
   const [fact] = await readJourneyFacts("tenant", ["broker-text"], now, 15);
   expect(fact?.subject.dutyScheduleIds).toEqual(["duty"]);
   expect(fact?.days.find((d) => d.date === "2026-10-10")?.hasDuty).toBe(true);
+});
+it("collects real stages with a thirty-minute cutoff, tenant and current broker ownership", async () => {
+  const [fact] = await readJourneyFacts("tenant", ["broker-text"], now, 15);
+  expect(fact?.pointsByDay).toEqual({ "2026-10-10": 30 });
+  expect(fact?.days.find((d) => d.date === "2026-10-10")).toMatchObject({ stageEligibleLeads: 5, stagedLeads: 3 });
+  const query = queries.find((q) => q.sql.includes("as staged"))!;
+  expect(query.sql).toContain("status not in ('new','distributed')");
+  expect(query.sql).toContain("interval '30 minutes'");
+  expect(query.sql).toContain("archived_at is null");
+  expect(query.params).toEqual(expect.arrayContaining(["tenant", "broker-text", now.toISOString()]));
 });
 it("respects the monthly feature flag for dated assignments", async () => {
   fixtures.set(schema.dutyRosterAssignments, [{ ...roster[0], dutyDate: "2026-10-10", monthlyPlanId: "plan" }]);

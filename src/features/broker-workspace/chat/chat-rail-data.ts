@@ -1,6 +1,7 @@
 import "server-only";
 
 import { cache } from "react";
+import { getBrokerJourneyData } from "@/features/engagement/journey-queries";
 
 import type { ThreadSummary } from "@/components/chat/types";
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
@@ -13,6 +14,7 @@ import { buildAssistantThreads, buildLeadThreads } from "./assistant-scripts";
 
 /** One workspace load per request: the layout's rail and the Início page share it. */
 export const getCachedBrokerWorkspaceData = cache(getBrokerWorkspaceData);
+export const getCachedBrokerJourneyData = cache((tenantId: string, brokerId: string) => getBrokerJourneyData(tenantId, brokerId));
 
 export type ChatRailData = {
   viewerName: string;
@@ -47,10 +49,12 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
     const data = await getCachedBrokerWorkspaceData();
     const dutyCalendar = (await getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false")) === "true";
     const now = new Date();
-    const capabilities = { quoteSimulator: true, dutyCalendar };
+    const journeyEnabled = (await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false")) === "true";
+    const journey = journeyEnabled ? await getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null) : null;
+    const capabilities = { quoteSimulator: true, dutyCalendar, journey: journeyEnabled };
     return {
       viewerName: data.viewer.name,
-      assistants: buildAssistantThreads({ data, capabilities, now }),
+      assistants: buildAssistantThreads({ data, capabilities, journey, now }),
       leads: buildLeadThreads({ queue: data.queue, now }),
       nowIso: now.toISOString(),
       canQuote: capabilities.quoteSimulator,

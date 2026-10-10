@@ -7,9 +7,10 @@ import { buildTeamInternal, buildTeamLeaderboard, buildUnitLeaderboard, type Bro
 import { journeyWeek, shiftJourneyDay } from "./journey-periods";
 import { journeyUserIdSchema } from "./journey-validation";
 import type { BrokerWeekSummary } from "./journey-types";
+import { journeyRankingTag } from "./journey-cache";
 
 /** Tenant and SP week are cache arguments; no request cookies enter this scope. */
-const standings = unstable_cache(async (tenantId: string, weekStart: string, weekEnd: string) => {
+async function readStandings(tenantId: string, weekStart: string, weekEnd: string) {
   const db = getDatabase();
   const previousStart = shiftJourneyDay(weekStart, -7);
   const rows = await db.execute<BrokerStanding & { totalPoints: number }>(sql`
@@ -25,7 +26,10 @@ const standings = unstable_cache(async (tenantId: string, weekStart: string, wee
       from tenant_memberships m join "user" u on u.id=m.user_id left join week_points p on p.broker_id=m.user_id left join career c on c.broker_id=m.user_id
       where m.tenant_id=${tenantId} and m.role='broker' and m.status='active'`).catch(() => []);
   return rows.map((r) => ({ ...r, points: Number(r.points), previousPoints: Number(r.previousPoints), totalPoints: Number(r.totalPoints) }));
-}, ["journey-standings-v1"], { revalidate: 60 });
+}
+function standings(tenantId: string, weekStart: string, weekEnd: string) {
+  return unstable_cache(readStandings, ["journey-standings-v1"], { revalidate: 60, tags: [journeyRankingTag(tenantId)] })(tenantId, weekStart, weekEnd);
+}
 
 const teamProfiles = unstable_cache(async (tenantId: string): Promise<TeamProfile[]> => getDatabase().select({
   supervisorId: schema.supervisorTeams.supervisorId, name: schema.supervisorTeams.name, imageUrl: schema.supervisorTeams.imageUrl, branchId: schema.supervisorTeams.branchId,

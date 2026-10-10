@@ -12,23 +12,38 @@ import { readJourneyFacts } from "./journey-facts";
 import { resolveRules } from "./catalog";
 import { periodDay, type PointsCandidate } from "./scoring";
 import type { AchievementKey, JourneyCelebrationPayload } from "./journey-types";
+import { dailyJourneySummary, isJourneySummaryDue } from "./daily-summary";
 
 /** Includes denominator changes and deadlines even when no points rule scores. */
 export async function touchedJourneyBrokers(tenantId: string, since: Date, until: Date, slaMinutes: number): Promise<string[]> {
   const from = since.toISOString(), to = until.toISOString();
   const today = journeyDay(until);
   const closedWeek = journeyWeek(until).startsAt === today ? shiftJourneyDay(today, -7) : "";
+  const summaryDue = isJourneySummaryDue(until);
+  const stagesCloseAt = new Date(journeyMidnight(today).getTime() + 30 * 60_000).toISOString();
   const rows = await getDatabase().execute<{ broker: string }>(sql`
     select distinct broker from (
       select corretor_id as broker from leads where tenant_id=${tenantId} and deleted_at is null
         and ((assigned_at>=${from}::timestamptz and assigned_at<${to}::timestamptz) or (service_started_at>=${from}::timestamptz and service_started_at<${to}::timestamptz)
-          or (assigned_at+(${slaMinutes} * interval '1 minute')>=${from}::timestamptz and assigned_at+(${slaMinutes} * interval '1 minute')<${to}::timestamptz))
+          or (assigned_at+(${slaMinutes} * interval '1 minute')>=${from}::timestamptz and assigned_at+(${slaMinutes} * interval '1 minute')<${to}::timestamptz)
+          or (assigned_at+interval '30 minutes'>=${from}::timestamptz and assigned_at+interval '30 minutes'<${to}::timestamptz)
+          or (updated_at>=${from}::timestamptz and updated_at<${to}::timestamptz and assigned_at is not null))
       union all select broker_id from lead_offers where tenant_id=${tenantId} and offered_at>=${from}::timestamptz and offered_at<${to}::timestamptz
       union all select assigned_to from lead_tasks where tenant_id=${tenantId} and ((completed_at>=${from}::timestamptz and completed_at<${to}::timestamptz) or (due_at>=${from}::timestamptz and due_at<${to}::timestamptz))
       union all select broker_id from duty_presence_confirmations where tenant_id=${tenantId} and ((confirmed_at>=${from}::timestamptz and confirmed_at<${to}::timestamptz) or (shift_ends_at>=${from}::timestamptz and shift_ends_at<${to}::timestamptz))
       union all select i.user_id from lead_interactions i join leads l on l.id=i.lead_id and l.tenant_id=${tenantId} where i.tipo='note' and i.created_at>=${from}::timestamptz and i.created_at<${to}::timestamptz
       union all select subject_id from engagement_mission_progress where tenant_id=${tenantId} and completed_at is null
         and period_key in (${shiftJourneyDay(today, -1)}, ${closedWeek}) and updated_at<${journeyMidnight(today).toISOString()}::timestamptz
+      union all select p.subject_id from engagement_mission_progress p join engagement_missions m
+        on m.id=p.mission_id and m.tenant_id=${tenantId} and m.metric='steps.coverage'
+        where p.tenant_id=${tenantId} and p.completed_at is null and p.period_key=${shiftJourneyDay(today, -1)}
+          and ${to}::timestamptz>=${stagesCloseAt}::timestamptz and p.updated_at<${stagesCloseAt}::timestamptz
+      union all select broker_id from engagement_point_events e where tenant_id=${tenantId} and ${summaryDue}
+        and period_day=${today}::date and reversed_at is null and not exists (
+          select 1 from engagement_celebrations c where c.tenant_id=${tenantId} and c.idempotency_key='daily_summary:'||e.broker_id||':'||${today})
+      union all select corretor_id from leads l where tenant_id=${tenantId} and ${summaryDue} and deleted_at is null
+        and assigned_at>=${journeyMidnight(today).toISOString()}::timestamptz and assigned_at<${to}::timestamptz
+        and not exists (select 1 from engagement_celebrations c where c.tenant_id=${tenantId} and c.idempotency_key='daily_summary:'||l.corretor_id||':'||${today})
     ) touched where broker is not null`).catch(() => []);
   return rows.map((row) => row.broker);
 }
@@ -99,12 +114,15 @@ export async function collectJourneyBatch(input: { tenantId: string; brokerIds: 
       progress: sql`excluded.progress`, target: sql`excluded.target`, updatedAt: now,
       completedAt: sql`coalesce(${schema.engagementMissionProgress.completedAt}, excluded.completed_at)`,
     } });
-    const insertedBonuses = bonuses.length ? await tx.insert(schema.engagementPointEvents).values(bonuses).onConflictDoNothing().returning({ brokerId: schema.engagementPointEvents.brokerId, points: schema.engagementPointEvents.points }) : [];
+    const insertedBonuses = bonuses.length ? await tx.insert(schema.engagementPointEvents).values(bonuses).onConflictDoNothing().returning({ brokerId: schema.engagementPointEvents.brokerId, points: schema.engagementPointEvents.points, periodDay: schema.engagementPointEvents.periodDay }) : [];
     if (achievementValues.length) await tx.insert(schema.engagementAchievements).values(achievementValues).onConflictDoNothing();
     for (const fact of facts) {
       const bonusPoints = insertedBonuses.filter((b) => b.brokerId === fact.subject.brokerId).reduce((n, b) => n + b.points, 0);
       const level = evaluateLevel(fact.totalPoints + bonusPoints);
       if (level.level.index > 0) celebrate(fact.subject.brokerId, `level:${fact.subject.brokerId}:${level.level.index}`, { kind: "level", level: level.level, totalPoints: level.totalPoints }, 60);
+      const todayBonus = insertedBonuses.filter((b) => b.brokerId === fact.subject.brokerId && b.periodDay === today).reduce((n, b) => n + b.points, 0);
+      const summary = dailyJourneySummary({ brokerId: fact.subject.brokerId, days: fact.days, points: (fact.pointsByDay?.[today] ?? 0) + todayBonus, now });
+      if (summary) celebrate(fact.subject.brokerId, summary.key, summary.payload, 10);
     }
     // Remove duplicate weekly/campaign entries before a single batch insertion.
     const unique = [...new Map(celebrations.map((c) => [c.idempotencyKey, c])).values()];

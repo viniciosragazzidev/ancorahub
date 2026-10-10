@@ -7,6 +7,7 @@ import { TtlCache } from "@/shared/cache/ttl-cache";
 import { getDatabase, schema } from "@/shared/db";
 
 import { rankBroker, type BrokerOfferStats, type RankPosition } from "./ranking";
+import { journeyDay, journeyMidnight } from "./journey-periods";
 
 /** Rankings and stats look at a rolling week: recent enough to move, long enough to be fair. */
 export const STATS_PERIOD_DAYS = 7;
@@ -93,7 +94,7 @@ async function getTeamOnlyOfferStats(tenantId: string, window: { since: Date; un
 }
 
 /** Leads the broker accepted but never moved to a step (still "novo"/"distribuído"), oldest first. */
-export async function getLeadsWithoutStep(tenantId: string, brokerId: string, now = new Date()) {
+export async function getLeadsWithoutStep(tenantId: string, brokerId: string, now = new Date(), assignedSince?: Date) {
   const leads = schema.leads;
   const where = and(
     eq(leads.tenantId, tenantId),
@@ -104,6 +105,7 @@ export async function getLeadsWithoutStep(tenantId: string, brokerId: string, no
     eq(leads.distributionStatus, "assigned"),
     isNotNull(leads.assignedAt),
     lte(leads.assignedAt, new Date(now.getTime() - STEP_MISSION_AFTER_MS)),
+    assignedSince ? gte(leads.assignedAt, assignedSince) : undefined,
   );
   const db = getDatabase();
   const [[total], oldest] = await Promise.all([
@@ -124,8 +126,9 @@ const journeyEnabled = async () => (await getFeatureFlag(FEATURE_FLAGS.BROKER_EN
 
 /** What the broker's Início shows about themself. Null while the journey flag is off. */
 export async function getBrokerHighlights(tenantId: string, brokerId: string, now = new Date()): Promise<BrokerHighlights | null> {
-  if (!(await journeyEnabled())) return null;
-  const [team, withoutStep] = await Promise.all([getTeamOfferStats(tenantId, statsWindow(now)), getLeadsWithoutStep(tenantId, brokerId, now)]);
+  const [legacy, journey] = await Promise.all([journeyEnabled(), getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false")]);
+  if (!legacy && journey !== "true") return null;
+  const [team, withoutStep] = await Promise.all([getTeamOfferStats(tenantId, statsWindow(now)), getLeadsWithoutStep(tenantId, brokerId, now, journey === "true" ? journeyMidnight(journeyDay(now)) : undefined)]);
   return {
     ranks: rankBroker(team, brokerId),
     stats: team.find((row) => row.brokerId === brokerId) ?? null,

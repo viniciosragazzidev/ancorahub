@@ -7,23 +7,24 @@ vi.mock("@/shared/db", async () => ({ schema: await import("@/shared/db/schema")
 vi.mock("@/features/system-settings/queries", () => ({ FEATURE_FLAGS: { BROKER_JOURNEY: "journey", TEAM_RANKING: "ranking", ENGAGEMENT_CAMPAIGNS: "campaigns" }, getFeatureFlag: mocks.flags }));
 vi.mock("./journey-facts", () => ({ readJourneyFacts: mocks.facts }));
 import { schema } from "@/shared/db";
-import { getBrokerJourneyData, getPendingJourneyCelebrations } from "./journey-queries";
+import { getBrokerJourneyData, getPendingJourneyCelebrations, getJourneyDailySummaries } from "./journey-queries";
 import { brokerWeek, teamInternal, teamLeaderboard, unitLeaderboard } from "./leaderboard-queries";
 const now = new Date("2026-10-10T15:00:00Z");
 const fixtures = new Map<unknown, unknown[]>();
 let failedTable: unknown;
 const accessed: unknown[] = [];
 const limits: number[] = [];
+const filters: { sql: string; params: unknown[] }[] = [];
 const standings = [{ brokerId: "broker-text", name: "Ana", imageUrl: null, branchId: "branch-a", supervisorId: "supervisor-text", points: 25, previousPoints: 10, totalPoints: 500, optedOut: true }, { brokerId: "other", name: "Bea", imageUrl: null, branchId: "branch-b", supervisorId: "other-super", points: 100, previousPoints: 200, totalPoints: 1_000, optedOut: false }];
 function query(table: unknown) {
   accessed.push(table);
   const promise = table === failedTable ? Promise.reject(new Error("table absent")) : Promise.resolve(fixtures.get(table) ?? []);
   promise.catch(() => undefined);
-  const q = { where: () => q, innerJoin: () => q, orderBy: () => q, limit: (n: number) => { limits.push(n); return q; }, then: promise.then.bind(promise), catch: promise.catch.bind(promise) };
+  const q = { where: (condition: Parameters<PgDialect["sqlToQuery"]>[0]) => { filters.push(new PgDialect().sqlToQuery(condition)); return q; }, innerJoin: () => q, orderBy: () => q, limit: (n: number) => { limits.push(n); return q; }, then: promise.then.bind(promise), catch: promise.catch.bind(promise) };
   return q;
 }
 beforeEach(() => {
-  vi.clearAllMocks(); fixtures.clear(); accessed.length = 0; limits.length = 0; failedTable = undefined;
+  vi.clearAllMocks(); fixtures.clear(); accessed.length = 0; limits.length = 0; filters.length = 0; failedTable = undefined;
   mocks.flags.mockImplementation(async (flag: string) => flag === "campaigns" ? "false" : "true");
   mocks.db.select.mockImplementation(() => ({ from: (table: unknown) => query(table) }));
   mocks.db.execute.mockResolvedValue(standings);
@@ -53,10 +54,24 @@ describe("journey reads", () => {
     fixtures.set(schema.engagementCelebrations, [{ id: "celebration", userId: "broker-text", kind: "points", payload: { kind: "points", points: 15, ruleKey: "contact.first", label: "Contato" }, priority: 10, createdAt: now, seenAt: null }]);
     expect(await getPendingJourneyCelebrations("tenant-a", "broker-text")).toHaveLength(1);
     expect(accessed).toEqual([schema.engagementCelebrations]); expect(mocks.facts).not.toHaveBeenCalled();
+    expect(filters[0]?.params).toEqual(["tenant-a", "broker-text"]);
+    expect(filters[0]?.sql).toContain('"seen_at" is null');
   });
   it("returns an empty poll when its table is absent", async () => {
     failedTable = schema.engagementCelebrations;
     expect(await getPendingJourneyCelebrations("tenant-a", "broker-text")).toEqual([]);
+  });
+  it("does not query the queue or daily summaries while BROKER_JOURNEY is off", async () => {
+    mocks.flags.mockResolvedValue("false");
+    expect(await getPendingJourneyCelebrations("tenant-a", "broker-text")).toEqual([]);
+    expect(await getJourneyDailySummaries("tenant-a", "broker-text")).toEqual([]);
+    expect(mocks.db.select).not.toHaveBeenCalled();
+  });
+  it("keeps seen daily summaries in the conversation without reading business tables", async () => {
+    fixtures.set(schema.engagementCelebrations, [{ id: "summary", userId: "broker-text", kind: "daily_summary", payload: { kind: "daily_summary", date: "2026-10-10", received: 6, onTimeContacts: 5, points: 85 }, priority: 10, createdAt: now, seenAt: now }]);
+    expect(await getJourneyDailySummaries("tenant-a", "broker-text")).toMatchObject([{ id: "summary", seenAt: now.toISOString() }]);
+    expect(accessed).toEqual([schema.engagementCelebrations]); expect(limits).toContain(7);
+    expect(mocks.facts).not.toHaveBeenCalled();
   });
 });
 describe("ranking queries", () => {
@@ -65,6 +80,7 @@ describe("ranking queries", () => {
     const sql = new PgDialect().sqlToQuery(mocks.db.execute.mock.calls[0]![0]);
     expect(sql.sql).toContain("reversed_at is null"); expect(sql.params).toContain("tenant-a"); expect(sql.params).toContain("2026-10-05");
     expect(sql.params.some((value) => value instanceof Date)).toBe(false);
+    expect(mocks.cache).toHaveBeenCalledWith(["journey-standings-v1"], { revalidate: 60, tags: ["journey-ranking:tenant-a"] });
   });
   it("limits a unit to its own branch and retains only own opted-out position", async () => {
     const result = await unitLeaderboard("tenant-a", "branch-a", "broker-text", now);

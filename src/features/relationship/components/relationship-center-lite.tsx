@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotionConfig } from "motion/react";
 
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/arc/avatar/avatar";
@@ -56,7 +56,7 @@ export function RelationshipCenterLite({ options, history, initialBrokerId, init
   options: AudienceOptions; history: HistoryItem[]; initialBrokerId?: string | null; initialKind?: BroadcastKind; initialTitle?: string; initialBody?: string;
 }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
+  const reduce = useReducedMotionConfig();
   const [tab, setTab] = useState<"new" | "sent">("new");
   const [audienceKind, setAudienceKind] = useState<AudienceKind>(initialBrokerId ? "people" : options.role === "supervisor" ? "team" : "people");
   const [people, setPeople] = useState<Set<string>>(new Set(initialBrokerId ? [initialBrokerId] : []));

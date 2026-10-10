@@ -218,9 +218,10 @@ export async function collectTenantPoints(tenantId: string, now = new Date()) {
   return { tenantId, since: window.since.toISOString(), until: nextMark.toISOString(), partial: cutoffs.length > 0, candidates: candidates.length, inserted, byRule, journey };
 }
 
-/** Cron entry: every tenant, one failure does not stop the others. Off unless BROKER_ENGAGEMENT is on. */
+/** Cron entry: the new journey works independently of the legacy engagement flag. */
 export async function runEngagementCollector(now = new Date()) {
-  if ((await getFeatureFlag(FEATURE_FLAGS.BROKER_ENGAGEMENT).catch(() => "false")) !== "true") return { skipped: "flag_off" as const };
+  const flags = await Promise.all([FEATURE_FLAGS.BROKER_ENGAGEMENT, FEATURE_FLAGS.BROKER_JOURNEY].map((flag) => getFeatureFlag(flag).catch(() => "false")));
+  if (!flags.includes("true")) return { skipped: "flag_off" as const };
   const tenants = await getDatabase().select({ id: schema.tenants.id }).from(schema.tenants);
   const results = [];
   for (const tenant of tenants) {
