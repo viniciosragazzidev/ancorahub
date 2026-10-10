@@ -1,4 +1,5 @@
-import { and, eq, ilike, isNull, or } from "drizzle-orm";
+import { and, eq, ilike, inArray, isNull, or } from "drizzle-orm";
+import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
 import { NextRequest } from "next/server";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -9,9 +10,10 @@ import type { TenantRole } from "@/shared/db/schema";
 
 import { FEATURE_SEARCH_INDEX } from "@/shared/feature-search-index";
 
-function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string) {
+function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string, teamScoped = false) {
   const base = and(eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt));
   if (role === "director") return base;
+  if (teamScoped) return and(base, inSupervisorTeam(schema.leads.corretorId, tenantId, userId));
   if ((role === "manager" || role === "supervisor") && branchId) {
     return and(base, eq(schema.leads.branchId, branchId));
   }
@@ -38,7 +40,8 @@ export async function GET(request: NextRequest) {
   }).slice(0, 6);
 
   const pattern = `%${query.replace(/[%_]/g, "\\$&")}%`.trim();
-  const scope = leadScope(context.tenantId, context.role, context.branchId, context.userId);
+  const teamScoped = isSupervisorTeamScoped(context);
+  const scope = leadScope(context.tenantId, context.role, context.branchId, context.userId, teamScoped);
   const [leads, clients, tasks, team] = await Promise.all([
     db.select({ id: schema.leads.id, title: schema.leads.nome, subtitle: schema.leads.email, status: schema.leads.status })
       .from(schema.leads)
@@ -46,7 +49,7 @@ export async function GET(request: NextRequest) {
       .limit(6),
     db.select({ id: schema.clients.id, title: schema.clients.nome, subtitle: schema.clients.email, leadId: schema.clients.leadId })
       .from(schema.clients)
-      .where(and(eq(schema.clients.tenantId, context.tenantId), ...(context.role === "manager" && context.branchId ? [eq(schema.clients.branchId, context.branchId)] : []), ...(context.role === "broker" ? [eq(schema.clients.corretorId, context.userId)] : []), or(ilike(schema.clients.nome, pattern), ilike(schema.clients.telefone, pattern), ilike(schema.clients.email, pattern))))
+      .where(and(eq(schema.clients.tenantId, context.tenantId), ...(context.role === "manager" && context.branchId ? [eq(schema.clients.branchId, context.branchId)] : []), ...(context.role === "broker" ? [eq(schema.clients.corretorId, context.userId)] : []), ...(teamScoped ? [inSupervisorTeam(schema.clients.corretorId, context.tenantId, context.userId)] : []), or(ilike(schema.clients.nome, pattern), ilike(schema.clients.telefone, pattern), ilike(schema.clients.email, pattern))))
       .limit(6),
     db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, subtitle: schema.leads.nome, leadId: schema.leadTasks.leadId })
       .from(schema.leadTasks)
@@ -56,7 +59,7 @@ export async function GET(request: NextRequest) {
     db.select({ id: schema.user.id, title: schema.user.name, subtitle: schema.user.email })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
-      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.status, "active"), ...(context.role === "manager" && context.branchId ? [eq(schema.tenantMemberships.branchId, context.branchId)] : []), ...(context.role === "broker" ? [eq(schema.tenantMemberships.userId, context.userId)] : []), or(ilike(schema.user.name, pattern), ilike(schema.user.email, pattern))))
+      .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.status, "active"), ...(context.role === "manager" && context.branchId ? [eq(schema.tenantMemberships.branchId, context.branchId)] : []), ...(context.role === "broker" ? [eq(schema.tenantMemberships.userId, context.userId)] : []), ...(teamScoped ? [eq(schema.tenantMemberships.supervisorId, context.userId)] : []), or(ilike(schema.user.name, pattern), ilike(schema.user.email, pattern))))
       .limit(6),
   ]);
 

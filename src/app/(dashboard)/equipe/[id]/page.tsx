@@ -31,7 +31,8 @@ function Metric({ label, value, detail, icon: Icon, tone = "default" }: { label:
 
 export default async function TeamMemberProfilePage({ params }: { params: Promise<{ id: string }> }) {
   const context = await getRequiredTenantContext();
-  if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
+  // Supervisor sees the profile of their own team's brokers (team checked in getTeamMemberProfile).
+  if (context.role !== "director" && context.role !== "manager" && !(context.role === "supervisor" && context.supervisorTeamScope)) redirect("/access-denied");
   const { id } = await params;
   const profile = await getTeamMemberProfile(id);
   if (!profile) redirect("/access-denied");

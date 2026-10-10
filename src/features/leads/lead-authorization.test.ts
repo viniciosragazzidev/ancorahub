@@ -6,6 +6,7 @@ import {
   buildLeadScopeWhere,
 } from "./lead-authorization";
 import { sql } from "drizzle-orm";
+import { PgDialect } from "drizzle-orm/pg-core";
 
 function createMockContext(overrides?: Partial<AccessContext>): AccessContext {
   return {
@@ -323,5 +324,59 @@ describe("Lead Authorization & Query Scoping (Fase 1B)", () => {
     expect(() => {
       AuthorizationService.require(brokerContext, "acessar_leads", otherLead);
     }).toThrowError(/Acesso restrito/);
+  });
+
+  // N. Supervisor with the team scope (S1 of the supervisor Lite)
+  it("N. Team-scoped supervisor reads only leads of their team and an empty team reads nothing", () => {
+    const supervisor = createMockContext({
+      userId: "sup-1",
+      role: "supervisor",
+      jobTitle: "supervisor",
+      scopeType: "UNITS",
+      supervisorTeamScope: true,
+      scope: { tenantWide: false, unitIds: ["unit-a"], teamIds: ["broker-1"], teamScoped: true, ownership: "SCOPED", provenance: { units: "LEGACY_MEMBERSHIP_BRANCH" } },
+    });
+    const teamLead = buildLeadResourceScope({ tenantId: "tenant-1", branchId: "unit-a", corretorId: "broker-1" });
+    const sameUnitOtherBroker = buildLeadResourceScope({ tenantId: "tenant-1", branchId: "unit-a", corretorId: "broker-9" });
+    expect(AuthorizationService.can(supervisor, "acessar_leads", teamLead)).toBe(true);
+    // Same unit is not enough any more: only the team.
+    expect(AuthorizationService.evaluate(supervisor, "acessar_leads", sameUnitOtherBroker).reason).toBe("OUT_OF_TEAM");
+
+    const emptyTeam = createMockContext({ ...supervisor, scope: { ...supervisor.scope, teamIds: [] } });
+    expect(AuthorizationService.can(emptyTeam, "acessar_leads", teamLead)).toBe(false);
+
+    // The list filter is the team subquery, not the unit.
+    const where = new PgDialect().sqlToQuery(buildLeadScopeWhere(supervisor));
+    expect(where.sql).toContain("supervisor_id");
+    expect(where.sql).not.toContain('"leads"."branch_id" in');
+  });
+
+  it("O. Supervisor without the flag keeps the unit scope (unchanged behaviour)", () => {
+    const supervisor = createMockContext({
+      userId: "sup-1",
+      role: "supervisor",
+      jobTitle: "supervisor",
+      scopeType: "UNITS",
+      scope: { tenantWide: false, unitIds: ["unit-a"], teamIds: [], ownership: "SCOPED", provenance: { units: "LEGACY_MEMBERSHIP_BRANCH" } },
+    });
+    const sameUnit = buildLeadResourceScope({ tenantId: "tenant-1", branchId: "unit-a", corretorId: "broker-9" });
+    expect(AuthorizationService.can(supervisor, "acessar_leads", sameUnit)).toBe(true);
+    expect(new PgDialect().sqlToQuery(buildLeadScopeWhere(supervisor)).sql).not.toContain("supervisor_id");
+  });
+
+  it("P. A team-scoped supervisor with a tenant-wide custom role is still limited to the team (list and detail)", () => {
+    const supervisor = createMockContext({
+      userId: "sup-1",
+      role: "supervisor",
+      jobTitle: "supervisor",
+      customRoleScope: "tenant",
+      supervisorTeamScope: true,
+      scopeType: "GLOBAL",
+      canAccessAllUnits: false,
+      scope: { tenantWide: false, unitIds: [], teamIds: ["broker-1"], teamScoped: true, ownership: "ANY", provenance: { units: "CUSTOM_ROLE_SCOPE" } },
+    });
+    const outside = buildLeadResourceScope({ tenantId: "tenant-1", branchId: "unit-z", corretorId: "broker-9" });
+    expect(AuthorizationService.can(supervisor, "acessar_leads", outside)).toBe(false);
+    expect(new PgDialect().sqlToQuery(buildLeadScopeWhere(supervisor)).sql).toContain("supervisor_id");
   });
 });

@@ -137,10 +137,22 @@ export async function resolveAccessContext(
       }
     }
 
+    // Supervisor with the team scope: the brokers pointing to them (empty team = nothing).
+    // One rule everywhere (lists, detail, search): the team scope wins over any custom role scope.
+    const teamScoped = context.role === "supervisor" && Boolean(context.supervisorTeamScope);
+    const teamIds = teamScoped
+      ? await getDatabase().select({ userId: schema.tenantMemberships.userId }).from(schema.tenantMemberships)
+        .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.supervisorId, context.userId), eq(schema.tenantMemberships.status, "active")))
+        .then((rows) => rows.map((row) => row.userId))
+        .catch(() => [] as string[])
+      : [];
+
+    if (teamScoped) canAccessAllUnits = false;
     const scope: AccessScope = {
       tenantWide: canAccessAllUnits,
       unitIds: Object.freeze([...allowedUnitIds]),
-      teamIds: Object.freeze([]),
+      teamIds: Object.freeze([...teamIds]),
+      ...(teamScoped ? { teamScoped: true } : {}),
       ownership,
       provenance: {
         units: unitsProvenance,

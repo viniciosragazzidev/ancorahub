@@ -8,6 +8,7 @@ import { AuthorizationError } from "./errors";
 import { getRequiredSession } from "./session";
 import type { TenantContext } from "./types";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getSuperAdminRoleOverride } from "@/features/super-admin/role-impersonation";
 import { selectSingleActiveMembership } from "./active-membership";
 import {
@@ -112,6 +113,9 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
       customRoleId: membership.customRoleId,
       customRoleScope: membership.customRoleScope,
       branchId: membership.branchId,
+      ...(membership.role === "supervisor"
+        ? { supervisorTeamScope: (await getFeatureFlag(FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE).catch(() => "false")) === "true" }
+        : {}),
     };
   } catch (error) {
     markDbEnd();

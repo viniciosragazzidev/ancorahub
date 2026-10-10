@@ -99,7 +99,13 @@ export async function getTeamMemberProfile(memberUserId: string) {
     .leftJoin(schema.branches, eq(schema.tenantMemberships.branchId, schema.branches.id))
     .leftJoin(schema.customRoles, eq(schema.tenantMemberships.customRoleId, schema.customRoles.id))
     .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, context.tenantId)))
-    .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.user.id, parsedUserId.data), managerScope))
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      eq(schema.user.id, parsedUserId.data),
+      managerScope,
+      // Supervisor: only a broker of their team.
+      context.role === "supervisor" ? (context.supervisorTeamScope ? eq(schema.tenantMemberships.supervisorId, context.userId) : sql`false`) : undefined,
+    ))
     .limit(1);
   if (!member || !canViewTeamMemberProfile(context, member.branchId)) return null;
 

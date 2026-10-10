@@ -59,6 +59,20 @@ export class AuthorizationService {
     // 3. ESCOPO (ONDE)
     const scope = context.scope;
 
+    // 3.25 Equipe do supervisor: só recursos dos corretores que ele supervisiona.
+    if (scope?.teamScoped) {
+      if (resource.ownerUserId && scope.teamIds.includes(resource.ownerUserId)) {
+        return { allowed: true, capability, matchedScope: "UNIT" };
+      }
+      return {
+        allowed: false,
+        capability,
+        reason: "OUT_OF_TEAM",
+        details: "Acesso restrito aos corretores da sua equipe.",
+        matchedScope: "NONE",
+      };
+    }
+
     // 3.1 Tenant-Wide (Diretor ou Custom Role com escopo tenant)
     if (scope?.tenantWide || context.canAccessAllUnits || context.scopeType === "GLOBAL") {
       return {

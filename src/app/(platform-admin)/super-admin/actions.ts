@@ -907,6 +907,7 @@ const BROKER_NEWS_FLAGS = [
   { field: "relationshipCenterEnabled", flag: FEATURE_FLAGS.RELATIONSHIP_CENTER },
   { field: "brokerEngagementEnabled", flag: FEATURE_FLAGS.BROKER_ENGAGEMENT },
   { field: "brokerAiAssistantsEnabled", flag: FEATURE_FLAGS.BROKER_AI_ASSISTANTS },
+  { field: "supervisorTeamScopeEnabled", flag: FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE },
 ] as const;
 
 export async function updateBrokerNewsSettingsAction(formData: FormData) {
@@ -918,7 +919,7 @@ export async function updateBrokerNewsSettingsAction(formData: FormData) {
     .then((result) => Boolean((result as unknown as { ready: boolean }[])[0]?.ready))
     .catch(() => false);
   for (const { field, flag } of BROKER_NEWS_FLAGS) {
-    if (!tables && flag.key !== FEATURE_FLAGS.BROKER_AI_ASSISTANTS.key) continue;
+    if (!tables && (flag.key === FEATURE_FLAGS.RELATIONSHIP_CENTER.key || flag.key === FEATURE_FLAGS.BROKER_ENGAGEMENT.key)) continue;
     const enabled = formData.get(field) === "true" ? "true" : "false";
     await setSystemSetting(flag.key, enabled, now);
     await getDatabase().insert(schema.platformAuditLogs).values({

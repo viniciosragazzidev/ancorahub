@@ -15,6 +15,8 @@ export type TenantContext = {
   customRoleScope?: CustomRoleScope | null;
   /** Escopo de filial — null para diretores e marketing central */
   branchId: string | null;
+  /** Supervisor limited to the brokers they supervise (flag SUPERVISOR_TEAM_SCOPE, resolved on the server). */
+  supervisorTeamScope?: boolean;
 };
 
 export type ScopeProvenance =
@@ -37,6 +39,8 @@ export interface AccessScope {
   unitIds: readonly string[];
   /** IDs de equipes autorizadas para este usuário (se aplicável) */
   teamIds: readonly string[];
+  /** Supervisor team scope: only resources owned by the users in teamIds (empty = nothing, never the unit). */
+  teamScoped?: boolean;
   /** Modo de posse/titularidade de recursos */
   ownership: ResourceOwnershipScope;
   /** Proveniência de auditoria indicando a origem da resolução do escopo */
@@ -64,7 +68,8 @@ export type AuthorizationDenyReason =
   | "TEAM_OUT_OF_SCOPE"
   | "NOT_RESOURCE_OWNER"
   | "SCOPE_EMPTY"
-  | "INVALID_CONTEXT";
+  | "INVALID_CONTEXT"
+  | "OUT_OF_TEAM";
 
 export interface AuthorizationDecision {
   /** Decisão final de autorização */

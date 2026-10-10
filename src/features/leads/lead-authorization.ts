@@ -5,6 +5,7 @@ import type { AccessContext } from "@/shared/auth/access-context";
 import { AuthorizationService } from "@/shared/auth/authorization-service";
 import type { ResourceScopeDescriptor, TenantContext } from "@/shared/auth/types";
 import { schema } from "@/shared/db";
+import { inSupervisorTeam } from "@/features/team/supervisor-scope";
 
 export type LeadResourceInput = {
   tenantId: string;
@@ -87,6 +88,14 @@ export function buildLeadScopeWhere(
     return and(...conditions)!;
   }
 
+  // 1b. Supervisor com escopo de equipe: só leads dos corretores dele, resolvido no banco
+  // (cobre TenantContext e AccessContext; equipe vazia = nada, nunca a unidade inteira).
+  if (context.role === "supervisor" && (context.supervisorTeamScope || context.scope?.teamScoped)) {
+    conditions.push(inSupervisorTeam(table.corretorId, constraints.tenantId, context.userId));
+    if (options?.requestedBranchId) conditions.push(eq(table.branchId, options.requestedBranchId));
+    return and(...conditions)!;
+  }
+
   // 1. Tenant-wide (Diretores)
   if (constraints.tenantWide) {
     if (options?.requestedBranchId) {
@@ -94,6 +103,7 @@ export function buildLeadScopeWhere(
     }
     return and(...conditions)!;
   }
+
 
   // 2. Corretor / Titularidade própria (SELF)
   if (constraints.ownerMode === "SELF" || context.scopeType === "SELF") {

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { and, eq, count, sql, desc } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
+import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
 import { assignLeadToBroker } from "@/features/lead-distribution/service";
 import { getQualificationAlerts } from "@/features/ai-qualification/alerts-service";
 
@@ -132,7 +133,10 @@ export const getBranchQueueSummaryTool: McpToolDefinition = {
     const targetBranch = branchId || context.branchId;
 
     const conditions = [eq(schema.leads.tenantId, context.tenantId)];
-    if (targetBranch) {
+    if (isSupervisorTeamScoped(context)) {
+      // Team-scoped supervisor: the team's leads, whatever unit is asked.
+      conditions.push(inSupervisorTeam(schema.leads.corretorId, context.tenantId, context.userId));
+    } else if (targetBranch) {
       conditions.push(eq(schema.leads.branchId, targetBranch));
     }
 

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { and, asc, eq, or, sql } from "drizzle-orm";
+import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
+import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ShieldCheck } from "@/components/huge-icons";
@@ -24,15 +25,24 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     if (context.role !== "director" && !(context.role === "manager" && context.branchId)) redirect("/access-denied");
     return <UnitsView context={context} />;
   }
-  const branchScope = context.role === "manager"
-    ? context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : sql`false`
-    : undefined;
-  const branchEntityScope = context.role === "manager"
+  // Supervisor with the team scope: only their team (and themself), never the whole company.
+  const teamScoped = isSupervisorTeamScoped(context);
+  const team = teamScoped ? { tenantId: context.tenantId, userId: context.userId } : null;
+  const branchScope = team
+    ? or(inSupervisorTeam(schema.tenantMemberships.userId, team.tenantId, team.userId), eq(schema.tenantMemberships.userId, context.userId))
+    : context.role === "manager"
+      ? context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : sql`false`
+      : undefined;
+  const branchEntityScope = team
     ? context.branchId ? eq(schema.branches.id, context.branchId) : sql`false`
-    : undefined;
-  const leadBranchScope = context.role === "manager"
-    ? context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`
-    : undefined;
+    : context.role === "manager"
+      ? context.branchId ? eq(schema.branches.id, context.branchId) : sql`false`
+      : undefined;
+  const leadBranchScope = team
+    ? inSupervisorTeam(schema.leads.corretorId, team.tenantId, team.userId)
+    : context.role === "manager"
+      ? context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`
+      : undefined;
 
   const customRolesPromise = context.role === "director"
     ? isCustomRolesEnabled(context.tenantId).then((enabled) => enabled
@@ -94,7 +104,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
       ))
       .where(and(
         eq(schema.brokerProfiles.tenantId, context.tenantId),
-        context.role === "manager" && context.branchId ? eq(schema.brokerProfiles.branchId, context.branchId) : undefined
+        context.role === "manager" && context.branchId ? eq(schema.brokerProfiles.branchId, context.branchId) : undefined,
+        team ? inSupervisorTeam(schema.brokerProfiles.userId, team.tenantId, team.userId) : undefined,
       )),
     getDatabase()
       .select({

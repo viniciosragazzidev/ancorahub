@@ -1,4 +1,5 @@
 import "server-only";
+import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
 
 import { and, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 
@@ -30,14 +31,16 @@ type Aggregate = { count: number; oldestAt: string | null };
 
 import type { TenantRole } from "@/shared/db/schema";
 
-function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string) {
+function leadScope(tenantId: string, role: TenantRole, branchId: string | null, userId: string, teamScoped = false) {
   const conditions = [eq(schema.leads.tenantId, tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)];
-  if ((role === "manager" || role === "supervisor") && branchId) conditions.push(eq(schema.leads.branchId, branchId));
+  if (teamScoped) conditions.push(inSupervisorTeam(schema.leads.corretorId, tenantId, userId));
+  else if ((role === "manager" || role === "supervisor") && branchId) conditions.push(eq(schema.leads.branchId, branchId));
   if (role === "broker") conditions.push(eq(schema.leads.corretorId, userId));
   return and(...conditions);
 }
 
-function taskScope(role: TenantRole, branchId: string | null, userId: string) {
+function taskScope(role: TenantRole, branchId: string | null, userId: string, tenantId = "", teamScoped = false) {
+  if (teamScoped) return or(inSupervisorTeam(schema.leads.corretorId, tenantId, userId), eq(schema.leadTasks.assignedTo, userId));
   if (role === "broker") {
     return or(eq(schema.leadTasks.assignedTo, userId), eq(schema.leadTaskAssignees.userId, userId));
   }
@@ -63,8 +66,9 @@ export async function getAttentionCenter(): Promise<AttentionCenterData> {
   const stagnantDays = Number.isInteger(stagnantDaysValue) && stagnantDaysValue > 0 ? stagnantDaysValue : 3;
   if (!enabled) return { enabled: false, stagnantDays, items: [] };
 
-  const scope = leadScope(context.tenantId, context.role, context.branchId, context.userId);
-  const assignedTaskScope = taskScope(context.role, context.branchId, context.userId);
+  const teamScoped = isSupervisorTeamScoped(context);
+  const scope = leadScope(context.tenantId, context.role, context.branchId, context.userId, teamScoped);
+  const assignedTaskScope = taskScope(context.role, context.branchId, context.userId, context.tenantId, teamScoped);
   const now = new Date();
   const stagnantSince = new Date(now.getTime() - stagnantDays * 24 * 60 * 60 * 1000);
 

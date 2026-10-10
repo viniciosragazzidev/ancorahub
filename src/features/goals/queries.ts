@@ -90,6 +90,21 @@ export async function getGoals(): Promise<GoalRecord[]> {
       eq(schema.goals.scope, "team"),
     );
     if (managerCondition) conditions.push(managerCondition);
+  } else if (context.role === "supervisor" && context.supervisorTeamScope) {
+    // Supervisor with the team scope: the goals of their brokers, of their team and the company-wide ones.
+    const supervisorCondition = or(
+      and(eq(schema.goals.scope, "team"), eq(schema.goals.scopeId, context.userId)),
+      eq(schema.goals.scope, "tenant"),
+      sql`(
+        ${schema.goals.scope} = 'broker' AND ${schema.goals.scopeId} IN (
+          SELECT ${schema.tenantMemberships.userId}
+          FROM ${schema.tenantMemberships}
+          WHERE ${schema.tenantMemberships.tenantId} = ${context.tenantId}
+            AND ${schema.tenantMemberships.supervisorId} = ${context.userId}
+        )
+      )`,
+    );
+    if (supervisorCondition) conditions.push(supervisorCondition);
   }
 
   return db
