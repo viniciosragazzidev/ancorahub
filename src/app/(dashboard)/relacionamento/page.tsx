@@ -2,6 +2,8 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { canSend, getAudienceOptions } from "@/features/relationship/audience";
 import { BrokerMural } from "@/features/relationship/components/broker-mural";
 import { RelationshipCenter } from "@/features/relationship/components/relationship-center";
+import { RelationshipCenterLite } from "@/features/relationship/components/relationship-center-lite";
+import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { listBroadcasts, listBrokerInbox } from "@/features/relationship/service";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -23,6 +25,13 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
   const enabled = (await getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")) === "true";
 
   if (!enabled) {
+    if (supervisorLite) {
+      return (
+        <div className="arc-venancor min-h-full bg-[var(--surface)] px-4 py-12">
+          <EmptyState title="Recados ainda desligados" description="A Central de relacionamento ainda não está ligada nesta empresa. Peça ao diretor para ativar." />
+        </div>
+      );
+    }
     return (
       <>
         {supervisorLite ? null : <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />}
@@ -46,6 +55,12 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
   let initialBrokerId: string | null = null;
   let initialTitle = "";
   let initialBody = "";
+  let initialKind: "notice" | "recognition" = "notice";
+  // Shortcuts from the team screens: "Mandar recado" and "Reconhecer" open with the broker chosen.
+  if (supervisorLite && params.brokerId && !params.leadId && options.brokers.some((broker) => broker.id === params.brokerId)) {
+    initialBrokerId = params.brokerId;
+    if (params.action === "recognition") initialKind = "recognition";
+  }
   if (supervisorLite && params.action === "reminder" && params.brokerId && params.leadId) {
     const [lead] = await getDatabase().select({ id: schema.leads.id, name: schema.leads.nome, brokerId: schema.leads.corretorId }).from(schema.leads)
       .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.id, params.leadId.slice(0, 80)), eq(schema.leads.corretorId, params.brokerId.slice(0, 80)), isNull(schema.leads.deletedAt), buildLeadScopeWhere(context))).limit(1);
@@ -55,13 +70,16 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
       initialBody = `Oi, como está o atendimento de ${lead.name}?`.slice(0, 1000);
     }
   }
+  const historyItems = history.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }));
+  if (supervisorLite) {
+    return <RelationshipCenterLite options={options} history={historyItems} initialBrokerId={initialBrokerId} initialKind={initialKind} initialTitle={initialTitle} initialBody={initialBody} />;
+  }
   return (
     <>
-      {supervisorLite ? null : <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />}
+      <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />
       <RelationshipCenter
         options={options}
-        history={history.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }))}
-        lite={supervisorLite}
+        history={historyItems}
         initialBrokerId={initialBrokerId}
         initialTitle={initialTitle}
         initialBody={initialBody}
