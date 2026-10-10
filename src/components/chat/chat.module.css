@@ -51,6 +51,8 @@
   transition: background-color var(--duration-fast) var(--ease-standard);
 }
 .thread:hover { background: var(--surface-muted); }
+/* The conversation open beside the rail (computers). */
+.threadActive, .threadActive:hover { background: var(--surface); box-shadow: var(--shadow-resting); }
 .threadMain { min-width: 0; display: grid; gap: 2px; }
 .threadTop { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .threadName { font-weight: 500; font-size: var(--text-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

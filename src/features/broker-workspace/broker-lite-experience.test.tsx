@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({ pathname: "/minha-fila", search: "", push: vi.fn(), back: vi.fn(), replace: vi.fn() }));
 
+// The rail list is a server action: the chrome only calls it on computers.
+vi.mock("@/features/broker-workspace/chat/chat-rail-actions", () => ({ loadChatRailAction: vi.fn().mockResolvedValue(null) }));
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
   useSearchParams: () => new URLSearchParams(navigation.search),

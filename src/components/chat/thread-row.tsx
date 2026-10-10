@@ -26,7 +26,7 @@ function VerifiedBadge() {
   );
 }
 
-export function ThreadRow({ thread, now, index = 0 }: { thread: ThreadSummary; now: Date; index?: number }) {
+export function ThreadRow({ thread, now, index = 0, active = false }: { thread: ThreadSummary; now: Date; index?: number; active?: boolean }) {
   const reduce = useReducedMotion();
   return (
     <motion.li
@@ -35,7 +35,7 @@ export function ThreadRow({ thread, now, index = 0 }: { thread: ThreadSummary; n
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1], delay: reduce ? 0 : Math.min(index, 8) * 0.035 }}
     >
-      <Link href={thread.href} className={styles.thread} data-tour={thread.assistant ? `thread-${thread.assistant}` : undefined} aria-label={`${thread.name}: ${thread.preview}${thread.waitingYou ? " (esperando você)" : ""}`}>
+      <Link href={thread.href} className={`${styles.thread} ${active ? styles.threadActive : ""}`} aria-current={active ? "page" : undefined} data-tour={thread.assistant ? `thread-${thread.assistant}` : undefined} aria-label={`${thread.name}: ${thread.preview}${thread.waitingYou ? " (esperando você)" : ""}`}>
         <AssistantAvatar shape={thread.shape} hue={thread.hue} initials={thread.initials} temperature={thread.temperature} />
         <span className={styles.threadMain}>
           <span className={styles.threadTop}>
@@ -61,11 +61,11 @@ export function ThreadRow({ thread, now, index = 0 }: { thread: ThreadSummary; n
   );
 }
 
-export function ThreadList({ threads, now, emptyText }: { threads: ThreadSummary[]; now: Date; emptyText: string }) {
+export function ThreadList({ threads, now, emptyText, activeId = null }: { threads: ThreadSummary[]; now: Date; emptyText: string; activeId?: string | null }) {
   if (!threads.length) return <p style={{ padding: "32px 20px", textAlign: "center", color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>{emptyText}</p>;
   return (
     <ul className={styles.threadList}>
-      {threads.map((thread, index) => <ThreadRow key={thread.id} thread={thread} now={now} index={index} />)}
+      {threads.map((thread, index) => <ThreadRow key={thread.id} thread={thread} now={now} index={index} active={thread.id === activeId} />)}
     </ul>
   );
 }

@@ -61,17 +61,6 @@ export const TOUR_STEPS: TourStep[] = [
     mascot: { shape: "mochi", hue: 212 },
   },
   {
-    id: "02b-lista-leads",
-    kind: "spotlight",
-    target: "home-leads-list",
-    title: "Seus leads, sempre à mão",
-    body: "No computador, a lista da esquerda são os seus leads. Quem espera você aparece primeiro, e Ver todos abre a lista com filtros.",
-    narration:
-      "No computador, a lista da esquerda mostra os seus leads, cada um como uma conversa. Quem está esperando você aparece primeiro. E se precisar de filtros, o botão Ver todos abre a lista completa.",
-    xp: 10,
-    mascot: { shape: "mochi", hue: 212 },
-  },
-  {
     id: "03-leads",
     kind: "spotlight",
     target: "thread-leads",

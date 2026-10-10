@@ -121,3 +121,17 @@
 /* Arc sheet close and grabber are smaller than 44px: extend the hit area without changing the look. */
 .arc-venancor button[aria-label="Fechar"], .arc-venancor [data-grabber] { position: relative; }
 .arc-venancor button[aria-label="Fechar"]::after, .arc-venancor [data-grabber]::after { position: absolute; inset: -8px; content: ""; }
+
+/* Lite on computers: conversation list fixed on the left, the open screen at the center (2026-10-10). */
+.lite-rail { display: none; }
+.lite-split, .lite-main { display: contents; }
+@media (min-width: 1024px) {
+  .lite-split { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: 100dvh; overflow: hidden; }
+  .lite-rail { display: block; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--border, rgb(16 16 40 / 0.08)); background: var(--surface-muted, #f1f1f5); }
+  .lite-main { display: block; min-width: 0; height: 100dvh; overflow: hidden; }
+}
+.lite-rail-skeleton { display: grid; gap: 14px; padding: 88px 20px 20px; }
+.lite-rail-skeleton > span { display: block; height: 44px; border-radius: 999px; background: color-mix(in oklab, rgb(16 16 40 / 0.18) 38%, #ffffff); animation: lite-rail-pulse 1.8s cubic-bezier(.65, 0, .35, 1) infinite; }
+.lite-rail-skeleton > span:nth-child(2n) { animation-delay: 90ms; }
+@keyframes lite-rail-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .52; } }
+@media (prefers-reduced-motion: reduce) { .lite-rail-skeleton > span { animation: none; } }

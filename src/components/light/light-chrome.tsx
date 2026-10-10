@@ -1,9 +1,14 @@
 "use client";
 
-import { useState, type ReactNode, type RefObject } from "react";
+import { useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import "@/components/arc/venancor-scope.css";
 import { useLightAvailability, type LightAvailability } from "@/components/light-top-nav";
+
+import { ChatHome } from "@/components/chat/chat-home";
+import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
+import { loadChatRailAction } from "@/features/broker-workspace/chat/chat-rail-actions";
+import { REALTIME_SYNC_BROWSER_EVENT } from "@/components/providers/realtime-events";
 
 import { LightAppHeader } from "./light-app-header";
 import { LightAvailabilityProvider } from "./light-availability-context";
@@ -57,19 +62,40 @@ export function LightChrome({
     />
   );
 
+  const chatRail = useDesktopChatRail();
+  const shell = { availability, isPending, setStatus, openMore: () => setMoreOpen(true) };
+  // Computers: the conversation list stays on the left and the screen opens at the center
+  // (CSS .lite-split, venancor-scope.css); phones keep one screen at a time.
+  const withRail = (content: ReactNode) => (
+    <LightAvailabilityProvider value={shell}>
+      <div className="lite-split">
+        <aside className="lite-rail arc-venancor" aria-label="Conversas" aria-busy={!chatRail}>
+          {chatRail ? (
+            <ChatHome mode="rail" viewerName={chatRail.viewerName} assistants={chatRail.assistants} leads={chatRail.leads} nowIso={chatRail.nowIso} canQuote={chatRail.canQuote} />
+          ) : (
+            <div className="lite-rail-skeleton" aria-hidden="true">
+              {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
+            </div>
+          )}
+        </aside>
+        <div className="lite-main">{content}</div>
+      </div>
+    </LightAvailabilityProvider>
+  );
+
   // Chat screens draw their own header; the conversation list is the navigation.
   if (chat) {
-    return (
+    return withRail(
       <div className="arc-venancor h-dvh w-full overflow-hidden bg-[var(--surface)]">
         <main ref={mainRef} data-slot="app-content" className="h-full w-full overflow-y-auto overscroll-contain">
           <LightAvailabilityProvider value={{ availability, isPending, setStatus, openMore: () => setMoreOpen(true) }}>{children}</LightAvailabilityProvider>
         </main>
         {sheet}
-      </div>
+      </div>,
     );
   }
 
-  return (
+  return withRail(
     <div className="flex h-dvh w-full overflow-hidden light-canvas selection:bg-primary/20">
       <div className="flex min-w-0 flex-1 flex-col">
         <LightAppHeader
@@ -87,6 +113,43 @@ export function LightChrome({
         </main>
       </div>
       {sheet}
-    </div>
+    </div>,
   );
+}
+
+const DESKTOP_QUERY = "(min-width: 1024px)";
+const RAIL_REFRESH_MS = 3000;
+
+/**
+ * The rail's list, loaded in the browser and only on computers (phones never
+ * show it). Refreshed when realtime says something changed, at most every 3s.
+ */
+function useDesktopChatRail() {
+  const [rail, setRail] = useState<ChatRailData | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const media = window.matchMedia(DESKTOP_QUERY);
+    let alive = true;
+    let timer = 0;
+    let lastLoad = 0;
+    const load = () => {
+      if (!media.matches) return;
+      lastLoad = Date.now();
+      void loadChatRailAction().then((data) => { if (alive && data) setRail(data); }).catch(() => undefined);
+    };
+    const onRealtime = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(load, Math.max(0, RAIL_REFRESH_MS - (Date.now() - lastLoad)));
+    };
+    load();
+    media.addEventListener("change", load);
+    window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+      media.removeEventListener("change", load);
+      window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+    };
+  }, []);
+  return rail;
 }

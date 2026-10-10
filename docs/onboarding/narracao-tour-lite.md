@@ -39,16 +39,6 @@ Dica de voz: tom de colega, animado e calmo, 150 a 165 palavras por minuto; cada
 
 > Aqui você alterna entre duas visões. Em Assistentes ficam as áreas do seu trabalho, cada uma com um ajudante. Em Leads, cada cliente vira uma conversa: o número azul mostra quantos estão esperando você.
 
-## 02b-lista-leads.mp3 · Seus leads, sempre à mão
-
-- Tipo: spotlight · destaque: `home-leads-list` · 10 XP
-- Texto na tela: No computador, a lista da esquerda são os seus leads. Quem espera você aparece primeiro, e Ver todos abre a lista com filtros.
-- Duração estimada: 13s (34 palavras)
-
-**Narração:**
-
-> No computador, a lista da esquerda mostra os seus leads, cada um como uma conversa. Quem está esperando você aparece primeiro. E se precisar de filtros, o botão Ver todos abre a lista completa.
-
 ## 03-leads.mp3 · Leads: quem chegou e quem espera
 
 - Tipo: spotlight · destaque: `thread-leads` · 10 XP
