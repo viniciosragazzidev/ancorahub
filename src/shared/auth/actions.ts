@@ -9,6 +9,7 @@ import { TtlCache } from "@/shared/cache/ttl-cache";
 import type { TenantRole } from "@/shared/db/schema";
 import { listEffectiveCapabilities, listEffectiveRoutes } from "@/features/custom-roles/service";
 import { isUserProfileEnabled } from "@/features/user-profile/feature";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 const ROLE_REDIRECT: Record<TenantRole, string> = {
   director: "/dashboard",
@@ -35,6 +36,8 @@ export type UserDisplayInfo = {
   isPlatformAdmin?: boolean;
   activeRoleOverride?: string | null;
   userProfileEnabled?: boolean;
+  /** Central de relacionamento flag (shows the sidebar item). */
+  relationshipCenterEnabled?: boolean;
 };
 
 export async function getRoleRedirect(): Promise<string> {
@@ -161,6 +164,7 @@ async function loadUserDisplayInfo(session: NonNullable<Awaited<ReturnType<typeo
     ]
     : [];
   const userProfileEnabled = await isUserProfileEnabled();
+  const relationshipCenterEnabled = (await getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")) === "true";
 
   return {
     name: session.user.name,
@@ -173,5 +177,6 @@ async function loadUserDisplayInfo(session: NonNullable<Awaited<ReturnType<typeo
     isPlatformAdmin,
     activeRoleOverride,
     userProfileEnabled,
+    relationshipCenterEnabled,
   };
 }

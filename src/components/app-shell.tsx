@@ -40,6 +40,7 @@ export function AppShell({
   user,
   isLightBroker = false,
   showDutyCalendar = false,
+  showRelationship = false,
   showQuoteSimulator = false,
   initialAvailability = "available",
   cleanUiEnabled = false,
@@ -50,6 +51,7 @@ export function AppShell({
   user?: UserInfo;
   isLightBroker?: boolean;
   showDutyCalendar?: boolean;
+  showRelationship?: boolean;
   showQuoteSimulator?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
   cleanUiEnabled?: boolean;
@@ -143,6 +145,7 @@ export function AppShell({
           branding={branding}
           user={user}
           showDutyCalendar={showDutyCalendar}
+          showRelationship={showRelationship}
           showQuoteSimulator={showQuoteSimulator}
           initialAvailability={initialAvailability}
           queueBadgeCount={queueBadgeCount}

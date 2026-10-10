@@ -12,12 +12,13 @@ import { addLeadNoteAction } from "@/features/leads/actions";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { MOTIVOS_PERDA } from "@/features/leads/lead-status-constants";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
+import { acknowledgeAction } from "@/features/relationship/actions";
 
 /** warning: it worked, but part of it did not (shown as an alert, not as success). */
 export type ChatServerActionResult = { ok: boolean; message: string; href?: string; warning?: boolean };
 
 const leadPayload = z.object({ leadId: z.string().min(1) });
-const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead"]);
+const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead", "relationship.ack"]);
 
 const whenPreset = z.enum(["today", "tomorrow", "in_2_days", "in_3_days"]);
 const RETURN_TEXT: Record<z.infer<typeof whenPreset>, string> = {
@@ -108,6 +109,11 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
       case "notifications.markRead": {
         await markAllNotificationsReadAction();
         return { ok: true, message: "Pronto, marquei todos os avisos como lidos." };
+      }
+      case "relationship.ack": {
+        const result = await acknowledgeAction();
+        if (!result.ok) return { ok: false, message: result.error };
+        return { ok: true, message: result.data ? "Pronto, a gestão já sabe que você está ciente." : "Não tinha nenhum pedido de confirmação pendente." };
       }
       default:
         return { ok: false, message: "Isso se faz na conversa do lead. Abra o lead para continuar." };

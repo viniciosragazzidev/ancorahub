@@ -22,6 +22,7 @@ import {
   UserCircle,
   ShieldCheck,
   Megaphone,
+  HandHeart,
 } from "@phosphor-icons/react";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import {
@@ -68,6 +69,8 @@ type NavItemConfig = {
   isWhatsApp?: boolean;
   beta?: boolean;
   statusDot?: boolean;
+  /** Hidden while the matching flag is off. */
+  requires?: "relationshipCenter";
 };
 
 const navigationItems: NavItemConfig[] = [
@@ -124,6 +127,16 @@ const navigationItems: NavItemConfig[] = [
     permission: "convidar_corretor",
     section: "Operação",
     iconTone: "text-cyan-600 dark:text-cyan-300",
+  },
+  {
+    label: "Relacionamento",
+    fullLabel: "Central de relacionamento com o corretor",
+    icon: HandHeart,
+    url: "/relacionamento",
+    permission: "convidar_corretor",
+    section: "Operação",
+    iconTone: "text-rose-600 dark:text-rose-300",
+    requires: "relationshipCenter",
   },
   {
     label: "Qualificação",
@@ -208,6 +221,7 @@ const managerHiddenPaths = [
 
 function canShowItem(item: NavItemConfig, user: UserDisplayInfo | null, roleKey: UserDisplayInfo["roleKey"]) {
   if (!roleKey) return false;
+  if (item.requires === "relationshipCenter" && (!user?.relationshipCenterEnabled || roleKey === "broker")) return false;
   if (user?.jobTitle === "marketing" && marketingHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
     return false;
   }

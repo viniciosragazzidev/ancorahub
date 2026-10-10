@@ -548,6 +548,10 @@ export function buildAncoraScript(input: { notifications: AncoraNotification[]; 
   const latestLead = [...unread].reverse().find((item) => item.leadId);
   const choices: ChatChoice[] = [];
   if (latestLead?.leadId) choices.push({ id: "open-lead", label: "Abrir o lead do último aviso", action: { kind: "href", href: `/leads/${latestLead.leadId}` } });
+  // A message of the Central that asks for confirmation (relationship.confirmation).
+  if (unread.some((item) => item.type === "relationship.confirmation")) {
+    choices.push({ id: "relationship-ack", label: "Ciente", reply: "Ciente", action: { kind: "server", name: "relationship.ack", payload: {} } });
+  }
   if (unread.length) choices.push({ id: "mark-all", label: "Marcar tudo como lido", reply: "Já vi, pode marcar como lido", action: { kind: "server", name: "notifications.markRead", payload: {} } });
   choices.push({ id: "settings", label: "Configurar avisos", hint: "Notificações no celular e pop-up de lead", action: { kind: "href", href: "/notificacoes" } });
   blocks.push(question("ancora-choice", unread.length ? "O que você quer fazer?" : "Tudo lido. Quer ajustar seus avisos?", choices));

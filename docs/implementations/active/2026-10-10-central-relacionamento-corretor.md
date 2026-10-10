@@ -189,3 +189,12 @@ Sugestão: R0 + R1 primeiro (mensagens resolvem uma dor já hoje), depois R2. Pi
 5. **Performance.** Índices para o coletor (leads tenant + first_contact_at, lead_offers tenant + accepted_at, tarefas completed_at, vendas updated_at) e para o placar (eventos tenant + corretor + created_at), ou total semanal materializado. Celebrações em lote, sem um publish por evento.
 6. **Avisos (DEC-125).** Pontos e celebrações nunca vão para o WhatsApp. Envio pela Meta fora da janela de 24h exige template aprovado. Respeitar horário silencioso e limite por pessoa; "reenviar para quem não leu" conta no limite. O card "+15" **nunca** passa na frente de uma oferta de lead (fila com prioridade: oferta > celebração).
 7. **Processo.** O cron novo entra em `docs/runbooks/coolify-scheduled-tasks.md`. Migração 0188 confirmada livre em 2026-10-10.
+
+## 9. Como subir R0+R1 (ordem obrigatória)
+
+1. **Antes do deploy**, na máquina do Vinicios: `node scripts/apply-0188-engagement-relationship.mjs` (simula) e depois `--apply`. Ele cria os 4 índices nas tabelas existentes com CONCURRENTLY e depois as tabelas novas. Se o migrate do deploy rodar antes, os índices são criados sem CONCURRENTLY e travam escrita em `lead_offers`, `lead_tasks`, `lead_interactions` e `duty_presence_confirmations` durante o build (Vigia T31).
+2. Deploy.
+3. Coolify: tarefa `*/2 * * * *` em `/api/internal/jobs/engagement` (runbook).
+4. Ligar `feature_relationship_center_enabled` (Central) quando quiser. `feature_broker_engagement_enabled` só grava pontos no extrato, ninguém vê ainda.
+
+Pendências não bloqueantes do T31: envio de até 1.000 avisos dentro da ação pode demorar (mover para fila na R3); limite de envios por remetente (anti-spam).

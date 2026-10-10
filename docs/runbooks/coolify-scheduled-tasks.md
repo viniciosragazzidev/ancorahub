@@ -33,6 +33,7 @@ curl --fail --silent --show-error \
 | `/api/internal/jobs/meta-sync` | `0 * * * *` | Sincronização com a Meta | O código também limita a sincronização automática a uma vez por hora e aplica espera progressiva quando a Meta retorna limite de chamadas. |
 | `/api/internal/jobs/situation-learning` | `*/30 * * * *` | Aprendizado de situações: agrupa com a IA as perguntas que nenhuma situação cobriu e gera as sugestões de Atendimento → Situações; anexa a resposta do corretor; apaga perguntas com mais de 90 dias | No máximo 12 chamadas de IA por empresa por dia. Modelo: Super-admin → IA → "Modelo das sugestões de situações" (vazio = modelos padrão) |
 | `/api/internal/jobs/waha-cadence` | `*/5 * * * *` | Cadências WAHA corporativas | Desligadas no código (`getWahaCadenceConfig`); a tarefa é opcional e hoje não envia nada |
+| `/api/internal/jobs/engagement` | `*/2 * * * *` | Jornada do corretor: lê os fatos novos (mensagem enviada ao cliente, aceite, retorno, nota) e grava os pontos no extrato | Desligado pela flag `feature_broker_engagement_enabled` (responde `skipped`). Idempotente: pode repetir sem duplicar ponto. Antes do primeiro deploy, rodar `scripts/apply-0188-engagement-relationship.mjs --apply` (índices CONCURRENTLY). Plano: `docs/implementations/active/2026-10-10-central-relacionamento-corretor.md` |
 
 Os caminhos antigos em `/api/internal/cron/*` continuam respondendo para
 tarefas já publicadas; tarefas novas usam os caminhos acima.

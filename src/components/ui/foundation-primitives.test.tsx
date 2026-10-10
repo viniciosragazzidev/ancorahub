@@ -59,7 +59,7 @@ describe("foundation primitives", () => {
     )
 
     expect(screen.getByLabelText("Nome")).toHaveClass("rounded-full")
-    expect(screen.getByLabelText("Observações")).toHaveClass("rounded-full")
+    expect(screen.getByLabelText("Observações")).toHaveClass("rounded-2xl")
     expect(screen.getByRole("alert")).toHaveTextContent("Informe o nome.")
   })
 })

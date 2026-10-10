@@ -16,6 +16,7 @@ export const LIGHT_ALLOWED_PREFIXES = [
   "/l/",
   "/settings",
   "/notificacoes",
+  "/relacionamento",
   "/primeiro-acesso",
 ] as const;
 
@@ -38,18 +39,19 @@ export type LightMoreDestination = {
   href: string;
   label: string;
   /** Hidden unless the matching capability is on. */
-  requires?: "quoteSimulator" | "dutyCalendar";
+  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter";
 };
 
 export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/cotacao", label: "Cotação", requires: "quoteSimulator" },
   { href: "/plantoes", label: "Plantões", requires: "dutyCalendar" },
   { href: "/clientes", label: "Clientes" },
+  { href: "/relacionamento", label: "Mural da gestão", requires: "relationshipCenter" },
   { href: "/notificacoes", label: "Notificações" },
   { href: "/settings", label: "Configurações" },
 ];
 
-export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean }) {
+export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean }) {
   return LIGHT_MORE_DESTINATIONS.filter((item) => !item.requires || capabilities[item.requires]);
 }
 
@@ -134,6 +136,7 @@ const RULES: readonly RouteRule[] = [
         : { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true, chat: true },
   },
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/relacionamento"), route: { title: "Mural da gestão", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
   // Settings is a list of sections; ?tab opens one and back returns to the list.

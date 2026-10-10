@@ -45,6 +45,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const brokerDutyCalendarFlagPromise = context.role === "broker"
     ? getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR)
     : Promise.resolve("false");
+  const relationshipFlagPromise = context.role === "broker"
+    ? getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")
+    : Promise.resolve("false");
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   const headersPromise = headers();
   const tenantPromise = getDatabase()
@@ -88,6 +91,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     membershipRows,
     cleanUiEnabled,
     brokerDutyCalendarFlag,
+    relationshipFlag,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -96,6 +100,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     membershipPromise,
     cleanUiPromise,
     brokerDutyCalendarFlagPromise,
+    relationshipFlagPromise,
   ]);
 
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
@@ -166,6 +171,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
+        showRelationship={isLightBroker && relationshipFlag === "true"}
         branding={{
           tenantName: tenant?.name ?? null,
           brandColor: tenant?.brandColor ?? null,

@@ -24,6 +24,7 @@ export function LightMoreSheet({
   user,
   showQuoteSimulator,
   showDutyCalendar,
+  showRelationship = false,
   availability,
   availabilityPending,
   onChangeAvailability,
@@ -33,11 +34,12 @@ export function LightMoreSheet({
   user?: { name: string | null; email: string | null };
   showQuoteSimulator: boolean;
   showDutyCalendar: boolean;
+  showRelationship?: boolean;
   availability: LightAvailability;
   availabilityPending: boolean;
   onChangeAvailability: (next: "available" | "paused") => void;
 }) {
-  const destinations = getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar });
+  const destinations = getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship });
 
   return (
     <BottomSheet

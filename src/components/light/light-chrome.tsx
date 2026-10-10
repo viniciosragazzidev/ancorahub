@@ -30,6 +30,7 @@ export function LightChrome({
   user,
   showQuoteSimulator = false,
   showDutyCalendar = false,
+  showRelationship = false,
   initialAvailability = "available",
 }: {
   children: ReactNode;
@@ -38,6 +39,7 @@ export function LightChrome({
   user?: { name: string | null; email: string | null };
   showQuoteSimulator?: boolean;
   showDutyCalendar?: boolean;
+  showRelationship?: boolean;
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
 }) {
@@ -56,6 +58,7 @@ export function LightChrome({
       user={user}
       showQuoteSimulator={showQuoteSimulator}
       showDutyCalendar={showDutyCalendar}
+      showRelationship={showRelationship}
       availability={availability}
       availabilityPending={isPending}
       onChangeAvailability={setStatus}

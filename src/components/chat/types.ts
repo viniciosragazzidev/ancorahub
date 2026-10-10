@@ -30,7 +30,8 @@ export type ChatServerActionName =
   | "lead.addNote"
   | "duty.pause"
   | "duty.resume"
-  | "notifications.markRead";
+  | "notifications.markRead"
+  | "relationship.ack";
 
 export type ChatChoice = {
   id: string;

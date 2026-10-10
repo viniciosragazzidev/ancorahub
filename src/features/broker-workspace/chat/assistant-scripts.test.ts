@@ -326,4 +326,10 @@ describe("buildAncoraScript", () => {
     expect(questionBlocks(read)[0]?.choices.map(({ id }) => id)).toEqual(["settings"]);
     expect(read.status?.tone).toBe("idle");
   });
+
+  it("offers \"Ciente\" while a Central message asking for confirmation is unread", () => {
+    const script = buildAncoraScript({ now, notifications: [{ ...notification("9", "2026-10-09T08:00:00-03:00", false), type: "relationship.confirmation" }] });
+    const ack = questionBlocks(script)[0]?.choices.find(({ id }) => id === "relationship-ack");
+    expect(ack?.action).toEqual({ kind: "server", name: "relationship.ack", payload: {} });
+  });
 });

@@ -857,7 +857,10 @@ export const leadInteractions = pgTable(
     metadata: jsonb("metadata"),
     createdAt,
   },
-  (table) => [index("lead_interactions_lead_created_idx").on(table.leadId, table.createdAt)],
+  (table) => [
+    index("lead_interactions_lead_created_idx").on(table.leadId, table.createdAt),
+    index("lead_interactions_note_created_idx").on(table.createdAt).where(sql`${table.tipo} = 'note'`),
+  ],
 );
 
 export const leadTaskAssignees = pgTable(
@@ -894,6 +897,7 @@ export const leadTasks = pgTable(
   (table) => [
     index("lead_tasks_tenant_lead_idx").on(table.tenantId, table.leadId),
     index("lead_tasks_assigned_due_idx").on(table.assignedTo, table.dueAt),
+    index("lead_tasks_tenant_completed_at_partial_idx").on(table.tenantId, table.completedAt).where(sql`${table.completedAt} is not null`),
   ],
 );
 
@@ -1480,6 +1484,7 @@ export const dutyPresenceConfirmations = pgTable(
     uniqueIndex("duty_presence_occurrence_assignment_unique").on(table.tenantId, table.assignmentId, table.dutyDate, table.shiftStartsAt, table.shiftEndsAt),
     index("duty_presence_schedule_date_idx").on(table.tenantId, table.scheduleId, table.dutyDate),
     index("duty_presence_broker_date_idx").on(table.tenantId, table.brokerId, table.dutyDate, table.status),
+    index("duty_presence_tenant_confirmed_at_partial_idx").on(table.tenantId, table.confirmedAt).where(sql`${table.confirmedAt} is not null`),
     check("duty_presence_status_check", sql`${table.status} in ('pending', 'confirmed', 'expired', 'absent')`),
     check("duty_presence_notification_status_check", sql`${table.notificationStatus} in ('pending', 'dispatching', 'queued', 'sent', 'error')`),
   ],
@@ -3236,6 +3241,7 @@ export const leadOffers = pgTable(
     index("lead_offers_tenant_lead_status_idx").on(table.tenantId, table.leadId, table.status),
     index("lead_offers_broker_status_expires_idx").on(table.brokerId, table.status, table.expiresAt),
     index("lead_offers_broker_accepted_at_partial_idx").on(table.brokerId, table.acceptedAt).where(sql`${table.acceptedAt} is not null`),
+    index("lead_offers_tenant_accepted_at_partial_idx").on(table.tenantId, table.acceptedAt).where(sql`${table.acceptedAt} is not null`),
     index("lead_offers_whatsapp_msg_idx").on(table.whatsappMessageId),
   ],
 );
@@ -3542,6 +3548,99 @@ export const performanceAwards = pgTable(
   (table) => [
     uniqueIndex("performance_awards_season_rank_title_unique").on(table.seasonId, table.rankPosition, table.title),
     index("performance_awards_tenant_season_idx").on(table.tenantId, table.seasonId),
+  ],
+);
+
+/* ─── Engagement (jornada do corretor) e Central de relacionamento (0188) ─── */
+
+/** Points ledger: the source of truth, every total is a sum of it. */
+export const engagementPointEvents = pgTable(
+  "engagement_point_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    ruleKey: text("rule_key").notNull(),
+    points: integer("points").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    /** Day of the fact in America/Sao_Paulo (daily caps and missions). */
+    periodDay: date("period_day").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    reversalReason: text("reversal_reason"),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("engagement_point_events_tenant_key_unique").on(table.tenantId, table.idempotencyKey),
+    index("engagement_point_events_tenant_broker_occurred_idx").on(table.tenantId, table.brokerId, table.occurredAt),
+    index("engagement_point_events_tenant_day_idx").on(table.tenantId, table.periodDay, table.ruleKey),
+  ],
+);
+
+export const engagementWatermarks = pgTable(
+  "engagement_watermarks",
+  {
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    source: text("source").notNull(),
+    lastRunAt: timestamp("last_run_at", { withTimezone: true }).notNull(),
+    updatedAt,
+  },
+  (table) => [primaryKey({ columns: [table.tenantId, table.source] })],
+);
+
+/** Per-tenant adjustments over the code catalog (validated with zod). */
+export const engagementSettings = pgTable("engagement_settings", {
+  tenantId: text("tenant_id").primaryKey().references(() => tenants.id, { onDelete: "cascade" }),
+  rules: jsonb("rules").$type<Record<string, unknown>>().notNull().default({}),
+  updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  updatedAt,
+});
+
+export const relationshipBroadcasts = pgTable(
+  "relationship_broadcasts",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    senderId: text("sender_id").notNull().references(() => user.id),
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    audience: jsonb("audience").$type<Record<string, unknown>>().notNull(),
+    audienceLabel: text("audience_label").notNull(),
+    channel: text("channel").notNull().default("app"),
+    requireAck: boolean("require_ack").notNull().default(false),
+    recipientsCount: integer("recipients_count").notNull().default(0),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    index("relationship_broadcasts_tenant_created_idx").on(table.tenantId, table.createdAt),
+    check("relationship_broadcasts_kind_check", sql`${table.kind} in ('notice', 'recognition', 'confirmation')`),
+    check("relationship_broadcasts_channel_check", sql`${table.channel} in ('app', 'app_whatsapp')`),
+  ],
+);
+
+export const relationshipBroadcastRecipients = pgTable(
+  "relationship_broadcast_recipients",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    broadcastId: text("broadcast_id").notNull().references(() => relationshipBroadcasts.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    /** idempotency_key of the in-app notification (its read_at also counts as read). */
+    notificationKey: text("notification_key").notNull(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    ackAt: timestamp("ack_at", { withTimezone: true }),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("relationship_recipients_broadcast_broker_unique").on(table.broadcastId, table.brokerId),
+    index("relationship_recipients_tenant_broker_idx").on(table.tenantId, table.brokerId, table.createdAt),
   ],
 );
 

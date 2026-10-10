@@ -946,6 +946,13 @@
                         "when":  1791561600000,
                         "tag":  "0187_duty_schedule_type_groups",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  135,
+                        "version":  "7",
+                        "when":  1791648000000,
+                        "tag":  "0188_broker_engagement_relationship",
+                        "breakpoints":  true
                     }
                 ]
 }

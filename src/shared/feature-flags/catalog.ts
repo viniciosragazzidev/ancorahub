@@ -135,6 +135,22 @@ export const FEATURE_FLAGS = {
     description: "Habilita a IA nos assistentes do app do corretor (texto livre e sugestões de ação). Plano: docs/implementations/active/2026-10-10-ia-assistentes-corretor.md.",
   },
 
+  BROKER_ENGAGEMENT: {
+    key: "feature_broker_engagement_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Liga a jornada do corretor: o coletor grava pontos por fatos do sistema (contato com mensagem enviada, aceite rápido, retorno em dia). Plano: docs/implementations/active/2026-10-10-central-relacionamento-corretor.md.",
+  },
+
+  RELATIONSHIP_CENTER: {
+    key: "feature_relationship_center_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Liga a Central de relacionamento: direção envia avisos a corretores, unidades, plantões ou equipes e acompanha quem leu.",
+  },
+
   CONVERSATION_INTELLIGENCE: {
     key: "feature_conversation_intelligence_enabled",
     scope: "global",
