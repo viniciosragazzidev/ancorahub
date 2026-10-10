@@ -66,7 +66,7 @@ export function MyTeamPage({ initialData }: { initialData: SupervisorTeamPageDat
           <Link className={styles.memberLink} href={`/equipe/${encodeURIComponent(member.id)}`}><Avatar name={member.name} src={member.imageUrl ?? undefined} size="lg" status={member.availability === "available" ? "online" : "offline"} className={`${styles.avatar} ${member.late ? styles.avatarAlert : ""}`} style={{ "--team-hue": `${teamAvatarHue(member.name)}` } as React.CSSProperties} /><span>{member.name}<small><Badge tone={member.availability === "available" ? "success" : "neutral"} size="sm">{member.availability === "available" ? "Disponível" : member.availability === "paused" ? "Pausado" : "Fora do ar"}</Badge></small></span></Link>
           <div className={styles.memberNumbers}><span><strong>{member.receivedToday || "·"}</strong> hoje</span><span><strong>{member.inService || "·"}</strong> em atendimento</span>{member.late ? <Badge tone="danger" size="sm">Precisa de você · {member.late}</Badge> : null}</div>
           <BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este membro." closeLabel="Fechar" detents={[0.38, 0.7]}>
-            <div className={styles.sheetActions}><Link href={`/equipe/${encodeURIComponent(member.id)}`}>Abrir perfil</Link><p>Remover este corretor da equipe? O histórico de leads dele será mantido.</p><Button variant="destructive" disabled={pending} onClick={() => removeMember(member.id)}>Remover da equipe</Button></div>
+            <MemberSheetActions memberId={member.id} memberName={member.name} pending={pending} onRemove={() => removeMember(member.id)} />
           </BottomSheet>
         </li>)}</ul> : <EmptyState title="Sua equipe ainda não tem membros" description="Adicione alguém da sua unidade ou envie um convite." action={<Button variant="outline" onClick={() => setActiveTab("unit")}>Ver corretores da unidade</Button>} />}
       </section> : null}
@@ -82,4 +82,32 @@ export function MyTeamPage({ initialData }: { initialData: SupervisorTeamPageDat
       </section> : null}
     </div>
   </div>;
+}
+
+const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] ?? name;
+
+/** Member actions in the sheet: shortcuts first, removal behind a confirmation step. */
+function MemberSheetActions({ memberId, memberName, pending, onRemove }: { memberId: string; memberName: string; pending: boolean; onRemove: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const id = encodeURIComponent(memberId);
+  return (
+    <div className={styles.sheetActions}>
+      <nav className={styles.sheetList} aria-label="Atalhos">
+        <Link href={`/equipe/${id}`} className={styles.sheetRow}><span>Ver perfil</span><small>Números, leads e notas de {firstNameOf(memberName)}</small></Link>
+        <Link href={`/relacionamento?brokerId=${id}`} className={styles.sheetRow}><span>Mandar recado</span><small>Pela Central de relacionamento</small></Link>
+        <Link href={`/relacionamento?brokerId=${id}&action=recognition`} className={styles.sheetRow}><span>Reconhecer</span><small>Um elogio que ele recebe no app</small></Link>
+      </nav>
+      {confirming ? (
+        <div className={styles.sheetDanger} role="group" aria-label="Confirmar remoção">
+          <p>Tirar {firstNameOf(memberName)} da sua equipe? Ele volta a ficar livre na unidade e o histórico de leads é mantido.</p>
+          <div className={styles.sheetDangerActions}>
+            <Button variant="ghost" onClick={() => setConfirming(false)}>Voltar</Button>
+            <Button variant="destructive" disabled={pending} onClick={onRemove}>Sim, remover</Button>
+          </div>
+        </div>
+      ) : (
+        <button type="button" className={styles.sheetRemove} onClick={() => setConfirming(true)}>Remover da equipe</button>
+      )}
+    </div>
+  );
 }
