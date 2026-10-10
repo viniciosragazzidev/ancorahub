@@ -132,7 +132,7 @@ export function GoalForm({ goal, teamMembers, branches, onDone }: GoalFormProps)
                 Selecione {scope === "broker" ? "um corretor" :
                   scope === "branch" ? "uma filial" : "uma equipe"}
               </option>
-              {scope === "broker" && teamMembers.map((m) => (
+              {scope === "broker" && teamMembers.filter((m) => m.role !== "supervisor").map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}{m.branchName ? ` — ${m.branchName}` : ""}
                 </option>
@@ -140,8 +140,9 @@ export function GoalForm({ goal, teamMembers, branches, onDone }: GoalFormProps)
               {scope === "branch" && branches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
               ))}
-              {scope === "team" && teamMembers.map((m) => (
-                <option key={m.id} value={m.id}>{m.name}</option>
+              {/* Team goal = the supervisor's team (sum of their brokers). */}
+              {scope === "team" && teamMembers.filter((m) => m.role === "supervisor").map((m) => (
+                <option key={m.id} value={m.id}>Equipe de {m.name}{m.branchName ? ` (${m.branchName})` : ""}</option>
               ))}
             </select>
           </div>

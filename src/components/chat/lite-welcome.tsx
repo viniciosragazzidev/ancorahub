@@ -10,6 +10,7 @@ import type { MascotShape } from "./types";
 
 /** Bump the version to show the card again after a future redesign. */
 const STORAGE_KEY = "ancora:lite-welcome:2026-10-chat";
+const SUPERVISOR_STORAGE_KEY = "ancora:lite-welcome:2026-10-supervisor";
 
 const TEAM: Array<{ shape: MascotShape; hue: number | null }> = [
   { shape: "logo", hue: null },
@@ -20,15 +21,28 @@ const TEAM: Array<{ shape: MascotShape; hue: number | null }> = [
   { shape: "nuvem", hue: 330 },
 ];
 
+/** Supervisor Lite: the team's assistants and what the supervisor does with one tap. */
+const SUPERVISOR_TEAM: Array<{ shape: MascotShape; hue: number | null }> = [
+  { shape: "logo", hue: null },
+  { shape: "mochi", hue: 150 },
+  { shape: "cubo", hue: 212 },
+  { shape: "nuvem", hue: 330 },
+];
+const SUPERVISOR_POINTS = [
+  { title: "Sua equipe no Início", text: "Equipe, Leads da equipe e Desempenho mostram quem precisa de você agora." },
+  { title: "Um toque resolve", text: "Cobrar, repassar um lead parado, mandar recado ou adicionar um corretor livre." },
+  { title: "Alertas e resumo do dia", text: "Lead da equipe sem contato chega na Âncora, e às 19h vem o resumo." },
+];
+
 const POINTS = [
   { title: "Seus assistentes no Início", text: "Leads, Plantão, Agenda, Cotação e Desempenho dizem o que fazer agora." },
   { title: "Um toque resolve", text: "As opções aparecem como respostas prontas: aceitar, chamar no WhatsApp, agendar." },
   { title: "Lead novo no topo da tela", text: "O aviso desce do topo; toque em Atender e a conversa abre." },
 ];
 
-function readSeen() {
+function readSeen(key: string) {
   try {
-    return window.localStorage.getItem(STORAGE_KEY) === "1";
+    return window.localStorage.getItem(key) === "1";
   } catch {
     return true; // Storage blocked: never trap the broker behind the card.
   }
@@ -39,18 +53,22 @@ function readSeen() {
  * Lite (chat) app: the team of assistants lands one by one, then three short
  * points and one button. Remembered in localStorage (a per-viewer convenience).
  */
-export function LiteWelcome() {
+export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supervisor" } = {}) {
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
+  const isSupervisor = variant === "supervisor";
+  const storageKey = isSupervisor ? SUPERVISOR_STORAGE_KEY : STORAGE_KEY;
+  const team = isSupervisor ? SUPERVISOR_TEAM : TEAM;
+  const points = isSupervisor ? SUPERVISOR_POINTS : POINTS;
 
   useEffect(() => {
     // After mount only: the server render never shows it, so there is no flash or mismatch.
-    const timer = window.setTimeout(() => { if (!readSeen()) setOpen(true); }, 350);
+    const timer = window.setTimeout(() => { if (!readSeen(storageKey)) setOpen(true); }, 350);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [storageKey]);
 
   function close() {
-    try { window.localStorage.setItem(STORAGE_KEY, "1"); } catch { /* ignore */ }
+    try { window.localStorage.setItem(storageKey, "1"); } catch { /* ignore */ }
     setOpen(false);
   }
 
@@ -77,7 +95,7 @@ export function LiteWelcome() {
             transition={{ type: "spring", stiffness: 380, damping: 32 }}
           >
             <div className={styles.team} aria-hidden="true">
-              {TEAM.map((member, index) => (
+              {team.map((member, index) => (
                 <motion.span
                   key={member.shape}
                   className={styles.member}
@@ -92,12 +110,12 @@ export function LiteWelcome() {
 
             <motion.div initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, delay: reduce ? 0 : 0.55 }}>
               <span className={styles.tag}>Novidade</span>
-              <h2 id="lite-welcome-title" className={styles.title}>O app do corretor mudou</h2>
-              <p className={styles.lead}>Bem-vindo! Agora tudo funciona como uma conversa: seus assistentes trazem o que fazer e você responde com um toque.</p>
+              <h2 id="lite-welcome-title" className={styles.title}>{isSupervisor ? "Seu app de supervisor chegou" : "O app do corretor mudou"}</h2>
+              <p className={styles.lead}>{isSupervisor ? "Bem-vindo! Sua equipe agora cabe numa conversa: os assistentes mostram quem precisa de você e você age com um toque." : "Bem-vindo! Agora tudo funciona como uma conversa: seus assistentes trazem o que fazer e você responde com um toque."}</p>
             </motion.div>
 
             <ul className={styles.points}>
-              {POINTS.map((point, index) => (
+              {points.map((point, index) => (
                 <motion.li
                   key={point.title}
                   className={styles.point}
@@ -127,7 +145,7 @@ export function LiteWelcome() {
                 autoFocus
                 whileTap={reduce ? undefined : { scale: 0.97 }}
               >
-                Fazer o tour (3 min)
+                {isSupervisor ? "Fazer o tour (2 min)" : "Fazer o tour (3 min)"}
               </motion.button>
               <button type="button" className={styles.later} onClick={close}>Agora não</button>
             </motion.div>

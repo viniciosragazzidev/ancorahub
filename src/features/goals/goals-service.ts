@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
+import { inSupervisorTeam } from "@/features/team/supervisor-scope";
 
 export async function calculateGoalProgress(goalId: string): Promise<void> {
   const db = getDatabase();
@@ -101,9 +102,8 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
           )`,
         );
       } else if (goal.scope === "team") {
-        // Team scope looks for a specific set of brokers
-        // For MVP, this is simplified to the scopeId matching a specific query
-        conditions.push(sql`1=1`); // TODO: implement team membership lookup
+        // Team goal: scopeId is the supervisor; the team is their active brokers (no supervisor = nothing).
+        conditions.push(goal.scopeId ? inSupervisorTeam(schema.sales.brokerId, goal.tenantId, goal.scopeId) : sql`false`);
       }
 
       const [countResult] = await db
@@ -139,6 +139,8 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
               AND ${schema.leads.archivedAt} IS NULL
           )`,
         );
+      } else if (goal.scope === "team") {
+        conditions.push(goal.scopeId ? inSupervisorTeam(schema.sales.brokerId, goal.tenantId, goal.scopeId) : sql`false`);
       }
 
       const [revenueResult] = await db
@@ -163,6 +165,8 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
         conditions.push(eq(schema.leads.corretorId, goal.scopeId));
       } else if (goal.scope === "branch" && goal.scopeId) {
         conditions.push(eq(schema.leads.branchId, goal.scopeId));
+      } else if (goal.scope === "team") {
+        conditions.push(goal.scopeId ? inSupervisorTeam(schema.leads.corretorId, goal.tenantId, goal.scopeId) : sql`false`);
       }
 
       const [leadsResult] = await db
@@ -180,7 +184,9 @@ async function computeCurrentValue(goal: GoalRow): Promise<number> {
           ? eq(schema.leads.corretorId, goal.scopeId)
           : goal.scope === "branch" && goal.scopeId
             ? eq(schema.leads.branchId, goal.scopeId)
-            : sql`1=1`;
+            : goal.scope === "team"
+              ? goal.scopeId ? inSupervisorTeam(schema.leads.corretorId, goal.tenantId, goal.scopeId) : sql`false`
+              : sql`1=1`;
 
       const [rateResult] = await db
         .select({

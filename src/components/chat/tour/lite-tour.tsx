@@ -7,7 +7,13 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AssistantAvatar } from "../assistant-avatar";
 import { DynamicNotice, type DynamicNoticeItem } from "../dynamic-notice";
 import styles from "./lite-tour.module.css";
-import { availableSteps, narrationSrc, TOUR_STEPS, TOUR_STORAGE_KEY, totalXp, type TourStep } from "./tour-steps";
+import { availableSteps, narrationSrc, SUPERVISOR_TOUR_STEPS, SUPERVISOR_TOUR_STORAGE_KEY, TOUR_STEPS, TOUR_STORAGE_KEY, totalXp, type TourStep } from "./tour-steps";
+
+export type TourVariant = "broker" | "supervisor";
+const TOUR_CONFIG: Record<TourVariant, { steps: TourStep[]; storageKey: string; badge: string }> = {
+  broker: { steps: TOUR_STEPS, storageKey: TOUR_STORAGE_KEY, badge: "Pronto para atender" },
+  supervisor: { steps: SUPERVISOR_TOUR_STEPS, storageKey: SUPERVISOR_TOUR_STORAGE_KEY, badge: "Pronto para liderar" },
+};
 
 export const START_TOUR_EVENT = "ancora:start-lite-tour";
 const MUTE_KEY = "ancora:lite-tour:muted";
@@ -22,8 +28,8 @@ export function startLiteTour() {
   window.dispatchEvent(new Event(START_TOUR_EVENT));
 }
 
-export function hasSeenLiteTour() {
-  try { return window.localStorage.getItem(TOUR_STORAGE_KEY) === "done"; } catch { return true; }
+export function hasSeenLiteTour(variant: TourVariant = "broker") {
+  try { return window.localStorage.getItem(TOUR_CONFIG[variant].storageKey) === "done"; } catch { return true; }
 }
 
 type Rect = { x: number; y: number; width: number; height: number; radius: number };
@@ -70,7 +76,8 @@ const NOTICE_DEMO: DynamicNoticeItem = {
  * challenge, the new-lead notice preview and a finale with a badge. Each step
  * plays /onboarding/narracao/{id}.mp3 when the file exists (mute toggle).
  */
-export function LiteTour() {
+export function LiteTour({ variant = "broker" }: { variant?: TourVariant } = {}) {
+  const config = TOUR_CONFIG[variant];
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [steps, setSteps] = useState<TourStep[]>([]);
@@ -101,7 +108,7 @@ export function LiteTour() {
     // Usually runs inside the tap that opened the tour; from ?tour=1 the first tour button unlocks it instead.
     ensureAudio();
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const list = availableSteps(TOUR_STEPS, (target) => isVisible(targetElement(target)));
+    const list = availableSteps(config.steps, (target) => isVisible(targetElement(target)));
     earned.current = new Set();
     try { setMuted(window.localStorage.getItem(MUTE_KEY) === "1"); } catch { /* ignore */ }
     setSteps(list);
@@ -109,7 +116,7 @@ export function LiteTour() {
     setXp(0);
     setAnswer(null);
     setOpen(true);
-  }, [ensureAudio]);
+  }, [ensureAudio, config.steps]);
 
   // Start from the event (welcome card, menu) or from ?tour=1.
   useEffect(() => {
@@ -179,13 +186,13 @@ export function LiteTour() {
   }, []);
 
   const close = useCallback((completed: boolean) => {
-    try { window.localStorage.setItem(TOUR_STORAGE_KEY, completed ? "done" : "skipped"); } catch { /* ignore */ }
+    try { window.localStorage.setItem(config.storageKey, completed ? "done" : "skipped"); } catch { /* ignore */ }
     audioRef.current?.pause();
     setOpen(false);
     setRect(null);
     const back = returnFocus.current;
     if (back?.isConnected) window.setTimeout(() => back.focus({ preventScroll: true }), 0);
-  }, []);
+  }, [config.storageKey]);
 
   const next = useCallback(() => {
     if (!step) return;
@@ -367,7 +374,7 @@ export function LiteTour() {
           transition={{ duration: 0.28, ease: EASE }}
         >
           {step.kind === "intro" ? <Team reduce={Boolean(reduce)} /> : null}
-          {step.kind === "finale" ? <Badge xp={xp} maxXp={maxXp} reduce={Boolean(reduce)} /> : null}
+          {step.kind === "finale" ? <Badge xp={xp} maxXp={maxXp} reduce={Boolean(reduce)} label={config.badge} /> : null}
 
           <div className={styles.cardHead}>
             {step.kind === "spotlight" || step.kind === "demo-reply" || step.kind === "demo-notice" ? (
@@ -459,7 +466,7 @@ function Team({ reduce }: { reduce: boolean }) {
   );
 }
 
-function Badge({ xp, maxXp, reduce }: { xp: number; maxXp: number; reduce: boolean }) {
+function Badge({ xp, maxXp, reduce, label }: { xp: number; maxXp: number; reduce: boolean; label: string }) {
   return (
     <div className={styles.badgeWrap}>
       <motion.div
@@ -471,7 +478,7 @@ function Badge({ xp, maxXp, reduce }: { xp: number; maxXp: number; reduce: boole
         <AssistantAvatar shape="logo" hue={null} size={64} />
       </motion.div>
       <motion.p className={styles.badgeLabel} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: reduce ? 0 : 0.45 }}>
-        Selo: Pronto para atender · {xp} de {maxXp} XP
+        Selo: {label} · {xp} de {maxXp} XP
       </motion.p>
     </div>
   );

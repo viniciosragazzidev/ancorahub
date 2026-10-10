@@ -143,6 +143,10 @@ Telas:
 | P8 | Meta da equipe: metas com escopo `team` e `scopeId` = supervisor, progresso = soma dos corretores (resolve o TODO de `goals-service.ts`), barra no Início | Maestro | - | Meta da equipe com progresso real |
 | P9 | Pedido de transferência: supervisor pede um corretor de outra equipe e o gestor aprova ou recusa (tabela `supervisor_transfer_requests`, notificação ao gestor) | Maestro | 0191 | Transferência só acontece com aprovação |
 
+**Execução P3 (2026-10-10):** implementados tabela/schema e migration 0190, actions de escrita/leitura com escopo tenant/equipe/unidade e auditoria sem conteúdo, formulário e histórico na ficha Lite, além do cartão somente leitura para Diretor/Gestor. Testes focados (8), ESLint e TypeScript passaram. A migration não foi aplicada nesta tarefa. `npm run build` falha antes da compilação por `node_modules` symlink fora da raiz do Turbopack; entrega local mantida como parcial até a aplicação e validação de build.
+
+**Execucao P9 (2026-10-10):** migration 0191 e schema para pedidos pendentes unicos por corretor, script com simulacao padrao, actions tenant-scoped para solicitar/listar/decidir, auditoria transacional, notificacoes governadas pela capability `supervisor_transfer`, limite de 30 e troca condicional de equipe na aprovacao. O Lite ganhou `/equipe/transferencia`; a gestao decide em `/equipe`. Testes focados (10), ESLint focado e TypeScript passaram. A suite completa apontou 6 falhas fora do P9 apos corrigir a expectativa antiga da rota; o lint global aponta 993 ocorrencias de encoding em 2 arquivos. O build para antes da compilacao porque o symlink de node_modules aponta para fora da raiz do worktree. A migration nao foi aplicada. Evidencia: reports/agent/verification/2026-10-10-lite-supervisor-p9.md.
+
 ### 8.3 Ordem e paralelismo
 
 1. **Fechar o S2:** QA do Cinzel, revisão do Vigia, commit.

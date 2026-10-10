@@ -18,6 +18,8 @@ export const notificationCapabilities = [
   { id: "lead_archived", label: "Lead arquivado", description: "Notifica quando um lead é arquivado (disponível para uso futuro).", channels: "Toast/in-app" },
   { id: "quick_reply_human", label: "Quick Reply e atendimento humano", description: "Aviso ao corretor quando uma mensagem foi resolvida automaticamente ou solicita atendimento humano.", channels: "Toast + push" },
   { id: "duty_assignment", label: "Escala de plantão", description: "Avisa o corretor quando a gestão o coloca em um plantão.", channels: "Toast + push" },
+  { id: "supervisor_digest", label: "Resumo do dia para o supervisor", description: "Às 19h, o dia da equipe do supervisor em poucas linhas (leads, atrasos, destaque e meta).", channels: "Toast + push" },
+  { id: "supervisor_transfer", label: "Pedido de transferência entre equipes", description: "Avisa os gestores sobre pedidos de transferência de corretores entre equipes de supervisão.", channels: "Toast + push" },
   { id: "relationship_message", label: "Mensagens da Central de relacionamento", description: "Avisos, reconhecimentos e pedidos de confirmação que a direção envia aos corretores.", channels: "Toast + push" },
   { id: "lead_ai_insight", label: "Insight e Diagnóstico de IA na Conversa", description: "Notifica o corretor e a gestão quando a IA identifica sinais de compra, objeções críticas ou sugere avanço no funil.", channels: "Toast + push" },
 ] as const;

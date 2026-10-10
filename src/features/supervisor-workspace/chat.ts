@@ -19,7 +19,7 @@ function minutesSince(date: Date | null, now: Date) {
   return date ? Math.max(0, Math.round((now.getTime() - date.getTime()) / 60_000)) : null;
 }
 
-function thread(id: "ancora" | "equipe" | "equipe-leads" | "equipe-desempenho", values: Pick<ThreadSummary, "preview" | "at" | "unread" | "waitingYou">): ThreadSummary {
+function thread(id: "ancora" | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho", values: Pick<ThreadSummary, "preview" | "at" | "unread" | "waitingYou">): ThreadSummary {
   const definition = ASSISTANTS[id];
   return { id: `assistant:${id}`, kind: "assistant", assistant: id, name: definition.name, verified: definition.verified, href: definition.href, shape: definition.shape, hue: definition.hue, ...values };
 }
@@ -58,6 +58,18 @@ export function buildSupervisorThreads(data: SupervisorWorkspaceData, now: Date)
       at: data.attention[0]?.assignedAt?.toISOString() ?? null,
       unread: false,
       waitingYou: data.today.late > 0,
+    }),
+    thread("equipe-plantao", {
+      preview: !data.duty.length
+        ? "Ninguém da equipe escalado hoje."
+        : (() => {
+          const pending = data.duty.filter((item) => item.presence === "pending").length;
+          const absent = data.duty.filter((item) => item.presence === "absent").length;
+          return absent ? `${absent} falta(s) no plantão de hoje.` : pending ? `${pending} esperando confirmar presença.` : `${data.duty.length} da equipe de plantão hoje.`;
+        })(),
+      at: null,
+      unread: false,
+      waitingYou: data.duty.some((item) => item.presence === "absent"),
     }),
     thread("equipe-desempenho", {
       preview: best?.stats?.accepted ? `${firstName(best.name)} lidera a semana com ${best.stats.accepted} aceites.` : "Placar da semana da sua equipe.",
@@ -241,12 +253,50 @@ function teamPerformanceScript(data: SupervisorWorkspaceData, now: Date): ChatSc
   return { blocks, status: { label: "Semana da equipe", tone: "idle" } };
 }
 
-export type SupervisorScriptId = "equipe" | "equipe-leads" | "equipe-desempenho";
+const PRESENCE: Record<string, string> = { confirmed: "presença confirmada", pending: "esperando confirmar", absent: "faltou", expired: "não confirmou", not_required: "online" };
+
+/** Plantão da equipe (P5): who of the team is on duty today, read only (the roster is the manager's). */
+function teamDutyScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
+  if (!data.team.length) return emptyTeam(now, "equipe-plantao");
+  const blocks: ChatBlock[] = [date("equipe-plantao-date", now)];
+  if (!data.duty.length) {
+    blocks.push(say("equipe-plantao-empty", "Ninguém da sua equipe está escalado hoje."));
+    return { blocks, status: { label: "Sem plantão hoje", tone: "idle" } };
+  }
+  const absent = data.duty.filter((item) => item.presence === "absent" || item.presence === "expired");
+  const pending = data.duty.filter((item) => item.presence === "pending");
+  blocks.push(say("equipe-plantao-summary", `${data.duty.length === 1 ? "1 corretor da equipe está" : `${data.duty.length} corretores da equipe estão`} no plantão de hoje.${pending.length ? ` ${pending.length} ainda não confirmou presença.` : ""}${absent.length ? ` ${absent.length} faltou.` : ""}`));
+  blocks.push({
+    type: "list",
+    id: "equipe-plantao-list",
+    title: "Plantão de hoje",
+    items: data.duty.map((item, index) => ({
+      id: `${item.brokerId}-${index}`,
+      primary: item.brokerName,
+      secondary: `${item.scheduleName} · ${item.startsAt} às ${item.endsAt}${item.paused ? " · pausado" : ""}`,
+      trailing: PRESENCE[item.presence] ?? item.presence,
+      href: `/equipe/${item.brokerId}`,
+    })),
+  });
+  const follow = [...absent, ...pending].slice(0, 3);
+  if (follow.length) {
+    blocks.push({
+      type: "question",
+      id: "equipe-plantao-choice",
+      prompt: "Quer falar com alguém?",
+      choices: follow.map((item) => ({ id: `duty-${item.brokerId}`, label: `Ver ${firstName(item.brokerName)}`, hint: PRESENCE[item.presence], action: { kind: "href" as const, href: `/equipe/${item.brokerId}` } })),
+    });
+  }
+  return { blocks, status: absent.length ? { label: `${absent.length} falta(s)`, tone: "waiting" } : pending.length ? { label: "Confirmações pendentes", tone: "waiting" } : { label: "Plantão em dia", tone: "idle" } };
+}
+
+export type SupervisorScriptId = "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho";
 
 export function buildSupervisorScript(id: SupervisorScriptId, data: SupervisorWorkspaceData, now: Date): ChatScript {
   switch (id) {
     case "equipe": return teamScript(data, now);
     case "equipe-leads": return teamLeadsScript(data, now);
+    case "equipe-plantao": return teamDutyScript(data, now);
     case "equipe-desempenho": return teamPerformanceScript(data, now);
   }
 }

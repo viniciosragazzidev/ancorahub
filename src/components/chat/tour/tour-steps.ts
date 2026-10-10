@@ -202,6 +202,132 @@ export const TOUR_STEPS: TourStep[] = [
   },
 ];
 
+/** Supervisor Lite (2026-10-10): same engine, the team instead of the broker's own work. */
+export const SUPERVISOR_TOUR_VERSION = "2026-10-supervisor-tour-v1";
+export const SUPERVISOR_TOUR_STORAGE_KEY = `ancora:${SUPERVISOR_TOUR_VERSION}`;
+
+export const SUPERVISOR_TOUR_STEPS: TourStep[] = [
+  {
+    id: "sup-00-apresentacao",
+    kind: "intro",
+    title: "Sua equipe na palma da mão",
+    body: "Em uns 2 minutos você conhece o app do supervisor. Cada passo vale XP, e no fim você leva o selo de pronto para liderar.",
+    narration:
+      "Olá! Este é o app do supervisor da Âncora. Aqui você acompanha a sua equipe como se fosse uma conversa: os assistentes mostram quem precisa de você e o que fazer, e você age com um toque. Vamos dar uma volta rápida? São uns dois minutinhos.",
+    xp: 10,
+    mascot: { shape: "logo", hue: null },
+  },
+  {
+    id: "sup-01-inicio",
+    kind: "spotlight",
+    target: "home-header",
+    title: "Este é o seu Início",
+    body: "A lista das conversas sobre a sua equipe. O que precisa de você sobe para o topo.",
+    narration:
+      "Este é o seu Início. Ele funciona como a lista de conversas de um aplicativo de mensagem, só que sobre a sua equipe: o que precisa da sua atenção aparece primeiro.",
+    xp: 10,
+    mascot: { shape: "logo", hue: null },
+  },
+  {
+    id: "sup-02-abas",
+    kind: "spotlight",
+    target: "home-tabs",
+    title: "Assistentes e Leads parados",
+    body: "Em Assistentes ficam as áreas da supervisão. Em Leads, os leads da equipe esperando o primeiro contato.",
+    narration:
+      "Aqui você alterna entre duas visões. Em Assistentes ficam as áreas da supervisão. Em Leads aparecem os leads da sua equipe que ainda esperam o primeiro contato, com o nome do corretor de cada um.",
+    xp: 10,
+    mascot: { shape: "cubo", hue: 212 },
+  },
+  {
+    id: "sup-03-equipe",
+    kind: "spotlight",
+    target: "thread-equipe",
+    title: "Equipe",
+    body: "Quem está disponível, quem precisa de você e a ficha de cada corretor. Também é onde você adiciona corretores livres da unidade.",
+    narration:
+      "A conversa Equipe mostra cada corretor: se está disponível, quantos leads tem em atendimento e quem está com lead atrasado. Tocando no nome você abre a ficha dele, com números, leads e feedbacks. E se tiver corretor da sua unidade sem supervisor, ele aparece aqui para você adicionar.",
+    xp: 15,
+    mascot: { shape: "mochi", hue: 150 },
+  },
+  {
+    id: "sup-04-leads",
+    kind: "spotlight",
+    target: "thread-equipe-leads",
+    title: "Leads da equipe",
+    body: "Os leads parados, do mais atrasado para o menos. Se o corretor não puder atender, você repassa para outro da equipe, com o motivo.",
+    narration:
+      "Em Leads da equipe ficam os leads esperando o primeiro contato, do mais atrasado para o menos. Você abre o lead, cobra o corretor, e se ele não puder atender, repassa para outro da equipe. O motivo fica registrado no histórico.",
+    xp: 15,
+    mascot: { shape: "cubo", hue: 212 },
+  },
+  {
+    id: "sup-04b-plantao",
+    kind: "spotlight",
+    target: "thread-equipe-plantao",
+    title: "Plantão da equipe",
+    body: "Quem da equipe está escalado hoje, o horário e se confirmou presença. Quem faltou aparece primeiro.",
+    narration:
+      "Plantão da equipe mostra quem dos seus corretores está escalado hoje, o horário e se já confirmou presença. Se alguém faltou ou ainda não confirmou, você vê aqui e já abre a ficha dele.",
+    xp: 15,
+    mascot: { shape: "onigiri", hue: 28 },
+  },
+  {
+    id: "sup-05-desempenho",
+    kind: "spotlight",
+    target: "thread-equipe-desempenho",
+    title: "Desempenho da equipe",
+    body: "O placar da semana só entre os seus corretores: aceites, tempo para aceitar e atendimentos.",
+    narration:
+      "Desempenho da equipe é o placar da semana, só entre os seus corretores: quem mais aceita, quem aceita mais rápido e quantos atendimentos cada um fez. Bom lugar para achar quem merece um reconhecimento.",
+    xp: 15,
+    mascot: { shape: "nuvem", hue: 330 },
+  },
+  {
+    id: "sup-06-ancora",
+    kind: "spotlight",
+    target: "thread-ancora",
+    title: "Âncora",
+    body: "Os avisos da empresa e os alertas da sua equipe. Às 19h chega aqui o resumo do dia.",
+    narration:
+      "Na Âncora chegam os avisos da empresa e os alertas da sua equipe, como lead sem contato no prazo. E todo dia às sete da noite chega aqui o resumo do dia da equipe.",
+    xp: 10,
+    mascot: { shape: "logo", hue: null },
+  },
+  {
+    id: "sup-07-acoes",
+    kind: "spotlight",
+    target: "home-pill",
+    title: "Ações da equipe",
+    body: "Atalho para ver a equipe ou mandar um recado para todos, como um aviso, um parabéns ou um pedido de ciente.",
+    narration:
+      "Este botão abre as ações da equipe: ver a sua equipe ou mandar um recado para todos, seja um aviso, um parabéns ou um pedido de ciente. Você vê depois quem leu.",
+    xp: 10,
+    mascot: { shape: "logo", hue: null },
+  },
+  {
+    id: "sup-08-menu",
+    kind: "spotlight",
+    target: "home-me",
+    title: "Seu menu",
+    body: "Nas suas iniciais ficam Minha equipe, Central de relacionamento, clientes, configurações e este tour.",
+    narration:
+      "Tocando nas suas iniciais você abre o seu menu: minha equipe, a central de relacionamento, os clientes da equipe, configurações, e este tour, se quiser rever.",
+    xp: 10,
+    mascot: { shape: "logo", hue: null },
+  },
+  {
+    id: "sup-09-final",
+    kind: "finale",
+    title: "Pronto para liderar!",
+    body: "Você concluiu o tour e ganhou o selo. O que precisa de você vai estar sempre no topo.",
+    narration:
+      "Parabéns! Você concluiu o tour e ganhou o selo de pronto para liderar. A partir de agora, é só abrir o app: quem precisa de você vai estar sempre no topo. Boa supervisão!",
+    xp: 20,
+    mascot: { shape: "logo", hue: null },
+  },
+];
+
 /** Steps whose target is on screen (spotlights without a target are dropped). */
 export function availableSteps(steps: TourStep[], hasTarget: (target: string) => boolean) {
   return steps.filter((step) => step.kind !== "spotlight" || (step.target ? hasTarget(step.target) : false));

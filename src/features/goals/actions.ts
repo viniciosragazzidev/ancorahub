@@ -15,6 +15,26 @@ import { calculateGoalProgress } from "./goals-service";
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────
 
+/**
+ * The goal target must match its scope (Vigia T42): broker = active broker,
+ * team = active supervisor (their team is the sum), branch = unit of the tenant.
+ */
+async function assertScopeTarget(tenantId: string, scope: string, scopeId: string | null | undefined) {
+  if (scope === "tenant") return;
+  if (!scopeId) throw new Error("Escolha a quem a meta se aplica.");
+  const db = getDatabase();
+  if (scope === "branch") {
+    const [branch] = await db.select({ id: schema.branches.id }).from(schema.branches).where(and(eq(schema.branches.id, scopeId), eq(schema.branches.tenantId, tenantId))).limit(1);
+    if (!branch) throw new Error("Unidade inválida para a meta.");
+    return;
+  }
+  const role = scope === "team" ? "supervisor" : "broker";
+  const [member] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships)
+    .where(and(eq(schema.tenantMemberships.tenantId, tenantId), eq(schema.tenantMemberships.userId, scopeId), eq(schema.tenantMemberships.role, role), eq(schema.tenantMemberships.status, "active")))
+    .limit(1);
+  if (!member) throw new Error(scope === "team" ? "Meta de equipe precisa de um supervisor ativo." : "Meta individual precisa de um corretor ativo.");
+}
+
 async function getManagedContext() {
   const context = await getRequiredTenantContext();
   requireAnyRole(context, ["director", "manager"] as const);
@@ -55,6 +75,7 @@ export async function createGoalAction(
 
   try {
     const context = await getManagedContext();
+    await assertScopeTarget(context.tenantId, parsed.data.scope, parsed.data.scopeId);
     const db = getDatabase();
 
     const [goal] = await db
@@ -116,6 +137,7 @@ export async function updateGoalAction(
 
   try {
     const context = await getManagedContext();
+    await assertScopeTarget(context.tenantId, parsed.data.scope, parsed.data.scopeId);
     const db = getDatabase();
 
     const result = await db

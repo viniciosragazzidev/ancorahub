@@ -33,6 +33,7 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/clientes$/,
   new RegExp(`^/clientes/${ID}$`),
   /^\/equipe$/,
+  /^\/equipe\/transferencia$/,
   new RegExp(`^/equipe/(?!cargos$|convidar$|dashboard$|recuperacoes$)${ID}$`),
   /^\/relacionamento$/,
   /^\/notificacoes$/,
@@ -51,6 +52,7 @@ export function isLightRouteAllowed(pathname: string, audience: "broker" | "supe
 /** "Mais" of the supervisor. */
 export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/equipe", label: "Minha equipe" },
+  { href: "/equipe/transferencia", label: "Pedir corretor de outra equipe" },
   { href: "/relacionamento", label: "Central de relacionamento", requires: "relationshipCenter" },
   { href: "/clientes", label: "Clientes da equipe" },
   { href: "/notificacoes", label: "Notificações" },
@@ -173,6 +175,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/relacionamento"), route: { title: "Mural da gestão", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/equipe/repassar"), route: { title: "Repassar lead", tab: "inicio", isRoot: false, parentHref: "/dashboard/c/equipe-leads" } },
+  { test: exact("/equipe/transferencia"), route: { title: "Pedir transferência", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/equipe"), route: { title: "Minha equipe", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/equipe"), route: { title: "Corretor", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },

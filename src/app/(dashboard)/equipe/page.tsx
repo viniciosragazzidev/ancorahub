@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
-import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, eq, or, sql } from "drizzle-orm";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ShieldCheck } from "@/components/huge-icons";
@@ -16,6 +16,8 @@ import { TeamMembersTable } from "./team-members-table";
 import { isCustomRolesEnabled } from "@/features/custom-roles/service";
 import { TeamManagementTabs } from "./team-management-tabs";
 import { UnitsView } from "./units-view";
+import { getPendingBrokerTransferRequestsAction } from "@/features/supervisor-workspace/transfer-actions";
+import { TransferRequestsPanel } from "@/features/supervisor-workspace/transfer-requests-panel";
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
   const context = await getRequiredTenantContext();
@@ -227,6 +229,9 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const activeMembers = members.filter((member) => member.status === "active").length;
   const unassignedCount = unassignedLeads[0]?.count ?? 0;
   const totalVolume = salesTotal[0]?.sum ?? 0;
+  const transferRequests = context.role === "director" || context.role === "manager"
+    ? await getPendingBrokerTransferRequestsAction()
+    : [];
 
   return (
     <>
@@ -254,6 +259,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
           <StatCard label="Leads sem atendimento" value={unassignedCount} sublabel="aguardando corretor" sparklineData={leadsTrend} sparklineColor="var(--chart-4)" />
           <StatCard label="Vendas acumuladas" value={new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(totalVolume)} sublabel="últimos 6 meses" sparklineData={salesTrend} sparklineColor="var(--chart-2)" />
         </div>
+        {context.role === "director" || context.role === "manager" ? <TransferRequestsPanel requests={transferRequests} /> : null}
         <TeamMembersTable
           branches={branches}
           currentBranchId={context.branchId}

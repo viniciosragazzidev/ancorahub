@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, or, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql, type SQL } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -32,6 +32,8 @@ export type TeamMemberOption = {
   name: string;
   branchId: string | null;
   branchName: string | null;
+  /** broker (individual goals) or supervisor (team goals: the team is their brokers). */
+  role?: "broker" | "supervisor";
 };
 
 const goalProgressColumns = {
@@ -179,6 +181,7 @@ export async function getTeamMembers(): Promise<TeamMemberOption[]> {
       name: schema.user.name,
       branchId: schema.tenantMemberships.branchId,
       branchName: schema.branches.name,
+      role: sql<"broker" | "supervisor">`${schema.tenantMemberships.role}::text`,
     })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
@@ -186,7 +189,7 @@ export async function getTeamMembers(): Promise<TeamMemberOption[]> {
     .where(
       and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
-        eq(schema.tenantMemberships.role, "broker"),
+        inArray(schema.tenantMemberships.role, ["broker", "supervisor"]),
         eq(schema.tenantMemberships.status, "active"),
       ),
     )

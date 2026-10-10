@@ -13,6 +13,12 @@ import { MemberLeadsTabs } from "./_components/member-leads-tabs";
 import { MemberOffersPanel, MemberTemperaturePanel } from "./_components/member-temperature";
 import { MemberRankingPanel } from "./_components/member-ranking";
 import { getMemberOfferRanking } from "@/features/engagement/broker-stats";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { getCachedSupervisorWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
+import { rankHeadline, type RankPosition } from "@/features/engagement/ranking";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import { listBrokerNotes } from "@/features/supervisor-workspace/notes-actions";
+import { SupervisorBrokerProfile, SupervisorNoteHistory } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
 
 export const dynamic = "force-dynamic";
 
@@ -37,8 +43,62 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
   const profile = await getTeamMemberProfile(id);
   if (!profile) redirect("/access-denied");
 
+  const supervisorLite = context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor";
+  if (supervisorLite) {
+    const notes = await listBrokerNotes(profile.member.userId);
+    const ranking = profile.member.role === "broker"
+      ? await getMemberOfferRanking(context.tenantId, profile.member.userId).catch(() => null)
+      : null;
+    let teamRanks: RankPosition[] = [];
+    if (ranking) {
+      const teamData = await getCachedSupervisorWorkspaceData().catch(() => null);
+      teamRanks = teamData?.team.find((broker) => broker.userId === profile.member.userId)?.ranks ?? [];
+    }
+    const activeStatuses = new Set(["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+    return (
+      <SupervisorBrokerProfile
+        member={{
+          userId: profile.member.userId,
+          name: profile.member.name,
+          image: profile.member.image,
+          branchName: profile.member.branchName,
+          availabilityStatus: profile.member.availabilityStatus,
+        }}
+        metrics={{
+          portfolio: profile.metrics.leads.total,
+          inService: profile.metrics.leads.active,
+          withoutFirstContact: profile.metrics.leads.withoutFirstContact,
+          sales: profile.metrics.sales.active,
+          overdueTasks: profile.metrics.tasks.overdue,
+        }}
+        recentLeads={profile.recentLeads
+          .filter((lead) => activeStatuses.has(lead.status))
+          .slice(0, 5)
+          .map((lead) => ({
+            id: lead.id,
+            name: lead.name,
+            status: lead.status,
+            queueName: lead.queueName,
+            assignedAt: lead.assignedAt?.toISOString() ?? null,
+            createdAt: lead.createdAt.toISOString(),
+          }))}
+        whatsappHref={buildWhatsAppUrl(profile.member.brokerPhone)}
+        relationshipHref="/relacionamento"
+        ranking={ranking ? {
+          medianAcceptSeconds: ranking.stats?.medianAcceptSeconds ?? null,
+          positions: teamRanks.map((rank) => rankHeadline(rank)),
+          periodDays: ranking.periodDays,
+        } : null}
+        notes={notes}
+      />
+    );
+  }
+
   const { member, metrics, recentLeads, recentRedistributions, dutyDays } = profile;
   const isBroker = member.role === "broker";
+  const supervisorNotes = isBroker && (context.role === "director" || context.role === "manager")
+    ? await listBrokerNotes(member.userId)
+    : [];
   // Behind the journey flag (inside): off, the profile shows nothing new and runs no query.
   const ranking = isBroker ? await getMemberOfferRanking(context.tenantId, member.userId).catch(() => null) : null;
   const roleName = member.customRoleName ?? ({ director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" }[member.role]);
@@ -80,6 +140,17 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
         </div>
 
         <aside className="grid content-start gap-5">
+          {isBroker && (context.role === "director" || context.role === "manager") ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Feedbacks</CardTitle>
+                <CardDescription>Histórico de feedbacks registrados pelo supervisor.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SupervisorNoteHistory notes={supervisorNotes} />
+              </CardContent>
+            </Card>
+          ) : null}
           {isBroker && ranking ? <MemberRankingPanel stats={ranking.stats} ranks={ranking.ranks} periodDays={ranking.periodDays} withoutStep={ranking.withoutStep} /> : null}
           {isBroker ? <MemberDutyCalendar days={dutyDays} /> : null}
           <Card className="border-border bg-card shadow-none">

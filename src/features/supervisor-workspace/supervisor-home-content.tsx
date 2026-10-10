@@ -11,7 +11,7 @@ function summaryOf(data: SupervisorWorkspaceData): HomeSummary {
     inServiceNow: data.today.inService,
     slaAtRiskNow: data.today.late,
     duty: null,
-    goal: null,
+    goal: data.goal,
     // The team's day (the broker's labels do not fit a supervisor).
     stats: [
       { label: "Corretores na equipe", value: data.team.length },

@@ -2841,6 +2841,52 @@ export const tenantMemberships = pgTable(
   ],
 );
 
+export const supervisorNotes = pgTable(
+  "supervisor_notes",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    supervisorId: text("supervisor_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("supervisor_notes_kind_check", sql`${table.kind} in ('orientacao', 'elogio', 'alerta')`),
+    check("supervisor_notes_body_length_check", sql`char_length(${table.body}) between 1 and 1000`),
+    index("supervisor_notes_tenant_broker_created_idx").on(table.tenantId, table.brokerId, table.createdAt.desc()),
+  ],
+);
+
+export const supervisorTransferRequests = pgTable(
+  "supervisor_transfer_requests",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    fromSupervisorId: text("from_supervisor_id").references(() => user.id, { onDelete: "set null" }),
+    toSupervisorId: text("to_supervisor_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").notNull(),
+    reason: text("reason").notNull(),
+    status: text("status").notNull().default("pending"),
+    decidedBy: text("decided_by").references(() => user.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check("supervisor_transfer_requests_status_check", sql`${table.status} in ('pending', 'approved', 'rejected', 'cancelled')`),
+    check("supervisor_transfer_requests_reason_length_check", sql`char_length(trim(${table.reason})) between 1 and 1000`),
+    foreignKey({
+      columns: [table.branchId, table.tenantId],
+      foreignColumns: [branches.id, branches.tenantId],
+      name: "supervisor_transfer_requests_branch_tenant_fk",
+    }).onDelete("cascade"),
+    uniqueIndex("supervisor_transfer_requests_one_pending_broker_idx").on(table.tenantId, table.brokerId).where(sql`${table.status} = 'pending'`),
+    index("supervisor_transfer_requests_tenant_branch_status_idx").on(table.tenantId, table.branchId, table.status, table.createdAt.desc()),
+  ],
+);
+
 export const tenantManagerBranches = pgTable(
   "tenant_manager_branches",
   {

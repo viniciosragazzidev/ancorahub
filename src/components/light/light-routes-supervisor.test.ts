@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getLightMoreDestinations, isLightRouteAllowed } from "./light-routes";
+import { getLightMoreDestinations, isLightRouteAllowed, resolveLightRoute } from "./light-routes";
 
 describe("supervisor Lite routes", () => {
   it("allows the team screens route by route", () => {
-    for (const path of ["/dashboard", "/dashboard/c/equipe", "/leads", "/leads/abc", "/clientes", "/equipe", "/equipe/u1", "/relacionamento", "/notificacoes", "/settings"]) {
+    for (const path of ["/dashboard", "/dashboard/c/equipe", "/leads", "/leads/abc", "/clientes", "/equipe", "/equipe/u1", "/equipe/transferencia", "/relacionamento", "/notificacoes", "/settings"]) {
       expect(isLightRouteAllowed(path, "supervisor")).toBe(true);
     }
   });
@@ -18,6 +18,10 @@ describe("supervisor Lite routes", () => {
   });
 
   it("gives the supervisor their own Mais menu", () => {
-    expect(getLightMoreDestinations({ relationshipCenter: true }, "supervisor").map((item) => item.href)).toEqual(["/equipe", "/relacionamento", "/clientes", "/notificacoes", "/settings"]);
+    expect(getLightMoreDestinations({ relationshipCenter: true }, "supervisor").map((item) => item.href)).toEqual(["/equipe", "/equipe/transferencia", "/relacionamento", "/clientes", "/notificacoes", "/settings"]);
+  });
+
+  it("sets the transfer page title and parent", () => {
+    expect(resolveLightRoute("/equipe/transferencia")).toMatchObject({ title: "Pedir transferência", parentHref: "/equipe", tab: "mais" });
   });
 });

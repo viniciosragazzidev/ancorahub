@@ -80,7 +80,8 @@ export function LightMoreSheet({
           </ul>
         </nav>
 
-        {isSupervisor ? null : <button
+        {/* The tour of the audience (broker or supervisor steps) runs on the Início. */}
+        <button
           type="button"
           onClick={() => {
             onOpenChange(false);
@@ -92,10 +93,10 @@ export function LightMoreSheet({
         >
           <span>
             Ver o tour do app
-            <span className="block text-xs font-normal text-(--text-muted)">uns 3 minutos, passo a passo</span>
+            <span className="block text-xs font-normal text-(--text-muted)">{isSupervisor ? "uns 2 minutos, passo a passo" : "uns 3 minutos, passo a passo"}</span>
           </span>
           <ChevronRight className="size-4 text-(--text-muted)" aria-hidden="true" />
-        </button>}
+        </button>
 
         {isSupervisor ? null : <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-(--foreground)">Disponibilidade</p>

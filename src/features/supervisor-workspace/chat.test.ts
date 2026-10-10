@@ -13,6 +13,8 @@ function data(overrides: Partial<SupervisorWorkspaceData> = {}): SupervisorWorks
       { userId: "b2", name: "Bruno Reis", availability: "paused", inService: 1, waiting: 0, late: 0, receivedToday: 0, stats: { brokerId: "b2", offered: 4, accepted: 2, medianAcceptSeconds: 120, started: 2 }, ranks: [{ key: "accepted", position: 2, total: 2 }] },
     ],
     freeBrokers: [{ userId: "b9", name: "Davi Livre" }],
+    goal: null,
+    duty: [{ brokerId: "b2", brokerName: "Bruno Reis", scheduleName: "PME Tarde", startsAt: "13:30", endsAt: "19:00", paused: false, presence: "pending" }],
     today: { receivedToday: 2, inService: 4, waiting: 1, late: 1 },
     attention: [{ leadId: "l1", name: "Maria Souza", brokerName: "Ana Lima", assignedAt: new Date("2026-10-10T14:20:00-03:00"), late: true }],
     unreadNotifications: 0,
@@ -26,7 +28,7 @@ function data(overrides: Partial<SupervisorWorkspaceData> = {}): SupervisorWorks
 describe("supervisor Lite chat", () => {
   it("lists the team assistants with who needs the supervisor first", () => {
     const threads = buildSupervisorThreads(data(), now);
-    expect(threads.map((thread) => thread.assistant)).toEqual(["ancora", "equipe", "equipe-leads", "equipe-desempenho"]);
+    expect(threads.map((thread) => thread.assistant)).toEqual(["ancora", "equipe", "equipe-leads", "equipe-plantao", "equipe-desempenho"]);
     expect(threads[1]!.preview).toContain("Ana precisa de você");
     expect(threads[1]!.waitingYou).toBe(true);
     expect(threads[2]!.preview).toContain("1 lead(s) com primeiro contato atrasado");
@@ -41,7 +43,7 @@ describe("supervisor Lite chat", () => {
   it("an empty team says to ask the manager, never shows other brokers", () => {
     const empty = data({ team: [], attention: [], today: { receivedToday: 0, inService: 0, waiting: 0, late: 0 } });
     expect(buildSupervisorThreads(empty, now)[1]!.preview).toContain("Peça ao gestor");
-    for (const id of ["equipe", "equipe-leads", "equipe-desempenho"] as const) {
+    for (const id of ["equipe", "equipe-leads", "equipe-plantao", "equipe-desempenho"] as const) {
       const script = buildSupervisorScript(id, empty, now);
       expect(script.status?.label).toBe("Sem equipe");
     }
@@ -68,5 +70,12 @@ describe("supervisor Lite chat", () => {
     const leads = buildSupervisorScript("equipe-leads", data(), now);
     const handoff = leads.blocks.find((block) => block.id === "equipe-leads-handoff");
     expect(handoff && handoff.type === "question" ? handoff.choices[0]!.action : null).toEqual({ kind: "href", href: "/equipe/repassar?lead=l1" });
+  });
+
+  it("team duty lists today's plantão with presence and points at who has not confirmed", () => {
+    const script = buildSupervisorScript("equipe-plantao", data(), now);
+    const list = script.blocks.find((block) => block.type === "list");
+    expect(list && list.type === "list" ? list.items[0] : null).toMatchObject({ primary: "Bruno Reis", secondary: "PME Tarde · 13:30 às 19:00", trailing: "esperando confirmar", href: "/equipe/b2" });
+    expect(script.status?.label).toBe("Confirmações pendentes");
   });
 });

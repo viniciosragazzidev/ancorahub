@@ -1,6 +1,9 @@
 import "server-only";
 
-import { and, asc, count, desc, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+
+import { getLocalDutyParts } from "@/features/leads/assignment";
+import { periodDay } from "@/features/engagement/scoring";
 
 import { getTeamOfferStats, statsWindow } from "@/features/engagement/broker-stats";
 import { rankBroker, type BrokerOfferStats, type RankPosition } from "@/features/engagement/ranking";
@@ -27,6 +30,16 @@ export type TeamBroker = {
   ranks: RankPosition[];
 };
 
+export type TeamDuty = {
+  brokerId: string;
+  brokerName: string;
+  scheduleName: string;
+  startsAt: string;
+  endsAt: string;
+  paused: boolean;
+  presence: "confirmed" | "pending" | "absent" | "expired" | "not_required";
+};
+
 export type AttentionLead = { leadId: string; name: string; brokerName: string; assignedAt: Date | null; late: boolean };
 
 export type SupervisorWorkspaceData = {
@@ -34,6 +47,10 @@ export type SupervisorWorkspaceData = {
   team: TeamBroker[];
   /** Active brokers of the supervisor's unit with no supervisor (P2: "add to my team"). */
   freeBrokers: { userId: string; name: string }[];
+  /** P5: who of the team has a plantão today (weekly roster or published occurrence) and the presence. */
+  duty: TeamDuty[];
+  /** P8: the team goal running now (scope team, scopeId = the supervisor). */
+  goal: { name: string; percentage: number; currentValue: string; targetValue: string } | null;
   today: { receivedToday: number; inService: number; waiting: number; late: number };
   attention: AttentionLead[];
   unreadNotifications: number;
@@ -56,7 +73,7 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
   const db = getDatabase();
   const memberships = schema.tenantMemberships;
 
-  const [viewerRows, teamRows, tenantRows, unreadRows, latestRows, freeRows] = await Promise.all([
+  const [viewerRows, teamRows, tenantRows, unreadRows, latestRows, freeRows, goalRows] = await Promise.all([
     db.select({ name: schema.user.name, branchName: schema.branches.name }).from(schema.user)
       .leftJoin(schema.branches, eq(schema.branches.id, sql`${context.branchId}`))
       .where(eq(schema.user.id, context.userId)).limit(1),
@@ -84,6 +101,12 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
         .where(and(eq(memberships.tenantId, context.tenantId), eq(memberships.branchId, context.branchId), eq(memberships.role, "broker"), eq(memberships.status, "active"), isNull(memberships.supervisorId), eq(schema.user.active, true)))
         .orderBy(asc(schema.user.name)).limit(20)
       : Promise.resolve([] as { userId: string; name: string }[]),
+    db.select({ name: schema.goals.name, targetValue: schema.goals.targetValue, currentValue: schema.goalProgress.currentValue, percentage: schema.goalProgress.percentage })
+      .from(schema.goals)
+      .leftJoin(schema.goalProgress, eq(schema.goalProgress.goalId, schema.goals.id))
+      .where(and(eq(schema.goals.tenantId, context.tenantId), eq(schema.goals.scope, "team"), eq(schema.goals.scopeId, context.userId), eq(schema.goals.active, true), lt(schema.goals.startDate, now), gte(schema.goals.endDate, now)))
+      .orderBy(desc(schema.goals.endDate))
+      .limit(1),
   ]);
 
   const slaMinutes = Math.max(1, Number.parseInt(tenantRows[0]?.sla ?? "15", 10) || 15);
@@ -120,6 +143,38 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
     ])
     : [[], [], [] as BrokerOfferStats[]];
 
+  // P5: plantões of the team today (read only; the roster stays with the manager).
+  const local = getLocalDutyParts(now);
+  const dutyRows = teamIds.length
+    ? await db.select({
+      brokerId: schema.dutyRosterAssignments.brokerId,
+      scheduleName: schema.unitDutySchedules.name,
+      startsAt: schema.dutyRosterAssignments.startsAt,
+      endsAt: schema.dutyRosterAssignments.endsAt,
+      pausedAt: schema.dutyRosterAssignments.pausedAt,
+    }).from(schema.dutyRosterAssignments)
+      .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyRosterAssignments.tenantId)))
+      .where(and(
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+        inArray(schema.dutyRosterAssignments.brokerId, teamIds),
+        eq(schema.dutyRosterAssignments.status, "active"),
+        eq(schema.unitDutySchedules.status, "active"),
+        or(
+          eq(schema.dutyRosterAssignments.dutyDate, periodDay(now)),
+          and(isNull(schema.dutyRosterAssignments.dutyDate), eq(schema.dutyRosterAssignments.dayOfWeek, local.weekday), lte(schema.dutyRosterAssignments.validFrom, now), or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now))),
+        ),
+      ))
+      .orderBy(asc(schema.dutyRosterAssignments.startsAt))
+    : [];
+  const presenceRows = dutyRows.length
+    ? await db.select({ brokerId: schema.dutyPresenceConfirmations.brokerId, status: schema.dutyPresenceConfirmations.status })
+      .from(schema.dutyPresenceConfirmations)
+      .where(and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), inArray(schema.dutyPresenceConfirmations.brokerId, teamIds), eq(schema.dutyPresenceConfirmations.dutyDate, periodDay(now))))
+      .orderBy(desc(schema.dutyPresenceConfirmations.createdAt))
+    : [];
+  const presenceBy = new Map<string, string>();
+  for (const row of presenceRows) if (!presenceBy.has(row.brokerId)) presenceBy.set(row.brokerId, row.status);
+
   const countBy = new Map(counts.map((row) => [row.brokerId, row]));
   const nameBy = new Map(teamRows.map((row) => [row.userId, row.name]));
   const team: TeamBroker[] = teamRows.map((row) => {
@@ -142,6 +197,24 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
     viewer: { userId: context.userId, tenantId: context.tenantId, name: viewerRows[0]?.name ?? "Supervisor", branchName: viewerRows[0]?.branchName ?? null },
     team,
     freeBrokers: freeRows,
+    duty: dutyRows.map((row) => {
+      const presence = presenceBy.get(row.brokerId);
+      return {
+        brokerId: row.brokerId,
+        brokerName: nameBy.get(row.brokerId) ?? "Corretor",
+        scheduleName: row.scheduleName,
+        startsAt: row.startsAt.slice(0, 5),
+        endsAt: row.endsAt.slice(0, 5),
+        paused: Boolean(row.pausedAt),
+        presence: presence === "confirmed" || presence === "pending" || presence === "absent" || presence === "expired" ? presence : "not_required",
+      };
+    }),
+    goal: goalRows[0] ? {
+      name: goalRows[0].name,
+      percentage: Math.round(Number(goalRows[0].percentage ?? 0)),
+      currentValue: String(Number(goalRows[0].currentValue ?? 0)),
+      targetValue: String(Number(goalRows[0].targetValue)),
+    } : null,
     today: { receivedToday: sum("receivedToday"), inService: sum("inService"), waiting: sum("waiting"), late: sum("late") },
     attention: attentionRows.map((row) => ({
       leadId: row.leadId,

@@ -1,19 +1,12 @@
 ## 2026-10-06 — Simulador demonstrativo de cotação do Corretor Lite
 
-Papel: Corretor no modo Lite. Objetivo: comparar exemplos de planos para um perfil
-de beneficiários. Ação principal: escolher um plano demonstrativo após comparar
-preço, faixa etária e rede indicada. A disclosure segue seis etapas sem rolagem
-horizontal: perfil, beneficiários, preferências, resultados, comparação e resumo.
-Estados: idade inválida, nenhum resultado pelos filtros, seleção/comparação,
-resumo demonstrativo e prévia visual de lead. Os componentes compartilhados são
-reutilizados; não há token, primitive, dado real, API ou persistência novos.
-Os nomes, valores e redes são exemplos fictícios, separados do catálogo oficial
-da DEC-031; o resumo informa que não é proposta comercial. O QA visual autenticado
-transversal UX-M1.10 continua pendente.
-Registro: docs/implementations/active/2026-10-06-lite-quote-simulator.md.
+## 2026-10-10 - Pedido de transferencia entre equipes do supervisor
 
+Papel: supervisor no Lite. Objetivo: pedir a transferencia de um corretor ativo de outra equipe na mesma unidade. Acao principal: escolher o corretor e explicar o motivo. A gestao decide em `/equipe`; estados: lista vazia, envio, confirmacao e erro. A equipe so muda apos aprovacao autorizada, com auditoria e limite de 30. Reutiliza Button, Textarea e tokens Lite existentes; sem nova primitive ou movimento. Registro: `docs/implementations/active/2026-10-10-lite-supervisor.md`, pacote P9.
 
-# Controle de Execução do Redesign
+## 2026-10-10 — Feedback 1 a 1 na ficha Lite do supervisor
+
+Papel: supervisor; objetivo: registrar orientação, elogio ou alerta para um corretor da própria equipe e consultar o histórico. Ação principal: salvar um feedback curto; estados: formulário, envio, sucesso, erro e histórico vazio/preenchido. Diretor e Gestor consultam o histórico em cartão somente leitura, com autorização de equipe/unidade no servidor. Reutiliza Button, Textarea e tokens Lite existentes; sem nova primitive, token ou animação. Auditoria registra ator, tipo e alvo, sem copiar o texto pessoal para o log. Registro: `docs/implementations/active/2026-10-10-lite-supervisor.md`, pacote P3.
 
 ## 2026-10-07 — Reatribuição pelo drawer dentro do plantão
 

@@ -229,7 +229,7 @@ export function ChatHome({
                 </Link>
               ) : null}
               {summary.goal ? (
-                <Link href="/dashboard/c/desempenho" className={home.card}>
+                <Link href={isSupervisor ? "/dashboard/c/equipe-desempenho" : "/dashboard/c/desempenho"} className={home.card}>
                   <AssistantAvatar shape="nuvem" hue={330} size={40} />
                   <span className={home.cardName}>{summary.goal.name}</span>
                   <span className={home.goalTrack} aria-hidden="true"><motion.span className={home.goalFill} initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: Math.min(1, summary.goal.percentage / 100) }} transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: reduce ? 0 : 0.2 }} /></span>
@@ -249,9 +249,9 @@ export function ChatHome({
         )}
       </div>
 
-      {/* Welcome and tour describe the broker's app. */}
-      {isSupervisor ? null : <LiteWelcome />}
-      {isSupervisor ? null : <LiteTour />}
+      {/* Welcome and tour of the audience: broker or supervisor (each with its own steps). */}
+      <LiteWelcome variant={isSupervisor ? "supervisor" : "broker"} />
+      <LiteTour variant={isSupervisor ? "supervisor" : "broker"} />
       {sheet}
     </div>
   );

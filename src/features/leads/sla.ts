@@ -8,6 +8,7 @@ import { notifyLeadReassigned, sendNotificationToUser } from "@/features/notific
 import { publishRealtimeSyncSignals } from "@/features/notifications/realtime-sync";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { processQueuedLead } from "@/features/lead-distribution/service";
 import { isAcceptedOfferAssignment, shouldReleaseUnacceptedProvisionalOwner } from "@/features/lead-distribution/domain";
 import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
@@ -71,6 +72,16 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
     const recipients = await db.select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId })
       .from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.status, "active"), inArray(schema.tenantMemberships.role, ["manager", "director"])));
     
+    // Supervisor Lite P6: the broker's supervisor gets the same alerts as the manager (team scope on).
+    const supervisorOf = new Map<string, string>();
+    const brokerIds = [...new Set(leads.map((lead) => lead.corretorId).filter((id): id is string => Boolean(id)))];
+    if (brokerIds.length && (await getFeatureFlag(FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE).catch(() => "false")) === "true") {
+      const links = await db.select({ brokerId: schema.tenantMemberships.userId, supervisorId: schema.tenantMemberships.supervisorId })
+        .from(schema.tenantMemberships)
+        .where(and(eq(schema.tenantMemberships.tenantId, tenant.id), inArray(schema.tenantMemberships.userId, brokerIds), eq(schema.tenantMemberships.status, "active")));
+      for (const link of links) if (link.supervisorId) supervisorOf.set(link.brokerId, link.supervisorId);
+    }
+
     const leadIds = leads.map((lead) => lead.id);
     const existing = await db.select({ recipientUserId: schema.notifications.recipientUserId, leadId: schema.notifications.leadId, type: schema.notifications.type })
       .from(schema.notifications).where(and(eq(schema.notifications.tenantId, tenant.id), inArray(schema.notifications.leadId, leadIds), gte(schema.notifications.createdAt, new Date(now - 24 * 60 * 60 * 1000))));
@@ -218,6 +229,14 @@ export async function runSlaSweep(tenantId?: string): Promise<SlaSweepResult> {
           if (existingKeys.has(key)) continue;
           existingKeys.add(key);
           pending.push({ id: randomUUID(), tenantId: tenant.id, recipientUserId: recipient.userId, leadId: lead.id, type: kind, title: kind === "lead_unworked" ? "Lead não trabalhado" : "Lead estagnado", message: kind === "lead_unworked" ? `O lead ${lead.nome} está sem primeiro contato há mais de ${firstContactMinutes} minutos.` : `O lead ${lead.nome} está sem avanço há mais de ${stagnantDays} dias.`, createdAt: new Date() });
+        }
+        const supervisorId = lead.corretorId ? supervisorOf.get(lead.corretorId) : undefined;
+        if (supervisorId) {
+          const key = `${supervisorId}:${lead.id}:${kind}`;
+          if (!existingKeys.has(key)) {
+            existingKeys.add(key);
+            pending.push({ id: randomUUID(), tenantId: tenant.id, recipientUserId: supervisorId, leadId: lead.id, type: kind, title: kind === "lead_unworked" ? "Lead da equipe sem contato" : "Lead da equipe parado", message: kind === "lead_unworked" ? `O lead ${lead.nome} da sua equipe está sem primeiro contato há mais de ${firstContactMinutes} minutos.` : `O lead ${lead.nome} da sua equipe está sem avanço há mais de ${stagnantDays} dias.`, createdAt: new Date() });
+          }
         }
       }
 
