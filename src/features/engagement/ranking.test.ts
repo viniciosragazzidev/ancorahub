@@ -41,4 +41,15 @@ describe("rankBroker", () => {
     expect(formatDuration(null)).toBe("sem dado");
     expect(rankHeadline({ key: "speed", position: 1, total: 8 })).toBe("1º no aceite mais rápido");
   });
+
+  it("counts services started (offers and direct assignments), without a start speed ranking", () => {
+    const team = [
+      { brokerId: "ana", offered: 0, accepted: 0, medianAcceptSeconds: null, started: 2, medianStartSeconds: 120 },
+      { brokerId: "bia", offered: 0, accepted: 0, medianAcceptSeconds: null, started: 4, medianStartSeconds: 600 },
+      { brokerId: "caio", offered: 0, accepted: 0, medianAcceptSeconds: null, started: 3, medianStartSeconds: 60 },
+    ];
+    // ana has no offers (direct assignments only) and still ranks on services.
+    expect(rankBroker(team, "ana")).toEqual([{ key: "started", position: 3, total: 3 }]);
+    expect(rankBroker(team, "caio")).toEqual([{ key: "started", position: 2, total: 3 }]);
+  });
 });

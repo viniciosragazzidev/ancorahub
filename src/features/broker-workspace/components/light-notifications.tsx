@@ -5,7 +5,6 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 
 import { ArrowRight, Bell, BellRinging, CalendarCheck, CheckCircle, Clock, TriangleAlertIcon, Warning, XCircle } from "@/components/huge-icons";
-import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
@@ -13,6 +12,7 @@ import SegmentedControl from "@/components/arc/segmented-control/segmented-contr
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import { PushNotificationManager } from "@/features/notifications/components/push-notification-manager";
 import { LightLeadToastToggle } from "./light-lead-toast-toggle";
+import css from "./light-notifications.module.css";
 import { loadMoreNotificationsAction, markAllNotificationsReadAction, markNotificationReadAction } from "@/app/(dashboard)/notificacoes/actions";
 
 type Priority = "urgent" | "attention" | "info";
@@ -56,11 +56,19 @@ function priorityFor(type: string): Priority {
   return "info";
 }
 
-const PRIORITY_UI: Record<Priority, { color: string; tone: "warning" | "info"; label: string }> = {
-  urgent: { color: "var(--warning)", tone: "warning", label: "Ação necessária" },
-  attention: { color: "var(--text-secondary)", tone: "info", label: "Acompanhar" },
-  info: { color: "var(--accent)", tone: "info", label: "Informativo" },
-};
+
+type Category = "gestao" | "lead" | "plantao" | "alerta" | "info";
+
+/** Who the notice is about, for the color of its icon (same idea as the assistants' colors). */
+function categoryFor(item: Pick<LightNotificationItem, "type" | "leadId">): Category {
+  if (priorityFor(item.type) === "urgent") return "alerta";
+  if (item.type.startsWith("relationship.") || item.type === "manager_note") return "gestao";
+  if (item.type.includes("duty") || item.type.includes("plantao")) return "plantao";
+  if (item.leadId || item.type.startsWith("lead") || item.type.includes("lead")) return "lead";
+  return "info";
+}
+
+const CATEGORY_LABEL: Record<Category, string> = { gestao: "Gestão", lead: "Lead", plantao: "Plantão", alerta: "Ação necessária", info: "Aviso" };
 
 function NotificationIcon({ type, className, style }: { type: string; className?: string; style?: React.CSSProperties }) {
   if (type === "lead_unworked") return <Warning className={className} style={style} />;
@@ -109,56 +117,44 @@ function NotificationRow({
   onMarkRead: (id: string) => void;
   reduceMotion: boolean | null;
 }) {
-  const priority = priorityFor(item.type);
-  const ui = PRIORITY_UI[priority];
+  const category = categoryFor(item);
   const href = item.type === "situation_suggestion" ? "/atendimento/situacoes?view=sugestoes" : item.leadId ? `/leads/${item.leadId}` : null;
-  const iconColor = isRead ? "var(--text-muted)" : ui.color;
+  const body = (
+    <>
+      <span className={`${css.icon} ${css[category]}`} aria-hidden="true">
+        <NotificationIcon type={item.type} className="size-5" />
+      </span>
+      <span className={css.text}>
+        <span className={css.top}>
+          <span className={`${css.title} ${isRead ? "" : css.titleUnread}`}>{item.title}</span>
+          <time dateTime={item.createdAt} className={css.time}>{formatTimestamp(item.createdAt)}</time>
+        </span>
+        <span className={css.message}>{item.message}</span>
+        <span className={css.meta}>
+          <span className={`${css.tag} ${css[category]}`}>{CATEGORY_LABEL[category]}</span>
+          {href ? <span className={css.open}>{item.type === "situation_suggestion" ? "Revisar sugestão" : "Abrir lead"} <ArrowRight className="size-3" aria-hidden="true" /></span> : null}
+        </span>
+      </span>
+      {!isRead ? <span className={css.dot} aria-label="Não lida" /> : null}
+    </>
+  );
 
   return (
-    <motion.article
+    <motion.li
       layout="position"
       initial={reduceMotion ? false : { opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
       exit={reduceMotion ? undefined : { opacity: 0, y: -4, transition: { duration: motionTokens.duration.fast, ease: [...motionTokens.ease.exit] } }}
       transition={reduceMotion ? { duration: motionTokens.duration.instant } : { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.enter] }}
-      className="px-4 py-4 sm:px-5"
+      className={css.item}
     >
-      <div className="flex items-start gap-3">
-        <span aria-hidden="true" className="mt-0.5 shrink-0">
-          <NotificationIcon type={item.type} className="size-5" style={{ color: iconColor }} />
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm" style={{ color: isRead ? "var(--text-secondary)" : "var(--foreground)", fontWeight: isRead ? 400 : 500 }}>
-              {item.title}
-            </p>
-            {!isRead && <Badge tone={ui.tone} size="sm">{ui.label}</Badge>}
-          </div>
-          <p className="mt-1 text-sm leading-5" style={{ color: "var(--text-secondary)" }}>{item.message}</p>
-          <div className="mt-1 flex flex-wrap items-center gap-1">
-            {href && (
-              <Link
-                href={href}
-                className="inline-flex h-11 items-center gap-1 rounded-full px-3 text-sm font-medium transition-opacity hover:opacity-80"
-                style={{ color: "var(--accent)" }}
-              >
-                {item.type === "situation_suggestion" ? "Revisar sugestão" : "Abrir lead"}
-                <ArrowRight className="size-3.5" aria-hidden="true" />
-              </Link>
-            )}
-            {!isRead && (
-              <Button type="button" variant="ghost" size="sm" onClick={() => onMarkRead(item.id)}>
-                <CheckCircle className="size-3.5" aria-hidden="true" />
-                Marcar como lida
-              </Button>
-            )}
-          </div>
-        </div>
-        <time dateTime={item.createdAt} className="shrink-0 pt-0.5 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
-          {formatTimestamp(item.createdAt)}
-        </time>
-      </div>
-    </motion.article>
+      {href ? (
+        // Opening a notice reads it.
+        <Link href={href} className={css.row} onClick={() => { if (!isRead) onMarkRead(item.id); }}>{body}</Link>
+      ) : (
+        <button type="button" className={css.row} onClick={() => { if (!isRead) onMarkRead(item.id); }}>{body}{!isRead ? <span className="sr-only">Toque para marcar como lida</span> : null}</button>
+      )}
+    </motion.li>
   );
 }
 
@@ -185,7 +181,6 @@ export function LightNotifications({
   initialNextCursor,
   initialHasMore,
   totalCount: serverTotalCount,
-  unreadCount: serverUnreadCount,
   urgentCount: serverUrgentCount,
   leadToastEnabled,
 }: LightNotificationsProps) {
@@ -241,16 +236,19 @@ export function LightNotifications({
   return (
     <div className="arc-venancor flex min-h-full flex-col" style={{ color: "var(--foreground)" }}>
       <div className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-4 pb-6 pt-2 sm:px-6">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="sr-only">Notificações</h1>
-            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              {serverTotalCount} no total, {serverUnreadCount} não lidas
-              {serverUrgentCount > 0 ? `, ${serverUrgentCount} ação necessária` : null}
-            </p>
+        <header className={css.header}>
+          <h1 className="sr-only">Notificações</h1>
+          <div className={css.summary}>
+            <span className={css.summaryNumber}>{localUnreadCount}</span>
+            <span className={css.summaryText}>
+              <span className={css.summaryTitle}>{localUnreadCount === 1 ? "aviso novo" : localUnreadCount ? "avisos novos" : "Tudo em dia"}</span>
+              <span className={css.summaryDetail}>
+                {serverTotalCount} no total{serverUrgentCount > 0 ? ` · ${serverUrgentCount} pedem ação` : ""}
+              </span>
+            </span>
           </div>
           {localUnreadCount > 0 && (
-            <Button variant="secondary" size="sm" className="self-start" onClick={() => void markAllRead()}>
+            <Button variant="secondary" size="sm" onClick={() => void markAllRead()}>
               Marcar todas como lidas
             </Button>
           )}
@@ -276,17 +274,12 @@ export function LightNotifications({
               >
                 {groups.map(([label, items]) => (
                   <section key={label} aria-label={label}>
-                    <h2 className="mb-2 text-sm font-medium" style={{ color: "var(--text-muted)" }}>
-                      {label}
-                      <span className="ml-2 tabular-nums">{items.length}</span>
-                    </h2>
-                    <div className="overflow-hidden" style={CARD_STYLE}>
-                      {items.map((item, index) => (
-                        <div key={item.id} style={index > 0 ? { borderTop: "1px solid var(--border-subtle)" } : undefined}>
-                          <NotificationRow item={item} isRead={Boolean(item.readAt) || optimisticReads.has(item.id)} onMarkRead={(id) => void markRead(id)} reduceMotion={reduceMotion} />
-                        </div>
+                    <h2 className={css.day}>{label}</h2>
+                    <ul className={css.list}>
+                      {items.map((item) => (
+                        <NotificationRow key={item.id} item={item} isRead={Boolean(item.readAt) || optimisticReads.has(item.id)} onMarkRead={(id) => void markRead(id)} reduceMotion={reduceMotion} />
                       ))}
-                    </div>
+                    </ul>
                   </section>
                 ))}
               </motion.div>
@@ -312,12 +305,10 @@ export function LightNotifications({
           )}
         </section>
 
-        <section aria-label="Configuração de alertas" className="space-y-3">
+        <section aria-label="Configuração de alertas" className={css.settings}>
           <div>
-            <h2 className="text-base font-semibold">Não perca novas oportunidades</h2>
-            <p className="mt-1 text-xs leading-5" style={{ color: "var(--text-secondary)" }}>
-              Ative o push neste dispositivo para acompanhar o que precisa da sua atenção.
-            </p>
+            <h2 className={css.settingsTitle}>Avisos neste aparelho</h2>
+            <p className={css.settingsDetail}>Ative o push para não perder lead nem recado da gestão.</p>
           </div>
           <PushNotificationManager />
           <LightLeadToastToggle initialEnabled={leadToastEnabled} />

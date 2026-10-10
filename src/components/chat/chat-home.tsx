@@ -15,6 +15,7 @@ import home from "./chat-home.module.css";
 import { LiteWelcome } from "./lite-welcome";
 import { LiteTour } from "./tour/lite-tour";
 import { ThreadList } from "./thread-row";
+import { WeekRanking, type HomeHighlights } from "./week-ranking";
 import type { ThreadSummary } from "./types";
 
 type Tab = "assistentes" | "leads";
@@ -50,57 +51,7 @@ export type HomeSummary = {
   goal: { name: string; percentage: number; currentValue: string; targetValue: string } | null;
 };
 
-/** The broker's own standing and the "register a step" mission (journey flag on). */
-export type HomeHighlights = {
-  ranks: { key: string; position: number; label: string; total: number }[];
-  /** Median time to accept the offers of the week ("1 min 20 s"). */
-  acceptTime: string | null;
-  mission: { title: string; detail: string; href: string } | null;
-};
-
-function Highlights({ data, className }: { data: HomeHighlights; className?: string }) {
-  // Journey on but nothing to rank yet: say where it will show (an empty block looked like a missing feature).
-  if (!data.ranks.length && !data.mission && !data.acceptTime) {
-    return (
-      <div className={`${home.highlights} ${className ?? ""}`} data-tour="home-highlights">
-        <div className={home.rank}>
-          <span className={home.rankLabel}>Seu ranking da semana</span>
-          <span className={home.missionDetail}>Aparece aqui depois das suas primeiras ofertas aceitas nos últimos 7 dias.</span>
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className={`${home.highlights} ${className ?? ""}`} data-tour="home-highlights">
-      {data.ranks.length || data.acceptTime ? (
-        <ul className={home.rankRow} aria-label="Sua posição na semana">
-          {data.ranks.map((rank) => (
-            <li key={rank.key} className={`${home.rank} ${rank.position <= 3 ? home.rankTop : ""}`}>
-              <span className={home.rankPos}>{rank.position}º</span>
-              <span className={home.rankLabel}>{rank.label} · de {rank.total}</span>
-            </li>
-          ))}
-          {data.acceptTime ? (
-            <li className={home.rank}>
-              <span className={home.rankPos}>{data.acceptTime}</span>
-              <span className={home.rankLabel}>seu tempo para aceitar</span>
-            </li>
-          ) : null}
-        </ul>
-      ) : null}
-      {data.mission ? (
-        <Link href={data.mission.href} className={home.mission}>
-          <span className={home.missionBadge}>Missão</span>
-          <span className={home.missionText}>
-            <span className={home.missionTitle}>{data.mission.title}</span>
-            <span className={home.missionDetail}>{data.mission.detail}</span>
-          </span>
-          <svg viewBox="0 0 16 16" aria-hidden="true" className={home.missionArrow}><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </Link>
-      ) : null}
-    </div>
-  );
-}
+export type { HomeHighlights } from "./week-ranking";
 
 /** The thread whose screen is open (computers keep the list beside it). */
 function isActive(thread: ThreadSummary, pathname: string) {
@@ -191,7 +142,7 @@ export function ChatHome({
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>
       </header>
-      {mode === "page" && highlights ? <Highlights data={highlights} /> : null}
+      {mode === "page" && highlights ? <WeekRanking data={highlights} /> : null}
       {list}
     </aside>
   );
@@ -261,7 +212,7 @@ export function ChatHome({
             </ul>
           ) : null}
 
-          {highlights ? <Highlights data={highlights} className={home.centerHighlights} /> : null}
+          {highlights ? <WeekRanking data={highlights} className={home.centerHighlights} /> : null}
 
           {summary?.duty || summary?.goal ? (
             <div className={home.cards}>

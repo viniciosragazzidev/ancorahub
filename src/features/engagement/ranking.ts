@@ -10,18 +10,24 @@ export type BrokerOfferStats = {
   accepted: number;
   /** Median seconds from the offer to the accept (null when nothing was accepted). */
   medianAcceptSeconds: number | null;
+  /** Services started in the period: offers and direct assignments alike. */
+  started?: number;
+  /** Median seconds from the assignment to the service start. */
+  medianStartSeconds?: number | null;
 };
 
-export type RankKey = "accepted" | "speed" | "rate";
+export type RankKey = "accepted" | "speed" | "rate" | "started" | "startSpeed";
 export type RankPosition = { key: RankKey; position: number; total: number };
 
 /** A broker only enters a ranking with enough data (one lucky accept is not "the fastest"). */
-export const RANK_MINIMUMS = { speed: 3, rate: 5 } as const;
+export const RANK_MINIMUMS = { speed: 3, rate: 5, startSpeed: 3 } as const;
 
 export const RANK_LABEL: Record<RankKey, string> = {
   accepted: "nos que mais aceitam",
   speed: "no aceite mais rápido",
   rate: "na taxa de aceite",
+  started: "nos que mais atendem",
+  startSpeed: "no início de atendimento mais rápido",
 };
 
 export function acceptRate(stats: Pick<BrokerOfferStats, "offered" | "accepted">) {
@@ -54,6 +60,14 @@ export function rankBroker(team: BrokerOfferStats[], brokerId: string): RankPosi
   const rated = team.filter((row) => row.offered >= RANK_MINIMUMS.rate);
   const rate = positionOf(rated, brokerId, (row) => row.brokerId, (a, b) => acceptRate(b) - acceptRate(a));
   if (rate) result.push({ key: "rate", ...rate });
+
+  // Services started count every lead (offer or direct assignment).
+  const serving = team.filter((row) => (row.started ?? 0) > 0);
+  const started = positionOf(serving, brokerId, (row) => row.brokerId, (a, b) => (b.started ?? 0) - (a.started ?? 0));
+  if (started) result.push({ key: "started", ...started });
+
+  // No "start speed" ranking: the start is the "Registrar contato" tap, easy to game without talking
+  // to the client (Vigia T35). It comes back once it is measured by the first message actually sent.
 
   return result;
 }

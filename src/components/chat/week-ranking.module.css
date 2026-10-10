@@ -1,0 +1,42 @@
+.root { display: grid; gap: 8px; padding: 2px 20px 10px; }
+.card { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 14px 16px; border: 0; border-radius: var(--radius-panel); background: linear-gradient(135deg, color-mix(in oklch, var(--chat-action) 14%, var(--surface-muted)), var(--surface-muted) 60%); color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.cardBadge { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 999px; background: var(--surface); font-size: 22px; box-shadow: var(--shadow-resting); }
+.cardText { display: grid; gap: 2px; min-width: 0; }
+.cardTitle { font-size: var(--text-base); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cardDetail { font-size: var(--text-xs); color: var(--text-muted); }
+.chevron { width: 16px; height: 16px; color: var(--text-muted); }
+
+.mission { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-panel); background: var(--surface-muted); color: inherit; text-decoration: none; transition: background-color var(--duration-fast) var(--ease-standard); }
+.mission:hover { background: var(--neutral-3); }
+.missionBadge { padding: 3px 8px; border-radius: 999px; background: var(--chat-action); color: white; font-size: var(--text-xs); font-weight: 500; }
+.missionTitle { font-size: var(--text-sm); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sheet { display: grid; gap: 18px; padding-bottom: 16px; }
+.hero { display: grid; justify-items: center; gap: 4px; padding: 20px 16px; border-radius: var(--radius-panel); background: linear-gradient(160deg, color-mix(in oklch, var(--chat-action) 18%, var(--surface)), var(--surface-muted)); text-align: center; }
+.heroMedal { font-size: 40px; line-height: 1; }
+.heroPosition { font-family: var(--font-display); font-size: 56px; font-weight: 500; letter-spacing: var(--tracking-display); line-height: 1; font-variant-numeric: tabular-nums; }
+.heroLabel { font-size: var(--text-base); font-weight: 500; }
+.heroDetail { font-size: var(--text-sm); color: var(--text-muted); }
+
+.ranks { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.rank { display: grid; gap: 6px; }
+.rankHead { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.rankLabel { font-size: var(--text-sm); }
+.rankPosition { font-size: var(--text-sm); font-weight: 500; font-variant-numeric: tabular-nums; }
+.rankTop { color: var(--chat-action); }
+.track { display: block; height: 8px; border-radius: 999px; background: var(--neutral-4); overflow: hidden; }
+.fill { display: block; height: 100%; border-radius: inherit; background: var(--chat-action); transform-origin: left; }
+
+.stats { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.stat { padding: 12px 14px; border-radius: var(--radius-panel); background: var(--surface-muted); }
+.statLabel { font-size: var(--text-xs); color: var(--text-muted); }
+.statValue { margin: 2px 0 0; font-size: var(--text-lg); font-weight: 500; font-variant-numeric: tabular-nums; }
+.tip { margin: 0; padding: 12px 14px; border-radius: var(--radius-panel); background: var(--surface-muted); font-size: var(--text-sm); }
+.tip strong { font-weight: 500; }
+
+@media (min-width: 1024px) {
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mission { transition: none; }
+}

@@ -27,11 +27,39 @@ function summaryOf(data: BrokerWorkspaceData): HomeSummary {
   };
 }
 
+/** The numbers of the week in the sheet (zeros included: the broker sees what counts). */
+function weekStats(data: BrokerHighlights) {
+  const stats = data.stats;
+  const offered = stats?.offered ?? 0;
+  const accepted = stats?.accepted ?? 0;
+  return [
+    { label: "Ofertas recebidas", value: String(offered) },
+    { label: "Ofertas aceitas", value: String(accepted) },
+    { label: "Taxa de aceite", value: offered ? `${Math.round((accepted / offered) * 100)}%` : "sem ofertas" },
+    { label: "Tempo para aceitar", value: formatDuration(stats?.medianAcceptSeconds ?? null) },
+    { label: "Atendimentos iniciados", value: String(stats?.started ?? 0) },
+    { label: "Tempo até iniciar", value: formatDuration(stats?.medianStartSeconds ?? null) },
+  ];
+}
+
+/** One concrete way to climb, from the weakest number. */
+function tipOf(data: BrokerHighlights) {
+  const stats = data.stats;
+  if (data.stepMission) return "registre a etapa dos leads aceitos: funil em dia conta para a gestão.";
+  if (!stats || (!stats.offered && !stats.started)) return "fique disponível no plantão e aceite as ofertas assim que chegarem.";
+  if (stats.offered && stats.accepted / stats.offered < 0.7) return "aceite mais ofertas: cada recusa ou oferta expirada derruba sua taxa.";
+  if ((stats.medianAcceptSeconds ?? 0) > 60) return "aceite em até 1 minuto: quem responde primeiro sobe no aceite mais rápido.";
+  if ((stats.medianStartSeconds ?? 0) > 15 * 60) return "chame o cliente logo depois de aceitar: o início rápido é o que mais converte.";
+  return "continue assim: responder rápido e registrar cada atendimento mantém você no topo.";
+}
+
 function highlightsOf(data: BrokerHighlights | null): HomeHighlights | null {
   if (!data) return null;
   return {
     ranks: data.ranks.map((rank) => ({ key: rank.key, position: rank.position, label: RANK_LABEL[rank.key], total: rank.total })),
     acceptTime: data.stats?.medianAcceptSeconds !== null && data.stats?.medianAcceptSeconds !== undefined ? formatDuration(data.stats.medianAcceptSeconds) : null,
+    stats: weekStats(data),
+    tip: tipOf(data),
     mission: data.stepMission
       ? {
         title: `Registre a etapa de ${shortName(data.stepMission.leadName)}`,

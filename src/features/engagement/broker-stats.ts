@@ -3,6 +3,7 @@ import "server-only";
 import { and, asc, count, eq, gte, inArray, isNotNull, isNull, lt, lte, notInArray, sql } from "drizzle-orm";
 
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
+import { TtlCache } from "@/shared/cache/ttl-cache";
 import { getDatabase, schema } from "@/shared/db";
 
 import { rankBroker, type BrokerOfferStats, type RankPosition } from "./ranking";
@@ -17,8 +18,55 @@ export function statsWindow(now = new Date()) {
   return { since: new Date(now.getTime() - STATS_PERIOD_DAYS * 86_400_000), until: now };
 }
 
-/** Offers received, accepted and the median time to accept of every active broker (one grouped query). */
+/**
+ * Services started (offers and direct assignments) and the median time from assignment to start, per broker.
+ * A reassigned lead counts for its current broker (corretorId), even if the previous one started it.
+ */
+async function getTeamServiceStats(tenantId: string, window: { since: Date; until: Date }) {
+  const leads = schema.leads;
+  const rows = await getDatabase().select({
+    brokerId: leads.corretorId,
+    started: count(),
+    medianStartSeconds: sql<number | null>`percentile_cont(0.5) within group (order by extract(epoch from (${leads.serviceStartedAt} - ${leads.assignedAt}))) filter (where ${leads.assignedAt} is not null and ${leads.serviceStartedAt} >= ${leads.assignedAt})`,
+  }).from(leads)
+    .innerJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.tenantId, leads.tenantId), eq(schema.tenantMemberships.userId, leads.corretorId)))
+    .where(and(
+      eq(leads.tenantId, tenantId),
+      isNull(leads.deletedAt),
+      isNotNull(leads.serviceStartedAt),
+      gte(leads.serviceStartedAt, window.since),
+      lt(leads.serviceStartedAt, window.until),
+      eq(schema.tenantMemberships.role, "broker"),
+      eq(schema.tenantMemberships.status, "active"),
+    ))
+    .groupBy(leads.corretorId);
+  return new Map(rows.filter((row) => row.brokerId).map((row) => [row.brokerId!, { started: Number(row.started), medianStartSeconds: row.medianStartSeconds === null ? null : Number(row.medianStartSeconds) }]));
+}
+
+/** The team numbers change slowly: every Início of the tenant shares them for a minute. */
+const teamStatsCache = new TtlCache<BrokerOfferStats[]>(60_000, 200);
+
+/** Offers and services of every active broker: offers only cover the plantão; services also count direct assignments. */
 export async function getTeamOfferStats(tenantId: string, window = statsWindow()): Promise<BrokerOfferStats[]> {
+  const cached = teamStatsCache.get(tenantId);
+  if (cached) return cached;
+  const stats = await loadTeamStats(tenantId, window);
+  teamStatsCache.set(tenantId, stats);
+  return stats;
+}
+
+async function loadTeamStats(tenantId: string, window: { since: Date; until: Date }): Promise<BrokerOfferStats[]> {
+  const [offerStats, serviceStats] = await Promise.all([getTeamOnlyOfferStats(tenantId, window), getTeamServiceStats(tenantId, window)]);
+  const byBroker = new Map(offerStats.map((row) => [row.brokerId, row]));
+  for (const [brokerId, service] of serviceStats) {
+    const current = byBroker.get(brokerId) ?? { brokerId, offered: 0, accepted: 0, medianAcceptSeconds: null };
+    byBroker.set(brokerId, { ...current, ...service });
+  }
+  return [...byBroker.values()].map((row) => ({ started: 0, medianStartSeconds: null, ...row }));
+}
+
+/** Offers received, accepted and the median time to accept of every active broker (one grouped query). */
+async function getTeamOnlyOfferStats(tenantId: string, window: { since: Date; until: Date }): Promise<BrokerOfferStats[]> {
   const offers = schema.leadOffers;
   const rows = await getDatabase().select({
     brokerId: offers.brokerId,

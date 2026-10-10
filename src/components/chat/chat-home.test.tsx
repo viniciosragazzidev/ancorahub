@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const navigation = vi.hoisted(() => ({ pathname: "/dashboard/c/plantao" }));
@@ -55,17 +55,20 @@ describe("ChatHome", () => {
       mission: { title: "Registre a etapa de Maria S.", detail: "3 leads ainda sem etapa.", href: "/leads/1" },
     };
     const { unmount } = render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote highlights={highlights} />);
-    expect(screen.getAllByText("1º").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("no aceite mais rápido · de 12").length).toBeGreaterThan(0);
+    // The card shows the best position; tapping it opens the week sheet with every position.
+    expect(screen.getAllByText("1º no aceite mais rápido").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByRole("button", { name: /Ver sua semana/ })[0]!);
+    expect(screen.getByText("À frente de 100% da equipe")).toBeTruthy();
+    expect(screen.getByText("10º de 12")).toBeTruthy();
     expect(screen.getAllByRole("link", { name: /Registre a etapa de Maria S\./ })[0]!.getAttribute("href")).toBe("/leads/1");
     unmount();
     render(<ChatHome mode="rail" viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote highlights={highlights} />);
-    expect(screen.queryByText("1º")).toBeNull();
+    expect(screen.queryByText("1º no aceite mais rápido")).toBeNull();
   });
 
   it("with the journey on but no data yet, says where the ranking will appear", () => {
     navigation.pathname = "/dashboard";
     render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote highlights={{ ranks: [], acceptTime: null, mission: null }} />);
-    expect(screen.getAllByText("Seu ranking da semana").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Seu ranking aparece depois dos primeiros atendimentos/).length).toBeGreaterThan(0);
   });
 });
