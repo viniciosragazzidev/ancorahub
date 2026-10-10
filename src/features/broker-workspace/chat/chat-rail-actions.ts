@@ -2,6 +2,8 @@
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
+import { isSupervisorLiteAvailable } from "../lite-audience";
+
 import { getChatRailData, type ChatRailData } from "./chat-rail-data";
 
 /**
@@ -11,6 +13,7 @@ import { getChatRailData, type ChatRailData } from "./chat-rail-data";
  */
 export async function loadChatRailAction(): Promise<ChatRailData | null> {
   const context = await getRequiredTenantContext();
-  if (context.role !== "broker") return null;
+  // Broker or supervisor with the supervisor Lite (the rail lists the team threads).
+  if (context.role !== "broker" && !(await isSupervisorLiteAvailable(context))) return null;
   return getChatRailData();
 }
