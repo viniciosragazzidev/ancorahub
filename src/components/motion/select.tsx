@@ -216,10 +216,10 @@ export function SelectTrigger({
       aria-controls={ctx.listId}
       onClick={() => ctx.setOpen(!ctx.open)}
       className={cn(
-        "relative z-10 flex w-full items-center justify-between gap-2 rounded-[10px] border border-input bg-card px-3 text-foreground outline-none transition-colors select-none",
-        "hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring/20",
+        "relative z-10 flex w-full items-center justify-between gap-2 rounded-full border border-[var(--border-strong)] bg-card px-3 text-foreground outline-none transition-colors select-none",
+        "hover:border-foreground focus-visible:border-foreground",
         "disabled:pointer-events-none disabled:opacity-50",
-        size === "sm" ? "h-7 py-1 text-xs" : "h-8 py-1.5 text-xs",
+        size === "sm" ? "h-9 text-sm" : "h-11 text-sm",
         className,
       )}
     >

@@ -14,14 +14,14 @@ export function DsSwitch({ className, ...props }: SwitchPrimitive.Root.Props) {
     <SwitchPrimitive.Root
       data-slot="ds-switch"
       className={cn(
-        "inline-flex h-ds-20 w-ds-36 shrink-0 cursor-pointer items-center rounded-ds-tags p-0.5 outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-checked:bg-ds-electric-blue data-unchecked:bg-ds-ash",
+        "inline-flex h-6 w-[42px] shrink-0 cursor-pointer items-center rounded-full p-[3px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 data-checked:bg-[#3b2dff] data-unchecked:bg-[oklch(89.5%_0_0)]",
         className,
       )}
       {...props}
     >
       <SwitchPrimitive.Thumb
         data-slot="ds-switch-thumb"
-        className="pointer-events-none block size-4 rounded-full bg-ds-canvas-white shadow-ds-subtle transition-transform duration-150 data-checked:translate-x-4 data-unchecked:translate-x-0 motion-reduce:transition-none"
+        className="pointer-events-none block size-[18px] rounded-full bg-white shadow-[0_0_0_.5px_oklch(0%_0_0/.07),0_1px_2px_oklch(0%_0_0/.14),0_2px_6px_oklch(0%_0_0/.06)] transition-transform duration-150 data-checked:translate-x-[18px] data-unchecked:translate-x-0 motion-reduce:transition-none"
       />
     </SwitchPrimitive.Root>
   );

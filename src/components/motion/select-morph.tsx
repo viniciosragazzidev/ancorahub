@@ -214,7 +214,7 @@ export function MorphSelectTrigger({
       <div
         aria-hidden
         inert
-        className={cn(ROW, "invisible rounded-[10px] border border-input")}
+        className={cn(ROW, "invisible rounded-full border border-[var(--border-strong)]")}
       >
         {children}
         <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -236,8 +236,8 @@ export function MorphSelectTrigger({
             style={{ borderRadius: 10 }}
             className={cn(
               ROW,
-              "absolute inset-x-0 top-0 z-10 rounded-[10px] border border-input bg-card text-foreground outline-none transition-colors select-none",
-              "hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring/20",
+              "absolute inset-x-0 top-0 z-10 rounded-full border border-[var(--border-strong)] bg-card text-foreground outline-none transition-colors select-none",
+              "hover:border-foreground focus-visible:border-foreground",
               "disabled:pointer-events-none disabled:opacity-50",
               className,
             )}

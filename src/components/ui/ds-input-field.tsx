@@ -20,7 +20,7 @@ export const DsInputField = React.forwardRef<
       data-slot="ds-input-field"
       disabled={disabled}
       className={cn(
-        "w-full rounded-ds-inputs border border-ds-midnight-ink bg-ds-canvas-white px-ds-12 py-ds-8 font-ds-inter text-ds-body-lg text-ds-charcoal outline-none transition-[border-color,box-shadow] duration-150 ease-out placeholder:text-ds-fog focus-visible:border-ds-electric-blue focus-visible:ring-2 focus-visible:ring-ds-electric-blue/20 disabled:cursor-not-allowed disabled:border-ds-ash disabled:bg-ds-paper-mist disabled:text-ds-fog",
+        "h-11 w-full rounded-full border border-[var(--border-strong)] bg-card px-3 text-sm text-foreground outline-none transition-[border-color] duration-150 ease-out placeholder:text-muted-foreground hover:border-foreground focus-visible:border-foreground disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground",
         className,
       )}
       {...props}

@@ -66,7 +66,7 @@ export function DsSegmentedControl<T extends string = string>({
       role="radiogroup"
       data-slot="ds-segmented-control"
       className={cn(
-        "inline-flex max-w-full items-center gap-ds-4 overflow-x-auto rounded-ds-buttons border border-ds-ash bg-ds-paper-mist p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+        "inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-border bg-muted p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className,
       )}
       {...props}
@@ -85,7 +85,7 @@ export function DsSegmentedControl<T extends string = string>({
             onClick={() => onValueChange(option.value)}
             onKeyDown={(event) => onKeyDown(event, index)}
             className={cn(
-              "relative flex shrink-0 cursor-pointer items-center gap-ds-8 whitespace-nowrap rounded-ds-inputs px-ds-12 py-ds-8 font-ds-inter text-ds-body outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 disabled:cursor-not-allowed disabled:opacity-50",
+              "relative flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 disabled:cursor-not-allowed disabled:opacity-50",
               selected ? "font-medium text-ds-charcoal" : "text-ds-fog hover:text-ds-charcoal",
             )}
           >
@@ -93,7 +93,7 @@ export function DsSegmentedControl<T extends string = string>({
               <motion.span
                 layoutId={reduce ? undefined : pillId}
                 aria-hidden="true"
-                className="absolute inset-0 rounded-ds-inputs bg-ds-canvas-white shadow-ds-subtle"
+                className="absolute inset-0 rounded-full border border-border bg-card shadow-[var(--shadow-xs)]"
                 transition={reduce ? { duration: 0 } : transitions.normal}
               />
             ) : null}

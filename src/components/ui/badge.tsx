@@ -27,13 +27,14 @@ const VARIANT_STATUS_MAP: Record<string, AnimatedBadgeStatus> = {
   link: "info",
 };
 
+/* Lite/Arc badge tints (src/components/arc/badge): status color at 10-11% on the surface, 25-27% on the border. */
 const VENANCOR_STATUS: Record<AnimatedBadgeStatus, string> = {
-  neutral: "border-transparent bg-muted text-[var(--text-secondary)]",
-  info: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
-  success: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300",
-  warning: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300",
-  danger: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-300",
-  loading: "border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300",
+  neutral: "border-border bg-muted text-[var(--text-secondary)]",
+  info: "border-[color-mix(in_oklab,var(--primary)_24%,var(--border))] bg-[color-mix(in_oklab,var(--primary)_10%,var(--card))] text-primary",
+  success: "border-[color-mix(in_oklab,var(--success)_25%,var(--border))] bg-[color-mix(in_oklab,var(--success)_10%,var(--card))] text-success",
+  warning: "border-[color-mix(in_oklab,var(--warning)_27%,var(--border))] bg-[color-mix(in_oklab,var(--warning)_11%,var(--card))] text-warning",
+  danger: "border-[color-mix(in_oklab,var(--destructive)_26%,var(--border))] bg-[color-mix(in_oklab,var(--destructive)_10%,var(--card))] text-destructive",
+  loading: "border-[color-mix(in_oklab,var(--primary)_24%,var(--border))] bg-[color-mix(in_oklab,var(--primary)_10%,var(--card))] text-primary",
 };
 
 export interface BadgeProps

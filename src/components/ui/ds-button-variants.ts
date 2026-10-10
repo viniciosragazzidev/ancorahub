@@ -1,29 +1,27 @@
 import { cva, type VariantProps } from "class-variance-authority";
 
 /**
- * Shared button primitive for the four button-shaped components in
- * docs/design-system.md (Filled Dark CTA, Outlined Action Button,
- * Ghost Nav Button, Outlined Nav Button). Each `dsVariant` locks the exact
- * colors/border/radius/padding from its spec — callers pick a role, not a
- * loose style.
+ * Legacy button roles, skinned as the Lite/Arc button (docs/design-system/lite
+ * §10.1b): filled-dark = primary, outlined-action = secondary, ghost-nav = ghost,
+ * outlined-nav = small secondary.
  */
 export const dsButtonVariants = cva(
-  "ct-press inline-flex shrink-0 items-center justify-center whitespace-nowrap font-ds-inter text-ds-body font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] select-none disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 focus-visible:ring-offset-2 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "ct-press inline-flex shrink-0 items-center justify-center whitespace-nowrap text-sm font-medium outline-none transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] select-none disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[color-mix(in_oklab,var(--foreground)_72%,transparent)] [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       dsVariant: {
         /** Filled Dark CTA — primary action, once per surface */
         "filled-dark":
-          "rounded-ds-buttons border border-transparent bg-ds-primary-action-fill px-ds-16 py-ds-12 text-ds-on-primary-action shadow-ds-subtle hover:bg-ds-primary-action-hover",
+          "h-11 rounded-full border border-foreground bg-foreground px-ds-16 text-background hover:opacity-[.91] hover:shadow-[var(--shadow-card)] active:opacity-[.84]",
         /** Outlined Action Button — secondary/utility action workhorse */
         "outlined-action":
-          "rounded-ds-buttons border border-ds-ash bg-ds-canvas-white px-ds-16 py-ds-12 text-ds-charcoal hover:bg-ds-paper-mist",
+          "h-11 rounded-full border border-border bg-card px-ds-16 text-foreground hover:bg-muted hover:shadow-[var(--shadow-card)]",
         /** Ghost Nav Button — top-level nav item, no border until hover */
         "ghost-nav":
-          "rounded-ds-tags border border-transparent bg-transparent px-ds-16 py-ds-8 text-ds-charcoal hover:border-ds-ash hover:bg-ds-paper-mist",
+          "h-9 rounded-full border border-transparent bg-transparent px-ds-16 text-[var(--text-secondary)] hover:bg-muted hover:text-foreground",
         /** Outlined Nav Button — secondary nav action (Log in) */
         "outlined-nav":
-          "rounded-ds-buttons border border-ds-ash bg-ds-canvas-white px-ds-16 py-ds-8 text-ds-charcoal hover:bg-ds-paper-mist",
+          "h-9 rounded-full border border-border bg-card px-ds-16 text-foreground hover:bg-muted",
       },
     },
   },

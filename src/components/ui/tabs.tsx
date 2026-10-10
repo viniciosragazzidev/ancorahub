@@ -109,12 +109,12 @@ function Tabs({
 // ---------------------------------------------------------------------------
 
 const listClasses: Record<Variant, string> = {
-  pill: "inline-flex items-center gap-1 rounded-full bg-muted p-1",
+  pill: "inline-flex items-center gap-0.5 rounded-full border border-border bg-muted p-[3px]",
   underline:
     "inline-flex w-full items-center gap-1 overflow-x-auto border-b border-border bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
   line:
     "inline-flex w-full items-center gap-1 overflow-x-auto border-b border-border bg-transparent [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-  segment: "inline-flex items-center gap-0 rounded-full bg-muted p-0.5",
+  segment: "inline-flex items-center gap-0.5 rounded-full border border-border bg-muted p-[3px]",
 };
 
 function TabsList({
@@ -202,7 +202,7 @@ function TabsTrigger({
           layoutId={reduce ? undefined : layoutId}
           style={{ borderRadius: "var(--border-radius-pill)" }}
           className={cn(
-            "absolute inset-0 border border-primary/20 bg-primary/8",
+            "absolute inset-0 border border-border bg-card shadow-[var(--shadow-xs)]",
             radius,
             indicatorClassName,
           )}
@@ -216,10 +216,10 @@ function TabsTrigger({
         disabled={disabled}
         onClick={handleClick}
         className={cn(
-          "relative z-10 inline-flex cursor-pointer items-center justify-center gap-2 whitespace-nowrap bg-transparent px-3.5 py-1.5 text-sm font-medium outline-none transition-colors",
+          "relative z-10 inline-flex min-h-9 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap bg-transparent px-3 text-sm font-medium outline-none transition-colors duration-[var(--duration-fast)]",
           "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
           "disabled:pointer-events-none disabled:opacity-50",
-          active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+          active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
           radius,
           className,
         )}
