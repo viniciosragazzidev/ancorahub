@@ -107,7 +107,7 @@ function EditMemberDialog({
   const [team, setTeam] = useState<string[]>(initialTeam);
   const [teamSearch, setTeamSearch] = useState("");
   // Active brokers of the supervisor's unit (the server checks the same rule).
-  const teamCandidates = allMembers.filter((item) => item.role === "broker" && item.status === "active" && item.userId && (branchId === "__tenant__" || item.branchId === branchId));
+  const teamCandidates = allMembers.filter((item) => item.role === "broker" && item.status === "active" && item.userId && item.userId !== member.userId && (branchId === "__tenant__" || item.branchId === branchId));
   const selectedCustomRole = customRoles.find((item) => item.id === customRoleId);
   const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || selectedCustomRole?.scope === "branch";
 
@@ -136,7 +136,8 @@ function EditMemberDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-lg">
+      {/* Tall form (supervisor team list): the dialog scrolls so "Salvar" is always reachable. */}
+      <DialogPopup key={open ? "open" : "closed"} className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
         <DialogTitle>Editar membro</DialogTitle>
         <DialogDescription>
           Atualize os dados, a filial e o papel operacional desse acesso.
