@@ -6,8 +6,8 @@ import {
   Select,
   SelectTrigger as MotionSelectTrigger,
   SelectValue,
-  SelectContent,
-  SelectItem,
+  SelectContent as MotionSelectContent,
+  SelectItem as MotionSelectItem,
   type SelectProps,
   type SelectTriggerProps,
   type SelectValueProps,
@@ -18,8 +18,8 @@ import {
   MorphSelect,
   MorphSelectTrigger as MotionMorphSelectTrigger,
   MorphSelectValue,
-  MorphSelectContent,
-  MorphSelectItem,
+  MorphSelectContent as MotionMorphSelectContent,
+  MorphSelectItem as MotionMorphSelectItem,
   type MorphSelectProps,
   type MorphSelectTriggerProps,
   type MorphSelectValueProps,
@@ -33,6 +33,22 @@ function SelectTrigger({ className, ...props }: SelectTriggerProps) {
 
 function MorphSelectTrigger({ className, ...props }: MorphSelectTriggerProps) {
   return <MotionMorphSelectTrigger className={cn("!rounded-full", className)} {...props} />;
+}
+
+function SelectContent({ className, ...props }: SelectContentProps) {
+  return <MotionSelectContent className={cn("rounded-[var(--radius-card)] border border-border bg-card text-foreground shadow-[var(--shadow-dialog)]", className)} {...props} />;
+}
+
+function SelectItem({ className, ...props }: SelectItemProps) {
+  return <MotionSelectItem className={cn("rounded-full px-2.5 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:bg-muted aria-selected:bg-muted aria-selected:text-foreground motion-reduce:transition-none", className)} {...props} />;
+}
+
+function MorphSelectContent({ className, ...props }: MorphSelectContentProps) {
+  return <MotionMorphSelectContent className={cn("!rounded-[var(--radius-card)] border border-border bg-card text-foreground shadow-[var(--shadow-dialog)]", className)} {...props} />;
+}
+
+function MorphSelectItem({ className, ...props }: MorphSelectItemProps) {
+  return <MotionMorphSelectItem className={cn("rounded-full px-2.5 py-2 text-sm font-medium text-foreground hover:bg-muted focus-visible:bg-muted aria-selected:bg-muted aria-selected:text-foreground motion-reduce:transition-none", className)} {...props} />;
 }
 
 function SelectGroup({ className, children, ...props }: React.ComponentPropsWithoutRef<"div">) {

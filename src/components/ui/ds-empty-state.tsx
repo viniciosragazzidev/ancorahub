@@ -27,22 +27,22 @@ export const DsEmptyState = React.forwardRef<HTMLDivElement, DsEmptyStateProps>(
         data-slot="ds-empty-state"
         className={cn(
           "flex flex-col items-center gap-ds-8 rounded-ds-cards px-ds-24 py-ds-48 text-center",
-          bordered && "border border-dashed border-ds-ash",
+          bordered && "border border-dashed border-[var(--border-subtle)] dark:border-border",
           className,
         )}
         {...props}
       >
         {icon ? (
           <span
-            className="flex size-ds-40 shrink-0 items-center justify-center rounded-ds-cards bg-ds-paper-mist text-ds-silver"
+            className="flex size-12 shrink-0 items-center justify-center rounded-[var(--radius-card)] border border-border bg-muted text-[var(--text-secondary)] dark:text-muted-foreground motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-200 motion-reduce:animate-none"
             aria-hidden="true"
           >
             {icon}
           </span>
         ) : null}
-        <p className="font-ds-inter text-ds-body-lg font-semibold text-ds-charcoal">{title}</p>
+        <p className="text-base font-medium text-foreground">{title}</p>
         {description ? (
-          <p className="max-w-[40ch] font-ds-inter text-ds-body text-ds-fog">{description}</p>
+          <p className="max-w-[18rem] text-sm text-[var(--text-secondary)] dark:text-muted-foreground">{description}</p>
         ) : null}
         {action ? <div className="mt-ds-8">{action}</div> : null}
       </div>

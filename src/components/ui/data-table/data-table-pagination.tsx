@@ -22,21 +22,21 @@ export function DataTablePagination<TData>({
   showSelectionCount = true,
 }: DataTablePaginationProps<TData>) {
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t border-border/60 text-xs">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 py-3 border-t border-[var(--border-subtle)] dark:border-border text-sm">
       {showSelectionCount ? (
-        <div className="flex-1 text-muted-foreground font-mono text-[11px]">
+        <div className="flex-1 text-[var(--text-secondary)] dark:text-muted-foreground">
           {table.getFilteredSelectedRowModel().rows.length} de{" "}
           {table.getFilteredRowModel().rows.length} linha(s) selecionada(s).
         </div>
       ) : (
-        <div className="flex-1 text-muted-foreground font-mono text-[11px]">
+        <div className="flex-1 text-[var(--text-secondary)] dark:text-muted-foreground">
           Total de {table.getFilteredRowModel().rows.length} registro(s).
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-6 lg:gap-8">
         <div className="flex items-center space-x-2">
-          <p className="text-xs font-medium text-muted-foreground">Linhas por página</p>
+          <p className="text-sm font-medium text-muted-foreground">Linhas por página</p>
           <AppSelect
             size="sm"
             className="w-20"
@@ -49,7 +49,7 @@ export function DataTablePagination<TData>({
           />
         </div>
 
-        <div className="flex w-[100px] items-center justify-center text-xs font-medium font-mono text-muted-foreground">
+        <div className="flex w-[100px] items-center justify-center text-sm font-medium text-muted-foreground">
           Página {table.getState().pagination.pageIndex + 1} de{" "}
           {table.getPageCount() || 1}
         </div>

@@ -40,7 +40,7 @@ export const DsPageHeader = React.forwardRef<HTMLElement, DsPageHeaderProps>(
         ref={ref}
         data-slot="ds-page-header"
         className={cn(
-          "flex min-h-ds-64 w-full flex-wrap items-center gap-x-ds-12 gap-y-ds-8 border-b border-ds-ash bg-ds-canvas-white px-ds-16 py-ds-12 sm:gap-x-ds-16 sm:px-ds-24 sm:py-ds-16",
+          "flex min-h-ds-64 w-full flex-wrap items-center gap-x-ds-12 gap-y-ds-8 border-b border-[var(--border-subtle)] dark:border-border bg-card px-ds-16 py-ds-12 sm:gap-x-ds-16 sm:px-ds-24 sm:py-ds-16",
           className,
         )}
         {...props}
@@ -49,16 +49,16 @@ export const DsPageHeader = React.forwardRef<HTMLElement, DsPageHeaderProps>(
           {leading ? <div className="shrink-0">{leading}</div> : null}
           <div className="flex min-w-0 flex-col gap-ds-4">
             {breadcrumb ? (
-              <p className="hidden truncate font-ds-inter text-ds-caption text-ds-fog sm:block">{breadcrumb}</p>
+              <p className="hidden truncate text-xs text-muted-foreground sm:block">{breadcrumb}</p>
             ) : null}
             <div className="flex flex-wrap items-center gap-ds-8">
-              <h1 className="font-ds-inter text-ds-body-xl font-semibold text-ds-charcoal sm:text-ds-heading-sm">
+              <h1 className="text-[22px] font-medium tracking-[var(--tracking-display)] text-foreground sm:text-[28px]">
                 {title}
               </h1>
               {context}
             </div>
             {description ? (
-              <p className="hidden font-ds-inter text-ds-body text-ds-steel sm:block">{description}</p>
+              <p className="hidden text-sm text-[var(--text-secondary)] dark:text-muted-foreground sm:block">{description}</p>
             ) : null}
           </div>
         </div>

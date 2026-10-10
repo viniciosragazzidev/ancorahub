@@ -26,8 +26,8 @@ export function DsSectionHeader({ title, description, actions, as: Heading = "h2
       {...props}
     >
       <div className="min-w-0">
-        <Heading className="font-ds-inter text-ds-body-lg font-semibold text-ds-charcoal">{title}</Heading>
-        {description ? <p className="mt-ds-4 font-ds-inter text-ds-body text-ds-fog">{description}</p> : null}
+        <Heading className="text-[22px] font-medium tracking-[var(--tracking-display)] text-foreground">{title}</Heading>
+        {description ? <p className="mt-ds-4 text-sm text-[var(--text-secondary)] dark:text-muted-foreground">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-ds-8">{actions}</div> : null}
     </div>

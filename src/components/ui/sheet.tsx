@@ -53,7 +53,7 @@ function SheetContent({
         data-slot="sheet-content"
         data-side={side}
         className={cn(
-        "fixed z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-visible border border-border bg-popover bg-clip-padding text-sm text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[transform,opacity,translate] duration-[var(--motion-duration-normal)] data-ending-style:duration-[var(--duration-quick)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:h-auto data-[side=bottom]:rounded-[var(--radius-panel)] sm:data-[side=bottom]:inset-x-4 sm:data-[side=bottom]:bottom-4 sm:data-[side=bottom]:mx-auto sm:data-[side=bottom]:max-w-xl data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:h-[calc(100dvh-1rem)] data-[side=left]:w-[min(100vw-1rem,32rem)] data-[side=left]:rounded-[var(--radius-panel)] sm:data-[side=left]:inset-y-3 sm:data-[side=left]:left-3 sm:data-[side=left]:h-[calc(100dvh-1.5rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100dvh-1rem)] data-[side=right]:w-[min(100vw-1rem,32rem)] data-[side=right]:rounded-[var(--radius-panel)] sm:data-[side=right]:inset-y-3 sm:data-[side=right]:right-3 sm:data-[side=right]:h-[calc(100dvh-1.5rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:h-auto data-[side=top]:rounded-[var(--radius-panel)] sm:data-[side=top]:inset-x-4 sm:data-[side=top]:top-4 sm:data-[side=top]:mx-auto sm:data-[side=top]:max-w-xl max-[559px]:data-[side=left]:inset-0 max-[559px]:data-[side=left]:h-dvh max-[559px]:data-[side=left]:max-h-dvh max-[559px]:data-[side=left]:w-full max-[559px]:data-[side=left]:rounded-none max-[559px]:data-[side=right]:inset-0 max-[559px]:data-[side=right]:h-dvh max-[559px]:data-[side=right]:max-h-dvh max-[559px]:data-[side=right]:w-full max-[559px]:data-[side=right]:rounded-none ",
+        "fixed z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-visible border-0 bg-[var(--card)] bg-clip-padding text-sm text-foreground shadow-[var(--shadow-dialog)] outline-none transition-[transform,opacity,translate] duration-[var(--motion-duration-normal)] data-ending-style:duration-[var(--duration-quick)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:h-auto data-[side=bottom]:rounded-[var(--radius-panel)] sm:data-[side=bottom]:inset-x-4 sm:data-[side=bottom]:bottom-4 sm:data-[side=bottom]:mx-auto sm:data-[side=bottom]:max-w-xl data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:h-[calc(100dvh-1rem)] data-[side=left]:w-[min(100vw-1rem,32rem)] data-[side=left]:rounded-[var(--radius-panel)] sm:data-[side=left]:inset-y-3 sm:data-[side=left]:left-3 sm:data-[side=left]:h-[calc(100dvh-1.5rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100dvh-1rem)] data-[side=right]:w-[min(100vw-1rem,32rem)] data-[side=right]:rounded-[var(--radius-panel)] sm:data-[side=right]:inset-y-3 sm:data-[side=right]:right-3 sm:data-[side=right]:h-[calc(100dvh-1.5rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:h-auto data-[side=top]:rounded-[var(--radius-panel)] sm:data-[side=top]:inset-x-4 sm:data-[side=top]:top-4 sm:data-[side=top]:mx-auto sm:data-[side=top]:max-w-xl max-[559px]:data-[side=left]:inset-0 max-[559px]:data-[side=left]:h-dvh max-[559px]:data-[side=left]:max-h-dvh max-[559px]:data-[side=left]:w-full max-[559px]:data-[side=left]:rounded-none max-[559px]:data-[side=right]:inset-0 max-[559px]:data-[side=right]:h-dvh max-[559px]:data-[side=right]:max-h-dvh max-[559px]:data-[side=right]:w-full max-[559px]:data-[side=right]:rounded-none ",
           className,
         )}
         {...props}
@@ -85,7 +85,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sheet-header"
       className={cn(
-        "flex shrink-0 flex-col gap-1.5 border-b border-border/80 bg-card/70 px-5 pt-[calc(1rem+var(--mobile-safe-top))] pr-14 pb-4 sm:px-6 sm:py-5",
+        "flex shrink-0 flex-col gap-1.5 border-b border-[var(--border-subtle)] dark:border-border bg-card px-5 pt-[calc(1rem+var(--mobile-safe-top))] pr-14 pb-4 sm:px-6 sm:py-5",
         className,
       )}
       {...props}
@@ -120,7 +120,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="sheet-footer"
       className={cn(
-        "mt-auto flex shrink-0 flex-col gap-2 border-t border-border/80 bg-card/80 px-5 pt-3.5 pb-[max(0.875rem,var(--mobile-safe-bottom))] supports-backdrop-filter:bg-card/70 sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-3.5",
+        "mt-auto flex shrink-0 flex-col gap-2 border-t border-[var(--border-subtle)] dark:border-border bg-card px-5 pt-3.5 pb-[max(0.875rem,var(--mobile-safe-bottom))] sm:flex-row sm:items-center sm:justify-end sm:px-6 sm:py-3.5",
         className,
       )}
       {...props}
@@ -133,7 +133,7 @@ function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
     <SheetPrimitive.Title
       data-slot="sheet-title"
       className={cn(
-        "font-heading text-base font-semibold tracking-tight text-foreground",
+        "font-sans text-lg font-medium text-foreground",
         className,
       )}
       {...props}
@@ -145,7 +145,7 @@ function SheetDescription({ className, ...props }: SheetPrimitive.Description.Pr
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("max-w-[44ch] text-sm leading-5 text-muted-foreground", className)}
+      className={cn("max-w-[44ch] text-sm leading-5 text-[var(--text-secondary)] dark:text-muted-foreground", className)}
       {...props}
     />
   );
@@ -155,7 +155,7 @@ function SheetSection({ className, ...props }: React.ComponentProps<"section">) 
   return (
     <section
       data-slot="sheet-section"
-      className={cn("rounded-xl border border-border/80 bg-card/60", className)}
+      className={cn("rounded-[var(--radius-card)] border border-[var(--border-subtle)] dark:border-border bg-card", className)}
       {...props}
     />
   );
@@ -166,7 +166,7 @@ function SheetSectionHeader({ className, ...props }: React.ComponentProps<"div">
     <div
       data-slot="sheet-section-header"
       className={cn(
-        "flex items-start justify-between gap-4 border-b border-border/70 px-4 py-3.5",
+        "flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] dark:border-border px-4 py-3.5",
         className,
       )}
       {...props}

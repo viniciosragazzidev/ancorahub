@@ -397,6 +397,9 @@
   /* Lite cards have no border in light mode; in dark the shadow disappears, so the contour comes back. */
   --card-border: var(--border);
   --shadow-card: none;
+  /* Secondary text and subtle dividers stay readable on dark surfaces (AA). */
+  --text-secondary: #a1a1aa;
+  --border-subtle: rgb(255 255 255 / 0.08);
 }
 
 /* Contrast guardrails for legacy status utilities. The light theme must keep

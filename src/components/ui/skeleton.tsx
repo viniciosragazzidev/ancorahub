@@ -6,7 +6,7 @@ function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="skeleton"
-      className={cn("ct-skeleton rounded-[var(--radius-card)] bg-muted", className)}
+      className={cn("ct-skeleton rounded-xl !bg-[color-mix(in_oklab,var(--border-strong)_38%,var(--card))] !animate-[ct-pulse_1.8s_var(--ease-in-out)_11_both] motion-reduce:animate-none after:content-none", className)}
       {...props}
     />
   )

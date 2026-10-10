@@ -24,10 +24,10 @@ export function SectionCardHeader({
   className?: string;
 }) {
   return (
-    <CardHeader className={cn("gap-0 border-b border-border/50 p-4", className)}>
+    <CardHeader className={cn("gap-0 border-b border-[var(--border-subtle)] dark:border-border p-4", className)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+          <CardTitle className="flex flex-wrap items-center gap-2 text-[22px] font-medium tracking-[var(--tracking-display)]">
             {icon ? (
               <span aria-hidden="true" className="flex size-4 shrink-0 items-center justify-center text-foreground [&_svg]:size-4!">
                 {icon}
@@ -37,7 +37,7 @@ export function SectionCardHeader({
             {badge}
           </CardTitle>
           {description ? (
-            <CardDescription className="mt-1 max-w-3xl text-xs leading-5">{description}</CardDescription>
+            <CardDescription className="mt-1 max-w-3xl text-sm leading-5 text-[var(--text-secondary)] dark:text-muted-foreground">{description}</CardDescription>
           ) : null}
         </div>
         {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
