@@ -45,7 +45,7 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
 
   const supervisorLite = context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor";
   if (supervisorLite) {
-    const notes = await listBrokerNotes(profile.member.userId);
+    const notes = await listBrokerNotes(profile.member.userId).catch(() => []);
     const ranking = profile.member.role === "broker"
       ? await getMemberOfferRanking(context.tenantId, profile.member.userId).catch(() => null)
       : null;
@@ -97,7 +97,7 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
   const { member, metrics, recentLeads, recentRedistributions, dutyDays } = profile;
   const isBroker = member.role === "broker";
   const supervisorNotes = isBroker && (context.role === "director" || context.role === "manager")
-    ? await listBrokerNotes(member.userId)
+    ? await listBrokerNotes(member.userId).catch(() => [])
     : [];
   // Behind the journey flag (inside): off, the profile shows nothing new and runs no query.
   const ranking = isBroker ? await getMemberOfferRanking(context.tenantId, member.userId).catch(() => null) : null;

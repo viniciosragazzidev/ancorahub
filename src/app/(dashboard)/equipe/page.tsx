@@ -230,7 +230,8 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   const unassignedCount = unassignedLeads[0]?.count ?? 0;
   const totalVolume = salesTotal[0]?.sum ?? 0;
   const transferRequests = context.role === "director" || context.role === "manager"
-    ? await getPendingBrokerTransferRequestsAction()
+    // Optional panel: a missing table (0191 not applied) must not take the team screen down.
+    ? await getPendingBrokerTransferRequestsAction().catch((error) => { console.error("[equipe] transfer requests unavailable", error instanceof Error ? error.message : error); return []; })
     : [];
 
   return (
