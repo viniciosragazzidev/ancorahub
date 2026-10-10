@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => {
   const schema = {
@@ -12,7 +12,7 @@ const state = vi.hoisted(() => {
     auditLogs: "auditLogs",
     leadInteractions: "leadInteractions",
     user: { id: "user.id", active: "user.active", status: "user.status" },
-    tenantMemberships: { tenantId: "members.tenantId", userId: "members.userId", role: "members.role", status: "members.status", branchId: "members.branchId" },
+    tenantMemberships: { tenantId: "members.tenantId", userId: "members.userId", role: "members.role", status: "members.status", branchId: "members.branchId", supervisorId: "members.supervisorId" },
     tenants: { id: "tenants.id", feedbackRequiredEnabled: "tenants.feedbackRequiredEnabled", feedbackGraceMinutes: "tenants.feedbackGraceMinutes", slaFirstContactMinutes: "tenants.slaFirstContactMinutes" },
   };
   const updates: Array<{ table: unknown; values: Record<string, unknown> }> = [];
@@ -31,15 +31,21 @@ const state = vi.hoisted(() => {
     archivedAt: null as Date | null,
     deletedAt: null as Date | null,
   };
-  const controls = { enabled: true, conflict: false, postSale: false, dutyRoster: false };
+  const controls = { enabled: true, conflict: false, postSale: false, dutyRoster: false, teamMembers: [] as string[] };
   const db = {
     select: vi.fn(() => ({
       from: vi.fn((table: unknown) => ({
         innerJoin: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000003", branchId: "00000000-0000-4000-8000-000000000004" }]) })) })),
-        where: vi.fn(() => table === schema.leads
+        where: vi.fn((condition?: unknown) => table === schema.leads
           ? { limit: vi.fn(async () => [{ ...lead }]) }
           : table === schema.branches ? { limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000004", status: "active", acceptingLeads: true, isDistributionHub: false }]) }
-          : table === schema.tenants ? { limit: vi.fn(async () => [{ feedbackRequiredEnabled: true, slaFirstContactMinutes: "15", feedbackGraceMinutes: "5" }]) } : Promise.resolve([{ outboundMessageId: "outbound-test" }]),
+          : table === schema.tenants ? { limit: vi.fn(async () => [{ feedbackRequiredEnabled: true, slaFirstContactMinutes: "15", feedbackGraceMinutes: "5" }]) }
+          // Supervisor team check: the userId condition is the 2nd item of the and(...) list.
+          : table === schema.tenantMemberships ? { limit: vi.fn(async () => {
+            const userId = (Array.isArray(condition) ? condition : []).find((item: { field?: unknown }) => item?.field === "members.userId") as { value?: string } | undefined;
+            return userId?.value && controls.teamMembers.includes(userId.value) ? [{ id: "membership" }] : [];
+          }) }
+          : Promise.resolve([{ outboundMessageId: "outbound-test" }]),
         ),
       })),
     })),
@@ -228,5 +234,53 @@ describe("manual service reassignment", () => {
     if (reason === "conflict") state.controls.conflict = true;
     expect(await reassignLeadAction({}, data)).toMatchObject({ error: expect.any(String) });
     expect(state.inserts).toHaveLength(0);
+  });
+});
+
+describe("supervisor hand-off within the team (supervisor Lite P4)", () => {
+  const owner = "00000000-0000-4000-8000-000000000002";
+  const target = "00000000-0000-4000-8000-000000000003";
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.updates.length = 0;
+    state.inserts.length = 0;
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, teamMembers: [owner, target] });
+    Object.assign(state.lead, { corretorId: owner, status: "distributed", distributionStatus: "assigned", firstContactAt: null, serviceStartedAt: null, archivedAt: null, deletedAt: null, branchId: "00000000-0000-4000-8000-000000000004" });
+    Object.assign(state.mockTenantContext, { userId: "supervisor-test", role: "supervisor", supervisorTeamScope: true });
+  });
+  afterAll(() => {
+    Object.assign(state.mockTenantContext, { userId: "director-test", role: "director", supervisorTeamScope: undefined });
+  });
+  function handoff(extra: Record<string, string> = {}) {
+    const data = formData();
+    data.set("brokerId", target);
+    data.set("reason", "Corretor fora do plantão");
+    for (const [key, value] of Object.entries(extra)) data.set(key, value);
+    return data;
+  }
+
+  it("hands the lead to another broker of the team, with the reason in history and audit", async () => {
+    const result = await reassignLeadAction({}, handoff());
+    expect(result).toMatchObject({ success: true, entity: { corretorId: target } });
+    expect(state.inserts.find((insert) => insert.table === state.schema.auditLogs)?.values.acao).toBe("supervisor_repassou_lead: Corretor fora do plantão");
+    expect(String(state.inserts.find((insert) => insert.table === state.schema.leadInteractions)?.values.conteudo)).toContain("Supervisor");
+    expect(state.inserts.find((insert) => insert.table === state.schema.leadDistributionEvents)?.values.metadata).toMatchObject({ bySupervisor: true, supervisorReason: "Corretor fora do plantão" });
+  });
+
+  it("requires a reason", async () => {
+    expect(await reassignLeadAction({}, handoff({ reason: "" }))).toMatchObject({ error: expect.stringContaining("motivo") });
+    expect(state.inserts).toHaveLength(0);
+  });
+
+  it("refuses a broker outside the team and a lead of someone outside the team", async () => {
+    state.controls.teamMembers = [owner];
+    expect(await reassignLeadAction({}, handoff())).toMatchObject({ error: expect.stringContaining("sua equipe") });
+    state.controls.teamMembers = [target];
+    expect(await reassignLeadAction({}, handoff())).toMatchObject({ error: expect.any(String) });
+    expect(state.inserts).toHaveLength(0);
+  });
+
+  it("never moves the lead to another unit", async () => {
+    expect(await reassignLeadAction({}, handoff({ branchId: "00000000-0000-4000-8000-000000000099" }))).toMatchObject({ error: expect.stringContaining("mesma unidade") });
   });
 });

@@ -12,6 +12,7 @@ function data(overrides: Partial<SupervisorWorkspaceData> = {}): SupervisorWorks
       { userId: "b1", name: "Ana Lima", availability: "available", inService: 3, waiting: 1, late: 1, receivedToday: 2, stats: { brokerId: "b1", offered: 6, accepted: 5, medianAcceptSeconds: 40, started: 4 }, ranks: [{ key: "accepted", position: 1, total: 2 }] },
       { userId: "b2", name: "Bruno Reis", availability: "paused", inService: 1, waiting: 0, late: 0, receivedToday: 0, stats: { brokerId: "b2", offered: 4, accepted: 2, medianAcceptSeconds: 120, started: 2 }, ranks: [{ key: "accepted", position: 2, total: 2 }] },
     ],
+    freeBrokers: [{ userId: "b9", name: "Davi Livre" }],
     today: { receivedToday: 2, inService: 4, waiting: 1, late: 1 },
     attention: [{ leadId: "l1", name: "Maria Souza", brokerName: "Ana Lima", assignedAt: new Date("2026-10-10T14:20:00-03:00"), late: true }],
     unreadNotifications: 0,
@@ -50,7 +51,7 @@ describe("supervisor Lite chat", () => {
     const script = buildSupervisorScript("equipe", data(), now);
     const list = script.blocks.find((block) => block.type === "list");
     expect(list && list.type === "list" ? list.items.map((item) => item.href) : []).toEqual(["/equipe/b1", "/equipe/b2"]);
-    const choice = script.blocks.find((block) => block.type === "question");
+    const choice = script.blocks.find((block) => block.id === "equipe-choice");
     expect(choice && choice.type === "question" ? choice.choices.map((item) => item.id) : []).toEqual(["open-needing", "message", "team-page"]);
   });
 
@@ -58,5 +59,14 @@ describe("supervisor Lite chat", () => {
     const script = buildSupervisorScript("equipe-desempenho", data(), now);
     const bars = script.blocks.find((block) => block.type === "bars");
     expect(bars && bars.type === "bars" ? bars.values.map((value) => value.label) : []).toEqual(["Ana", "Bruno"]);
+  });
+
+  it("offers to add a free broker of the unit and to hand off a late lead", () => {
+    const team = buildSupervisorScript("equipe", data(), now);
+    const add = team.blocks.find((block) => block.id === "equipe-free-choice");
+    expect(add && add.type === "question" ? add.choices[0]!.action : null).toEqual({ kind: "server", name: "team.addBroker", payload: { brokerId: "b9" } });
+    const leads = buildSupervisorScript("equipe-leads", data(), now);
+    const handoff = leads.blocks.find((block) => block.id === "equipe-leads-handoff");
+    expect(handoff && handoff.type === "question" ? handoff.choices[0]!.action : null).toEqual({ kind: "href", href: "/equipe/repassar?lead=l1" });
   });
 });

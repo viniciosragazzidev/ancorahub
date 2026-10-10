@@ -103,8 +103,30 @@ function emptyTeam(now: Date, prefix: string): ChatScript {
 }
 
 /** Equipe: who is available, who needs the supervisor, a card per broker. */
+/** P2: free brokers of the unit, one tap to add each (the server re-checks every rule). */
+function freeBrokersBlocks(data: SupervisorWorkspaceData): ChatBlock[] {
+  if (!data.freeBrokers.length) return [];
+  return [
+    say("equipe-free", `${data.freeBrokers.length === 1 ? "1 corretor" : `${data.freeBrokers.length} corretores`} da sua unidade ${data.freeBrokers.length === 1 ? "está" : "estão"} sem supervisor.`),
+    {
+      type: "question",
+      id: "equipe-free-choice",
+      prompt: "Quer adicionar à sua equipe?",
+      choices: data.freeBrokers.slice(0, 6).map((broker) => ({
+        id: `add-${broker.userId}`,
+        label: `Adicionar ${broker.name}`,
+        reply: `Adicionar ${firstName(broker.name)} à minha equipe`,
+        action: { kind: "server" as const, name: "team.addBroker" as const, payload: { brokerId: broker.userId } },
+      })),
+    },
+  ];
+}
+
 function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
-  if (!data.team.length) return emptyTeam(now, "equipe");
+  if (!data.team.length) {
+    const empty = emptyTeam(now, "equipe");
+    return { ...empty, blocks: [...empty.blocks, ...freeBrokersBlocks(data)] };
+  }
   const needing = brokersNeedingAttention(data.team);
   const online = data.team.filter((broker) => broker.availability === "available").length;
   const blocks: ChatBlock[] = [
@@ -128,6 +150,7 @@ function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
   } else {
     blocks.push(say("equipe-ok", "Ninguém com lead parado. Bom momento para reconhecer quem está indo bem."));
   }
+  blocks.push(...freeBrokersBlocks(data));
   blocks.push({
     type: "question",
     id: "equipe-choice",
@@ -167,7 +190,16 @@ function teamLeadsScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
         };
       }),
     });
-    blocks.push(say("equipe-leads-tip", "Abra o lead para ver a conversa e cobre o corretor pelo recado ou pelo WhatsApp dele."));
+    blocks.push(say("equipe-leads-tip", "Abra o lead para ver a conversa e cobre o corretor. Se ele não puder atender, repasse para outro da equipe."));
+    const late = data.attention.filter((lead) => lead.late).slice(0, 3);
+    if (late.length && data.team.length > 1) {
+      blocks.push({
+        type: "question",
+        id: "equipe-leads-handoff",
+        prompt: "Repassar algum lead atrasado?",
+        choices: late.map((lead) => ({ id: `handoff-${lead.leadId}`, label: `Repassar ${firstName(lead.name)}`, hint: `Hoje com ${firstName(lead.brokerName)}`, action: { kind: "href" as const, href: `/equipe/repassar?lead=${lead.leadId}` } })),
+      });
+    }
   }
   blocks.push({ type: "question", id: "equipe-leads-choice", prompt: "Quer ver mais?", choices: [{ id: "all", label: "Ver todos os leads da equipe", action: { kind: "href", href: "/leads" } }] });
   return { blocks, status: data.today.late ? { label: `${data.today.late} atrasado(s)`, tone: "waiting" } : { label: "Sem atraso", tone: "idle" } };

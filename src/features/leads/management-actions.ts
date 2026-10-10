@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -46,7 +46,24 @@ import { AuthorizationService } from "@/shared/auth/authorization-service";
 import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
 import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 
-async function getManagedLead(leadId: string) {
+/** Supervisor with the team scope: the broker is an active member of their team. */
+async function isInSupervisorTeam(tenantId: string, supervisorId: string, brokerId: string | null, branchId?: string | null) {
+  if (!brokerId) return false;
+  const [row] = await getDatabase().select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships)
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, tenantId),
+      eq(schema.tenantMemberships.userId, brokerId),
+      eq(schema.tenantMemberships.supervisorId, supervisorId),
+      eq(schema.tenantMemberships.status, "active"),
+      eq(schema.tenantMemberships.role, "broker"),
+      // Target of a hand-off: the broker is in the lead's unit too (a stale team link never moves a lead across units).
+      branchId !== undefined ? (branchId ? eq(schema.tenantMemberships.branchId, branchId) : sql`false`) : undefined,
+    ))
+    .limit(1);
+  return Boolean(row);
+}
+
+async function getManagedLead(leadId: string, options?: { allowSupervisorTeam?: boolean }) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
   const [lead] = await db.select({ id: schema.leads.id, nome: schema.leads.nome, tenantId: schema.leads.tenantId, branchId: schema.leads.branchId, status: schema.leads.status, corretorId: schema.leads.corretorId, distributionStatus: schema.leads.distributionStatus, firstContactAt: schema.leads.firstContactAt, serviceStartedAt: schema.leads.serviceStartedAt, archivedAt: schema.leads.archivedAt, deletedAt: schema.leads.deletedAt, queueId: schema.leads.queueId, webhookCredentialId: schema.leads.webhookCredentialId })
@@ -68,7 +85,13 @@ async function getManagedLead(leadId: string) {
   });
 
   const isDirector = context.role === "director" || accessContext.canAccessAllUnits;
-  const isAllowed = isDirector || AuthorizationService.can(accessContext, "leads_reassign", resourceScope) || (context.role === "manager" && accessContext.allowedUnitIds.includes(lead.branchId ?? ""));
+  // Only the reassignment opts in: a team-scoped supervisor manages the leads of their own team's brokers.
+  const supervisorTeam = Boolean(options?.allowSupervisorTeam) && context.role === "supervisor" && Boolean(context.supervisorTeamScope)
+    && await isInSupervisorTeam(context.tenantId, context.userId, lead.corretorId);
+  // A supervisor is allowed only through their team (never by unit or a broader permission).
+  const isAllowed = context.role === "supervisor"
+    ? supervisorTeam
+    : isDirector || AuthorizationService.can(accessContext, "leads_reassign", resourceScope) || (context.role === "manager" && accessContext.allowedUnitIds.includes(lead.branchId ?? ""));
   if (!isAllowed) {
     throw new AuthorizationError("Este lead está fora da sua filial ou escopo autorizado.");
   }
@@ -364,7 +387,17 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
     const mutationId = randomUUID();
     try {
       const input = inputSchema.parse({ leadId: formData.get("leadId"), brokerId: String(formData.get("brokerId") || "") || null, branchId: String(formData.get("branchId") || "") || undefined, dutyScheduleId: String(formData.get("dutyScheduleId") || "") || undefined, assignmentMode: formData.get("assignmentMode") || undefined });
-      const { context, db, lead } = await getManagedLead(input.leadId);
+      const { context, db, lead } = await getManagedLead(input.leadId, { allowSupervisorTeam: true });
+      // Supervisor (team scope): from a broker of the team to another broker of the same team, same unit,
+      // direct assignment only, with a mandatory reason (supervisor Lite P4).
+      const bySupervisor = context.role === "supervisor";
+      const supervisorReason = bySupervisor ? String(formData.get("reason") ?? "").trim().slice(0, 300) : "";
+      if (bySupervisor) {
+        if (supervisorReason.length < 5) throw new Error("Escreva o motivo do repasse (mínimo 5 caracteres).");
+        if (input.branchId && input.branchId !== lead.branchId) throw new Error("O supervisor repassa só dentro da mesma unidade.");
+        if (input.assignmentMode === "offer") throw new Error("O supervisor repassa direto para o corretor da equipe.");
+        if (!(await isInSupervisorTeam(context.tenantId, context.userId, input.brokerId, lead.branchId))) throw new AuthorizationError("Escolha um corretor da sua equipe, da mesma unidade do lead.");
+      }
       if ((await getSystemSetting("feature_lead_management_actions_enabled")) === "false") throw new Error("As ações de gestão de leads estão desativadas pelo Super-admin.");
       if (lead.archivedAt || lead.deletedAt) throw new Error("Não é possível reatribuir um lead arquivado ou excluído.");
       // Pós Venda (2026-10-08): livre movimentação para qualquer unidade ou corretor,
@@ -397,7 +430,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       if (!targetBranchId) throw new Error("Selecione uma unidade para reatribuir o lead.");
       const accessContext = toEffectiveLeadAccessContext(context);
       const targetResourceScope = buildLeadResourceScope({ tenantId: context.tenantId, branchId: targetBranchId });
-      const targetScopeAllowed = context.role === "director" || accessContext.canAccessAllUnits ||
+      const targetScopeAllowed = context.role === "director" || accessContext.canAccessAllUnits || (bySupervisor && targetBranchId === lead.branchId) ||
         AuthorizationService.can(accessContext, "leads_reassign", targetResourceScope);
       if (!targetScopeAllowed) throw new AuthorizationError("A unidade de destino está fora do seu escopo autorizado.");
       const [targetBranch] = await db.select({ id: schema.branches.id, status: schema.branches.status, acceptingLeads: schema.branches.acceptingLeads, isDistributionHub: schema.branches.isDistributionHub })
@@ -488,8 +521,9 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           eq(schema.leadAssignmentAttempts.status, "open"),
         ));
         if (tenantPolicy?.feedbackRequiredEnabled !== false && !keepsClosedStatus) await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: lead.tenantId, leadId: lead.id, brokerId, dutyScheduleId, sequence: 1, assignedAt: now, feedbackDueAt: new Date(now.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000), status: "open", createdAt: now });
-        await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: keepsClosedStatus ? `Lead da Pós Venda transferido por ${context.role === "director" ? "Diretor" : "Gestor"}; status e histórico preservados.` : `Lead reatribuído por ${context.role === "director" ? "Diretor" : "Gestor"}; atendimento e SLA reiniciados, com histórico preservado.` });
-        await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: isPostSale ? postSaleTransferAuditAction(postSaleQueueName) : "reatribuiu_lead" });
+        const actorLabel = context.role === "director" ? "Diretor" : bySupervisor ? "Supervisor" : "Gestor";
+        await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: keepsClosedStatus ? `Lead da Pós Venda transferido por ${actorLabel}; status e histórico preservados.` : `Lead reatribuído por ${actorLabel}; atendimento e SLA reiniciados, com histórico preservado.${supervisorReason ? ` Motivo: ${supervisorReason}` : ""}` });
+        await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: isPostSale ? postSaleTransferAuditAction(postSaleQueueName) : bySupervisor ? `supervisor_repassou_lead: ${supervisorReason}` : "reatribuiu_lead" });
         await tx.insert(schema.leadDistributionEvents).values({
           id: assignmentEventId,
           tenantId: lead.tenantId,
@@ -516,6 +550,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
             previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null,
             previousServiceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
             serviceRestarted: !keepsClosedStatus,
+            ...(bySupervisor ? { bySupervisor: true, supervisorReason } : {}),
           },
           actorId: context.userId,
           createdAt: now,

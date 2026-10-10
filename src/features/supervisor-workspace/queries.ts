@@ -32,6 +32,8 @@ export type AttentionLead = { leadId: string; name: string; brokerName: string; 
 export type SupervisorWorkspaceData = {
   viewer: { userId: string; tenantId: string; name: string; branchName: string | null };
   team: TeamBroker[];
+  /** Active brokers of the supervisor's unit with no supervisor (P2: "add to my team"). */
+  freeBrokers: { userId: string; name: string }[];
   today: { receivedToday: number; inService: number; waiting: number; late: number };
   attention: AttentionLead[];
   unreadNotifications: number;
@@ -54,7 +56,7 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
   const db = getDatabase();
   const memberships = schema.tenantMemberships;
 
-  const [viewerRows, teamRows, tenantRows, unreadRows, latestRows] = await Promise.all([
+  const [viewerRows, teamRows, tenantRows, unreadRows, latestRows, freeRows] = await Promise.all([
     db.select({ name: schema.user.name, branchName: schema.branches.name }).from(schema.user)
       .leftJoin(schema.branches, eq(schema.branches.id, sql`${context.branchId}`))
       .where(eq(schema.user.id, context.userId)).limit(1),
@@ -76,6 +78,12 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
     db.select({ title: schema.notifications.title }).from(schema.notifications)
       .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId), isNull(schema.notifications.readAt)))
       .orderBy(desc(schema.notifications.createdAt)).limit(1),
+    context.branchId
+      ? db.select({ userId: memberships.userId, name: schema.user.name }).from(memberships)
+        .innerJoin(schema.user, eq(schema.user.id, memberships.userId))
+        .where(and(eq(memberships.tenantId, context.tenantId), eq(memberships.branchId, context.branchId), eq(memberships.role, "broker"), eq(memberships.status, "active"), isNull(memberships.supervisorId), eq(schema.user.active, true)))
+        .orderBy(asc(schema.user.name)).limit(20)
+      : Promise.resolve([] as { userId: string; name: string }[]),
   ]);
 
   const slaMinutes = Math.max(1, Number.parseInt(tenantRows[0]?.sla ?? "15", 10) || 15);
@@ -133,6 +141,7 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
   return {
     viewer: { userId: context.userId, tenantId: context.tenantId, name: viewerRows[0]?.name ?? "Supervisor", branchName: viewerRows[0]?.branchName ?? null },
     team,
+    freeBrokers: freeRows,
     today: { receivedToday: sum("receivedToday"), inService: sum("inService"), waiting: sum("waiting"), late: sum("late") },
     attention: attentionRows.map((row) => ({
       leadId: row.leadId,

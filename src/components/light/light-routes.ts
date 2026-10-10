@@ -172,6 +172,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/plantoes/agora"), route: { title: "Meu plantão agora", tab: "inicio", isRoot: false, parentHref: "/dashboard/c/plantao" } },
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/relacionamento"), route: { title: "Mural da gestão", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/equipe/repassar"), route: { title: "Repassar lead", tab: "inicio", isRoot: false, parentHref: "/dashboard/c/equipe-leads" } },
   { test: exact("/equipe"), route: { title: "Minha equipe", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/equipe"), route: { title: "Corretor", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
