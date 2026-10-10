@@ -9,6 +9,7 @@ import { getDatabase, schema } from "@/shared/db";
 
 import { resolveRules, type EngagementRuleKey } from "./catalog";
 import { applyDailyCaps, capKey, periodDay, scoreFastAccept, scoreFirstContact, scorePresence, scoreReturnOnTime, scoreServiceNote, type PointsCandidate } from "./scoring";
+import { collectJourneyBatch, touchedJourneyBrokers } from "./journey-collector";
 
 const SOURCE = "points";
 /** Overlap with the previous run: late commits are caught, the unique key absorbs repeats. */
@@ -169,11 +170,19 @@ export async function collectTenantPoints(tenantId: string, now = new Date()) {
     noteCandidates(tenantId, window, rules),
     presenceCandidates(tenantId, window, rules),
   ]);
-  const candidates = sources.flatMap((source) => source.candidates).filter((candidate) => brokers.has(candidate.brokerId));
+  const candidates = [...new Map(sources.flatMap((source) => source.candidates).filter((candidate) => brokers.has(candidate.brokerId)).map((candidate) => [candidate.idempotencyKey, candidate])).values()];
   // A full page leaves rows behind: the mark stops at the earliest cutoff so nothing is skipped.
   const cutoffs = sources.map((source) => source.cutoff).filter((cutoff): cutoff is Date => Boolean(cutoff));
   const nextMark = cutoffs.length ? new Date(Math.min(...cutoffs.map((cutoff) => cutoff.getTime()))) : now;
-  const kept = applyDailyCaps(candidates, rules, await existingCapCounts(tenantId, candidates, rules));
+  const existing = candidates.length ? await db.select().from(schema.engagementPointEvents).where(and(eq(schema.engagementPointEvents.tenantId, tenantId), inArray(schema.engagementPointEvents.idempotencyKey, candidates.map((c) => c.idempotencyKey)))) : [];
+  const existingKeys = new Set(existing.map((event) => event.idempotencyKey));
+  // Replayed candidates already consumed their daily slot. Do not consume it again.
+  const fresh = candidates.filter((candidate) => !existingKeys.has(candidate.idempotencyKey));
+  const kept = applyDailyCaps(fresh, rules, await existingCapCounts(tenantId, fresh, rules));
+  const journeyCandidates = [...kept, ...candidates.flatMap((candidate) => {
+    const event = existing.find((row) => row.idempotencyKey === candidate.idempotencyKey);
+    return event && !event.reversedAt ? [{ ...candidate, points: event.points, occurredAt: event.occurredAt, metadata: event.metadata }] : [];
+  })];
 
   let inserted = 0;
   if (kept.length) {
@@ -194,11 +203,19 @@ export async function collectTenantPoints(tenantId: string, now = new Date()) {
     inserted = rows.length;
   }
 
+  let journey: { available: boolean; brokers: number } = { available: false, brokers: 0 };
+  if (await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false") === "true") {
+    const touched = await touchedJourneyBrokers(tenantId, window.since, nextMark, slaMinutes);
+    journey = await collectJourneyBatch({ tenantId, brokerIds: [...new Set([...touched, ...candidates.map((c) => c.brokerId)])], candidates: journeyCandidates, now, slaMinutes, rules }).catch((error: unknown) => {
+      console.error("[engagement] journey unavailable", tenantId, error instanceof Error ? error.message : "unknown_error");
+      return { available: false, brokers: 0 };
+    });
+  }
   await db.insert(schema.engagementWatermarks).values({ tenantId, source: SOURCE, lastRunAt: nextMark, updatedAt: now })
     .onConflictDoUpdate({ target: [schema.engagementWatermarks.tenantId, schema.engagementWatermarks.source], set: { lastRunAt: nextMark, updatedAt: now } });
 
   const byRule = kept.reduce<Partial<Record<EngagementRuleKey, number>>>((acc, candidate) => ({ ...acc, [candidate.ruleKey]: (acc[candidate.ruleKey] ?? 0) + 1 }), {});
-  return { tenantId, since: window.since.toISOString(), until: nextMark.toISOString(), partial: cutoffs.length > 0, candidates: candidates.length, inserted, byRule };
+  return { tenantId, since: window.since.toISOString(), until: nextMark.toISOString(), partial: cutoffs.length > 0, candidates: candidates.length, inserted, byRule, journey };
 }
 
 /** Cron entry: every tenant, one failure does not stop the others. Off unless BROKER_ENGAGEMENT is on. */

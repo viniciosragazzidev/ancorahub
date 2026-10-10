@@ -860,6 +860,7 @@ export const leadInteractions = pgTable(
   (table) => [
     index("lead_interactions_lead_created_idx").on(table.leadId, table.createdAt),
     index("lead_interactions_note_created_idx").on(table.createdAt).where(sql`${table.tipo} = 'note'`),
+    index("lead_interactions_user_note_created_idx").on(table.userId, table.createdAt, table.leadId).where(sql`${table.tipo} = 'note'`),
   ],
 );
 
@@ -2819,6 +2820,7 @@ export const tenantMemberships = pgTable(
     preferredExperienceMode: text("preferred_experience_mode").notNull().default("LIGHT"),
     /** "Novo lead recebido" pop-up (toast + sound); off keeps only the bell/inbox. */
     leadToastEnabled: boolean("lead_toast_enabled").notNull().default(true),
+    rankingOptOut: boolean("ranking_opt_out").notNull().default(false),
     onboardingDismissedAt: timestamp("onboarding_dismissed_at", { withTimezone: true }),
     createdAt,
     updatedAt,
@@ -3332,6 +3334,7 @@ export const leadOffers = pgTable(
     index("lead_offers_broker_status_expires_idx").on(table.brokerId, table.status, table.expiresAt),
     index("lead_offers_broker_accepted_at_partial_idx").on(table.brokerId, table.acceptedAt).where(sql`${table.acceptedAt} is not null`),
     index("lead_offers_tenant_offered_at_idx").on(table.tenantId, table.offeredAt),
+    index("lead_offers_broker_offered_at_idx").on(table.brokerId, table.offeredAt),
     index("lead_offers_tenant_accepted_at_partial_idx").on(table.tenantId, table.acceptedAt).where(sql`${table.acceptedAt} is not null`),
     index("lead_offers_whatsapp_msg_idx").on(table.whatsappMessageId),
   ],
@@ -3669,6 +3672,8 @@ export const engagementPointEvents = pgTable(
     uniqueIndex("engagement_point_events_tenant_key_unique").on(table.tenantId, table.idempotencyKey),
     index("engagement_point_events_tenant_broker_occurred_idx").on(table.tenantId, table.brokerId, table.occurredAt),
     index("engagement_point_events_tenant_day_idx").on(table.tenantId, table.periodDay, table.ruleKey),
+    // INCLUDE(points) is provided by 0193; the Drizzle index API lacks INCLUDE.
+    index("engagement_point_events_tenant_period_broker_idx").on(table.tenantId, table.periodDay, table.brokerId).where(sql`${table.reversedAt} is null`),
   ],
 );
 
@@ -3690,6 +3695,54 @@ export const engagementSettings = pgTable("engagement_settings", {
   updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
   updatedAt,
 });
+
+export const engagementMissions = pgTable("engagement_missions", {
+  id: text("id").primaryKey(),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(), title: text("title").notNull(), description: text("description").notNull().default(""),
+  metric: text("metric").notNull(), target: integer("target").notNull(), bonusPoints: integer("bonus_points").notNull().default(0),
+  period: text("period").notNull(), audience: jsonb("audience").$type<Record<string, unknown>>().notNull().default({}),
+  startsAt: timestamp("starts_at", { withTimezone: true }), endsAt: timestamp("ends_at", { withTimezone: true }),
+  status: text("status").notNull().default("active"), createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+  createdAt, updatedAt,
+}, (table) => [
+  unique("engagement_missions_id_tenant_unique").on(table.id, table.tenantId),
+  index("engagement_missions_tenant_status_idx").on(table.tenantId, table.status),
+  check("engagement_missions_kind_check", sql`${table.kind} in ('daily','weekly','team','campaign')`),
+  check("engagement_missions_period_check", sql`${table.period} in ('daily','weekly','campaign')`),
+  check("engagement_missions_status_check", sql`${table.status} in ('active','inactive')`),
+  check("engagement_missions_target_check", sql`${table.target} > 0`),
+  check("engagement_missions_bonus_check", sql`${table.bonusPoints} >= 0`),
+  check("engagement_missions_dates_check", sql`${table.endsAt} is null or ${table.startsAt} is null or ${table.endsAt} > ${table.startsAt}`),
+]);
+export const engagementMissionProgress = pgTable("engagement_mission_progress", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  missionId: text("mission_id").notNull(), subjectId: text("subject_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+  subjectType: text("subject_type").notNull().default("broker"), periodKey: text("period_key").notNull(),
+  progress: integer("progress").notNull().default(0), target: integer("target").notNull(),
+  completedAt: timestamp("completed_at", { withTimezone: true }), createdAt, updatedAt,
+}, (table) => [
+  foreignKey({ columns: [table.missionId, table.tenantId], foreignColumns: [engagementMissions.id, engagementMissions.tenantId], name: "engagement_progress_mission_tenant_fk" }).onDelete("cascade"),
+  uniqueIndex("engagement_progress_mission_subject_period_unique").on(table.tenantId, table.missionId, table.subjectId, table.periodKey),
+  index("engagement_progress_tenant_subject_idx").on(table.tenantId, table.subjectId, table.periodKey),
+  check("engagement_progress_subject_check", sql`${table.subjectType} in ('broker','supervisor')`),
+  check("engagement_progress_counts_check", sql`${table.progress} >= 0 and ${table.target} > 0`),
+]);
+export const engagementAchievements = pgTable("engagement_achievements", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }), badgeKey: text("badge_key").notNull(),
+  earnedAt: timestamp("earned_at", { withTimezone: true }).notNull().defaultNow(), evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
+}, (table) => [uniqueIndex("engagement_achievements_tenant_broker_badge_unique").on(table.tenantId, table.brokerId, table.badgeKey)]);
+export const engagementCelebrations = pgTable("engagement_celebrations", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }), kind: text("kind").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}), idempotencyKey: text("idempotency_key").notNull(),
+  priority: integer("priority").notNull().default(10), createdAt, seenAt: timestamp("seen_at", { withTimezone: true }),
+}, (table) => [
+  uniqueIndex("engagement_celebrations_tenant_key_unique").on(table.tenantId, table.idempotencyKey),
+  index("engagement_celebrations_tenant_user_seen_idx").on(table.tenantId, table.userId, table.seenAt, table.createdAt),
+  check("engagement_celebrations_kind_check", sql`${table.kind} in ('points','mission','achievement','level','daily_summary')`),
+]);
 
 export const relationshipBroadcasts = pgTable(
   "relationship_broadcasts",

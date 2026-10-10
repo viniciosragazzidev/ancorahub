@@ -143,6 +143,22 @@ export const FEATURE_FLAGS = {
     description: "Liga a jornada do corretor: o coletor grava pontos por fatos do sistema (contato com mensagem enviada, aceite rápido, retorno em dia). Plano: docs/implementations/active/2026-10-10-central-relacionamento-corretor.md.",
   },
 
+  BROKER_JOURNEY: {
+    key: "feature_broker_journey_enabled", scope: "global", defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita missões, conquistas, níveis e celebrações da jornada do corretor.",
+  },
+  TEAM_RANKING: {
+    key: "feature_team_ranking_enabled", scope: "global", defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o placar semanal da unidade e das equipes, com opção de privacidade.",
+  },
+  ENGAGEMENT_CAMPAIGNS: {
+    key: "feature_engagement_campaigns_enabled", scope: "global", defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita missões de campanha configuradas pelo gestor.",
+  },
+
   SUPERVISOR_LITE: {
     key: "feature_supervisor_lite_enabled",
     scope: "global",
