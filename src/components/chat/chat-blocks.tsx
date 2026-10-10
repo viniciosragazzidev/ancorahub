@@ -129,7 +129,7 @@ function WhatsAppGlyph() {
   );
 }
 
-export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>) => void }) {
+export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void }) {
   const reduce = useReducedMotion();
   switch (block.type) {
     case "button": {
@@ -142,7 +142,7 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: 
             target={external ? "_blank" : undefined}
             rel={external ? "noopener noreferrer" : undefined}
             className={`${styles.linkButton} ${block.tone === "whatsapp" ? styles.linkButtonWhatsapp : ""}`}
-            onClick={() => onButtonOpen?.(block)}
+            onClick={(event) => onButtonOpen?.(block, event)}
           >
             {block.tone === "whatsapp" ? <WhatsAppGlyph /> : null}
             {block.label}

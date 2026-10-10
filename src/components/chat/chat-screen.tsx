@@ -75,7 +75,8 @@ export function ChatScreen({
   /** Keyboard and accessible name of the composer when it answers a question. */
   composerInput?: { inputMode?: "text" | "numeric"; label?: string };
   /** A button block was tapped (e.g. record that WhatsApp was opened). */
-  onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>) => void;
+  /** A button block was tapped; preventDefault on the event keeps the link from opening (e.g. a dialog instead). */
+  onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void;
   /** History-like threads (Âncora): show everything at once, already scrolled to the newest. */
   instant?: boolean;
 }) {

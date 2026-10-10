@@ -1,7 +1,7 @@
 "use server";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -15,6 +15,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { normalizeWhatsAppDestination } from "@/lib/whatsapp-url";
+import { phoneHash as normalizedPhoneHash } from "@/features/waha-cadence/contract";
 
 export type SendLeadMessageResult = {
   success: boolean;
@@ -323,11 +324,12 @@ export async function sendLeadMessageAction(
       };
 
     // ── Opt-out guard ──────────────────────────────────────────────────────
-    const phoneHash = createPhoneHash(lead.telefone);
+    // Opt-out may be stored with the raw or the WAHA-normalized hash: check both.
+    const phoneHashes = [...new Set([createPhoneHash(lead.telefone), normalizedPhoneHash(lead.telefone)])];
     const [suppression] = await db
       .select({ id: schema.wahaSuppressions.id })
       .from(schema.wahaSuppressions)
-      .where(eq(schema.wahaSuppressions.phoneHash, phoneHash))
+      .where(inArray(schema.wahaSuppressions.phoneHash, phoneHashes))
       .limit(1);
     if (suppression)
       return { success: false, error: "Este contato não pode receber novas mensagens." };

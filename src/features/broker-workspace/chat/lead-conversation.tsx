@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { ChatScreen } from "@/components/chat/chat-screen";
 import styles from "@/components/chat/chat.module.css";
 import type { Mention } from "@/components/chat/composer";
 import type { ChatBlock, ChatScript } from "@/components/chat/types";
 import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
+import { FirstMessageDialog } from "@/features/broker-workspace/first-message/first-message-dialog";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 import { runChatServerAction } from "./chat-actions";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
@@ -31,6 +34,9 @@ export function LeadConversation({
   script: ChatScript;
 }) {
   const router = useRouter();
+  // On a computer "WhatsApp" opens the first-message dialog (send from the system or connect); phones open the app.
+  const desktop = useMediaQuery("(min-width: 1024px) and (pointer: fine)");
+  const [firstMessageOpen, setFirstMessageOpen] = useState(false);
   return (
     <div className="arc-venancor">
       <ChatScreen
@@ -38,7 +44,15 @@ export function LeadConversation({
         backHref="/dashboard"
         script={script}
         composerDisabled={!canWrite}
-        onButtonOpen={(block) => { if (block.tone === "whatsapp") void recordWhatsAppOpenedAction(leadId); }}
+        onButtonOpen={(block, event) => {
+          if (block.tone !== "whatsapp") return;
+          void recordWhatsAppOpenedAction(leadId);
+          // An AI draft keeps its own text: only the plain "Abrir WhatsApp" goes to the dialog.
+          if (desktop && !block.id.startsWith("ai-send")) {
+            event.preventDefault();
+            setFirstMessageOpen(true);
+          }
+        }}
         headerAction={
           <Link href={`/leads/${leadId}?ficha=1`} className={styles.iconButton} aria-label="Ver ficha completa">
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2.5" width="10" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
@@ -49,6 +63,7 @@ export function LeadConversation({
           if (result.ok && action.name === "lead.decline") router.push("/minha-fila");
           // Registering the first contact returns the WhatsApp link: a button right below opens it.
           const followUp: ChatBlock[] = result.ok && result.href?.startsWith("http") ? [whatsappButton(`b-whatsapp-${Date.now()}`, result.href)] : [];
+          if (desktop && action.name === "lead.registerContact" && result.ok) setFirstMessageOpen(true);
           return { ok: result.ok, message: result.message, warning: result.warning, followUp };
         }}
         onFreeText={async (text): Promise<ChatBlock[]> => {
@@ -65,6 +80,7 @@ export function LeadConversation({
           return [];
         }}
       />
+      {desktop ? <FirstMessageDialog leadId={leadId} open={firstMessageOpen} onOpenChange={setFirstMessageOpen} onSent={() => router.refresh()} /> : null}
     </div>
   );
 }

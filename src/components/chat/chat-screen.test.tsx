@@ -105,7 +105,7 @@ describe("ChatScreen", () => {
     expect(link.getAttribute("href")).toBe("https://wa.me/5521999999999");
     expect(link.getAttribute("target")).toBe("_blank");
     fireEvent.click(link);
-    expect(onButtonOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }));
+    expect(onButtonOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "b" }), expect.anything());
   });
 
   it("navigates for link replies", () => {
