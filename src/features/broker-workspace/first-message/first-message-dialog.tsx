@@ -30,6 +30,16 @@ const GUIDE = [
 
 const POLL_MS = 1_500;
 
+/** Always visible: whether the broker's WhatsApp is connected (and a way to connect when it is not). */
+function ConnectionPill({ connected }: { connected: boolean }) {
+  return (
+    <span className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ${connected ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
+      <span className={`size-2 rounded-full ${connected ? "bg-success" : "bg-muted-foreground/60"}`} aria-hidden />
+      {connected ? "Seu WhatsApp está conectado" : "Seu WhatsApp não está conectado"}
+    </span>
+  );
+}
+
 /**
  * "Chamar no WhatsApp" on the computer: the first message goes from the broker's
  * own WhatsApp through the system (decision 2026-10-10); not connected, the
@@ -46,6 +56,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
   const [now, setNow] = useState(() => Date.now());
   const [webUrl, setWebUrl] = useState<string | null>(null);
   const [justSent, setJustSent] = useState(false);
+  const [connected, setConnected] = useState(false);
   const polling = useRef(false);
 
   // Each opening starts over from the server state (connection may have changed).
@@ -62,6 +73,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
       setStep(result.alreadySent ? "done" : result.connected ? "compose" : "offer");
       setWebUrl(result.webUrl);
       setJustSent(false);
+      setConnected(result.connected);
     });
     return () => { cancelled = true; };
   }, [open, leadId]);
@@ -83,6 +95,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
       if (result && result.success) {
         if (result.status === "ready") {
           polling.current = false;
+          setConnected(true);
           setStep("connected");
           window.setTimeout(() => setStep("compose"), reduce ? 400 : 1_400);
           return;
@@ -100,7 +113,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
     setStep("qr");
     const result = await startWhatsAppConnection().catch(() => null);
     if (!result || !result.success) { setError("Não consegui gerar o QR code agora. Tente de novo em instantes."); setStep("guide"); return; }
-    if (result.status === "ready") { setStep("compose"); return; }
+    if (result.status === "ready") { setConnected(true); setStep("compose"); return; }
     if (result.qrCode) showQr(result.qrCode);
   }
 
@@ -110,6 +123,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
     const result = await sendFirstMessageAction({ leadId, text });
     if (result.ok) { setWebUrl(result.webUrl ?? webUrl); setJustSent(true); setStep("done"); onSent?.(); return; }
     setError(result.error);
+    if (result.code === "not_connected") setConnected(false);
     setStep(result.code === "already_sent" ? "done" : result.code === "not_connected" ? "offer" : "compose");
   }
 
@@ -148,6 +162,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
               <>
                 <DialogTitle>Primeira mensagem para {name}</DialogTitle>
                 <DialogDescription>Sai do seu WhatsApp, direto daqui. Pode editar antes de enviar.</DialogDescription>
+                <ConnectionPill connected />
                 <Textarea value={text} rows={5} maxLength={FIRST_MESSAGE_MAX_LENGTH} onChange={(event) => setText(event.target.value)} aria-label="Mensagem" disabled={step === "sending"} />
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -161,6 +176,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
               <>
                 <DialogTitle>Conecte seu WhatsApp e mande daqui</DialogTitle>
                 <DialogDescription>Você está no computador. Conectando seu WhatsApp, a primeira mensagem para {name} sai daqui com um clique.</DialogDescription>
+                <ConnectionPill connected={false} />
                 {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
                 <ul className="grid gap-2">
                   {ADVANTAGES.map((item, index) => (
@@ -221,9 +237,13 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
             {step === "done" ? (
               <>
                 <DialogTitle>{justSent ? `Mensagem enviada para ${name}` : "A primeira mensagem já foi enviada"}</DialogTitle>
-                <DialogDescription>Agora continue pelo seu celular ou pelo WhatsApp Web. A resposta do cliente chega no seu WhatsApp.</DialogDescription>
+                <DialogDescription>{justSent ? "Agora continue pelo seu celular ou pelo WhatsApp Web. A resposta do cliente chega no seu WhatsApp." : `Você já escreveu para ${name}. Continue a conversa pelo seu celular ou pelo WhatsApp Web.`}</DialogDescription>
+                <ConnectionPill connected={connected} />
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  {webUrl ? <Button variant="outline" render={<a href={webUrl} target="_blank" rel="noreferrer" />}>Abrir o WhatsApp Web</Button> : <span />}
+                  <div className="flex flex-wrap gap-2">
+                    {webUrl ? <Button variant="outline" render={<a href={webUrl} target="_blank" rel="noreferrer" />}>Abrir o WhatsApp Web</Button> : null}
+                    {!connected ? <Button variant="ghost" onClick={() => { setGuideIndex(0); setStep("guide"); }}>Conectar meu WhatsApp</Button> : null}
+                  </div>
                   <Button onClick={() => onOpenChange(false)}>Fechar</Button>
                 </div>
               </>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, type ReactNode, useMemo, useState, useEffect } from "react";
+import { Children, isValidElement, type ReactNode, useMemo, useState, useEffect } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +14,8 @@ const tabs = [
 
 type SettingsTab = (typeof tabs)[number]["id"];
 
-// Maps each <Card> in page.tsx, by render order, to the tab that shows it.
+// Fallback only: every card in page.tsx declares data-settings-tab="..." (the
+// position list drifted and hid cards). Maps each untagged <Card>, by render order, to the tab that shows it.
 // Keep this in sync whenever a card is added, removed or reordered there —
 // a card with no entry here (index beyond this array) never renders in any
 // tab. See src/app/(platform-admin)/super-admin/settings/page.tsx.
@@ -74,7 +75,11 @@ export function SuperAdminSettingsTabs({ children }: SuperAdminSettingsTabsProps
     }
   }
 
-  const visibleCards = Children.toArray(children).filter((_, index) => tabForCard[index] === activeTab);
+  // Each card declares its tab (data-settings-tab); the index list is only a fallback for an untagged card.
+  const visibleCards = Children.toArray(children).filter((child, index) => {
+    const declared = isValidElement(child) ? (child.props as { "data-settings-tab"?: SettingsTab })["data-settings-tab"] : undefined;
+    return (declared ?? tabForCard[index]) === activeTab;
+  });
 
   return (
     <Tabs value={activeTab} onValueChange={selectTab} variant="underline" className="gap-5">

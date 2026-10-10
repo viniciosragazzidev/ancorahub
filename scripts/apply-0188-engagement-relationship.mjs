@@ -24,6 +24,7 @@ const INDEXES = [
 const NEW_TABLES = ["engagement_point_events", "engagement_watermarks", "engagement_settings", "relationship_broadcasts", "relationship_broadcast_recipients"];
 
 // One connection, no transaction (CONCURRENTLY cannot run inside one).
+console.log(`Banco: ${new URL(url.replace(/^postgres(ql)?:/, "http:")).host}`);
 const sql = postgres(url, { prepare: false, max: 1, connect_timeout: 15 });
 
 async function indexState(name) {

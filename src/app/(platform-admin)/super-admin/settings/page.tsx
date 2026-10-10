@@ -1,6 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { sql } from "drizzle-orm";
 import { getSystemSettings } from "@/features/system-settings/queries";
+import { getDatabase } from "@/shared/db";
 import { getNotificationCapabilityStates } from "@/features/notifications/queries";
 import {
   updateCentralAtencaoSettingsAction,
@@ -37,6 +39,7 @@ import {
   updateDutyInactiveBrokersSettingsAction,
   updateDutyOccurrenceHistorySettingsAction,
   updateBrokerDutyCalendarEnabledSettingsAction,
+  updateBrokerNewsSettingsAction,
   updateBrokerDutyCalendarHorizonSettingsAction,
   updateCustomRolesGlobalSettingsAction,
   updatePerformanceRankingSettingsAction,
@@ -112,6 +115,9 @@ export default async function SuperAdminSettingsPage() {
     FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key,
     FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key,
+    FEATURE_FLAGS.RELATIONSHIP_CENTER.key,
+    FEATURE_FLAGS.BROKER_ENGAGEMENT.key,
+    FEATURE_FLAGS.BROKER_AI_ASSISTANTS.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key,
     FEATURE_FLAGS.ATTENDANCE_FLOWS.key,
     FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key,
@@ -142,6 +148,11 @@ export default async function SuperAdminSettingsPage() {
   ]);
   const [notificationCapabilities] = await Promise.all([getNotificationCapabilityStates()]);
   const settingMap = new Map(settings.map((setting) => [setting.key, setting.value]));
+  // The Central and the journey need the 0188 tables (scripts/apply-0188-engagement-relationship.mjs).
+  const engagementTablesReady = await getDatabase()
+    .execute(sql`select to_regclass('public.relationship_broadcasts') is not null and to_regclass('public.engagement_point_events') is not null as ready`)
+    .then((result) => Boolean((result as unknown as { ready: boolean }[])[0]?.ready))
+    .catch(() => false);
   const centralEnabled = settingMap.get("feature_central_atencao_enabled") !== "false";
   const stagnantDays = settingMap.get("feature_central_atencao_stagnant_days") ?? "3";
   const globalSearchEnabled = settingMap.get("feature_global_search_enabled") !== "false";
@@ -176,6 +187,12 @@ export default async function SuperAdminSettingsPage() {
   const dutyInactiveBrokersEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key) ?? FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.defaultValue) === "true";
   const attendanceFlowsEnabled = (settingMap.get(FEATURE_FLAGS.ATTENDANCE_FLOWS.key) ?? FEATURE_FLAGS.ATTENDANCE_FLOWS.defaultValue) === "true";
   const dutyOccurrenceHistoryEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key) ?? FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.defaultValue) === "true";
+  const flagOn = (flag: { key: string; defaultValue: string }) => (settingMap.get(flag.key) ?? flag.defaultValue) === "true";
+  const brokerNews = [
+    { field: "relationshipCenterEnabled", needsTables: true, enabled: flagOn(FEATURE_FLAGS.RELATIONSHIP_CENTER), title: "Central de relacionamento", detail: "Rota /relacionamento: direção manda avisos para corretores, unidades, plantões ou equipes e vê quem leu; corretor ganha o Mural da gestão." },
+    { field: "brokerEngagementEnabled", needsTables: true, enabled: flagOn(FEATURE_FLAGS.BROKER_ENGAGEMENT), title: "Jornada do corretor (pontos, ranking e missão de etapa)", detail: "Liga o extrato de pontos (cron /api/internal/jobs/engagement), a posição do próprio corretor no Início e no perfil, e a missão \"registre a etapa\". Requer parecer jurídico antes de ligar para todos (ranking e corretor autônomo)." },
+    { field: "brokerAiAssistantsEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.BROKER_AI_ASSISTANTS), title: "IA nos assistentes do corretor", detail: "Texto livre nos assistentes do Lite responde com IA. Precisa das chaves (Groq/OpenRouter) no Coolify; a conversa do lead só usa provedor pago." },
+  ];
   const brokerDutyCalendarEnabled = (settingMap.get(FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key) ?? FEATURE_FLAGS.BROKER_DUTY_CALENDAR.defaultValue) === "true";
   const savedBrokerDutyCalendarHorizon = settingMap.get(FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key) ?? FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.defaultValue;
   const brokerDutyCalendarHorizonMonths = FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.allowedValues.includes(savedBrokerDutyCalendarHorizon as (typeof FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.allowedValues)[number])
@@ -260,7 +277,7 @@ export default async function SuperAdminSettingsPage() {
           }
         >
           <SuperAdminSettingsTabs>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Workspace do Corretor</CardTitle>
                 <CardDescription>
@@ -294,7 +311,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Agenda obrigatória do corretor</CardTitle>
                 <CardDescription>
@@ -311,7 +328,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Automation Builder</CardTitle>
                 <CardDescription>
@@ -346,7 +363,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Clean UI operacional</CardTitle>
                 <CardDescription>
@@ -384,7 +401,7 @@ export default async function SuperAdminSettingsPage() {
                 </Button>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Cargos personalizados</CardTitle>
                 <CardDescription>
@@ -422,7 +439,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="channels" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Exclusão de históricos de conversa</CardTitle>
                 <CardDescription>
@@ -451,7 +468,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="channels" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Mídia nas conversas oficiais</CardTitle>
                 <CardDescription>
@@ -482,7 +499,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Temporadas e ranking comercial</CardTitle>
                 <CardDescription>
@@ -517,7 +534,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Perfil administrativo da equipe</CardTitle>
                 <CardDescription>
@@ -554,7 +571,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Reenvio de convites de ativação</CardTitle>
                 <CardDescription>
@@ -588,7 +605,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Perfil pessoal do usuário</CardTitle>
                 <CardDescription>
@@ -624,7 +641,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Configuração do Servidor</CardTitle>
                 <CardDescription>Parâmetros operacionais do ambiente ativo.</CardDescription>
@@ -650,7 +667,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Onboarding por rota</CardTitle>
                 <CardDescription>
@@ -684,7 +701,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Motor de distribuição</CardTitle>
                 <CardDescription>
@@ -784,7 +801,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Central de notificações</CardTitle>
                 <CardDescription>
@@ -828,7 +845,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Sincronização em tempo real</CardTitle>
                 <CardDescription>
@@ -864,7 +881,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="channels" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>WhatsApp oficial da Meta</CardTitle>
                 <CardDescription>
@@ -899,7 +916,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="channels" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Report de problema no WhatsApp</CardTitle>
                 <CardDescription>
@@ -947,7 +964,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Central de Relatórios (Reporting 1)</CardTitle>
                 <CardDescription>
@@ -987,7 +1004,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="channels" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Captação manual de Lead Ads</CardTitle>
                 <CardDescription>
@@ -1023,7 +1040,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Capacidades operacionais</CardTitle>
                 <CardDescription>
@@ -1066,7 +1083,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Busca global</CardTitle>
                 <CardDescription>
@@ -1101,7 +1118,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Movimento da interface</CardTitle>
                 <CardDescription>
@@ -1136,7 +1153,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Painel e Ações Administrativas no Lead</CardTitle>
                 <CardDescription>
@@ -1174,7 +1191,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Planejamento e inclusão em plantões</CardTitle>
                 <CardDescription>
@@ -1204,7 +1221,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Fluxos de atendimento por fila</CardTitle>
                 <CardDescription>
@@ -1224,7 +1241,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Histórico de plantões encerrados</CardTitle>
                 <CardDescription>Permite consultar cada ocorrência encerrada e os registros de distribuição associados. Desativar oculta a consulta sem apagar eventos.</CardDescription>
@@ -1240,7 +1257,37 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
+              <CardHeader>
+                <CardTitle>Novidades do corretor</CardTitle>
+                <CardDescription>
+                  Liga e desliga as funções novas de 2026-10-10. Desligar esconde a função e não apaga nada. Cada mudança fica na auditoria.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form action={updateBrokerNewsSettingsAction} className="grid gap-4">
+                  {!engagementTablesReady ? (
+                    <p role="status" className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+                      As tabelas da Central e da jornada ainda não existem neste banco. Rode <code>node scripts/apply-0188-engagement-relationship.mjs --apply</code> antes de ligar essas duas.
+                    </p>
+                  ) : null}
+                  {brokerNews.map((item) => (
+                    <label key={item.field} className={`flex items-start gap-3 text-sm ${item.needsTables && !engagementTablesReady ? "opacity-60" : ""}`}>
+                      <input type="checkbox" name={item.field} value="true" defaultChecked={item.enabled} disabled={item.needsTables && !engagementTablesReady} className="mt-0.5 size-4 accent-primary" />
+                      <span>
+                        <span className="font-medium">{item.title}</span>
+                        <span className="block text-xs text-muted-foreground">{item.detail}</span>
+                      </span>
+                    </label>
+                  ))}
+                  <div className="flex justify-end border-t border-border pt-4">
+                    <Button type="submit">Salvar novidades</Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Agenda de plantões do Corretor Lite</CardTitle>
                 <CardDescription>
@@ -1281,7 +1328,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Escolha de oferta na atribuição manual</CardTitle>
                 <CardDescription>
@@ -1310,7 +1357,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Confirmação de presença em plantões</CardTitle>
                 <CardDescription>
@@ -1331,7 +1378,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Motor de Inteligência Artificial</CardTitle>
                 <CardDescription>
@@ -1569,7 +1616,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="operations" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Outbox do recebimento de leads</CardTitle>
                 <CardDescription>
@@ -1659,7 +1706,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="channels" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Cadência de WhatsApp</CardTitle>
                 <CardDescription>
@@ -1781,7 +1828,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>CorreTop Assistant</CardTitle>
                 <CardDescription>
@@ -1814,7 +1861,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="platform" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Armazenamento de arquivos</CardTitle>
                 <CardDescription>
@@ -1849,7 +1896,7 @@ export default async function SuperAdminSettingsPage() {
               </CardContent>
             </Card>
 
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Qualificação automática no WhatsApp</CardTitle>
                 <CardDescription>
@@ -1884,7 +1931,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Reativação de leads frios sem distribuição</CardTitle>
                 <CardDescription>
@@ -1918,7 +1965,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Quick Reply determinístico</CardTitle>
                 <CardDescription>
@@ -1952,7 +1999,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Reset de memória do agente de WhatsApp</CardTitle>
                 <CardDescription>
@@ -1991,7 +2038,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="intelligence" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Centro de Treinamento do Agente</CardTitle>
                 <CardDescription>
@@ -2029,7 +2076,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="channels" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Identidade pública do Lead Ads</CardTitle>
                 <CardDescription>
@@ -2065,7 +2112,7 @@ export default async function SuperAdminSettingsPage() {
                 </form>
               </CardContent>
             </Card>
-            <Card className="border-border bg-card shadow-none">
+            <Card data-settings-tab="channels" className="border-border bg-card shadow-none">
               <CardHeader>
                 <CardTitle>Liberação por empresa</CardTitle>
                 <CardDescription>

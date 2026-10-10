@@ -2,7 +2,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 
-import { and, count, eq, gte, inArray, isNull } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -42,6 +42,7 @@ async function loadOwnLead(leadId: string) {
     status: schema.leads.status,
     branchId: schema.leads.branchId,
     distributionStatus: schema.leads.distributionStatus,
+    assignedAt: schema.leads.assignedAt,
   }).from(schema.leads)
     .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), isNull(schema.leads.deletedAt)))
     .limit(1);
@@ -57,9 +58,21 @@ async function connectionOf(tenantId: string, userId: string) {
   return { ready, sessionName: connection?.sessionName ?? null };
 }
 
-async function hasOutboundMessage(tenantId: string, leadId: string) {
-  const [row] = await getDatabase().select({ id: schema.whatsappMessages.id }).from(schema.whatsappMessages)
-    .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId), inArray(schema.whatsappMessages.direction, OUTBOUND)))
+/**
+ * Did the broker already write to this client? Only a message typed by a person
+ * (CRM, the broker's phone synced by WAHA) after the assignment counts; the
+ * qualification AI, offers and other automations (assistant/system) do not.
+ */
+async function brokerAlreadyWrote(tenantId: string, leadId: string, assignedAt: Date | null) {
+  const messages = schema.whatsappMessages;
+  const [row] = await getDatabase().select({ id: messages.id }).from(messages)
+    .where(and(
+      eq(messages.tenantId, tenantId),
+      eq(messages.leadId, leadId),
+      inArray(messages.direction, OUTBOUND),
+      or(isNull(messages.senderRole), inArray(messages.senderRole, ["user", "agent"])),
+      assignedAt ? gte(messages.sentAt, assignedAt) : undefined,
+    ))
     .limit(1);
   return Boolean(row);
 }
@@ -74,7 +87,7 @@ export async function getFirstMessageContextAction(leadId: string): Promise<Firs
       db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
       db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1),
       connectionOf(context.tenantId, context.userId),
-      hasOutboundMessage(context.tenantId, lead.id),
+      brokerAlreadyWrote(context.tenantId, lead.id, lead.assignedAt),
     ]);
     const message = buildFirstMessage({ leadName: lead.nome, brokerName: broker?.name ?? null, companyName: tenant?.name ?? null });
     const reveal = canRevealLightContact({ status: lead.status, isCurrentBroker: true });
@@ -109,7 +122,7 @@ export async function sendFirstMessageAction(raw: { leadId: string; text: string
     if (!lead) return { ok: false, error: "Este lead não está com você." };
     const db = getDatabase();
 
-    if (await hasOutboundMessage(context.tenantId, lead.id)) return { ok: false, code: "already_sent", error: "A primeira mensagem já foi enviada. Continue pelo seu WhatsApp." };
+    if (await brokerAlreadyWrote(context.tenantId, lead.id, lead.assignedAt)) return { ok: false, code: "already_sent", error: "A primeira mensagem já foi enviada. Continue pelo seu WhatsApp." };
 
     const [recent] = await db.select({ total: count() }).from(schema.auditLogs)
       .where(and(eq(schema.auditLogs.userId, context.userId), eq(schema.auditLogs.entidade, AUDIT_ENTITY), gte(schema.auditLogs.createdAt, new Date(Date.now() - 3_600_000))));

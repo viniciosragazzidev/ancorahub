@@ -19,6 +19,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { eq } from "drizzle-orm";
 import { runSlaSweep } from "@/features/leads/sla";
 import { sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { getRequiredPlatformAdmin } from "@/shared/auth/platform-admin";
 import { getSystemSetting, setSystemSetting } from "@/features/system-settings/queries";
 import { z } from "zod";
@@ -899,6 +900,38 @@ export async function updateBrokerDutyCalendarEnabledSettingsAction(formData: Fo
     metadata: { enabled: enabled === "true" },
     createdAt: now,
   });
+}
+
+/** The three switches of the broker news (Central de relacionamento, jornada e IA dos assistentes). */
+const BROKER_NEWS_FLAGS = [
+  { field: "relationshipCenterEnabled", flag: FEATURE_FLAGS.RELATIONSHIP_CENTER },
+  { field: "brokerEngagementEnabled", flag: FEATURE_FLAGS.BROKER_ENGAGEMENT },
+  { field: "brokerAiAssistantsEnabled", flag: FEATURE_FLAGS.BROKER_AI_ASSISTANTS },
+] as const;
+
+export async function updateBrokerNewsSettingsAction(formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const now = new Date();
+  // Without the 0188 tables the two first switches stay as they are (the checkbox is disabled, so it is not sent).
+  const tables = await getDatabase()
+    .execute(sql`select to_regclass('public.relationship_broadcasts') is not null and to_regclass('public.engagement_point_events') is not null as ready`)
+    .then((result) => Boolean((result as unknown as { ready: boolean }[])[0]?.ready))
+    .catch(() => false);
+  for (const { field, flag } of BROKER_NEWS_FLAGS) {
+    if (!tables && flag.key !== FEATURE_FLAGS.BROKER_AI_ASSISTANTS.key) continue;
+    const enabled = formData.get(field) === "true" ? "true" : "false";
+    await setSystemSetting(flag.key, enabled, now);
+    await getDatabase().insert(schema.platformAuditLogs).values({
+      id: crypto.randomUUID(),
+      actorUserId: admin.userId,
+      action: "broker_news.settings_updated",
+      targetType: "system_settings",
+      targetId: flag.key,
+      metadata: { enabled: enabled === "true" },
+      createdAt: now,
+    });
+  }
+  revalidatePath("/super-admin/settings");
 }
 
 export async function updateBrokerDutyCalendarHorizonSettingsAction(formData: FormData) {
