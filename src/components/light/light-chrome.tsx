@@ -99,7 +99,7 @@ export function LightChrome({
   }
 
   return withRail(
-    <div className={`flex h-dvh w-full overflow-hidden light-canvas selection:bg-primary/20 ${WHITE_CANVAS.includes(pathname) ? "light-canvas-white" : ""}`}>
+    <div className="flex h-dvh w-full overflow-hidden light-canvas selection:bg-primary/20">
       <div className="flex min-w-0 flex-1 flex-col">
         <LightAppHeader
           availability={availability}
@@ -119,9 +119,6 @@ export function LightChrome({
     </div>,
   );
 }
-
-/** Screens drawn as one white sheet (list-like), instead of cards on the gray canvas. */
-const WHITE_CANVAS = ["/notificacoes", "/plantoes/agora"];
 
 const DESKTOP_QUERY = "(min-width: 1024px)";
 const RAIL_REFRESH_MS = 3000;
