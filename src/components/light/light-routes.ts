@@ -114,7 +114,9 @@ const RULES: readonly RouteRule[] = [
   {
     test: exact("/conversas/broker"),
     route: (_path, search) =>
-      search?.get("leadId")
+      search?.get("insight")
+        ? { title: "Análise", tab: "insights", isRoot: false, parentHref: "/conversas/broker", chat: true, hidesTabBar: true }
+        : search?.get("leadId")
         ? { title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker?todas=1", backToParent: true }
         : search?.get("todas") === "1"
           ? { title: "Conversas", tab: "insights", isRoot: false, parentHref: "/conversas/broker", backToParent: true, chat: true, hidesTabBar: true }

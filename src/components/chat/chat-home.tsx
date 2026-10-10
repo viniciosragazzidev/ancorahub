@@ -11,6 +11,7 @@ import { useLightAvailabilityContext } from "@/components/light/light-availabili
 import { AssistantAvatar } from "./assistant-avatar";
 import styles from "./chat.module.css";
 import home from "./chat-home.module.css";
+import { LiteWelcome } from "./lite-welcome";
 import { ThreadList } from "./thread-row";
 import type { ThreadSummary } from "./types";
 
@@ -86,6 +87,14 @@ export function ChatHome({
           <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "leads" ? "Buscar lead" : "Buscar conversa"} aria-label="Buscar" className={home.searchInput} />
         </div>
       ) : null}
+      {tab === "leads" ? (
+        <div className={home.listShortcut}>
+          <Link href="/minha-fila" className={styles.headerPill}>
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+            Lista completa com filtros
+          </Link>
+        </div>
+      ) : null}
       <ThreadList threads={visible} now={now} emptyText={tab === "leads" ? (query ? "Nenhum lead com esse nome." : "Nenhum lead com você agora.") : "Nada por aqui."} />
     </>
   );
@@ -130,6 +139,8 @@ export function ChatHome({
           <button type="button" className={styles.pill} onClick={() => setNewOpen(true)}><PlusIcon /> Novo atendimento</button>
         )}
       </div>
+
+      <LiteWelcome />
 
       <BottomSheet open={newOpen} onOpenChange={setNewOpen} title="O que você quer fazer?" className="arc-venancor">
         <ul className={home.newList}>

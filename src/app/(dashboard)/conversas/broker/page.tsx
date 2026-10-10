@@ -9,7 +9,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
-import { buildInsightThreads, buildInsightsScript } from "@/features/broker-workspace/chat/insights-script";
+import { buildInsightThreads, buildInsightsScript, buildLeadInsightScript } from "@/features/broker-workspace/chat/insights-script";
 import { ThreadListScreen } from "@/components/chat/thread-list-screen";
 import { readLeadIntelligence as readIntelligence } from "@/features/broker-workspace/chat/intelligence";
 import { canRevealLightContact } from "@/features/broker-workspace/lead-contact-privacy";
@@ -33,8 +33,8 @@ function toTimestamp(value: Date | string | null | undefined) {
  * A resposta ocorre no WhatsApp do corretor; esta rota só revela a própria
  * carteira e os insights já persistidos pelo CRM.
  */
-export default async function BrokerConversationsPage({ searchParams }: { searchParams: Promise<{ leadId?: string; todas?: string }> }) {
-  const { leadId, todas } = await searchParams;
+export default async function BrokerConversationsPage({ searchParams }: { searchParams: Promise<{ leadId?: string; todas?: string; insight?: string }> }) {
+  const { leadId, todas, insight } = await searchParams;
   const context = await getRequiredTenantContext();
   if (!hasPermission(context.role, "acessar_conversas")) redirect("/minha-fila");
   if (context.role !== "broker" || (await getExperienceMode(context)) !== "LIGHT") redirect("/conversas");
@@ -87,6 +87,17 @@ export default async function BrokerConversationsPage({ searchParams }: { search
     .sort((a, b) => toTimestamp(b.latestMessage?.sentAt) - toTimestamp(a.latestMessage?.sentAt));
 
   const connection = connectionRows[0];
+  // One conversation's analysis: insights and next step, not the transcript.
+  const insightItem = insight ? insights.find((item) => item.id === insight) : null;
+  if (insightItem) {
+    const insightsAssistant = ASSISTANTS.insights;
+    return (
+      <AssistantChat
+        identity={{ name: `Análise · ${insightItem.name.split(" ")[0]}`, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
+        script={buildLeadInsightScript({ item: insightItem, now: new Date() })}
+      />
+    );
+  }
   // Broker chat (2026-10-09): Insights opens with who is waiting for an answer; the mirror stays one tap away.
   if (!leadId && todas !== "1") {
     const insightsAssistant = ASSISTANTS.insights;

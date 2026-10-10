@@ -1,0 +1,31 @@
+/* Welcome card of the new Lite app (tokens: docs/design-system/lite §2). */
+.backdrop {
+  position: fixed; inset: 0; z-index: 80; display: grid; place-items: end center;
+  padding: 16px 12px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background: oklch(16% 0 0 / .34); backdrop-filter: blur(2px);
+}
+@media (min-width: 640px) { .backdrop { place-items: center; } }
+.card {
+  width: min(440px, 100%); display: grid; gap: 18px; padding: 24px 22px 20px;
+  border-radius: 28px; background: var(--surface); color: var(--foreground);
+  box-shadow: 0 20px 48px oklch(0% 0 0 / .14), 0 3px 10px oklch(0% 0 0 / .05);
+  font-family: var(--font-body);
+}
+.team { display: flex; justify-content: center; gap: 6px; padding-top: 4px; }
+.member { display: inline-grid; }
+.tag {
+  display: inline-flex; height: 24px; align-items: center; padding: 0 10px; border-radius: 999px;
+  background: oklch(62% .2 255 / .1); color: oklch(55% .21 258); font-size: 12px; font-weight: 500;
+}
+.title { margin: 10px 0 0; font-size: 22px; font-weight: 500; letter-spacing: -.03em; line-height: 1.15; }
+.lead { margin: 8px 0 0; font-size: 15px; line-height: 1.5; color: var(--text-secondary); }
+.points { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.point { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; align-items: start; font-size: 14px; }
+.point strong { display: block; font-weight: 500; }
+.pointText { display: block; color: var(--text-muted); font-size: 13px; line-height: 1.45; margin-top: 2px; }
+.letter { font-size: 12px; font-weight: 500; color: var(--text-muted); text-align: center; padding-top: 1px; }
+.start {
+  height: 50px; border: 0; border-radius: 999px; font: inherit; font-size: 16px; font-weight: 500; color: white; cursor: pointer;
+  background: linear-gradient(180deg, oklch(62% .2 255), oklch(55% .21 258));
+  box-shadow: 0 10px 24px oklch(55% .21 258 / .32);
+}

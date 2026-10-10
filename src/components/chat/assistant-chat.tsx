@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
@@ -9,7 +10,7 @@ import type { Mention } from "./composer";
 import type { ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean }) {
+export function AssistantChat({ identity, script, instant = false, headerAction }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode }) {
   const router = useRouter();
   return (
     <ChatScreen
@@ -17,6 +18,7 @@ export function AssistantChat({ identity, script, instant = false }: { identity:
       backHref="/dashboard"
       script={script}
       instant={instant}
+      headerAction={headerAction}
       runAction={async (action) => {
         const result = await runChatServerAction(action.name, action.payload);
         // An accepted lead continues in its own conversation: offer it as the next reply.

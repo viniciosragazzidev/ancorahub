@@ -22,7 +22,7 @@ export type BrokerConversationInsight = {
   id: string; kind: "lead" | "client"; name: string; phone: string | null; status: string; href: string;
   firstContactAt?: string | null; serviceStartedAt?: string | null;
   latestMessage: BrokerInsightMessage | null; messages: BrokerInsightMessage[];
-  intelligence?: { summary?: string | null; nextBestAction?: string | null; pendingFrom?: string | null; sentiment?: string | null; customerIntent?: string | null; risk?: string | null; lastAnalyzedAt?: string | null } | null;
+  intelligence?: { summary?: string | null; nextBestAction?: string | null; pendingFrom?: string | null; sentiment?: string | null; customerIntent?: string | null; risk?: string | null; lastAnalyzedAt?: string | null; conversationStage?: string | null; engagement?: string | null; opportunity?: string | null; objections?: string[]; buyingSignals?: string[] } | null;
 };
 
 const CARD_STYLE: React.CSSProperties = {

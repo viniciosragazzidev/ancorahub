@@ -2,7 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 
 /*
  * Button skin = Lite/Arc button (docs/design-system/lite §10.1b, src/components/arc/button):
- * pill, 14/500, primary on --foreground, outlined secondary on --surface, ghost on secondary text,
+ * pill, 14/500, primary on the brand indigo (--primary, decided by the Vinicios for the normal mode), outlined secondary on --surface, ghost on secondary text,
  * danger outlined. Sizes follow Arc (sm 36, default 44, lg 50); names and props are unchanged.
  */
 export const buttonVariants = cva(
@@ -10,8 +10,8 @@ export const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "border-foreground bg-foreground text-background hover:opacity-[.91] hover:shadow-[var(--shadow-card)] active:opacity-[.84]",
-        primary: "border-foreground bg-foreground text-background hover:opacity-[.91] hover:shadow-[var(--shadow-card)] active:opacity-[.84]",
+        default: "border-primary bg-primary text-primary-foreground hover:opacity-[.91] hover:shadow-[var(--shadow-card)] active:opacity-[.84]",
+        primary: "border-primary bg-primary text-primary-foreground hover:opacity-[.91] hover:shadow-[var(--shadow-card)] active:opacity-[.84]",
         success:
           "border-success bg-success text-success-foreground hover:opacity-[.91] hover:shadow-[var(--shadow-card)] active:opacity-[.84]",
         outline:

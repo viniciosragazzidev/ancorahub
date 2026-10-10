@@ -2,7 +2,7 @@ import type { ChatBlock, ChatChoice, ChatScript, ThreadSummary } from "@/compone
 import type { BrokerConversationInsight } from "@/features/broker-workspace/components/light-conversations-view";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
-import { isOutboundMessage } from "./intelligence";
+import { intelligenceLabel, intelligenceTips, isOutboundMessage, nextStepText } from "./intelligence";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const OTHERS_SHOWN = 5;
@@ -45,9 +45,9 @@ function lastInbound(item: BrokerConversationInsight) {
   return [...item.messages].reverse().find((message) => !isOutboundMessage(message.direction)) ?? null;
 }
 
-/** The conversation opens as the lead's chat (WhatsApp mirror included); clients open their record. */
+/** Each conversation opens its analysis (insights and next step), never a copy of the lead screen. */
 function detailHref(item: BrokerConversationInsight) {
-  return item.href;
+  return `/conversas/broker?insight=${encodeURIComponent(item.id)}`;
 }
 
 function initialsOf(name: string) {
@@ -60,9 +60,10 @@ export function buildInsightThreads(insights: BrokerConversationInsight[]): Thre
     .map((item) => {
       const waiting = isWaitingForBroker(item);
       const last = item.latestMessage;
-      const preview = waiting && item.intelligence?.nextBestAction
-        ? `Sugestão: ${item.intelligence.nextBestAction}`
-        : last ? `${isOutboundMessage(last.direction) ? "Você: " : ""}${clip(last.body, 90)}` : item.status;
+      const step = nextStepText(item.intelligence?.nextBestAction);
+      const preview = step
+        ? `Próximo passo: ${step}`
+        : item.intelligence?.summary ? clip(item.intelligence.summary, 90) : last ? `${isOutboundMessage(last.direction) ? "Você: " : ""}${clip(last.body, 90)}` : item.status;
       return {
         id: `insight:${item.id}`,
         kind: "lead" as const,
@@ -125,14 +126,16 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
     id: "i-count",
     text: waiting.length === 1 ? `${name} está esperando sua resposta há ${waited(since, now)}.` : `${waiting.length} clientes esperando sua resposta. Comece por ${name}, que espera há ${waited(since, now)}.`,
   });
-  if (inbound) blocks.push({ type: "system", id: "i-last", strong: name, text: `disse às ${time(inbound.sentAt)}: "${clip(inbound.body)}"` });
   if (first.intelligence?.summary) blocks.push({ type: "assistant", id: "i-summary", text: first.intelligence.summary });
-  if (first.intelligence?.nextBestAction) blocks.push({ type: "assistant", id: "i-next", text: `Sugestão: ${first.intelligence.nextBestAction}` });
+  else if (inbound) blocks.push({ type: "system", id: "i-last", strong: name, text: `escreveu às ${time(inbound.sentAt)}` });
+  const step = nextStepText(first.intelligence?.nextBestAction);
+  if (step) blocks.push({ type: "assistant", id: "i-next", text: `Próximo passo: ${step}` });
 
   const whatsapp = buildWhatsAppUrl(first.phone);
   const choices: ChatChoice[] = [
     ...(whatsapp ? [{ id: "reply", label: `Responder ${name} no WhatsApp`, reply: `Vou responder ${name}`, action: { kind: "href" as const, href: whatsapp } }] : []),
-    { id: "detail", label: first.kind === "client" ? "Abrir o cliente" : "Ver a conversa inteira", action: { kind: "href", href: detailHref(first) } },
+    { id: "detail", label: "Ver a análise completa", hint: "Leitura da conversa, sinais e dicas", action: { kind: "href", href: detailHref(first) } },
+    { id: "lead", label: first.kind === "client" ? "Abrir o cliente" : "Abrir o lead", action: { kind: "href", href: first.href } },
   ];
   blocks.push({ type: "question", id: "i-choice", prompt: "Como quer seguir?", choices });
 
@@ -142,9 +145,73 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
       id: "i-others",
       title: "Depois",
       subtitle: "Também esperando você",
-      items: rest.slice(0, OTHERS_SHOWN).map(({ item, since: at }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: item.intelligence?.nextBestAction ? clip(item.intelligence.nextBestAction, 80) : clip(lastInbound(item)?.body ?? "", 70), trailing: waited(at, now), href: detailHref(item) })),
+      items: rest.slice(0, OTHERS_SHOWN).map(({ item, since: at }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : "Sem análise ainda"), trailing: waited(at, now), href: detailHref(item) })),
     });
   }
 
   return { blocks, status: { label: "Esperando você", tone: "waiting" } };
+}
+
+function analyzedLabel(iso: string | null | undefined, now: Date) {
+  if (!iso) return "Análise da conversa";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Análise da conversa";
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(date);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(now);
+  const prefix = day === today ? "Hoje" : new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, day: "2-digit", month: "2-digit" }).format(date);
+  return `Análise de ${prefix.toLowerCase() === "hoje" ? "hoje" : prefix}, ${time(iso)}`;
+}
+
+/**
+ * The analysis of one conversation (route /conversas/broker?insight={id}):
+ * what the AI read, buying signals and objections, risk and opportunity, the
+ * next step and practical tips. No message transcript: the conversation itself
+ * lives in the lead screen.
+ */
+export function buildLeadInsightScript(input: { item: BrokerConversationInsight; now: Date }): ChatScript {
+  const { item, now } = input;
+  const ai = item.intelligence ?? null;
+  const name = firstName(item.name);
+  const whatsapp = buildWhatsAppUrl(item.phone);
+  const actions: ChatChoice[] = [
+    ...(whatsapp ? [{ id: "reply", label: `Responder ${name} no WhatsApp`, action: { kind: "href" as const, href: whatsapp } }] : []),
+    { id: "lead", label: item.kind === "client" ? "Abrir o cliente" : "Abrir o lead", action: { kind: "href", href: item.href } },
+    { id: "all", label: "Ver outros clientes", action: { kind: "href", href: "/conversas/broker?todas=1" } },
+  ];
+
+  if (!ai || (!ai.summary && !ai.nextBestAction)) {
+    return {
+      blocks: [
+        { type: "assistant", id: "n-empty", text: `Ainda não analisei a conversa com ${name}. A análise aparece aqui depois das próximas mensagens.` },
+        { type: "question", id: "n-choice", prompt: "Enquanto isso:", choices: actions },
+      ],
+      status: { label: "Sem análise ainda", tone: "idle" },
+    };
+  }
+
+  const blocks: ChatBlock[] = [{ type: "date", id: "n-date", label: analyzedLabel(ai.lastAnalyzedAt, now) }];
+  if (ai.summary) blocks.push({ type: "assistant", id: "n-summary", text: ai.summary });
+
+  const rows = [
+    { label: "Estágio", value: intelligenceLabel.stage(ai.conversationStage) },
+    { label: "Intenção de compra", value: intelligenceLabel.intent(ai.customerIntent) },
+    { label: "Sentimento", value: intelligenceLabel.sentiment(ai.sentiment) },
+    { label: "Engajamento", value: intelligenceLabel.engagement(ai.engagement) },
+    { label: "Quem deve responder", value: intelligenceLabel.pending(ai.pendingFrom) },
+  ].filter((row): row is { label: string; value: string } => Boolean(row.value));
+  if (rows.length) blocks.push({ type: "facts", id: "n-reading", title: "Leitura da conversa", subtitle: item.name, rows });
+
+  const signals = ai.buyingSignals ?? [];
+  if (signals.length) blocks.push({ type: "list", id: "n-signals", title: "Sinais de compra", items: signals.slice(0, 5).map((text, index) => ({ id: `s${index}`, primary: clip(text, 120) })) });
+  const objections = ai.objections ?? [];
+  if (objections.length) blocks.push({ type: "list", id: "n-objections", title: "Objeções", items: objections.slice(0, 5).map((text, index) => ({ id: `o${index}`, primary: clip(text, 120) })) });
+  if (ai.risk) blocks.push({ type: "system", id: "n-risk", strong: "Risco:", text: clip(ai.risk, 200) });
+  if (ai.opportunity) blocks.push({ type: "system", id: "n-opportunity", strong: "Oportunidade:", text: clip(ai.opportunity, 200) });
+
+  const step = nextStepText(ai.nextBestAction);
+  if (step) blocks.push({ type: "assistant", id: "n-step", text: `Próximo passo: ${step}` });
+  intelligenceTips(ai).forEach((tip, index) => blocks.push({ type: "assistant", id: `n-tip-${index}`, text: `Dica: ${tip}` }));
+
+  blocks.push({ type: "question", id: "n-choice", prompt: "Como quer seguir?", choices: actions });
+  return { blocks, status: ai.pendingFrom === "BROKER" ? { label: "Esperando você", tone: "waiting" } : { label: "Analisado", tone: "idle" } };
 }

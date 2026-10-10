@@ -12,7 +12,7 @@ export const dsButtonVariants = cva(
       dsVariant: {
         /** Filled Dark CTA — primary action, once per surface */
         "filled-dark":
-          "h-11 rounded-full border border-foreground bg-foreground px-ds-16 text-background hover:opacity-[.91] hover:shadow-[var(--shadow-card)] active:opacity-[.84]",
+          "h-11 rounded-full border border-primary bg-primary px-ds-16 text-primary-foreground hover:opacity-[.91] hover:shadow-[var(--shadow-card)] active:opacity-[.84]",
         /** Outlined Action Button — secondary/utility action workhorse */
         "outlined-action":
           "h-11 rounded-full border border-border bg-card px-ds-16 text-foreground hover:bg-muted hover:shadow-[var(--shadow-card)]",

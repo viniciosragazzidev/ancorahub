@@ -2,7 +2,7 @@ import type { ChatBlock, ChatChoice, ChatFactRow, ChatScript } from "@/component
 import { DECLINE_REASONS } from "@/features/broker-workspace/components/light-lead-detail/types";
 import { LEAD_STATUS_LABELS, MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
 
-import { isOutboundMessage } from "./intelligence";
+import { isOutboundMessage, nextStepText } from "./intelligence";
 
 const TIME_ZONE = "America/Sao_Paulo";
 
@@ -224,7 +224,7 @@ function nextStep(lead: LeadConversationLead, now: Date, whatsappUrl: string | n
     const lead_ = owesAnswer ? `${name} está esperando sua resposta.` : `Etapa atual: ${stage}. Me conta como está e eu registro.`;
     const blocks: ChatBlock[] = [
       { type: "assistant", id: "a-next", text: lead_ },
-      ...(advice?.nextBestAction ? [{ type: "assistant" as const, id: "a-advice", text: `Sugestão: ${advice.nextBestAction}` }] : []),
+      ...(nextStepText(advice?.nextBestAction) ? [{ type: "assistant" as const, id: "a-advice", text: `Sugestão: ${nextStepText(advice?.nextBestAction)}` }] : []),
       { type: "question", id: "q-main", prompt: `E aí, como está o ${name}?`, choices },
       returnQuestion(lead),
     ];
