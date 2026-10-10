@@ -59,7 +59,17 @@ export type HomeHighlights = {
 };
 
 function Highlights({ data, className }: { data: HomeHighlights; className?: string }) {
-  if (!data.ranks.length && !data.mission && !data.acceptTime) return null;
+  // Journey on but nothing to rank yet: say where it will show (an empty block looked like a missing feature).
+  if (!data.ranks.length && !data.mission && !data.acceptTime) {
+    return (
+      <div className={`${home.highlights} ${className ?? ""}`} data-tour="home-highlights">
+        <div className={home.rank}>
+          <span className={home.rankLabel}>Seu ranking da semana</span>
+          <span className={home.missionDetail}>Aparece aqui depois das suas primeiras ofertas aceitas nos últimos 7 dias.</span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className={`${home.highlights} ${className ?? ""}`} data-tour="home-highlights">
       {data.ranks.length || data.acceptTime ? (

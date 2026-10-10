@@ -62,4 +62,10 @@ describe("ChatHome", () => {
     render(<ChatHome mode="rail" viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote highlights={highlights} />);
     expect(screen.queryByText("1º")).toBeNull();
   });
+
+  it("with the journey on but no data yet, says where the ranking will appear", () => {
+    navigation.pathname = "/dashboard";
+    render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote highlights={{ ranks: [], acceptTime: null, mission: null }} />);
+    expect(screen.getAllByText("Seu ranking da semana").length).toBeGreaterThan(0);
+  });
 });
