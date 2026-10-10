@@ -128,6 +128,14 @@ vi.mock("next/cache", () => ({
   revalidateTag: vi.fn(),
 }));
 
+const supervision = vi.hoisted(() => ({ detach: vi.fn(async () => {}), sync: vi.fn(async () => {}), clear: vi.fn(async () => {}) }));
+vi.mock("@/features/team/supervised-brokers", () => ({
+  detachFromSupervision: supervision.detach,
+  syncSupervisedBrokers: supervision.sync,
+  clearSupervisedBrokers: supervision.clear,
+  supervisedBrokersField: { parse: () => undefined },
+}));
+
 vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),

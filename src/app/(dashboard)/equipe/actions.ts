@@ -26,6 +26,7 @@ import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidat
 import { getSystemSetting } from "@/features/system-settings/queries";
 
 import { invalidateTenantContextCache } from "@/shared/auth/tenant-context";
+import { clearSupervisedBrokers, detachFromSupervision, supervisedBrokersField, syncSupervisedBrokers } from "@/features/team/supervised-brokers";
 export type TeamActionState = { success?: boolean; error?: string; message?: string; token?: string; invitationId?: string; whatsappStatus?: "queued" | "not_available" | "failed" | "sent"; status?: "active" | "disabled" };
 
 const memberRole = z.enum(["director", "manager", "supervisor", "broker"]);
@@ -75,6 +76,7 @@ export async function updateTeamMemberAction(
 ): Promise<TeamActionState> {
   try {
     const input = updateMemberInput.parse(Object.fromEntries(formData));
+    const supervisedBrokerIds = supervisedBrokersField.parse(formData.get("supervisedBrokerIds") ?? undefined);
     const context = await getRequiredTenantContext();
     const db = getDatabase();
 
@@ -361,9 +363,18 @@ export async function updateTeamMemberAction(
         jobTitle: input.jobTitle,
         branchId: normalizedBranchId,
         customRoleId: input.customRoleId ?? null,
+        // A broker who changes unit or stops being a broker leaves the supervisor's team.
+        ...(input.role !== "broker" || normalizedBranchId !== member.branchId ? { supervisorId: null } : {}),
         updatedAt: new Date(),
       }).where(eq(schema.tenantMemberships.id, member.membershipId));
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "tenant_membership", entidadeId: member.membershipId, acao: "atualizou_membro" });
+
+      // The supervisor's team (brokers pointing to them through supervisor_id).
+      if (input.role === "supervisor" && supervisedBrokerIds) {
+        await syncSupervisedBrokers(tx, { tenantId: context.tenantId, actorId: context.userId, supervisorUserId: member.userId, supervisorBranchId: normalizedBranchId, brokerUserIds: supervisedBrokerIds });
+      } else if (input.role !== "supervisor" && member.role === "supervisor") {
+        await clearSupervisedBrokers(tx, { tenantId: context.tenantId, actorId: context.userId, supervisorUserId: member.userId });
+      }
 
       const authorityChanged =
         member.role !== input.role ||
@@ -464,6 +475,7 @@ export async function bulkToggleTeamMemberStatusAction(
         });
 
         if (!nextActive) {
+          await detachFromSupervision(tx, { tenantId: context.tenantId, actorId: context.userId, userId: member.userId });
           await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
         }
       });
@@ -537,6 +549,7 @@ export async function toggleTeamMemberStatusAction(
       // Revogar sessões ao desativar membro
       if (!nextActive) {
         await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
+        await detachFromSupervision(tx, { tenantId: context.tenantId, actorId: context.userId, userId: member.userId });
       }
     });
 
@@ -657,6 +670,7 @@ export async function deleteTeamMemberAction(
         // ── Excluir o membro (mesma lógica anterior) ───────────────────────
         if (profile) await tx.delete(schema.brokerInvitations).where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.brokerProfileId, profile.id)));
         if (profile) await tx.delete(schema.brokerProfiles).where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, context.tenantId)));
+        await detachFromSupervision(tx, { tenantId: context.tenantId, actorId: context.userId, userId: member.userId });
         await tx.delete(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.id, member.membershipId), eq(schema.tenantMemberships.tenantId, context.tenantId)));
         await tx.delete(schema.session).where(eq(schema.session.userId, member.userId));
       });

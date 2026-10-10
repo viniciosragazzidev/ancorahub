@@ -32,6 +32,8 @@ type TeamMember = {
   customRoleScope?: "none" | "own" | "branch" | "tenant" | null;
   customRoleId?: string | null;
   customRoleName?: string | null;
+  /** Broker: who supervises them (user id of the supervisor). */
+  supervisorId?: string | null;
   canEditAuthority: boolean;
   canManage: boolean;
 };
@@ -81,6 +83,7 @@ function EditMemberDialog({
   currentRole,
   currentBranchId,
   customRoles = [],
+  allMembers = [],
 }: Props & {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -99,6 +102,12 @@ function EditMemberDialog({
   const [jobTitle, setJobTitle] = useState<string>(member.jobTitle);
   const [role, setRole] = useState<string>(member.role);
   const [customRoleId, setCustomRoleId] = useState(member.customRoleId ?? "");
+  const [branchId, setBranchId] = useState<string>(member.branchId ?? "__tenant__");
+  const initialTeam = member.userId ? allMembers.filter((item) => item.supervisorId === member.userId && item.userId).map((item) => item.userId!) : [];
+  const [team, setTeam] = useState<string[]>(initialTeam);
+  const [teamSearch, setTeamSearch] = useState("");
+  // Active brokers of the supervisor's unit (the server checks the same rule).
+  const teamCandidates = allMembers.filter((item) => item.role === "broker" && item.status === "active" && item.userId && (branchId === "__tenant__" || item.branchId === branchId));
   const selectedCustomRole = customRoles.find((item) => item.id === customRoleId);
   const requiresBranch = jobTitle === "manager" || jobTitle === "broker" || selectedCustomRole?.scope === "branch";
 
@@ -120,8 +129,10 @@ function EditMemberDialog({
       setJobTitle(member.jobTitle);
       setRole(member.role);
       setCustomRoleId(member.customRoleId ?? "");
+      setBranchId(member.branchId ?? "__tenant__");
+      setTeamSearch("");
     }
-  }, [open, member.customRoleId, member.jobTitle, member.role]);
+  }, [open, member.customRoleId, member.jobTitle, member.role, member.branchId]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -217,7 +228,8 @@ function EditMemberDialog({
           <Field>
             <FieldLabel>{requiresBranch ? "Unidade" : "Unidade (opcional)"}</FieldLabel>
             <Select
-              defaultValue={member.branchId ?? "__tenant__"}
+              value={branchId}
+              onValueChange={(value) => { if (value) { setBranchId(value); setTeam((current) => current.filter((id) => allMembers.some((item) => item.userId === id && (value === "__tenant__" || item.branchId === value)))); } }}
               disabled={pending || allowedBranches.length === 1}
               name="branchId"
             >
@@ -235,6 +247,32 @@ function EditMemberDialog({
             </Select>
             <p className="text-xs text-muted-foreground">{requiresBranch ? "Este acesso precisa permanecer em uma única unidade." : "Sem unidade, este cargo atua em toda a empresa dentro das permissões liberadas."}</p>
           </Field>
+          {role === "supervisor" && member.userId ? (
+            <Field>
+              <FieldLabel>Corretores que ele supervisiona <span className="text-muted-foreground">({team.length})</span></FieldLabel>
+              <input type="hidden" name="supervisedBrokerIds" value={JSON.stringify(team)} />
+              <Input value={teamSearch} onChange={(event) => setTeamSearch(event.target.value)} placeholder="Buscar corretor" aria-label="Buscar corretor" disabled={pending} />
+              <ul className="max-h-56 divide-y divide-border overflow-y-auto rounded-lg border border-border">
+                {teamCandidates
+                  .filter((item) => !teamSearch.trim() || (item.name ?? item.email).toLocaleLowerCase("pt-BR").includes(teamSearch.trim().toLocaleLowerCase("pt-BR")))
+                  .map((item) => {
+                    const checked = team.includes(item.userId!);
+                    const elsewhere = item.supervisorId && item.supervisorId !== member.userId ? allMembers.find((other) => other.userId === item.supervisorId)?.name : null;
+                    return (
+                      <li key={item.id}>
+                        <label className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-muted/60">
+                          <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={checked} disabled={pending} onChange={() => setTeam((current) => checked ? current.filter((id) => id !== item.userId) : [...current, item.userId!])} />
+                          <span className="min-w-0 flex-1 truncate">{item.name ?? item.email}</span>
+                          {elsewhere && !checked ? <span className="shrink-0 text-xs text-muted-foreground">com {elsewhere}</span> : null}
+                        </label>
+                      </li>
+                    );
+                  })}
+                {!teamCandidates.length ? <li className="px-3 py-3 text-sm text-muted-foreground">Nenhum corretor ativo nesta unidade.</li> : null}
+              </ul>
+              <p className="text-xs text-muted-foreground">Só corretores ativos da unidade do supervisor. Marcar um corretor que já está com outro supervisor passa ele para este.</p>
+            </Field>
+          ) : null}
           <div className="flex flex-col gap-2 sm:flex-row">
             <Button className="flex-1" disabled={pending} type="submit">
               {pending ? "Salvando..." : "Salvar alterações"}
@@ -539,6 +577,7 @@ export function TeamMemberActions({
         currentRole={currentRole}
         currentUserId={currentUserId}
         member={member}
+        allMembers={allMembers}
         open={editOpen}
         onOpenChange={setEditOpen}
       />

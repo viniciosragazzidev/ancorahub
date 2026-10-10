@@ -42,6 +42,7 @@ type TeamMember = {
   customRoleScope: "none" | "own" | "branch" | "tenant" | null;
   customRoleId: string | null;
   customRoleName: string | null;
+  supervisorId?: string | null;
   canEditAuthority: boolean;
   canManage: boolean;
 };

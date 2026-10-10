@@ -72,6 +72,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         `,
         branchId: sql<string | null>`case when ${schema.tenantMemberships.id} is null then ${schema.brokerProfiles.branchId} else ${schema.tenantMemberships.branchId} end`,
         branchName: schema.branches.name,
+        supervisorId: schema.tenantMemberships.supervisorId,
       })
       .from(schema.brokerProfiles)
       .leftJoin(schema.branches, eq(schema.brokerProfiles.branchId, schema.branches.id))
@@ -121,6 +122,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         `,
         branchId: schema.tenantMemberships.branchId,
         branchName: schema.branches.name,
+        supervisorId: schema.tenantMemberships.supervisorId,
       })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
