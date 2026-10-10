@@ -37,16 +37,17 @@ export function LightAppHeader({
   return (
     <header
       className={cn(
-        "arc-venancor z-30 shrink-0 bg-(--background)/90 pt-(--mobile-safe-top) backdrop-blur-md",
+        "arc-venancor z-30 shrink-0 bg-(--surface)/92 pt-(--mobile-safe-top) backdrop-blur-md",
         className,
       )}
     >
-      <div className="mx-auto flex h-16 w-full max-w-4xl items-center gap-3 px-4 sm:px-6">
-        {!isRoot && parentHref ? <LightBackButton fallbackHref={parentHref} alwaysParent={backToParent} /> : null}
+      {/* Same header as the chat screens: full width, back at the left edge, 16/500 title. */}
+      <div className="flex min-h-[60px] w-full items-center gap-2.5 px-3 py-2.5">
+        {!isRoot && parentHref ? <LightBackButton fallbackHref={parentHref} alwaysParent={backToParent} className="size-10 border border-(--border)" /> : null}
         <p
           className={cn(
             "min-w-0 flex-1 truncate tracking-tight text-(--foreground)",
-            isRoot ? "text-2xl font-bold" : "text-lg font-semibold",
+            isRoot ? "text-xl font-medium" : "text-base font-medium",
           )}
         >
           {title}

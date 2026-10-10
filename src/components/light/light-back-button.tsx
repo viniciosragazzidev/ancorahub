@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -25,7 +25,7 @@ export function LightBackButton({ fallbackHref, alwaysParent = false, className 
         className,
       )}
     >
-      <ArrowLeft className="size-5" aria-hidden="true" />
+      <ChevronLeft className="size-[18px]" aria-hidden="true" />
     </button>
   );
 }
