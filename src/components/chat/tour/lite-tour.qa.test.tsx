@@ -29,6 +29,8 @@ vi.mock("motion/react", async () => {
 import { LiteTour, startLiteTour } from "./lite-tour";
 import { TOUR_STEPS } from "./tour-steps";
 
+const CHALLENGE = TOUR_STEPS.find((step) => step.kind === "demo-reply")!;
+
 beforeEach(() => {
   window.localStorage.clear();
   vi.stubGlobal("requestAnimationFrame", vi.fn(() => 1));
@@ -57,7 +59,7 @@ describe("Lite tour QA", () => {
     await act(async () => { startLiteTour(); });
 
     fireEvent.click(screen.getByRole("button", { name: /^Come/ }));
-    expect(await screen.findByRole("dialog", { name: TOUR_STEPS[10]!.title })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: CHALLENGE.title })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Voltar" }));
     expect(screen.getByRole("dialog", { name: TOUR_STEPS[0]!.title })).toBeTruthy();
@@ -103,7 +105,7 @@ describe("Lite tour QA", () => {
     render(<LiteTour />);
     await act(async () => { startLiteTour(); });
     fireEvent.click(screen.getByRole("button", { name: /^Come/ }));
-    expect(await screen.findByRole("dialog", { name: TOUR_STEPS[10]!.title })).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: CHALLENGE.title })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /Esperar ela mandar mensagem/ }));
 

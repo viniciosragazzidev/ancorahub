@@ -68,6 +68,8 @@ export function ChatHome({
   const firstName = viewerName.split(/\s+/)[0] || viewerName;
   const waitingLeads = leads.filter((lead) => lead.waitingYou).length;
   const visible = (tab === "assistentes" ? assistants : leads).filter((thread) => matches(thread, query));
+  // Computers show the assistants as cards at the center, so the side list carries only the leads.
+  const desktopLeads = leads.filter((thread) => matches(thread, query));
   const nextLead = leads.find((lead) => lead.waitingYou) ?? null;
 
   const list = (
@@ -85,9 +87,11 @@ export function ChatHome({
       </div>
       {searching ? (
         <div className={home.search}>
-          <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "leads" ? "Buscar lead" : "Buscar conversa"} aria-label="Buscar" className={home.searchInput} />
+          <span className={home.mobileOnly}><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tab === "leads" ? "Buscar lead" : "Buscar conversa"} aria-label="Buscar" className={home.searchInput} /></span>
+          <span className={home.desktopOnly}><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar lead" aria-label="Buscar lead" className={home.searchInput} /></span>
         </div>
       ) : null}
+      <div className={home.mobileList}>
       {tab === "leads" ? (
         <div className={home.listShortcut}>
           <Link href="/minha-fila" className={styles.headerPill}>
@@ -97,6 +101,14 @@ export function ChatHome({
         </div>
       ) : null}
       <ThreadList threads={visible} now={now} emptyText={tab === "leads" ? (query ? "Nenhum lead com esse nome." : "Nenhum lead com você agora.") : "Nada por aqui."} />
+      </div>
+      <section className={home.desktopList} aria-label="Leads" data-tour="home-leads-list">
+        <div className={home.desktopListHead}>
+          <h2 className={home.desktopListTitle}>Leads{waitingLeads ? <span className={home.count}>{waitingLeads}</span> : null}</h2>
+          <Link href="/minha-fila" className={styles.headerPill}>Ver todos</Link>
+        </div>
+        <ThreadList threads={desktopLeads} now={now} emptyText={query ? "Nenhum lead com esse nome." : "Nenhum lead com você agora."} />
+      </section>
     </>
   );
 
@@ -121,7 +133,7 @@ export function ChatHome({
           <ul className={home.cards}>
             {assistants.map((thread, index) => (
               <motion.li key={thread.id} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: reduce ? 0 : 0.06 + index * 0.04 }}>
-                <Link href={thread.href} className={home.card}>
+                <Link href={thread.href} className={home.card} data-tour={thread.assistant ? `thread-${thread.assistant}` : undefined}>
                   <AssistantAvatar shape={thread.shape} hue={thread.hue} size={52} state={thread.waitingYou ? "waiting" : "idle"} />
                   <span className={home.cardName}>{thread.name}</span>
                   <span className={home.cardPreview}>{thread.preview}</span>

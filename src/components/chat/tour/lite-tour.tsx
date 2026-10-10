@@ -28,14 +28,17 @@ export function hasSeenLiteTour() {
 
 type Rect = { x: number; y: number; width: number; height: number; radius: number };
 
-function targetElement(target?: string) {
-  return target ? document.querySelector<HTMLElement>(`[data-tour="${target}"]`) : null;
-}
-
 function isVisible(element: HTMLElement | null) {
   if (!element) return false;
   const rect = element.getBoundingClientRect();
   return rect.width > 0 && rect.height > 0;
+}
+
+/** The visible element for a target: phones and computers render different copies of some areas. */
+function targetElement(target?: string) {
+  if (!target) return null;
+  const all = Array.from(document.querySelectorAll<HTMLElement>(`[data-tour="${target}"]`));
+  return all.find(isVisible) ?? null;
 }
 
 function measure(element: HTMLElement): Rect {
