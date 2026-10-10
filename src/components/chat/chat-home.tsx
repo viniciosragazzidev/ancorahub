@@ -49,6 +49,8 @@ export type HomeSummary = {
   slaAtRiskNow: number;
   duty: { title: string; detail: string; href: string } | null;
   goal: { name: string; percentage: number; currentValue: string; targetValue: string } | null;
+  /** Replaces the four broker numbers (supervisor: the team's day). */
+  stats?: { label: string; value: number; alert?: boolean }[];
 };
 
 export type { HomeHighlights } from "./week-ranking";
@@ -90,6 +92,7 @@ export function ChatHome({
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
   const shell = useLightAvailabilityContext();
+  const isSupervisor = shell?.audience === "supervisor";
   const pathname = usePathname() ?? "";
   const [tab, setTab] = useState<Tab>("assistentes");
   const [searching, setSearching] = useState(false);
@@ -150,10 +153,12 @@ export function ChatHome({
   const sheet = (
     <BottomSheet open={newOpen} onOpenChange={setNewOpen} title="O que você quer fazer?" className="arc-venancor">
       <ul className={home.newList}>
-        {nextLead ? <li><Link href={nextLead.href} className={home.newItem} onClick={() => setNewOpen(false)}><strong>Atender {nextLead.name}</strong><span>{nextLead.preview}</span></Link></li> : null}
+        {nextLead ? <li><Link href={nextLead.href} className={home.newItem} onClick={() => setNewOpen(false)}><strong>{isSupervisor ? "Ver" : "Atender"} {nextLead.name}</strong><span>{nextLead.preview}</span></Link></li> : null}
+        {isSupervisor ? <li><Link href="/equipe" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver minha equipe</strong><span>Corretores, status e números</span></Link></li> : null}
+        {isSupervisor ? <li><Link href="/relacionamento" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Mandar recado para a equipe</strong><span>Aviso, reconhecimento ou pedido de ciente</span></Link></li> : null}
         {canQuote ? <li><Link href="/cotacao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Fazer uma cotação</strong><span>Simular planos para um cliente</span></Link></li> : null}
         <li><button type="button" className={home.newItem} onClick={() => { setNewOpen(false); setTab("leads"); setSearching(true); }}><strong>Buscar um lead</strong><span>Pelo nome ou telefone</span></button></li>
-        <li><Link href="/dashboard/c/plantao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver meu plantão</strong><span>Agora e próximos</span></Link></li>
+        {isSupervisor ? null : <li><Link href="/dashboard/c/plantao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver meu plantão</strong><span>Agora e próximos</span></Link></li>}
       </ul>
     </BottomSheet>
   );
@@ -167,7 +172,7 @@ export function ChatHome({
     );
   }
 
-  const stats = summary
+  const stats = summary?.stats ? summary.stats : summary
     ? [
       { label: "Recebidos hoje", value: summary.receivedToday },
       { label: "Aceitos hoje", value: summary.acceptedToday },
@@ -186,13 +191,13 @@ export function ChatHome({
           <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>
           <p className={home.centerSubtitle}>
             {nextLead
-              ? `${nextLead.name.split(" ")[0]} está esperando você. Escolha uma conversa à esquerda ou comece por ela.`
+              ? isSupervisor ? `O lead de ${nextLead.name.split(" ")[0]} está com o contato atrasado. Comece por ele.` : `${nextLead.name.split(" ")[0]} está esperando você. Escolha uma conversa à esquerda ou comece por ela.`
               : waitingAssistants.length
                 ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
                 : "Tudo em dia. Escolha uma conversa à esquerda para começar."}
           </p>
           {nextLead ? (
-            <Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>Atender {nextLead.name.split(" ")[0]}</Link>
+            <Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
           ) : null}
 
           {stats.length ? (
@@ -238,14 +243,15 @@ export function ChatHome({
 
       <div className={styles.pillWrap} data-mobile-only>
         {nextLead ? (
-          <Link href={nextLead.href} className={styles.pill} data-tour="home-pill">Atender {nextLead.name.split(" ")[0]}</Link>
+          <Link href={nextLead.href} className={styles.pill} data-tour="home-pill">{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
         ) : (
-          <button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> Novo atendimento</button>
+          <button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> {isSupervisor ? "Ações da equipe" : "Novo atendimento"}</button>
         )}
       </div>
 
-      <LiteWelcome />
-      <LiteTour />
+      {/* Welcome and tour describe the broker's app. */}
+      {isSupervisor ? null : <LiteWelcome />}
+      {isSupervisor ? null : <LiteTour />}
       {sheet}
     </div>
   );

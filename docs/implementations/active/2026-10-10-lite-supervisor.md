@@ -1,6 +1,6 @@
 # Modo Lite do supervisor
 
-> Pedido do Vinicios em 2026-10-10. Status: S0 (campo de equipe no modo diretor) implementado; o resto é plano.
+> Pedido do Vinicios em 2026-10-10. Status: S0 e S1 em produção, 0189 aplicada (enum com "supervisor"), S2 escrito e em QA. Versão completa: §8 (plano de execução com o time).
 > Decisão: **o supervisor só supervisiona.** Não recebe lead, não entra em plantão. Está um nível abaixo do gestor, pertence a uma unidade e acompanha um número limitado de corretores (até 30).
 
 ## 1. Como está hoje (levantamento de 2026-10-10)
@@ -102,3 +102,59 @@ No computador, o centro mostra o **dia da equipe**:
 - **Repassar lead (S3)** passa pela reatribuição existente (eventos, ciclo de vida, fila), nunca por update direto.
 - **Distribuição e plantão já excluem `role = supervisor`** (confirmado no levantamento: todas as consultas filtram `role = broker`), coerente com "só supervisiona".
 - `supervisor_notes` com `tenant_id`, migração aplicada antes do deploy. O resumo das 19h entra em `docs/runbooks/coolify-scheduled-tasks.md`.
+
+
+## 8. Versão completa: plano de execução (2026-10-10)
+
+> Pedido do Vinicios: "faça completamente a versão de supervisor e planeje melhor". Cada pacote tem dono, entrega e critério de pronto. Execução com o time do Maestri: **Cinzel** executa e faz QA, o **Maestro** (Claude) executa e integra, o **Vigia** revisa cada pacote antes do commit. Tudo atrás das chaves `feature_supervisor_team_scope_enabled` e `feature_supervisor_lite_enabled`.
+
+### 8.1 Mapa da experiência completa
+
+Início do supervisor, em conversas:
+
+| Conversa | Pergunta que responde | Ações |
+|---|---|---|
+| **Equipe** | Quem está disponível, quem precisa de mim? | Abrir a ficha do corretor, mandar recado, adicionar corretor |
+| **Leads da equipe** | O que está parado e de quem? | Abrir o lead, cobrar o corretor, repassar dentro da equipe |
+| **Plantão da equipe** | Quem está de plantão hoje, quem confirmou, quem faltou? | Ver o plantão do corretor, cobrar a confirmação |
+| **Desempenho da equipe** | Como a equipe está na semana? | Reconhecer, ver a ficha |
+| **Âncora** | O que a empresa avisou? E o resumo do dia da equipe às 19h | Ciente |
+
+Telas:
+- **Ficha do corretor (Lite):**
+  - status e números da semana;
+  - posição dentro da equipe, leads ativos e plantões;
+  - feedbacks 1 a 1;
+  - ações: WhatsApp, recado, pausar ou retomar, repassar lead.
+- **Minha equipe:** lista com status ao vivo e a seção "Corretores da unidade sem supervisor" com "Adicionar".
+
+### 8.2 Pacotes
+
+| # | Pacote | Dono | Banco | Pronto quando |
+|---|---|---|---|---|
+| S2 | Lite do supervisor (Início, Equipe, Leads da equipe, Desempenho, rail, menu Mais, rotas) | Maestro (feito) + Cinzel (QA) | - | Supervisor entra no Lite e vê só a equipe |
+| P1 | Ficha do corretor no Lite (`/equipe/[id]` com audiência supervisor): cabeçalho, números da semana, posição na equipe, leads ativos com link, botões WhatsApp e Recado | Cinzel | - | Da conversa Equipe, tocar no corretor abre a ficha Lite |
+| P2 | Adicionar corretor à minha equipe: lista "sem supervisor" da unidade + ação `addBrokerToMyTeam` (só supervisor, mesma unidade, sem supervisor, até 30, auditado) | Maestro | - | Supervisor adiciona um corretor livre da unidade em 1 toque |
+| P3 | Feedback 1 a 1: tabela `supervisor_notes` (tenant_id, supervisor_id, broker_id, kind orientação/elogio/alerta, texto, criado em), registrar e listar na ficha; gestor e diretor também veem no perfil | Cinzel | 0190 | Nota registrada aparece na ficha e no perfil do diretor |
+| P4 | Repassar lead parado dentro da equipe: permissão nova `leads_reassign_team`, motivo obrigatório, **usando a reatribuição existente** (eventos, ciclo de vida, fila); só para corretor da mesma equipe | Maestro | - | Lead atrasado vai para outro da equipe com motivo na auditoria |
+| P5 | Plantão da equipe: conversa com quem está escalado hoje, presença confirmada ou pendente e faltas (lê a escala, nunca edita) | Cinzel | - | Supervisor vê o plantão de hoje da equipe |
+| P6 | Alertas para o supervisor: lead da equipe sem contato no SLA, falta no plantão e oferta expirada em sequência vão também para o supervisor do corretor (Âncora + push) | Maestro | - | Supervisor recebe o alerta junto com o gestor |
+| P7 | Resumo das 19h: cron `/api/internal/jobs/supervisor-digest` manda ao supervisor o dia da equipe em 5 linhas (na Âncora); entra no runbook do Coolify | Cinzel | - | Às 19h chega o resumo |
+| P8 | Meta da equipe: metas com escopo `team` e `scopeId` = supervisor, progresso = soma dos corretores (resolve o TODO de `goals-service.ts`), barra no Início | Maestro | - | Meta da equipe com progresso real |
+| P9 | Pedido de transferência: supervisor pede um corretor de outra equipe e o gestor aprova ou recusa (tabela `supervisor_transfer_requests`, notificação ao gestor) | Maestro | 0191 | Transferência só acontece com aprovação |
+
+### 8.3 Ordem e paralelismo
+
+1. **Fechar o S2:** QA do Cinzel, revisão do Vigia, commit.
+2. **Em paralelo, sem tocar os mesmos arquivos:**
+   - **Cinzel:** P1 (ficha) → P3 (feedback) → P5 (plantão) → P7 (resumo);
+   - **Maestro:** P2 (adicionar) → P4 (repassar) → P6 (alertas) → P8 (meta) → P9 (transferência).
+3. **Cada pacote:** testes, Vigia, commit, e banco aplicado por script (simulação, depois `--apply`) antes do deploy.
+4. **Pronto da versão completa:** um supervisor entra no Lite, vê só a equipe, recebe alertas e o resumo, age (recado, repassar, pausar, feedback, adicionar) e o gestor acompanha tudo na auditoria.
+
+### 8.4 Riscos e regras
+
+- **Repassar lead:** sempre pela reatribuição existente, nunca por update direto (Vigia T37).
+- **Pausar corretor:** só o recebimento (disponibilidade), registrado na auditoria. Mexer na escala continua com o gestor.
+- **Alertas:** respeitam horário e limite dos avisos da equipe (DEC-125), sem duplicar para quem já recebe.
+- **Banco:** toda tabela nova com `tenant_id`, e a migração é aplicada antes do deploy, por script.

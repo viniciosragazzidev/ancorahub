@@ -119,6 +119,7 @@ export default async function SuperAdminSettingsPage() {
     FEATURE_FLAGS.BROKER_ENGAGEMENT.key,
     FEATURE_FLAGS.BROKER_AI_ASSISTANTS.key,
     FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE.key,
+    FEATURE_FLAGS.SUPERVISOR_LITE.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR_HORIZON_MONTHS.key,
     FEATURE_FLAGS.ATTENDANCE_FLOWS.key,
     FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key,
@@ -193,6 +194,7 @@ export default async function SuperAdminSettingsPage() {
     { field: "relationshipCenterEnabled", needsTables: true, enabled: flagOn(FEATURE_FLAGS.RELATIONSHIP_CENTER), title: "Central de relacionamento", detail: "Rota /relacionamento: direção manda avisos para corretores, unidades, plantões ou equipes e vê quem leu; corretor ganha o Mural da gestão." },
     { field: "brokerEngagementEnabled", needsTables: true, enabled: flagOn(FEATURE_FLAGS.BROKER_ENGAGEMENT), title: "Jornada do corretor (pontos, ranking e missão de etapa)", detail: "Liga o extrato de pontos (cron /api/internal/jobs/engagement), a posição do próprio corretor no Início e no perfil, e a missão \"registre a etapa\". Requer parecer jurídico antes de ligar para todos (ranking e corretor autônomo)." },
     { field: "supervisorTeamScopeEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE), title: "Supervisor vê só a equipe dele", detail: "Leads, clientes, busca, central de atenção, Equipe, perfil e metas do supervisor ficam limitados aos corretores que ele supervisiona (Equipe → Editar membro). Avise os supervisores antes: leads de fora da equipe somem da lista deles." },
+    { field: "supervisorLiteEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.SUPERVISOR_LITE), title: "Lite do supervisor", detail: "O supervisor entra no app Lite com Início em conversas: Equipe, Leads da equipe, Desempenho da equipe e Âncora. Só vale com \"Supervisor vê só a equipe dele\" ligado." },
     { field: "brokerAiAssistantsEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.BROKER_AI_ASSISTANTS), title: "IA nos assistentes do corretor", detail: "Texto livre nos assistentes do Lite responde com IA. Precisa das chaves (Groq/OpenRouter) no Coolify; a conversa do lead só usa provedor pago." },
   ];
   const brokerDutyCalendarEnabled = (settingMap.get(FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key) ?? FEATURE_FLAGS.BROKER_DUTY_CALENDAR.defaultValue) === "true";

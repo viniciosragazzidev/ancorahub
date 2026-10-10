@@ -3,7 +3,7 @@ import { desc, and, eq, isNull, count, or } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { LightNotifications } from "@/features/broker-workspace/components/light-notifications";
 import { NotificationsClient } from "./notifications-client";
 
@@ -12,8 +12,8 @@ const PAGE_SIZE = 20;
 export default async function NotificationsPage() {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-  const experienceMode = await getExperienceMode(context);
-  const isLightBroker = experienceMode === "LIGHT" && context.role === "broker";
+  // Broker Lite and supervisor Lite share the Lite notifications screen.
+  const isLightBroker = (await getLiteAudience(context)) !== null;
 
   const rows = await db
     .select({

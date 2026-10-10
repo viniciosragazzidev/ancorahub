@@ -23,7 +23,10 @@ export function LightAppHeader({
   onOpenMore,
   actions,
   className,
+  hideAvailability = false,
 }: {
+  /** Supervisor Lite: no availability (they do not receive leads). */
+  hideAvailability?: boolean;
   availability: LightAvailability;
   availabilityPending: boolean;
   onToggleAvailability: () => void;
@@ -53,7 +56,7 @@ export function LightAppHeader({
           {title}
         </p>
         {actions}
-        {isRoot ? (
+        {isRoot && !hideAvailability ? (
           <LightAvailabilityPill
             availability={availability}
             isPending={availabilityPending}

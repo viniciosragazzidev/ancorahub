@@ -5,7 +5,9 @@
  * or opens the next question.
  */
 
-export type AssistantId = "ancora" | "leads" | "plantao" | "agenda" | "cotacao" | "desempenho" | "insights";
+export type AssistantId = "ancora" | "leads" | "plantao" | "agenda" | "cotacao" | "desempenho" | "insights"
+  /** Supervisor Lite (2026-10-10): the team instead of the broker's own work. */
+  | "equipe" | "equipe-leads" | "equipe-desempenho";
 
 /** Mascot drawn by AssistantAvatar. "logo" is the company mark (verified Âncora thread). */
 export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "salte" | "logo";

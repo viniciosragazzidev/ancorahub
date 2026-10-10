@@ -20,9 +20,42 @@ export const LIGHT_ALLOWED_PREFIXES = [
   "/primeiro-acesso",
 ] as const;
 
-export function isLightRouteAllowed(pathname: string) {
+/**
+ * Supervisor Lite: route by route (never a bare prefix, which would let the
+ * normal management screens like /leads/distribuicao in under the Lite chrome).
+ */
+const ID = "[^/]+";
+export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
+  /^\/dashboard$/,
+  new RegExp(`^/dashboard/c/${ID}$`),
+  /^\/leads$/,
+  new RegExp(`^/leads/(?!distribuicao$|distribuicao/)${ID}$`),
+  /^\/clientes$/,
+  new RegExp(`^/clientes/${ID}$`),
+  /^\/equipe$/,
+  new RegExp(`^/equipe/(?!cargos$|convidar$|dashboard$|recuperacoes$)${ID}$`),
+  /^\/relacionamento$/,
+  /^\/notificacoes$/,
+  /^\/settings$/,
+  /^\/primeiro-acesso(\/.*)?$/,
+];
+
+export function isLightRouteAllowed(pathname: string, audience: "broker" | "supervisor" = "broker") {
+  if (audience === "supervisor") {
+    const path = pathname.split("?")[0] ?? pathname;
+    return LIGHT_SUPERVISOR_ALLOWED_ROUTES.some((route) => route.test(path));
+  }
   return LIGHT_ALLOWED_PREFIXES.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
 }
+
+/** "Mais" of the supervisor. */
+export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
+  { href: "/equipe", label: "Minha equipe" },
+  { href: "/relacionamento", label: "Central de relacionamento", requires: "relationshipCenter" },
+  { href: "/clientes", label: "Clientes da equipe" },
+  { href: "/notificacoes", label: "Notificações" },
+  { href: "/settings", label: "Configurações" },
+];
 
 export type LightTabId = "inicio" | "fila" | "insights" | "mais";
 
@@ -51,8 +84,9 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/settings", label: "Configurações" },
 ];
 
-export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean }) {
-  return LIGHT_MORE_DESTINATIONS.filter((item) => !item.requires || capabilities[item.requires]);
+export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean }, audience: "broker" | "supervisor" = "broker") {
+  const list = audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : LIGHT_MORE_DESTINATIONS;
+  return list.filter((item) => !item.requires || capabilities[item.requires]);
 }
 
 export type LightRoute = {
@@ -138,6 +172,8 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/plantoes/agora"), route: { title: "Meu plantão agora", tab: "inicio", isRoot: false, parentHref: "/dashboard/c/plantao" } },
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/relacionamento"), route: { title: "Mural da gestão", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/equipe"), route: { title: "Minha equipe", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: under("/equipe"), route: { title: "Corretor", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
   // Settings is a list of sections; ?tab opens one and back returns to the list.

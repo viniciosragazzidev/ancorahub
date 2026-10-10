@@ -31,6 +31,7 @@ export function LightChrome({
   showQuoteSimulator = false,
   showDutyCalendar = false,
   showRelationship = false,
+  audience = "broker",
   initialAvailability = "available",
 }: {
   children: ReactNode;
@@ -40,6 +41,7 @@ export function LightChrome({
   showQuoteSimulator?: boolean;
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
+  audience?: "broker" | "supervisor";
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
 }) {
@@ -59,6 +61,7 @@ export function LightChrome({
       showQuoteSimulator={showQuoteSimulator}
       showDutyCalendar={showDutyCalendar}
       showRelationship={showRelationship}
+      audience={audience}
       availability={availability}
       availabilityPending={isPending}
       onChangeAvailability={setStatus}
@@ -66,7 +69,7 @@ export function LightChrome({
   );
 
   const chatRail = useDesktopChatRail();
-  const shell = { availability, isPending, setStatus, openMore: () => setMoreOpen(true) };
+  const shell = { availability, isPending, setStatus, openMore: () => setMoreOpen(true), audience };
   // Computers: the conversation list stays on the left and the screen opens at the center
   // (CSS .lite-split, venancor-scope.css); phones keep one screen at a time.
   const withRail = (content: ReactNode) => (
@@ -91,7 +94,7 @@ export function LightChrome({
     return withRail(
       <div className="arc-venancor h-dvh w-full overflow-hidden bg-[var(--surface)]">
         <main ref={mainRef} data-slot="app-content" className="h-full w-full overflow-y-auto overscroll-contain">
-          <LightAvailabilityProvider value={{ availability, isPending, setStatus, openMore: () => setMoreOpen(true) }}>{children}</LightAvailabilityProvider>
+          <LightAvailabilityProvider value={shell}>{children}</LightAvailabilityProvider>
         </main>
         {sheet}
       </div>,
@@ -105,6 +108,7 @@ export function LightChrome({
           availability={availability}
           availabilityPending={isPending}
           onToggleAvailability={() => setStatus(availability === "available" ? "paused" : "available")}
+          hideAvailability={audience === "supervisor"}
           onOpenMore={() => setMoreOpen(true)}
         />
         <main
@@ -112,7 +116,7 @@ export function LightChrome({
           data-slot="app-content"
           className="min-h-0 w-full flex-1 overflow-y-auto overscroll-contain pb-[var(--mobile-safe-bottom)]"
         >
-          <LightAvailabilityProvider value={{ availability, isPending, setStatus, openMore: () => setMoreOpen(true) }}>{children}</LightAvailabilityProvider>
+          <LightAvailabilityProvider value={shell}>{children}</LightAvailabilityProvider>
         </main>
       </div>
       {sheet}

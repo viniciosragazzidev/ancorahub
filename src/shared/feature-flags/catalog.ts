@@ -143,6 +143,14 @@ export const FEATURE_FLAGS = {
     description: "Liga a jornada do corretor: o coletor grava pontos por fatos do sistema (contato com mensagem enviada, aceite rápido, retorno em dia). Plano: docs/implementations/active/2026-10-10-central-relacionamento-corretor.md.",
   },
 
+  SUPERVISOR_LITE: {
+    key: "feature_supervisor_lite_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Modo Lite do supervisor (S2): Início em conversas com Equipe, Leads da equipe e Desempenho da equipe. Só vale com o escopo da equipe ligado.",
+  },
+
   SUPERVISOR_TEAM_SCOPE: {
     key: "feature_supervisor_team_scope_enabled",
     scope: "global",

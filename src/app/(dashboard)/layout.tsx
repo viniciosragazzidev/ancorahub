@@ -21,6 +21,7 @@ import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 import { getRealtimeSyncTopic, isRealtimeSyncEnabled } from "@/features/notifications/realtime-sync";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { isSupervisorLiteAvailable } from "@/features/broker-workspace/lite-audience";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
@@ -45,9 +46,10 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const brokerDutyCalendarFlagPromise = context.role === "broker"
     ? getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR)
     : Promise.resolve("false");
-  const relationshipFlagPromise = context.role === "broker"
+  const relationshipFlagPromise = context.role === "broker" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")
     : Promise.resolve("false");
+  const supervisorLitePromise = isSupervisorLiteAvailable(context);
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   const headersPromise = headers();
   const tenantPromise = getDatabase()
@@ -92,6 +94,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     cleanUiEnabled,
     brokerDutyCalendarFlag,
     relationshipFlag,
+    supervisorLiteAvailable,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -101,14 +104,18 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     cleanUiPromise,
     brokerDutyCalendarFlagPromise,
     relationshipFlagPromise,
+    supervisorLitePromise,
   ]);
 
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
+  // Supervisor Lite (S2): same chrome, team screens only.
+  const isLightSupervisor = supervisorLiteAvailable && experienceMode === "LIGHT";
+  const liteAudience = isLightSupervisor ? "supervisor" as const : "broker" as const;
 
   const pathname = headersList.get("x-pathname") || "";
 
-  if (isLightBroker) {
-    if (!isLightRouteAllowed(pathname) && pathname !== "") {
+  if (isLightBroker || isLightSupervisor) {
+    if (!isLightRouteAllowed(pathname, liteAudience) && pathname !== "") {
       redirect("/dashboard");
     }
   }
@@ -167,11 +174,12 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     <AgentDrawerProvider>
       <AppShell
         cleanUiEnabled={cleanUiEnabled}
-        isLightBroker={isLightBroker}
+        isLightBroker={isLightBroker || isLightSupervisor}
+        liteAudience={liteAudience}
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
-        showRelationship={isLightBroker && relationshipFlag === "true"}
+        showRelationship={(isLightBroker || isLightSupervisor) && relationshipFlag === "true"}
         branding={{
           tenantName: tenant?.name ?? null,
           brandColor: tenant?.brandColor ?? null,

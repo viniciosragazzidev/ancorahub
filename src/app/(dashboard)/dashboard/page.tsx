@@ -4,6 +4,8 @@ import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { Suspense } from "react";
 import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
 import { ChatHomeContent } from "@/features/broker-workspace/components/chat-home-content";
+import { SupervisorHomeContent } from "@/features/supervisor-workspace/supervisor-home-content";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getCommandCenterData } from "@/features/dashboard/today";
 import { CommandCenter } from "@/features/dashboard/components/command-center";
 import { canAccessLeadQualityCenter, getLeadQualityReport, parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
@@ -43,6 +45,14 @@ export default async function DashboardPage({
       return (
         <Suspense fallback={<LightPageSkeleton variant="dashboard" />}>
           <ChatHomeContent />
+        </Suspense>
+      );
+    }
+    // Supervisor Lite (S2): the team as conversations.
+    if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
+      return (
+        <Suspense fallback={<LightPageSkeleton variant="dashboard" />}>
+          <SupervisorHomeContent />
         </Suspense>
       );
     }

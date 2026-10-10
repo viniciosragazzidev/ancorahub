@@ -5,6 +5,9 @@ import { cache } from "react";
 import type { ThreadSummary } from "@/components/chat/types";
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
+import { buildSupervisorLeadThreads, buildSupervisorThreads } from "@/features/supervisor-workspace/chat";
+import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/queries";
+import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 import { buildAssistantThreads, buildLeadThreads } from "./assistant-scripts";
 
@@ -24,8 +27,23 @@ export type ChatRailData = {
  * that stays on the left of every Lite screen on computers. Null when the
  * workspace cannot load: the screens still work, only without the rail.
  */
+/** One team load per request for the supervisor Lite (rail and Início share it). */
+export const getCachedSupervisorWorkspaceData = cache(async () => getSupervisorWorkspaceData(await getRequiredTenantContext()));
+
 export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
   try {
+    const context = await getRequiredTenantContext();
+    if (context.role === "supervisor") {
+      const data = await getCachedSupervisorWorkspaceData();
+      const now = new Date();
+      return {
+        viewerName: data.viewer.name,
+        assistants: buildSupervisorThreads(data, now),
+        leads: buildSupervisorLeadThreads(data, now),
+        nowIso: now.toISOString(),
+        canQuote: false,
+      };
+    }
     const data = await getCachedBrokerWorkspaceData();
     const dutyCalendar = (await getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false")) === "true";
     const now = new Date();

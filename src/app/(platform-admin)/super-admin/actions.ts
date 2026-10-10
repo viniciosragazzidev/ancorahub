@@ -908,6 +908,7 @@ const BROKER_NEWS_FLAGS = [
   { field: "brokerEngagementEnabled", flag: FEATURE_FLAGS.BROKER_ENGAGEMENT },
   { field: "brokerAiAssistantsEnabled", flag: FEATURE_FLAGS.BROKER_AI_ASSISTANTS },
   { field: "supervisorTeamScopeEnabled", flag: FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE },
+  { field: "supervisorLiteEnabled", flag: FEATURE_FLAGS.SUPERVISOR_LITE },
 ] as const;
 
 export async function updateBrokerNewsSettingsAction(formData: FormData) {

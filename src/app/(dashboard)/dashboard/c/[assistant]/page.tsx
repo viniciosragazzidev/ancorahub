@@ -4,8 +4,11 @@ import { notFound, redirect } from "next/navigation";
 
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import type { AssistantId } from "@/components/chat/types";
-import { ASSISTANTS, buildAncoraScript, buildAssistantScript } from "@/features/broker-workspace/chat/assistant-scripts";
+import { ASSISTANTS, SUPERVISOR_ASSISTANTS, buildAncoraScript, buildAssistantScript } from "@/features/broker-workspace/chat/assistant-scripts";
+import { getCachedSupervisorWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
+import { buildSupervisorScript, type SupervisorScriptId } from "@/features/supervisor-workspace/chat";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -22,8 +25,13 @@ const ANCORA_HISTORY = 30;
 export default async function AssistantConversationPage({ params }: { params: Promise<{ assistant: string }> }) {
   const { assistant } = await params;
   const context = await getRequiredTenantContext();
-  if (context.role !== "broker" || (await getExperienceMode(context)) !== "LIGHT") redirect("/dashboard");
+  const audience = context.role === "supervisor" ? await getLiteAudience(context) : context.role === "broker" && (await getExperienceMode(context)) === "LIGHT" ? "broker" : null;
+  if (!audience) redirect("/dashboard");
   if (!Object.hasOwn(ASSISTANTS, assistant)) notFound();
+  const supervisorOnly = (SUPERVISOR_ASSISTANTS as readonly string[]).includes(assistant);
+  // Each audience only has its own assistants (Âncora is shared).
+  if (audience === "broker" && supervisorOnly) notFound();
+  if (audience === "supervisor" && assistant !== "ancora" && !supervisorOnly) notFound();
   const definition = ASSISTANTS[assistant as AssistantId];
   const identity = { name: definition.name, shape: definition.shape, hue: definition.hue };
   if (assistant === "ancora") {
@@ -41,7 +49,11 @@ export default async function AssistantConversationPage({ params }: { params: Pr
       .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId)))
       .orderBy(desc(schema.notifications.createdAt))
       .limit(ANCORA_HISTORY);
-    return <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId="ancora" />;
+    return <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} />;
+  }
+  if (audience === "supervisor") {
+    const data = await getCachedSupervisorWorkspaceData();
+    return <AssistantChat identity={identity} script={buildSupervisorScript(assistant as SupervisorScriptId, data, new Date())} />;
   }
   // Cotação and Insights have their own screens.
   if (!SCRIPTED.includes(assistant as Scripted)) redirect(definition.href);

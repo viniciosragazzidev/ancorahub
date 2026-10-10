@@ -28,10 +28,16 @@ export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
   cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },
   desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/dashboard/c/desempenho" },
   insights: { name: "Insights", shape: "salte", hue: 200, href: "/conversas/broker" },
+  equipe: { name: "Equipe", shape: "mochi", hue: 150, href: "/dashboard/c/equipe" },
+  "equipe-leads": { name: "Leads da equipe", shape: "cubo", hue: 212, href: "/dashboard/c/equipe-leads" },
+  "equipe-desempenho": { name: "Desempenho da equipe", shape: "nuvem", hue: 330, href: "/dashboard/c/equipe-desempenho" },
 };
 
+/** Assistants that only exist in the supervisor Lite. */
+export const SUPERVISOR_ASSISTANTS = ["equipe", "equipe-leads", "equipe-desempenho"] as const;
+
 type LeadQueueItem = BrokerWorkspaceData["queue"][number];
-type ScriptAssistantId = Exclude<AssistantId, "ancora" | "cotacao" | "insights">;
+type ScriptAssistantId = Exclude<AssistantId, "ancora" | "cotacao" | "insights" | "equipe" | "equipe-leads" | "equipe-desempenho">;
 
 function iso(date: Date | null | undefined) {
   return date && Number.isFinite(date.getTime()) ? date.toISOString() : null;

@@ -25,6 +25,7 @@ export function LightMoreSheet({
   showQuoteSimulator,
   showDutyCalendar,
   showRelationship = false,
+  audience = "broker",
   availability,
   availabilityPending,
   onChangeAvailability,
@@ -35,11 +36,14 @@ export function LightMoreSheet({
   showQuoteSimulator: boolean;
   showDutyCalendar: boolean;
   showRelationship?: boolean;
+  audience?: "broker" | "supervisor";
   availability: LightAvailability;
   availabilityPending: boolean;
   onChangeAvailability: (next: "available" | "paused") => void;
 }) {
-  const destinations = getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship });
+  const destinations = getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship }, audience);
+  // The supervisor does not receive leads: no availability, and the tour is the broker's.
+  const isSupervisor = audience === "supervisor";
 
   return (
     <BottomSheet
@@ -76,7 +80,7 @@ export function LightMoreSheet({
           </ul>
         </nav>
 
-        <button
+        {isSupervisor ? null : <button
           type="button"
           onClick={() => {
             onOpenChange(false);
@@ -91,9 +95,9 @@ export function LightMoreSheet({
             <span className="block text-xs font-normal text-(--text-muted)">uns 3 minutos, passo a passo</span>
           </span>
           <ChevronRight className="size-4 text-(--text-muted)" aria-hidden="true" />
-        </button>
+        </button>}
 
-        <div className="flex flex-col gap-2">
+        {isSupervisor ? null : <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-(--foreground)">Disponibilidade</p>
           <div aria-busy={availabilityPending}>
             <SegmentedControl
@@ -111,7 +115,7 @@ export function LightMoreSheet({
               ? "Você recebe novos leads normalmente."
               : "Pausado: você não recebe novos leads até voltar a ficar disponível."}
           </p>
-        </div>
+        </div>}
 
         <Button
           variant="secondary"

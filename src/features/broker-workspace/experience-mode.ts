@@ -60,7 +60,11 @@ export async function getExperienceMode(customContext?: TenantContext): Promise<
 
   // Default: LIGHT for broker role/jobTitle, NORMAL for others
   const isBroker = context.role === "broker" || context.jobTitle === "broker";
-  return isBroker ? "LIGHT" : "NORMAL";
+  if (isBroker) return "LIGHT";
+  // Supervisor Lite (team scope + flag): the supervisor starts in the Lite too.
+  const { isSupervisorLiteAvailable } = await import("./lite-audience");
+  if (await isSupervisorLiteAvailable(context)) return "LIGHT";
+  return "NORMAL";
 }
 
 /**

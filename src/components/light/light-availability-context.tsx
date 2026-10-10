@@ -10,6 +10,8 @@ export type LightAvailabilityValue = {
   setStatus: (next: "available" | "paused") => void;
   /** Opens the "Mais" sheet (chat screens have no tab bar of their own). */
   openMore?: () => void;
+  /** Who uses the Lite: the broker (default) or the supervisor (team, no availability). */
+  audience?: "broker" | "supervisor";
 };
 
 const LightAvailabilityContext = createContext<LightAvailabilityValue | null>(null);
