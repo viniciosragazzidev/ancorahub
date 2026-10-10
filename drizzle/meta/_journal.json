@@ -953,6 +953,13 @@
                         "when":  1791648000000,
                         "tag":  "0188_broker_engagement_relationship",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  136,
+                        "version":  "7",
+                        "when":  1791652000000,
+                        "tag":  "0189_tenant_role_supervisor",
+                        "breakpoints":  true
                     }
                 ]
 }
