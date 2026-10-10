@@ -103,6 +103,11 @@
   --font-body: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
   --font-display: var(--font-jakarta-sans), ui-sans-serif, system-ui, sans-serif;
   --control-height-sm: 2.75rem; /* touch targets are at least 44px */
+  /* The chat action blue, also for Lite screens outside the chat (team, journey, recados).
+     The chat root (chat.module.css) sets the same values, so nothing changes inside it. */
+  --chat-action: oklch(62% 0.2 255);
+  --chat-action-strong: oklch(55% 0.21 258);
+  --chat-action-soft: oklch(62% 0.2 255 / 0.1);
 }
 
 /* Arc shared keyboard ring, scoped (foundation.css applies it to :root). Pointer focus draws nothing. */
