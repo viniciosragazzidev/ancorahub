@@ -95,6 +95,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
       <AssistantChat
         identity={{ name: `Análise · ${insightItem.name.split(" ")[0]}`, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
         script={buildLeadInsightScript({ item: insightItem, now: new Date() })}
+        agentId="insights"
       />
     );
   }
@@ -105,6 +106,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
       <AssistantChat
         identity={{ name: insightsAssistant.name, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
         script={buildInsightsScript({ insights, whatsappConnected: connection?.status === "ready", now: new Date() })}
+        agentId="insights"
       />
     );
   }

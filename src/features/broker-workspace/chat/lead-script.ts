@@ -321,7 +321,7 @@ export function buildLeadConversationScript({
   const waiting = lead.isCurrentBroker && (lead.status === "distributed" || lead.status === "new" || IN_SERVICE.has(lead.status));
   return {
     blocks,
-    composerPlaceholder: lead.isCurrentBroker ? "Escreva uma nota sobre o atendimento" : "Só o corretor do lead pode anotar aqui",
+    composerPlaceholder: lead.isCurrentBroker ? "Escreva uma nota ou pergunte algo terminando com ?" : "Só o corretor do lead pode anotar aqui",
     status: waiting
       ? { label: lead.status === "distributed" || lead.status === "new" ? "Esperando você" : LEAD_STATUS_LABELS[lead.status] ?? "Em atendimento", tone: lead.status === "distributed" || lead.status === "new" ? "waiting" : "idle" }
       : { label: LEAD_STATUS_LABELS[lead.status] ?? lead.status, tone: "paused" },

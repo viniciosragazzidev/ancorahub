@@ -41,7 +41,7 @@ export default async function AssistantConversationPage({ params }: { params: Pr
       .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId)))
       .orderBy(desc(schema.notifications.createdAt))
       .limit(ANCORA_HISTORY);
-    return <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant />;
+    return <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId="ancora" />;
   }
   // Cotação and Insights have their own screens.
   if (!SCRIPTED.includes(assistant as Scripted)) redirect(definition.href);
@@ -56,5 +56,5 @@ export default async function AssistantConversationPage({ params }: { params: Pr
       </Link>
     )
     : undefined;
-  return <AssistantChat identity={identity} script={script} headerAction={headerAction} />;
+  return <AssistantChat identity={identity} script={script} headerAction={headerAction} agentId={assistant as Scripted} />;
 }

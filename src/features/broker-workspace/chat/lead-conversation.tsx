@@ -10,6 +10,7 @@ import type { ChatBlock, ChatScript } from "@/components/chat/types";
 import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
 
 import { runChatServerAction } from "./chat-actions";
+import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import { whatsappButton } from "./lead-script";
 
 /**
@@ -51,6 +52,11 @@ export function LeadConversation({
           return { ok: result.ok, message: result.message, warning: result.warning, followUp };
         }}
         onFreeText={async (text): Promise<ChatBlock[]> => {
+          // A question ("...?") goes to the AI of this lead; anything else, or an AI failure, is a note.
+          if (text.trim().endsWith("?")) {
+            const answer = await askAssistantAction({ agentId: "lead", question: text, leadId });
+            if (answer.ok) return answer.blocks;
+          }
           const result = await runChatServerAction("lead.addNote", { leadId, content: text });
           return [{ type: "assistant", id: `note-${Date.now()}`, text: result.message }];
         }}

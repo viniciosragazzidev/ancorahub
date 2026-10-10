@@ -4,13 +4,15 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
+import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
+import type { AgentId } from "@/features/ai-gateway/agents";
 
 import { ChatScreen } from "./chat-screen";
 import type { Mention } from "./composer";
 import type { ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, agentId }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId }) {
   const router = useRouter();
   return (
     <ChatScreen
@@ -34,9 +36,10 @@ export function AssistantChat({ identity, script, instant = false, headerAction 
         router.push(mention.handle === "cotacao" ? "/cotacao" : `/dashboard/c/${mention.handle}`);
         return [];
       }}
-      onFreeText={async (): Promise<ChatBlock[]> => [
-        { type: "assistant", id: `free-answer-${Date.now()}`, text: "Ainda não entendo texto livre aqui. Escolha uma das opções ou use @ para abrir outra conversa." },
-      ]}
+      onFreeText={async (text): Promise<ChatBlock[]> => {
+        if (agentId) return (await askAssistantAction({ agentId, question: text })).blocks;
+        return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Ainda não entendo texto livre aqui. Escolha uma das opções ou use @ para abrir outra conversa." }];
+      }}
     />
   );
 }

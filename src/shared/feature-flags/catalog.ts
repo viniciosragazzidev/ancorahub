@@ -127,6 +127,14 @@ export const FEATURE_FLAGS = {
       "Segundos de debounce antes do agente processar uma mensagem. 0 = desabilitado. Máximo: 2 (limitado internamente).",
   },
 
+  BROKER_AI_ASSISTANTS: {
+    key: "feature_broker_ai_assistants_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita a IA nos assistentes do app do corretor (texto livre e sugestões de ação). Plano: docs/implementations/active/2026-10-10-ia-assistentes-corretor.md.",
+  },
+
   CONVERSATION_INTELLIGENCE: {
     key: "feature_conversation_intelligence_enabled",
     scope: "global",
