@@ -6,6 +6,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { LightNotifications } from "@/features/broker-workspace/components/light-notifications";
 import { NotificationsClient } from "./notifications-client";
+import { getMyPendingSupervisorInvites, getMySupervisorTeamIdentity } from "@/features/supervisor-workspace/my-team-queries";
+import { SupervisorTeamInvites } from "@/features/broker-workspace/components/supervisor-team-invites";
 
 const PAGE_SIZE = 20;
 
@@ -14,6 +16,12 @@ export default async function NotificationsPage() {
   const db = getDatabase();
   // Broker Lite and supervisor Lite share the Lite notifications screen.
   const isLightBroker = (await getLiteAudience(context)) !== null;
+  const teamInvites = isLightBroker && context.role === "broker"
+    ? await getMyPendingSupervisorInvites().then((invites) => invites.map((invite) => ({ ...invite, createdAt: invite.createdAt.toISOString() }))).catch(() => null)
+    : [];
+  const teamIdentity = isLightBroker && context.role === "broker"
+    ? await getMySupervisorTeamIdentity().catch(() => null)
+    : null;
 
   const rows = await db
     .select({
@@ -85,15 +93,18 @@ export default async function NotificationsPage() {
 
   if (isLightBroker) {
     return (
-      <LightNotifications
-        initialNotifications={serializedNotifications}
-        initialNextCursor={nextCursor}
-        initialHasMore={hasMore}
-        totalCount={Number(totalResult?.total ?? 0)}
-        unreadCount={Number(unreadResult?.total ?? 0)}
-        urgentCount={Number(urgentResult?.total ?? 0)}
-        leadToastEnabled={membership?.leadToastEnabled ?? true}
-      />
+      <>
+        {context.role === "broker" ? <SupervisorTeamInvites initialInvites={teamInvites ?? []} teamIdentity={teamIdentity} unavailable={teamInvites === null} /> : null}
+        <LightNotifications
+          initialNotifications={serializedNotifications}
+          initialNextCursor={nextCursor}
+          initialHasMore={hasMore}
+          totalCount={Number(totalResult?.total ?? 0)}
+          unreadCount={Number(unreadResult?.total ?? 0)}
+          urgentCount={Number(urgentResult?.total ?? 0)}
+          leadToastEnabled={membership?.leadToastEnabled ?? true}
+        />
+      </>
     );
   }
 

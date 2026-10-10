@@ -783,3 +783,7 @@ de métricas entre tenants.
 - O mês atual abre inicialmente e uma nova vigência é aberta após criação ou edição.
 - O grupo mensal usa controles e tokens compartilhados, com regiões acessíveis; não
   foram introduzidos tokens, primitivas nem animações novas.
+
+## 2026-10-10 - Minha equipe no Lite do supervisor
+
+Papel: supervisor no Lite. Objetivo: montar a equipe, editar seu perfil e enviar convites a corretores livres da unidade. Acoes: salvar perfil, convidar, cancelar convite e remover membro; corretor decide em notificacoes. Estados de equipe vazia, carregamento, sucesso, erro e tabela indisponivel tratados. Reutiliza Button, Input, Textarea e tokens Lite existentes, sem nova primitive, token ou movimento. Registro: docs/implementations/active/2026-10-10-lite-supervisor.md, secao 9.

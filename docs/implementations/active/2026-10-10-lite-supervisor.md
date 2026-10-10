@@ -162,3 +162,28 @@ Telas:
 - **Pausar corretor:** só o recebimento (disponibilidade), registrado na auditoria. Mexer na escala continua com o gestor.
 - **Alertas:** respeitam horário e limite dos avisos da equipe (DEC-125), sem duplicar para quem já recebe.
 - **Banco:** toda tabela nova com `tenant_id`, e a migração é aplicada antes do deploy, por script.
+
+## 9. P10: Minha equipe (perfil, membros e convites) (2026-10-10)
+
+Pedido do Vinicios: o supervisor cria a própria equipe, convida corretores da unidade dele e tem uma área de equipe onde vê os membros e edita o perfil completo da equipe (nome, imagem, descrição).
+
+**Modelo (migração 0192, script `scripts/apply-0192-supervisor-teams.mjs`, simula por padrão, `--apply` grava):**
+- `supervisor_teams`: `id`, `tenant_id`, `supervisor_id` (único por tenant), `branch_id`, `name` (2 a 60), `description` (até 280), `image_url` (data URL `image/png|jpeg|webp`, até 200 KB, sem SVG), `created_at`, `updated_at`. FK `branches(id, tenant_id)`.
+- `supervisor_team_invites`: `id`, `tenant_id`, `branch_id`, `supervisor_id`, `broker_id`, `status` (`pending|accepted|declined|cancelled`), `message` (até 280, opcional), `created_at`, `decided_at`. Índice único parcial: um convite `pending` por (tenant, supervisor, broker).
+- A ligação corretor ↔ supervisor continua sendo `tenant_memberships.supervisor_id` (fonte única). A equipe é só o perfil.
+
+**Regras (BR-079):**
+- Só supervisor com `supervisorTeamScope` e unidade. Convida apenas corretor ativo da mesma unidade e sem supervisor. Corretor de outra equipe: botão leva ao pedido de transferência (P9), não a convite.
+- Corretor aceita ou recusa. Ao aceitar: transação com `FOR UPDATE` na linha do supervisor, confere teto de 30, e o `UPDATE` exige `supervisor_id IS NULL`, mesma unidade e ativo (mesma regra do `addBrokerToMyTeamAction`). Se não estiver mais livre, o convite vira `cancelled` com mensagem clara.
+- O "Adicionar" direto do P2 continua dispon?vel ao supervisor, inclusive na escolha do chat, e atribui o corretor livre sem exigir aceite. Na tela `/equipe/minha`, corretores livres t?m as op??es "Adicionar" (direto) e "Convidar" (com aceite do corretor). `addBrokerToMyTeamAction` permanece para o fluxo direto; convites usam a??es pr?prias.
+- Supervisor pode cancelar convite pendente e remover corretor da equipe (volta a livre; auditoria).
+- Notificação ao corretor: `publishNotification` capability `supervisor_team_invite`, título "Convite para a equipe <nome>", pushBody sem nomes. Aceitar/recusar no Lite do corretor (conversa Âncora ou /notificacoes) via ações de chat `team.acceptInvite` e `team.declineInvite`. Supervisor recebe aviso do aceite/recusa.
+- Auditoria em `audit_logs` para criar/editar equipe, convidar, cancelar, aceitar, recusar, remover.
+
+**Telas (Lite do supervisor, fundo branco, tokens do Lite, sem travessão):**
+- Rota `/equipe/minha` (entra em `LIGHT_SUPERVISOR_ALLOWED_ROUTES`): cabeçalho com imagem, nome e descrição da equipe e botão "Editar perfil" (formulário com upload de imagem redimensionada no navegador para 256x256 webp, nome, descrição). Sem equipe criada: estado vazio "Crie sua equipe" com o mesmo formulário.
+- Abaixo: "Membros" (lista com foto/nome, link para `/equipe/<id>`, a??o "Remover da equipe" com confirma??o), "Convites pendentes" (cancelar), "Corretores da sua unidade" (livres: "Adicionar" direto ou "Convidar" com aceite; em outra equipe: "Pedir transfer?ncia").
+- Entradas: conversa "Equipe" ganha a escolha "Minha equipe"; tela inicial do supervisor com 0 corretores mostra "Monte sua equipe"; menu Mais ganha "Minha equipe". Nome e imagem da equipe aparecem no cabeçalho da conversa Equipe.
+- Corretor vê no perfil dele o nome e a imagem da equipe a que pertence (se houver).
+
+**Pronto quando:** supervisor cria a equipe com nome, imagem e descrição; convida um corretor livre da unidade; o corretor aceita pelo Lite e aparece em Membros; tsc, testes focados e lint de encoding passam.

@@ -108,7 +108,8 @@ function emptyTeam(now: Date, prefix: string): ChatScript {
   return {
     blocks: [
       date(`${prefix}-date`, now),
-      say(`${prefix}-empty`, "Sua equipe ainda não foi montada. O gestor ou o diretor escolhe os corretores que você supervisiona em Equipe, Editar membro."),
+      say(`${prefix}-empty`, "Sua equipe ainda está vazia. Monte em Minha equipe: dê nome e foto, adicione ou convide corretores da sua unidade."),
+      { type: "question", id: `${prefix}-empty-choice`, prompt: "Vamos montar?", choices: [{ id: "my-team", label: "Montar minha equipe", action: { kind: "href", href: "/equipe/minha" } }] },
     ],
     status: { label: "Sem equipe", tone: "idle" },
   };
@@ -170,7 +171,7 @@ function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
     choices: [
       ...(needing[0] ? [{ id: "open-needing", label: `Ver ${firstName(needing[0].name)}`, action: { kind: "href" as const, href: `/equipe/${needing[0].userId}` } }] : []),
       { id: "message", label: "Mandar recado para a equipe", hint: "Pela Central de relacionamento", action: { kind: "href", href: "/relacionamento" } },
-      { id: "team-page", label: "Abrir a página da equipe", action: { kind: "href", href: "/equipe" } },
+      { id: "team-page", label: "Minha equipe", hint: "Perfil, membros e convites", action: { kind: "href", href: "/equipe/minha" } },
     ],
   });
   return { blocks, status: needing.some((broker) => broker.late) ? { label: "Precisa de você", tone: "waiting" } : { label: "Equipe em dia", tone: "idle" } };

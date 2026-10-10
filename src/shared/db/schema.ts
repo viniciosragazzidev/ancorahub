@@ -2887,6 +2887,50 @@ export const supervisorTransferRequests = pgTable(
   ],
 );
 
+export const supervisorTeams = pgTable(
+  "supervisor_teams",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    supervisorId: text("supervisor_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    imageUrl: text("image_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({ columns: [table.branchId, table.tenantId], foreignColumns: [branches.id, branches.tenantId], name: "supervisor_teams_branch_tenant_fk" }).onDelete("cascade"),
+    check("supervisor_teams_name_length_check", sql`char_length(trim(${table.name})) between 2 and 60`),
+    check("supervisor_teams_description_length_check", sql`char_length(${table.description}) <= 280`),
+    check("supervisor_teams_image_data_url_check", sql`${table.imageUrl} is null or (${table.imageUrl} ~ '^data:image/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$' and octet_length(${table.imageUrl}) <= 204800)`),
+    unique("supervisor_teams_supervisor_unique").on(table.tenantId, table.supervisorId),
+  ],
+);
+
+export const supervisorTeamInvites = pgTable(
+  "supervisor_team_invites",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").notNull(),
+    supervisorId: text("supervisor_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("pending"),
+    message: text("message"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+  },
+  (table) => [
+    foreignKey({ columns: [table.branchId, table.tenantId], foreignColumns: [branches.id, branches.tenantId], name: "supervisor_team_invites_branch_tenant_fk" }).onDelete("cascade"),
+    check("supervisor_team_invites_status_check", sql`${table.status} in ('pending', 'accepted', 'declined', 'cancelled')`),
+    check("supervisor_team_invites_message_length_check", sql`${table.message} is null or char_length(${table.message}) <= 280`),
+    uniqueIndex("supervisor_team_invites_one_pending_idx").on(table.tenantId, table.supervisorId, table.brokerId).where(sql`${table.status} = 'pending'`),
+    index("supervisor_team_invites_broker_pending_idx").on(table.tenantId, table.brokerId, table.status, table.createdAt.desc()),
+  ],
+);
+
 export const tenantManagerBranches = pgTable(
   "tenant_manager_branches",
   {
