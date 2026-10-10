@@ -60,7 +60,7 @@ export function AvailabilityToggle({
         onClick={() => handleToggle("offline")}
         className={`px-1.5 py-0.5 rounded-md font-medium transition-all ${
           status === "offline"
-            ? "bg-muted text-[var(--text-secondary)] border border-transparent"
+            ? "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border border-zinc-500/30"
             : "text-muted-foreground hover:text-foreground"
         }`}
       >

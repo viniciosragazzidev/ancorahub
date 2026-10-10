@@ -1,5 +1,3 @@
-> **DESCONTINUADO (2026-10-09).** O único design system do CRM é o do modo Lite: [`docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md`](/docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md). Este documento fica só como histórico; não use seus valores.
-
 # Migração para o Design System Venancor
 
 Fonte da verdade: `docs/design-system/venancor.md`. Trabalho atual na branch `design/venancor`, criada de `perf/crons-n1`; `design/venancor-ds` é só referência visual. Sem mudar regra de negócio, dados, comportamento ou estrutura das telas. Tema claro por padrão.

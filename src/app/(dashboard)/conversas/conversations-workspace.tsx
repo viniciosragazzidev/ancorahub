@@ -1524,7 +1524,7 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
     }
     if (targetStatus.includes("disqualified") || targetStatus.includes("desqualificado") || targetStatus.includes("wrong") || targetStatus.includes("opt")) {
       return (
-        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-transparent bg-muted text-muted-foreground font-medium">
+        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-gray-500/30 bg-gray-500/10 text-muted-foreground font-medium">
           Desqualificado
         </Badge>
       );
@@ -1625,7 +1625,7 @@ function renderQualificationRatingBadge(status: string, qualStatus?: string | nu
   }
   if (norm.includes("disqualified") || norm.includes("wrong") || norm.includes("opt")) {
     return (
-      <Badge variant="outline" className="border-transparent bg-muted text-muted-foreground font-medium text-xs gap-1">
+      <Badge variant="outline" className="border-gray-500/30 bg-gray-500/10 text-muted-foreground font-medium text-xs gap-1">
         Desqualificado
       </Badge>
     );

@@ -484,13 +484,13 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 }
 
 const sidebarMenuButtonVariants = cva(
-  "peer/menu-button group/menu-button relative isolate flex w-full items-center gap-2 overflow-hidden rounded-full border border-transparent p-2 text-left text-xs font-medium ring-sidebar-ring outline-hidden transition-[background-color,color,border-color] duration-150 group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:[&>span]:hidden hover:bg-muted hover:text-foreground focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:bg-muted data-active:font-medium data-active:text-foreground motion-reduce:transition-none [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
+  "peer/menu-button group/menu-button relative isolate flex w-full items-center gap-2 overflow-hidden rounded-full border border-transparent p-2 text-left text-xs font-medium ring-sidebar-ring outline-hidden transition-[background-color,color,border-color] duration-150 group-has-data-[sidebar=menu-action]/menu-item:pr-8 group-data-[collapsible=icon]:size-9! group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:rounded-full group-data-[collapsible=icon]:[&>span]:hidden hover:bg-primary/8 hover:text-primary focus-visible:ring-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-active:font-semibold data-active:text-primary group-data-[collapsible=icon]:data-active:text-primary motion-reduce:transition-none [&_svg]:size-4 [&_svg]:shrink-0 [&>span:last-child]:truncate",
   {
     variants: {
       variant: {
-        default: "hover:bg-muted hover:text-foreground",
+        default: "hover:bg-primary/8 hover:text-primary",
         outline:
-          "bg-background border-sidebar-border hover:bg-muted hover:text-foreground",
+          "bg-background border-sidebar-border hover:bg-primary/8 hover:text-primary",
       },
       size: {
         default: "h-8 text-sm",
@@ -538,7 +538,7 @@ function SidebarMenuButton({
               layoutId={reducedMotion ? undefined : activeIndicatorId}
               initial={false}
               transition={reducedMotion ? { duration: 0 } : transitions.normal}
-              className="pointer-events-none absolute inset-0 -z-10 rounded-full border border-transparent bg-muted group-data-[collapsible=icon]:block!"
+              className="pointer-events-none absolute inset-0 -z-10 rounded-full border border-primary/20 bg-primary/8 group-data-[collapsible=icon]:block!"
             />
             {children}
           </>

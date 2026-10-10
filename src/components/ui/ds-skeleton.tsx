@@ -7,7 +7,7 @@ import { cn } from "@/utils/core/cn";
  * should mirror the real content so nothing jumps when data arrives.
  */
 export function DsSkeleton({ className, ...props }: React.ComponentPropsWithoutRef<"div">) {
-  return <div aria-hidden="true" data-slot="ds-skeleton" className={cn("ds-skeleton rounded-xl !bg-[color-mix(in_oklab,var(--border-strong)_38%,var(--card))] !animate-[ct-pulse_1.8s_var(--ease-in-out)_11_both] motion-reduce:animate-none after:content-none", className)} {...props} />;
+  return <div aria-hidden="true" data-slot="ds-skeleton" className={cn("ds-skeleton rounded-ds-inputs", className)} {...props} />;
 }
 
 /** Loading placeholder that matches a `DsDataRow` (title, description, action). */
@@ -21,7 +21,7 @@ export function DsDataRowSkeleton({ className, ...props }: React.ComponentPropsW
           <DsSkeleton className="h-3 w-1/2" />
         </div>
       </div>
-      <DsSkeleton className="h-8 w-24 shrink-0 rounded-full" />
+      <DsSkeleton className="h-8 w-24 shrink-0 rounded-ds-buttons" />
     </li>
   );
 }

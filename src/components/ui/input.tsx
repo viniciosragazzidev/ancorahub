@@ -126,8 +126,7 @@ function Input({
         : { defaultValue })}
       onChange={handleChange}
       className={cn(
-        /* Lite/Arc field: 44px pill, strong border, focus = foreground border (no ring). */
-        "h-11 w-full min-w-0 rounded-full border border-[var(--border-strong)] bg-card px-3 text-sm text-foreground shadow-none transition-[background-color,border-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground hover:border-foreground focus-visible:border-foreground disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-50 aria-invalid:border-destructive motion-reduce:transition-none",
+        "h-8 w-full min-w-0 rounded-full border border-input bg-card px-2.5 py-1.5 text-xs text-foreground shadow-none transition-[background-color,border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-xs file:font-medium file:text-foreground placeholder:text-muted-foreground hover:border-border-strong focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 motion-reduce:transition-none dark:bg-card dark:border-border",
         className,
       )}
       {...props}

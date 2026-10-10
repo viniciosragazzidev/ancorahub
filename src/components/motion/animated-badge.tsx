@@ -56,9 +56,8 @@ const STATUS_CLASS: Record<AnimatedBadgeStatus, string> = {
 };
 
 const SIZE_CLASS: Record<AnimatedBadgeSize, string> = {
-  /* Lite/Arc badge: 22px (sm) and 26px (md) pills. */
-  sm: "h-[22px] gap-1 px-2 text-[11px] tracking-[-.01em]",
-  md: "h-[26px] gap-[5px] px-2.5 text-xs tracking-[-.01em]",
+  sm: "h-6 gap-1.5 px-2 text-[11px]",
+  md: "h-8 gap-2 px-3 text-xs",
 };
 
 const ICON_CLASS: Record<AnimatedBadgeSize, string> = {

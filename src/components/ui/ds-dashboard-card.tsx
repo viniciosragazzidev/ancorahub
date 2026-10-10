@@ -5,8 +5,9 @@ export type DsDashboardCardProps = React.ComponentPropsWithoutRef<"div">;
 
 /**
  * Dashboard Card — docs/design-system.md § Components.
- * White background, no border, 24px radius, one soft resting shadow (Lite
- * visual, docs/design-system/lite). The most frequent surface in the system.
+ * White background, 1px #e5e5e5 border, 12px radius, 8px internal padding.
+ * Flat and border-defined — no shadow. The most frequent surface in the
+ * system; relies on borders and spacing, not elevation.
  */
 export const DsDashboardCard = React.forwardRef<
   HTMLDivElement,
@@ -17,7 +18,7 @@ export const DsDashboardCard = React.forwardRef<
       ref={ref}
       data-slot="ds-dashboard-card"
       className={cn(
-        "rounded-ds-cards border border-[var(--card-border)] bg-ds-canvas-white p-ds-8 font-ds-inter text-ds-body text-ds-charcoal shadow-[var(--shadow-card)] transition-shadow duration-150 ease-out",
+        "rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-ds-8 font-ds-inter text-ds-body text-ds-charcoal shadow-none transition-colors duration-150 ease-out hover:border-ds-smoke",
         className,
       )}
       {...props}

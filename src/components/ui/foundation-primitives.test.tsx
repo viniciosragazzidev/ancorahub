@@ -23,15 +23,14 @@ describe("foundation primitives", () => {
     const { rerender } = render(<Button variant="success" type="submit">Confirmar reatribuição</Button>)
 
     const button = screen.getByRole("button", { name: "Confirmar reatribuição" })
-    // Lite/Arc skin: solid semantic fill, pill.
-    expect(button).toHaveClass("text-success-foreground", "bg-success", "rounded-full")
+    expect(button).toHaveClass("text-success-foreground", "dark:bg-success", "rounded-full")
+    expect(button).toHaveClass("bg-[color-mix(in_oklab,var(--success)_85%,black)]")
     expect(button).toHaveAttribute("type", "submit")
     expect(button).toBeEnabled()
 
     rerender(<Button variant="success" type="submit" disabled>Reatribuindo...</Button>)
     expect(screen.getByRole("button", { name: "Reatribuindo..." })).toBeDisabled()
-    // Lite: disabled at .52, keyboard focus as an outline (no ring).
-    expect(button).toHaveClass("disabled:opacity-[.52]", "focus-visible:outline-2")
+    expect(button).toHaveClass("disabled:opacity-50", "focus-visible:ring-2")
   })
 
   it("keeps content grouped in the shared flat card surface", () => {
@@ -60,8 +59,7 @@ describe("foundation primitives", () => {
     )
 
     expect(screen.getByLabelText("Nome")).toHaveClass("rounded-full")
-    // Multi-line field: 24px radius (a pill would distort a tall box).
-    expect(screen.getByLabelText("Observações")).toHaveClass("rounded-3xl")
+    expect(screen.getByLabelText("Observações")).toHaveClass("rounded-full")
     expect(screen.getByRole("alert")).toHaveTextContent("Informe o nome.")
   })
 })

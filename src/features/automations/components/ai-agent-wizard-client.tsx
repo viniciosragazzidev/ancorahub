@@ -88,18 +88,18 @@ export function AiAgentWizardClient({ initialConfig }: AiAgentWizardClientProps)
   return (
     <div className="flex-1 space-y-6 p-8 pt-6 max-w-4xl mx-auto">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">Configuracao do Agente de IA</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Configuracao do Agente de IA</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Configure as diretrizes, tom de voz, conhecimento e comportamento de qualificacao do assistente de IA.
         </p>
       </div>
 
-      <Card className="border-border">
-        <CardHeader className="border-b border-border pb-4">
+      <Card className="border-slate-200 dark:border-slate-700">
+        <CardHeader className="border-b border-slate-100 dark:border-slate-800 pb-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wider">Passo {step} de 4</span>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Status do Agente</span>
+              <span className="text-xs text-slate-400">Status do Agente</span>
               <Checkbox
                 checked={enabled}
                 onCheckedChange={(checked) => setEnabled(!!checked)}
@@ -111,8 +111,8 @@ export function AiAgentWizardClient({ initialConfig }: AiAgentWizardClientProps)
         <CardContent className="py-6">
           {step === 1 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">Informacoes do Assistente</h3>
-              <p className="text-xs text-muted-foreground">Defina o nome de exibicao e a persona conversacional.</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Informacoes do Assistente</h3>
+              <p className="text-xs text-slate-500">Defina o nome de exibicao e a persona conversacional.</p>
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold">Nome do Agente / Assistente</label>
@@ -183,10 +183,10 @@ export function AiAgentWizardClient({ initialConfig }: AiAgentWizardClientProps)
 
           {step === 2 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">Escopo e Perguntas Permitidas</h3>
-              <p className="text-xs text-muted-foreground">Selecione quais dados o agente deve colher antes do handoff.</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Escopo e Perguntas Permitidas</h3>
+              <p className="text-xs text-slate-500">Selecione quais dados o agente deve colher antes do handoff.</p>
 
-              <div className="grid grid-cols-2 gap-4 border border-border p-4 rounded-lg bg-muted/50">
+              <div className="grid grid-cols-2 gap-4 border border-slate-100 dark:border-slate-800 p-4 rounded-lg bg-slate-50/50 dark:bg-slate-900/50">
                 {["nome", "tipo_plano", "vidas", "idades", "cidade", "email"].map((f) => (
                   <div key={f} className="flex items-center gap-2">
                     <Checkbox
@@ -210,15 +210,15 @@ export function AiAgentWizardClient({ initialConfig }: AiAgentWizardClientProps)
                   min={1}
                   max={15}
                 />
-                <p className="text-[10px] text-muted-foreground">Apos este limite, a conversa sera transferida para um corretor humano.</p>
+                <p className="text-[10px] text-slate-400">Apos este limite, a conversa sera transferida para um corretor humano.</p>
               </div>
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">Conhecimento e Instrucoes</h3>
-              <p className="text-xs text-muted-foreground">Ensine as regras do seu negocio e como responder ao cliente.</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Conhecimento e Instrucoes</h3>
+              <p className="text-xs text-slate-500">Ensine as regras do seu negocio e como responder ao cliente.</p>
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold">Contexto da Corretora / Conhecimento Autorizado</label>
@@ -244,8 +244,8 @@ export function AiAgentWizardClient({ initialConfig }: AiAgentWizardClientProps)
 
           {step === 4 && (
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-foreground">Politicas de Resiliencia e Mensagens</h3>
-              <p className="text-xs text-muted-foreground">Defina as politicas de resposta automatica e textos padrao.</p>
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Politicas de Resiliencia e Mensagens</h3>
+              <p className="text-xs text-slate-500">Defina as politicas de resposta automatica e textos padrao.</p>
 
               <div className="space-y-1">
                 <label className="text-xs font-semibold">Mensagem de Boas-Vindas Inicial</label>
@@ -289,7 +289,7 @@ export function AiAgentWizardClient({ initialConfig }: AiAgentWizardClientProps)
             </div>
           )}
         </CardContent>
-        <CardFooter className="border-t border-border pt-4 flex justify-between">
+        <CardFooter className="border-t border-slate-100 dark:border-slate-800 pt-4 flex justify-between">
           <Button
             variant="outline"
             onClick={() => setStep(Math.max(1, step - 1))}

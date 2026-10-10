@@ -22,10 +22,9 @@ Regras inegociáveis:
   que envolvam dados pessoais, sensíveis, exportações ou permissões.
 - Não implemente uma regra marcada como pendente em `docs/decision-log.md` sem
   registrar a decisão aprovada.
-- Para trabalho de interface, o ÚNICO design system é o do modo Lite:
-  `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md` (2026-10-09). Os demais documentos de design estão descontinuados.
-  No modo normal aplica-se só a camada visual (tokens, cards, fontes, movimento),
-  mantendo a estrutura. Reutilize componentes compartilhados.
+- Para trabalho de interface, siga `docs/ux/UX_REDESIGN_CONTRACT.md` e o estado em
+  `docs/ux/UX_REDESIGN_CONTROL.md`. Reutilize componentes compartilhados; use
+  `transitions-dev` para qualquer transição ou animação nova.
 - Sempre reutilize componentes e tokens existentes em `src/components/ui/` e
   `src/components/unlumen-ui/`. Não crie variações locais de
   botões, campos, cards, tipografia, espaçamento ou estados que já tenham equivalente
@@ -48,8 +47,8 @@ preexistente nem para bloquear indiscriminadamente o trabalho em produção.
 
 ## UX REDESIGN CONTRACT RULES
 
-- DESCONTINUADO em 2026-10-09: a fonte de verdade visual é `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md`.
-  `docs/ux/UX_REDESIGN_*` fica só como histórico.
+- A fonte de verdade visual é `docs/ux/UX_REDESIGN_CONTRACT.md`; o próximo passo
+  permitido está em `docs/ux/UX_REDESIGN_CONTROL.md`.
 - Antes de uma mudança de UI, confirmar a etapa atual, o papel, a ação principal,
   os estados e a estratégia de disclosure da rota.
 - Não criar token, primitive ou variante sem registrar o gap e a decisão no controle

@@ -21,7 +21,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("border-b border-[var(--border-subtle)] dark:border-border bg-card [&_tr]:border-b-0", className)}
+      className={cn("border-b border-border bg-card [&_tr]:border-b-0", className)}
       {...props}
     />
   )
@@ -31,7 +31,7 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn("bg-transparent [&_tr:last-child]:border-0", className)}
+      className={cn("bg-card [&_tr:last-child]:border-0", className)}
       {...props}
     />
   )
@@ -42,7 +42,7 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
     <tfoot
       data-slot="table-footer"
       className={cn(
-        "border-t border-[var(--border-subtle)] dark:border-border bg-transparent font-medium [&>tr]:last:border-b-0",
+        "border-t border-border bg-muted/40 font-medium [&>tr]:last:border-b-0",
         className
       )}
       {...props}
@@ -55,7 +55,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b border-[var(--border-subtle)] dark:border-border bg-transparent transition-[background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-muted focus-within:bg-muted data-[state=selected]:bg-[color-mix(in_oklab,var(--primary)_8%,var(--card))] motion-reduce:transition-none",
+        "border-b border-border/70 bg-card transition-[background-color] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-muted focus-within:bg-muted/70 data-[state=selected]:bg-primary/8 motion-reduce:transition-none",
         className
       )}
       {...props}
@@ -68,7 +68,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "px-3 py-2.5 text-left align-middle text-xs font-medium text-muted-foreground whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "px-3 py-2.5 text-left align-middle text-xs font-semibold text-muted-foreground whitespace-nowrap [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

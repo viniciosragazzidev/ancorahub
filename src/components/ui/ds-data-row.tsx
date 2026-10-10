@@ -13,7 +13,7 @@ export function DsDataList({ className, ...props }: React.ComponentPropsWithoutR
     <ul
       data-slot="ds-data-list"
       className={cn(
-        "divide-y divide-ds-ash overflow-hidden rounded-ds-cards border border-[var(--card-border)] bg-ds-canvas-white p-0 shadow-[var(--shadow-card)]",
+        "divide-y divide-ds-ash overflow-hidden rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-0",
         className,
       )}
       {...props}

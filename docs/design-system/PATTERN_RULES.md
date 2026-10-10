@@ -1,5 +1,3 @@
-> **DESCONTINUADO (2026-10-09).** O único design system do CRM é o do modo Lite: [`docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md`](/docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md). Este documento fica só como histórico; não use seus valores.
-
 # Regras de Patterns
 
 Patterns são composições reutilizáveis entre primitives e features. Eles definem anatomia, hierarquia e estados; não consultam dados, não recebem autoridade de tenant e não contêm regra de negócio.

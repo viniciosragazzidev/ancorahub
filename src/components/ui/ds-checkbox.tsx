@@ -17,7 +17,7 @@ export function DsCheckbox({ className, ...props }: CheckboxPrimitive.Root.Props
     <CheckboxPrimitive.Root
       data-slot="ds-checkbox"
       className={cn(
-        "relative flex size-[18px] shrink-0 cursor-pointer items-center justify-center rounded-[6px] border border-[var(--border-strong)] bg-ds-canvas-white text-ds-canvas-white outline-none transition-colors duration-150 after:absolute after:-inset-2 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 disabled:cursor-not-allowed disabled:border-ds-ash disabled:bg-ds-paper-mist data-checked:border-ds-electric-blue data-checked:bg-ds-electric-blue data-indeterminate:border-ds-electric-blue data-indeterminate:bg-ds-electric-blue",
+        "relative flex size-4 shrink-0 cursor-pointer items-center justify-center rounded-ds-inputs border border-ds-pebble bg-ds-canvas-white text-ds-canvas-white outline-none transition-colors duration-150 after:absolute after:-inset-2 focus-visible:ring-2 focus-visible:ring-ds-electric-blue/40 disabled:cursor-not-allowed disabled:border-ds-ash disabled:bg-ds-paper-mist data-checked:border-ds-electric-blue data-checked:bg-ds-electric-blue data-indeterminate:border-ds-electric-blue data-indeterminate:bg-ds-electric-blue",
         className,
       )}
       {...props}

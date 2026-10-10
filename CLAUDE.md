@@ -13,15 +13,22 @@ Produção roda no **Coolify** (VPS), em `https://crm.ancorasaude.cloud`. **Não
 - A biblioteca `ai` (Vercel AI SDK) é dependência de código do agente, não hospedagem: pode continuar
 
 ## Design System — REGRA OBRIGATÓRIA
-O ÚNICO design system do CRM é o do modo Lite: `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md` (decisão do Vinicios em 2026-10-09).
-Qualquer outro documento de design (`docs/design-system.md`, `docs/design-system/*` fora de `lite/`, `docs/ux/UX_REDESIGN_*`, `NEWDesign.md`, `nexus-analytics-dashboard-DESIGN.md`, referências Dub/Satoshi) está DESCONTINUADO e deve ser ignorado.
-- Valores visuais vêm dos tokens do Lite (§2 do documento): fundo `#f7f7f9`, cards brancos sem borda com sombra leve e raio 24px, controles em pílula, Plus Jakarta Sans só 400/500, azul de ação e índigo dos controles, sombras resting/raised/floating, movimento do §3.
-- No modo normal (diretor/gestor) aplica-se só a camada visual do Lite: a estrutura (sidebar, tabelas, drawers, fluxos) continua; não transformar telas em chat.
-- Nunca criar cor, raio, sombra, peso ou fonte fora desses tokens. Se algo não estiver coberto, PARE e pergunte.
+Todo trabalho visual DEVE seguir estritamente `docs/design-system.md`.
+Nunca criar cor, radius, spacing ou tipografia fora dos tokens definidos ali.
+Se algo não estiver coberto pelo design system, PARE e pergunte — não assuma.
+
+### Regras não-negociáveis deste sistema específico:
+- Bordas definem containers (1px #e5e5e5), NÃO usar sombras pesadas para elevação
+- Radius: 9999px (tags/badges), 8px (botões), 12px (cards), 6px (inputs), 16px (cards grandes)
+- Inputs usam borda PRETA 1px (#000000) — exceção proposital ao padrão #e5e5e5
+- Azul #2563eb é destaque (links, ícones, métricas) — NUNCA fundo de superfície grande
+- #1e40af (Deep Sapphire) é a ÚNICA cor de CTA primário, uma vez por tela
+- Satoshi só em 36px+ (headlines). Abaixo disso, Inter sempre.
+- Nunca mais de uma cor cromática (verde/laranja/violeta) no mesmo componente
 
 ## Densidade de interface — REGRA OBRIGATÓRIA
 Só o essencial fica fixo na tela; o resto vai para drawer ou menu suspenso.
-A densidade é regra estrutural (vale com o visual do Lite).
+Detalhes em `docs/design-system.md` § "Product Density".
 - Lista de entidades = uma tabela no padrão de `/equipe` (`DataTable` + `SectionCardHeader`), nunca grade de cards grandes
 - Clique na linha abre drawer lateral (`Sheet`) com detalhes e configurações da entidade
 - Ações secundárias e configurações auxiliares em dropdown (`⋯` na linha, "Configurações ▾" no card)

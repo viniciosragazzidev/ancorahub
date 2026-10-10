@@ -184,19 +184,19 @@ const QUALIFICATION_CONFIG: Record<string, { label: string; className: string }>
   },
   baixa: {
     label: "Baixa Aptidão",
-    className: "bg-muted text-[var(--text-secondary)] border-transparent font-medium",
+    className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30 font-medium",
   },
   low: {
     label: "Baixa Aptidão",
-    className: "bg-muted text-[var(--text-secondary)] border-transparent font-medium",
+    className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30 font-medium",
   },
   cold: {
     label: "Baixa Aptidão",
-    className: "bg-muted text-[var(--text-secondary)] border-transparent font-medium",
+    className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30 font-medium",
   },
   frio: {
     label: "Baixa Aptidão",
-    className: "bg-muted text-[var(--text-secondary)] border-transparent font-medium",
+    className: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30 font-medium",
   },
   unqualified: {
     label: "Desqualificado",

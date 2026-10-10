@@ -36,7 +36,7 @@ export function DataTableViewOptions<TData>({
           <Button
             variant="outline"
             size="sm"
-            className="ml-auto hidden h-9 lg:flex gap-1 text-sm"
+            className="ml-auto hidden h-9 lg:flex gap-1 text-xs"
           >
             <SlidersHorizontal className="size-3.5" />
             Colunas
@@ -44,13 +44,13 @@ export function DataTableViewOptions<TData>({
         }
       />
       <DropdownMenuContent align="end" className="w-48">
-        <DropdownMenuLabel className="text-xs font-medium">Alternar colunas</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs">Alternar colunas</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {hideableColumns.map((column) => {
           return (
             <DropdownMenuCheckboxItem
               key={column.id}
-              className="capitalize text-sm"
+              className="capitalize text-xs"
               checked={column.getIsVisible()}
               onCheckedChange={(value) => column.toggleVisibility(!!value)}
             >
