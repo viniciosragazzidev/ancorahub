@@ -1,193 +1,85 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { useState, useTransition, type ChangeEvent, type FormEvent } from "react";
+import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { AssistantAvatar } from "@/components/chat/assistant-avatar";
+import { Avatar } from "@/components/arc/avatar/avatar";
+import { Badge } from "@/components/arc/badge/badge";
+import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
+import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 
 import { addBrokerToMyTeamAction } from "./actions";
-import { cancelMyTeamInviteAction, inviteBrokerToMyTeamAction, removeBrokerFromMyTeamAction, saveMySupervisorTeamAction } from "./my-team-actions";
+import { cancelMyTeamInviteAction, inviteBrokerToMyTeamAction, removeBrokerFromMyTeamAction } from "./my-team-actions";
 import type { SupervisorTeamPageData } from "./my-team-queries";
 import styles from "./my-team-page.module.css";
 
-function initials(name: string) {
-  return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("");
-}
-
-async function resizeImage(file: File): Promise<string> {
-  const image = await createImageBitmap(file);
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Seu navegador não conseguiu preparar a imagem.");
-  const scale = Math.min(256 / image.width, 256 / image.height);
-  const width = Math.round(image.width * scale);
-  const height = Math.round(image.height * scale);
-  context.drawImage(image, (256 - width) / 2, (256 - height) / 2, width, height);
-  image.close();
-  return canvas.toDataURL("image/webp", 0.82);
+export function teamAvatarHue(name: string) {
+  let hash = 0;
+  for (const character of name.trim().toLocaleLowerCase("pt-BR")) hash = (hash * 31 + character.codePointAt(0)!) >>> 0;
+  return hash % 360;
 }
 
 export function MyTeamPage({ initialData }: { initialData: SupervisorTeamPageData }) {
   const [data, setData] = useState(initialData);
-  const [editing, setEditing] = useState(!initialData.team);
-  const [name, setName] = useState(initialData.team?.name ?? "");
-  const [description, setDescription] = useState(initialData.team?.description ?? "");
-  const [imageUrl, setImageUrl] = useState(initialData.team?.imageUrl ?? null);
+  const [activeTab, setActiveTab] = useState<"members" | "invites" | "unit">("members");
   const [feedback, setFeedback] = useState("");
   const [pending, startTransition] = useTransition();
 
-  function selectImage(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.currentTarget.files?.[0];
-    event.currentTarget.value = "";
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      setFeedback("Escolha uma imagem para o perfil da equipe.");
-      return;
-    }
-    void resizeImage(file).then((value) => {
-      if (new TextEncoder().encode(value).byteLength > 204800) {
-        setFeedback("A imagem ficou acima de 200 KB. Escolha uma imagem menor.");
-        return;
-      }
-      setImageUrl(value);
-      setFeedback("");
-    }).catch(() => setFeedback("Não consegui preparar essa imagem."));
-  }
-
-  function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function runAction(action: () => Promise<{ ok: boolean; message: string }>, onSuccess?: () => void) {
     setFeedback("");
     startTransition(async () => {
-      const result = await saveMySupervisorTeamAction({ name, description, imageUrl });
+      const result = await action();
       setFeedback(result.message);
-      if (result.ok) {
-        setData((current) => ({ ...current, team: { name: name.trim(), description: description.trim(), imageUrl } }));
-        setEditing(false);
-      }
+      if (result.ok) onSuccess?.();
     });
   }
-
+  function removeMember(brokerId: string) {
+    runAction(() => removeBrokerFromMyTeamAction(brokerId), () => window.location.reload());
+  }
   function invite(brokerId: string) {
-    setFeedback("");
-    startTransition(async () => {
-      const result = await inviteBrokerToMyTeamAction({ brokerId });
-      setFeedback(result.message);
-      if (result.ok) window.location.reload();
-    });
+    runAction(() => inviteBrokerToMyTeamAction({ brokerId }), () => window.location.reload());
   }
-
   function addDirectly(brokerId: string) {
-    setFeedback("");
-    startTransition(async () => {
-      const result = await addBrokerToMyTeamAction(brokerId);
-      setFeedback(result.message);
-      if (result.ok) window.location.reload();
-    });
+    runAction(() => addBrokerToMyTeamAction(brokerId), () => window.location.reload());
   }
-
   function cancelInvite(inviteId: string) {
-    setFeedback("");
-    startTransition(async () => {
-      const result = await cancelMyTeamInviteAction(inviteId);
-      setFeedback(result.message);
-      if (result.ok) setData((current) => ({ ...current, invites: current.invites.filter((item) => item.id !== inviteId), brokers: current.brokers.map((item) => item.inviteId === inviteId ? { ...item, inviteId: null } : item) }));
-    });
+    runAction(() => cancelMyTeamInviteAction(inviteId), () => setData((current) => ({ ...current, invites: current.invites.filter((item) => item.id !== inviteId), brokers: current.brokers.map((item) => item.inviteId === inviteId ? { ...item, inviteId: null } : item) })));
   }
 
-  function removeMember(brokerId: string, brokerName: string) {
-    if (!window.confirm(`Remover ${brokerName} da equipe? O corretor poderá ser convidado novamente.`)) return;
-    setFeedback("");
-    startTransition(async () => {
-      const result = await removeBrokerFromMyTeamAction(brokerId);
-      setFeedback(result.message);
-      if (result.ok) window.location.reload();
-    });
-  }
+  return <div className={`arc-venancor ${styles.page}`} aria-labelledby="my-team-title">
+    <div className={styles.inner}>
+      <header className={styles.pageHeader}><h1 id="my-team-title">Minha equipe</h1></header>
+      {data.team ? <section className={styles.teamHero} aria-label="Perfil da equipe" style={{ "--team-hue": `${teamAvatarHue(data.team.name)}` } as React.CSSProperties}>
+        <Avatar name={data.team.name} src={data.team.imageUrl ?? undefined} size="xl" className={styles.teamImage} />
+        <div className={styles.heroText}><h2>{data.team.name}</h2><p>{data.team.description || "Sua equipe de atendimento."}</p><Button variant="outline" size="sm" render={<Link href="/equipe/minha/configurar" />}>Configurar equipe</Button></div>
+        <div className={styles.overview}><span><strong>{data.overview.brokers}</strong> corretores</span><span><strong>{data.overview.inService}</strong> em atendimento</span><span data-alert={data.overview.late > 0}><strong>{data.overview.late || "·"}</strong> atrasados</span></div>
+      </section> : <EmptyState label="Equipe ainda não criada" title="Sua equipe começa com um bom plano" description="Crie o perfil da equipe e convide corretores da sua unidade." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} action={<Button render={<Link href="/equipe/minha/configurar" />}>Criar minha equipe</Button>} />}
 
-  return (
-    <section className={`arc-venancor ${styles.page}`} aria-labelledby="my-team-title">
-      <div className={styles.inner}>
-        <header className={styles.pageHeader}>
-          <div>
-            <p className={styles.eyebrow}>Sua unidade</p>
-            <h1 id="my-team-title">Minha equipe</h1>
-            <p className={styles.muted}>Cuide do perfil e adicione ou convide corretores livres da sua unidade.</p>
-          </div>
-          {data.team && !editing ? <Button variant="outline" onClick={() => setEditing(true)}>Editar perfil</Button> : null}
-        </header>
+      <SegmentedControl label="Seções da equipe" value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} options={[{ value: "members", label: "Membros", accessory: <Badge size="sm">{data.members.length}</Badge> }, { value: "invites", label: "Convites", accessory: <Badge size="sm">{data.invites.length}</Badge> }, { value: "unit", label: "Unidade", accessory: <Badge size="sm">{data.brokers.length}</Badge> }]} />
+      {feedback ? <p className={styles.feedback} role="status" aria-live="polite">{feedback}</p> : null}
 
-        {editing ? (
-          <form className={styles.profile} onSubmit={save}>
-            <div className={styles.profilePreview}>
-              {imageUrl ? <Image src={imageUrl} alt="" width={256} height={256} unoptimized /> : <span aria-hidden="true">{initials(name || "Equipe")}</span>}
-            </div>
-            <div className={styles.formFields}>
-              <h2>{data.team ? "Editar perfil" : "Crie sua equipe"}</h2>
-              <label htmlFor="team-name">Nome da equipe</label>
-              <Input id="team-name" value={name} onChange={(event) => setName(event.currentTarget.value)} minLength={2} maxLength={60} required />
-              <label htmlFor="team-description">Descrição</label>
-              <Textarea id="team-description" value={description} onChange={(event) => setDescription(event.currentTarget.value)} maxLength={280} rows={3} />
-              <label className={styles.fileLabel} htmlFor="team-image">Imagem da equipe</label>
-              <input id="team-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={selectImage} />
-              <p className={styles.hint}>A imagem será redimensionada para 256 × 256 px e salva em WebP. Limite de 200 KB.</p>
-              <div className={styles.actions}>
-                <Button type="submit" disabled={pending}>{pending ? "Salvando..." : "Salvar perfil"}</Button>
-                {data.team ? <Button type="button" variant="outline" onClick={() => { setName(data.team!.name); setDescription(data.team!.description); setImageUrl(data.team!.imageUrl); setEditing(false); }}>Cancelar</Button> : null}
-              </div>
-            </div>
-          </form>
-        ) : null}
+      {activeTab === "members" ? <section className={styles.section} aria-labelledby="team-members-title"><div className={styles.sectionTitle}><h2 id="team-members-title">Membros</h2></div>
+        {data.members.length ? <ul className={styles.list}>{data.members.map((member) => <li key={member.id} className={styles.memberCard} data-attention={member.late > 0}>
+          <Link className={styles.memberLink} href={`/equipe/${encodeURIComponent(member.id)}`}><Avatar name={member.name} src={member.imageUrl ?? undefined} size="lg" status={member.availability === "available" ? "online" : "offline"} className={`${styles.avatar} ${member.late ? styles.avatarAlert : ""}`} style={{ "--team-hue": `${teamAvatarHue(member.name)}` } as React.CSSProperties} /><span>{member.name}<small><Badge tone={member.availability === "available" ? "success" : "neutral"} size="sm">{member.availability === "available" ? "Disponível" : member.availability === "paused" ? "Pausado" : "Fora do ar"}</Badge></small></span></Link>
+          <div className={styles.memberNumbers}><span><strong>{member.receivedToday || "·"}</strong> hoje</span><span><strong>{member.inService || "·"}</strong> em atendimento</span>{member.late ? <Badge tone="danger" size="sm">Precisa de você · {member.late}</Badge> : null}</div>
+          <BottomSheet trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este membro." closeLabel="Fechar" detents={[0.38, 0.7]}>
+            <div className={styles.sheetActions}><Link href={`/equipe/${encodeURIComponent(member.id)}`}>Abrir perfil</Link><p>Remover este corretor da equipe? O histórico de leads dele será mantido.</p><Button variant="destructive" disabled={pending} onClick={() => removeMember(member.id)}>Remover da equipe</Button></div>
+          </BottomSheet>
+        </li>)}</ul> : <EmptyState title="Sua equipe ainda não tem membros" description="Adicione alguém da sua unidade ou envie um convite." action={<Button variant="outline" onClick={() => setActiveTab("unit")}>Ver corretores da unidade</Button>} />}
+      </section> : null}
 
-        {data.team ? (
-          <section className={styles.teamIdentity} aria-label="Perfil da equipe">
-            <div className={styles.teamImage}>{data.team.imageUrl ? <Image src={data.team.imageUrl} alt="" width={88} height={88} unoptimized /> : <span>{initials(data.team.name)}</span>}</div>
-            <div><h2>{data.team.name}</h2><p>{data.team.description || "Sem descrição."}</p></div>
-          </section>
-        ) : null}
+      {activeTab === "invites" ? <section className={styles.section} aria-labelledby="team-invites-title"><div className={styles.sectionTitle}><h2 id="team-invites-title">Convites pendentes</h2></div>
+        {data.invites.length ? <ul className={styles.list}>{data.invites.map((invite) => <li key={invite.id} className={styles.row}><span>{invite.brokerName}<small>Enviado em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(invite.createdAt))}</small></span><Button variant="outline" size="sm" disabled={pending} onClick={() => cancelInvite(invite.id)}>Cancelar convite</Button></li>)}</ul> : <EmptyState title="Nenhum convite pendente" description="Os convites enviados para corretores aparecem aqui." />}
+      </section> : null}
 
-        {feedback ? <p className={styles.feedback} role="status">{feedback}</p> : null}
-
-        <section className={styles.section} aria-labelledby="team-members-title">
-          <div className={styles.sectionTitle}><h2 id="team-members-title">Membros</h2><span>{data.members.length}</span></div>
-          {data.members.length ? <ul className={styles.list}>{data.members.map((member) => (
-            <li key={member.id} className={styles.row}>
-              <Link className={styles.memberLink} href={`/equipe/${encodeURIComponent(member.id)}`}>
-                <span className={styles.avatar}>{member.imageUrl ? <Image src={member.imageUrl} alt="" width={40} height={40} unoptimized /> : initials(member.name)}</span>
-                <span>{member.name}</span>
-              </Link>
-              <Button variant="outline" size="sm" disabled={pending} onClick={() => removeMember(member.id, member.name)}>Remover da equipe</Button>
-            </li>
-          ))}</ul> : <p className={styles.empty}>Sua equipe ainda não tem membros.</p>}
-        </section>
-
-        <section className={styles.section} aria-labelledby="team-invites-title">
-          <div className={styles.sectionTitle}><h2 id="team-invites-title">Convites pendentes</h2><span>{data.invites.length}</span></div>
-          {data.invites.length ? <ul className={styles.list}>{data.invites.map((invite) => (
-            <li key={invite.id} className={styles.row}>
-              <span>{invite.brokerName}<small>Enviado em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" }).format(new Date(invite.createdAt))}</small></span>
-              <Button variant="outline" size="sm" disabled={pending} onClick={() => cancelInvite(invite.id)}>Cancelar convite</Button>
-            </li>
-          ))}</ul> : <p className={styles.empty}>Nenhum convite aguardando resposta.</p>}
-        </section>
-
-        <section className={styles.section} aria-labelledby="team-brokers-title">
-          <div className={styles.sectionTitle}><h2 id="team-brokers-title">Corretores da sua unidade</h2></div>
-          {data.brokers.length ? <ul className={styles.list}>{data.brokers.map((broker) => (
-            <li key={broker.id} className={styles.row}>
-              <span className={styles.memberLink}><span className={styles.avatar}>{broker.imageUrl ? <Image src={broker.imageUrl} alt="" width={40} height={40} unoptimized /> : initials(broker.name)}</span><span>{broker.name}<small>{broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}</small></span></span>
-              {broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}>
-                <Button size="sm" disabled={pending} onClick={() => addDirectly(broker.id)}>Adicionar</Button>
-                <Button variant="outline" size="sm" disabled={pending || !data.team} onClick={() => invite(broker.id)}>Convidar</Button>
-              </div>}
-            </li>
-          ))}</ul> : <p className={styles.empty}>Não há outros corretores ativos na sua unidade.</p>}
-        </section>
-      </div>
-    </section>
-  );
+      {activeTab === "unit" ? <section className={styles.section} aria-labelledby="team-brokers-title"><div className={styles.sectionTitle}><h2 id="team-brokers-title">Corretores da sua unidade</h2></div>
+        {data.brokers.length ? <ul className={styles.list}>{data.brokers.map((broker) => <li key={broker.id} className={styles.row}><span className={styles.memberLink}><Avatar name={broker.name} src={broker.imageUrl ?? undefined} size="md" className={styles.avatar} style={{ "--team-hue": `${teamAvatarHue(broker.name)}` } as React.CSSProperties} /><span>{broker.name}<small>{broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}</small></span></span>
+          {broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} onClick={() => addDirectly(broker.id)}>Adicionar</Button><Button variant="outline" size="sm" disabled={pending || !data.team} onClick={() => invite(broker.id)}>Convidar</Button></div>}
+        </li>)}</ul> : <EmptyState title="Não há outros corretores ativos" description="Quando houver corretores disponíveis na sua unidade, eles aparecerão aqui." />}
+      </section> : null}
+    </div>
+  </div>;
 }

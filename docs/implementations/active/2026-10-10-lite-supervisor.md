@@ -187,3 +187,48 @@ Pedido do Vinicios: o supervisor cria a própria equipe, convida corretores da u
 - Corretor vê no perfil dele o nome e a imagem da equipe a que pertence (se houver).
 
 **Pronto quando:** supervisor cria a equipe com nome, imagem e descrição; convida um corretor livre da unidade; o corretor aceita pelo Lite e aparece em Membros; tsc, testes focados e lint de encoding passam.
+
+## 10. P11: tudo do supervisor no estilo novo do Lite (2026-10-10)
+
+Pedido do Vinicios: nenhuma tela do supervisor pode reaproveitar o visual do modo normal. Todas refeitas no estilo novo do Lite (o mesmo do corretor: fundo branco, `arc-venancor`, tokens `--surface`, `--surface-muted`, `--chat-action`, `--radius-panel`, tipografia e espaçamentos do chat, motion/react com reduced motion, sem eyebrow, sem caixa alta, sem travessão, sem tabela de admin). Referências visuais: `light-settings`, `light-leads-list`, `light-lead-detail`, `light-notifications`, `duty-now-view`, `supervisor-broker-profile`, `chat-home`.
+
+**Telas (supervisor com Lite ativo; o modo normal do diretor/gestor não muda):**
+1. **Área de equipe** `/equipe/minha` refeita: topo tipo perfil (foto grande da equipe, nome, descrição, contadores: corretores, em atendimento, atrasados), abas em segmented control: Membros (cartões com avatar, status de disponibilidade, números do dia, toque abre o perfil), Convites (pendentes com cancelar), Unidade (livres com Adicionar e Convidar; em outra equipe com Pedir transferência). Estado vazio caprichado ("Monte sua equipe").
+2. **Configuração da equipe** nova rota `/equipe/minha/configurar`: tela de ajustes no estilo `light-settings` com prévia ao vivo do cartão da equipe, troca de foto (escolher, prévia redonda, remover), nome, descrição com contador, salvar com estado no próprio botão. Sai do formulário embutido da página.
+3. **`/equipe`** para o supervisor no Lite: redireciona para `/equipe/minha` (uma área de equipe só).
+4. **Perfil do supervisor** (o "eu" do Lite, `home-me`): tela `/settings` no estilo `LightSettings` para o supervisor: foto e nome dele, unidade, equipe que lidera (atalho para configurar), notificações (push), tour de novo, sair. Sem WhatsApp pessoal e sem disponibilidade (ele não atende).
+5. **Leads da equipe** `/leads` e **detalhe** `/leads/[id]`: versões Lite usando `LightLeadsList` e `LightLeadDetail` (ou variantes) com escopo da equipe: cada item mostra o corretor dono; no detalhe o supervisor vê a linha do tempo e tem as ações dele (Repassar dentro da equipe, Cobrar corretor via relacionamento), sem Aceitar/Recusar.
+6. **Clientes da equipe** `/clientes`: `LightClientsList` com o corretor de cada cliente.
+7. **Repassar lead** `/equipe/repassar` e **Pedir transferência** `/equipe/transferencia`: formulários no estilo Lite (lista de escolha em cartões, motivo, botão com estado), sem `DashboardHeader`.
+8. **Relacionamento** `/relacionamento` para o supervisor no Lite: casca Lite (sem `DashboardHeader`), mesma funcionalidade.
+9. **Perfil do corretor** `/equipe/[id]` (já Lite): alinhar com o novo topo da área de equipe (foto, números, notas privadas).
+
+**Regras:** só visual e composição; escopo e permissões continuam no servidor (inSupervisorTeam, AuthorizationService). Rotas novas entram em `LIGHT_SUPERVISOR_ALLOWED_ROUTES` (regex exata) com teste. Cada tela com estados vazio, carregando e erro, 390px e desktop em tela dividida (rail à esquerda).
+
+**Pronto quando:** logado como supervisor no Lite, nenhuma rota do menu, das conversas ou do Mais abre visual do modo normal; tsc, testes focados e lint passam.
+
+### 10.1 Adendo do P11: completo e diferenciado (pedido do Vinicios, 2026-10-10)
+
+Não é só trocar a casca: cada tela tem que parecer feita para o supervisor, com dados vivos e uma interação marcante.
+
+**Leads da equipe (`/leads`, supervisor):** um "radar da equipe".
+- Topo: mini funil da equipe em uma linha (Novos, 1º contato, Em atendimento, Cotação, Fechando) com contagem; tocar filtra.
+- Fila de avatares dos corretores da equipe (chips com foto e número de leads abertos, anel vermelho se tem atrasado); tocar filtra por corretor, tocar de novo limpa.
+- Lista agrupada por urgência: Atrasados (sem 1º contato além do SLA), Aguardando 1º contato, Em atendimento, Parados há 3+ dias. Cada cartão: nome do lead, operadora/produto se houver, avatar e primeiro nome do corretor, etapa, e um anel de tempo do SLA (cheio = no prazo, vermelho = estourado) com "há 2 h".
+- Ações rápidas no cartão (sem abrir): Repassar (vai para `/equipe/repassar?lead=`), Cobrar (recado ao corretor pela Central de relacionamento, já preenchido com o lead).
+- Busca por nome ou telefone no topo. Estados: vazio comemorativo ("Nenhum lead parado na equipe"), carregando com esqueleto do mesmo formato.
+
+**Detalhe do lead (`/leads/[id]`, supervisor):** mesmo `LightLeadDetail` com faixa do corretor dono no topo (avatar, nome, "com ele há 3 dias"), linha do tempo completa, e barra de ações do supervisor: Repassar, Cobrar corretor, Ver corretor. Sem Aceitar/Recusar/registrar contato.
+
+**Perfil do membro (`/equipe/[id]`, supervisor):** uma ficha de jogador.
+- Topo: foto grande com anel de status (disponível, em plantão, pausado, ausente), nome, há quanto tempo na equipe, posição no ranking da equipe ("2º da equipe em aceites nesta semana").
+- Faixa "Hoje": recebidos, aceitos, em atendimento, atrasados (o atrasado em destaque se > 0).
+- "Semana": gráfico pequeno de 7 dias de aceites (barras), tempo mediano para aceitar comparado à média da equipe ("2 min mais rápido que a equipe"), taxa de 1º contato no prazo.
+- Funil pessoal por etapa com barras horizontais.
+- Leads que precisam de atenção agora (os atrasados dele) com Repassar em um toque.
+- Notas privadas do supervisor como uma conversa (balões com data), campo para nova nota no rodapé.
+- Ações: Mandar recado, Reconhecer (Central de relacionamento), Repassar leads parados, Remover da equipe (confirmação).
+
+**Área de equipe (`/equipe/minha`):** o cartão de cada membro mostra avatar com anel de status, números do dia e um indicador de "precisa de você" quando tem atrasado; ordenação padrão: quem precisa de atenção primeiro.
+
+Dados: reaproveitar `getSupervisorWorkspaceData`, `getTeamOfferStats`, `getMemberOfferRanking` e consultas com `inSupervisorTeam`; consultas novas só leitura e por tenant. Datas sempre via operador drizzle ou ISO com `::timestamptz` (nunca Date cru dentro de `sql`).

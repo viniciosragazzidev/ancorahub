@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, sql, countDistinct } from "drizzle-orm";
+import { and, count, desc, eq, gte, countDistinct } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { PeriodSelect } from "@/components/period-select";
 import { BranchSelect } from "@/components/branch-select";
@@ -10,7 +10,8 @@ import { buildClientScopeWhere } from "@/features/customers/customer-authorizati
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
-import { LightClientsList, type LightClientItem } from "@/features/broker-workspace/components/light-clients-list";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { LightClientsList } from "@/features/broker-workspace/components/light-clients-list";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,21 @@ export default async function CustomersPage({
   const periodStartDate = periodStart(period);
 
   const experienceMode = await getExperienceMode(context);
+
+  if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
+    const clients = await db.select({
+      id: schema.clients.id,
+      name: schema.clients.nome,
+      phone: schema.clients.telefone,
+      email: schema.clients.email,
+      convertedAt: schema.clients.convertedAt,
+      brokerName: schema.user.name,
+    }).from(schema.clients)
+      .leftJoin(schema.user, eq(schema.clients.corretorId, schema.user.id))
+      .where(buildClientScopeWhere(context))
+      .orderBy(desc(schema.clients.convertedAt));
+    return <LightClientsList clients={clients} />;
+  }
 
   if (experienceMode === "LIGHT" && context.role === "broker") {
     const clients = await db

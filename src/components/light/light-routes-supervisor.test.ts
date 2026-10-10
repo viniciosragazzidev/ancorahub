@@ -4,7 +4,7 @@ import { getLightMoreDestinations, isLightRouteAllowed, resolveLightRoute } from
 
 describe("supervisor Lite routes", () => {
   it("allows the team screens route by route", () => {
-    for (const path of ["/dashboard", "/dashboard/c/equipe", "/leads", "/leads/abc", "/clientes", "/equipe", "/equipe/minha", "/equipe/u1", "/equipe/transferencia", "/relacionamento", "/notificacoes", "/settings"]) {
+    for (const path of ["/dashboard", "/dashboard/c/equipe", "/leads", "/leads/abc", "/clientes", "/equipe", "/equipe/minha", "/equipe/minha/configurar", "/equipe/u1", "/equipe/transferencia", "/relacionamento", "/notificacoes", "/settings"]) {
       expect(isLightRouteAllowed(path, "supervisor")).toBe(true);
     }
   });
@@ -23,6 +23,7 @@ describe("supervisor Lite routes", () => {
 
   it("sets the own team page title and parent", () => {
     expect(resolveLightRoute("/equipe/minha")).toMatchObject({ title: "Minha equipe", parentHref: "/dashboard", tab: "mais" });
+    expect(resolveLightRoute("/equipe/minha/configurar")).toMatchObject({ title: "Configuração da equipe", parentHref: "/equipe/minha" });
   });
 
   it("sets the transfer page title and parent", () => {

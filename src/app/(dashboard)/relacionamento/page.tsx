@@ -5,6 +5,10 @@ import { RelationshipCenter } from "@/features/relationship/components/relations
 import { listBroadcasts, listBrokerInbox } from "@/features/relationship/service";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { and, eq, isNull } from "drizzle-orm";
+import { getDatabase, schema } from "@/shared/db";
+import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 
 export const dynamic = "force-dynamic";
 
@@ -12,15 +16,17 @@ export const dynamic = "force-dynamic";
  * One route for both sides (plan 2026-10-10-central-relacionamento-corretor):
  * director, manager and supervisor get the Central; the broker gets the mural.
  */
-export default async function RelationshipPage() {
+export default async function RelationshipPage({ searchParams }: { searchParams: Promise<{ brokerId?: string; leadId?: string; action?: string }> }) {
   const context = await getRequiredTenantContext();
+  const supervisorLite = context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor";
+  const params = await searchParams;
   const enabled = (await getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")) === "true";
 
   if (!enabled) {
     return (
       <>
-        <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />
-        <div className="mx-auto w-full max-w-3xl px-4 py-10 text-center text-sm text-muted-foreground">
+        {supervisorLite ? null : <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />}
+        <div className={`mx-auto w-full max-w-3xl px-4 py-10 text-center text-sm ${supervisorLite ? "text-[var(--text-muted)]" : "text-muted-foreground"}`}>
           A Central de relacionamento ainda não está ligada nesta empresa.
         </div>
       </>
@@ -37,12 +43,28 @@ export default async function RelationshipPage() {
   }
 
   const [options, history] = await Promise.all([getAudienceOptions(context), listBroadcasts(context)]);
+  let initialBrokerId: string | null = null;
+  let initialTitle = "";
+  let initialBody = "";
+  if (supervisorLite && params.action === "reminder" && params.brokerId && params.leadId) {
+    const [lead] = await getDatabase().select({ id: schema.leads.id, name: schema.leads.nome, brokerId: schema.leads.corretorId }).from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.id, params.leadId.slice(0, 80)), eq(schema.leads.corretorId, params.brokerId.slice(0, 80)), isNull(schema.leads.deletedAt), buildLeadScopeWhere(context))).limit(1);
+    if (lead && options.brokers.some((broker) => broker.id === lead.brokerId)) {
+      initialBrokerId = lead.brokerId;
+      initialTitle = `Acompanhamento: ${lead.name}`.slice(0, 80);
+      initialBody = `Oi, como está o atendimento de ${lead.name}?`.slice(0, 1000);
+    }
+  }
   return (
     <>
-      <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />
+      {supervisorLite ? null : <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />}
       <RelationshipCenter
         options={options}
         history={history.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }))}
+        lite={supervisorLite}
+        initialBrokerId={initialBrokerId}
+        initialTitle={initialTitle}
+        initialBody={initialBody}
       />
     </>
   );

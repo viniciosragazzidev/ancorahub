@@ -1,0 +1,7 @@
+.lite{font-family:var(--font-arc-venancor,inherit);color:var(--foreground)}
+.litePanel{border:1px solid var(--border-subtle)!important;border-radius:var(--radius-panel)!important;background:var(--surface)!important;box-shadow:none}
+.liteHistory>h2{font-size:var(--text-base);font-weight:500;color:var(--foreground)}
+.liteHistory li button{border:1px solid var(--border-subtle)!important;border-radius:var(--radius-panel)!important;background:var(--surface)!important;box-shadow:none}
+.liteHistory li button:hover{background:var(--surface-muted)!important}
+.lite :global(input),.lite :global(textarea),.lite :global(select){border-radius:1rem!important;background:var(--surface-muted)!important;color:var(--foreground)}
+.lite :global(button[role=radio][aria-checked=true]){border-color:var(--chat-action)!important;background:var(--chat-action)!important;color:white!important}

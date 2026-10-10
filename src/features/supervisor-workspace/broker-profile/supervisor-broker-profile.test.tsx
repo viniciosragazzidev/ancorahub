@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockAddSupervisorNote = vi.hoisted(() => vi.fn());
 vi.mock("@/features/supervisor-workspace/notes-actions", () => ({ addSupervisorNoteAction: mockAddSupervisorNote }));
+vi.mock("@/features/supervisor-workspace/my-team-actions", () => ({ removeBrokerFromMyTeamAction: vi.fn() }));
 
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
@@ -11,9 +12,22 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-vi.mock("@/components/ui/user-avatar", () => ({
-  UserAvatar: ({ name }: { name: string }) => <div role="img" aria-label={name}>{name.slice(0, 2)}</div>,
-}));
+vi.mock("@/components/arc/avatar/avatar", () => ({ Avatar: ({ name }: { name: string }) => <div role="img" aria-label={name}>{name.slice(0, 2)}</div> }));
+vi.mock("@/components/arc/badge/badge", () => ({ Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
+vi.mock("@/components/arc/metric-card/metric-card", () => ({ MetricCard: ({ label, value }: { label: string; value: number }) => <div><span>{label}</span><strong>{value}</strong></div> }));
+vi.mock("@/components/arc/bottom-sheet/bottom-sheet", async () => {
+  const React = await import("react");
+  return { BottomSheet: ({ trigger, title, children, open, defaultOpen = false, onOpenChange }: { trigger: React.ReactElement<{ onClick?: () => void }>; title: string; children: React.ReactNode; open?: boolean; defaultOpen?: boolean; onOpenChange?: (value: boolean) => void }) => {
+    const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
+    const isOpen = open ?? internalOpen;
+    const nextTrigger = React.cloneElement(trigger, { onClick: () => { setInternalOpen(true); onOpenChange?.(true); } });
+    return <div>{nextTrigger}{isOpen ? <><h3>{title}</h3>{children}</> : null}</div>;
+  } };
+});
+vi.mock("@/components/arc/segmented-control/segmented-control", () => ({ default: ({ options, value, onValueChange, label }: { options: Array<{ value: string; label: string }>; value: string; onValueChange: (value: string) => void; label: string }) => <div role="group" aria-label={label}>{options.map((option) => <button type="button" key={option.value} aria-pressed={value === option.value} onClick={() => onValueChange(option.value)}>{option.label}</button>)}</div> }));
+vi.mock("@/components/arc/textarea/textarea", () => ({ Textarea: ({ label, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) => <label>{label}<textarea {...props} /></label> }));
+vi.mock("@/components/arc/action-button/action-button", () => ({ ActionButton: ({ label, onAction }: { label: string; onAction: () => Promise<void> }) => <button type="button" onClick={() => void onAction()}>{label}</button> }));
+vi.mock("@/components/arc/empty-state/empty-state", () => ({ EmptyState: ({ title, description }: { title: string; description: string }) => <section><strong>{title}</strong><p>{description}</p></section> }));
 
 vi.mock("motion/react", async () => {
   const React = await import("react");
@@ -80,7 +94,7 @@ describe("SupervisorBrokerProfile", () => {
     expect(screen.getByRole("link", { name: "Mandar recado" }).getAttribute("href")).toBe("/relacionamento");
     expect(screen.getByRole("heading", { name: "Feedbacks" })).toBeTruthy();
     expect(screen.getByText("Retornar o primeiro contato até o fim do dia.")).toBeTruthy();
-    expect(document.body.textContent).not.toContain("—");
+    expect(document.body.textContent).not.toContain("\u2014");
   });
 
   it("explains unavailable WhatsApp and empty recent leads without dead links", () => {
@@ -88,8 +102,8 @@ describe("SupervisorBrokerProfile", () => {
 
     expect(screen.queryByRole("link", { name: "Chamar no WhatsApp" })).toBeNull();
     expect(screen.getByText("Telefone não cadastrado para WhatsApp.")).toBeTruthy();
-    expect(screen.getByText("Nenhum lead ativo recente.")).toBeTruthy();
-    expect(screen.getByText("Sem feedbacks registrados.")).toBeTruthy();
+    expect(screen.getByText("Nenhum lead ativo recente")).toBeTruthy();
+    expect(screen.getByText("Sem feedbacks registrados")).toBeTruthy();
     expect(screen.queryByText("Tempo mediano para aceitar")).toBeNull();
   });
 
@@ -100,16 +114,17 @@ describe("SupervisorBrokerProfile", () => {
     });
     render(<SupervisorBrokerProfile {...profile} />);
 
+    fireEvent.click(screen.getByRole("button", { name: "Nova nota" }));
     fireEvent.click(screen.getByRole("button", { name: "Elogio" }));
     fireEvent.change(screen.getByLabelText("Mensagem"), { target: { value: "Boa condução com a cliente." } });
-    fireEvent.click(screen.getByRole("button", { name: "Salvar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Salvar nota" }));
 
     await waitFor(() => expect(mockAddSupervisorNote).toHaveBeenCalledWith({
       brokerId: "broker-1",
       kind: "elogio",
       body: "Boa condução com a cliente.",
     }));
-    expect(await screen.findByText("Feedback salvo.")).toBeTruthy();
+    expect(await screen.findByText("Nota salva.")).toBeTruthy();
     expect(screen.getByText("Boa condução com a cliente.")).toBeTruthy();
   });
 });

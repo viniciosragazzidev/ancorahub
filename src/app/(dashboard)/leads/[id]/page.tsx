@@ -37,6 +37,8 @@ import { LeadConversation } from "@/features/broker-workspace/chat/lead-conversa
 import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { readLeadIntelligence } from "@/features/broker-workspace/chat/intelligence";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { SupervisorLeadDetail } from "@/features/supervisor-workspace/supervisor-lead-detail";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -119,11 +121,14 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       serviceStartedAt: schema.leads.serviceStartedAt,
       stageEnteredAt: schema.leads.stageEnteredAt,
       corretorNome: schema.user.name,
+      corretorImage: schema.user.image,
       branchNome: schema.branches.name,
+      productName: schema.carrierPlans.name,
     })
     .from(schema.leads)
     .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
     .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
+    .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
     .where(and(
       eq(schema.leads.id, id),
       isNull(schema.leads.deletedAt),
@@ -132,6 +137,10 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
     .limit(1);
 
   if (!lead) notFound();
+  if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
+    const timeline = await getLeadTimeline(id);
+    return <SupervisorLeadDetail lead={{ id: lead.id, name: lead.nome, status: lead.status, ownerId: lead.corretorId, ownerName: lead.corretorNome, ownerImage: lead.corretorImage, productName: lead.productName, assignedAt: lead.assignedAt, branchName: lead.branchNome }} timeline={timeline ?? []} now={new Date().toISOString()} />;
+  }
   const [metaCampaign, metaAd, metaForm] = await Promise.all([
     lead.metaCampaignId
       ? db.select({ name: schema.metaCampaigns.name }).from(schema.metaCampaigns)

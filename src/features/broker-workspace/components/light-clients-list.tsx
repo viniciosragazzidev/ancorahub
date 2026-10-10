@@ -15,6 +15,7 @@ export type LightClientItem = {
   phone: string | null;
   email: string | null;
   convertedAt: Date | string;
+  brokerName?: string | null;
 };
 
 const secondaryAction =
@@ -62,6 +63,7 @@ export function LightClientsList({ clients }: { clients: LightClientItem[] }) {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-base font-semibold text-(--foreground)">{client.name}</p>
                       <p className="text-sm tabular-nums text-(--text-secondary)">Venda concluída em {convertedDate}</p>
+                      {client.brokerName ? <p className="text-sm text-(--text-secondary)">Com {client.brokerName}</p> : null}
                       {client.phone ? <p className="text-sm tabular-nums text-(--text-secondary)">{client.phone}</p> : null}
                     </div>
                   </div>

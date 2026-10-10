@@ -4,6 +4,9 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 
 import { reassignLeadAction, type ManagementActionState } from "@/features/leads/management-actions";
+import { Button } from "@/components/ui/button";
+import ChipGroup from "@/components/arc/chip-group/chip-group";
+import { Textarea } from "@/components/arc/textarea/textarea";
 
 import css from "./handoff-form.module.css";
 
@@ -42,30 +45,23 @@ export function HandoffForm({ lead, brokers }: { lead: { id: string; name: strin
         </div>
 
         {brokers.length ? (
-          <ul className={css.list} role="radiogroup" aria-label="Corretor que vai receber">
-            {brokers.map((broker) => (
-              <li key={broker.id}>
-                <button type="button" role="radio" aria-checked={brokerId === broker.id} className={`${css.option} ${brokerId === broker.id ? css.optionOn : ""}`} onClick={() => setBrokerId(broker.id)}>
-                  <span className={css.optionName}>{broker.name}</span>
-                  <span className={css.muted}>{AVAILABILITY[broker.availability] ?? broker.availability}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className={css.brokerPicker}>
+            <ChipGroup label="Corretor que vai receber" multiple={false} options={brokers.map((broker) => ({ value: broker.id, label: broker.name }))} value={brokerId ? [brokerId] : []} onValueChange={(values) => setBrokerId(values[0] ?? "")} />
+            {chosen ? <p className={css.muted}>{AVAILABILITY[chosen.availability] ?? chosen.availability}</p> : null}
+          </div>
         ) : (
           <p className={css.empty}>Ninguém mais na sua equipe pode receber este lead.</p>
         )}
 
-        <label className={css.field}>
-          <span className={css.label}>Motivo do repasse</span>
-          <textarea name="reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={300} rows={3} className={css.textarea} placeholder="Ex.: corretor fora do plantão, cliente sem resposta há 1 hora" />
-        </label>
+        <div className={css.field}>
+          <Textarea label="Motivo do repasse" name="reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={300} rows={3} placeholder="Ex.: corretor fora do plantão, cliente sem resposta há 1 hora" />
+        </div>
 
         {state.error ? <p role="alert" className={css.error}>{state.error}</p> : null}
 
-        <button type="submit" className={css.primary} disabled={pending || !brokerId || reason.trim().length < 5}>
+        <Button type="submit" disabled={pending || !brokerId || reason.trim().length < 5} loading={pending}>
           {pending ? "Repassando..." : chosen ? `Repassar para ${chosen.name.split(" ")[0]}` : "Repassar"}
-        </button>
+        </Button>
       </form>
     </div>
   );

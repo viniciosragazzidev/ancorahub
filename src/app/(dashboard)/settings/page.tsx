@@ -24,9 +24,17 @@ import { LightSettings } from "./_components/light-settings";
 import { LightWhatsappSection } from "./_components/light-whatsapp-section";
 
 import { RelatedActions } from "@/components/related-actions";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { SupervisorLiteSettings } from "@/features/supervisor-workspace/supervisor-lite-settings";
 
 export default async function SettingsPage() {
   const context = await getRequiredTenantContext();
+  if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
+    const [user] = await getDatabase().select({ name: schema.user.name, image: schema.user.image }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1);
+    const [branch] = context.branchId ? await getDatabase().select({ name: schema.branches.name }).from(schema.branches).where(and(eq(schema.branches.id, context.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1) : [];
+    const [team] = await getDatabase().select({ name: schema.supervisorTeams.name, imageUrl: schema.supervisorTeams.imageUrl }).from(schema.supervisorTeams).where(and(eq(schema.supervisorTeams.tenantId, context.tenantId), eq(schema.supervisorTeams.supervisorId, context.userId))).limit(1).catch(() => []);
+    return <SupervisorLiteSettings user={{ name: user?.name ?? "Supervisor", image: user?.image ?? null }} branchName={branch?.name ?? null} team={team ?? null} />;
+  }
   const canViewIntegrations = context.role === "director" || await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "ver_importacoes_meta" });
   const db = getDatabase();
   const [tenant, user] = await Promise.all([

@@ -19,6 +19,7 @@ import { rankHeadline, type RankPosition } from "@/features/engagement/ranking";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { listBrokerNotes } from "@/features/supervisor-workspace/notes-actions";
 import { SupervisorBrokerProfile, SupervisorNoteHistory } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
+import { getSupervisorLiteMemberPulse } from "@/features/supervisor-workspace/lite-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -49,11 +50,13 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
     const ranking = profile.member.role === "broker"
       ? await getMemberOfferRanking(context.tenantId, profile.member.userId).catch(() => null)
       : null;
-    let teamRanks: RankPosition[] = [];
-    if (ranking) {
-      const teamData = await getCachedSupervisorWorkspaceData().catch(() => null);
-      teamRanks = teamData?.team.find((broker) => broker.userId === profile.member.userId)?.ranks ?? [];
-    }
+    const teamData = profile.member.role === "broker" ? await getCachedSupervisorWorkspaceData().catch(() => null) : null;
+    const teamRanks: RankPosition[] = ranking ? teamData?.team.find((broker) => broker.userId === profile.member.userId)?.ranks ?? [] : [];
+    const pulse = profile.member.role === "broker" && teamData
+      ? await getSupervisorLiteMemberPulse({ context, memberId: profile.member.userId, slaMinutes: teamData.slaMinutes }).catch(() => null)
+      : null;
+    const duty = teamData?.duty.find((item) => item.brokerId === profile.member.userId);
+    const liveAvailability = duty ? duty.paused ? "paused" : duty.presence === "confirmed" ? "on_duty" : "offline" : profile.member.availabilityStatus;
     const activeStatuses = new Set(["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
     return (
       <SupervisorBrokerProfile
@@ -62,7 +65,7 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
           name: profile.member.name,
           image: profile.member.image,
           branchName: profile.member.branchName,
-          availabilityStatus: profile.member.availabilityStatus,
+          availabilityStatus: liveAvailability,
         }}
         metrics={{
           portfolio: profile.metrics.leads.total,
@@ -90,6 +93,8 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
           periodDays: ranking.periodDays,
         } : null}
         notes={notes}
+        joinedAt={profile.member.joinedAt.toISOString()}
+        pulse={pulse ?? undefined}
       />
     );
   }

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Sheet, SheetBody, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import styles from "./relationship-center.module.css";
 
 import { broadcastRecipientsAction, previewAudienceAction, sendBroadcastAction } from "../actions";
 import type { Audience, AudienceOptions } from "../audience";
@@ -72,17 +73,17 @@ function toggle(set: Set<string>, id: string) {
   return next;
 }
 
-export function RelationshipCenter({ options, history }: { options: AudienceOptions; history: HistoryItem[] }) {
+export function RelationshipCenter({ options, history, lite = false, initialBrokerId, initialTitle = "", initialBody = "" }: { options: AudienceOptions; history: HistoryItem[]; lite?: boolean; initialBrokerId?: string | null; initialTitle?: string; initialBody?: string }) {
   const router = useRouter();
   const [audienceKind, setAudienceKind] = useState<AudienceKind>("people");
-  const [people, setPeople] = useState<Set<string>>(new Set());
+  const [people, setPeople] = useState<Set<string>>(new Set(initialBrokerId ? [initialBrokerId] : []));
   const [branches, setBranches] = useState<Set<string>>(new Set());
   const [dutyTypes, setDutyTypes] = useState<Set<string>>(new Set());
   const [supervisorId, setSupervisorId] = useState("");
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<BroadcastKind>("notice");
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  const [title, setTitle] = useState(initialTitle);
+  const [body, setBody] = useState(initialBody);
   const [previewState, setPreview] = useState<{ key: string; count: number; names: string[]; error?: string } | null>(null);
   const [showNames, setShowNames] = useState(false);
   const [confirmingKey, setConfirmingKey] = useState<string | null>(null);
@@ -153,8 +154,8 @@ export function RelationshipCenter({ options, history }: { options: AudienceOpti
   }
 
   return (
-    <div className="mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
-      <section aria-labelledby="composer-title" className="space-y-6 rounded-xl border border-border bg-card p-5">
+    <div className={`mx-auto grid w-full max-w-6xl gap-6 px-4 py-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] ${lite ? styles.lite : ""}`}>
+      <section aria-labelledby="composer-title" className={`space-y-6 rounded-xl border border-border bg-card p-5 ${lite ? styles.litePanel : ""}`}>
         <div className="space-y-1">
           <h2 id="composer-title" className="text-base font-medium text-foreground">Nova mensagem</h2>
           <p className="text-sm text-muted-foreground">Chega no app do corretor, no celular (push) e na conversa da Âncora.</p>
@@ -243,7 +244,7 @@ export function RelationshipCenter({ options, history }: { options: AudienceOpti
         </div>
       </section>
 
-      <section aria-labelledby="history-title" className="space-y-3">
+      <section aria-labelledby="history-title" className={`space-y-3 ${lite ? styles.liteHistory : ""}`}>
         <h2 id="history-title" className="text-base font-medium text-foreground">Enviadas</h2>
         {!history.length ? (
           <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Nenhuma mensagem enviada ainda. A primeira aparece aqui com quem leu.</p>

@@ -3,7 +3,8 @@
 import { useState, useTransition, type FormEvent } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import ChipGroup from "@/components/arc/chip-group/chip-group";
+import { Textarea } from "@/components/arc/textarea/textarea";
 import { requestBrokerTransferAction, type TransferCandidate } from "./transfer-actions";
 
 export function TransferRequestForm({ candidates }: { candidates: TransferCandidate[] }) {
@@ -34,17 +35,13 @@ export function TransferRequestForm({ candidates }: { candidates: TransferCandid
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4 rounded-[var(--radius-panel)] bg-[var(--surface)] p-5 shadow-sm">
+    <form onSubmit={submit} className="arc-venancor space-y-4 rounded-[var(--radius-panel)] bg-[var(--surface)] p-5 shadow-[var(--shadow-resting)]">
       <div>
-        <label htmlFor="transfer-broker" className="mb-1.5 block text-sm font-medium">Corretor</label>
-        <select id="transfer-broker" value={brokerId} onChange={(event) => setBrokerId(event.target.value)} className="min-h-11 w-full rounded-xl border border-border bg-background px-3 text-sm">
-          {availableCandidates.map((candidate) => <option key={candidate.brokerId} value={candidate.brokerId}>{candidate.brokerName} · equipe de {candidate.currentSupervisorName}</option>)}
-        </select>
+        <p className="mb-2 text-sm font-medium">Quem você quer trazer para sua equipe?</p>
+        <ChipGroup label="Corretor para transferência" multiple={false} options={availableCandidates.map((candidate) => ({ value: candidate.brokerId, label: candidate.brokerName }))} value={brokerId ? [brokerId] : []} onValueChange={(values) => setBrokerId(values[0] ?? "")} />
+        {availableCandidates.find((candidate) => candidate.brokerId === brokerId) ? <small className="text-sm text-[var(--text-muted)]">Equipe de {availableCandidates.find((candidate) => candidate.brokerId === brokerId)?.currentSupervisorName}</small> : null}
       </div>
-      <div>
-        <label htmlFor="transfer-reason" className="mb-1.5 block text-sm font-medium">Por que você quer trazer este corretor para sua equipe?</label>
-        <Textarea id="transfer-reason" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} required rows={3} placeholder="Explique brevemente o pedido" />
-      </div>
+      <Textarea id="transfer-reason" label="Por que você quer trazer este corretor para sua equipe?" value={reason} onChange={(event) => setReason(event.target.value)} maxLength={1000} required rows={3} placeholder="Explique brevemente o pedido" />
       <Button type="submit" disabled={isPending || !brokerId || !reason.trim()} loading={isPending}>Pedir transferência</Button>
       <p role="status" aria-live="polite" className="min-h-5 text-sm text-[var(--text-muted)]">{feedback}</p>
     </form>

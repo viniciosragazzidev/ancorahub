@@ -1,6 +1,7 @@
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { and, count, desc, eq, gte, ilike, inArray, notInArray, isNull, isNotNull, lt, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
+import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,11 @@ import { getSystemSettings } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
+import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
+import { Skeleton } from "@/components/arc/skeleton/skeleton";
+import type { TenantContext } from "@/shared/auth/types";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
@@ -51,6 +57,22 @@ import {
 export default async function LeadsPage(props: Parameters<typeof LeadsPageContent>[0]) {
   const { result } = await withRequestTiming("/leads", () => LeadsPageContent(props));
   return result;
+}
+
+async function SupervisorRadarContent({ context, search }: { context: TenantContext; search: string }) {
+  const radar = await getSupervisorLiteRadar(context);
+  return <SupervisorLeadsRadar data={{
+    ...radar,
+    leads: radar.leads.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null, stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null })),
+  }} now={new Date().toISOString()} search={search} />;
+}
+
+function SupervisorRadarLoading() {
+  return <div className="arc-venancor mx-auto grid w-full max-w-5xl gap-5 px-4 py-5" aria-busy="true">
+    <Skeleton label="Carregando leads da equipe" lines={2} />
+    <Skeleton label="Carregando funil e corretores" lines={1} />
+    <Skeleton label="Carregando lista de leads" lines={5} avatar />
+  </div>;
 }
 
 async function LeadsPageContent({
@@ -93,6 +115,11 @@ async function LeadsPageContent({
     !(await capabilityPromise)
   )
     redirect("/access-denied");
+
+  if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
+    const params = await searchParams;
+    return <Suspense fallback={<SupervisorRadarLoading />}><SupervisorRadarContent context={context} search={params.search ?? ""} /></Suspense>;
+  }
 
   // ─── Modo Lite (corretor) ──────────────────────────────────────────────
   // Mantém a experiência simples do dashboard lite: lista leve com busca,

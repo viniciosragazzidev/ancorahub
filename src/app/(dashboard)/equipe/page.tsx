@@ -18,9 +18,11 @@ import { TeamManagementTabs } from "./team-management-tabs";
 import { UnitsView } from "./units-view";
 import { getPendingBrokerTransferRequestsAction } from "@/features/supervisor-workspace/transfer-actions";
 import { TransferRequestsPanel } from "@/features/supervisor-workspace/transfer-requests-panel";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
   const context = await getRequiredTenantContext();
+  if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") redirect("/equipe/minha");
   if (context.role === "broker") redirect("/access-denied");
   const params = await searchParams;
   if (params.visao === "unidades") {

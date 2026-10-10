@@ -5,10 +5,12 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/queries";
 
 export type SupervisorTeamPageData = {
   team: { name: string; description: string; imageUrl: string | null } | null;
-  members: Array<{ id: string; name: string; imageUrl: string | null }>;
+  overview: { brokers: number; inService: number; late: number };
+  members: Array<{ id: string; name: string; imageUrl: string | null; availability: string; receivedToday: number; inService: number; late: number }>;
   invites: Array<{ id: string; brokerId: string; brokerName: string; createdAt: string }>;
   brokers: Array<{ id: string; name: string; imageUrl: string | null; supervisorId: string | null; supervisorName: string | null; inviteId: string | null }>;
 };
@@ -20,7 +22,7 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
   }
 
   const db = getDatabase();
-  const [teamRows, memberRows, inviteRows, brokerRows] = await Promise.all([
+  const [teamRows, memberRows, inviteRows, brokerRows, workspace] = await Promise.all([
     db.select({ name: schema.supervisorTeams.name, description: schema.supervisorTeams.description, imageUrl: schema.supervisorTeams.imageUrl })
       .from(schema.supervisorTeams)
       .where(and(eq(schema.supervisorTeams.tenantId, context.tenantId), eq(schema.supervisorTeams.supervisorId, context.userId), eq(schema.supervisorTeams.branchId, context.branchId)))
@@ -53,6 +55,7 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
         eq(schema.user.status, "active"),
         eq(schema.user.active, true),
       )).orderBy(asc(schema.user.name)),
+    getSupervisorWorkspaceData(context),
   ]);
   const supervisorIds = [...new Set(brokerRows.map((row) => row.supervisorId).filter((id): id is string => Boolean(id) && id !== context.userId))];
   const supervisorRows = supervisorIds.length ? await db.select({ id: schema.user.id, name: schema.user.name }).from(schema.user)
@@ -63,7 +66,21 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
 
   return {
     team: teamRows[0] ?? null,
-    members: memberRows,
+    overview: {
+      brokers: workspace.team.length,
+      inService: workspace.today.inService,
+      late: workspace.today.late,
+    },
+    members: memberRows.map((member) => {
+      const activity = workspace.team.find((broker) => broker.userId === member.id);
+      return {
+        ...member,
+        availability: activity?.availability ?? "offline",
+        receivedToday: activity?.receivedToday ?? 0,
+        inService: activity?.inService ?? 0,
+        late: activity?.late ?? 0,
+      };
+    }).sort((a, b) => Number(b.late > 0) - Number(a.late > 0) || b.late - a.late || a.name.localeCompare(b.name, "pt-BR")),
     invites: inviteRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
     brokers: brokerRows.filter((row) => row.supervisorId !== context.userId).map((row) => ({
       ...row,
