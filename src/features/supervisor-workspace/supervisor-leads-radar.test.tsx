@@ -27,19 +27,19 @@ describe("SupervisorLeadsRadar", () => {
   it("shows the overdue owner and quick reassignment and reminder actions", () => {
     render(<SupervisorLeadsRadar data={data} now="2026-10-10T10:30:00.000Z" />);
     expect(screen.getByRole("heading", { name: /Atrasados/ })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Maria Silva" }).getAttribute("href")).toBe("/leads/lead-1");
+    expect(screen.getByRole("link", { name: /Maria Silva/ }).getAttribute("href")).toBe("/leads/lead-1");
     expect(screen.getAllByText("Ana Souza").length).toBeGreaterThan(0);
     expect(screen.getByRole("link", { name: "Repassar" }).getAttribute("href")).toContain("/equipe/repassar?lead=lead-1");
-    expect(screen.getByRole("link", { name: "Cobrar" }).getAttribute("href")).toContain("brokerId=broker-1");
+    expect(screen.getByRole("link", { name: /Cobrar/ }).getAttribute("href")).toContain("brokerId=broker-1");
   });
 
   it("filters the list by phone, broker and funnel stage", () => {
     render(<SupervisorLeadsRadar data={data} now="2026-10-10T10:30:00.000Z" />);
     fireEvent.change(screen.getByRole("textbox", { name: "Buscar lead ou corretor" }), { target: { value: "0000" } });
-    expect(screen.getByRole("link", { name: "Maria Silva" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Ana Souza" }));
-    expect(screen.getByRole("link", { name: "Maria Silva" })).toBeTruthy();
-    fireEvent.click(within(screen.getByRole("region", { name: "Funil da equipe" })).getByRole("button", { name: /Novos/ }));
-    expect(screen.getByRole("link", { name: "Maria Silva" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Maria Silva/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Ana Souza/ }));
+    expect(screen.getByRole("link", { name: /Maria Silva/ })).toBeTruthy();
+    fireEvent.click(within(screen.getByRole("region", { name: /Funil da equipe/ })).getByRole("button", { name: /Novos/ }));
+    expect(screen.getByRole("link", { name: /Maria Silva/ })).toBeTruthy();
   });
 });

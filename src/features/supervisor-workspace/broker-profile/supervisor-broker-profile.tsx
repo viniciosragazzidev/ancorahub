@@ -252,7 +252,7 @@ export function SupervisorBrokerProfile({
             <h2 id="broker-profile-feedback">Feedbacks</h2>
             <span>{numberFormat.format(notes.length)}</span>
           </div>
-          <BottomSheet open={noteSheetOpen} onOpenChange={setNoteSheetOpen} trigger={<Button variant="outline">Nova nota</Button>} title="Nova nota" description="Registre um feedback privado para este corretor." closeLabel="Fechar" detents={[0.52, 0.86]}>
+          <BottomSheet className="arc-venancor" open={noteSheetOpen} onOpenChange={setNoteSheetOpen} trigger={<Button variant="outline">Nova nota</Button>} title="Nova nota" description="Registre um feedback privado para este corretor." closeLabel="Fechar" detents={[0.52, 0.86]}>
             <div className={styles.noteComposer}>
               <SegmentedControl label="Tipo de feedback" value={noteKind} onValueChange={(value) => setNoteKind(value as SupervisorNoteKind)} options={SUPERVISOR_NOTE_KINDS.map((kind) => ({ value: kind, label: NOTE_KIND_LABELS[kind] }))} />
               <Textarea label="Mensagem" id="supervisor-note-body" value={noteBody} onChange={(event) => setNoteBody(event.currentTarget.value)} maxLength={1000} rows={3} placeholder="Escreva uma orientação, elogio ou alerta." aria-describedby="supervisor-note-count" />
@@ -264,7 +264,7 @@ export function SupervisorBrokerProfile({
           <SupervisorNoteHistory notes={notes} />
         </section>
 
-        <BottomSheet trigger={<Button variant="outline">Mais ações</Button>} title={`Ações para ${member.name}`} description="Escolha como quer apoiar este corretor." closeLabel="Fechar" detents={[0.4, 0.72]}>
+        <BottomSheet className="arc-venancor" trigger={<Button variant="outline">Mais ações</Button>} title={`Ações para ${member.name}`} description="Escolha como quer apoiar este corretor." closeLabel="Fechar" detents={[0.4, 0.72]}>
           <div className={styles.memberActions}><Link className={styles.secondaryAction} href={relationshipHref}>Mandar recado</Link><Link className={styles.secondaryAction} href={`${relationshipHref}?kind=recognition`}>Reconhecer</Link><Button variant="destructive" disabled={removing} loading={removing} onClick={removeFromTeam}>Remover da equipe</Button></div>
         </BottomSheet>
       </div>
