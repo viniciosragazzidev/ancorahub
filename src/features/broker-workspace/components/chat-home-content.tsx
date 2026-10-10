@@ -1,4 +1,7 @@
-import { ChatHome, type HomeSummary } from "@/components/chat/chat-home";
+import { ChatHome, type HomeHighlights, type HomeSummary } from "@/components/chat/chat-home";
+import { getBrokerHighlights, type BrokerHighlights } from "@/features/engagement/broker-stats";
+import { formatDuration, RANK_LABEL } from "@/features/engagement/ranking";
+import { shortName } from "@/features/ai-gateway/privacy";
 import { LightDashboardUnavailable } from "@/features/broker-workspace/components/light-dashboard";
 import { getCachedBrokerWorkspaceData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
@@ -24,6 +27,21 @@ function summaryOf(data: BrokerWorkspaceData): HomeSummary {
   };
 }
 
+function highlightsOf(data: BrokerHighlights | null): HomeHighlights | null {
+  if (!data) return null;
+  return {
+    ranks: data.ranks.map((rank) => ({ key: rank.key, position: rank.position, label: RANK_LABEL[rank.key], total: rank.total })),
+    acceptTime: data.stats?.medianAcceptSeconds !== null && data.stats?.medianAcceptSeconds !== undefined ? formatDuration(data.stats.medianAcceptSeconds) : null,
+    mission: data.stepMission
+      ? {
+        title: `Registre a etapa de ${shortName(data.stepMission.leadName)}`,
+        detail: data.stepMission.remaining > 1 ? `${data.stepMission.remaining} leads ainda sem etapa. Assim seu funil fica certinho.` : "Último lead sem etapa. Assim seu funil fica certinho.",
+        href: `/leads/${data.stepMission.leadId}`,
+      }
+      : null,
+  };
+}
+
 /**
  * Broker home as a chat (2026-10-09 redesign): the assistants and the leads as
  * conversations, plus the day at a glance shown at the center on computers.
@@ -31,6 +49,7 @@ function summaryOf(data: BrokerWorkspaceData): HomeSummary {
 export async function ChatHomeContent() {
   const [rail, data] = await Promise.all([getChatRailData(), getCachedBrokerWorkspaceData().catch(() => null)]);
   if (!rail || !data) return <LightDashboardUnavailable />;
+  const highlights = await getBrokerHighlights(data.viewer.tenantId, data.viewer.userId).catch(() => null);
   return (
     <ChatHome
       viewerName={rail.viewerName}
@@ -39,6 +58,7 @@ export async function ChatHomeContent() {
       nowIso={rail.nowIso}
       canQuote={rail.canQuote}
       summary={summaryOf(data)}
+      highlights={highlightsOf(highlights)}
     />
   );
 }

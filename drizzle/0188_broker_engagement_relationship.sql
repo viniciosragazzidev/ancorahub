@@ -80,6 +80,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS "relationship_recipients_broadcast_broker_uniq
 CREATE INDEX IF NOT EXISTS "relationship_recipients_tenant_broker_idx" ON "relationship_broadcast_recipients" ("tenant_id", "broker_id", "created_at");
 --> statement-breakpoint
 -- Collector indexes on existing tables (built CONCURRENTLY in production by the script).
+CREATE INDEX IF NOT EXISTS "lead_offers_tenant_offered_at_idx" ON "lead_offers" ("tenant_id", "offered_at");
+--> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "lead_offers_tenant_accepted_at_partial_idx" ON "lead_offers" ("tenant_id", "accepted_at") WHERE "accepted_at" IS NOT NULL;
 --> statement-breakpoint
 CREATE INDEX IF NOT EXISTS "lead_tasks_tenant_completed_at_partial_idx" ON "lead_tasks" ("tenant_id", "completed_at") WHERE "completed_at" IS NOT NULL;

@@ -1,5 +1,5 @@
 // Applies migration 0188 (Central de relacionamento + jornada do corretor).
-// 1) Builds the 4 collector indexes on existing tables with CREATE INDEX
+// 1) Builds the 5 collector/ranking indexes on existing tables with CREATE INDEX
 //    CONCURRENTLY (production keeps writing while they build).
 // 2) Runs the statements of drizzle/0188_broker_engagement_relationship.sql
 //    (all IF NOT EXISTS, so the indexes from step 1 are skipped).
@@ -15,6 +15,7 @@ const url = env.match(/^SUPABASE_DB_URL="?([^"\n]+)"?/m)?.[1] ?? env.match(/^DAT
 if (!url) throw new Error("SUPABASE_DB_URL ou DATABASE_URL não encontrado no .env.local.");
 
 const INDEXES = [
+  { name: "lead_offers_tenant_offered_at_idx", table: "lead_offers", sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS lead_offers_tenant_offered_at_idx ON lead_offers (tenant_id, offered_at)" },
   { name: "lead_offers_tenant_accepted_at_partial_idx", table: "lead_offers", sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS lead_offers_tenant_accepted_at_partial_idx ON lead_offers (tenant_id, accepted_at) WHERE accepted_at IS NOT NULL" },
   { name: "lead_tasks_tenant_completed_at_partial_idx", table: "lead_tasks", sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS lead_tasks_tenant_completed_at_partial_idx ON lead_tasks (tenant_id, completed_at) WHERE completed_at IS NOT NULL" },
   { name: "lead_interactions_note_created_idx", table: "lead_interactions", sql: "CREATE INDEX CONCURRENTLY IF NOT EXISTS lead_interactions_note_created_idx ON lead_interactions (created_at) WHERE tipo = 'note'" },

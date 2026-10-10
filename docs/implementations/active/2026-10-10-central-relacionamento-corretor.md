@@ -192,9 +192,11 @@ Sugestão: R0 + R1 primeiro (mensagens resolvem uma dor já hoje), depois R2. Pi
 
 ## 9. Como subir R0+R1 (ordem obrigatória)
 
-1. **Antes do deploy**, na máquina do Vinicios: `node scripts/apply-0188-engagement-relationship.mjs` (simula) e depois `--apply`. Ele cria os 4 índices nas tabelas existentes com CONCURRENTLY e depois as tabelas novas. Se o migrate do deploy rodar antes, os índices são criados sem CONCURRENTLY e travam escrita em `lead_offers`, `lead_tasks`, `lead_interactions` e `duty_presence_confirmations` durante o build (Vigia T31).
+1. **Antes do deploy**, na máquina do Vinicios: `node scripts/apply-0188-engagement-relationship.mjs` (simula) e depois `--apply`. Ele cria os 5 índices nas tabelas existentes com CONCURRENTLY e depois as tabelas novas. Se o migrate do deploy rodar antes, os índices são criados sem CONCURRENTLY e travam escrita em `lead_offers`, `lead_tasks`, `lead_interactions` e `duty_presence_confirmations` durante o build (Vigia T31).
 2. Deploy.
 3. Coolify: tarefa `*/2 * * * *` em `/api/internal/jobs/engagement` (runbook).
 4. Ligar `feature_relationship_center_enabled` (Central) quando quiser. `feature_broker_engagement_enabled` só grava pontos no extrato, ninguém vê ainda.
+
+Estatísticas e ranking (pedido de 2026-10-10, revisado no T32): posição só do próprio corretor, janela de 7 dias, tudo atrás de `feature_broker_engagement_enabled`. Ideias do Vigia para depois: rankear dentro da unidade (volumes diferentes entre unidades) e contar só ofertas dentro do horário de plantão na mediana de aceite.
 
 Pendências não bloqueantes do T31: envio de até 1.000 avisos dentro da ação pode demorar (mover para fila na R3); limite de envios por remetente (anti-spam).

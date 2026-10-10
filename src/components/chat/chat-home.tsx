@@ -50,6 +50,48 @@ export type HomeSummary = {
   goal: { name: string; percentage: number; currentValue: string; targetValue: string } | null;
 };
 
+/** The broker's own standing and the "register a step" mission (journey flag on). */
+export type HomeHighlights = {
+  ranks: { key: string; position: number; label: string; total: number }[];
+  /** Median time to accept the offers of the week ("1 min 20 s"). */
+  acceptTime: string | null;
+  mission: { title: string; detail: string; href: string } | null;
+};
+
+function Highlights({ data, className }: { data: HomeHighlights; className?: string }) {
+  if (!data.ranks.length && !data.mission && !data.acceptTime) return null;
+  return (
+    <div className={`${home.highlights} ${className ?? ""}`} data-tour="home-highlights">
+      {data.ranks.length || data.acceptTime ? (
+        <ul className={home.rankRow} aria-label="Sua posição na semana">
+          {data.ranks.map((rank) => (
+            <li key={rank.key} className={`${home.rank} ${rank.position <= 3 ? home.rankTop : ""}`}>
+              <span className={home.rankPos}>{rank.position}º</span>
+              <span className={home.rankLabel}>{rank.label} · de {rank.total}</span>
+            </li>
+          ))}
+          {data.acceptTime ? (
+            <li className={home.rank}>
+              <span className={home.rankPos}>{data.acceptTime}</span>
+              <span className={home.rankLabel}>seu tempo para aceitar</span>
+            </li>
+          ) : null}
+        </ul>
+      ) : null}
+      {data.mission ? (
+        <Link href={data.mission.href} className={home.mission}>
+          <span className={home.missionBadge}>Missão</span>
+          <span className={home.missionText}>
+            <span className={home.missionTitle}>{data.mission.title}</span>
+            <span className={home.missionDetail}>{data.mission.detail}</span>
+          </span>
+          <svg viewBox="0 0 16 16" aria-hidden="true" className={home.missionArrow}><path d="M6 3l5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 /** The thread whose screen is open (computers keep the list beside it). */
 function isActive(thread: ThreadSummary, pathname: string) {
   const path = thread.href.split("?")[0];
@@ -73,6 +115,7 @@ export function ChatHome({
   canQuote,
   mode = "page",
   summary = null,
+  highlights = null,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -81,6 +124,7 @@ export function ChatHome({
   canQuote: boolean;
   mode?: "page" | "rail";
   summary?: HomeSummary | null;
+  highlights?: HomeHighlights | null;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
@@ -137,6 +181,7 @@ export function ChatHome({
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>
       </header>
+      {mode === "page" && highlights ? <Highlights data={highlights} /> : null}
       {list}
     </aside>
   );
@@ -205,6 +250,8 @@ export function ChatHome({
               ))}
             </ul>
           ) : null}
+
+          {highlights ? <Highlights data={highlights} className={home.centerHighlights} /> : null}
 
           {summary?.duty || summary?.goal ? (
             <div className={home.cards}>

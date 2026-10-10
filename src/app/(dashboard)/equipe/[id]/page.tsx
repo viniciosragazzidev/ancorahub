@@ -11,6 +11,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { MemberDutyCalendar } from "./_components/member-duty-calendar";
 import { MemberLeadsTabs } from "./_components/member-leads-tabs";
 import { MemberOffersPanel, MemberTemperaturePanel } from "./_components/member-temperature";
+import { MemberRankingPanel } from "./_components/member-ranking";
+import { getMemberOfferRanking } from "@/features/engagement/broker-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +38,8 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
 
   const { member, metrics, recentLeads, recentRedistributions, dutyDays } = profile;
   const isBroker = member.role === "broker";
+  // Behind the journey flag (inside): off, the profile shows nothing new and runs no query.
+  const ranking = isBroker ? await getMemberOfferRanking(context.tenantId, member.userId).catch(() => null) : null;
   const roleName = member.customRoleName ?? ({ director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" }[member.role]);
   const firstContactRate = metrics.leads.total > 0 ? Math.round(((metrics.leads.total - metrics.leads.withoutFirstContact) / metrics.leads.total) * 100) : 0;
 
@@ -75,6 +79,7 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
         </div>
 
         <aside className="grid content-start gap-5">
+          {isBroker && ranking ? <MemberRankingPanel stats={ranking.stats} ranks={ranking.ranks} periodDays={ranking.periodDays} withoutStep={ranking.withoutStep} /> : null}
           {isBroker ? <MemberDutyCalendar days={dutyDays} /> : null}
           <Card className="border-border bg-card shadow-none">
             <CardHeader className="pb-3"><CardTitle className="text-base">Resultado comercial</CardTitle><CardDescription>Produção registrada no CRM.</CardDescription></CardHeader>

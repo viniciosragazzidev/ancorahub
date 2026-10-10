@@ -3241,6 +3241,7 @@ export const leadOffers = pgTable(
     index("lead_offers_tenant_lead_status_idx").on(table.tenantId, table.leadId, table.status),
     index("lead_offers_broker_status_expires_idx").on(table.brokerId, table.status, table.expiresAt),
     index("lead_offers_broker_accepted_at_partial_idx").on(table.brokerId, table.acceptedAt).where(sql`${table.acceptedAt} is not null`),
+    index("lead_offers_tenant_offered_at_idx").on(table.tenantId, table.offeredAt),
     index("lead_offers_tenant_accepted_at_partial_idx").on(table.tenantId, table.acceptedAt).where(sql`${table.acceptedAt} is not null`),
     index("lead_offers_whatsapp_msg_idx").on(table.whatsappMessageId),
   ],

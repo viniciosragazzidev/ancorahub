@@ -46,4 +46,20 @@ describe("ChatHome", () => {
     expect(screen.getByText(/Maria está esperando você/)).toBeTruthy();
     expect(screen.getByText("De plantão: PME")).toBeTruthy();
   });
+
+  it("shows the broker's positions and the step mission, but not in the rail", () => {
+    navigation.pathname = "/dashboard";
+    const highlights = {
+      ranks: [{ key: "speed", position: 1, label: "no aceite mais rápido", total: 12 }, { key: "accepted", position: 10, label: "nos que mais aceitam", total: 12 }],
+      acceptTime: "1 min 20 s",
+      mission: { title: "Registre a etapa de Maria S.", detail: "3 leads ainda sem etapa.", href: "/leads/1" },
+    };
+    const { unmount } = render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote highlights={highlights} />);
+    expect(screen.getAllByText("1º").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("no aceite mais rápido · de 12").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Registre a etapa de Maria S\./ })[0]!.getAttribute("href")).toBe("/leads/1");
+    unmount();
+    render(<ChatHome mode="rail" viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote highlights={highlights} />);
+    expect(screen.queryByText("1º")).toBeNull();
+  });
 });
