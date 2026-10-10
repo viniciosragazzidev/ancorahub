@@ -132,11 +132,9 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
   const name = data?.leadFirstName || "o cliente";
   const motionProps = reduce ? {} : { initial: { opacity: 0, x: 16 }, animate: { opacity: 1, x: 0 }, exit: { opacity: 0, x: -16 }, transition: { duration: 0.2, ease: [0.16, 1, 0.3, 1] as const } };
 
-  const fallbackLinks = data?.appUrl || data?.webUrl ? (
-    <div className="flex flex-wrap gap-2">
-      {data?.webUrl ? <Button variant="outline" size="sm" render={<a href={data.webUrl} target="_blank" rel="noreferrer" />}>Abrir no WhatsApp Web</Button> : null}
-      {data?.appUrl ? <Button variant="ghost" size="sm" render={<a href={data.appUrl} target="_blank" rel="noreferrer" />}>Abrir no app do WhatsApp</Button> : null}
-    </div>
+  // On the computer the alternative is WhatsApp Web only (the app link is for phones).
+  const fallbackLinks = data?.webUrl ? (
+    <Button variant="outline" size="sm" render={<a href={data.webUrl} target="_blank" rel="noreferrer" />}>Abrir no WhatsApp Web</Button>
   ) : null;
 
   return (
