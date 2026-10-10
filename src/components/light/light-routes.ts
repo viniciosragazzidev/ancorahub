@@ -135,6 +135,7 @@ const RULES: readonly RouteRule[] = [
         ? { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/cotacao", hidesTabBar: true, backToParent: true }
         : { title: "Cotação", tab: "mais", isRoot: false, parentHref: "/dashboard", hidesTabBar: true, chat: true },
   },
+  { test: exact("/plantoes/agora"), route: { title: "Meu plantão agora", tab: "inicio", isRoot: false, parentHref: "/dashboard/c/plantao" } },
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/relacionamento"), route: { title: "Mural da gestão", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },

@@ -215,9 +215,10 @@ describe("broker chat assistant scripts", () => {
         { label: "Unidade", value: "Centro" },
       ]),
     });
-    expect(questionBlocks(active)[0]?.choices.map(({ label }) => label)).toEqual(["Pausar agora", "Ver minha escala"]);
-    expect(questionBlocks(active)[0]?.choices[0]?.action).toEqual({ kind: "server", name: "duty.pause", payload: {} });
-    expect(questionBlocks(active)[0]?.choices[1]?.action).toEqual({ kind: "href", href: "/plantoes" });
+    expect(questionBlocks(active)[0]?.choices.map(({ label }) => label)).toEqual(["Abrir meu plantão", "Pausar agora", "Ver minha escala"]);
+    expect(questionBlocks(active)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/plantoes/agora" });
+    expect(questionBlocks(active)[0]?.choices[1]?.action).toEqual({ kind: "server", name: "duty.pause", payload: {} });
+    expect(questionBlocks(active)[0]?.choices[2]?.action).toEqual({ kind: "href", href: "/plantoes" });
 
     const paused = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty({ paused: true }), next: null, readyToReceive: false } }), now });
     expect(questionBlocks(paused)[0]?.choices[0]?.action).toEqual({ kind: "server", name: "duty.resume", payload: {} });
@@ -225,7 +226,7 @@ describe("broker chat assistant scripts", () => {
 
     const pending = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty({ presenceStatus: "pending" }), next: null, readyToReceive: false } }), now });
     expect(pending.blocks).toContainEqual({ type: "system", id: "duty-presence-schedule-1", text: "Aguardando o gestor liberar sua presença." });
-    expect(questionBlocks(pending)[0]?.choices.map(({ id }) => id)).toEqual(["schedule"]);
+    expect(questionBlocks(pending)[0]?.choices.map(({ id }) => id)).toEqual(["duty-now", "schedule"]);
 
     const next = buildAssistantScript("plantao", { data: workspace({ duty: { active: null, next: { scheduleName: "PME Centro", queueName: "Fila PME", dutyDate: "2026-10-10", startsAt: new Date("2026-10-10T09:00:00-03:00"), endsAt: new Date("2026-10-10T18:00:00-03:00"), paused: false }, readyToReceive: false } }), now });
     expect(next.blocks[1]).toMatchObject({ type: "facts", title: "Próximo plantão" });

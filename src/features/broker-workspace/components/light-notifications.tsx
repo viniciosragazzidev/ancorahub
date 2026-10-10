@@ -234,7 +234,7 @@ export function LightNotifications({
   }, [cursor, isPending]);
 
   return (
-    <div className="arc-venancor flex min-h-full flex-col" style={{ color: "var(--foreground)" }}>
+    <div className="arc-venancor flex min-h-full flex-col" style={{ color: "var(--foreground)", background: "var(--surface)" }}>
       <div className="mx-auto w-full max-w-4xl flex-1 space-y-6 px-4 pb-6 pt-2 sm:px-6">
         <header className={css.header}>
           <h1 className="sr-only">Notificações</h1>

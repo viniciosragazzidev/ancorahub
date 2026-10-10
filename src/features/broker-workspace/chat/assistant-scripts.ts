@@ -379,6 +379,7 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
       blocks.push({ type: "system", id: `duty-presence-${active.scheduleId}`, text: "Aguardando o gestor liberar sua presença." });
       blocks.push(assistantMessage(`duty-presence-hint-${active.scheduleId}`, "Assim que o gestor confirmar que você está na unidade, os leads começam a chegar. Não precisa fazer nada."));
       blocks.push(question("duty-presence-choice", "Enquanto isso:", [
+        { id: "duty-now", label: "Abrir meu plantão", hint: "Horário, números e leads deste plantão", action: { kind: "href", href: "/plantoes/agora" } },
         { id: "schedule", label: "Ver minha escala", action: { kind: "href", href: "/plantoes" } },
       ]));
       return { blocks, status: { label: "Aguardando liberação", tone: "idle" } };
@@ -387,11 +388,13 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
       blocks.push(assistantMessage(`duty-paused-${active.scheduleId}`, "Seu plantão está pausado."));
       blocks.push(question("duty-resume-choice", "Quer voltar a receber leads?", [
         { id: "resume", label: "Voltar a receber", action: { kind: "server", name: "duty.resume", payload: {} } },
+        { id: "duty-now", label: "Abrir meu plantão", hint: "Horário, números e leads deste plantão", action: { kind: "href", href: "/plantoes/agora" } },
       ]));
       return { blocks, status: { label: "Pausado", tone: "paused" } };
     }
     blocks.push(assistantMessage(`duty-active-${active.scheduleId}`, `Você está no ${active.scheduleName}, pronto para receber.`));
     blocks.push(question("duty-active-choice", "O que você quer fazer?", [
+      { id: "duty-now", label: "Abrir meu plantão", hint: "Horário, números e leads deste plantão", action: { kind: "href", href: "/plantoes/agora" } },
       { id: "pause", label: "Pausar agora", hint: "Você volta quando quiser, por aqui", reply: "Pausa, por favor", action: { kind: "server", name: "duty.pause", payload: {} } },
       { id: "schedule", label: "Ver minha escala", action: { kind: "href", href: "/plantoes" } },
     ]));
