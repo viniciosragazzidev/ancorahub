@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+
+import { startLiteTour } from "@/components/chat/tour/lite-tour";
 import { ChevronRight, LogOut } from "lucide-react";
 
 import { Avatar } from "@/components/arc/avatar/avatar";
@@ -71,6 +73,23 @@ export function LightMoreSheet({
             ))}
           </ul>
         </nav>
+
+        <button
+          type="button"
+          onClick={() => {
+            onOpenChange(false);
+            // The tour runs on the Início; from another screen, go there and start it.
+            if (window.location.pathname === "/dashboard") window.setTimeout(startLiteTour, 280);
+            else window.location.assign("/dashboard?tour=1");
+          }}
+          className="flex min-h-14 items-center justify-between gap-3 rounded-3xl bg-(--surface-muted) px-4 text-left text-sm font-medium text-(--foreground) active:bg-(--surface)"
+        >
+          <span>
+            Ver o tour do app
+            <span className="block text-xs font-normal text-(--text-muted)">uns 3 minutos, passo a passo</span>
+          </span>
+          <ChevronRight className="size-4 text-(--text-muted)" aria-hidden="true" />
+        </button>
 
         <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-(--foreground)">Disponibilidade</p>

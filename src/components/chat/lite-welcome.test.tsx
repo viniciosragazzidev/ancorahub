@@ -17,7 +17,7 @@ describe("LiteWelcome", () => {
     render(<LiteWelcome />);
     act(() => { vi.advanceTimersByTime(400); });
     expect(screen.getByRole("dialog", { name: "O app do corretor mudou" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Começar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Agora não" }));
     act(() => { vi.advanceTimersByTime(500); });
     cleanup();
     render(<LiteWelcome />);

@@ -24,6 +24,9 @@
 .point strong { display: block; font-weight: 500; }
 .pointText { display: block; color: var(--text-muted); font-size: 13px; line-height: 1.45; margin-top: 2px; }
 .letter { font-size: 12px; font-weight: 500; color: var(--text-muted); text-align: center; padding-top: 1px; }
+.buttons { display: grid; gap: 6px; }
+.later { height: 40px; border: 0; border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.later:hover { background: var(--surface-muted); color: var(--foreground); }
 .start {
   height: 50px; border: 0; border-radius: 999px; font: inherit; font-size: 16px; font-weight: 500; color: white; cursor: pointer;
   background: linear-gradient(180deg, oklch(62% .2 255), oklch(55% .21 258));

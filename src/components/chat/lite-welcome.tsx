@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { AssistantAvatar } from "./assistant-avatar";
 import styles from "./lite-welcome.module.css";
+import { startLiteTour } from "./tour/lite-tour";
 import type { MascotShape } from "./types";
 
 /** Bump the version to show the card again after a future redesign. */
@@ -113,18 +114,23 @@ export function LiteWelcome() {
               ))}
             </ul>
 
-            <motion.button
-              type="button"
-              className={styles.start}
-              onClick={close}
-              autoFocus
+            <motion.div
+              className={styles.buttons}
               initial={reduce ? false : { opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, delay: reduce ? 0 : 0.98 }}
-              whileTap={reduce ? undefined : { scale: 0.97 }}
             >
-              Começar
-            </motion.button>
+              <motion.button
+                type="button"
+                className={styles.start}
+                onClick={() => { close(); window.setTimeout(startLiteTour, 260); }}
+                autoFocus
+                whileTap={reduce ? undefined : { scale: 0.97 }}
+              >
+                Fazer o tour (3 min)
+              </motion.button>
+              <button type="button" className={styles.later} onClick={close}>Agora não</button>
+            </motion.div>
           </motion.section>
         </motion.div>
       ) : null}

@@ -12,6 +12,7 @@ import { AssistantAvatar } from "./assistant-avatar";
 import styles from "./chat.module.css";
 import home from "./chat-home.module.css";
 import { LiteWelcome } from "./lite-welcome";
+import { LiteTour } from "./tour/lite-tour";
 import { ThreadList } from "./thread-row";
 import type { ThreadSummary } from "./types";
 
@@ -71,7 +72,7 @@ export function ChatHome({
 
   const list = (
     <>
-      <div className={home.tabs}>
+      <div className={home.tabs} data-tour="home-tabs">
         <SegmentedControl
           label="Conversas"
           value={tab}
@@ -102,10 +103,10 @@ export function ChatHome({
   return (
     <div className={`${styles.root} ${home.page}`}>
       <aside className={home.sidebar}>
-        <header className={home.header}>
-          <button type="button" className={home.me} aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</button>
+        <header className={home.header} data-tour="home-header">
+          <button type="button" className={home.me} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</button>
           <h1 className={home.hello}>Olá, {firstName}</h1>
-          <div className={home.headerTools}>
+          <div className={home.headerTools} data-tour="home-tools">
             <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>
             <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
           </div>
@@ -134,13 +135,14 @@ export function ChatHome({
 
       <div className={styles.pillWrap} data-mobile-only>
         {nextLead ? (
-          <Link href={nextLead.href} className={styles.pill}>Atender {nextLead.name.split(" ")[0]}</Link>
+          <Link href={nextLead.href} className={styles.pill} data-tour="home-pill">Atender {nextLead.name.split(" ")[0]}</Link>
         ) : (
-          <button type="button" className={styles.pill} onClick={() => setNewOpen(true)}><PlusIcon /> Novo atendimento</button>
+          <button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> Novo atendimento</button>
         )}
       </div>
 
       <LiteWelcome />
+      <LiteTour />
 
       <BottomSheet open={newOpen} onOpenChange={setNewOpen} title="O que você quer fazer?" className="arc-venancor">
         <ul className={home.newList}>

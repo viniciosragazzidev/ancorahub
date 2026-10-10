@@ -96,6 +96,7 @@ function Notice({ item, queuedCount, reduce, onOpen, onDismiss }: { item: Dynami
       aria-live="polite"
       aria-label={`${item.app}: ${item.title}. ${item.message}`}
       className={styles.notice}
+      data-dynamic-notice=""
       initial={reduce ? { opacity: 0 } : { y: -60, opacity: 0, ...pill }}
       animate={reduce ? { opacity: 1 } : { y: 0, opacity: 1, ...(expanded ? card : pill) }}
       exit={reduce ? { opacity: 0 } : { y: -80, opacity: 0, scale: 0.96, transition: { duration: 0.22, ease: [0.4, 0, 1, 1] } }}

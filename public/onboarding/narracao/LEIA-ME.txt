@@ -1,0 +1,1 @@
+Coloque aqui os audios da narracao do tour (MP3), um por passo, com o nome do roteiro em docs/onboarding/narracao-tour-lite.md (ex.: 00-apresentacao.mp3).
