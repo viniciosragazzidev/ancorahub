@@ -120,8 +120,8 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
         brokerId: schema.leads.corretorId,
         inService: sql<number>`count(*) filter (where ${inArray(schema.leads.status, [...IN_SERVICE])})`,
         waiting: sql<number>`count(*) filter (where ${inArray(schema.leads.status, [...WAITING])} and ${schema.leads.firstContactAt} is null)`,
-        late: sql<number>`count(*) filter (where ${inArray(schema.leads.status, [...WAITING])} and ${schema.leads.firstContactAt} is null and ${schema.leads.assignedAt} < ${lateBefore})`,
-        receivedToday: sql<number>`count(*) filter (where ${schema.leads.assignedAt} >= ${today})`,
+        late: sql<number>`count(*) filter (where ${inArray(schema.leads.status, [...WAITING])} and ${schema.leads.firstContactAt} is null and ${schema.leads.assignedAt} < ${lateBefore.toISOString()}::timestamptz)`,
+        receivedToday: sql<number>`count(*) filter (where ${schema.leads.assignedAt} >= ${today.toISOString()}::timestamptz)`,
       }).from(schema.leads)
         .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.corretorId, teamIds), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
         .groupBy(schema.leads.corretorId),
