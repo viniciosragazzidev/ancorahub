@@ -902,13 +902,16 @@ export async function updateBrokerDutyCalendarEnabledSettingsAction(formData: Fo
   });
 }
 
-/** The three switches of the broker news (Central de relacionamento, jornada e IA dos assistentes). */
+/** Switches of the broker news card (Central, jornada v1 e v2, ranking de equipes, campanhas, IA, supervisor). */
 const BROKER_NEWS_FLAGS = [
   { field: "relationshipCenterEnabled", flag: FEATURE_FLAGS.RELATIONSHIP_CENTER },
   { field: "brokerEngagementEnabled", flag: FEATURE_FLAGS.BROKER_ENGAGEMENT },
   { field: "brokerAiAssistantsEnabled", flag: FEATURE_FLAGS.BROKER_AI_ASSISTANTS },
   { field: "supervisorTeamScopeEnabled", flag: FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE },
   { field: "supervisorLiteEnabled", flag: FEATURE_FLAGS.SUPERVISOR_LITE },
+  { field: "brokerJourneyEnabled", flag: FEATURE_FLAGS.BROKER_JOURNEY },
+  { field: "teamRankingEnabled", flag: FEATURE_FLAGS.TEAM_RANKING },
+  { field: "engagementCampaignsEnabled", flag: FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS },
 ] as const;
 
 export async function updateBrokerNewsSettingsAction(formData: FormData) {
