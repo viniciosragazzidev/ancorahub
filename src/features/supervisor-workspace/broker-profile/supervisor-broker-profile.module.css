@@ -48,9 +48,12 @@
   font-size: var(--text-sm);
   font-weight: 500;
   text-decoration: none;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
   transition: background-color var(--duration-fast) var(--ease-standard), color var(--duration-fast) var(--ease-standard);
 }
-.primaryAction { background: var(--chat-action); color: var(--primary-foreground); }
+.primaryAction { background: var(--chat-action-strong); color: var(--primary-foreground); }
 .primaryAction:hover { filter: brightness(0.96); }
 .secondaryAction { background: var(--surface); color: var(--foreground); }
 .secondaryAction:hover { background: color-mix(in oklch, var(--surface-muted), var(--foreground) 5%); }

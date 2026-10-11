@@ -19,6 +19,7 @@ export const notificationCapabilities = [
   { id: "quick_reply_human", label: "Quick Reply e atendimento humano", description: "Aviso ao corretor quando uma mensagem foi resolvida automaticamente ou solicita atendimento humano.", channels: "Toast + push" },
   { id: "duty_assignment", label: "Escala de plantão", description: "Avisa o corretor quando a gestão o coloca em um plantão.", channels: "Toast + push" },
   { id: "supervisor_digest", label: "Resumo do dia para o supervisor", description: "Às 19h, o dia da equipe do supervisor em poucas linhas (leads, atrasos, destaque e meta).", channels: "Toast + push" },
+  { id: "journey_near_completion", label: "Missão da equipe quase concluída", description: "Avisa o supervisor uma vez por corretor ao faltar um contato para concluir a missão do dia.", channels: "Toast/in-app" },
   { id: "supervisor_transfer", label: "Pedido de transferência entre equipes", description: "Avisa os gestores sobre pedidos de transferência de corretores entre equipes de supervisão.", channels: "Toast + push" },
   { id: "supervisor_team_invite", label: "Convite para equipe do supervisor", description: "Avisa o corretor quando um supervisor da unidade convida para a equipe e informa o resultado ao supervisor.", channels: "Toast + push" },
   { id: "relationship_message", label: "Mensagens da Central de relacionamento", description: "Avisos, reconhecimentos e pedidos de confirmação que a direção envia aos corretores.", channels: "Toast + push" },

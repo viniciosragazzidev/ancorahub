@@ -157,3 +157,7 @@ html[data-contrast="high"] .arc-venancor {
   --border: var(--neutral-7, #71717a);
   --chat-action-text: oklch(40% 0.2 258);
 }
+
+/* Inputs are pills in the Lite (--radius-control 9999px), but a multi-line box needs corners
+   the text can sit in: a pill clips the first and last letters of every line. */
+.arc-venancor textarea { border-radius: 1.125rem; padding-inline: 14px; }

@@ -11,6 +11,10 @@ import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { and, eq, isNull } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
+import { RelationshipJourneyTabs } from "@/features/relationship/components/relationship-journey-tabs";
+import { getDirectorJourneyPageData } from "@/features/journey/director-queries";
+import { createCampaign, pauseCampaign } from "@/features/journey/campaign-actions";
+import { updateRule, restoreRules, reverseEvent } from "@/features/journey/director-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +27,29 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
   const supervisorLite = context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor";
   const params = await searchParams;
   const enabled = (await getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")) === "true";
+
+  if (context.role === "director" || context.role === "manager") {
+    const journeyEnabled = (await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false")) === "true";
+    const [messageData, data] = await Promise.all([
+      enabled ? Promise.all([getAudienceOptions(context), listBroadcasts(context)]).then(([audienceOptions, broadcasts]) => [audienceOptions, broadcasts] as const) : Promise.resolve([null, []] as const),
+      journeyEnabled ? getDirectorJourneyPageData(context) : Promise.resolve(null),
+    ]);
+    const [audienceOptions, broadcasts] = messageData;
+    const historyItems = broadcasts.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }));
+    return (
+      <>
+        <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />
+        <RelationshipJourneyTabs
+          relationshipEnabled={enabled}
+          journeyEnabled={journeyEnabled}
+          options={audienceOptions}
+          history={historyItems}
+          data={data}
+          actions={{ createCampaign, pauseCampaign, updateRule, restoreRules, reverseEvent }}
+        />
+      </>
+    );
+  }
 
   if (!enabled) {
     if (supervisorLite) {

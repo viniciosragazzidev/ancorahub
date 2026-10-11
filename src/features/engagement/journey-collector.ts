@@ -6,6 +6,7 @@ import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/querie
 import { evaluateAchievements } from "./achievements";
 import { evaluateLevel } from "./levels";
 import { defaultJourneyMissions, evaluateMission, missionBonus, selectDailyMissions } from "./missions";
+import { defaultTeamMissions, evaluateTeamMission } from "./team-missions";
 import { journeyDay, journeyMidnight, journeyWeek, shiftJourneyDay } from "./journey-periods";
 import { journeyMissionSchema } from "./journey-validation";
 import { readJourneyFacts } from "./journey-facts";
@@ -13,6 +14,7 @@ import { resolveRules } from "./catalog";
 import { periodDay, type PointsCandidate } from "./scoring";
 import type { AchievementKey, JourneyCelebrationPayload } from "./journey-types";
 import { dailyJourneySummary, isJourneySummaryDue } from "./daily-summary";
+import { publishNotification } from "@/features/notifications/send-push-helper";
 
 /** Includes denominator changes and deadlines even when no points rule scores. */
 export async function touchedJourneyBrokers(tenantId: string, since: Date, until: Date, slaMinutes: number): Promise<string[]> {
@@ -32,8 +34,12 @@ export async function touchedJourneyBrokers(tenantId: string, since: Date, until
       union all select assigned_to from lead_tasks where tenant_id=${tenantId} and ((completed_at>=${from}::timestamptz and completed_at<${to}::timestamptz) or (due_at>=${from}::timestamptz and due_at<${to}::timestamptz))
       union all select broker_id from duty_presence_confirmations where tenant_id=${tenantId} and ((confirmed_at>=${from}::timestamptz and confirmed_at<${to}::timestamptz) or (shift_ends_at>=${from}::timestamptz and shift_ends_at<${to}::timestamptz))
       union all select i.user_id from lead_interactions i join leads l on l.id=i.lead_id and l.tenant_id=${tenantId} where i.tipo='note' and i.created_at>=${from}::timestamptz and i.created_at<${to}::timestamptz
-      union all select subject_id from engagement_mission_progress where tenant_id=${tenantId} and completed_at is null
+      union all select subject_id from engagement_mission_progress where tenant_id=${tenantId} and subject_type='broker' and completed_at is null
         and period_key in (${shiftJourneyDay(today, -1)}, ${closedWeek}) and updated_at<${journeyMidnight(today).toISOString()}::timestamptz
+      union all select m.user_id from engagement_mission_progress p join tenant_memberships m
+        on m.tenant_id=p.tenant_id and m.supervisor_id=p.subject_id and m.role='broker' and m.status='active'
+        where p.tenant_id=${tenantId} and p.subject_type='supervisor' and p.completed_at is null
+          and p.period_key in (${shiftJourneyDay(today, -1)}, ${closedWeek}) and p.updated_at<${journeyMidnight(today).toISOString()}::timestamptz
       union all select p.subject_id from engagement_mission_progress p join engagement_missions m
         on m.id=p.mission_id and m.tenant_id=${tenantId} and m.metric='steps.coverage'
         where p.tenant_id=${tenantId} and p.completed_at is null and p.period_key=${shiftJourneyDay(today, -1)}
@@ -53,22 +59,36 @@ export async function collectJourneyBatch(input: { tenantId: string; brokerIds: 
   const { tenantId, now, slaMinutes, rules } = input;
   if (!input.brokerIds.length || await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false") !== "true") return { available: false, brokers: 0 };
   const db = getDatabase();
-  const brokerIds = [...new Set(input.brokerIds)];
+  const touchedBrokerIds = [...new Set(input.brokerIds)];
+  const touchedMemberships = await db.select({ brokerId: schema.tenantMemberships.userId, supervisorId: schema.tenantMemberships.supervisorId, branchId: schema.tenantMemberships.branchId })
+    .from(schema.tenantMemberships).where(and(eq(schema.tenantMemberships.tenantId, tenantId), inArray(schema.tenantMemberships.userId, touchedBrokerIds), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"))).catch(() => []);
+  const touchedSupervisorIds = [...new Set(touchedMemberships.flatMap((row) => row.supervisorId ? [row.supervisorId] : []))];
+  const [supervisorRows, activeTeamRows] = await Promise.all([
+    touchedSupervisorIds.length ? db.select({ supervisorId: schema.tenantMemberships.userId, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.tenantId, tenantId), inArray(schema.tenantMemberships.userId, touchedSupervisorIds), eq(schema.tenantMemberships.role, "supervisor"), eq(schema.tenantMemberships.status, "active"))).catch(() => []) : Promise.resolve([]),
+    touchedSupervisorIds.length ? db.select({ brokerId: schema.tenantMemberships.userId, supervisorId: schema.tenantMemberships.supervisorId, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships)
+      .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+      .where(and(eq(schema.tenantMemberships.tenantId, tenantId), inArray(schema.tenantMemberships.supervisorId, touchedSupervisorIds), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).catch(() => []) : Promise.resolve([]),
+  ]);
+  const supervisorBranch = new Map(supervisorRows.map((row) => [row.supervisorId, row.branchId]));
+  const teamMemberships = activeTeamRows.filter((row) => Boolean(row.supervisorId) && row.branchId === supervisorBranch.get(row.supervisorId!));
+  const brokerIds = [...new Set([...touchedBrokerIds, ...teamMemberships.map((row) => row.brokerId)])];
+  const teamBrokerIds = new Set(teamMemberships.map((row) => row.brokerId));
   // Catch outside transactions: a missing table must not poison an open transaction.
   const [missionsRead, previousRead, earnedRead, celebrationsReady, campaigns] = await Promise.all([
     db.select().from(schema.engagementMissions).where(eq(schema.engagementMissions.tenantId, tenantId)).catch(() => null),
-    db.select().from(schema.engagementMissionProgress).where(and(eq(schema.engagementMissionProgress.tenantId, tenantId), inArray(schema.engagementMissionProgress.subjectId, brokerIds))).catch(() => null),
+    db.select().from(schema.engagementMissionProgress).where(and(eq(schema.engagementMissionProgress.tenantId, tenantId), inArray(schema.engagementMissionProgress.subjectId, [...brokerIds, ...touchedSupervisorIds]))).catch(() => null),
     db.select().from(schema.engagementAchievements).where(and(eq(schema.engagementAchievements.tenantId, tenantId), inArray(schema.engagementAchievements.brokerId, brokerIds))).catch(() => null),
     db.select({ id: schema.engagementCelebrations.id }).from(schema.engagementCelebrations).where(eq(schema.engagementCelebrations.tenantId, tenantId)).limit(1).catch(() => null),
     getFeatureFlag(FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS).catch(() => "false"),
   ]);
   if (!missionsRead || !previousRead || !earnedRead || !celebrationsReady) return { available: false, brokers: 0 };
-  const defaults = defaultJourneyMissions(tenantId);
+  const defaults = [...defaultJourneyMissions(tenantId), ...defaultTeamMissions(tenantId)];
   await db.insert(schema.engagementMissions).values(defaults.map((m) => ({ ...m, tenantId, createdAt: now, updatedAt: now, startsAt: null, endsAt: null }))).onConflictDoNothing();
   const storedIds = new Set(missionsRead.map((m) => m.id));
   const missions = [...missionsRead, ...defaults.filter((m) => !storedIds.has(m.id))].flatMap((row) => {
     const parsed = journeyMissionSchema.safeParse({ ...row, startsAt: row.startsAt instanceof Date ? row.startsAt.toISOString() : row.startsAt, endsAt: row.endsAt instanceof Date ? row.endsAt.toISOString() : row.endsAt });
-    return parsed.success && (parsed.data.kind !== "campaign" || campaigns === "true") && parsed.data.kind !== "team" ? [parsed.data] : [];
+    return parsed.success && (parsed.data.kind !== "campaign" || campaigns === "true") ? [parsed.data] : [];
   });
   const facts = await readJourneyFacts(tenantId, brokerIds, now, slaMinutes, rules["sale.approved"].enabled);
   if (!facts.length) return { available: true, brokers: 0 };
@@ -85,7 +105,7 @@ export async function collectJourneyBatch(input: { tenantId: string; brokerIds: 
     const brokerId = fact.subject.brokerId;
     for (const date of [yesterday, today]) {
       const hasDuty = fact.days.find((d) => d.date === date)?.hasDuty ?? false;
-      for (const mission of selectDailyMissions(missions, hasDuty)) {
+      for (const mission of selectDailyMissions(missions.filter((item) => item.kind !== "team"), hasDuty)) {
         if (date !== today && mission.period === "campaign") continue;
         if (date !== today && mission.period !== "daily" && journeyWeek(new Date(`${date}T12:00:00Z`)).periodKey === journeyWeek(now).periodKey) continue;
         const initial = evaluateMission({ mission, subject: fact.subject, days: fact.days, now, date });
@@ -106,7 +126,31 @@ export async function collectJourneyBatch(input: { tenantId: string; brokerIds: 
       celebrate(brokerId, `achievement:${brokerId}:${badge.key}`, { kind: "achievement", badgeKey: badge.key, name: badge.name }, 50);
     }
   }
-  return db.transaction(async (tx) => {
+  for (const supervisorId of touchedSupervisorIds) {
+    const memberFacts = facts.filter((fact) => teamMemberships.some((row) => row.supervisorId === supervisorId && row.brokerId === fact.subject.brokerId));
+    if (!memberFacts.length) continue;
+    for (const mission of missions.filter((item) => item.kind === "team")) {
+      if (mission.audience.supervisorIds?.length && !mission.audience.supervisorIds.includes(supervisorId)) continue;
+      const dates = mission.period === "daily" ? [yesterday, today] : [today];
+      for (const date of dates) {
+        const period = mission.period === "weekly" ? journeyWeek(new Date(`${date}T12:00:00Z`)).periodKey : date;
+        const previous = previousRead.find((row) => row.subjectType === "supervisor" && row.subjectId === supervisorId && row.missionId === mission.id && row.periodKey === period);
+        const evaluation = evaluateTeamMission({ mission, members: memberFacts.map((fact) => ({ brokerId: fact.subject.brokerId, days: fact.days })), now, date, previousCompleted: Boolean(previous?.completedAt) });
+        if (!evaluation || (!evaluation.eligible && !evaluation.completed)) continue;
+        const completedAt = previous?.completedAt ?? (evaluation.completed ? now : null);
+        progressValues.push({ id: randomUUID(), tenantId, missionId: mission.id, subjectId: supervisorId, subjectType: "supervisor", periodKey: evaluation.periodKey, progress: evaluation.progress, target: evaluation.target, completedAt, createdAt: now, updatedAt: now });
+        if (evaluation.completed && completedAt && mission.bonusPoints > 0) {
+          for (const fact of memberFacts) {
+            const brokerId = fact.subject.brokerId;
+            const idempotencyKey = `mission:${mission.id}:team:${supervisorId}:${evaluation.periodKey}:${brokerId}`;
+            bonuses.push({ id: randomUUID(), tenantId, brokerId, ruleKey: "mission.completed", points: mission.bonusPoints, entityType: "mission", entityId: mission.id, idempotencyKey, occurredAt: completedAt, periodDay: periodDay(completedAt), metadata: { missionId: mission.id, title: mission.title, periodKey: evaluation.periodKey, teamSupervisorId: supervisorId, progress: evaluation.progress, target: evaluation.target } });
+            celebrate(brokerId, idempotencyKey, { kind: "mission", missionId: mission.id, title: mission.title, bonusPoints: mission.bonusPoints, periodKey: evaluation.periodKey }, 40);
+          }
+        }
+      }
+    }
+  }
+  const result = await db.transaction(async (tx) => {
     // All journey writers in this tenant share the lock; conflicts remain safe on retry.
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`journey:${tenantId}`}))`);
     const uniqueProgress = [...new Map(progressValues.map((p) => [JSON.stringify([p.missionId, p.subjectId, p.periodKey]), p])).values()];
@@ -127,6 +171,24 @@ export async function collectJourneyBatch(input: { tenantId: string; brokerIds: 
     // Remove duplicate weekly/campaign entries before a single batch insertion.
     const unique = [...new Map(celebrations.map((c) => [c.idempotencyKey, c])).values()];
     if (unique.length) await tx.insert(schema.engagementCelebrations).values(unique).onConflictDoNothing();
-    return { available: true, brokers: facts.length, bonuses: insertedBonuses.length };
+    return { available: true, brokers: touchedBrokerIds.filter((id) => facts.some((fact) => fact.subject.brokerId === id)).length, bonuses: insertedBonuses.length, teamBrokers: [...teamBrokerIds].length };
   });
+  const todayProgress = progressValues.filter((row) => row.subjectType === "broker" && row.missionId === `journey:${tenantId}:fast-contact` && row.periodKey === today && row.completedAt === null && typeof row.target === "number" && typeof row.progress === "number" && row.target - row.progress === 1);
+  const nearBrokerIds = [...new Set(todayProgress.map((row) => row.subjectId))];
+  const nearNames = nearBrokerIds.length ? await db.select({ id: schema.user.id, name: schema.user.name }).from(schema.user).where(inArray(schema.user.id, nearBrokerIds)).catch(() => []) : [];
+  const nameByBroker = new Map(nearNames.map((row) => [row.id, row.name?.trim() || "Um corretor da equipe"]));
+  for (const row of todayProgress) {
+    const membership = touchedMemberships.find((item) => item.brokerId === row.subjectId);
+    const supervisorId = membership?.supervisorId;
+    if (!supervisorId) continue;
+    const brokerName = nameByBroker.get(row.subjectId) ?? "Um corretor da equipe";
+    await publishNotification({
+      capability: "journey_near_completion", tenantId, recipientUserId: supervisorId, type: "journey_near_completion",
+      title: `${brokerName} está a 1 contato de completar a missão do dia`,
+      message: "Acompanhe o primeiro contato para ajudar a equipe a fechar a missão.",
+      url: `/equipe/${row.subjectId}`, tag: `journey-near:${row.subjectId}:${today}`,
+      idempotencyKey: `journey-near:${row.subjectId}:${today}`,
+    }).catch(() => undefined);
+  }
+  return result;
 }

@@ -10,7 +10,7 @@ import { journeyDay, journeyWeek, shiftJourneyDay } from "./journey-periods";
 import { confirmedPresenceSequence } from "./achievements";
 
 export type BrokerJourneyFacts = { subject: MissionSubject; days: JourneyDayFacts[]; evidence: AchievementEvidence; totalPoints: number; pointsByDay?: Record<string, number> };
-type CountRow = { broker: string; day: string; received?: number; breaches?: number; service?: number; notes?: number; offers?: number; due?: number; overdue?: number; returned?: number; contacts?: number; ontime?: number; fast?: number; accepted?: number; points?: number };
+type CountRow = { broker: string; day: string; received?: number; breaches?: number; evidenced?: number; service?: number; notes?: number; offers?: number; due?: number; overdue?: number; returned?: number; contacts?: number; ontime?: number; fast?: number; accepted?: number; points?: number };
 export const emptyJourneyDay = (date: string): JourneyDayFacts => ({ date, hasDuty: false, receivedLeads: 0, evidencedContacts: 0, fastContacts: 0, onTimeContacts: 0, offers: 0, fastAcceptedOffers: 0, serviceLeads: 0, validNotes: 0, returnsDue: 0, returnsCompletedOnTime: 0, overdueReturns: 0, slaBreaches: 0, confirmedPresence: false });
 
 /** Batch sources. Notes bypass the points cap; SLA uses actual sent human messages. */
@@ -31,8 +31,9 @@ export async function readJourneyFacts(tenantId: string, brokerIds: string[], no
       from engagement_point_events where tenant_id=${tenantId} and broker_id in (${ids}) and reversed_at is null
       group by broker_id, period_day`),
     db.execute<CountRow>(sql`select l.corretor_id as broker, (l.assigned_at at time zone 'America/Sao_Paulo')::date::text as day,
-      count(*) filter (where exists (select 1 from engagement_point_events e where e.tenant_id=${tenantId} and e.broker_id=l.corretor_id and e.rule_key='contact.first' and e.reversed_at is null
-        and e.metadata->>'tier'='5min' and e.idempotency_key='contact.first:'||l.id||':'||l.corretor_id||':'||floor(extract(epoch from l.assigned_at)*1000)::bigint::text))::int as fast,
+      count(*) filter (where first_contact.sent_at is not null and first_contact.sent_at<=l.assigned_at+interval '5 minutes')::int as fast,
+      count(*) filter (where first_contact.sent_at is not null)::int as evidenced,
+      count(*) filter (where first_contact.sent_at is not null and first_contact.sent_at<=l.assigned_at+(${slaMinutes} * interval '1 minute'))::int as ontime,
       count(*)::int as received, count(*) filter (where
         coalesce(first_contact.sent_at, ${nowIso}::timestamptz) > l.assigned_at + (${slaMinutes} * interval '1 minute'))::int as breaches
       from leads l left join lateral (select min(w.sent_at) as sent_at from whatsapp_messages w
@@ -96,7 +97,7 @@ export async function readJourneyFacts(tenantId: string, brokerIds: string[], no
       d.returnsCompletedOnTime = Number(row.returned); totalPoints += Number(row.points);
       pointsByDay[row.day] = Number(row.points);
     }
-    for (const row of assignments.filter((r) => r.broker === member.brokerId)) { const d = day(row.day); d.receivedLeads = Number(row.received); d.slaBreaches = Number(row.breaches); d.fastContacts = Number(row.fast); }
+    for (const row of assignments.filter((r) => r.broker === member.brokerId)) { const d = day(row.day); d.receivedLeads = Number(row.received); d.slaBreaches = Number(row.breaches); d.fastContacts = Number(row.fast); d.evidencedContacts = Number(row.evidenced); d.onTimeContacts = Number(row.ontime); }
     for (const row of services.filter((r) => r.broker === member.brokerId)) day(row.day).serviceLeads = Number(row.service);
     for (const row of notes.filter((r) => r.broker === member.brokerId)) day(row.day).validNotes = Number(row.notes);
     for (const row of offers.filter((r) => r.broker === member.brokerId)) { const d = day(row.day); d.offers = Number(row.offers); d.fastAcceptedOffers = Number(row.accepted); }

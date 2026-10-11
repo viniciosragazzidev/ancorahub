@@ -100,7 +100,7 @@ describe("journey collector", () => {
     await touchedJourneyBrokers("tenant", new Date("2026-10-12T03:00:00Z"), monday, 15);
     const mondayQuery = new PgDialect().sqlToQuery(mocks.db.execute.mock.calls[0]![0]);
     expect(mondayQuery.params).toContain("2026-10-11"); expect(mondayQuery.params).toContain("2026-10-05");
-    expect(mondayQuery.sql).toContain("period_key in"); expect(mondayQuery.params.some((p) => p instanceof Date)).toBe(false);
+    expect(mondayQuery.sql).toContain("period_key in"); expect(mondayQuery.sql).toContain("subject_type='supervisor'"); expect(mondayQuery.params.some((p) => p instanceof Date)).toBe(false);
     mocks.db.execute.mockClear();
     await touchedJourneyBrokers("tenant", monday, new Date("2026-10-14T03:10:00Z"), 15);
     const wednesdayQuery = new PgDialect().sqlToQuery(mocks.db.execute.mock.calls[0]![0]);

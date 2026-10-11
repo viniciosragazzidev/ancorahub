@@ -72,7 +72,7 @@ export type MissionProgress = {
   completedAt: string | null;
 };
 
-export type JourneyMissionCard = JourneyMission & { progress: MissionProgress };
+export type JourneyMissionCard = JourneyMission & { progress: MissionProgress; contribution?: number };
 export type MissionBonus = {
   brokerId: string;
   missionId: string;
@@ -169,7 +169,7 @@ export type TeamInternalLeaderboard = JourneyWeek & {
 
 export type JourneyPointRuleKey = EngagementRuleKey | "mission.completed" | "recognition.bonus";
 export type JourneyCelebrationPayload =
-  | { kind: "points"; points: number; ruleKey: JourneyPointRuleKey; label: string }
+  | { kind: "points"; points: number; ruleKey: JourneyPointRuleKey; label: string; detail?: string }
   | { kind: "mission"; missionId: string; title: string; bonusPoints: number; periodKey: string }
   | { kind: "achievement"; badgeKey: AchievementKey; name: string }
   | { kind: "level"; level: JourneyLevel; totalPoints: number }

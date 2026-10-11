@@ -18,6 +18,8 @@ import { formatDuration } from "@/features/engagement/ranking";
 import { addSupervisorNoteAction } from "@/features/supervisor-workspace/notes-actions";
 import { SUPERVISOR_NOTE_KINDS, type SupervisorNote, type SupervisorNoteKind } from "@/features/supervisor-workspace/notes-types";
 import { removeBrokerFromMyTeamAction } from "@/features/supervisor-workspace/my-team-actions";
+import { recognizeBrokerAction } from "@/features/journey/recognition-actions";
+import { RecognizeSheet } from "@/features/journey/components/recognize-sheet";
 
 import styles from "./supervisor-broker-profile.module.css";
 
@@ -119,6 +121,7 @@ export function SupervisorBrokerProfile({
 }: SupervisorBrokerProfileProps) {
   const reduce = useReducedMotion();
   const [notes, setNotes] = useState(initialNotes);
+  const [recognizeOpen, setRecognizeOpen] = useState(false);
   const [noteKind, setNoteKind] = useState<SupervisorNoteKind>("orientacao");
   const [noteBody, setNoteBody] = useState("");
   const [noteFeedback, setNoteFeedback] = useState("");
@@ -265,7 +268,8 @@ export function SupervisorBrokerProfile({
         </section>
 
         <BottomSheet className="arc-venancor" trigger={<Button variant="outline">Mais ações</Button>} title={`Ações para ${member.name}`} description="Escolha como quer apoiar este corretor." closeLabel="Fechar" detents={[0.4, 0.72]}>
-          <div className={styles.memberActions}><Link className={styles.secondaryAction} href={relationshipHref}>Mandar recado</Link><Link className={styles.secondaryAction} href={`${relationshipHref}?kind=recognition`}>Reconhecer</Link><Button variant="destructive" disabled={removing} loading={removing} onClick={removeFromTeam}>Remover da equipe</Button></div>
+          <div className={styles.memberActions}><Link className={styles.secondaryAction} href={relationshipHref}>Mandar recado</Link><button type="button" className={styles.secondaryAction} onClick={() => setRecognizeOpen(true)}>Reconhecer com pontos</button><Button variant="destructive" disabled={removing} loading={removing} onClick={removeFromTeam}>Remover da equipe</Button></div>
+          <RecognizeSheet brokerId={member.userId} brokerName={member.name} open={recognizeOpen} onOpenChange={setRecognizeOpen} onRecognize={recognizeBrokerAction} />
         </BottomSheet>
       </div>
     </div>
