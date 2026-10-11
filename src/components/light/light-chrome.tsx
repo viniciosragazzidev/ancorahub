@@ -7,7 +7,6 @@ import { useLightAvailability, type LightAvailability } from "@/components/light
 
 import { ChatHome } from "@/components/chat/chat-home";
 import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
-import { loadChatRailAction } from "@/features/broker-workspace/chat/chat-rail-actions";
 import { REALTIME_SYNC_BROWSER_EVENT } from "@/components/providers/realtime-events";
 
 import { A11yPrefsProvider } from "@/features/assist/a11y-prefs";
@@ -165,7 +164,11 @@ function useDesktopChatRail() {
     const load = () => {
       if (!media.matches) return;
       lastLoad = Date.now();
-      void loadChatRailAction().then((data) => { if (alive && data) setRail(data); }).catch(() => undefined);
+      // A GET route, not a server action: "Ver como" refuses POSTs and the rail stayed a skeleton.
+      void fetch("/api/chat/rail", { cache: "no-store" })
+        .then((response) => (response.ok ? (response.json() as Promise<{ rail: ChatRailData | null }>) : null))
+        .then((body) => { if (alive && body?.rail) setRail(body.rail); })
+        .catch(() => undefined);
     };
     const onRealtime = () => {
       window.clearTimeout(timer);
