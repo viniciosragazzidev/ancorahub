@@ -156,6 +156,7 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
           <button
             type="button"
             onClick={() => openOccurrence(highlight)}
+            data-tour="micro-duty-highlight"
             aria-label={`Ver plantão ${highlight.scheduleName}, das ${getOccurrenceTime(highlight)}`}
             className="w-full cursor-pointer p-4 text-left transition-transform active:scale-[0.99] motion-reduce:transition-none motion-reduce:active:scale-100 sm:p-5"
             style={CARD_STYLE}
@@ -199,7 +200,7 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
           </div>
         )}
 
-        <section aria-label="Calendário dos seus plantões" className="p-4 sm:p-5" style={CARD_STYLE}>
+        <section data-tour="micro-duty-calendar" aria-label="Calendário dos seus plantões" className="p-4 sm:p-5" style={CARD_STYLE}>
           <div className="mb-2 flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold" style={{ color: "var(--foreground)" }}>Calendário</h2>
             <Button type="button" variant="secondary" size="sm" onClick={jumpToToday}>
@@ -224,12 +225,12 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
         </section>
 
         {nextSevenDays.length > 0 && (
-          <section aria-labelledby="next-seven-days-title" style={CARD_STYLE}>
+          <section data-tour="micro-duty-upcoming" aria-labelledby="next-seven-days-title" style={CARD_STYLE}>
             <h2 id="next-seven-days-title" className="px-4 pt-4 text-base font-semibold sm:px-5" style={{ color: "var(--foreground)" }}>
               Próximos 7 dias
             </h2>
             <ul className="mt-2">
-              {Array.from(new Set(nextSevenDays.map((occurrence) => occurrence.dutyDate))).map((dateKey, index, keys) => {
+              {Array.from(new Set(nextSevenDays.map((occurrence) => occurrence.dutyDate))).map((dateKey, index) => {
                 const dayOccurrences = occurrencesByDate.get(dateKey) ?? [];
                 return (
                   <li key={dateKey} style={index > 0 ? { borderTop: "1px solid var(--border-subtle)" } : undefined}>

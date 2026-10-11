@@ -42,6 +42,7 @@ export function AppShell({
   showDutyCalendar = false,
   showRelationship = false,
   journeyEnabled = false,
+  teamRankingEnabled = false,
   liteAudience = "broker",
   showQuoteSimulator = false,
   initialAvailability = "available",
@@ -55,6 +56,7 @@ export function AppShell({
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
   journeyEnabled?: boolean;
+  teamRankingEnabled?: boolean;
   /** Who uses the Lite chrome (supervisor Lite, 2026-10-10). */
   liteAudience?: "broker" | "supervisor";
   showQuoteSimulator?: boolean;
@@ -152,6 +154,7 @@ export function AppShell({
           showDutyCalendar={showDutyCalendar}
           showRelationship={showRelationship}
           journeyEnabled={journeyEnabled}
+          teamRankingEnabled={teamRankingEnabled}
           audience={liteAudience}
           showQuoteSimulator={showQuoteSimulator}
           initialAvailability={initialAvailability}

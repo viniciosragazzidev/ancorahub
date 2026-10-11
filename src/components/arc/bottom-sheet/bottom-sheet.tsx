@@ -351,7 +351,7 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
   return <>
     <DialogPrimitive.Overlay forceMount asChild><motion.div className={styles.overlay} style={{ opacity: backdrop }} /></DialogPrimitive.Overlay>
     <DialogPrimitive.Content forceMount {...(description ? {} : { "aria-describedby": undefined })} onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }} onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }} asChild><motion.div ref={sheetRef} className={[styles.sheet, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey}><div className={styles.header} onPointerDown={headerDown} onPointerMove={headerMove} onPointerUp={headerUp} onPointerCancel={headerUp}>
-                <button type="button" className={styles.grabber} data-grabber="" aria-label={expanded ? "Collapse sheet" : "Expand sheet"} aria-expanded={expanded} onClick={grabberClick} onKeyDown={grabberKey}>
+                <button type="button" className={styles.grabber} data-grabber="" aria-label={expanded ? "Recolher painel" : "Expandir painel"} aria-expanded={expanded} onClick={grabberClick} onKeyDown={grabberKey}>
                   <span className={styles.grabberBar} aria-hidden="true" />
                 </button>
                 <div className={styles.headRow}>

@@ -39,6 +39,7 @@ export function Composer({
   onStop,
   inputMode,
   inputLabel,
+  dataTour,
 }: {
   placeholder?: string;
   progress?: ChatProgress | null;
@@ -53,6 +54,7 @@ export function Composer({
   inputMode?: "text" | "numeric";
   /** Accessible name when the field answers a question ("Idades de quem vai entrar no plano"). */
   inputLabel?: string;
+  dataTour?: string;
 }) {
   const reduce = useReducedMotion();
   const [text, setText] = useState("");
@@ -76,7 +78,7 @@ export function Composer({
   }
 
   return (
-    <div className={styles.composerWrap}>
+    <div data-tour={dataTour} className={styles.composerWrap}>
       <div className={styles.composerInner}>
         <AnimatePresence>
           {menuOpen ? (

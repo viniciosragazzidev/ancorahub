@@ -56,6 +56,7 @@ export function ChatScreen({
   composerInput,
   onButtonOpen,
   instant = false,
+  tourTargets,
 }: {
   identity: Identity;
   backHref: string;
@@ -79,6 +80,7 @@ export function ChatScreen({
   onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void;
   /** History-like threads (Âncora): show everything at once, already scrolled to the newest. */
   instant?: boolean;
+  tourTargets?: { conversation?: string; composer?: string };
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -191,7 +193,7 @@ export function ChatScreen({
       </header>
 
       <div ref={scrollRef} className={styles.scroll} aria-live="polite" aria-relevant="additions">
-        <div className={styles.thread_}>
+        <div data-tour={tourTargets?.conversation} className={styles.thread_}>
           {shown.map((block) => (
             <MessageEnter key={block.id}>
               {block.type === "question"
@@ -212,6 +214,7 @@ export function ChatScreen({
         disabled={composerDisabled}
         inputMode={composerInput?.inputMode}
         inputLabel={composerInput?.label}
+        dataTour={tourTargets?.composer}
         onSend={async (text) => {
           setShown((current) => [...current, { type: "user", id: `free-${Date.now()}`, text, at: nowLabel() }]);
           if (!onFreeText) return;

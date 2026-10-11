@@ -126,7 +126,7 @@
 .ledgerDay time { color: var(--text-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .ledgerPoints { min-width: 40px; color: oklch(48% .13 150); font-size: var(--text-sm); font-weight: 500; text-align: right; font-variant-numeric: tabular-nums; }
 .ledgerDay li[data-reversed="true"] .ledgerPoints { color: var(--text-muted); font-size: 12px; font-weight: 400; }
-.more { justify-self: center; height: 36px; padding: 0 16px; border: 0; border-radius: 99px; background: transparent; color: var(--chat-action-text); font-size: var(--text-sm); font-weight: 500; cursor: pointer; }
+.more { justify-self: center; height: 44px; padding: 0 16px; border: 0; border-radius: 99px; background: transparent; color: var(--chat-action-text); font-size: var(--text-sm); font-weight: 500; cursor: pointer; }
 .more:hover { background: color-mix(in oklch, var(--chat-action) 8%, transparent); }
 
 /* Confetti (shared with celebrations). */

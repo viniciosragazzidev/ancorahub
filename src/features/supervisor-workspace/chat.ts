@@ -249,7 +249,10 @@ function teamPerformanceScript(data: SupervisorWorkspaceData, now: Date): ChatSc
         };
       }),
     },
-    { type: "question", id: "equipe-desempenho-choice", prompt: "Quer reconhecer alguém?", choices: [{ id: "recognize", label: "Mandar um reconhecimento", hint: "Pela Central de relacionamento", action: { kind: "href", href: "/relacionamento" } }] },
+    { type: "question", id: "equipe-desempenho-choice", prompt: "O que você quer ver?", choices: [
+      { id: "leaderboard", label: "Ver o placar", hint: "Posição das equipes da unidade", action: { kind: "href", href: "/equipe/desempenho" } },
+      { id: "recognize", label: "Mandar um reconhecimento", hint: "Pela Central de relacionamento", action: { kind: "href", href: "/relacionamento" } },
+    ] },
   ];
   return { blocks, status: { label: "Semana da equipe", tone: "idle" } };
 }

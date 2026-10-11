@@ -61,6 +61,8 @@ describe("supervisor Lite chat", () => {
     const script = buildSupervisorScript("equipe-desempenho", data(), now);
     const bars = script.blocks.find((block) => block.type === "bars");
     expect(bars && bars.type === "bars" ? bars.values.map((value) => value.label) : []).toEqual(["Ana", "Bruno"]);
+    const choice = script.blocks.find((block) => block.id === "equipe-desempenho-choice");
+    expect(choice && choice.type === "question" ? choice.choices.map((item) => [item.label, item.action]) : []).toContainEqual(["Ver o placar", { kind: "href", href: "/equipe/desempenho" }]);
   });
 
   it("offers to add a free broker of the unit and to hand off a late lead", () => {

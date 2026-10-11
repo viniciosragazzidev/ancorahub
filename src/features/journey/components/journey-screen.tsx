@@ -10,6 +10,8 @@ import type {
   BrokerJourneyData, JourneyAchievement, JourneyMissionCard, MissionMetric, UnitLeaderboard,
 } from "@/features/engagement/journey-types";
 
+import { Term } from "@/features/assist/components/term";
+
 import { BadgeArt } from "./badge-art";
 import { LEVEL_HUE, LevelRing } from "./level-ring";
 import { Podium } from "./podium";
@@ -48,16 +50,16 @@ export function JourneyScreen({ data }: { data: JourneyScreenData }) {
   return (
     <div className={`arc-venancor ${styles.page}`}>
       <div className={styles.inner}>
-        <motion.header className={styles.pageHeader} initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(0)}>
+        <motion.header className={styles.pageHeader} data-tour="micro-journey-summary" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(0)}>
           <h1>Minha jornada</h1>
-          <p>Seus pontos vêm só do que você fez de verdade no atendimento.</p>
+          <p>Seus pontos vêm só do que você fez <Term id="evidence">de verdade</Term> no atendimento.</p>
         </motion.header>
 
         <motion.div initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(1)}>
           <JourneyHero data={data} />
         </motion.div>
 
-        <motion.section className={styles.section} aria-labelledby="journey-missions" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(2)}>
+        <motion.section className={styles.section} data-tour="micro-journey-missions" aria-labelledby="journey-missions" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(2)}>
           <div className={styles.sectionHead}>
             <h2 id="journey-missions">Missões de hoje</h2>
             {daily.length ? <span className={styles.sectionNote}>{daily.filter((mission) => mission.progress.completed).length} de {daily.length} concluídas</span> : null}
@@ -81,7 +83,7 @@ export function JourneyScreen({ data }: { data: JourneyScreenData }) {
         <motion.section className={styles.section} aria-labelledby="journey-board" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(4)}>
           <div className={styles.sectionHead}>
             <h2 id="journey-board">Placar da unidade</h2>
-            <span className={styles.sectionNote}>Zera toda segunda</span>
+            <span className={styles.sectionNote}><Term id="board">Zera toda segunda</Term></span>
           </div>
           <UnitBoard board={data.leaderboard} optedOut={Boolean(data.optedOut)} />
         </motion.section>
@@ -95,7 +97,7 @@ export function JourneyScreen({ data }: { data: JourneyScreenData }) {
         </motion.section>
 
         {data.ledger ? (
-          <motion.section id="extrato" className={`${styles.section} ${styles.anchor}`} aria-labelledby="journey-ledger" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(6)}>
+          <motion.section id="extrato" data-tour="micro-journey-ledger" className={`${styles.section} ${styles.anchor}`} aria-labelledby="journey-ledger" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(6)}>
             <div className={styles.sectionHead}><h2 id="journey-ledger">De onde vieram seus pontos</h2></div>
             <PointsLedger items={data.ledger} />
           </motion.section>
@@ -128,7 +130,7 @@ function JourneyHero({ data }: { data: JourneyScreenData }) {
           ) : null}
         </span>
         {level.nextLevel ? (
-          <span className={styles.heroNext}>Faltam <strong>{pts(level.pointsToNext)}</strong> para {level.nextLevel.name}</span>
+          <span className={styles.heroNext}>Faltam <strong>{pts(level.pointsToNext)}</strong> para o <Term id="level">nível</Term> {level.nextLevel.name}</span>
         ) : <span className={styles.heroNext}>Você chegou ao nível máximo.</span>}
       </div>
     </section>

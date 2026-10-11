@@ -19,6 +19,7 @@
 .teamImage { width: 96px; height: 96px; border: 3px solid var(--surface); border-radius: 50%; background: hsl(var(--team-hue,210) 48% 90%); color: hsl(var(--team-hue,210) 45% 30%); }
 .heroText { min-width: 0; }.heroText h2 { margin: 0; font-size: var(--text-lg); font-weight: 500; }.heroText p { margin: 4px 0 0; color: var(--text-muted); font-size: var(--text-sm); }
 .overview { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }.overview span { flex: 1; min-width: 6rem; padding: 10px 12px; border-radius: 1rem; background: var(--surface-muted); color: var(--text-muted); font-size: var(--text-xs); }.overview strong { display: block; color: var(--foreground); font-size: var(--text-lg); font-weight: 500; }.overview [data-alert=true] strong { color: var(--danger); }
+.teamRanking { grid-column: 1 / -1; margin: 0; color: var(--text-muted); font-size: var(--text-sm); }.teamRanking strong { color: var(--foreground); font-weight: 500; }.teamRanking [data-change="up"] { color: var(--success); }.teamRanking [data-change="down"] { color: var(--danger); }
 
 .teamIdentity p { margin: 4px 0 0; color: var(--text-muted); font-size: var(--text-sm); white-space: pre-wrap; }
 .section { display: grid; gap: 10px; }

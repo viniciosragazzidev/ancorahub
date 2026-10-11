@@ -36,6 +36,7 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/equipe$/,
   /^\/equipe\/minha$/,
   /^\/equipe\/minha\/configurar$/,
+  /^\/equipe\/desempenho$/,
   /^\/equipe\/transferencia$/,
   new RegExp(`^/equipe/(?!cargos$|convidar$|dashboard$|recuperacoes$)${ID}$`),
   /^\/relacionamento$/,
@@ -55,6 +56,7 @@ export function isLightRouteAllowed(pathname: string, audience: "broker" | "supe
 /** "Mais" of the supervisor. */
 export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/equipe/minha", label: "Minha equipe" },
+  { href: "/equipe/desempenho", label: "Placar da equipe", requires: "teamRanking" },
   { href: "/equipe/transferencia", label: "Pedir corretor de outra equipe" },
   { href: "/relacionamento", label: "Central de relacionamento", requires: "relationshipCenter" },
   { href: "/clientes", label: "Clientes da equipe" },
@@ -77,7 +79,7 @@ export type LightMoreDestination = {
   href: string;
   label: string;
   /** Hidden unless the matching capability is on. */
-  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter" | "journey";
+  requires?: "quoteSimulator" | "dutyCalendar" | "relationshipCenter" | "journey" | "teamRanking";
 };
 
 export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
@@ -90,7 +92,7 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/settings", label: "Configurações" },
 ];
 
-export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean }, audience: "broker" | "supervisor" = "broker") {
+export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean }, audience: "broker" | "supervisor" = "broker") {
   const list = audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : LIGHT_MORE_DESTINATIONS;
   return list.filter((item) => !item.requires || capabilities[item.requires]);
 }
@@ -185,6 +187,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/equipe/transferencia"), route: { title: "Pedir transferência", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/equipe/minha"), route: { title: "Minha equipe", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/equipe/minha/configurar"), route: { title: "Configuração da equipe", tab: "mais", isRoot: false, parentHref: "/equipe/minha" } },
+  { test: exact("/equipe/desempenho"), route: { title: "Placar da equipe", tab: "mais", isRoot: false, parentHref: "/equipe/minha" } },
   { test: exact("/equipe"), route: { title: "Minha equipe", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/equipe"), route: { title: "Corretor", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },

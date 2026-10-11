@@ -43,6 +43,7 @@ export function LeadConversation({
         identity={{ name, shape: "mochi", hue: null, initials }}
         backHref="/dashboard"
         script={script}
+        tourTargets={{ conversation: "micro-lead-details", composer: "micro-lead-actions" }}
         composerDisabled={!canWrite}
         onButtonOpen={(block, event) => {
           if (block.tone !== "whatsapp") return;
@@ -54,7 +55,7 @@ export function LeadConversation({
           }
         }}
         headerAction={
-          <Link href={`/leads/${leadId}?ficha=1`} className={styles.iconButton} aria-label="Ver ficha completa">
+          <Link href={`/leads/${leadId}?ficha=1`} className={styles.iconButton} data-tour="micro-lead-identity" aria-label="Ver ficha completa">
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2.5" width="10" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
           </Link>
         }

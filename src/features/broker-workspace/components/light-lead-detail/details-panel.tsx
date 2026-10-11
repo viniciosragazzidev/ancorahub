@@ -25,7 +25,7 @@ export function DetailsZone({ lead, c }: { lead: LightLeadDetailData; c: LeadDet
 
   return (
     <>
-      <section className="arc-venancor rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
+      <section data-tour="micro-lead-details" className="arc-venancor rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
         <button
           type="button"
           onClick={() => setDetailsExpanded((previous) => !previous)}

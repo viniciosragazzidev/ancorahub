@@ -3,6 +3,8 @@
 import Link from "next/link";
 
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
+import { getMicroTourForPath } from "@/components/chat/tour/tour-steps";
+import { startLiteMicroTour } from "@/components/chat/tour/lite-tour";
 
 import { helpForRoute } from "../catalog";
 import styles from "./assist.module.css";
@@ -13,6 +15,7 @@ import styles from "./assist.module.css";
  */
 export function HelpSheet({ pathname, open, onOpenChange, onSearch }: { pathname: string; open: boolean; onOpenChange: (open: boolean) => void; onSearch: () => void }) {
   const help = helpForRoute(pathname);
+  const hasMicroTour = Boolean(getMicroTourForPath(pathname));
   return (
     <BottomSheet className="arc-venancor" open={open} onOpenChange={onOpenChange} title={help ? `Ajuda: ${help.title}` : "Ajuda"} description={help?.intro} detents={[0.62, 0.92]} closeLabel="Fechar">
       <div className={styles.help}>
@@ -34,6 +37,11 @@ export function HelpSheet({ pathname, open, onOpenChange, onSearch }: { pathname
             ))}
           </nav>
         ) : null}
+
+        {hasMicroTour ? <button type="button" className={styles.searchCta} onClick={() => { onOpenChange(false); window.setTimeout(() => startLiteMicroTour(pathname), 280); }}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18" /></svg>
+          Me mostra
+        </button> : null}
 
         <button type="button" className={styles.searchCta} onClick={() => { onOpenChange(false); onSearch(); }}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>

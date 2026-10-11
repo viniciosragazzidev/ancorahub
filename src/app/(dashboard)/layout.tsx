@@ -52,6 +52,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const relationshipFlagPromise = context.role === "broker" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")
     : Promise.resolve("false");
+  const teamRankingFlagPromise = context.role === "supervisor"
+    ? getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false")
+    : Promise.resolve("false");
   const supervisorLitePromise = isSupervisorLiteAvailable(context);
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   const headersPromise = headers();
@@ -98,6 +101,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     brokerDutyCalendarFlag,
     brokerJourneyFlag,
     relationshipFlag,
+    teamRankingFlag,
     supervisorLiteAvailable,
   ] = await Promise.all([
     experienceModePromise,
@@ -109,6 +113,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     brokerDutyCalendarFlagPromise,
     brokerJourneyFlagPromise,
     relationshipFlagPromise,
+    teamRankingFlagPromise,
     supervisorLitePromise,
   ]);
 
@@ -185,6 +190,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
         journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
+        teamRankingEnabled={isLightSupervisor && teamRankingFlag === "true"}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         showRelationship={(isLightBroker || isLightSupervisor) && relationshipFlag === "true"}
         branding={{

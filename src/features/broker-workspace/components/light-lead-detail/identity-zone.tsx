@@ -13,7 +13,7 @@ export function IdentityHeader({ lead, c }: { lead: LightLeadDetailData; c: Lead
   const tone: BadgeTone = isDistributed ? "info" : leadStatus === "converted" ? "success" : "neutral";
 
   return (
-    <header className="arc-venancor flex flex-col items-center gap-3 pt-2 text-center">
+    <header data-tour="micro-lead-identity" className="arc-venancor flex flex-col items-center gap-3 pt-2 text-center">
       <Avatar name={lead.nome} size="xl" className="light-avatar" />
       <div className="flex min-w-0 max-w-full flex-col items-center gap-1">
         <h1 className="max-w-full break-words text-2xl font-bold tracking-tight text-(--foreground)">{lead.nome}</h1>

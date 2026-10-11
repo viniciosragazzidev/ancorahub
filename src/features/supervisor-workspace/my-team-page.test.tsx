@@ -18,7 +18,7 @@ vi.mock("@/components/arc/bottom-sheet/bottom-sheet", () => ({ BottomSheet: ({ t
 
 import { MyTeamPage, teamAvatarHue } from "./my-team-page";
 
-const base = { overview: { brokers: 0, inService: 0, late: 0 }, team: null, members: [], invites: [], brokers: [{ id: "broker-1", name: "Ana Exemplo", imageUrl: null, supervisorId: null, supervisorName: null, inviteId: null }] };
+const base = { overview: { brokers: 0, inService: 0, late: 0 }, ranking: null, team: null, members: [], invites: [], brokers: [{ id: "broker-1", name: "Ana Exemplo", imageUrl: null, supervisorId: null, supervisorName: null, inviteId: null }] };
 
 beforeEach(() => { cleanup(); mockInvite.mockReset(); mockCancel.mockReset(); mockRemove.mockReset(); mockAddDirectly.mockReset(); });
 
@@ -52,5 +52,11 @@ describe("MyTeamPage", () => {
   it("derives a stable non-neutral hue from the member name", () => {
     expect(teamAvatarHue("Ana Souza")).toBe(teamAvatarHue("Ana Souza"));
     expect(teamAvatarHue("Ana Souza")).not.toBe(teamAvatarHue("Bruno Lima"));
+  });
+
+  it("shows the unit position and weekly movement only when the ranking is available", () => {
+    render(<MyTeamPage initialData={{ ...base, team: { name: "Equipe Centro", description: "", imageUrl: null }, ranking: { position: 2, positionChange: 1 } }} />);
+    expect(screen.getByText(/Sua equipe está em/).textContent).toContain("Nº 2");
+    expect(screen.getByLabelText("Subiu 1 posições")).toBeTruthy();
   });
 });

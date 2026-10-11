@@ -7,7 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AssistantAvatar } from "../assistant-avatar";
 import { DynamicNotice, type DynamicNoticeItem } from "../dynamic-notice";
 import styles from "./lite-tour.module.css";
-import { availableSteps, narrationSrc, SUPERVISOR_TOUR_STEPS, SUPERVISOR_TOUR_STORAGE_KEY, TOUR_STEPS, TOUR_STORAGE_KEY, totalXp, type TourStep } from "./tour-steps";
+import { availableSteps, getMicroTourForPath, narrationSrc, SUPERVISOR_TOUR_STEPS, SUPERVISOR_TOUR_STORAGE_KEY, TOUR_STEPS, TOUR_STORAGE_KEY, totalXp, type TourStep } from "./tour-steps";
 
 export type TourVariant = "broker" | "supervisor";
 const TOUR_CONFIG: Record<TourVariant, { steps: TourStep[]; storageKey: string; badge: string }> = {
@@ -16,6 +16,7 @@ const TOUR_CONFIG: Record<TourVariant, { steps: TourStep[]; storageKey: string; 
 };
 
 export const START_TOUR_EVENT = "ancora:start-lite-tour";
+const START_MICRO_TOUR_EVENT = "ancora:start-lite-micro-tour:";
 const MUTE_KEY = "ancora:lite-tour:muted";
 const PAD = 8;
 const CARD_GAP = 14;
@@ -28,8 +29,28 @@ export function startLiteTour() {
   window.dispatchEvent(new Event(START_TOUR_EVENT));
 }
 
+export function startLiteMicroTour(pathname: string) {
+  const microTour = getMicroTourForPath(pathname);
+  if (microTour) window.dispatchEvent(new Event(`${START_MICRO_TOUR_EVENT}${microTour.id}`));
+}
+
 export function hasSeenLiteTour(variant: TourVariant = "broker") {
   try { return window.localStorage.getItem(TOUR_CONFIG[variant].storageKey) === "done"; } catch { return true; }
+}
+
+/** One short, first-visit tour for the current broker Lite screen. */
+export function LiteMicroTour({ pathname }: { pathname: string }) {
+  const microTour = getMicroTourForPath(pathname);
+  if (!microTour) return null;
+  return <LiteTour
+    key={microTour.id}
+    steps={microTour.steps}
+    storageKey={`ancora:lite-micro-tour:v1:${microTour.id}`}
+    startEvent={`${START_MICRO_TOUR_EVENT}${microTour.id}`}
+    autoStart
+    queryStart={false}
+    showRewards={false}
+  />;
 }
 
 type Rect = { x: number; y: number; width: number; height: number; radius: number };
@@ -76,8 +97,21 @@ const NOTICE_DEMO: DynamicNoticeItem = {
  * challenge, the new-lead notice preview and a finale with a badge. Each step
  * plays /onboarding/narracao/{id}.mp3 when the file exists (mute toggle).
  */
-export function LiteTour({ variant = "broker" }: { variant?: TourVariant } = {}) {
-  const config = TOUR_CONFIG[variant];
+export function LiteTour({ variant = "broker", steps: configuredSteps, storageKey, startEvent, autoStart = false, queryStart = true, showRewards = true, badge }: {
+  variant?: TourVariant;
+  steps?: TourStep[];
+  storageKey?: string;
+  startEvent?: string;
+  autoStart?: boolean;
+  queryStart?: boolean;
+  showRewards?: boolean;
+  badge?: string;
+} = {}) {
+  const baseConfig = TOUR_CONFIG[variant];
+  const tourSteps = configuredSteps ?? baseConfig.steps;
+  const activeStorageKey = storageKey ?? baseConfig.storageKey;
+  const activeStartEvent = startEvent ?? START_TOUR_EVENT;
+  const badgeLabel = badge ?? baseConfig.badge;
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [steps, setSteps] = useState<TourStep[]>([]);
@@ -105,10 +139,11 @@ export function LiteTour({ variant = "broker" }: { variant?: TourVariant } = {})
   }, []);
 
   const start = useCallback(() => {
+    if (document.documentElement.dataset.leadOffer === "1") return;
     // Usually runs inside the tap that opened the tour; from ?tour=1 the first tour button unlocks it instead.
     ensureAudio();
     returnFocus.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const list = availableSteps(config.steps, (target) => isVisible(targetElement(target)));
+    const list = availableSteps(tourSteps, (target) => isVisible(targetElement(target)));
     earned.current = new Set();
     try { setMuted(window.localStorage.getItem(MUTE_KEY) === "1"); } catch { /* ignore */ }
     setSteps(list);
@@ -116,22 +151,49 @@ export function LiteTour({ variant = "broker" }: { variant?: TourVariant } = {})
     setXp(0);
     setAnswer(null);
     setOpen(true);
-  }, [ensureAudio, config.steps]);
+  }, [ensureAudio, tourSteps]);
 
   // Start from the event (welcome card, menu) or from ?tour=1.
   useEffect(() => {
     const onStart = () => start();
-    window.addEventListener(START_TOUR_EVENT, onStart);
+    window.addEventListener(activeStartEvent, onStart);
+    if (!queryStart) return () => window.removeEventListener(activeStartEvent, onStart);
     const params = new URLSearchParams(window.location.search);
     if (params.get("tour") === "1") {
       params.delete("tour");
       const query = params.toString();
       window.history.replaceState(window.history.state, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
       const timer = window.setTimeout(start, 400);
-      return () => { window.removeEventListener(START_TOUR_EVENT, onStart); window.clearTimeout(timer); };
+      return () => { window.removeEventListener(activeStartEvent, onStart); window.clearTimeout(timer); };
     }
-    return () => window.removeEventListener(START_TOUR_EVENT, onStart);
-  }, [start]);
+    return () => window.removeEventListener(activeStartEvent, onStart);
+  }, [activeStartEvent, queryStart, start]);
+
+  // Micro-tours start once per screen. An active lead offer takes priority; a
+  // mutation observer starts the tour after the offer closes without reloading.
+  useEffect(() => {
+    if (!autoStart || open) return;
+    let timer: number | null = null;
+    const maybeStart = () => {
+      if (timer !== null || document.documentElement.dataset.leadOffer === "1") return;
+      try {
+        if (window.localStorage.getItem(activeStorageKey) !== null) return;
+      } catch {
+        return;
+      }
+      timer = window.setTimeout(() => {
+        timer = null;
+        start();
+      }, 450);
+    };
+    maybeStart();
+    const observer = new MutationObserver(maybeStart);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-lead-offer"] });
+    return () => {
+      observer.disconnect();
+      if (timer !== null) window.clearTimeout(timer);
+    };
+  }, [activeStorageKey, autoStart, open, start]);
 
   // Follow the target: scroll it into view, then track its box while the step is open.
   useEffect(() => {
@@ -179,20 +241,32 @@ export function LiteTour({ variant = "broker" }: { variant?: TourVariant } = {})
   }, [open, index, reduce]);
 
   const award = useCallback((id: string, value: number) => {
+    if (!showRewards) return;
     if (earned.current.has(id)) return;
     earned.current.add(id);
     setXp((current) => current + value);
     setGain({ key: Date.now(), value });
-  }, []);
+  }, [showRewards]);
 
   const close = useCallback((completed: boolean) => {
-    try { window.localStorage.setItem(config.storageKey, completed ? "done" : "skipped"); } catch { /* ignore */ }
+    try { window.localStorage.setItem(activeStorageKey, completed ? "done" : "skipped"); } catch { /* ignore */ }
     audioRef.current?.pause();
     setOpen(false);
     setRect(null);
     const back = returnFocus.current;
     if (back?.isConnected) window.setTimeout(() => back.focus({ preventScroll: true }), 0);
-  }, [config.storageKey]);
+  }, [activeStorageKey]);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeForLeadOffer = () => {
+      if (document.documentElement.dataset.leadOffer === "1") close(false);
+    };
+    closeForLeadOffer();
+    const observer = new MutationObserver(closeForLeadOffer);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-lead-offer"] });
+    return () => observer.disconnect();
+  }, [close, open]);
 
   const next = useCallback(() => {
     if (!step) return;
@@ -279,6 +353,8 @@ export function LiteTour({ variant = "broker" }: { variant?: TourVariant } = {})
   }
 
   const isLast = index === steps.length - 1;
+  const numberedSteps = steps.filter((item) => item.kind !== "intro" && item.kind !== "finale");
+  const numberedStep = Math.max(1, numberedSteps.findIndex((item) => item.id === step.id) + 1);
   const spring = reduce ? { duration: 0 } : { type: "spring" as const, stiffness: 300, damping: 32, mass: 0.9 };
 
   return createPortal(
@@ -320,10 +396,10 @@ export function LiteTour({ variant = "broker" }: { variant?: TourVariant } = {})
           ))}
         </div>
         <div className={styles.topActions}>
-          <span className={styles.xp} aria-live="polite">
+          {showRewards ? <span className={styles.xp} aria-live="polite">
             <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.5l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.3l-3.8 2 .7-4.3-3.1-3 4.3-.6L8 1.5Z" fill="currentColor" /></svg>
             <motion.span key={xp} initial={reduce ? false : { scale: 1.35 }} animate={{ scale: 1 }} transition={{ type: "spring", visualDuration: 0.3, bounce: 0.4 }}>{xp}</motion.span> XP
-          </span>
+          </span> : null}
           <button type="button" className={styles.iconButton} onClick={toggleMute} aria-label={muted ? "Ligar narração" : "Silenciar narração"} aria-pressed={muted}>
             {muted
               ? <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6h2.5L9 3v10L5.5 10H3V6Z" fill="currentColor" /><path d="m11 6 3.5 4M14.5 6 11 10" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
@@ -374,13 +450,13 @@ export function LiteTour({ variant = "broker" }: { variant?: TourVariant } = {})
           transition={{ duration: 0.28, ease: EASE }}
         >
           {step.kind === "intro" ? <Team reduce={Boolean(reduce)} /> : null}
-          {step.kind === "finale" ? <Badge xp={xp} maxXp={maxXp} reduce={Boolean(reduce)} label={config.badge} /> : null}
+          {step.kind === "finale" ? <Badge xp={xp} maxXp={maxXp} reduce={Boolean(reduce)} label={badgeLabel} /> : null}
 
           <div className={styles.cardHead}>
             {step.kind === "spotlight" || step.kind === "demo-reply" || step.kind === "demo-notice" ? (
               <AssistantAvatar shape={step.mascot.shape} hue={step.mascot.hue} size={36} state="working" />
             ) : null}
-            <span className={styles.stepTag}>{step.kind === "intro" ? "Tour do app" : step.kind === "finale" ? "Concluído" : `Passo ${index} de ${steps.length - 2}`}</span>
+            <span className={styles.stepTag}>{step.kind === "intro" ? "Tour do app" : step.kind === "finale" ? "Concluído" : `Passo ${numberedStep} de ${numberedSteps.length}`}</span>
           </div>
           <h2 id="lite-tour-title" className={styles.title}>{step.title}</h2>
           <p id="lite-tour-body" className={styles.body}>{step.body}</p>

@@ -33,7 +33,7 @@ export function LightSettings({ sections }: { sections: LightSettingsSection[] }
 
   if (active) {
     return (
-      <div className="mx-auto w-full max-w-4xl px-4 pb-6 pt-2 sm:px-6">
+      <div data-tour="micro-settings-intro" className="mx-auto w-full max-w-4xl px-4 pb-6 pt-2 sm:px-6">
         <h1 className="sr-only">{active.title}</h1>
         {active.node}
       </div>
@@ -43,10 +43,10 @@ export function LightSettings({ sections }: { sections: LightSettingsSection[] }
   return (
     <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-col gap-4 px-4 pb-6 pt-2 sm:px-6">
       <h1 className="sr-only">Configurações</h1>
-      <p className="text-sm text-(--text-secondary)">Sua conta, sua disponibilidade e a segurança do acesso.</p>
-      <ul className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
-        {sections.map((section) => (
-          <li key={section.id} className="border-b border-(--border) last:border-b-0">
+      <p data-tour="micro-settings-intro" className="text-sm text-(--text-secondary)">Sua conta, sua disponibilidade e a segurança do acesso.</p>
+      <ul data-tour="micro-settings-sections" className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
+        {sections.map((section, index) => (
+          <li key={section.id} data-tour={index === 0 ? "micro-settings-account" : undefined} className="border-b border-(--border) last:border-b-0">
             <Link href={`/settings?tab=${section.id}`} className="flex min-h-16 items-center justify-between gap-3 px-5 py-4 active:bg-(--surface-muted)">
               <span className="min-w-0">
                 <span className="block text-base font-semibold text-(--foreground)">{section.title}</span>

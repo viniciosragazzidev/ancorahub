@@ -23,6 +23,59 @@ export type TourStep = {
   mascot: { shape: MascotShape; hue: number | null };
 };
 
+export type MicroTourId = "jornada" | "minha-fila" | "lead" | "plantoes" | "settings";
+export type MicroTour = { id: MicroTourId; steps: TourStep[] };
+
+const microStep = (id: string, target: string, title: string, body: string, shape: MascotShape = "logo", hue: number | null = null): TourStep => ({
+  id: `micro-${id}`,
+  kind: "spotlight",
+  target,
+  title,
+  body,
+  narration: body,
+  xp: 5,
+  mascot: { shape, hue },
+});
+
+export const MICRO_TOURS: Record<MicroTourId, TourStep[]> = {
+  jornada: [
+    microStep("jornada-resumo", "micro-journey-summary", "Seu resumo da semana", "Aqui você vê seu nível e os pontos que já conquistou.", "favo", 85),
+    microStep("jornada-missoes", "micro-journey-missions", "Missões para hoje", "Acompanhe o que falta e veja seu avanço em cada missão.", "mochi", 212),
+    microStep("jornada-extrato", "micro-journey-ledger", "Seus pontos, item por item", "No extrato você confere de onde veio cada ponto.", "favo", 85),
+  ],
+  "minha-fila": [
+    microStep("fila-busca", "micro-queue-search", "Encontre um atendimento", "Busque pelo nome, telefone ou produto.", "mochi", 212),
+    microStep("fila-etapas", "micro-queue-tabs", "Organize sua fila", "Alterne entre novos, atendimentos, retornos e prazos em risco.", "cubo", 150),
+    microStep("fila-lead", "micro-queue-lead", "Veja o que pede atenção", "Leads com uma ação pendente aparecem primeiro.", "mochi", 212),
+  ],
+  lead: [
+    microStep("lead-identidade", "micro-lead-identity", "A ficha do cliente", "Nome, etapa e prazo de aceite ficam no começo.", "mochi", 212),
+    microStep("lead-detalhes", "micro-lead-details", "Contexto do atendimento", "Confira as informações que ajudam na próxima conversa.", "cubo", 150),
+    microStep("lead-acoes", "micro-lead-actions", "Próximo passo", "Use a barra para chamar no WhatsApp, ligar ou atualizar a etapa.", "mochi", 212),
+  ],
+  plantoes: [
+    microStep("plantao-proximo", "micro-duty-highlight", "Seu próximo plantão", "Veja o horário e a unidade do próximo turno.", "onigiri", 28),
+    microStep("plantao-calendario", "micro-duty-calendar", "Confira outras datas", "Escolha um dia para abrir os detalhes da escala.", "cubo", 150),
+    microStep("plantao-proximos", "micro-duty-upcoming", "A semana à frente", "Os próximos turnos ficam reunidos nesta lista.", "onigiri", 28),
+  ],
+  settings: [
+    microStep("settings-intro", "micro-settings-intro", "Seu espaço", "Aqui você ajusta sua conta e as ferramentas do app.", "logo", null),
+    microStep("settings-sections", "micro-settings-sections", "Abra uma seção", "Toque no assunto que quer revisar.", "cubo", 150),
+    microStep("settings-account", "micro-settings-account", "Seus dados", "Conta, segurança e preferências ficam nas configurações.", "logo", null),
+  ],
+};
+
+export function getMicroTourForPath(pathname: string): MicroTour | null {
+  const path = pathname.split("?")[0]?.replace(/\/+$/, "") || "/";
+  const id: MicroTourId | null = path === "/jornada" ? "jornada"
+    : path === "/minha-fila" ? "minha-fila"
+      : /^\/leads\/(?!distribuicao(?:\/|$)|arquivados(?:\/|$)|dashboard(?:\/|$))[^/]+$/.test(path) ? "lead"
+        : path === "/plantoes" ? "plantoes"
+          : path === "/settings" ? "settings"
+            : null;
+  return id ? { id, steps: MICRO_TOURS[id] } : null;
+}
+
 export const TOUR_VERSION = "2026-10-lite-tour-v1";
 export const TOUR_STORAGE_KEY = `ancora:${TOUR_VERSION}`;
 export const narrationSrc = (id: string) => `/onboarding/narracao/${id}.mp3`;

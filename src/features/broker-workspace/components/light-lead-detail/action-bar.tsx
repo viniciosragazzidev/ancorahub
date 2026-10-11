@@ -32,6 +32,7 @@ export function LeadActionBar({ lead, c }: { lead: LightLeadDetailData; c: LeadD
 
   return (
     <nav
+      data-tour="micro-lead-actions"
       aria-label="Ações do lead"
       className="arc-venancor fixed inset-x-4 bottom-[calc(22px+var(--mobile-safe-bottom))] z-40 md:left-[calc(72px+1rem)]"
     >

@@ -4,7 +4,7 @@ import { getLightMoreDestinations, isLightRouteAllowed, resolveLightRoute } from
 
 describe("supervisor Lite routes", () => {
   it("allows the team screens route by route", () => {
-    for (const path of ["/dashboard", "/dashboard/c/equipe", "/leads", "/leads/abc", "/clientes", "/equipe", "/equipe/minha", "/equipe/minha/configurar", "/equipe/u1", "/equipe/transferencia", "/relacionamento", "/notificacoes", "/settings"]) {
+    for (const path of ["/dashboard", "/dashboard/c/equipe", "/leads", "/leads/abc", "/clientes", "/equipe", "/equipe/minha", "/equipe/minha/configurar", "/equipe/desempenho", "/equipe/u1", "/equipe/transferencia", "/relacionamento", "/notificacoes", "/settings"]) {
       expect(isLightRouteAllowed(path, "supervisor")).toBe(true);
     }
   });
@@ -19,6 +19,8 @@ describe("supervisor Lite routes", () => {
 
   it("gives the supervisor their own Mais menu", () => {
     expect(getLightMoreDestinations({ relationshipCenter: true }, "supervisor").map((item) => item.href)).toEqual(["/equipe/minha", "/equipe/transferencia", "/relacionamento", "/clientes", "/notificacoes", "/settings"]);
+    expect(getLightMoreDestinations({ relationshipCenter: true, teamRanking: true }, "supervisor").map((item) => item.href)).toContain("/equipe/desempenho");
+    expect(getLightMoreDestinations({ relationshipCenter: true, teamRanking: false }, "supervisor").map((item) => item.href)).not.toContain("/equipe/desempenho");
   });
 
   it("sets the own team page title and parent", () => {
@@ -28,5 +30,9 @@ describe("supervisor Lite routes", () => {
 
   it("sets the transfer page title and parent", () => {
     expect(resolveLightRoute("/equipe/transferencia")).toMatchObject({ title: "Pedir transferência", parentHref: "/equipe", tab: "mais" });
+  });
+
+  it("gives the team board a direct Lite destination", () => {
+    expect(resolveLightRoute("/equipe/desempenho")).toMatchObject({ title: "Placar da equipe", parentHref: "/equipe/minha", tab: "mais" });
   });
 });

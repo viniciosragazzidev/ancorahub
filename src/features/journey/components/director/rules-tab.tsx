@@ -53,7 +53,7 @@ function RuleRow({ rule, onUpdate }: { rule: EngagementRule; onUpdate?: (input: 
   return (
     <li className="grid gap-3 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
       <div className="flex items-start gap-3">
-        <DsSwitch checked={enabled} aria-label={`${enabled ? "Desligar" : "Ligar"} ${rule.label}`} onCheckedChange={(checked) => { setEnabled(checked); save({ enabled: checked }); }} disabled={pending || !onUpdate} />
+        <DsSwitch className="relative mt-0.5 before:absolute before:-inset-x-2 before:-inset-y-3 before:content-['']" checked={enabled} aria-label={`${enabled ? "Desligar" : "Ligar"} ${rule.label}`} onCheckedChange={(checked) => { setEnabled(checked); save({ enabled: checked }); }} disabled={pending || !onUpdate} />
         <div className="min-w-0">
           <p className="font-medium">{rule.label}</p>
           <p className="text-xs text-muted-foreground">{rule.hint}</p>

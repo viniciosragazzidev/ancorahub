@@ -6,9 +6,12 @@ import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/queries";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
+import { teamLeaderboard } from "@/features/engagement/leaderboard-queries";
 
 export type SupervisorTeamPageData = {
   team: { name: string; description: string; imageUrl: string | null } | null;
+  ranking: { position: number; positionChange: number | null } | null;
   overview: { brokers: number; inService: number; late: number };
   members: Array<{ id: string; name: string; imageUrl: string | null; availability: string; receivedToday: number; inService: number; late: number }>;
   invites: Array<{ id: string; brokerId: string; brokerName: string; createdAt: string }>;
@@ -57,6 +60,11 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
       )).orderBy(asc(schema.user.name)),
     getSupervisorWorkspaceData(context),
   ]);
+  const rankingEnabled = await getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false") === "true";
+  const leaderboard = rankingEnabled
+    ? await teamLeaderboard(context.tenantId, context.branchId).catch(() => null)
+    : null;
+  const teamStanding = leaderboard?.teams.find((team) => team.supervisorId === context.userId);
   const supervisorIds = [...new Set(brokerRows.map((row) => row.supervisorId).filter((id): id is string => Boolean(id) && id !== context.userId))];
   const supervisorRows = supervisorIds.length ? await db.select({ id: schema.user.id, name: schema.user.name }).from(schema.user)
     .innerJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.user.id), eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.role, "supervisor"), eq(schema.tenantMemberships.status, "active")))
@@ -66,6 +74,7 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
 
   return {
     team: teamRows[0] ?? null,
+    ranking: teamStanding ? { position: teamStanding.position, positionChange: teamStanding.positionChange } : null,
     overview: {
       brokers: workspace.team.length,
       inService: workspace.today.inService,

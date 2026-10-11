@@ -1,0 +1,11 @@
+.term {
+  display: inline; padding: 0; border: 0; background: none;
+  color: inherit; font: inherit; text-align: inherit; cursor: help;
+  text-decoration: underline dotted; text-decoration-color: color-mix(in oklch, currentColor 45%, transparent);
+  text-underline-offset: 3px; text-decoration-thickness: 1.5px;
+}
+.term:hover { text-decoration-color: currentColor; }
+.sheet { display: grid; gap: 12px; padding: 4px 0 24px; }
+.meaning { margin: 0; font-size: var(--text-base); line-height: 1.5; }
+.why { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--surface-muted); color: var(--text-muted); font-size: var(--text-sm); line-height: 1.5; }
+.why strong { color: var(--foreground); font-weight: 500; }

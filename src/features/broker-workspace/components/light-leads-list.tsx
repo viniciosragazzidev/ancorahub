@@ -94,10 +94,10 @@ const actionPrimary =
 const actionSecondary =
   "inline-flex h-11 w-full items-center justify-center rounded-full bg-(--surface-muted) px-5 text-sm font-semibold text-(--foreground) sm:w-auto";
 
-function NeedsYouCard({ lead }: { lead: LightLeadItem }) {
+function NeedsYouCard({ lead, dataTour }: { lead: LightLeadItem; dataTour?: string }) {
   const state = describeLead(lead);
   return (
-    <li className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+    <li data-tour={dataTour} className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
       <div className="flex items-start gap-3">
         <Avatar name={lead.name} size="lg" className="light-avatar" />
         <div className="min-w-0 flex-1">
@@ -122,10 +122,10 @@ function NeedsYouCard({ lead }: { lead: LightLeadItem }) {
   );
 }
 
-function CompactRow({ lead }: { lead: LightLeadItem }) {
+function CompactRow({ lead, dataTour }: { lead: LightLeadItem; dataTour?: string }) {
   const state = describeLead(lead);
   return (
-    <li className="border-b border-(--border) last:border-b-0">
+    <li data-tour={dataTour} className="border-b border-(--border) last:border-b-0">
       <Link href={`/leads/${lead.id}`} className="flex min-h-16 items-center gap-3 px-4 py-3 active:bg-(--surface-muted)">
         <Avatar name={lead.name} size="md" className="light-avatar" />
         <span className="min-w-0 flex-1">
@@ -193,19 +193,19 @@ export function LightLeadsList({
       <LightAvailabilityBanner initialStatus={availabilityStatus} />
 
       <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-6 pt-2 sm:px-6">
-        <SearchField
+        <div data-tour="micro-queue-search"><SearchField
           label="Buscar lead"
           placeholder="Nome, telefone ou produto"
           value={searchQuery}
           onValueChange={setSearchQuery}
-        />
+        /></div>
 
-        <SegmentedControl
+        <div data-tour="micro-queue-tabs"><SegmentedControl
           label="Etapas da fila"
           options={options}
           value={filter}
           onValueChange={(value) => setFilter(value as FilterTab)}
-        />
+        /></div>
 
         {visible.length === 0 ? (
           <EmptyState
@@ -228,8 +228,8 @@ export function LightLeadsList({
                   <span className="ml-2 tabular-nums text-(--text-secondary)">{urgent.length}</span>
                 </h2>
                 <ul className="flex flex-col gap-3">
-                  {urgent.map((lead) => (
-                    <NeedsYouCard key={lead.id} lead={lead} />
+                  {urgent.map((lead, index) => (
+                    <NeedsYouCard key={lead.id} lead={lead} dataTour={index === 0 ? "micro-queue-lead" : undefined} />
                   ))}
                 </ul>
               </section>
@@ -247,8 +247,8 @@ export function LightLeadsList({
                   </h2>
                 )}
                 <ul className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
-                  {rest.map((lead) => (
-                    <CompactRow key={lead.id} lead={lead} />
+                  {rest.map((lead, index) => (
+                    <CompactRow key={lead.id} lead={lead} dataTour={urgent.length === 0 && index === 0 ? "micro-queue-lead" : undefined} />
                   ))}
                 </ul>
               </section>

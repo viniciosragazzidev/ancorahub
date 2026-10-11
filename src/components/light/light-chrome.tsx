@@ -13,6 +13,7 @@ import { REALTIME_SYNC_BROWSER_EVENT } from "@/components/providers/realtime-eve
 import { A11yPrefsProvider } from "@/features/assist/a11y-prefs";
 import { AssistHelpButton, AssistLayer } from "@/features/assist/components/assist-layer";
 import { CelebrationHost } from "@/features/journey/components/celebration-host";
+import { LiteMicroTour } from "@/components/chat/tour/lite-tour";
 
 import { LightAppHeader } from "./light-app-header";
 import { LightAvailabilityProvider } from "./light-availability-context";
@@ -36,6 +37,7 @@ export function LightChrome({
   showDutyCalendar = false,
   showRelationship = false,
   journeyEnabled = false,
+  teamRankingEnabled = false,
   audience = "broker",
   initialAvailability = "available",
 }: {
@@ -47,6 +49,7 @@ export function LightChrome({
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
   journeyEnabled?: boolean;
+  teamRankingEnabled?: boolean;
   audience?: "broker" | "supervisor";
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
@@ -68,6 +71,7 @@ export function LightChrome({
       showDutyCalendar={showDutyCalendar}
       showRelationship={showRelationship}
       journeyEnabled={journeyEnabled}
+      teamRankingEnabled={teamRankingEnabled}
       audience={audience}
       availability={availability}
       availabilityPending={isPending}
@@ -99,6 +103,7 @@ export function LightChrome({
       </div>
       {/* Points, missions and achievements of the broker show up here, never over a lead offer. */}
       {journeyEnabled && audience === "broker" ? <CelebrationHost /> : null}
+      {audience === "broker" ? <LiteMicroTour pathname={pathname} /> : null}
     </LightAvailabilityProvider>
   );
 
