@@ -8,6 +8,7 @@ import { Suspense, useMemo, useState } from "react";
 import type { JourneyCelebration, JourneyMissionCard } from "@/features/engagement/journey-types";
 import { CelebrationLayer } from "@/features/journey/components/celebration-layer";
 import { JourneyScreen, type JourneyScreenData } from "@/features/journey/components/journey-screen";
+import { AppShell } from "@/components/app-shell";
 import { LightChrome } from "@/components/light/light-chrome";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { ViewAsBanner } from "@/features/super-admin/components/view-as";
@@ -97,7 +98,10 @@ function Showcase() {
   const screen = <JourneyScreen data={data} />;
   return (
     <>
-      {params.get("chrome") === "1" ? (
+      {params.get("shell") === "1" ? (
+        // The real app shell (Lite branch), as the (dashboard) layout renders it.
+        <AppShell isLightBroker journeyEnabled user={{ name: "Vinicios Ragazzi", email: null, role: "broker" }}>{screen}</AppShell>
+      ) : params.get("chrome") === "1" ? (
         // Same wrapper as the real app shell (app-shell.tsx, Lite branch).
         <SidebarProvider defaultOpen={false} open={false} className="min-h-dvh flex-col overflow-x-hidden" style={{ "--sidebar-width": "0px", "--header-height": "3.5rem" } as React.CSSProperties}>
           {/* ?viewas=1: with the "Ver como" strip above the app. */}

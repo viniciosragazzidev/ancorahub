@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
+  getPushPublicKeyAction,
   getSubscriptionStatusAction,
   sendTestNotificationAction,
   subscribeUserAction,
@@ -17,7 +18,8 @@ import {
 } from "../push-actions";
 import { getPushAvailability } from "../push-availability";
 
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+/** Build-time key, if the build had it; the server's key (read at runtime) wins once loaded. */
+const buildVapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
 
 function urlBase64ToArrayBuffer(base64String: string): ArrayBuffer {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -43,14 +45,18 @@ export function PushNotificationManager({
   const [checking, setChecking] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [vapidPublicKey, setVapidPublicKey] = useState(buildVapidPublicKey);
 
   const checkSubscription = useCallback(async () => {
     try {
       const registration = await navigator.serviceWorker.ready;
-      const [status, browserSubscription] = await Promise.all([
+      const [status, browserSubscription, serverKey] = await Promise.all([
         getSubscriptionStatusAction(),
         registration.pushManager.getSubscription(),
+        getPushPublicKeyAction().catch(() => null),
       ]);
+      // The server has the last word (its key is checked); the build key only covers a failed call.
+      if (serverKey !== null) setVapidPublicKey(serverKey);
       setIsSubscribed(Boolean(browserSubscription));
       setSubscriptionCount(status.count);
       setPermission(Notification.permission);
@@ -114,7 +120,9 @@ export function PushNotificationManager({
         description: "Você receberá alertas mesmo com o CorreTop fechado.",
       });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Não foi possível ativar as notificações.");
+      // The browser's own message (bad key, push service down) means nothing to the broker.
+      console.error("[push] subscribe failed", error);
+      toast.error("Push indisponível agora.", { description: "Tente de novo em alguns minutos ou fale com o suporte." });
     } finally {
       setLoading(false);
     }

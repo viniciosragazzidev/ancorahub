@@ -11,13 +11,8 @@ import { runWithConcurrency } from "@/shared/async/run-with-concurrency";
 import { isNotificationCapabilityEnabled } from "./queries";
 import { publishRealtimeSync } from "./realtime-sync";
 import type { NotificationCapabilityId } from "./catalog";
+import { ensureVapidConfigured } from "./vapid";
 
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY ?? "";
-
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails("mailto:suporte@corretop.com.br", vapidPublicKey, vapidPrivateKey);
-}
 
 // ─── Coalescing & Aggregation Tracker ──────────────────────────────────────────
 
@@ -102,6 +97,10 @@ export async function sendNotificationToUser(
     requireInteraction = false;
   }
 
+  if (!ensureVapidConfigured()) {
+    console.error("[push-notification] VAPID keys missing: set VAPID_PUBLIC_KEY (or NEXT_PUBLIC_VAPID_PUBLIC_KEY) and VAPID_PRIVATE_KEY.");
+    return;
+  }
   await runWithConcurrency(subscriptions, 5, async (sub) => {
     try {
       await webpush.sendNotification(

@@ -9,16 +9,13 @@ import webpush from "web-push";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
-// Configure VAPID details
-const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "";
-const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY ?? "";
+import { ensureVapidConfigured, getVapidPublicKey } from "./vapid";
 
-if (vapidPublicKey && vapidPrivateKey) {
-  webpush.setVapidDetails(
-    "mailto:suporte@corretop.com.br",
-    vapidPublicKey,
-    vapidPrivateKey,
-  );
+/** The public key for the browser subscription, read when the server runs (see vapid.ts). */
+export async function getPushPublicKeyAction(): Promise<string> {
+  await getRequiredTenantContext();
+  // Only a pair the server can sign with: a bad key would subscribe the browser for nothing.
+  return ensureVapidConfigured() ? getVapidPublicKey() : "";
 }
 
 type PushSubscriptionJSON = {
@@ -132,6 +129,10 @@ export async function sendTestNotificationAction(message: string) {
 
   if (subscriptions.length === 0) {
     return { success: false, error: "Nenhuma inscrição encontrada. Você precisa se inscrever primeiro." };
+  }
+
+  if (!ensureVapidConfigured()) {
+    return { success: false, error: "O envio de avisos não está configurado no servidor. Fale com o suporte." };
   }
 
   const results: Array<{ endpoint: string; sent: boolean; error?: string }> = [];
