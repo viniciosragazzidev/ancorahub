@@ -124,12 +124,12 @@ export function useLeadDetail({
         try {
           res = await startLeadServiceAction({}, formData);
         } catch {
-          toast.error("Não foi possível aceitar o lead no momento.");
+          toast.error("Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
           return;
         }
 
         if (!res.success) {
-          toast.error(res.error ?? "Não foi possível aceitar o lead.");
+          toast.error("Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
           return;
         }
 
@@ -162,14 +162,14 @@ export function useLeadDetail({
         try {
           const res = await declineLeadAction(lead.id, declineReason);
           if (!res.success) {
-            toast.error(res.error ?? "Não foi possível recusar o lead.");
+            toast.error("Não deu para devolver o lead agora. Tente de novo em instantes.");
             return;
           }
 
           toast.info("Lead devolvido. Outro corretor assumirá o atendimento.");
           router.push("/minha-fila");
         } catch {
-          toast.error("Não foi possível recusar no momento.");
+          toast.error("Não deu para devolver o lead agora. Tente de novo em instantes.");
         }
       });
     }
@@ -208,7 +208,7 @@ export function useLeadDetail({
       if (potentialSaleCheck.isPotentialSale && isSelectedStepRegression) {
         if (regressionJustification.trim().length < 15) {
           toast.error(
-            "Proteção de Regressão IA: É obrigatório fornecer uma justificativa detalhada com no mínimo 15 caracteres.",
+            "Esse lead parecia perto de fechar. Conte em poucas palavras por que ele voltou de etapa, com pelo menos 15 caracteres.",
           );
           return;
         }
@@ -232,7 +232,7 @@ export function useLeadDetail({
           resetStepDialog();
 
           if (!res.success) {
-            toast.error(res.error ?? "Não foi possível atualizar a etapa.");
+            toast.error("Não deu para mudar a etapa agora. Tente de novo em instantes.");
             return;
           }
 
@@ -243,8 +243,8 @@ export function useLeadDetail({
             reminderForm.set("when", followupWhen);
             const reminder = await quickReminderAction({}, reminderForm);
             if (!reminder.success) {
-              toast.warning("Etapa atualizada, mas não foi possível agendar o acompanhamento.", {
-                description: reminder.error ?? "Tente criar o lembrete pelo painel do lead.",
+              toast.warning("Etapa atualizada, mas não deu para marcar o acompanhamento.", {
+                description: "Tente de novo em instantes ou marque o retorno pela ficha do lead.",
               });
               resetStepDialog();
               return;
@@ -253,7 +253,7 @@ export function useLeadDetail({
           toast.success(followupWhen ? "Etapa e acompanhamento registrados." : "Etapa atualizada.");
         } catch {
           resetStepDialog();
-          toast.error("Não foi possível atualizar no momento.");
+          toast.error("Não deu para mudar a etapa agora. Tente de novo em instantes.");
         }
       });
     }
@@ -324,7 +324,7 @@ export function useLeadDetail({
           });
 
           if (res.error) {
-            toast.error(res.error);
+            toast.error("O documento não subiu. Confira sua internet e o tamanho do arquivo e tente de novo.");
             return;
           }
 
@@ -335,7 +335,7 @@ export function useLeadDetail({
 
           const statusRes = await changeLeadStatusAction({}, statusFormData);
           if (!statusRes.success) {
-            toast.error(statusRes.error ?? "Não foi possível solicitar a venda.");
+            toast.error("Não deu para enviar a venda para conferência. Seus documentos estão salvos; tente de novo.");
             return;
           }
 
@@ -350,8 +350,8 @@ export function useLeadDetail({
               : "Envie os demais documentos de comprovação para o supervisor aprovar.",
             duration: 8000,
           });
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Não foi possível enviar o documento.");
+        } catch {
+          toast.error("O documento não subiu. Confira sua internet e o tamanho do arquivo e tente de novo.");
         }
       });
     }

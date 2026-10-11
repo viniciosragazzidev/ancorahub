@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
@@ -61,8 +61,8 @@ const TAB_FILTERS: Record<FilterTab, (lead: LightLeadItem) => boolean> = {
 const QUERY_FILTERS: Record<string, FilterTab> = { awaiting: "new", new: "new", active: "active", returns: "returns", risk: "risk", closed: "closed", finished: "closed", lost: "closed" };
 
 const EMPTY_COPY: Record<FilterTab, { title: string; description: string }> = {
-  new: { title: "Nenhum lead novo", description: "Quando um lead chegar para você, ele aparece aqui." },
-  active: { title: "Nenhum atendimento em andamento", description: "Leads aceitos ficam aqui até serem fechados." },
+  new: { title: "Nenhum lead novo", description: "Fique disponível no plantão para receber os próximos leads." },
+  active: { title: "Nenhum atendimento em andamento", description: "Aceite um lead novo para começar um atendimento." },
   returns: { title: "Nenhum retorno pendente", description: "Leads sem atualização há mais de 3 dias aparecem aqui." },
   risk: { title: "Nenhum lead com prazo em risco", description: "Leads sem primeiro contato perto do limite aparecem aqui." },
   closed: { title: "Nada fechado ainda", description: "Vendas concluídas e leads perdidos aparecem aqui." },
@@ -147,6 +147,7 @@ export function LightLeadsList({
   initialFilter?: FilterTab;
   availabilityStatus?: "available" | "paused" | "offline";
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const requested = QUERY_FILTERS[searchParams.get("filter") ?? ""];
   const [filter, setFilter] = useState<FilterTab>(() => requested ?? initialFilter ?? (leads.some(isNewLead) ? "new" : "active"));
@@ -209,13 +210,17 @@ export function LightLeadsList({
 
         {visible.length === 0 ? (
           <EmptyState
-            title={searching ? `Nenhum resultado para "${searchQuery.trim()}"` : EMPTY_COPY[filter].title}
-            description={searching ? "Tente outro nome, telefone ou produto." : EMPTY_COPY[filter].description}
+            title={searching ? `Não encontramos nenhum lead com "${searchQuery.trim()}"` : EMPTY_COPY[filter].title}
+            description={searching ? "Confira o nome ou telefone, ou limpe a busca para ver sua lista." : EMPTY_COPY[filter].description}
             action={
               searching ? (
                 <Button variant="secondary" onClick={() => setSearchQuery("")}>
                   Limpar busca
                 </Button>
+              ) : filter === "new" ? (
+                <Button variant="secondary" onClick={() => router.push("/plantoes")}>Ver plantões</Button>
+              ) : filter === "active" ? (
+                <Button variant="secondary" onClick={() => router.push("/minha-fila?filter=new")}>Ver leads novos</Button>
               ) : undefined
             }
           />

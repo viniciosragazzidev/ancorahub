@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 import { acknowledgeAction, markInboxReadAction } from "../actions";
@@ -32,7 +33,7 @@ export function BrokerMural({ items: initial }: { items: MuralItem[] }) {
     startTransition(async () => {
       const result = await acknowledgeAction(id);
       setPendingId(null);
-      if (!result.ok) { setError(result.error); return; }
+      if (!result.ok) { setError("Não deu para marcar como lido. Tente de novo."); return; }
       const now = new Date().toISOString();
       setItems((current) => current.map((item) => (item.id === id ? { ...item, ackAt: now, readAt: item.readAt ?? now } : item)));
     });
@@ -46,7 +47,7 @@ export function BrokerMural({ items: initial }: { items: MuralItem[] }) {
       </div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
       {!items.length ? (
-        <p className="rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">Nenhuma mensagem por enquanto. Quando a gestão mandar algo, aparece aqui e na conversa da Âncora.</p>
+        <div className="space-y-3 rounded-xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground"><p>Nenhuma mensagem por enquanto. Quando a gestão mandar algo, aparece aqui e na conversa da Âncora.</p><Button asChild variant="outline"><Link href="/dashboard">Voltar ao início</Link></Button></div>
       ) : (
         <ul className="space-y-3">
           {items.map((item) => (

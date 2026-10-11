@@ -1,4 +1,5 @@
 import { DashboardHeader } from "@/components/dashboard-header";
+import Link from "next/link";
 import { canSend, getAudienceOptions } from "@/features/relationship/audience";
 import { BrokerMural } from "@/features/relationship/components/broker-mural";
 import { RelationshipCenter } from "@/features/relationship/components/relationship-center";
@@ -55,7 +56,7 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
     if (supervisorLite) {
       return (
         <div className="arc-venancor min-h-full bg-[var(--surface)] px-4 py-12">
-          <EmptyState title="Recados ainda desligados" description="A Central de relacionamento ainda não está ligada nesta empresa. Peça ao diretor para ativar." />
+          <EmptyState title="Recados ainda desligados" description="Os recados da gestão ainda não estão ligados. Quando ligarem, eles aparecem aqui." action={<Link className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--surface-muted)] px-5 text-sm font-medium" href="/dashboard">Voltar ao início</Link>} />
         </div>
       );
     }
@@ -63,7 +64,8 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
       <>
         {supervisorLite ? null : <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />}
         <div className={`mx-auto w-full max-w-3xl px-4 py-10 text-center text-sm ${supervisorLite ? "text-[var(--text-muted)]" : "text-muted-foreground"}`}>
-          A Central de relacionamento ainda não está ligada nesta empresa.
+          Os recados da gestão ainda não estão ligados. Quando ligarem, eles aparecem aqui.
+          <div className="mt-3"><Link href="/dashboard" className="underline underline-offset-4">Voltar ao início</Link></div>
         </div>
       </>
     );

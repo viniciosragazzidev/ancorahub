@@ -53,8 +53,8 @@ export function BrokerAvailabilityScheduleEditor({ initialWindows, onSaved, subm
         setWindows(saved);
         onSaved?.(saved);
         toast.success("Sua agenda de distribuição foi atualizada.");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível salvar sua disponibilidade.");
+      } catch {
+        toast.error("Não deu para salvar seus horários. Tente de novo em instantes.");
       }
     });
   }

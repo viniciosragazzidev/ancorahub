@@ -25,7 +25,7 @@ export function SupervisorTeamInvites({ initialInvites, teamIdentity = null, una
     });
   }
 
-  if (unavailable) return <section className="mx-auto mb-4 w-full max-w-3xl rounded-[var(--radius-panel)] bg-[var(--surface-muted)] p-4 text-[var(--foreground)]" role="status"><h2 className="text-base font-medium">Convites da equipe indisponíveis</h2><p className="mt-1 text-sm text-[var(--text-muted)]">Tente novamente quando a estrutura de equipes estiver disponível.</p></section>;
+  if (unavailable) return <section className="mx-auto mb-4 w-full max-w-3xl rounded-[var(--radius-panel)] bg-[var(--surface-muted)] p-4 text-[var(--foreground)]" role="status"><h2 className="text-base font-medium">Convites da equipe indisponíveis</h2><p className="mt-1 text-sm text-[var(--text-muted)]">As equipes ainda não foram montadas nesta empresa. Fale com o diretor para criar as equipes.</p></section>;
   if (!invites.length && !teamIdentity && !feedback) return null;
 
   return (

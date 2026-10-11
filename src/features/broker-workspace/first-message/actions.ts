@@ -81,7 +81,7 @@ async function brokerAlreadyWrote(tenantId: string, leadId: string, assignedAt: 
 export async function getFirstMessageContextAction(leadId: string): Promise<FirstMessageContext> {
   try {
     const { context, lead } = await loadOwnLead(String(leadId).slice(0, 80));
-    if (!lead) return { ok: false, error: "Este lead não está com você." };
+    if (!lead) return { ok: false, error: "Este lead não está mais com você. Volte para a fila para ver os seus." };
     const db = getDatabase();
     const [[broker], [tenant], connection, alreadySent] = await Promise.all([
       db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
@@ -101,8 +101,9 @@ export async function getFirstMessageContextAction(leadId: string): Promise<Firs
       appUrl: digits ? buildWhatsAppUrl(lead.telefone, message) : null,
       webUrl: digits ? buildWhatsAppWebUrl(digits, message) : null,
     };
-  } catch {
-    return { ok: false, error: "Não consegui abrir agora. Tente de novo." };
+  } catch (error) {
+    console.error("[first-message] context load failed", error);
+    return { ok: false, error: "Não deu para abrir agora. Tente de novo em instantes." };
   }
 }
 
@@ -119,7 +120,7 @@ export async function sendFirstMessageAction(raw: { leadId: string; text: string
   if (!input.success) return { ok: false, error: input.error.issues[0]?.message ?? "Confira a mensagem." };
   try {
     const { context, lead } = await loadOwnLead(input.data.leadId);
-    if (!lead) return { ok: false, error: "Este lead não está com você." };
+    if (!lead) return { ok: false, error: "Este lead não está mais com você. Volte para a fila para ver os seus." };
     const db = getDatabase();
 
     if (await brokerAlreadyWrote(context.tenantId, lead.id, lead.assignedAt)) return { ok: false, code: "already_sent", error: "A primeira mensagem já foi enviada. Continue pelo seu WhatsApp." };
@@ -134,7 +135,7 @@ export async function sendFirstMessageAction(raw: { leadId: string; text: string
     if (suppression) return { ok: false, error: "Este contato pediu para não receber mensagens." };
 
     const connection = await connectionOf(context.tenantId, context.userId);
-    if (!connection.ready || !connection.sessionName) return { ok: false, code: "not_connected", error: "Seu WhatsApp não está conectado." };
+    if (!connection.ready || !connection.sessionName) return { ok: false, code: "not_connected", error: "Seu WhatsApp não está conectado. Conecte em Configurações para mandar a mensagem por aqui." };
     const digits = normalizeWhatsAppDestination(lead.telefone);
     if (!digits || !/^\d{10,15}$/.test(digits)) return { ok: false, error: "O telefone deste lead não é válido para WhatsApp." };
 

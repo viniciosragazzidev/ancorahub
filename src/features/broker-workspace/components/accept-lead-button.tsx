@@ -20,7 +20,7 @@ export function AcceptLeadButton({ leadId, className, children }: { leadId: stri
     startTransition(async () => {
       const result = await acceptLeadOfferAction(leadId);
       if (!result.success) {
-        toast.error(result.error ?? "Não foi possível aceitar o lead agora.");
+        toast.error("Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
         router.refresh();
         return;
       }

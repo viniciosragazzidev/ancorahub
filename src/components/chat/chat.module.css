@@ -87,7 +87,7 @@
 .headerName { font-weight: 500; font-size: var(--text-base); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .headerStatus { display: flex; align-items: center; gap: 5px; font-size: var(--text-xs); color: var(--text-muted); }
 .statusDot { width: 6px; height: 6px; border-radius: 999px; background: var(--chat-online); }
-.statusWaiting { color: var(--chat-action); }
+.statusWaiting { color: var(--chat-action-text, var(--chat-action-strong)); }
 
 .scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
 .thread_ { width: 100%; max-width: var(--chat-maxw); margin-inline: auto; padding: 12px var(--chat-gutter) 24px; display: grid; gap: 14px; }
@@ -183,3 +183,8 @@
   .thread, .choice { transition: none; }
   .scroll { scroll-behavior: auto; }
 }
+
+/* Notice block (Âncora): the Notificações row, framed so it reads as a card in the conversation. */
+.notice { border: 1px solid var(--border-subtle, rgb(16 16 40 / 0.08)); background: var(--surface); }
+.noticeStatic { cursor: default; }
+.noticeStatic:hover { background: var(--surface); }

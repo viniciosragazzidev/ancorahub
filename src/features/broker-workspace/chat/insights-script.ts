@@ -108,7 +108,7 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
     .sort((left, right) => Date.parse(left.since) - Date.parse(right.since));
 
   const blocks: ChatBlock[] = [];
-  if (!whatsappConnected) blocks.push({ type: "system", id: "i-offline", text: "WhatsApp desconectado: mostrando as últimas mensagens sincronizadas." });
+  if (!whatsappConnected) blocks.push({ type: "system", id: "i-offline", text: "WhatsApp desconectado: mostrando as mensagens que já chegaram." });
 
   if (!waiting.length) {
     blocks.push({ type: "assistant", id: "i-clear", text: "Ninguém esperando sua resposta agora." });
@@ -145,7 +145,7 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
       id: "i-others",
       title: "Depois",
       subtitle: "Também esperando você",
-      items: rest.slice(0, OTHERS_SHOWN).map(({ item, since: at }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : "Sem análise ainda"), trailing: waited(at, now), href: detailHref(item) })),
+      items: rest.slice(0, OTHERS_SHOWN).map(({ item, since: at }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : "A IA ainda não analisou esta conversa"), trailing: waited(at, now), href: detailHref(item) })),
     });
   }
 
@@ -182,10 +182,10 @@ export function buildLeadInsightScript(input: { item: BrokerConversationInsight;
   if (!ai || (!ai.summary && !ai.nextBestAction)) {
     return {
       blocks: [
-        { type: "assistant", id: "n-empty", text: `Ainda não analisei a conversa com ${name}. A análise aparece aqui depois das próximas mensagens.` },
+        { type: "assistant", id: "n-empty", text: `A IA ainda não analisou a conversa com ${name}. Envie e receba mais mensagens no WhatsApp para ver o resumo aqui.` },
         { type: "question", id: "n-choice", prompt: "Enquanto isso:", choices: actions },
       ],
-      status: { label: "Sem análise ainda", tone: "idle" },
+      status: { label: "Análise em andamento", tone: "idle" },
     };
   }
 

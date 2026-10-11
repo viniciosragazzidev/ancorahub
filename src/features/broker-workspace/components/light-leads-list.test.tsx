@@ -94,7 +94,7 @@ describe("LightLeadsList", () => {
     render(<LightLeadsList leads={leads} />);
     fireEvent.change(screen.getByLabelText("Buscar lead"), { target: { value: "zzz" } });
 
-    expect(screen.getByRole("heading", { name: /Nenhum resultado para "zzz"/ })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Não encontramos nenhum lead com "zzz"/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Limpar busca" }));
     expect(screen.getByText("Ana Novo")).toBeTruthy();
   });

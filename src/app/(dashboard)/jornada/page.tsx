@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { getBrokerJourneyData } from "@/features/engagement/journey-queries";
@@ -20,8 +21,9 @@ export default async function JourneyPage() {
     return (
       <div className="arc-venancor min-h-full bg-[var(--surface)] px-4 py-16">
         <EmptyState
-          title="Sua jornada está quase pronta"
-          description="Não conseguimos carregar seus pontos agora. Tente de novo em alguns minutos."
+          title="Seus pontos não abriram agora"
+          description="Tente de novo em alguns minutos. Nada do que você fez se perdeu."
+          action={<Link className="inline-flex min-h-11 items-center justify-center rounded-full bg-[var(--surface-muted)] px-5 text-sm font-medium text-[var(--foreground)]" href="/jornada">Tentar de novo</Link>}
         />
       </div>
     );

@@ -73,6 +73,27 @@ export function BottomSheet({ trigger, open: openProp, defaultOpen = false, onOp
     onOpenChange?.(next);
   }, [openProp, onOpenChange]);
   const dismiss = useCallback(() => setOpen(false), [setOpen]);
+  // Without a trigger (opened from state), remember what had the focus and give it back on close:
+  // keyboard and screen reader users stay where they were instead of landing at the top of the page.
+  const returnTo = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    if (trigger || open) return;
+    const remember = (event: globalThis.FocusEvent) => { if (event.target instanceof HTMLElement) returnTo.current = event.target; };
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) returnTo.current = document.activeElement;
+    document.addEventListener("focusin", remember);
+    return () => document.removeEventListener("focusin", remember);
+  }, [open, trigger]);
+  useEffect(() => {
+    const closed = wasOpen.current && !open;
+    wasOpen.current = open;
+    if (!closed || trigger) return;
+    const target = returnTo.current;
+    const timer = window.setTimeout(() => {
+      if (target?.isConnected && (document.activeElement === document.body || document.activeElement === null)) target.focus({ preventScroll: true });
+    }, 360);
+    return () => window.clearTimeout(timer);
+  }, [open, trigger]);
   return <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
     {trigger ? <DialogPrimitive.Trigger>{trigger}</DialogPrimitive.Trigger> : null}
     {/* The sheet stays mounted while it leaves, so a close can be caught and reversed mid-flight. */}

@@ -66,7 +66,7 @@ export function SaleDocSheet({
               onValueChange={setDocRequirementId}
             />
           ) : (
-            <p className="text-sm text-(--text-secondary)">Nenhum tipo de documento configurado.</p>
+            <p className="text-sm text-(--text-secondary)">Ainda não há tipos de documento para escolher. Fale com seu supervisor.</p>
           )}
         </div>
 

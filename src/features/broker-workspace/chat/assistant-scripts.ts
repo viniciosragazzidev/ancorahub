@@ -218,7 +218,7 @@ export function buildAssistantThreads(input: {
     assistantThread("ancora", {
       preview: data.today.unreadNotifications > 0
         ? notification?.title ?? `Você tem ${data.today.unreadNotifications} avisos novos.`
-        : "Sem avisos novos.",
+        : "Você não tem avisos novos. Quando a escala mudar ou um lead precisar de você, o recado aparece aqui.",
       at: data.today.unreadNotifications > 0 ? iso(data.updatedAt) : null,
       unread: data.today.unreadNotifications > 0,
       waitingYou: false,
@@ -238,7 +238,7 @@ export function buildAssistantThreads(input: {
             : `Plantão ${activeDuty.scheduleName} ativo, ${activeTime}.`
         : nextDuty
           ? `Próximo plantão: ${nextDuty.scheduleName}, ${formatDate(nextDuty.startsAt)} às ${formatTime(nextDuty.startsAt)}.`
-          : "Nenhum plantão agendado.",
+          : "Você não tem plantão marcado. Quando o supervisor colocar você na escala, eu aviso aqui.",
       at: activeDuty ? iso(activeDuty.startsAt) : nextDuty ? iso(nextDuty.startsAt) : null,
       unread: false,
       waitingYou: activeDuty?.presenceStatus === "pending",
@@ -248,7 +248,7 @@ export function buildAssistantThreads(input: {
         ? `Retorno vencido para ${overdueReturn.leadName}.`
         : todayAgenda.length > 0
           ? `Hoje: ${todayAgenda.length} ${todayAgenda.length === 1 ? "retorno" : "retornos"}.`
-          : "Sem retornos hoje.",
+          : "Você não tem retornos para hoje. Quando combinar um novo contato com um cliente, ele aparece aqui.",
       at: latestIso(todayAgenda.map((item) => item.dueAt)),
       unread: false,
       waitingYou: Boolean(overdueReturn),
@@ -356,7 +356,10 @@ function leadScript(data: BrokerWorkspaceData, now: Date): ChatScript {
     .filter((lead) => ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status))
     .slice(0, 5)
     .map((lead) => ({ id: lead.id, lead: lead.name, primary: lead.name, secondary: statusLabel(lead.status), href: `/leads/${lead.id}` }));
-  blocks.push({ type: "list", id: "leads-in-service", title: "Em atendimento", items: inService, emptyText: "Nenhum lead em atendimento." });
+  blocks.push({ type: "list", id: "leads-in-service", title: "Em atendimento", items: inService, emptyText: "Você não tem nenhum lead em atendimento agora. Quando aceitar uma oferta, ele aparece nesta lista." });
+  if (!inService.length) blocks.push(question("leads-empty-choice", "Quer ver o que chegou?", [
+    { id: "new-leads", label: "Ver leads novos", action: { kind: "href", href: "/minha-fila?filter=new" } },
+  ]));
   return { blocks, status: { label: "Tudo em dia", tone: "idle" } };
 }
 
@@ -384,7 +387,7 @@ function dutyFacts(active: NonNullable<NonNullable<BrokerWorkspaceData["duty"]>[
   return factSheet(`duty-facts-${active.scheduleId}`, "Seu plantão", [
     { label: "Plantão", value: active.scheduleName },
     { label: "Horário", value: `${formatTime(active.startsAt)} às ${formatTime(active.endsAt)}` },
-    { label: "Fila", value: active.queueName ?? "Sem fila informada" },
+    { label: "Fila", value: active.queueName ?? "Este plantão não está ligado a uma fila." },
     { label: "Unidade", value: active.branchName ?? "Unidade não informada" },
     { label: "Status", value: active.presenceStatus === "pending" ? "Aguardando liberação" : active.paused ? "Pausado" : "Pronto para receber" },
   ]);
@@ -421,7 +424,15 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
   }
 
   const next = data.duty?.next;
-  if (!next) return { blocks: [assistantMessage("duty-empty", "Nenhum plantão agendado.")], status: { label: "Sem plantão", tone: "idle" } };
+  if (!next) return {
+    blocks: [
+      assistantMessage("duty-empty", "Você não tem plantão marcado. Quando o supervisor colocar você na escala, eu aviso aqui."),
+      question("duty-empty-choice", "O que você quer fazer?", [
+        { id: "schedule", label: "Ver plantões", action: { kind: "href", href: "/plantoes" } },
+      ]),
+    ],
+    status: { label: "Sem plantão", tone: "idle" },
+  };
   const rows = [
     { label: "Plantão", value: next.scheduleName },
     { label: "Data", value: formatDate(next.startsAt) },
@@ -449,7 +460,15 @@ const RESCHEDULE_CHOICES = [
 
 function agendaScript(data: BrokerWorkspaceData, now: Date): ChatScript {
   if (data.agenda.length === 0) {
-    return { blocks: [assistantMessage("agenda-empty", "Sem retornos hoje.")], status: { label: "Agenda livre", tone: "idle" } };
+    return {
+      blocks: [
+        assistantMessage("agenda-empty", "Você não tem retornos para hoje. Quando combinar um novo contato com um cliente, ele aparece aqui."),
+        question("agenda-empty-choice", "O que você quer fazer?", [
+          { id: "returns", label: "Ver meus retornos", action: { kind: "href", href: "/minha-fila?filter=returns" } },
+        ]),
+      ],
+      status: { label: "Agenda livre", tone: "idle" },
+    };
   }
   const first = data.agenda[0];
   const items = data.agenda.map((item) => ({
@@ -550,7 +569,7 @@ export function buildJourneyScript(input: { journey: BrokerJourneyData | null; d
   for (const mission of open.slice(0, 3)) {
     blocks.push(assistantMessage(`journey-mission-${mission.id}`, `${mission.title}: ${mission.progress.progress} de ${mission.progress.target}. Bônus de ${mission.bonusPoints} pts.`));
   }
-  if (!open.length) blocks.push(assistantMessage("journey-no-missions", "Nenhuma missão aberta por aqui."));
+  if (!open.length) blocks.push(assistantMessage("journey-no-missions", "Nenhuma missão aberta agora. Novas missões aparecem todo dia."));
   blocks.push(question("journey-choice", "O que você quer consultar?", [
     { id: "journey", label: "Ver minha jornada", action: { kind: "href", href: "/jornada" } },
     { id: "ledger", label: "Ver extrato", action: { kind: "href", href: "/jornada#extrato" } },
@@ -595,8 +614,7 @@ export function buildAncoraScript(input: { notifications: AncoraNotification[]; 
       blocks.push({ type: "system", id: "ancora-unread", text: unread.length === 1 ? "1 aviso novo" : `${unread.length} avisos novos` });
       markedUnread = true;
     }
-    const text = item.message && item.message !== item.title ? `${item.title}. ${item.message}` : item.title;
-    blocks.push({ type: "assistant", id: `ancora-${item.id}`, text, at: formatTime(item.createdAt) });
+    blocks.push({ type: "notice", id: `ancora-${item.id}`, noticeType: item.type, leadId: item.leadId, title: item.title, message: item.message || null, at: formatTime(item.createdAt), atIso: item.createdAt.toISOString(), unread: !item.readAt });
   }
 
   const latestLead = [...unread].reverse().find((item) => item.leadId);

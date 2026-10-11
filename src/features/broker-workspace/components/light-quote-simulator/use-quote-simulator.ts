@@ -176,7 +176,7 @@ export function useQuoteSimulator() {
       + beneficiaries.length + " vidas. Total estimado: " + money(finalMonthly) + " por mês. Valores sujeitos à análise da operadora.";
     void navigator.clipboard.writeText(summary)
       .then(() => toast.success("Resumo copiado."))
-      .catch(() => toast.error("Não foi possível copiar. Selecione e copie o resumo exibido."));
+      .catch(() => toast.error("Não deu para copiar agora. Selecione e copie o resumo exibido."));
   }
 
   function openWhatsApp() {

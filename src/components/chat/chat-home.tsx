@@ -139,7 +139,14 @@ export function ChatHome({
           </Link>
         </div>
       ) : null}
-      <ThreadList threads={visible} now={now} activeId={activeId} emptyText={tab === "leads" ? (query ? "Nenhum lead com esse nome." : "Nenhum lead com você agora.") : "Nada por aqui."} />
+      <ThreadList threads={visible} now={now} activeId={activeId} emptyText={tab === "leads" ? (query ? `Não encontramos nenhum lead com "${query}". Confira a grafia ou limpe a busca.` : "Você não tem lead no momento. Assim que uma oferta chegar, ela aparece aqui.") : "Nada por aqui ainda."} />
+      {!visible.length && query ? <button type="button" className={home.headerPill} onClick={() => setQuery("")}>Limpar busca</button> : null}
+      {!visible.length && !query && tab === "leads" ? (
+        <Link href="/plantoes" className={styles.headerPill}>Ver plantões</Link>
+      ) : null}
+      {!visible.length && tab === "assistentes" && !query ? (
+        <Link href="/notificacoes" className={styles.headerPill}>Ver avisos da Âncora</Link>
+      ) : null}
     </>
   );
 

@@ -40,7 +40,7 @@ export function statusSentence(today: BrokerWorkspaceData["today"]) {
   if (today.slaAtRiskNow > 0) return `${plural(today.slaAtRiskNow, "lead com prazo em risco", "leads com prazo em risco")}. Vale olhar primeiro.`;
   if (today.newLeads > 0) return `${plural(today.newLeads, "novo lead aguarda", "novos leads aguardam")} seu aceite.`;
   if (today.awaitingResponse > 0) return `${plural(today.awaitingResponse, "cliente aguarda", "clientes aguardam")} sua resposta.`;
-  return "Nenhuma pendência agora.";
+  return "Você não tem pendências agora.";
 }
 
 type ActionKind = NonNullable<BrokerWorkspaceData["nextAction"]>["kind"];

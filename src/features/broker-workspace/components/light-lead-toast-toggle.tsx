@@ -30,7 +30,7 @@ export function LightLeadToastToggle({ initialEnabled }: { initialEnabled: boole
       } catch {
         setEnabled(!next);
         window.dispatchEvent(new CustomEvent(LEAD_TOAST_PREFERENCE_EVENT, { detail: { enabled: !next } }));
-        toast.error("Não foi possível salvar a preferência.");
+        toast.error("Não deu para salvar esse aviso. Tente de novo.");
       }
     });
   }

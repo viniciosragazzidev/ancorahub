@@ -58,7 +58,7 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
       try {
         const result = await resetWhatsAppSessionAction();
         if (!result.success) {
-          toast.error("Não foi possível desconectar. Tente novamente.");
+          toast.error("Não deu para desconectar o WhatsApp. Tente de novo em instantes.");
           return;
         }
         setConfirmOpen(false);
@@ -66,7 +66,7 @@ export function ConnectionBadge({ connected: initialConnected, status: initialSt
         setLive((current) => ({ ...current, connected: false, status: "disconnected" }));
         refreshConnection();
       } catch {
-        toast.error("Erro ao desconectar.");
+        toast.error("Não deu para desconectar o WhatsApp. Tente de novo em instantes.");
       }
     });
   }

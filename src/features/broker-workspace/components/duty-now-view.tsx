@@ -93,7 +93,7 @@ export function DutyNowView({ data, nowIso }: { data: DutyNowViewData; nowIso: s
         <section aria-labelledby="duty-leads" className={css.leads}>
           <h2 id="duty-leads" className={css.sectionTitle}>Leads deste plantão <span className={css.count}>{data.leads.length}</span></h2>
           {!data.leads.length ? (
-            <p className={css.empty}>{data.state === "ativo" ? "Nenhum lead ainda. Fique de olho: as ofertas chegam aqui e no seu celular." : "Nenhum lead ainda neste plantão."}</p>
+            <p className={css.empty}>{data.state === "ativo" ? "Nenhum lead ainda. Fique de olho: as ofertas chegam aqui e no seu celular." : "Nenhum lead ainda neste plantão. Continue disponível: as ofertas vão aparecer aqui."}</p>
           ) : (
             <ul className={css.list}>
               {data.leads.map((lead, index) => (

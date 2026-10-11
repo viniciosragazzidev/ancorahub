@@ -32,8 +32,8 @@ export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindow
         await completeBrokerAvailabilityOnboardingAction();
         toast.success("Sua agenda está pronta. Você receberá leads apenas dentro dela.");
         window.location.assign("/dashboard");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível concluir o onboarding.");
+      } catch {
+        toast.error("Não deu para concluir sua disponibilidade agora. Tente de novo em instantes.");
       }
     });
   }
@@ -45,8 +45,8 @@ export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindow
         await skipBrokerAvailabilityOnboardingAction();
         setOpen(false);
         toast.success("Você pode configurar sua disponibilidade em Configurações quando quiser.");
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível fechar o onboarding.");
+      } catch {
+        toast.error("Não deu para fechar esse aviso agora. Tente de novo em instantes.");
       }
     });
   }

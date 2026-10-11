@@ -165,7 +165,7 @@ describe("broker chat assistant scripts", () => {
     } });
     const plantaoUnavailable = buildAssistantThreads({ data: withNextDuty, capabilities: { quoteSimulator: false, dutyCalendar: false }, now }).find((thread) => thread.assistant === "plantao");
     const plantaoAvailable = buildAssistantThreads({ data: withNextDuty, capabilities: { quoteSimulator: false, dutyCalendar: true }, now }).find((thread) => thread.assistant === "plantao");
-    expect(plantaoUnavailable).toMatchObject({ preview: "Nenhum plantão agendado." });
+    expect(plantaoUnavailable).toMatchObject({ preview: "Você não tem plantão marcado. Quando o supervisor colocar você na escala, eu aviso aqui." });
     expect(plantaoAvailable?.preview).toContain("Próximo plantão: PME Centro");
   });
 
@@ -275,7 +275,9 @@ describe("broker chat assistant scripts", () => {
 
     const next = buildAssistantScript("plantao", { data: workspace({ duty: { active: null, next: { scheduleName: "PME Centro", queueName: "Fila PME", dutyDate: "2026-10-10", startsAt: new Date("2026-10-10T09:00:00-03:00"), endsAt: new Date("2026-10-10T18:00:00-03:00"), paused: false }, readyToReceive: false } }), now });
     expect(next.blocks[1]).toMatchObject({ type: "facts", title: "Próximo plantão" });
-    expect(buildAssistantScript("plantao", { data: workspace(), now }).blocks).toContainEqual({ type: "assistant", id: "duty-empty", text: "Nenhum plantão agendado." });
+    const emptyDuty = buildAssistantScript("plantao", { data: workspace(), now });
+    expect(emptyDuty.blocks).toContainEqual({ type: "assistant", id: "duty-empty", text: "Você não tem plantão marcado. Quando o supervisor colocar você na escala, eu aviso aqui." });
+    expect(questionBlocks(emptyDuty)[0]?.choices[0]).toMatchObject({ label: "Ver plantões", action: { kind: "href", href: "/plantoes" } });
     expectNoEmDash([active, paused, pending, next]);
   });
 
@@ -292,7 +294,7 @@ describe("broker chat assistant scripts", () => {
     expect(questionBlocks(script)[1]?.choices[1]?.action).toEqual({ kind: "server", name: "lead.scheduleReturn", payload: { leadId: "lead-1", when: "tomorrow" } });
 
     const empty = buildAssistantScript("agenda", { data: workspace(), now });
-    expect(empty.blocks).toContainEqual({ type: "assistant", id: "agenda-empty", text: "Sem retornos hoje." });
+    expect(empty.blocks).toContainEqual({ type: "assistant", id: "agenda-empty", text: "Você não tem retornos para hoje. Quando combinar um novo contato com um cliente, ele aparece aqui." });
     // Nothing overdue yet (15:30 > 12:00): no pressure.
     expect(script.status?.tone).toBe("idle");
     expect(empty.status?.tone).toBe("idle");
@@ -358,7 +360,8 @@ describe("buildAncoraScript", () => {
     expect(ids).toEqual(["ancora-day-2026-10-08", "ancora-1", "ancora-day-2026-10-09", "ancora-unread", "ancora-2", "ancora-3", "ancora-choice"]);
     expect(script.blocks[0]).toMatchObject({ label: "Ontem" });
     expect(script.blocks.find((block) => block.id === "ancora-unread")).toMatchObject({ text: "2 avisos novos" });
-    expect(script.blocks.find((block) => block.id === "ancora-3")).toMatchObject({ text: "Aviso 3. Detalhe 3", at: "10:00" });
+    expect(script.blocks.find((block) => block.id === "ancora-3")).toMatchObject({ type: "notice", title: "Aviso 3", message: "Detalhe 3", at: "10:00", unread: true, leadId: "lead-7" });
+    expect(script.blocks.find((block) => block.id === "ancora-1")).toMatchObject({ type: "notice", unread: false });
     expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["open-lead", "mark-all", "settings"]);
     expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/leads/lead-7" });
     expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "server", name: "notifications.markRead", payload: {} });

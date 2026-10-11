@@ -50,8 +50,8 @@ export function LightAvailabilitySection({ windows: initialWindows, schemaReady 
         const result = await saveOwnBrokerAvailabilityAction({ windows: snapshot });
         setWindows(ordered(result.windows));
         setSaved(true);
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : "Não foi possível salvar sua disponibilidade.");
+      } catch {
+        toast.error("Não deu para salvar seus horários. Tente de novo em instantes.");
       }
     });
   }

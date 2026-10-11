@@ -78,7 +78,7 @@ function CompareView({ q }: { q: QuoteSimulator }) {
     return (
       <EmptyState
         title="Nenhum plano na comparação"
-        description="Marque até três planos na lista para compará-los lado a lado."
+        description="Você ainda não escolheu planos para comparar. Marque até três na lista para ver os valores lado a lado."
         action={<Button variant="secondary" onClick={() => q.setPlansView("list")}>Ver planos</Button>}
       />
     );
@@ -199,8 +199,8 @@ export function PlansStep({ q }: { q: QuoteSimulator }) {
 
           {filteredResults.length === 0 ? (
             <EmptyState
-              title="Nenhum exemplo corresponde a estes filtros"
-              description="Aumente o orçamento máximo ou ajuste a região e as preferências para ver outras combinações simuladas."
+              title="Nenhum exemplo com esses filtros"
+              description="Ajuste a busca para ver outros modelos de plano."
               action={<Button variant="secondary" onClick={q.clearFilters}>Limpar filtros</Button>}
             />
           ) : (

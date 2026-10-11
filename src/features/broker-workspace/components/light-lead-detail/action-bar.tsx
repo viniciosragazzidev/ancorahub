@@ -63,7 +63,7 @@ export function LeadActionBar({ lead, c }: { lead: LightLeadDetailData; c: LeadD
               </a>
             ) : (
               <Button className="flex-1" disabled>
-                WhatsApp indisponível
+                Sem WhatsApp no cadastro
               </Button>
             )}
             {lead.telefone ? (

@@ -99,10 +99,11 @@ export async function setExperienceModeAction(newMode: ExperienceMode): Promise<
 
     return { success: true, mode };
   } catch (error) {
+    console.error("[broker-workspace] experience mode update failed", error);
     return {
       success: false,
       mode: newMode,
-      error: error instanceof Error ? error.message : "Não foi possível alterar o modo de uso.",
+      error: "O modo de uso não foi alterado. Toque de novo.",
     };
   }
 }

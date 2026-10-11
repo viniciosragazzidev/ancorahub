@@ -74,3 +74,13 @@
 .urgentDot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 3px color-mix(in oklch, var(--danger) 25%, transparent); vertical-align: middle; }
 
 .firstSteps { margin: 4px var(--chat-gutter, 20px) 8px; width: auto; }
+
+/* Same pill as the chat header (empty-state actions on the Início list). */
+.headerPill {
+  height: 36px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); font-size: var(--text-sm); font-weight: 500; text-decoration: none; white-space: nowrap;
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.headerPill:hover { background: var(--surface-muted); }
+.headerPill svg { width: 16px; height: 16px; }
+.headerPill { justify-self: center; margin-top: 4px; }

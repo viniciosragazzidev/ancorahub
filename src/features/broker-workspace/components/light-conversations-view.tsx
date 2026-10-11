@@ -40,9 +40,9 @@ const SUBCARD_STYLE: React.CSSProperties = {
 const REFRESH_DEBOUNCE_MS = 2000;
 
 function formatDateTime(value?: string | null) {
-  if (!value) return "Ainda não registrado";
+  if (!value) return "Sem data registrada";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Ainda não registrado";
+  if (Number.isNaN(date.getTime())) return "Sem data registrada";
   return new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 function formatTime(value?: string | null) {
@@ -52,7 +52,7 @@ function formatTime(value?: string | null) {
 }
 function isOutbound(direction: string) { return direction === "outgoing" || direction === "outbound"; }
 function pendingLabel(value?: string | null) {
-  return ({ BROKER: "Você precisa responder", CUSTOMER: "Aguardando o cliente", INTERNAL: "Há uma pendência interna", NONE: "Sem pendência identificada" } as Record<string, string>)[value ?? ""] ?? "Análise pendente";
+  return ({ BROKER: "Você precisa responder", CUSTOMER: "Aguardando o cliente", INTERNAL: "Há uma pendência interna", NONE: "A IA ainda não identificou pendência" } as Record<string, string>)[value ?? ""] ?? "Análise em andamento";
 }
 function intentLabel(value?: string | null) {
   return ({ VERY_HIGH: "Muito alta", HIGH: "Alta", MEDIUM: "Média", LOW: "Baixa" } as Record<string, string>)[value ?? ""] ?? value ?? null;
@@ -179,11 +179,13 @@ export function LightConversationsView({
                 <EmptyState
                   label="Nenhuma conversa encontrada"
                   icon={<MessageSquareText width={24} height={24} strokeWidth={1.5} />}
-                  title={query.trim() ? `Nenhum resultado para "${query.trim()}"` : "Nenhum insight disponível"}
+                  title={query.trim() ? `Não encontramos conversa com "${query.trim()}"` : "Nenhuma conversa ainda"}
                   description={query.trim()
-                    ? "Tente outro nome ou telefone."
-                    : "Assim que houver uma conversa vinculada a um lead ou cliente da sua carteira, ela aparecerá aqui."}
-                  action={query.trim() ? <Button variant="secondary" onClick={() => setQuery("")}>Limpar busca</Button> : undefined}
+                    ? "Confira o nome ou telefone, ou limpe a busca para ver sua lista."
+                    : "Nenhuma conversa ainda. Converse com seus leads pelo WhatsApp conectado e o resumo aparece aqui."}
+                  action={query.trim()
+                    ? <Button variant="secondary" onClick={() => setQuery("")}>Limpar busca</Button>
+                    : <Button variant="secondary" onClick={() => router.push("/settings")}>Conectar WhatsApp</Button>}
                 />
               </div>
             )}
@@ -246,7 +248,7 @@ function InsightCard({ item, active, onSelect }: { item: BrokerConversationInsig
           <p className="mt-1 truncate text-xs" style={{ color: "var(--text-muted)" }}>
             {item.latestMessage
               ? `${isOutbound(item.latestMessage.direction) ? "Você" : "Cliente"}: ${item.latestMessage.body}`
-              : "Sem conversa sincronizada"}
+              : "Sem mensagens ainda"}
           </p>
           <p className="mt-1 text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>
             {item.latestMessage ? `Última interação ${formatDateTime(item.latestMessage.sentAt)}` : "Aguardando primeira interação"}
@@ -324,7 +326,7 @@ function InsightDetail({ item }: { item: BrokerConversationInsight }) {
             </a>
           ) : (
             <Button className="flex-1" disabled>
-              Telefone indisponível
+              Sem telefone cadastrado.
             </Button>
           )}
           <Link
@@ -343,7 +345,7 @@ function InsightDetail({ item }: { item: BrokerConversationInsight }) {
       <div className="p-4 sm:p-5" style={CARD_STYLE}>
         <h3 className="text-sm font-semibold">Leitura da IA</h3>
         <p className="mt-2 text-sm leading-6" style={{ color: "var(--text-secondary)" }}>
-          {item.intelligence?.summary || "Ainda não há análise suficiente. Continue atendendo pelo WhatsApp; quando houver mensagens vinculadas a este lead, os insights serão atualizados."}
+          {item.intelligence?.summary || "A Âncora ainda não leu mensagens suficientes. Continue no WhatsApp que o resumo aparece aqui."}
         </p>
         <div className="mt-3 px-3 py-2" style={{ background: "var(--accent-subtle)", borderRadius: "var(--radius-panel)" }}>
           <p className="text-xs font-medium" style={{ color: "var(--accent-strong)" }}>Próxima ação</p>
@@ -356,16 +358,16 @@ function InsightDetail({ item }: { item: BrokerConversationInsight }) {
           </div>
         )}
         <p className="mt-3 text-xs" style={{ color: "var(--text-muted)" }}>
-          Análise baseada apenas nas mensagens sincronizadas desta conversa.
+          Análise feita com as mensagens desta conversa.
         </p>
       </div>
 
       <div className="p-4 sm:p-5" style={CARD_STYLE}>
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-sm font-semibold">Histórico sincronizado</h3>
+          <h3 className="text-sm font-semibold">Histórico de mensagens</h3>
           <span className="text-xs tabular-nums" style={{ color: "var(--text-muted)" }}>{messages.length} mensagens</span>
         </div>
-        <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>Somente leitura. Conversas pessoais não são trazidas para o CRM.</p>
+        <p className="mt-1 text-xs" style={{ color: "var(--text-muted)" }}>Somente leitura. Mensagens trocadas fora desta conversa não aparecem aqui.</p>
         <div className="mt-3 space-y-2">
           {messages.length ? messages.map((message) => (
             <div key={message.id} className={cn("flex", isOutbound(message.direction) ? "justify-end" : "justify-start")}>
@@ -381,7 +383,7 @@ function InsightDetail({ item }: { item: BrokerConversationInsight }) {
             </div>
           )) : (
             <p className="px-4 py-4 text-center text-xs" style={{ background: "var(--surface-muted)", borderRadius: "var(--radius-panel)", color: "var(--text-muted)" }}>
-              Nenhuma mensagem vinculada a este contato foi sincronizada ainda.
+              Ainda não chegou mensagem deste contato. Converse pelo WhatsApp e ela aparece aqui.
             </p>
           )}
         </div>

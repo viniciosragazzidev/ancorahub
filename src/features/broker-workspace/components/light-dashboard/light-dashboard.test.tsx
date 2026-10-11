@@ -62,7 +62,7 @@ afterEach(() => cleanup());
 
 describe("statusSentence and formatRemaining", () => {
   it("says a number only when there is something to count", () => {
-    expect(statusSentence(emptyToday)).toBe("Nenhuma pendência agora.");
+    expect(statusSentence(emptyToday)).toBe("Você não tem pendências agora.");
     expect(statusSentence({ ...emptyToday, newLeads: 1 })).toBe("1 novo lead aguarda seu aceite.");
     expect(statusSentence({ ...emptyToday, newLeads: 3 })).toBe("3 novos leads aguardam seu aceite.");
     expect(statusSentence({ ...emptyToday, newLeads: 3, slaAtRiskNow: 2 })).toMatch(/^2 leads com prazo em risco/);
@@ -80,7 +80,7 @@ describe("LightDashboard", () => {
     render(<LightDashboard data={makeData()} greeting="Bom dia" />);
 
     expect(screen.getByRole("heading", { level: 1, name: "Bom dia, Ana" })).toBeTruthy();
-    expect(screen.getByText("Nenhuma pendência agora.")).toBeTruthy();
+    expect(screen.getByText("Você não tem pendências agora.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Sair da conta/i })).toBeNull();
   });
 

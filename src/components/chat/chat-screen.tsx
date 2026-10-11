@@ -154,7 +154,7 @@ export function ChatScreen({
       setStatus(result.ok && !result.warning ? { label: "Pronto", tone: "idle" } : { label: result.ok ? "Precisa de atenção" : "Esperando você", tone: "waiting" });
       if (result.ok) router.refresh();
     } catch {
-      enqueue([{ type: "assistant", id: `error-${question.id}`, text: "Não consegui concluir agora. Tente de novo em instantes." }]);
+      enqueue([{ type: "assistant", id: `error-${question.id}`, text: "Sua ação não foi concluída. Toque de novo em alguns segundos. Se continuar, fale com o suporte." }]);
       setStatus({ label: "Esperando você", tone: "waiting" });
       setAnswers((current) => { const next = { ...current }; delete next[question.id]; return next; });
     } finally {

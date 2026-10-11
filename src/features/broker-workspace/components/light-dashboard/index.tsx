@@ -68,9 +68,14 @@ export function LightDashboardUnavailable() {
   return (
     <div className="arc-venancor mx-auto flex w-full max-w-lg flex-1 flex-col justify-center px-4 py-12">
       <EmptyState
-        title="Não foi possível carregar o seu início"
-        description="Verifique a conexão e tente de novo. Seus leads continuam disponíveis na fila."
-        action={<Button variant="secondary" onClick={() => router.refresh()}>Tentar de novo</Button>}
+        title="Seu início não abriu agora"
+        description="Confira sua internet e tente de novo. Seus leads continuam na fila."
+        action={
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Button variant="secondary" onClick={() => router.refresh()}>Tentar de novo</Button>
+            <Button variant="ghost" onClick={() => router.push("/minha-fila")}>Ver minha fila</Button>
+          </div>
+        }
       />
     </div>
   );

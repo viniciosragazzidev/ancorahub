@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
+import { NoticeCardBody, noticeLink, noticeRowClass } from "@/components/notifications/notice-card";
+
 import styles from "./chat.module.css";
 import type { ChatBlock, ChatChoice } from "./types";
 
@@ -161,6 +163,13 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: 
       );
     case "assistant":
       return <AssistantText block={block} />;
+    case "notice": {
+      const link = noticeLink({ type: block.noticeType, leadId: block.leadId });
+      const body = <NoticeCardBody type={block.noticeType} leadId={block.leadId} title={block.title} message={block.message} time={block.at} timeIso={block.atIso} unread={block.unread} linkLabel={link?.label} />;
+      return link
+        ? <Link href={link.href} className={`${noticeRowClass} ${styles.notice}`}>{body}</Link>
+        : <div className={`${noticeRowClass} ${styles.notice} ${styles.noticeStatic}`}>{body}</div>;
+    }
     case "user":
       return <p className={styles.user} style={{ margin: 0 }}>{block.text}</p>;
     case "whatsapp": {
@@ -218,7 +227,7 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: 
                 return <li key={item.id}>{item.href ? <Link href={item.href} className={styles.listRow}>{content}</Link> : <div className={styles.listRow}>{content}</div>}</li>;
               })}
             </ul>
-          ) : <p className={styles.cardSubtitle} style={{ padding: "0 16px 16px", margin: 0 }}>{block.emptyText ?? "Nada por aqui."}</p>}
+          ) : <p className={styles.cardSubtitle} style={{ padding: "0 16px 16px", margin: 0 }}>{block.emptyText ?? "Nada por aqui ainda."}</p>}
         </section>
       );
     case "bars": {

@@ -20,7 +20,7 @@ export function SummaryStep({ q }: { q: QuoteSimulator }) {
     return (
       <EmptyState
         title="Nenhum plano escolhido"
-        description="Escolha um plano na lista ou na comparação para montar o resumo."
+        description="Você ainda não escolheu um plano. Volte para a lista e toque em um plano para comparar aqui."
         action={<Button variant="secondary" onClick={() => q.goToStep(2)}>Ver planos</Button>}
       />
     );
@@ -100,7 +100,7 @@ export function SummaryStep({ q }: { q: QuoteSimulator }) {
         <section aria-label="Vincular a um lead" className={card}>
           <div>
             <h3 className="text-base font-semibold text-(--foreground)">Vincular a um lead</h3>
-            <p className="mt-1 text-sm text-(--text-secondary)">Prévia visual com nomes de demonstração. Nenhum vínculo será gravado.</p>
+            <p className="mt-1 text-sm text-(--text-secondary)">Prévia visual com nomes de demonstração. Ela não altera seus leads.</p>
           </div>
           <SearchField
             label="Buscar lead de exemplo"
@@ -134,7 +134,7 @@ export function SummaryStep({ q }: { q: QuoteSimulator }) {
                 </li>
               );
             })}
-            {q.matchingLeads.length === 0 ? <li className="px-2 py-3 text-sm text-(--text-secondary)">Nenhum lead demonstrativo encontrado.</li> : null}
+            {q.matchingLeads.length === 0 ? <li className="px-2 py-3 text-sm text-(--text-secondary)">Nenhum lead de exemplo encontrado.</li> : null}
           </ul>
           <Button variant="secondary" onClick={q.previewLeadLink}>Vincular a um lead</Button>
           {q.leadLinkPreview && q.selectedLeadId ? (

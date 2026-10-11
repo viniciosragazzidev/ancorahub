@@ -19,7 +19,8 @@ function failure(error: unknown): { ok: false; error: string } {
     const issues = (error as { issues: { message: string }[] }).issues;
     return { ok: false, error: issues[0]?.message ?? "Confira os campos." };
   }
-  return { ok: false, error: error instanceof Error ? error.message : "Não consegui concluir agora." };
+  console.error("[relationship] action failed", error);
+  return { ok: false, error: "Não deu para concluir agora. Tente de novo em instantes." };
 }
 
 /** How many people (and who) an audience reaches right now, resolved on the server. */

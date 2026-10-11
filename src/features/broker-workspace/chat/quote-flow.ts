@@ -143,7 +143,7 @@ function profileLine(answers: QuoteAnswers) {
 export function resultBlocks(answers: QuoteAnswers, round: number): ChatBlock[] {
   const results = quoteResults(answers);
   const suffix = round ? `-${round}` : "";
-  const restart: ChatChoice = { id: "restart", label: "Refazer a cotação", action: local("restart", "1") };
+  const restart: ChatChoice = { id: "restart", label: "Rever preferências", action: local("restart", "1") };
   const full: ChatChoice = { id: "full", label: "Abrir o simulador completo", hint: "Filtros, rede e comparação", action: { kind: "href", href: "/cotacao?completo=1" } };
   if (!results.length) {
     return [

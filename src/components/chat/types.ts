@@ -53,6 +53,8 @@ export type ChatBlock =
   | { type: "date"; id: string; label: string }
   | { type: "system"; id: string; text: string; strong?: string; action?: { label: string; choiceAction: ChatAction } }
   | { type: "assistant"; id: string; text: string; at?: string }
+  /** A notification shown as in Notificações (Âncora conversation): icon by category, tag, link, unread dot. */
+  | { type: "notice"; id: string; noticeType: string; leadId: string | null; title: string; message: string | null; at: string; atIso: string; unread: boolean }
   | { type: "user"; id: string; text: string; at?: string }
   /** A mirrored WhatsApp message: the client, the AI qualification or the broker, each with its own light bubble. */
   | { type: "whatsapp"; id: string; text: string; at?: string; from: "client" | "qualification" | "broker" }

@@ -52,12 +52,12 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
         const result = await acceptLeadOfferAction(leadId);
         return result.success
           ? { ok: true, message: "Aceito. O lead agora é seu: abra a conversa dele para fazer o primeiro contato.", href: `/leads/${leadId}` }
-          : { ok: false, message: result.error ?? "Não consegui aceitar esse lead." };
+          : { ok: false, message: "O aceite não foi registrado. Toque de novo em alguns segundos." };
       }
       case "lead.decline": {
         const { leadId, reason } = leadPayload.extend({ reason: z.string().min(2).max(200) }).parse(payload);
         const result = await declineLeadAction(leadId, reason);
-        return result.success ? { ok: true, message: "Recusado. Ele volta para a fila e vai para outro corretor." } : { ok: false, message: result.error ?? "Não consegui recusar esse lead." };
+        return result.success ? { ok: true, message: "Recusado. Ele volta para a fila e vai para outro corretor." } : { ok: false, message: "A recusa não foi registrada. Toque de novo em alguns segundos." };
       }
       case "lead.registerContact": {
         const { leadId } = leadPayload.parse(payload);
@@ -66,37 +66,37 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
         const result = await startLeadServiceAction({}, form);
         return result.success
           ? { ok: true, message: "Contato registrado. O atendimento começou.", href: result.whatsappUrl }
-          : { ok: false, message: result.error ?? "Não consegui registrar o contato." };
+          : { ok: false, message: "O contato não foi registrado. Toque de novo em alguns segundos." };
       }
       case "lead.changeStep": {
         const { leadId, status, when } = leadPayload.extend({ status: z.enum(["quote_sent", "negotiation"]), when: whenPreset.optional() }).parse(payload);
         const result = await changeLeadStatusAction({}, form({ leadId, newStatus: status }));
-        if (!result.success) return { ok: false, message: result.error ?? "Não consegui mudar a etapa." };
+        if (!result.success) return { ok: false, message: "A etapa não foi alterada. Toque de novo em alguns segundos." };
         const stage = status === "quote_sent" ? "Cotação enviada" : "Em negociação";
         if (!when) return { ok: true, message: `Pronto, etapa: ${stage}.` };
         const reminder = await scheduleReturn(leadId, when);
         return reminder.success
           ? { ok: true, message: `Pronto, etapa: ${stage}. Te lembro de acompanhar ${RETURN_TEXT[when]}.` }
-          : { ok: true, warning: true, message: `Etapa: ${stage}. Mas não consegui criar o lembrete: ${reminder.error ?? "tente pela ficha"}.` };
+          : { ok: true, warning: true, message: `Etapa: ${stage}. Não consegui criar o lembrete. Tente de novo pela ficha.` };
       }
       case "lead.scheduleReturn": {
         const { leadId, when } = leadPayload.extend({ when: whenPreset }).parse(payload);
         const result = await scheduleReturn(leadId, when);
         return result.success
           ? { ok: true, message: `Combinado. Te lembro ${RETURN_TEXT[when]} e ele aparece na sua Agenda.` }
-          : { ok: false, message: result.error ?? "Não consegui agendar o retorno." };
+          : { ok: false, message: "O retorno não foi agendado. Toque de novo em alguns segundos." };
       }
       case "lead.markLost": {
         const { leadId, reason } = leadPayload.extend({ reason: z.enum(MOTIVOS_PERDA) }).parse(payload);
         const result = await changeLeadStatusAction({}, form({ leadId, newStatus: "lost", motivoPerda: reason }));
         return result.success
           ? { ok: true, message: "Registrei. O atendimento foi encerrado e conta no seu histórico." }
-          : { ok: false, message: result.error ?? "Não consegui encerrar o atendimento." };
+          : { ok: false, message: "O atendimento não foi encerrado. Toque de novo em alguns segundos." };
       }
       case "lead.addNote": {
         const { leadId, content } = leadPayload.extend({ content: z.string().trim().min(1).max(2000) }).parse(payload);
         const result = await addLeadNoteAction({}, form({ leadId, content }));
-        return result.success ? { ok: true, message: "Anotei no histórico do lead." } : { ok: false, message: result.error ?? "Não consegui salvar a nota." };
+        return result.success ? { ok: true, message: "Anotei no histórico do lead." } : { ok: false, message: "A nota não foi salva. Toque de novo em alguns segundos." };
       }
       case "duty.pause": {
         await updateBrokerAvailabilityAction("paused");
@@ -113,17 +113,18 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
       }
       case "team.addBroker": {
         const result = await addBrokerToMyTeamAction(String(payload.brokerId ?? ""));
-        return { ok: result.ok, message: result.message };
+        return { ok: result.ok, message: result.ok ? result.message : "Não deu para adicionar o corretor agora. Tente de novo em alguns segundos." };
       }
       case "relationship.ack": {
         const result = await acknowledgeAction();
-        if (!result.ok) return { ok: false, message: result.error };
-        return { ok: true, message: result.data ? "Pronto, a gestão já sabe que você está ciente." : "Não tinha nenhum pedido de confirmação pendente." };
+        if (!result.ok) return { ok: false, message: "Não consegui confirmar agora. Tente de novo em instantes." };
+        return { ok: true, message: result.data ? "Pronto, a gestão já sabe que você está ciente." : "Não havia pedido de confirmação pendente. Nada foi alterado." };
       }
       default:
         return { ok: false, message: "Isso se faz na conversa do lead. Abra o lead para continuar." };
     }
   } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : "Não consegui concluir agora." };
+    console.error("[broker-chat] action failed", error);
+    return { ok: false, message: "Sua ação não foi concluída. Toque de novo em alguns segundos." };
   }
 }

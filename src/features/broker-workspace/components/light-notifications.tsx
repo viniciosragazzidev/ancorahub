@@ -4,7 +4,7 @@ import { useCallback, useMemo, useOptimistic, useState, startTransition, useTran
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import Link from "next/link";
 
-import { ArrowRight, Bell, BellRinging, CalendarCheck, CheckCircle, Clock, TriangleAlertIcon, Warning, XCircle } from "@/components/huge-icons";
+import { Bell, CheckCircle } from "@/components/huge-icons";
 import { Button } from "@/components/arc/button/button";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
@@ -12,10 +12,10 @@ import SegmentedControl from "@/components/arc/segmented-control/segmented-contr
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import { PushNotificationManager } from "@/features/notifications/components/push-notification-manager";
 import { LightLeadToastToggle } from "./light-lead-toast-toggle";
+import { NoticeCardBody, noticeLink, noticePriority, noticeRowClass } from "@/components/notifications/notice-card";
 import css from "./light-notifications.module.css";
 import { loadMoreNotificationsAction, markAllNotificationsReadAction, markNotificationReadAction } from "@/app/(dashboard)/notificacoes/actions";
 
-type Priority = "urgent" | "attention" | "info";
 type FilterType = "all" | "unread" | "urgent";
 
 export interface LightNotificationItem {
@@ -50,35 +50,6 @@ const CARD_STYLE: React.CSSProperties = {
   boxShadow: "var(--shadow-resting)",
 };
 
-function priorityFor(type: string): Priority {
-  if (["lead_unworked", "lead_stalled", "document_rejected"].includes(type)) return "urgent";
-  if (["agent.lead_assigned", "lead_feedback_reminder", "client_renewal_reminder"].includes(type)) return "attention";
-  return "info";
-}
-
-
-type Category = "gestao" | "lead" | "plantao" | "alerta" | "info";
-
-/** Who the notice is about, for the color of its icon (same idea as the assistants' colors). */
-function categoryFor(item: Pick<LightNotificationItem, "type" | "leadId">): Category {
-  if (priorityFor(item.type) === "urgent") return "alerta";
-  if (item.type.startsWith("relationship.") || item.type === "manager_note") return "gestao";
-  if (item.type.includes("duty") || item.type.includes("plantao")) return "plantao";
-  if (item.leadId || item.type.startsWith("lead") || item.type.includes("lead")) return "lead";
-  return "info";
-}
-
-const CATEGORY_LABEL: Record<Category, string> = { gestao: "Gestão", lead: "Lead", plantao: "Plantão", alerta: "Ação necessária", info: "Aviso" };
-
-function NotificationIcon({ type, className, style }: { type: string; className?: string; style?: React.CSSProperties }) {
-  if (type === "lead_unworked") return <Warning className={className} style={style} />;
-  if (type === "lead_stalled") return <TriangleAlertIcon className={className} style={style} />;
-  if (type === "document_rejected") return <XCircle className={className} style={style} />;
-  if (type === "lead_feedback_reminder") return <Clock className={className} style={style} />;
-  if (type === "client_renewal_reminder") return <CalendarCheck className={className} style={style} />;
-  if (type === "lead_reengagement") return <BellRinging className={className} style={style} />;
-  return <Bell className={className} style={style} />;
-}
 
 const TIME_ZONE = "America/Sao_Paulo";
 const dayKey = (date: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(date);
@@ -117,27 +88,9 @@ function NotificationRow({
   onMarkRead: (id: string) => void;
   reduceMotion: boolean | null;
 }) {
-  const category = categoryFor(item);
-  const href = item.type === "situation_suggestion" ? "/atendimento/situacoes?view=sugestoes" : item.leadId ? `/leads/${item.leadId}` : null;
-  const body = (
-    <>
-      <span className={`${css.icon} ${css[category]}`} aria-hidden="true">
-        <NotificationIcon type={item.type} className="size-5" />
-      </span>
-      <span className={css.text}>
-        <span className={css.top}>
-          <span className={`${css.title} ${isRead ? "" : css.titleUnread}`}>{item.title}</span>
-          <time dateTime={item.createdAt} className={css.time}>{formatTimestamp(item.createdAt)}</time>
-        </span>
-        <span className={css.message}>{item.message}</span>
-        <span className={css.meta}>
-          <span className={`${css.tag} ${css[category]}`}>{CATEGORY_LABEL[category]}</span>
-          {href ? <span className={css.open}>{item.type === "situation_suggestion" ? "Revisar sugestão" : "Abrir lead"} <ArrowRight className="size-3" aria-hidden="true" /></span> : null}
-        </span>
-      </span>
-      {!isRead ? <span className={css.dot} aria-label="Não lida" /> : null}
-    </>
-  );
+  const link = noticeLink({ type: item.type, leadId: item.leadId });
+  const href = link?.href ?? null;
+  const body = <NoticeCardBody type={item.type} leadId={item.leadId} title={item.title} message={item.message} time={formatTimestamp(item.createdAt)} timeIso={item.createdAt} unread={!isRead} linkLabel={link?.label} />;
 
   return (
     <motion.li
@@ -150,9 +103,9 @@ function NotificationRow({
     >
       {href ? (
         // Opening a notice reads it.
-        <Link href={href} className={css.row} onClick={() => { if (!isRead) onMarkRead(item.id); }}>{body}</Link>
+        <Link href={href} className={noticeRowClass} onClick={() => { if (!isRead) onMarkRead(item.id); }}>{body}</Link>
       ) : (
-        <button type="button" className={css.row} onClick={() => { if (!isRead) onMarkRead(item.id); }}>{body}{!isRead ? <span className="sr-only">Toque para marcar como lida</span> : null}</button>
+        <button type="button" className={noticeRowClass} onClick={() => { if (!isRead) onMarkRead(item.id); }}>{body}{!isRead ? <span className="sr-only">Toque para marcar como lida</span> : null}</button>
       )}
     </motion.li>
   );
@@ -160,7 +113,7 @@ function NotificationRow({
 
 function EmptyStateContent({ filter, onSeeAll }: { filter: FilterType; onSeeAll: () => void }) {
   if (filter === "unread") {
-    return <EmptyState label="Nenhuma notificação não lida" icon={<CheckCircle width={24} height={24} strokeWidth={1.5} />} title="Tudo lido" description="Você está em dia com as notificações." />;
+      return <EmptyState label="Nenhuma notificação não lida" icon={<CheckCircle width={24} height={24} strokeWidth={1.5} />} title="Tudo lido" description="Você está em dia com as notificações." action={<Button variant="secondary" onClick={onSeeAll}>Ver todos os avisos</Button>} />;
   }
   if (filter === "urgent") {
     return (
@@ -173,7 +126,7 @@ function EmptyStateContent({ filter, onSeeAll }: { filter: FilterType; onSeeAll:
       />
     );
   }
-  return <EmptyState label="Nenhuma notificação" icon={<Bell width={24} height={24} strokeWidth={1.5} />} title="Nenhuma notificação" description="Alertas de leads, tarefas e atualizações aparecerão aqui." />;
+  return <EmptyState label="Nenhuma notificação" icon={<Bell width={24} height={24} strokeWidth={1.5} />} title="Nenhuma notificação" description="Alertas de leads, tarefas e atualizações aparecerão aqui." action={<Button variant="secondary" onClick={onSeeAll}>Ver todos os avisos</Button>} />;
 }
 
 export function LightNotifications({
@@ -199,7 +152,7 @@ export function LightNotifications({
       const isRead = Boolean(item.readAt) || optimisticReads.has(item.id);
       if (filter === "all") return true;
       if (filter === "unread") return !isRead;
-      return priorityFor(item.type) === "urgent" && !isRead;
+      return noticePriority(item.type) === "urgent" && !isRead;
     }),
     [filter, notifications, optimisticReads],
   );
@@ -228,7 +181,7 @@ export function LightNotifications({
         setCursor(result.nextCursor);
         setHasMore(result.hasMore);
       } catch {
-        setLoadError("Não foi possível carregar mais notificações. Tente novamente.");
+        setLoadError("Não deu para trazer mais avisos. Toque em Carregar mais de novo.");
       }
     });
   }, [cursor, isPending]);

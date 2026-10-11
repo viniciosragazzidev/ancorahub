@@ -62,12 +62,12 @@ export function LightFeedbackView({ leadId, leadName, phone }: FeedbackViewProps
     try {
       res = await changeLeadStatusAction({}, formData);
     } catch {
-      toast.error("Não foi possível registrar no momento.");
+      toast.error("Não deu para salvar a atualização. Tente de novo em instantes.");
       throw new Error("feedback-action-failed");
     }
 
     if (!res.success) {
-      toast.error(res.error ?? "Não foi possível registrar a atualização.");
+      toast.error("Não deu para salvar a atualização. Tente de novo em instantes.");
       throw new Error("feedback-action-failed");
     }
 

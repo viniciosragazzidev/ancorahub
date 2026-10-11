@@ -24,7 +24,7 @@ export function LightAvailabilityBanner({
         setStatus("available");
         toast.success("Você está disponível para receber novos leads.");
       } catch {
-        toast.error("Não foi possível atualizar a disponibilidade.");
+        toast.error("Não deu para mudar seu status agora. Tente de novo em instantes.");
       }
     });
   }

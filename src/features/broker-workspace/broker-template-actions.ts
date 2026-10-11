@@ -144,7 +144,7 @@ export async function sendBrokerTemplateAction(input: SendBrokerTemplateInput) {
     console.error("[sendBrokerTemplateAction] error:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Erro ao processar envio de template para corretores.",
+      error: "A mensagem não foi enviada. Toque de novo em alguns segundos.",
     };
   }
 }
@@ -259,9 +259,10 @@ export async function sendBrokerDirectMessageAction(input: { brokerProfileId: st
 
     return { success: true };
   } catch (error) {
+    console.error("[sendBrokerDirectMessageAction] error:", error);
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Erro ao enviar mensagem direta ao corretor.",
+      error: "A mensagem não foi enviada. Toque de novo em alguns segundos.",
     };
   }
 }

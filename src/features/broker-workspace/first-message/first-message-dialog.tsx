@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { pollWhatsAppConnection, startWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
@@ -112,7 +113,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
     setError(null);
     setStep("qr");
     const result = await startWhatsAppConnection().catch(() => null);
-    if (!result || !result.success) { setError("Não consegui gerar o QR code agora. Tente de novo em instantes."); setStep("guide"); return; }
+    if (!result || !result.success) { setError("Não deu para gerar o código agora. Toque em Mostrar QR code para tentar de novo."); setStep("guide"); return; }
     if (result.status === "ready") { setConnected(true); setStep("compose"); return; }
     if (result.qrCode) showQr(result.qrCode);
   }
@@ -153,6 +154,7 @@ export function FirstMessageDialog({ leadId, open, onOpenChange, onSent }: { lea
               <>
                 <DialogTitle>Chamar no WhatsApp</DialogTitle>
                 <DialogDescription role="alert">{error}</DialogDescription>
+                <Button variant="outline" render={<Link href="/minha-fila" />}>Voltar para a fila</Button>
               </>
             ) : null}
 

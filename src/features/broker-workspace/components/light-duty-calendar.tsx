@@ -192,10 +192,10 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
         ) : (
           <div className="px-4 py-10" style={CARD_STYLE}>
             <EmptyState
-              label="Nenhum plantão próximo"
+              label="Você não tem plantão marcado"
               icon={<CalendarDays width={24} height={24} strokeWidth={1.5} />}
-              title="Nenhum plantão próximo"
-              description="Quando você estiver em uma escala ativa, os próximos horários vão aparecer aqui."
+              title="Você não tem plantão marcado"
+              description="Quando o supervisor colocar você na escala, os horários aparecem aqui."
             />
           </div>
         )}
