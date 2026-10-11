@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { NoticeCardBody, noticeLink, noticeRowClass } from "@/components/notifications/notice-card";
 
 import styles from "./chat.module.css";
-import type { ChatBlock, ChatChoice } from "./types";
+import type { ChatBlock, ChatChoice, ChatListItem } from "./types";
 
 const LETTERS = "ABCDEFGHIJ";
 const enter = { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
@@ -131,7 +131,49 @@ function WhatsAppGlyph() {
   );
 }
 
-export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void }) {
+const SWIPE_DISTANCE = 96;
+
+/**
+ * A list row that can be swiped to the left to run its action (Agenda: cancel a
+ * return). Past the line it goes; short of it, it springs back. The same action
+ * is a real button for keyboards and screen readers, revealed on focus.
+ */
+function SwipeRow({ item, disabled, onSwipe, children }: { item: ChatListItem & { swipe: NonNullable<ChatListItem["swipe"]> }; disabled?: boolean; onSwipe: (item: ChatListItem) => void; children: React.ReactNode }) {
+  const reduce = useReducedMotion();
+  const [armed, setArmed] = useState(false);
+  const dragged = useRef(false);
+  return (
+    // The row is a link: the browser's own link dragging would steal the gesture.
+    <div className={styles.swipe} data-armed={armed || undefined} onDragStart={(event) => event.preventDefault()}>
+      <motion.div
+        className={styles.swipeFront}
+        drag={disabled ? false : "x"}
+        dragDirectionLock
+        dragConstraints={{ left: -220, right: 0 }}
+        dragElastic={{ left: 0.15, right: 0 }}
+        dragSnapToOrigin
+        transition={reduce ? { duration: 0 } : undefined}
+        onDragStart={() => { dragged.current = true; }}
+        onDrag={(_, info) => setArmed(info.offset.x < -SWIPE_DISTANCE)}
+        onDragEnd={(_, info) => {
+          setArmed(false);
+          if (info.offset.x < -SWIPE_DISTANCE || (info.offset.x < -40 && info.velocity.x < -700)) onSwipe(item);
+          // The click that ends a drag must not open the lead.
+          window.setTimeout(() => { dragged.current = false; }, 0);
+        }}
+        onClickCapture={(event) => { if (dragged.current) { event.preventDefault(); event.stopPropagation(); } }}
+      >
+        {children}
+      </motion.div>
+      <button type="button" className={styles.swipeAction} disabled={disabled} onClick={() => onSwipe(item)} aria-label={`${item.swipe.label}: ${[item.primary, item.secondary].filter(Boolean).join(", ")}`}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+        <span>{item.swipe.label}</span>
+      </button>
+    </div>
+  );
+}
+
+export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe, swipeDisabled }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void; onItemSwipe?: (item: ChatListItem) => void; swipeDisabled?: boolean }) {
   const reduce = useReducedMotion();
   switch (block.type) {
     case "button": {
@@ -224,7 +266,8 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen }: { block: 
                     {item.trailing ? <span className={styles.listTrailing}>{item.trailing}</span> : <span />}
                   </>
                 );
-                return <li key={item.id}>{item.href ? <Link href={item.href} className={styles.listRow}>{content}</Link> : <div className={styles.listRow}>{content}</div>}</li>;
+                const row = item.href ? <Link href={item.href} className={styles.listRow}>{content}</Link> : <div className={styles.listRow}>{content}</div>;
+                return <li key={item.id}>{item.swipe && onItemSwipe ? <SwipeRow item={{ ...item, swipe: item.swipe }} disabled={swipeDisabled} onSwipe={onItemSwipe}>{row}</SwipeRow> : row}</li>;
               })}
             </ul>
           ) : <p className={styles.cardSubtitle} style={{ padding: "0 16px 16px", margin: 0 }}>{block.emptyText ?? "Nada por aqui ainda."}</p>}

@@ -28,6 +28,9 @@ export type ChatServerActionName =
   | "lead.registerContact"
   | "lead.changeStep"
   | "lead.scheduleReturn"
+  | "lead.completeReturn"
+  | "lead.cancelReturn"
+  | "lead.reopenReturn"
   | "lead.markLost"
   | "lead.addNote"
   | "duty.pause"
@@ -47,7 +50,11 @@ export type ChatChoice = {
 };
 
 export type ChatFactRow = { label: string; value: string; badge?: string };
-export type ChatListItem = { id: string; lead?: string; primary: string; secondary?: string; trailing?: string; href?: string };
+export type ChatListItem = {
+  id: string; lead?: string; primary: string; secondary?: string; trailing?: string; href?: string;
+  /** Swipe the row to the left (or its button, by keyboard) to run this action; the row leaves the list. */
+  swipe?: { label: string; reply: string; action: Extract<ChatAction, { kind: "server" }> };
+};
 
 export type ChatBlock =
   | { type: "date"; id: string; label: string }
@@ -76,6 +83,8 @@ export type ChatScript = {
   composerPlaceholder?: string;
   /** Header status line ("Esperando você", "Trabalhando...", "Pausado"). */
   status?: { label: string; tone: "waiting" | "working" | "idle" | "paused" };
+  /** After a server action, the first question comes back with the fresh data (Agenda: the next return). */
+  replayAfterAction?: boolean;
 };
 
 /** One row of the conversation list (Início). */

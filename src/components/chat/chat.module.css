@@ -119,6 +119,22 @@
 .listPrimary { font-size: var(--text-sm); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .listSecondary { font-size: var(--text-xs); color: var(--text-muted); }
 .listTrailing { font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+/* Swipe a row to the left to cancel it (Agenda). The action waits underneath, on the right. */
+.swipe { position: relative; overflow: hidden; isolation: isolate; }
+.swipeFront { position: relative; z-index: 1; background: var(--surface); touch-action: pan-y; cursor: grab; }
+.swipeFront:active { cursor: grabbing; }
+.swipeFront :is(a, img) { -webkit-user-drag: none; user-select: none; }
+.swipeAction {
+  position: absolute; inset: 0 0 0 auto; z-index: 0; width: 100%;
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 20px;
+  border: 0; background: color-mix(in oklch, var(--danger) 14%, var(--surface)); color: var(--danger);
+  font: inherit; font-size: var(--text-sm); font-weight: 500;
+  transition: background-color 160ms cubic-bezier(.25, 1, .5, 1), color 160ms cubic-bezier(.25, 1, .5, 1);
+}
+.swipe[data-armed] .swipeAction { background: var(--danger); color: #fff; }
+/* Keyboard: focusing the action slides the row aside so the button shows. */
+.swipe:has(.swipeAction:focus-visible) .swipeFront { transform: translateX(-148px) !important; transition: transform 200ms cubic-bezier(.25, 1, .5, 1); }
+@media (prefers-reduced-motion: reduce) { .swipeAction, .swipe:has(.swipeAction:focus-visible) .swipeFront { transition: none; } }
 .bars { display: flex; align-items: flex-end; gap: 6px; height: 120px; padding: 8px 16px 16px; }
 .bar { flex: 1; min-width: 6px; border-radius: 6px 6px 2px 2px; background: var(--neutral-4); transform-origin: bottom; }
 .barHighlight { background: var(--chat-action); }

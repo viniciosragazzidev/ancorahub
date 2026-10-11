@@ -12,14 +12,16 @@ import { addLeadNoteAction } from "@/features/leads/actions";
 import { declineLeadAction } from "@/features/leads/decline-action";
 import { MOTIVOS_PERDA } from "@/features/leads/lead-status-constants";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
+import { setLeadTaskDoneAction } from "@/features/leads/task-actions";
 import { acknowledgeAction } from "@/features/relationship/actions";
 import { addBrokerToMyTeamAction } from "@/features/supervisor-workspace/actions";
 
 /** warning: it worked, but part of it did not (shown as an alert, not as success). */
-export type ChatServerActionResult = { ok: boolean; message: string; href?: string; warning?: boolean };
+export type ChatServerActionResult = { ok: boolean; message: string; href?: string; warning?: boolean; undo?: { label: string; action: { kind: "server"; name: ChatServerActionName; payload: Record<string, string> } } };
 
 const leadPayload = z.object({ leadId: z.string().min(1) });
-const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead", "relationship.ack", "team.addBroker"]);
+const taskPayload = z.object({ taskId: z.string().uuid(), leadName: z.string().max(120).optional() });
+const actionName = z.enum(["lead.accept", "lead.decline", "lead.registerContact", "lead.changeStep", "lead.scheduleReturn", "lead.completeReturn", "lead.cancelReturn", "lead.reopenReturn", "lead.markLost", "lead.addNote", "duty.pause", "duty.resume", "notifications.markRead", "relationship.ack", "team.addBroker"]);
 
 const whenPreset = z.enum(["today", "tomorrow", "in_2_days", "in_3_days"]);
 const RETURN_TEXT: Record<z.infer<typeof whenPreset>, string> = {
@@ -35,8 +37,8 @@ function form(values: Record<string, string>) {
   return data;
 }
 
-async function scheduleReturn(leadId: string, when: z.infer<typeof whenPreset>) {
-  return quickReminderAction({}, form({ leadId, when }));
+async function scheduleReturn(leadId: string, when: z.infer<typeof whenPreset>, replaceTaskId?: string) {
+  return quickReminderAction({}, form({ leadId, when, ...(replaceTaskId ? { replaceTaskId } : {}) }));
 }
 
 /**
@@ -80,11 +82,28 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
           : { ok: true, warning: true, message: `Etapa: ${stage}. Não consegui criar o lembrete. Tente de novo pela ficha.` };
       }
       case "lead.scheduleReturn": {
-        const { leadId, when } = leadPayload.extend({ when: whenPreset }).parse(payload);
-        const result = await scheduleReturn(leadId, when);
+        const { leadId, when, taskId } = leadPayload.extend({ when: whenPreset, taskId: z.string().uuid().optional() }).parse(payload);
+        const result = await scheduleReturn(leadId, when, taskId);
         return result.success
           ? { ok: true, message: `Combinado. Te lembro ${RETURN_TEXT[when]} e ele aparece na sua Agenda.` }
           : { ok: false, message: "O retorno não foi agendado. Toque de novo em alguns segundos." };
+      }
+      case "lead.completeReturn": {
+        const { taskId } = taskPayload.parse(payload);
+        const result = await setLeadTaskDoneAction(taskId, "done");
+        return result.success ? { ok: true, message: "Boa. Tirei esse retorno da sua Agenda." } : { ok: false, message: "O retorno não foi concluído. Toque de novo em alguns segundos." };
+      }
+      case "lead.cancelReturn": {
+        const { taskId, leadName } = taskPayload.parse(payload);
+        const result = await setLeadTaskDoneAction(taskId, "cancel");
+        return result.success
+          ? { ok: true, message: `Cancelei o retorno${leadName ? ` de ${leadName}` : ""}.`, undo: { label: "Desfazer", action: { kind: "server", name: "lead.reopenReturn", payload: { taskId } } } }
+          : { ok: false, message: "O retorno não foi cancelado. Arraste de novo em alguns segundos." };
+      }
+      case "lead.reopenReturn": {
+        const { taskId } = taskPayload.parse(payload);
+        const result = await setLeadTaskDoneAction(taskId, "reopen");
+        return result.success ? { ok: true, message: "Pronto, o retorno voltou para a sua Agenda." } : { ok: false, message: "Não consegui desfazer. Toque de novo em alguns segundos." };
       }
       case "lead.markLost": {
         const { leadId, reason } = leadPayload.extend({ reason: z.enum(MOTIVOS_PERDA) }).parse(payload);

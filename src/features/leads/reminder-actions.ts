@@ -3,7 +3,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -15,6 +15,8 @@ const reminderInput = z.object({
   leadId: z.string().min(1),
   /** Preset key or an ISO date string */
   when: z.string().min(1),
+  /** Rescheduling: the open return this one replaces (closed in the same transaction). */
+  replaceTaskId: z.string().uuid().optional(),
 });
 
 export async function quickReminderAction(
@@ -24,6 +26,7 @@ export async function quickReminderAction(
   const parsed = reminderInput.safeParse({
     leadId: formData.get("leadId"),
     when: formData.get("when"),
+    replaceTaskId: formData.get("replaceTaskId") || undefined,
   });
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Dados invalidos." };
 
@@ -82,6 +85,19 @@ export async function quickReminderAction(
     const taskId = randomUUID();
 
     await db.transaction(async (tx) => {
+      if (parsed.data.replaceTaskId) {
+        // Same lead, still open, and (for a broker) their own: otherwise nothing is closed.
+        const closed = await tx.update(schema.leadTasks).set({ completedAt: new Date() }).where(and(
+          eq(schema.leadTasks.id, parsed.data.replaceTaskId),
+          eq(schema.leadTasks.tenantId, context.tenantId),
+          eq(schema.leadTasks.leadId, lead.id),
+          isNull(schema.leadTasks.completedAt),
+          ...(context.role === "broker" ? [eq(schema.leadTasks.assignedTo, context.userId)] : []),
+        )).returning({ id: schema.leadTasks.id });
+        if (closed.length) {
+          await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_task", entidadeId: parsed.data.replaceTaskId, acao: "reagendou" });
+        }
+      }
       await tx.insert(schema.leadTasks).values({
         id: taskId,
         tenantId: context.tenantId,

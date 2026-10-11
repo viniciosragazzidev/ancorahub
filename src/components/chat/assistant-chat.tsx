@@ -33,6 +33,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
           : result.ok && result.href?.startsWith("https://")
             ? [{ type: "button", id: `after-${action.name}-${Date.now()}`, label: "Abrir WhatsApp", href: result.href, tone: "whatsapp" }]
             : [];
+        if (result.ok && result.undo) followUp.push({ type: "question", id: `undo-${action.name}-${Date.now()}`, prompt: "Foi sem querer?", choices: [{ id: "undo", label: result.undo.label, action: result.undo.action }] });
         return { ok: result.ok, message: result.message, warning: result.warning, followUp };
       }}
       onMention={(mention: Mention): ChatBlock[] => {

@@ -9,7 +9,7 @@ import { AssistantAvatar } from "./assistant-avatar";
 import { ChatBlockView, ChoiceList, MessageEnter, TypingIndicator } from "./chat-blocks";
 import { Composer, type Mention } from "./composer";
 import styles from "./chat.module.css";
-import type { ChatAction, ChatBlock, ChatChoice, ChatProgress, ChatScript, MascotShape } from "./types";
+import type { ChatAction, ChatBlock, ChatChoice, ChatProgress, ChatScript, MascotShape, ChatListItem } from "./types";
 
 /** Result of a server action run from a reply. A message is shown as the assistant's answer. */
 export type ChatActionResult = { ok: boolean; message?: string; followUp?: ChatBlock[]; warning?: boolean };
@@ -121,6 +121,45 @@ export function ChatScreen({
 
   const enqueue = useCallback((blocks: ChatBlock[]) => setQueue((current) => [...current, ...blocks]), []);
 
+  // After an action the page refreshes (router.refresh): cards and lists on screen take the
+  // fresh data (a cancelled return leaves the Agenda), and scripts that ask for it offer
+  // their first question again, now about the next item.
+  const replayPending = useRef(false);
+  // A question asked again gets a new id; this remembers which script question it copies.
+  const copySource = useRef(new Map<string, string>());
+  const copyQuestion = useCallback(<T extends ChatBlock>(block: T): T => {
+    const id = `${block.id}-${Date.now()}`;
+    copySource.current.set(id, copySource.current.get(block.id) ?? block.id);
+    return { ...block, id };
+  }, []);
+  const answersRef = useRef<Record<string, string>>({});
+  const shownRef = useRef<ChatBlock[]>([]);
+  useEffect(() => {
+    answersRef.current = answers;
+    shownRef.current = shown;
+  });
+  useEffect(() => {
+    const fresh = new Map(script.blocks.map((block) => [block.id, block]));
+    const sourceOf = (id: string) => copySource.current.get(id) ?? id;
+    setShown((current) => current.flatMap((block) => {
+      if (block.type === "user") return [block];
+      // Questions not answered yet follow the data too (never offer a return that is gone).
+      if (block.type === "question") {
+        const next = answersRef.current[block.id] ? null : fresh.get(sourceOf(block.id));
+        return [next ? { ...next, id: block.id } : block];
+      }
+      const next = fresh.get(block.id);
+      if (next) return [next];
+      return block.type === "list" ? [] : [block];
+    }));
+    if (!replayPending.current) return;
+    replayPending.current = false;
+    const first = initial.find((block) => block.type === "question");
+    // Only when the first question is not already waiting on screen.
+    const waiting = shownRef.current.some((block) => block.type === "question" && !answersRef.current[block.id] && sourceOf(block.id) === first?.id);
+    if (first && !waiting) enqueue([copyQuestion(first)]);
+  }, [script.blocks, initial, enqueue, copyQuestion]);
+
   const choose = useCallback(async (question: Extract<ChatBlock, { type: "question" }>, choice: ChatChoice) => {
     if (answers[question.id]) return;
     setAnswers((current) => ({ ...current, [question.id]: choice.id }));
@@ -135,7 +174,7 @@ export function ChatScreen({
     }
     if (action.kind === "next") {
       const target = script.blocks.find((block) => block.id === action.questionId);
-      if (target) enqueue([target]);
+      if (target) enqueue([answers[target.id] ? copyQuestion(target) : target]);
       return;
     }
     if (action.kind === "local") {
@@ -152,15 +191,31 @@ export function ChatScreen({
         ...(result.followUp ?? []),
       ]);
       setStatus(result.ok && !result.warning ? { label: "Pronto", tone: "idle" } : { label: result.ok ? "Precisa de atenção" : "Esperando você", tone: "waiting" });
-      if (result.ok) router.refresh();
+      if (result.ok) {
+        if (script.replayAfterAction) replayPending.current = true;
+        router.refresh();
+      }
+      return result.ok;
     } catch {
       enqueue([{ type: "assistant", id: `error-${question.id}`, text: "Sua ação não foi concluída. Toque de novo em alguns segundos. Se continuar, fale com o suporte." }]);
       setStatus({ label: "Esperando você", tone: "waiting" });
       setAnswers((current) => { const next = { ...current }; delete next[question.id]; return next; });
+      return false;
     } finally {
       setWorking(false);
     }
-  }, [answers, enqueue, onLocalChoice, router, runAction, script.blocks]);
+  }, [answers, copyQuestion, enqueue, onLocalChoice, router, runAction, script.blocks, script.replayAfterAction]);
+
+  // A list row swiped away (Agenda: cancel a return): it leaves at once, the action runs as a reply.
+  const swipeItem = useCallback((item: ChatListItem) => {
+    if (!item.swipe || working) return;
+    const swipe = item.swipe;
+    setShown((current) => current.map((block) => block.type === "list" ? { ...block, items: block.items.filter((row) => row.id !== item.id) } : block));
+    void choose({ type: "question", id: `swipe-${item.id}-${Date.now()}`, prompt: "", choices: [] }, { id: "swipe", label: swipe.reply, action: swipe.action }).then((ok) => {
+      // Failed: the row comes back from the data the screen already had.
+      if (ok === false) setShown((current) => current.map((block) => block.type === "list" ? (script.blocks.find((fresh) => fresh.id === block.id) ?? block) : block));
+    });
+  }, [choose, script.blocks, working]);
 
   const answeredCount = Object.keys(answers).length;
   const progress = progressOverride !== undefined
@@ -198,7 +253,7 @@ export function ChatScreen({
             <MessageEnter key={block.id}>
               {block.type === "question"
                 ? <ChoiceList block={block} chosenId={answers[block.id] ?? null} disabled={working} onChoose={(choice) => { void choose(block, choice); }} />
-                : <ChatBlockView block={block} onButtonOpen={onButtonOpen} onSystemAction={(system) => { if (system.action) void choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
+                : <ChatBlockView block={block} onButtonOpen={onButtonOpen} onItemSwipe={swipeItem} swipeDisabled={working} onSystemAction={(system) => { if (system.action) void choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
             </MessageEnter>
           ))}
           <AnimatePresence>{typing ? <MessageEnter key="typing"><TypingIndicator /></MessageEnter> : null}</AnimatePresence>

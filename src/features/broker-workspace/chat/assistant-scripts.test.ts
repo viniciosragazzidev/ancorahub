@@ -287,14 +287,19 @@ describe("broker chat assistant scripts", () => {
       now,
     });
     expect(script.blocks.find((block) => block.type === "list")).toMatchObject({ items: [{ id: "task-1", lead: "Clara Souza", trailing: "15:30" }] });
-    expect(questionBlocks(script)[0]?.choices.map(({ label }) => label)).toEqual(["Falar com Clara", "Reagendar Clara", "Ver todos"]);
+    expect(questionBlocks(script)[0]?.choices.map(({ label }) => label)).toEqual(["Falar com Clara", "Já falei com Clara", "Reagendar Clara", "Ver todos"]);
     expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/leads/lead-1" });
-    expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "next", questionId: "agenda-reschedule" });
-    expect(questionBlocks(script)[0]?.choices[2]?.action).toEqual({ kind: "href", href: "/minha-fila?aba=retornos" });
-    expect(questionBlocks(script)[1]?.choices[1]?.action).toEqual({ kind: "server", name: "lead.scheduleReturn", payload: { leadId: "lead-1", when: "tomorrow" } });
+    expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "server", name: "lead.completeReturn", payload: { taskId: "task-1" } });
+    expect(questionBlocks(script)[0]?.choices[2]?.action).toEqual({ kind: "next", questionId: "agenda-reschedule" });
+    expect(questionBlocks(script)[0]?.choices[3]?.action).toEqual({ kind: "href", href: "/minha-fila?aba=retornos" });
+    // Rescheduling closes the return it replaces.
+    expect(questionBlocks(script)[1]?.choices[1]?.action).toEqual({ kind: "server", name: "lead.scheduleReturn", payload: { leadId: "lead-1", when: "tomorrow", taskId: "task-1" } });
+    // Swipe a row to cancel it; the first question comes back after each action.
+    expect(script.blocks.find((block) => block.type === "list")).toMatchObject({ items: [{ swipe: { label: "Cancelar", action: { kind: "server", name: "lead.cancelReturn", payload: { taskId: "task-1", leadName: "Clara Souza" } } } }] });
+    expect(script.replayAfterAction).toBe(true);
 
     const empty = buildAssistantScript("agenda", { data: workspace(), now });
-    expect(empty.blocks).toContainEqual({ type: "assistant", id: "agenda-empty", text: "Você não tem retornos para hoje. Quando combinar um novo contato com um cliente, ele aparece aqui." });
+    expect(empty.blocks).toContainEqual({ type: "assistant", id: "agenda-summary", text: "Você não tem retornos para hoje. Quando combinar um novo contato com um cliente, ele aparece aqui." });
     // Nothing overdue yet (15:30 > 12:00): no pressure.
     expect(script.status?.tone).toBe("idle");
     expect(empty.status?.tone).toBe("idle");

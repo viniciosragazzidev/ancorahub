@@ -462,7 +462,8 @@ function agendaScript(data: BrokerWorkspaceData, now: Date): ChatScript {
   if (data.agenda.length === 0) {
     return {
       blocks: [
-        assistantMessage("agenda-empty", "Você não tem retornos para hoje. Quando combinar um novo contato com um cliente, ele aparece aqui."),
+        // Same id as the summary: after the last return leaves, the message on screen becomes this one.
+        assistantMessage("agenda-summary", "Você não tem retornos para hoje. Quando combinar um novo contato com um cliente, ele aparece aqui."),
         question("agenda-empty-choice", "O que você quer fazer?", [
           { id: "returns", label: "Ver meus retornos", action: { kind: "href", href: "/minha-fila?filter=returns" } },
         ]),
@@ -478,6 +479,7 @@ function agendaScript(data: BrokerWorkspaceData, now: Date): ChatScript {
     secondary: item.leadName,
     trailing: item.dueAt ? formatTime(item.dueAt) : undefined,
     href: item.href,
+    swipe: { label: "Cancelar", reply: `Cancelar o retorno de ${item.leadName.split(" ")[0] || item.leadName}`, action: { kind: "server" as const, name: "lead.cancelReturn" as const, payload: { taskId: item.id, leadName: item.leadName } } },
   }));
   const overdue = data.agenda.filter((item) => item.dueAt && item.dueAt.getTime() <= now.getTime()).length;
   const summary = `Você tem ${items.length} ${items.length === 1 ? "item" : "itens"} na agenda${overdue ? `, ${overdue} já ${overdue === 1 ? "venceu" : "venceram"}` : ""}.`;
@@ -485,18 +487,20 @@ function agendaScript(data: BrokerWorkspaceData, now: Date): ChatScript {
   return {
     blocks: [
       assistantMessage("agenda-summary", summary),
-      { type: "list", id: "agenda-items", title: "Seus retornos", items },
+      { type: "list", id: "agenda-items", title: "Seus retornos", subtitle: "Arraste para o lado para cancelar", items },
       question("agenda-choice", "Por onde quer começar?", [
         { id: "start-first", label: `Falar com ${firstName}`, hint: first.title, action: { kind: "href", href: `/leads/${first.leadId}` } },
+        { id: "done-first", label: `Já falei com ${firstName}`, action: { kind: "server", name: "lead.completeReturn", payload: { taskId: first.id } } },
         { id: "reschedule-first", label: `Reagendar ${firstName}`, action: { kind: "next", questionId: "agenda-reschedule" } },
         { id: "view-all", label: "Ver todos", action: { kind: "href", href: "/minha-fila?aba=retornos" } },
       ]),
       question("agenda-reschedule", `Para quando passo o retorno de ${firstName}?`, RESCHEDULE_CHOICES.map((option) => ({
         id: `reschedule-${option.value}`,
         label: option.label,
-        action: { kind: "server" as const, name: "lead.scheduleReturn" as const, payload: { leadId: first.leadId, when: option.value } },
+        action: { kind: "server" as const, name: "lead.scheduleReturn" as const, payload: { leadId: first.leadId, when: option.value, taskId: first.id } },
       }))),
     ],
+    replayAfterAction: true,
     status: overdue ? { label: "Esperando você", tone: "waiting" } : { label: "Em dia", tone: "idle" },
   };
 }
