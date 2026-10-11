@@ -388,6 +388,8 @@ async function MinhaFilaContent() {
         city: readDetail(extra?.qualificationDetails, "cidade") ?? readDetail(extra?.qualificationDetails, "city"),
         summary: readDetail(extra?.qualificationDetails, "resumoAtendimento") ?? readDetail(extra?.qualificationDetails, "resumoNecessidade"),
         createdAt: l.createdAt,
+        // When it reached this broker (distribution), the lead's creation otherwise.
+        arrivedAt: l.assignedAt ?? l.createdAt,
         updatedAt: l.stageEnteredAt,
         dueAt,
         isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
