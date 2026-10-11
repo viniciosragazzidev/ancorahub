@@ -83,4 +83,4 @@
 }
 .headerPill:hover { background: var(--surface-muted); }
 .headerPill svg { width: 16px; height: 16px; }
-.headerPill { justify-self: center; margin-top: 4px; }
+.emptyAction { display: flex; justify-content: center; padding: 4px 20px 16px; }

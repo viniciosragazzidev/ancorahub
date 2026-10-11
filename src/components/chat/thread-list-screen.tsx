@@ -57,7 +57,7 @@ export function ThreadListScreen({
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPlaceholder} aria-label={searchPlaceholder} className={home.searchInput} />
         </div>
         <ThreadList threads={visible} now={now} emptyText={needle ? `Não encontramos ninguém com "${query.trim()}". Confira a grafia ou limpe a busca.` : emptyText} />
-        {needle ? <button type="button" className={home.headerPill} onClick={() => setQuery("")}>Limpar busca</button> : null}
+        {needle ? <div className={home.emptyAction}><button type="button" className={home.headerPill} onClick={() => setQuery("")}>Limpar busca</button></div> : null}
       </div>
     </div>
   );

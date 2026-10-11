@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
@@ -16,7 +16,10 @@ export default async function BrokerDutyCalendarPage() {
     getExperienceMode(context),
     getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR),
   ]);
-  if (experienceMode !== "LIGHT" || calendarEnabled !== "true") notFound();
+  if (experienceMode !== "LIGHT") redirect("/dashboard");
+  // Without the calendar, "Ver plantões" links land on the Plantão conversation (always there),
+  // never on a "Registro não encontrado" page.
+  if (calendarEnabled !== "true") redirect("/dashboard/c/plantao");
 
   const calendar = await getBrokerDutyCalendarData();
   return <LightDutyCalendar calendar={calendar} />;
