@@ -226,7 +226,9 @@
     scrollbar-gutter: auto;
   }
 
-  :root:has([data-ui-refinement="clean"]) [data-slot="app-content"] {
+  /* Not the Lite scroll frame (<main data-slot="app-content"> below the header):
+   * 100% of the screen there pushed its end, header-tall, below the bottom edge. */
+  :root:has([data-ui-refinement="clean"]) [data-slot="app-content"]:not(main) {
     min-height: 100%;
   }
 

@@ -100,7 +100,7 @@ function Showcase() {
     <>
       {params.get("shell") === "1" ? (
         // The real app shell (Lite branch), as the (dashboard) layout renders it.
-        <AppShell isLightBroker journeyEnabled user={{ name: "Vinicios Ragazzi", email: null, role: "broker" }}>{screen}</AppShell>
+        <AppShell isLightBroker journeyEnabled cleanUiEnabled user={{ name: "Vinicios Ragazzi", email: null, role: "broker" }}>{screen}</AppShell>
       ) : params.get("chrome") === "1" ? (
         // Same wrapper as the real app shell (app-shell.tsx, Lite branch).
         <SidebarProvider defaultOpen={false} open={false} className="min-h-dvh flex-col overflow-x-hidden" style={{ "--sidebar-width": "0px", "--header-height": "3.5rem" } as React.CSSProperties}>
