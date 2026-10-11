@@ -8,6 +8,8 @@ import { Suspense, useMemo, useState } from "react";
 import type { JourneyCelebration, JourneyMissionCard } from "@/features/engagement/journey-types";
 import { CelebrationLayer } from "@/features/journey/components/celebration-layer";
 import { JourneyScreen, type JourneyScreenData } from "@/features/journey/components/journey-screen";
+import { LightChrome } from "@/components/light/light-chrome";
+import { LiteMicroTour } from "@/components/chat/tour/lite-tour";
 
 /**
  * Dev-only showcase of the broker Journey with fixtures, for screenshots
@@ -89,9 +91,12 @@ function Showcase() {
   const data = useMemo(() => fixture(state), [state]);
   const [seen, setSeen] = useState<string[]>([]);
   const items = celebration(params.get("celebrate") ?? "").filter((item) => !seen.includes(item.id));
+  // ?chrome=1: inside the real Lite chrome (scroll container, header), to check scrolling.
+  const screen = <JourneyScreen data={data} />;
   return (
     <>
-      <JourneyScreen data={data} />
+      {params.get("chrome") === "1" ? <LightChrome audience="broker" journeyEnabled>{screen}</LightChrome> : screen}
+      {params.get("tour") === "jornada" ? <LiteMicroTour pathname="/jornada" /> : null}
       <CelebrationLayer items={items} onSeen={(ids) => setSeen((current) => [...current, ...ids])} />
     </>
   );

@@ -8,6 +8,7 @@ import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { LightChrome } from "@/components/light/light-chrome";
+import { ViewAsBanner, type ViewAsState } from "@/features/super-admin/components/view-as";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
 
@@ -43,6 +44,7 @@ export function AppShell({
   showRelationship = false,
   journeyEnabled = false,
   teamRankingEnabled = false,
+  viewAs = { canViewAs: false, viewingAs: null },
   liteAudience = "broker",
   showQuoteSimulator = false,
   initialAvailability = "available",
@@ -57,6 +59,8 @@ export function AppShell({
   showRelationship?: boolean;
   journeyEnabled?: boolean;
   teamRankingEnabled?: boolean;
+  /** Super admin "Ver como" (button and the strip while viewing as someone). */
+  viewAs?: ViewAsState;
   /** Who uses the Lite chrome (supervisor Lite, 2026-10-10). */
   liteAudience?: "broker" | "supervisor";
   showQuoteSimulator?: boolean;
@@ -147,7 +151,9 @@ export function AppShell({
           } as CSSProperties
         }
       >
+        <ViewAsBanner viewingAs={viewAs.viewingAs} />
         <LightChrome
+          viewAs={viewAs}
           mainRef={canvasRef}
           branding={branding}
           user={user}
@@ -189,6 +195,7 @@ export function AppShell({
           } as CSSProperties
         }
       >
+        <ViewAsBanner viewingAs={viewAs.viewingAs} />
         {isFinanceiro ? (
           <CorreTopFinanceiroSidebar />
         ) : (

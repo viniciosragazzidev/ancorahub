@@ -35,8 +35,8 @@ afterEach(() => {
 });
 
 describe("Lite micro tours", () => {
-  it("has short screen-specific steps for all five broker Lite destinations", () => {
-    const routes = ["/jornada", "/minha-fila", "/leads/lead-1", "/plantoes", "/settings"];
+  it("has short screen-specific steps for every broker Lite destination", () => {
+    const routes = ["/jornada", "/minha-fila", "/leads/lead-1", "/leads/lead-1?ficha=1", "/plantoes", "/settings"];
     for (const route of routes) {
       const microTour = getMicroTourForPath(route);
       expect(microTour, route).not.toBeNull();
@@ -47,7 +47,10 @@ describe("Lite micro tours", () => {
     }
     expect(getMicroTourForPath("/leads")).toBeNull();
     expect(getMicroTourForPath("/leads/distribuicao")).toBeNull();
-    expect(Object.keys(MICRO_TOURS)).toHaveLength(5);
+    expect(Object.keys(MICRO_TOURS)).toHaveLength(6);
+    // The lead opens on the conversation; the ficha (?ficha=1) has its own tour.
+    expect(getMicroTourForPath("/leads/lead-1")?.id).toBe("lead-conversa");
+    expect(getMicroTourForPath("/leads/lead-1?ficha=1")?.id).toBe("lead");
   });
 
   it("starts automatically on first visit and can be started again manually", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode, type RefObject } from "react";
+import { Suspense, useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import "@/components/arc/venancor-scope.css";
 import { useLightAvailability, type LightAvailability } from "@/components/light-top-nav";
@@ -13,6 +13,7 @@ import { REALTIME_SYNC_BROWSER_EVENT } from "@/components/providers/realtime-eve
 import { A11yPrefsProvider } from "@/features/assist/a11y-prefs";
 import { AssistHelpButton, AssistLayer } from "@/features/assist/components/assist-layer";
 import { CelebrationHost } from "@/features/journey/components/celebration-host";
+import type { ViewAsState } from "@/features/super-admin/components/view-as";
 import { LiteMicroTour } from "@/components/chat/tour/lite-tour";
 
 import { LightAppHeader } from "./light-app-header";
@@ -38,6 +39,7 @@ export function LightChrome({
   showRelationship = false,
   journeyEnabled = false,
   teamRankingEnabled = false,
+  viewAs = { canViewAs: false, viewingAs: null },
   audience = "broker",
   initialAvailability = "available",
 }: {
@@ -50,6 +52,7 @@ export function LightChrome({
   showRelationship?: boolean;
   journeyEnabled?: boolean;
   teamRankingEnabled?: boolean;
+  viewAs?: ViewAsState;
   audience?: "broker" | "supervisor";
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
@@ -71,6 +74,7 @@ export function LightChrome({
       showDutyCalendar={showDutyCalendar}
       showRelationship={showRelationship}
       journeyEnabled={journeyEnabled}
+      viewAs={viewAs}
       teamRankingEnabled={teamRankingEnabled}
       audience={audience}
       availability={availability}
@@ -103,7 +107,7 @@ export function LightChrome({
       </div>
       {/* Points, missions and achievements of the broker show up here, never over a lead offer. */}
       {journeyEnabled && audience === "broker" ? <CelebrationHost /> : null}
-      {audience === "broker" ? <LiteMicroTour pathname={pathname} /> : null}
+      {audience === "broker" ? <Suspense fallback={null}><LiteMicroTour pathname={pathname} /></Suspense> : null}
     </LightAvailabilityProvider>
   );
 

@@ -10,6 +10,7 @@ import type { TenantContext } from "./types";
 import { requiresMemberBranch } from "@/features/custom-roles/member-scope";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getSuperAdminRoleOverride } from "@/features/super-admin/role-impersonation";
+import { isActivePlatformAdmin, readViewAsTargetId, VIEW_AS_ROLES } from "@/features/super-admin/view-as";
 import { selectSingleActiveMembership } from "./active-membership";
 import {
   markTenantStart,
@@ -66,12 +67,19 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
   // Session phase is already timed by getRequiredSession()
   const { user: sessionUser } = await getRequiredSession();
 
+  // "Ver como": only an active platform admin can see the app as a broker or a supervisor.
+  const viewAsTarget = await readViewAsTargetId();
+  const viewAs = viewAsTarget && viewAsTarget !== sessionUser.id && (await isActivePlatformAdmin(sessionUser.id))
+    ? { adminUserId: sessionUser.id }
+    : null;
+  const effectiveUserId = viewAs && viewAsTarget ? viewAsTarget : sessionUser.id;
+
   markTenantStart();
   markDbStart();
 
   try {
-    const memberships = await membershipCache.getOrLoad(sessionUser.id, () => withPerfSpan("tenant.resolve", () => withTimeout(
-      loadMemberships(sessionUser.id),
+    const memberships = await membershipCache.getOrLoad(effectiveUserId, () => withPerfSpan("tenant.resolve", () => withTimeout(
+      loadMemberships(effectiveUserId),
       TENANT_QUERY_TIMEOUT_MS,
       "getRequiredTenantContext",
     )));
@@ -83,6 +91,10 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
 
     if (!membership.userActive) {
       throw new AuthorizationError("The authenticated user is inactive.");
+    }
+
+    if (viewAs && !(VIEW_AS_ROLES as readonly string[]).includes(membership.role)) {
+      throw new AuthorizationError("Ver como só vale para corretor ou supervisor.");
     }
 
     if (membership.tenantStatus !== "active") {
@@ -106,7 +118,7 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
     }
 
     return {
-      userId: sessionUser.id,
+      userId: effectiveUserId,
       tenantId: membership.tenantId,
       role: membership.role,
       jobTitle: membership.jobTitle,
@@ -116,6 +128,7 @@ async function resolveRequiredTenantContext(): Promise<TenantContext> {
       ...(membership.role === "supervisor"
         ? { supervisorTeamScope: (await getFeatureFlag(FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE).catch(() => "false")) === "true" }
         : {}),
+      ...(viewAs ? { viewAs } : {}),
     };
   } catch (error) {
     markDbEnd();

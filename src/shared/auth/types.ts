@@ -17,6 +17,8 @@ export type TenantContext = {
   branchId: string | null;
   /** Supervisor limited to the brokers they supervise (flag SUPERVISOR_TEAM_SCOPE, resolved on the server). */
   supervisorTeamScope?: boolean;
+  /** "Ver como": a platform admin is seeing the app as this user (read only; the proxy blocks writes). */
+  viewAs?: { adminUserId: string };
 };
 
 export type ScopeProvenance =

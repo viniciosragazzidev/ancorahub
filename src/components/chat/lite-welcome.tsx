@@ -1,5 +1,6 @@
 "use client";
 
+import { readSeen as readSeenMark, writeSeen } from "./tour/seen-storage";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
@@ -42,7 +43,7 @@ const POINTS = [
 
 function readSeen(key: string) {
   try {
-    return window.localStorage.getItem(key) === "1";
+    return readSeenMark(key) === "1";
   } catch {
     return true; // Storage blocked: never trap the broker behind the card.
   }
@@ -68,7 +69,7 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
   }, [storageKey]);
 
   function close() {
-    try { window.localStorage.setItem(storageKey, "1"); } catch { /* ignore */ }
+    writeSeen(storageKey, "1");
     setOpen(false);
   }
 

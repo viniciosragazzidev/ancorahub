@@ -1,3 +1,4 @@
+import { isViewAsBlockedWrite, VIEW_AS_COOKIE, VIEW_AS_READ_ONLY_MESSAGE } from "@/features/super-admin/view-as-constants";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
@@ -147,6 +148,13 @@ export async function proxy(request: NextRequest) {
   request.headers.set("x-request-id", requestId);
   request.headers.set("x-pathname", pathname);
   const timing = startMiddlewareTiming(pathname, requestId);
+
+  // "Ver como" is read only: no write reaches the app while a platform admin sees it as someone else.
+  if (request.cookies.get(VIEW_AS_COOKIE)?.value && isViewAsBlockedWrite(request.method, pathname)) {
+    const blocked = NextResponse.json({ error: VIEW_AS_READ_ONLY_MESSAGE, code: "view_as_read_only" }, { status: 403 });
+    blocked.headers.set("x-request-id", requestId);
+    return blocked;
+  }
 
   if (isNavigationPrefetch(request.headers)) {
     const response = NextResponse.next({ request: { headers: request.headers } });

@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useSearchParams } from "next/navigation";
+import { readSeen, writeSeen } from "./seen-storage";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { AssistantAvatar } from "../assistant-avatar";
@@ -35,12 +37,13 @@ export function startLiteMicroTour(pathname: string) {
 }
 
 export function hasSeenLiteTour(variant: TourVariant = "broker") {
-  try { return window.localStorage.getItem(TOUR_CONFIG[variant].storageKey) === "done"; } catch { return true; }
+  return readSeen(TOUR_CONFIG[variant].storageKey) === "done";
 }
 
 /** One short, first-visit tour for the current broker Lite screen. */
 export function LiteMicroTour({ pathname }: { pathname: string }) {
-  const microTour = getMicroTourForPath(pathname);
+  const search = useSearchParams()?.toString() ?? "";
+  const microTour = getMicroTourForPath(search ? `${pathname}?${search}` : pathname);
   if (!microTour) return null;
   return <LiteTour
     key={microTour.id}
@@ -177,7 +180,7 @@ export function LiteTour({ variant = "broker", steps: configuredSteps, storageKe
     const maybeStart = () => {
       if (timer !== null || document.documentElement.dataset.leadOffer === "1") return;
       try {
-        if (window.localStorage.getItem(activeStorageKey) !== null) return;
+        if (readSeen(activeStorageKey) !== null) return;
       } catch {
         return;
       }
@@ -249,7 +252,7 @@ export function LiteTour({ variant = "broker", steps: configuredSteps, storageKe
   }, [showRewards]);
 
   const close = useCallback((completed: boolean) => {
-    try { window.localStorage.setItem(activeStorageKey, completed ? "done" : "skipped"); } catch { /* ignore */ }
+    writeSeen(activeStorageKey, completed ? "done" : "skipped");
     audioRef.current?.pause();
     setOpen(false);
     setRect(null);

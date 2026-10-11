@@ -961,10 +961,11 @@ export default async function ConversationsPage({
         .insert(schema.auditLogs)
         .values({
           id: randomUUID(),
-          userId: context.userId,
+          // "Ver como": the audit names the real admin, not the broker being viewed.
+          userId: context.viewAs?.adminUserId ?? context.userId,
           entidade: "official_broker_conversations",
           entidadeId: context.tenantId,
-          acao: "consultou_historico",
+          acao: context.viewAs ? `consultou_historico_ver_como:${context.userId}` : "consultou_historico",
         });
     }
   }

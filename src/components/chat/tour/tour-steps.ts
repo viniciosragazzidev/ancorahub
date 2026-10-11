@@ -23,7 +23,7 @@ export type TourStep = {
   mascot: { shape: MascotShape; hue: number | null };
 };
 
-export type MicroTourId = "jornada" | "minha-fila" | "lead" | "plantoes" | "settings";
+export type MicroTourId = "jornada" | "minha-fila" | "lead" | "lead-conversa" | "plantoes" | "settings";
 export type MicroTour = { id: MicroTourId; steps: TourStep[] };
 
 const microStep = (id: string, target: string, title: string, body: string, shape: MascotShape = "logo", hue: number | null = null): TourStep => ({
@@ -53,6 +53,12 @@ export const MICRO_TOURS: Record<MicroTourId, TourStep[]> = {
     microStep("lead-detalhes", "micro-lead-details", "Contexto do atendimento", "Confira as informações que ajudam na próxima conversa.", "cubo", 150),
     microStep("lead-acoes", "micro-lead-actions", "Próximo passo", "Use a barra para chamar no WhatsApp, ligar ou atualizar a etapa.", "mochi", 212),
   ],
+  // The lead opens on the conversation (/leads/[id]); the ficha is ?ficha=1. Each view has its own tour.
+  "lead-conversa": [
+    microStep("conversa-mensagens", "micro-conv-messages", "A conversa com o cliente", "As mensagens do WhatsApp com este lead aparecem aqui, a mais nova embaixo.", "mochi", 212),
+    microStep("conversa-responder", "micro-conv-composer", "Responda por aqui", "Escreva ou escolha uma das opções. A mensagem sai pelo seu WhatsApp conectado.", "cubo", 150),
+    microStep("conversa-ficha", "micro-conv-ficha", "Abra a ficha", "Toque aqui para ver nome, etapa, prazo e as ações do lead.", "mochi", 212),
+  ],
   plantoes: [
     microStep("plantao-proximo", "micro-duty-highlight", "Seu próximo plantão", "Veja o horário e a unidade do próximo turno.", "onigiri", 28),
     microStep("plantao-calendario", "micro-duty-calendar", "Confira outras datas", "Escolha um dia para abrir os detalhes da escala.", "cubo", 150),
@@ -66,10 +72,12 @@ export const MICRO_TOURS: Record<MicroTourId, TourStep[]> = {
 };
 
 export function getMicroTourForPath(pathname: string): MicroTour | null {
-  const path = pathname.split("?")[0]?.replace(/\/+$/, "") || "/";
+  const [rawPath, query = ""] = pathname.split("?");
+  const path = rawPath?.replace(/\/+$/, "") || "/";
+  const ficha = new URLSearchParams(query).get("ficha") === "1";
   const id: MicroTourId | null = path === "/jornada" ? "jornada"
     : path === "/minha-fila" ? "minha-fila"
-      : /^\/leads\/(?!distribuicao(?:\/|$)|arquivados(?:\/|$)|dashboard(?:\/|$))[^/]+$/.test(path) ? "lead"
+      : /^\/leads\/(?!distribuicao(?:\/|$)|arquivados(?:\/|$)|dashboard(?:\/|$))[^/]+$/.test(path) ? (ficha ? "lead" : "lead-conversa")
         : path === "/plantoes" ? "plantoes"
           : path === "/settings" ? "settings"
             : null;

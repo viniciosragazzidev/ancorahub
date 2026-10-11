@@ -72,6 +72,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     .select({
       name: schema.user.name,
       email: schema.user.email,
+      isPlatformAdmin: schema.user.isPlatformAdmin,
     })
     .from(schema.user)
     .where(eq(schema.user.id, context.userId))
@@ -174,6 +175,11 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
 
   const [tenant] = tenantRows;
   const [currentUser] = userRows;
+  // "Ver como": the real signed-in user is a platform admin (while viewing, context.viewAs says so).
+  const viewAsState = {
+    canViewAs: Boolean(context.viewAs) || Boolean(currentUser?.isPlatformAdmin),
+    viewingAs: context.viewAs ? { name: currentUser?.name ?? "usuário", role: context.role } : null,
+  };
   const [membership] = membershipRows;
   // With realtime switched off the server sends no signals; a null topic makes
   // the client fall back to periodic reconciliation instead of trusting a silent channel.
@@ -184,6 +190,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   return (
     <AgentDrawerProvider>
       <AppShell
+        viewAs={viewAsState}
         cleanUiEnabled={cleanUiEnabled}
         isLightBroker={isLightBroker || isLightSupervisor}
         liteAudience={liteAudience}

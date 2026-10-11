@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { motion, useReducedMotionConfig } from "motion/react";
 
 import { TOUR_STORAGE_KEY } from "@/components/chat/tour/tour-steps";
+import { readSeen, writeSeen } from "@/components/chat/tour/seen-storage";
 
 import type { FirstStep } from "../first-steps";
 import styles from "./first-steps.module.css";
@@ -25,8 +26,8 @@ export function FirstStepsCard({ steps, className }: { steps: FirstStep[]; class
     let tourDone = false;
     let wasHidden = false;
     try {
-      tourDone = window.localStorage.getItem(TOUR_STORAGE_KEY) === "done";
-      wasHidden = window.localStorage.getItem(HIDE_KEY) === "1";
+      tourDone = readSeen(TOUR_STORAGE_KEY) === "done";
+      wasHidden = readSeen(HIDE_KEY) === "1";
     } catch { /* private mode */ }
     setList(steps.map((step) => (step.key === "tour" ? { ...step, done: tourDone } : step)));
     setHidden(wasHidden);
@@ -53,7 +54,7 @@ export function FirstStepsCard({ steps, className }: { steps: FirstStep[]; class
           <h2 id="first-steps-title">Primeiros passos</h2>
           <p>{next ? <>Agora: <strong>{next.title.toLowerCase()}</strong></> : "Tudo pronto."}</p>
         </div>
-        <button type="button" className={styles.later} onClick={() => { setHidden(true); try { window.localStorage.setItem(HIDE_KEY, "1"); } catch { /* ignore */ } }}>Depois</button>
+        <button type="button" className={styles.later} onClick={() => { setHidden(true); writeSeen(HIDE_KEY, "1"); }}>Depois</button>
       </div>
       <ol className={styles.steps}>
         {list.map((step) => (

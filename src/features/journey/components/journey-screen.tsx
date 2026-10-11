@@ -50,12 +50,12 @@ export function JourneyScreen({ data }: { data: JourneyScreenData }) {
   return (
     <div className={`arc-venancor ${styles.page}`}>
       <div className={styles.inner}>
-        <motion.header className={styles.pageHeader} data-tour="micro-journey-summary" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(0)}>
+        <motion.header className={styles.pageHeader} initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(0)}>
           <h1>Minha jornada</h1>
           <p>Seus pontos vêm só do que você fez <Term id="evidence">de verdade</Term> no atendimento.</p>
         </motion.header>
 
-        <motion.div initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(1)}>
+        <motion.div data-tour="micro-journey-summary" initial={enter} animate={{ opacity: 1, y: 0 }} transition={rise(1)}>
           <JourneyHero data={data} />
         </motion.div>
 

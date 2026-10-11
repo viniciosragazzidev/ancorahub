@@ -1,0 +1,54 @@
+/* "Ver como" (super admin): a lightning button that does not look like the other menu items. */
+.button {
+  position: relative; width: 100%;
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px;
+  min-height: 56px; padding: 10px 14px;
+  border: 1px solid transparent; border-radius: 18px;
+  background:
+    linear-gradient(var(--surface, #fff), var(--surface, #fff)) padding-box,
+    linear-gradient(120deg, oklch(78% .16 85), oklch(66% .2 300), oklch(64% .18 250)) border-box;
+  color: var(--foreground, #111); font: inherit; text-align: left; text-decoration: none; cursor: pointer;
+  transition: transform 120ms ease, box-shadow 150ms ease;
+}
+.button:hover { box-shadow: 0 6px 18px oklch(60% .15 280 / .18); }
+.button:active { transform: scale(.98); }
+.button[data-active="true"] { background: linear-gradient(120deg, oklch(97% .04 85), oklch(96% .04 300)) padding-box, linear-gradient(120deg, oklch(78% .16 85), oklch(66% .2 300)) border-box; }
+.button[data-variant="sidebar"] { min-height: 44px; padding: 6px 10px; border-radius: 14px; }
+.bolt { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, oklch(84% .16 85), oklch(70% .19 60)); color: oklch(25% .05 60); box-shadow: 0 4px 10px oklch(70% .16 70 / .35); }
+.button[data-variant="sidebar"] .bolt { width: 28px; height: 28px; }
+.label { min-width: 0; display: grid; gap: 1px; }
+.label strong { font-size: 14px; font-weight: 600; }
+.label small { overflow: hidden; color: var(--text-muted, #666); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.sheet { display: grid; gap: 12px; padding: 4px 0 24px; }
+.searchWrap { position: relative; }
+.searchIcon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.search { width: 100%; height: 52px; padding: 0 16px 0 46px; border: 1px solid var(--border-subtle); border-radius: 99px; background: var(--surface-muted); color: var(--foreground); font: inherit; font-size: 16px; outline: none; }
+.search:focus { border-color: color-mix(in oklch, var(--chat-action) 55%, transparent); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in oklch, var(--chat-action) 12%, transparent); }
+.search::-webkit-search-cancel-button { display: none; }
+.muted { margin: 0; padding: 12px 4px; color: var(--text-muted); font-size: var(--text-sm); text-align: center; }
+.error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
+.list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.row { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 56px; padding: 8px 10px; border: 0; border-radius: 16px; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.row:hover { background: var(--surface-muted); }
+.row:disabled { cursor: progress; opacity: .7; }
+.rowText { min-width: 0; display: grid; gap: 1px; }
+.rowText strong { overflow: hidden; font-size: var(--text-sm); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.rowText small { overflow: hidden; color: var(--text-muted); font-size: var(--text-xs); text-overflow: ellipsis; white-space: nowrap; }
+.role { padding: 3px 10px; border-radius: 99px; background: var(--surface-muted); color: var(--text-secondary, var(--foreground)); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.role[data-role="supervisor"] { background: oklch(95% .04 300); color: oklch(42% .15 300); }
+
+/* Strip on top of every screen while viewing as someone. */
+.banner {
+  position: sticky; top: 0; z-index: 80;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px;
+  padding: 8px 12px calc(8px) 12px; padding-top: max(8px, env(safe-area-inset-top));
+  background: linear-gradient(90deg, oklch(28% .06 300), oklch(30% .06 260)); color: white;
+  font-size: 13px; line-height: 1.3; text-align: center;
+}
+.bannerBolt { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: linear-gradient(135deg, oklch(84% .16 85), oklch(70% .19 60)); color: oklch(25% .05 60); }
+.bannerText strong { font-weight: 600; }
+.bannerExit { min-height: 32px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 99px; background: white; color: oklch(28% .06 300); font-weight: 600; text-decoration: none; }
+.bannerExit:hover { background: oklch(95% .02 300); }
+
+@media (prefers-reduced-motion: reduce) { .button { transition: none; } .button:active { transform: none; } }

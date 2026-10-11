@@ -11,6 +11,7 @@ import { Button } from "@/components/arc/button/button";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import type { LightAvailability } from "@/components/light-top-nav";
 import { signOut } from "@/shared/auth/client";
+import { ViewAsButton, type ViewAsState } from "@/features/super-admin/components/view-as";
 
 import { getLightMoreDestinations } from "./light-routes";
 
@@ -26,6 +27,7 @@ export function LightMoreSheet({
   showDutyCalendar,
   showRelationship = false,
   journeyEnabled = false,
+  viewAs = { canViewAs: false, viewingAs: null },
   teamRankingEnabled = false,
   audience = "broker",
   availability,
@@ -39,6 +41,7 @@ export function LightMoreSheet({
   showDutyCalendar: boolean;
   showRelationship?: boolean;
   journeyEnabled?: boolean;
+  viewAs?: ViewAsState;
   teamRankingEnabled?: boolean;
   audience?: "broker" | "supervisor";
   availability: LightAvailability;
@@ -133,6 +136,8 @@ export function LightMoreSheet({
           <LogOut className="size-4" aria-hidden="true" />
           Sair da conta
         </Button>
+
+        <ViewAsButton state={viewAs} onNavigate={() => onOpenChange(false)} />
       </div>
     </BottomSheet>
   );

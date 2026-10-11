@@ -55,6 +55,7 @@ import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions"
 import { type PermissionKey } from "@/shared/auth/permissions";
 import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check";
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
+import { ViewAsButton } from "@/features/super-admin/components/view-as";
 import { cn } from "@/lib/utils";
 import { routePermissionForPath } from "@/features/custom-roles/routes";
 
@@ -311,6 +312,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
         {user?.isPlatformAdmin && (
           <div className="flex w-full min-w-0 justify-center">
             <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} compact={isMobile} />
+            {!isMobile ? <div className="mt-2 w-full px-2 group-data-[collapsible=icon]:hidden"><ViewAsButton state={{ canViewAs: true, viewingAs: null }} variant="sidebar" /></div> : null}
           </div>
         )}
 
