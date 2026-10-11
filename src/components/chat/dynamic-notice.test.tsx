@@ -18,11 +18,11 @@ describe("DynamicNotice", () => {
   it("announces the lead and opens it from the action or the card", () => {
     const onOpen = vi.fn();
     render(<DynamicNotice item={item} queuedCount={2} onOpen={onOpen} onDismiss={vi.fn()} />);
-    expect(screen.getByRole("status", { name: /Leads: Novo lead: Maria/ })).toBeTruthy();
+    expect(screen.getByRole("alert", { name: /Leads: Novo lead: Maria/ })).toBeTruthy();
     expect(screen.getByText("+2")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Atender" }));
     expect(onOpen).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("status"));
+    fireEvent.click(screen.getByRole("alert"));
     expect(onOpen).toHaveBeenCalledTimes(2);
   });
 
@@ -30,7 +30,7 @@ describe("DynamicNotice", () => {
     const onDismiss = vi.fn();
     const onOpen = vi.fn();
     render(<DynamicNotice item={{ ...item, pillLabel: "Lead novo" }} onOpen={onOpen} onDismiss={onDismiss} />);
-    const notice = screen.getByRole("status");
+    const notice = screen.getByRole("alert");
     fireEvent.pointerDown(notice);
     act(() => { vi.advanceTimersByTime(NOTICE_DURATION_MS + 500); });
     expect(screen.getByRole("button", { name: "Atender" })).toBeTruthy();
@@ -48,6 +48,6 @@ describe("DynamicNotice", () => {
 
   it("renders nothing without an item", () => {
     render(<DynamicNotice item={null} onOpen={vi.fn()} onDismiss={vi.fn()} />);
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });

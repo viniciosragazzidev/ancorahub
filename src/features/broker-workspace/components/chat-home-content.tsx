@@ -1,4 +1,6 @@
 import { ChatHome, type HomeHighlights, type HomeSummary } from "@/components/chat/chat-home";
+import { nextActionOf } from "@/features/assist/next-action";
+import { getFirstSteps } from "@/features/assist/first-steps";
 import { getBrokerHighlights, type BrokerHighlights } from "@/features/engagement/broker-stats";
 import { formatDuration, RANK_LABEL } from "@/features/engagement/ranking";
 import { shortName } from "@/features/ai-gateway/privacy";
@@ -80,9 +82,10 @@ function highlightsOf(data: BrokerHighlights | null, journey: BrokerJourneyData 
 export async function ChatHomeContent() {
   const [rail, data] = await Promise.all([getChatRailData(), getCachedBrokerWorkspaceData().catch(() => null)]);
   if (!rail || !data) return <LightDashboardUnavailable />;
-  const [highlights, journey] = await Promise.all([
+  const [highlights, journey, firstSteps] = await Promise.all([
     getBrokerHighlights(data.viewer.tenantId, data.viewer.userId).catch(() => null),
     getCachedBrokerJourneyData(data.viewer.tenantId, data.viewer.userId).catch(() => null),
+    getFirstSteps(data.viewer.tenantId, data.viewer.userId).catch(() => null),
   ]);
   return (
     <ChatHome
@@ -91,7 +94,8 @@ export async function ChatHomeContent() {
       leads={rail.leads}
       nowIso={rail.nowIso}
       canQuote={rail.canQuote}
-      summary={summaryOf(data)}
+      summary={{ ...summaryOf(data), next: nextActionOf(data.nextAction, journey) }}
+      firstSteps={firstSteps}
       highlights={highlightsOf(highlights, journey)}
     />
   );

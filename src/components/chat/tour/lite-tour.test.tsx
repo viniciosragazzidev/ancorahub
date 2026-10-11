@@ -66,7 +66,7 @@ describe("LiteTour", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Próximo/ }));
     expect(await screen.findByRole("dialog", { name: "Lead novo chega assim" })).toBeTruthy();
-    expect(screen.getByRole("status", { name: /Novo lead: Maria Souza/ })).toBeTruthy();
+    expect(screen.getByRole("alert", { name: /Novo lead: Maria Souza/ })).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: /Próximo/ }));
     expect(await screen.findByRole("dialog", { name: "Pronto para atender!" })).toBeTruthy();

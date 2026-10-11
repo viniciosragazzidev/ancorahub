@@ -1,0 +1,24 @@
+.card { display: grid; gap: 12px; width: 100%; padding: 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-panel); background: var(--surface); text-align: left; }
+.head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.ring { position: relative; width: 40px; height: 40px; display: grid; place-items: center; }
+.ring svg { position: absolute; inset: 0; }
+.ring > span { position: relative; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.track { fill: none; stroke: var(--surface-muted); stroke-width: 4; }
+.value { fill: none; stroke: var(--chat-action); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 500ms ease; }
+.headText { min-width: 0; }
+.headText h2 { margin: 0; font-size: var(--text-base); font-weight: 500; }
+.headText p { margin: 2px 0 0; color: var(--text-muted); font-size: var(--text-xs); }
+.headText strong { color: var(--foreground); font-weight: 500; }
+.later { height: 36px; padding: 0 12px; border: 0; border-radius: 99px; background: transparent; color: var(--text-muted); font: inherit; font-size: var(--text-xs); cursor: pointer; }
+.later:hover { background: var(--surface-muted); color: var(--foreground); }
+.steps { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.step { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 48px; padding: 8px 10px; border-radius: 14px; color: inherit; text-decoration: none; }
+a.step:hover { background: var(--surface-muted); }
+.check { width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--border-subtle); color: white; }
+li[data-done="true"] .check { background: oklch(60% .15 150); box-shadow: none; }
+li[data-done="true"] .stepText strong { color: var(--text-muted); font-weight: 400; text-decoration: line-through; text-decoration-color: color-mix(in oklch, var(--text-muted) 50%, transparent); }
+.stepText { min-width: 0; display: grid; gap: 1px; }
+.stepText strong { font-size: var(--text-sm); font-weight: 500; }
+.stepText small { color: var(--text-muted); font-size: var(--text-xs); }
+.go { color: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) { .value { transition: none; } }

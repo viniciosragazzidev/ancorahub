@@ -11,6 +11,8 @@ import { useLightAvailabilityContext } from "@/components/light/light-availabili
 
 import { AssistantAvatar } from "./assistant-avatar";
 import styles from "./chat.module.css";
+import { FirstStepsCard } from "@/features/assist/components/first-steps-card";
+import type { FirstStep } from "@/features/assist/first-steps";
 import home from "./chat-home.module.css";
 import { LiteWelcome } from "./lite-welcome";
 import { LiteTour } from "./tour/lite-tour";
@@ -51,6 +53,8 @@ export type HomeSummary = {
   goal: { name: string; percentage: number; currentValue: string; targetValue: string } | null;
   /** Replaces the four broker numbers (supervisor: the team's day). */
   stats?: { label: string; value: number; alert?: boolean }[];
+  /** "A próxima coisa é": the one most important thing now (offer > SLA > reply > return > mission). */
+  next?: { label: string; detail: string; href: string; urgent: boolean } | null;
 };
 
 export type { HomeHighlights } from "./week-ranking";
@@ -79,6 +83,7 @@ export function ChatHome({
   mode = "page",
   summary = null,
   highlights = null,
+  firstSteps = null,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -88,6 +93,8 @@ export function ChatHome({
   mode?: "page" | "rail";
   summary?: HomeSummary | null;
   highlights?: HomeHighlights | null;
+  /** New broker: what is left to set up (null once done). */
+  firstSteps?: FirstStep[] | null;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
@@ -102,6 +109,7 @@ export function ChatHome({
   const waitingLeads = leads.filter((lead) => lead.waitingYou).length;
   const visible = (tab === "assistentes" ? assistants : leads).filter((thread) => matches(thread, query));
   const nextLead = leads.find((lead) => lead.waitingYou) ?? null;
+  const next = summary?.next ?? null;
   const activeId = mode === "rail" ? [...assistants, ...leads].find((thread) => isActive(thread, pathname))?.id ?? null : null;
   const waitingAssistants = assistants.filter((thread) => thread.waitingYou);
 
@@ -145,6 +153,7 @@ export function ChatHome({
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>
       </header>
+      {mode === "page" && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
       {mode === "page" && highlights ? <WeekRanking data={highlights} /> : null}
       {list}
     </aside>
@@ -189,14 +198,20 @@ export function ChatHome({
         <motion.div initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className={home.centerInner}>
           <AssistantAvatar shape="logo" hue={null} size={56} />
           <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>
-          <p className={home.centerSubtitle}>
+          {next ? (
+            <p className={home.centerSubtitle}>
+              A próxima coisa é <strong className={home.nextLabel} data-urgent={next.urgent}>{next.label}</strong>. {next.detail}
+            </p>
+          ) : <p className={home.centerSubtitle}>
             {nextLead
               ? isSupervisor ? `O lead de ${nextLead.name.split(" ")[0]} está com o contato atrasado. Comece por ele.` : `${nextLead.name.split(" ")[0]} está esperando você. Escolha uma conversa à esquerda ou comece por ela.`
               : waitingAssistants.length
                 ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
                 : "Tudo em dia. Escolha uma conversa à esquerda para começar."}
-          </p>
-          {nextLead ? (
+          </p>}
+          {next ? (
+            <Link href={next.href} className={styles.pill} style={{ marginTop: 6 }}>{next.label}</Link>
+          ) : nextLead ? (
             <Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
           ) : null}
 
@@ -217,6 +232,7 @@ export function ChatHome({
             </ul>
           ) : null}
 
+          {firstSteps ? <FirstStepsCard steps={firstSteps} className={home.centerHighlights} /> : null}
           {highlights ? <WeekRanking data={highlights} className={home.centerHighlights} /> : null}
 
           {summary?.duty || summary?.goal ? (
@@ -242,7 +258,9 @@ export function ChatHome({
       </section>
 
       <div className={styles.pillWrap} data-mobile-only>
-        {nextLead ? (
+        {next ? (
+          <Link href={next.href} className={styles.pill} data-tour="home-pill" aria-label={`A próxima coisa é: ${next.label}. ${next.detail}`}>{next.urgent ? <span className={home.urgentDot} aria-hidden="true" /> : null}{next.label}</Link>
+        ) : nextLead ? (
           <Link href={nextLead.href} className={styles.pill} data-tour="home-pill">{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
         ) : (
           <button type="button" className={styles.pill} data-tour="home-pill" onClick={() => setNewOpen(true)}><PlusIcon /> {isSupervisor ? "Ações da equipe" : "Novo atendimento"}</button>

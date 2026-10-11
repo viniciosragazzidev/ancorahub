@@ -92,8 +92,9 @@ function Notice({ item, queuedCount, reduce, onOpen, onDismiss }: { item: Dynami
 
   return (
     <motion.div
-      role="status"
-      aria-live="polite"
+      // A lead offer expires: screen readers announce it right away; other notices wait their turn.
+      role={item.app === "Leads" ? "alert" : "status"}
+      aria-live={item.app === "Leads" ? "assertive" : "polite"}
       aria-label={`${item.app}: ${item.title}. ${item.message}`}
       className={styles.notice}
       data-dynamic-notice=""

@@ -36,3 +36,18 @@ describe("assist catalog", () => {
     expect(helpForRoute("/cotacao")).toBeNull();
   });
 });
+
+describe("bestAssistMatch", () => {
+  it("answers a where question with one confident entry", async () => {
+    const { bestAssistMatch } = await import("./catalog");
+    expect(bestAssistMatch("como faço pra pausar?")?.id).toBe("pause");
+    expect(bestAssistMatch("onde troco minha senha")?.id).toBe("password");
+    expect(bestAssistMatch("cadê meus pontos?", { journey: true })?.id).toBe("journey");
+  });
+
+  it("stays quiet when unsure or too short", async () => {
+    const { bestAssistMatch } = await import("./catalog");
+    expect(bestAssistMatch("oi")).toBeNull();
+    expect(bestAssistMatch("qual o sentido da vida")).toBeNull();
+  });
+});

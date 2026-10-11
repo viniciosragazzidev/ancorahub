@@ -6,7 +6,7 @@ import type { AssistCapability } from "../catalog";
 import { AssistSearch } from "./assist-search";
 import { HelpButton, HelpSheet } from "./help-sheet";
 
-type AssistApi = { openSearch: () => void; openHelp: () => void };
+type AssistApi = { openSearch: () => void; openHelp: () => void; capabilities: Partial<Record<AssistCapability, boolean>> };
 const AssistContext = createContext<AssistApi | null>(null);
 
 /** Open the search or the help from anywhere inside the broker Lite (null outside it). */
@@ -42,7 +42,7 @@ export function AssistLayer({ pathname, capabilities, children }: { pathname: st
     return () => window.removeEventListener("keydown", onKey);
   }, [openSearch, openHelp]);
 
-  const api = useMemo(() => ({ openSearch, openHelp }), [openSearch, openHelp]);
+  const api = useMemo(() => ({ openSearch, openHelp, capabilities }), [openSearch, openHelp, capabilities]);
   return (
     <AssistContext.Provider value={api}>
       {children}

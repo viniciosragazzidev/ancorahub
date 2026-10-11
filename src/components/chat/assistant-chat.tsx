@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
+import { bestAssistMatch } from "@/features/assist/catalog";
+import { useAssist } from "@/features/assist/components/assist-layer";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import type { AgentId } from "@/features/ai-gateway/agents";
 
@@ -14,6 +16,7 @@ import type { ChatBlock, ChatScript, MascotShape } from "./types";
 /** An assistant conversation: the script plays, replies run the broker's actions. */
 export function AssistantChat({ identity, script, instant = false, headerAction, agentId }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId }) {
   const router = useRouter();
+  const assist = useAssist();
   return (
     <ChatScreen
       identity={identity}
@@ -37,8 +40,17 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
         return [];
       }}
       onFreeText={async (text): Promise<ChatBlock[]> => {
+        // "Onde fica?" answered from the app catalog first: instant, free and always right.
+        const where = bestAssistMatch(text, assist?.capabilities ?? {});
+        if (where) {
+          const stamp = Date.now();
+          return [
+            { type: "assistant", id: `where-${stamp}`, text: `${where.title}: ${where.description}` },
+            { type: "button", id: `where-go-${stamp}`, label: where.kind === "action" ? "Me leva lá" : `Abrir ${where.title}`, href: where.href },
+          ];
+        }
         if (agentId) return (await askAssistantAction({ agentId, question: text })).blocks;
-        return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Ainda não entendo texto livre aqui. Escolha uma das opções ou use @ para abrir outra conversa." }];
+        return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Não achei isso. Tente com outras palavras, toque em \"?\" no topo para a ajuda da tela ou use @ para abrir outra conversa." }];
       }}
     />
   );

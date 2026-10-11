@@ -95,3 +95,23 @@ export function helpForRoute(pathname: string): ScreenHelp | null {
   const path = pathname.split(/[?#]/)[0] ?? pathname;
   return HELP.find((item) => item.match.test(path))?.help ?? null;
 }
+
+const QUESTION_NOISE = /\b(onde|fica|cade|como|faco|faço|eu|meu|minha|meus|minhas|vejo|ver|acho|achar|posso|consigo|tem|o|a|os|as|de|do|da|para|pra|no|na|um|uma|que|e|é)\b/g;
+
+/**
+ * The single best entry for a free-text question ("onde vejo meus pontos?",
+ * "como pauso?"), or null when nothing is a confident match. Used by the
+ * Âncora conversation to answer "where is it" without an AI.
+ */
+export function bestAssistMatch(question: string, capabilities: Partial<Record<AssistCapability, boolean>> = {}) {
+  const core = normalize(question).replace(/[?!.,;:]/g, " ").replace(QUESTION_NOISE, " ").replace(/\s+/g, " ").trim();
+  if (core.length < 3) return null;
+  const [first, second] = searchAssist(core, capabilities, ASSIST_ENTRIES, 2);
+  if (!first) return null;
+  // Confident only when the words point at one entry (a tie means "ask the search").
+  const words = core.split(" ");
+  const hits = (entry: AssistEntry) => words.filter((word) => word.length > 2 && [entry.title, ...entry.keywords].some((text) => normalize(text).includes(word))).length;
+  const exact = [first.title, ...first.keywords].map(normalize).includes(core);
+  if (!hits(first) || (!exact && second && hits(second) === hits(first) && first.kind === second.kind)) return null;
+  return first;
+}

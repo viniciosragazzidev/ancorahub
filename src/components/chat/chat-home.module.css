@@ -67,3 +67,10 @@
   .card { transition: none; }
   .card:hover { transform: none; }
 }
+
+/* "A próxima coisa é" (E5). */
+.nextLabel { color: var(--foreground); font-weight: 600; }
+.nextLabel[data-urgent="true"] { color: var(--danger); }
+.urgentDot { display: inline-block; width: 8px; height: 8px; margin-right: 8px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 3px color-mix(in oklch, var(--danger) 25%, transparent); vertical-align: middle; }
+
+.firstSteps { margin: 4px var(--chat-gutter, 20px) 8px; width: auto; }
