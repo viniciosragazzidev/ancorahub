@@ -114,7 +114,7 @@ export function LightChrome({
   // Chat screens draw their own header; the conversation list is the navigation.
   if (chat) {
     return withRail(
-      <div className="arc-venancor h-dvh w-full overflow-hidden bg-[var(--surface)]">
+      <div className="arc-venancor h-app w-full overflow-hidden bg-[var(--surface)]">
         <main ref={mainRef} data-slot="app-content" className="h-full w-full overflow-y-auto overscroll-contain">
           <LightAvailabilityProvider value={shell}>{children}</LightAvailabilityProvider>
         </main>
@@ -124,7 +124,7 @@ export function LightChrome({
   }
 
   return withRail(
-    <div className="flex h-dvh w-full overflow-hidden light-canvas selection:bg-primary/20">
+    <div className="flex h-app w-full overflow-hidden light-canvas selection:bg-primary/20">
       <div className="flex min-w-0 flex-1 flex-col">
         <LightAppHeader
           availability={availability}

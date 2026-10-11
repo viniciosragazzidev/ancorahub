@@ -1,4 +1,4 @@
-.page { min-height: 100dvh; background: var(--surface); }
+.page { min-height: var(--app-dvh, 100dvh); background: var(--surface); }
 .sidebar { display: grid; align-content: start; gap: 4px; padding-bottom: 96px; }
 .header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: calc(env(safe-area-inset-top, 0px) + 14px) 20px 10px; }
 .me { width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--foreground); font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; box-shadow: var(--shadow-resting); }
@@ -44,7 +44,7 @@
 
 /* Computers: the list on the side, the team at the center (reference: desktop home). */
 @media (min-width: 1024px) {
-  .page { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: 100dvh; }
+  .page { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: var(--app-dvh, 100dvh); }
   .sidebar { border-right: 1px solid var(--border); background: var(--surface-muted); overflow-y: auto; padding-bottom: 24px; }
   .center { display: grid; place-items: center; overflow-y: auto; padding: 48px 32px; }
   .centerInner { width: 100%; max-width: 760px; display: grid; justify-items: center; gap: 6px; }

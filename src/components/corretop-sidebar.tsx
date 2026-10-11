@@ -290,7 +290,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       data-slot="navigation-rail"
       variant="floating"
       collapsible="icon"
-      className="sticky top-0 h-dvh max-h-dvh overflow-hidden select-none"
+      className="sticky top-0 h-app max-h-app overflow-hidden select-none"
     >
       {/* Header: Logo & SuperAdmin Switcher */}
       <SidebarHeader className={cn("gap-3 border-b border-sidebar-border/70 p-3", isMobile && "px-3 pt-[calc(0.75rem+var(--mobile-safe-top))] pb-3")}>

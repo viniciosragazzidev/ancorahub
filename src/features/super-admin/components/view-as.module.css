@@ -41,6 +41,7 @@
 /* Strip on top of every screen while viewing as someone. */
 .banner {
   position: sticky; top: 0; z-index: 80;
+  width: 100%; flex: none; /* its own row above the app, also in the normal mode row */
   display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px;
   padding: 8px 12px calc(8px) 12px; padding-top: max(8px, env(safe-area-inset-top));
   background: linear-gradient(90deg, oklch(28% .06 300), oklch(30% .06 260)); color: white;

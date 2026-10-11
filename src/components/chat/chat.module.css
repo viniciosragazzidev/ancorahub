@@ -64,7 +64,7 @@
 .verified { width: 14px; height: 14px; flex: none; color: var(--chat-action); }
 
 /* ---------- screen ---------- */
-.screen { height: 100dvh; min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--surface); }
+.screen { height: var(--app-dvh, 100dvh); min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--surface); }
 .header {
   position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
   padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; background: color-mix(in oklab, var(--surface) 92%, transparent);

@@ -117,15 +117,28 @@ function ViewAsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
 /** Fixed strip while viewing as someone: who, read only, and the way back. */
 export function ViewAsBanner({ viewingAs }: { viewingAs: ViewAsState["viewingAs"] }) {
   const active = Boolean(viewingAs);
+  const bannerRef = useRef<HTMLDivElement>(null);
   // Layout effect: runs before the tours and welcome cards (rendered after the banner) read their marks.
   useLayoutEffect(() => {
     if (!active) return;
-    document.documentElement.dataset.viewAs = "1";
-    return () => { delete document.documentElement.dataset.viewAs; };
+    const html = document.documentElement;
+    html.dataset.viewAs = "1";
+    // The banner sits above the app, and the body never scrolls (globals.css): the screens
+    // that fill the viewport (--app-dvh) give up the banner's height, or their end is cut off.
+    const banner = bannerRef.current;
+    const fit = () => html.style.setProperty("--app-dvh", `calc(100dvh - ${banner?.offsetHeight ?? 0}px)`);
+    fit();
+    const observer = banner && typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
+    if (banner) observer?.observe(banner);
+    return () => {
+      observer?.disconnect();
+      html.style.removeProperty("--app-dvh");
+      delete html.dataset.viewAs;
+    };
   }, [active]);
   if (!viewingAs) return null;
   return (
-    <div className={styles.banner} role="status">
+    <div ref={bannerRef} className={styles.banner} role="status">
       <span className={styles.bannerBolt}><Bolt size={14} /></span>
       <span className={styles.bannerText}>Vendo como <strong>{viewingAs.name}</strong> ({ROLE_LABEL[viewingAs.role] ?? viewingAs.role}) · só visualização</span>
       <a href={EXIT_VIEW_AS_HREF} className={styles.bannerExit}>Voltar ao meu acesso</a>

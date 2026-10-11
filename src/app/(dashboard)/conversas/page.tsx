@@ -971,7 +971,7 @@ export default async function ConversationsPage({
   }
 
   return (
-    <div className="flex h-dvh min-h-0 w-full flex-1 flex-col overflow-hidden">
+    <div className="flex h-app min-h-0 w-full flex-1 flex-col overflow-hidden">
       <DashboardHeader
         breadcrumb="Atendimento"
         title="Conversas"

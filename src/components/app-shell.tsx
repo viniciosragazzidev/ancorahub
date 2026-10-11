@@ -7,6 +7,7 @@ import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-
 import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import { LightChrome } from "@/components/light/light-chrome";
 import { ViewAsBanner, type ViewAsState } from "@/features/super-admin/components/view-as";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
@@ -133,7 +134,7 @@ export function AppShell({
         data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
         defaultOpen={false}
         open={false}
-        className="min-h-dvh flex-col overflow-x-hidden"
+        className="min-h-app flex-col overflow-x-hidden"
         style={
           {
             "--sidebar-width": "0px",
@@ -176,7 +177,7 @@ export function AppShell({
     <OnboardingProvider>
       <SidebarProvider
         data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
-        className="min-h-dvh overflow-hidden"
+        className={cn("min-h-app overflow-hidden", viewAs.viewingAs && "flex-wrap content-start")}
         style={
           {
             "--sidebar-width": isFinanceiro ? "16rem" : "17rem",
@@ -204,7 +205,7 @@ export function AppShell({
         <SidebarInset
           ref={canvasRef}
           data-slot="app-scroll-frame"
-          className="app-shell-canvas min-h-0 h-dvh overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]"
+          className="app-shell-canvas min-h-0 h-app overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]"
           style={{
             scrollPaddingTop: "var(--header-height)",
             scrollPaddingBottom: "var(--mobile-safe-bottom)",

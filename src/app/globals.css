@@ -405,6 +405,13 @@ html {
 
 }
 
+/* The app's full height. "Ver como" (super admin) takes its strip off it
+   (--app-dvh, view-as.tsx): the body never scrolls, so a 100dvh screen under
+   the strip would have its end cut off. */
+.h-app { height: var(--app-dvh, 100dvh); }
+.min-h-app { min-height: var(--app-dvh, 100dvh); }
+.max-h-app { max-height: var(--app-dvh, 100dvh); }
+
 body {
   height: 100dvh;
   overflow: hidden;
