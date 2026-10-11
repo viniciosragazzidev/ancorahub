@@ -402,7 +402,9 @@ html {
      elementos position:fixed/sticky, ao contrário do zoom.       */
   font-size: 97%;
   min-height: 100%;
-
+  /* The document never scrolls (the shell's own frames do). With its own overflow,
+     the body's clip below stays on the body instead of passing to the viewport. */
+  overflow: hidden;
 }
 
 /* The app's full height. "Ver como" (super admin) takes its strip off it
@@ -415,6 +417,11 @@ html {
 body {
   height: 100dvh;
   overflow: hidden;
+  /* clip, not just hidden: scrollIntoView (tours, focus) could still scroll a hidden
+     box and leave the whole app shifted up with a blank strip below. */
+  overflow: clip;
+  /* Containing block for absolute elements too, so none of them makes the document taller. */
+  position: relative;
   margin: 0;
   background: var(--background);
   color: var(--foreground);
