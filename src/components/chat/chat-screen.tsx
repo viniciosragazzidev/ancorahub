@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { goBackInApp } from "@/components/light/light-navigation";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, useReducedMotion } from "motion/react";
@@ -141,17 +141,28 @@ export function ChatScreen({
   useEffect(() => {
     const fresh = new Map(script.blocks.map((block) => [block.id, block]));
     const sourceOf = (id: string) => copySource.current.get(id) ?? id;
-    setShown((current) => current.flatMap((block) => {
-      if (block.type === "user") return [block];
-      // Questions not answered yet follow the data too (never offer a return that is gone).
-      if (block.type === "question") {
-        const next = answersRef.current[block.id] ? null : fresh.get(sourceOf(block.id));
-        return [next ? { ...next, id: block.id } : block];
-      }
-      const next = fresh.get(block.id);
-      if (next) return [next];
-      return block.type === "list" ? [] : [block];
-    }));
+    // Realtime refreshes the page every few seconds: blocks that did not change keep their
+    // object (their rows skip rendering) and an unchanged conversation keeps its array, so
+    // scrolling never stutters on a refresh.
+    setShown((current) => {
+      let changed = false;
+      const next = current.flatMap((block) => {
+        if (block.type === "user") return [block];
+        let fresher: ChatBlock | undefined;
+        // Questions not answered yet follow the data too (never offer a return that is gone).
+        if (block.type === "question") {
+          const source = answersRef.current[block.id] ? undefined : fresh.get(sourceOf(block.id));
+          fresher = source ? { ...source, id: block.id } : undefined;
+        } else {
+          fresher = fresh.get(block.id);
+          if (!fresher && block.type === "list") { changed = true; return []; }
+        }
+        if (!fresher || sameBlock(fresher, block)) return [block];
+        changed = true;
+        return [fresher];
+      });
+      return changed ? next : current;
+    });
     if (!replayPending.current) return;
     replayPending.current = false;
     const first = initial.find((block) => block.type === "question");
@@ -217,6 +228,15 @@ export function ChatScreen({
     });
   }, [choose, script.blocks, working]);
 
+  // Rows are memoized: they get stable handlers that always call the latest ones.
+  const latest = useRef({ choose, swipeItem, onButtonOpen });
+  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen }; });
+  const rowHandlers = useMemo<RowHandlers>(() => ({
+    choose: (question, choice) => { void latest.current.choose(question, choice); },
+    swipe: (item) => latest.current.swipeItem(item),
+    buttonOpen: (block, event) => latest.current.onButtonOpen?.(block, event),
+  }), []);
+
   const answeredCount = Object.keys(answers).length;
   const progress = progressOverride !== undefined
     ? progressOverride
@@ -250,11 +270,7 @@ export function ChatScreen({
       <div ref={scrollRef} className={styles.scroll} aria-live="polite" aria-relevant="additions">
         <div data-tour={tourTargets?.conversation} className={styles.thread_}>
           {shown.map((block) => (
-            <MessageEnter key={block.id}>
-              {block.type === "question"
-                ? <ChoiceList block={block} chosenId={answers[block.id] ?? null} disabled={working} onChoose={(choice) => { void choose(block, choice); }} />
-                : <ChatBlockView block={block} onButtonOpen={onButtonOpen} onItemSwipe={swipeItem} swipeDisabled={working} onSystemAction={(system) => { if (system.action) void choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
-            </MessageEnter>
+            <BlockRow key={block.id} block={block} chosenId={block.type === "question" ? answers[block.id] ?? null : null} working={working} handlers={rowHandlers} />
           ))}
           <AnimatePresence>{typing ? <MessageEnter key="typing"><TypingIndicator /></MessageEnter> : null}</AnimatePresence>
           {working ? <MessageEnter key="working"><AssistantAvatar shape={identity.shape} hue={identity.hue} size={40} state="working" /></MessageEnter> : null}
@@ -281,3 +297,25 @@ export function ChatScreen({
     </div>
   );
 }
+
+type RowHandlers = {
+  choose: (question: Extract<ChatBlock, { type: "question" }>, choice: ChatChoice) => void;
+  swipe: (item: ChatListItem) => void;
+  buttonOpen: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void;
+};
+
+/** Blocks from the server are plain data: equal JSON means nothing to redraw. */
+function sameBlock(a: ChatBlock, b: ChatBlock) {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
+/** One message of the conversation. Memoized: a refresh redraws only what changed. */
+const BlockRow = memo(function BlockRow({ block, chosenId, working, handlers }: { block: ChatBlock; chosenId: string | null; working: boolean; handlers: RowHandlers }) {
+  return (
+    <MessageEnter>
+      {block.type === "question"
+        ? <ChoiceList block={block} chosenId={chosenId} disabled={working} onChoose={(choice) => handlers.choose(block, choice)} />
+        : <ChatBlockView block={block} onButtonOpen={handlers.buttonOpen} onItemSwipe={handlers.swipe} swipeDisabled={working} onSystemAction={(system) => { if (system.action) handlers.choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
+    </MessageEnter>
+  );
+});

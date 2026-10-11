@@ -67,8 +67,7 @@
 .screen { height: var(--app-dvh, 100dvh); min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--surface); }
 .header {
   position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;
-  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; background: color-mix(in oklab, var(--surface) 92%, transparent);
-  backdrop-filter: blur(12px);
+  padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 10px; background: var(--surface);
 }
 .iconButton {
   width: 40px; height: 40px; display: grid; place-items: center; border-radius: 999px; border: 1px solid var(--border);
