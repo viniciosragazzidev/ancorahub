@@ -281,6 +281,18 @@ describe("broker chat assistant scripts", () => {
     expectNoEmDash([active, paused, pending, next]);
   });
 
+  it("plantão: asks to confirm presence, with a photo when the plantão is presencial", () => {
+    const presence = { assignmentId: "as-1", scheduleName: "PME Centro", branchName: "Centro", mode: "presencial" as const, startsAt: new Date("2026-10-09T09:00:00-03:00"), endsAt: new Date("2026-10-09T18:00:00-03:00"), status: "pending" as const };
+    const data = workspace({ duty: { active: activeDuty({ presenceStatus: "pending" }), next: null, readyToReceive: false, presence } });
+    const script = buildAssistantScript("plantao", { data, now });
+    expect(script.blocks).toContainEqual(expect.objectContaining({ type: "presence", ask: expect.objectContaining({ assignmentId: "as-1", mode: "presencial", startsAt: "2026-10-09T12:00:00.000Z" }) }));
+    expect(script.blocks.some((block) => block.type === "assistant" && block.text.includes("presencial"))).toBe(true);
+    const thread = buildAssistantThreads({ data, capabilities: { quoteSimulator: false, dutyCalendar: true }, now }).find((item) => item.assistant === "plantao");
+    expect(thread).toMatchObject({ waitingYou: true, preview: "Confirme sua presença no PME Centro com uma foto do local." });
+    const confirmed = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty(), next: null, readyToReceive: true, presence: { ...presence, status: "confirmed" } } }), now });
+    expect(confirmed.blocks.some((block) => block.type === "presence")).toBe(false);
+  });
+
   it("lists agenda items in São Paulo time and gives the requested next steps", () => {
     const script = buildAssistantScript("agenda", {
       data: workspace({ agenda: [{ id: "task-1", leadId: "lead-1", leadName: "Clara Souza", title: "Retornar sobre a cotação", dueAt: new Date("2026-10-09T15:30:00-03:00"), priority: "urgent", href: "/leads/lead-1#tarefas" }] }),

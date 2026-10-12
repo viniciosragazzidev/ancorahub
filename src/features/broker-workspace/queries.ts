@@ -26,6 +26,16 @@ const activeLeadStatuses = [
   "under_analysis",
 ] as const;
 
+export type DutyPresenceAsk = {
+  assignmentId: string;
+  scheduleName: string;
+  branchName: string | null;
+  mode: "online" | "presencial";
+  startsAt: Date;
+  endsAt: Date;
+  status: "pending" | "confirmed";
+};
+
 export type BrokerWorkspaceData = {
   viewer: { tenantId: string; userId: string; name: string; branchName: string; availabilityStatus: "available" | "paused" | "offline" };
   nextAction: BrokerWorkspacePriority | null;
@@ -33,6 +43,8 @@ export type BrokerWorkspaceData = {
     active: { scheduleId: string; scheduleName: string; queueName: string | null; branchName: string | null; dutyDate: string; startsAt: Date; endsAt: Date; paused: boolean; presenceStatus: "confirmed" | "pending" | "not_required" } | null;
     next: { scheduleName: string; queueName: string | null; dutyDate: string; startsAt: Date; endsAt: Date; paused: boolean } | null;
     readyToReceive: boolean;
+    /** The plantão the broker must confirm now (from 30 min before until the end); null when nothing to confirm. */
+    presence?: DutyPresenceAsk | null;
   } | null;
   today: { awaitingResponse: number; overdueTasks: number; returnsDue: number; newLeads: number; pendingDocuments: number; pendingProposals: number; unreadNotifications: number; receivedToday: number; acceptedToday: number; inServiceNow: number; slaAtRiskNow: number };
   inbox: Array<{ id: string; source: "message" | "task" | "lead" | "document" | "proposal" | "notification"; title: string; description: string; href: string; severity: "critical" | "warning" | "normal" }>;
@@ -146,6 +158,21 @@ function buildDutySummary(input: {
           ? "pending" as const
           : "not_required" as const
       : null;
+    // To confirm: the shift in progress, or the next one when it starts within 30 minutes.
+    const presenceOccurrence = activeOccurrence
+      ?? (nextOccurrence && nextOccurrence.startsAt.getTime() - input.now.getTime() <= 30 * 60_000 ? nextOccurrence : undefined);
+    const presenceMode = presenceOccurrence?.row.attendanceMode === "presencial" ? "presencial" as const : "online" as const;
+    const presence: DutyPresenceAsk | null = presenceOccurrence && (presenceMode === "presencial" || input.presenceRequired)
+      ? {
+        assignmentId: presenceOccurrence.row.assignmentId,
+        scheduleName: presenceOccurrence.row.scheduleName,
+        branchName: presenceOccurrence.row.branchName,
+        mode: presenceMode,
+        startsAt: presenceOccurrence.startsAt,
+        endsAt: presenceOccurrence.endsAt,
+        status: presenceOccurrence.row.confirmationStatus === "confirmed" && (presenceMode === "online" || Boolean(presenceOccurrence.row.confirmedBy)) ? "confirmed" : "pending",
+      }
+      : null;
     const paused = activeOccurrence ? Boolean(activeOccurrence.row.pausedAt) : false;
     const active = activeOccurrence ? {
       scheduleId: activeOccurrence.row.scheduleId,
@@ -171,6 +198,7 @@ function buildDutySummary(input: {
       active,
       next,
       readyToReceive: active ? isBrokerReadyToReceive({ availabilityStatus: input.availabilityStatus, paused, presenceStatus: active.presenceStatus }) : false,
+      presence,
     };
   });
 }
@@ -254,7 +282,8 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
       .leftJoin(schema.dutyPresenceConfirmations, and(
         eq(schema.dutyPresenceConfirmations.assignmentId, schema.dutyRosterAssignments.id),
         eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId),
-        lte(schema.dutyPresenceConfirmations.shiftStartsAt, now),
+        // Includes the shift starting within 30 min (it can already be confirmed).
+        lte(schema.dutyPresenceConfirmations.shiftStartsAt, new Date(now.getTime() + 30 * 60_000)),
         gt(schema.dutyPresenceConfirmations.shiftEndsAt, now),
       ))
       .where(and(

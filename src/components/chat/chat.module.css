@@ -309,3 +309,28 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 .pausedText { margin: 0; max-width: 32ch; font-size: var(--text-sm); line-height: 1.5; color: var(--text-secondary); text-wrap: pretty; }
 @media (prefers-reduced-motion: reduce) { .pausedAurora, .pausedDot { animation: none; } }
 :global(.dark) .pausedPill { color: oklch(82% 0.1 var(--paused-hue)); background: oklch(30% 0.05 var(--paused-hue) / 0.8); border-color: oklch(40% 0.06 var(--paused-hue)); }
+
+/* Plantão presence to confirm (2026-10-12): highlighted card on the Início and in the Plantão chat. */
+.presence { --presence-hue: 28; position: relative; isolation: isolate; display: grid; gap: 12px; padding: 16px; border-radius: var(--radius-panel); background: var(--surface); box-shadow: var(--shadow-raised); border: 1px solid oklch(84% 0.08 var(--presence-hue)); overflow: hidden; }
+.presence[data-variant="home"] { margin: 4px 12px 10px; }
+.presence[data-done="true"] { border-color: color-mix(in oklab, var(--success) 45%, var(--border)); }
+.presenceHalo { position: absolute; inset: 0; z-index: -1; border-radius: inherit; background: radial-gradient(120% 90% at 0% 0%, oklch(93% 0.06 var(--presence-hue) / 0.9), transparent 60%); animation: presenceBreath 2.8s ease-in-out infinite; }
+@keyframes presenceBreath { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+.presenceHead { display: flex; gap: 12px; align-items: flex-start; }
+.presenceMascot { flex: none; display: grid; }
+.presenceText { display: grid; gap: 3px; min-width: 0; }
+.presencePill { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 500; color: oklch(45% 0.13 var(--presence-hue)); background: oklch(95% 0.04 var(--presence-hue)); }
+.presencePill[data-mode="online"] { color: var(--chat-action-text, var(--chat-action)); background: var(--chat-action-soft); }
+.presenceLive { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pausedPulse 2s ease-in-out infinite; --paused-hue: 255; }
+.presenceTitle { font-size: var(--text-base); font-weight: 500; color: var(--foreground); }
+.presenceDetail { font-size: var(--text-sm); line-height: 1.45; color: var(--text-secondary); }
+.presenceButton { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 999px; font: inherit; font-size: var(--text-sm); font-weight: 500; color: white; background: linear-gradient(135deg, oklch(66% 0.17 var(--presence-hue)), oklch(60% 0.19 calc(var(--presence-hue) + 12))); box-shadow: 0 6px 16px -8px oklch(55% 0.18 var(--presence-hue) / 0.8); cursor: pointer; }
+.presence:has(.presencePill[data-mode="online"]) .presenceButton { background: var(--chat-action); box-shadow: 0 6px 16px -8px color-mix(in oklab, var(--chat-action) 80%, transparent); }
+.presenceButton:disabled { opacity: 0.85; cursor: progress; }
+.presencePhoto { position: relative; justify-self: center; width: min(220px, 70%); aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; border: 4px solid var(--surface); box-shadow: var(--shadow-raised); }
+.presencePhoto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.presenceScan { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, oklch(100% 0 0 / 0.55) 48%, transparent 52%); background-size: 100% 220%; animation: presenceScan 1.3s linear infinite; }
+@keyframes presenceScan { from { background-position: 0 -120%; } to { background-position: 0 120%; } }
+.presenceDone { margin: 0; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 999px; font-size: var(--text-sm); font-weight: 500; color: var(--success); background: color-mix(in oklab, var(--success) 12%, var(--surface)); }
+.presenceError { margin: 0; font-size: var(--text-sm); color: var(--danger); }
+@media (prefers-reduced-motion: reduce) { .presenceHalo, .presenceLive, .presenceScan { animation: none; } }

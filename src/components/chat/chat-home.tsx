@@ -10,6 +10,7 @@ import SegmentedControl from "@/components/arc/segmented-control/segmented-contr
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 
 import { AssistantAvatar } from "./assistant-avatar";
+import { PresenceCallout } from "./presence-callout";
 import styles from "./chat.module.css";
 import { FirstStepsCard } from "@/features/assist/components/first-steps-card";
 import type { FirstStep } from "@/features/assist/first-steps";
@@ -18,7 +19,7 @@ import { LiteWelcome } from "./lite-welcome";
 import { LiteTour } from "./tour/lite-tour";
 import { ThreadList } from "./thread-row";
 import { WeekRanking, type HomeHighlights } from "./week-ranking";
-import type { ThreadSummary } from "./types";
+import type { PresenceAskView, ThreadSummary } from "./types";
 
 type Tab = "assistentes" | "leads";
 
@@ -84,6 +85,7 @@ export function ChatHome({
   summary = null,
   highlights = null,
   firstSteps = null,
+  presence = null,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -95,6 +97,8 @@ export function ChatHome({
   highlights?: HomeHighlights | null;
   /** New broker: what is left to set up (null once done). */
   firstSteps?: FirstStep[] | null;
+  /** Plantão to confirm now: highlighted at the top of the Início until confirmed. */
+  presence?: PresenceAskView | null;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
@@ -160,6 +164,7 @@ export function ChatHome({
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>
       </header>
+      {mode === "page" && presence?.status === "pending" ? <PresenceCallout ask={presence} /> : null}
       {mode === "page" && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
       {mode === "page" && highlights ? <WeekRanking data={highlights} /> : null}
       {list}

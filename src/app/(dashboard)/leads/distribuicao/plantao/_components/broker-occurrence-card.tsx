@@ -18,7 +18,7 @@ type LeadResult = Extract<Awaited<ReturnType<typeof getBrokerOccurrenceLeadsActi
 type AvailableResult = Extract<Awaited<ReturnType<typeof getDutyAvailableLeadsAction>>, { ok: true }>;
 type Tab = "received" | "available";
 
-export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false }: {
+export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null }: {
   children: ReactNode;
   scheduleId: string;
   assignmentId: string;
@@ -35,6 +35,8 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
   branchName?: string | null;
   /** Management actions enabled: the "Leads disponíveis" tab can assign. */
   canAssignLeads?: boolean;
+  /** Presencial confirmed by the broker with a photo of the place: the confirmation id to open it. */
+  presencePhotoId?: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [leads, setLeads] = useState<LeadResult["leads"] | null>(null);
@@ -132,6 +134,7 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
       <Badge variant={absent ? "destructive" : presenceStatus === "confirmed" ? "success" : "warning"}>{absent ? "Faltou" : presenceStatus === "confirmed" ? "Presença confirmada" : "Aguardando presença"}</Badge>
       <Badge variant="outline">{paused || onSitePending ? "Pausado" : "Ativo"}</Badge>
       <Badge variant="outline">{attendanceMode === "presencial" ? "Presencial" : "Online"}</Badge>
+      {presencePhotoId ? <a href={`/api/duty/presence/photo?id=${presencePhotoId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-muted">Ver foto do local</a> : null}
       <Badge variant="outline" className="tabular-nums" title="Ofertas enviadas a este corretor neste plantão hoje / aceitas por ele">
         {offers ? `${offers.offered} ${offers.offered === 1 ? "oferta enviada" : "ofertas enviadas"} / ${offers.accepted} ${offers.accepted === 1 ? "aceita" : "aceitas"}` : "Ofertas…"}
       </Badge>

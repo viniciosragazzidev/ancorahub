@@ -6,6 +6,7 @@ import { formatDuration, RANK_LABEL } from "@/features/engagement/ranking";
 import { shortName } from "@/features/ai-gateway/privacy";
 import { LightDashboardUnavailable } from "@/features/broker-workspace/components/light-dashboard";
 import { getCachedBrokerWorkspaceData, getCachedBrokerJourneyData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
+import { presenceAskOf } from "@/features/broker-workspace/chat/assistant-scripts";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
 
@@ -27,6 +28,18 @@ function summaryOf(data: BrokerWorkspaceData): HomeSummary {
         ? { title: `Próximo plantão: ${next.scheduleName}`, detail: `${day(next.startsAt)}, ${time(next.startsAt)} às ${time(next.endsAt)}`, href: "/dashboard/c/plantao" }
         : null,
     goal: data.goal,
+  };
+}
+
+/** A plantão waiting for the broker's confirmation comes first: without it no lead arrives. */
+function presenceNext(data: BrokerWorkspaceData): HomeSummary["next"] {
+  const presence = data.duty?.presence;
+  if (presence?.status !== "pending") return null;
+  return {
+    label: presence.mode === "presencial" ? "Tirar a foto do plantão" : "Confirmar presença",
+    detail: presence.mode === "presencial" ? `O ${presence.scheduleName} é presencial: a foto do local libera seus leads.` : `Confirme o ${presence.scheduleName} para começar a receber leads.`,
+    href: "/dashboard/c/plantao",
+    urgent: true,
   };
 }
 
@@ -94,7 +107,8 @@ export async function ChatHomeContent() {
       leads={rail.leads}
       nowIso={rail.nowIso}
       canQuote={rail.canQuote}
-      summary={{ ...summaryOf(data), next: nextActionOf(data.nextAction, journey) }}
+      summary={{ ...summaryOf(data), next: presenceNext(data) ?? nextActionOf(data.nextAction, journey) }}
+      presence={presenceAskOf(data)}
       firstSteps={firstSteps}
       highlights={highlightsOf(highlights, journey)}
     />

@@ -6,6 +6,7 @@ import type {
   ChatChoice,
   ChatScript,
   MascotShape,
+  PresenceAskView,
   ThreadSummary,
 } from "@/components/chat/types";
 import type { BrokerWorkspacePriority } from "@/features/broker-workspace/priority";
@@ -231,7 +232,9 @@ export function buildAssistantThreads(input: {
       waitingYou: leads.some((lead) => lead.waitingYou),
     }),
     assistantThread("plantao", {
-      preview: activeDuty
+      preview: data.duty?.presence?.status === "pending"
+        ? data.duty.presence.mode === "presencial" ? `Confirme sua presença no ${data.duty.presence.scheduleName} com uma foto do local.` : `Confirme sua presença no ${data.duty.presence.scheduleName}.`
+        : activeDuty
         ? activeDuty.presenceStatus === "pending"
           ? `Aguardando liberação do plantão ${activeDuty.scheduleName}.`
           : activeDuty.paused
@@ -242,7 +245,7 @@ export function buildAssistantThreads(input: {
           : "Você não tem plantão marcado. Quando o supervisor colocar você na escala, eu aviso aqui.",
       at: activeDuty ? iso(activeDuty.startsAt) : nextDuty ? iso(nextDuty.startsAt) : null,
       unread: false,
-      waitingYou: activeDuty?.presenceStatus === "pending",
+      waitingYou: data.duty?.presence?.status === "pending" || activeDuty?.presenceStatus === "pending",
     }),
     assistantThread("agenda", {
       preview: overdueReturn
@@ -394,8 +397,24 @@ function dutyFacts(active: NonNullable<NonNullable<BrokerWorkspaceData["duty"]>[
   ]);
 }
 
+/** The plantão to confirm as the client sees it (null when nothing to confirm now). */
+export function presenceAskOf(data: BrokerWorkspaceData): PresenceAskView | null {
+  const presence = data.duty?.presence;
+  return presence ? { ...presence, startsAt: presence.startsAt.toISOString(), endsAt: presence.endsAt.toISOString() } : null;
+}
+
 function dutyScript(data: BrokerWorkspaceData): ChatScript {
   const active = data.duty?.active;
+  const ask = presenceAskOf(data);
+  // Confirm first (also 30 min before the start): online with one tap, presencial with a photo of the place.
+  if (ask?.status === "pending") {
+    const blocks: ChatBlock[] = active ? [dutyFacts(active)] : [];
+    blocks.push(assistantMessage(`duty-presence-hint-${ask.assignmentId}`, ask.mode === "presencial"
+      ? "Seu plantão é presencial. Para começar a receber leads, tire uma foto do local aqui embaixo."
+      : "Confirme sua presença para começar a receber leads."));
+    blocks.push({ type: "presence", id: `duty-presence-${ask.assignmentId}`, ask });
+    return { blocks, status: { label: "Esperando você", tone: "waiting" } };
+  }
   if (active) {
     const blocks: ChatBlock[] = [dutyFacts(active)];
     if (active.presenceStatus === "pending") {

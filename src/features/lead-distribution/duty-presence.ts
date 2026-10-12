@@ -377,3 +377,91 @@ export async function sendDutyPresenceInviteManually(input: { tenantId: string; 
     return { ok: false, reason: "Não foi possível enviar o convite agora. Confira o canal de WhatsApp da empresa." };
   }
 }
+
+/** From this long before the shift the broker can already confirm in the app (same as the WhatsApp reminder). */
+export const SELF_CONFIRM_OPENS_MINUTES = 30;
+
+export type OwnDutyOccurrence = { assignmentId: string; scheduleId: string; mode: "online" | "presencial"; window: DutyWindow };
+
+/**
+ * The broker's own occurrence of an assignment that can be confirmed now
+ * (30 min before the start until the end). Scope: tenant + the broker himself.
+ */
+export async function resolveOwnDutyOccurrence(input: { tenantId: string; brokerId: string; assignmentId: string; now?: Date }): Promise<{ ok: true; occurrence: OwnDutyOccurrence } | { ok: false; reason: "not_found" | "outside_window" | "absent" }> {
+  const now = input.now ?? new Date();
+  const [row] = await getDatabase().select({
+    id: schema.dutyRosterAssignments.id,
+    scheduleId: schema.dutyRosterAssignments.scheduleId,
+    dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
+    startsAt: schema.dutyRosterAssignments.startsAt,
+    endsAt: schema.dutyRosterAssignments.endsAt,
+    validFrom: schema.dutyRosterAssignments.validFrom,
+    validUntil: schema.dutyRosterAssignments.validUntil,
+    timezone: schema.unitDutySchedules.timezone,
+    attendanceMode: schema.unitDutySchedules.attendanceMode,
+  }).from(schema.dutyRosterAssignments)
+    .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyRosterAssignments.tenantId)))
+    .where(and(
+      eq(schema.dutyRosterAssignments.id, input.assignmentId),
+      eq(schema.dutyRosterAssignments.tenantId, input.tenantId),
+      eq(schema.dutyRosterAssignments.brokerId, input.brokerId),
+      eq(schema.dutyRosterAssignments.status, "active"),
+      eq(schema.unitDutySchedules.status, "active"),
+    )).limit(1);
+  if (!row) return { ok: false, reason: "not_found" };
+  const window = getWindow({ id: row.scheduleId, dayOfWeek: row.dayOfWeek, startsAt: row.startsAt, endsAt: row.endsAt, timezone: row.timezone, validFrom: row.validFrom, validUntil: row.validUntil }, now);
+  if (!window || now.getTime() < window.startsAt.getTime() - SELF_CONFIRM_OPENS_MINUTES * 60_000 || now >= window.endsAt) return { ok: false, reason: "outside_window" };
+  // An absence marked by the manager blocks before any photo is uploaded.
+  const [absence] = await getDatabase().select({ id: schema.dutyPresenceConfirmations.id }).from(schema.dutyPresenceConfirmations).where(and(
+    eq(schema.dutyPresenceConfirmations.tenantId, input.tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, row.id),
+    eq(schema.dutyPresenceConfirmations.dutyDate, window.dutyDate), eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt),
+    eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt), eq(schema.dutyPresenceConfirmations.status, "absent"),
+  )).limit(1);
+  if (absence) return { ok: false, reason: "absent" };
+  return { ok: true, occurrence: { assignmentId: row.id, scheduleId: row.scheduleId, mode: row.attendanceMode === "presencial" ? "presencial" : "online", window } };
+}
+
+/**
+ * The broker confirms his own presence in the app. Online: one tap. Presencial
+ * (decision of 2026-10-12): the photo of the place releases him, so confirmedBy
+ * is the broker himself (the same rule the distribution already reads); the
+ * manager sees the photo and can mark an absence. An absence is never overwritten.
+ */
+export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId: string; occurrence: OwnDutyOccurrence; photoStorageKey: string | null; now?: Date }): Promise<{ ok: true; confirmationId: string } | { ok: false; reason: "photo_required" | "absent" }> {
+  const now = input.now ?? new Date();
+  const { occurrence } = input;
+  const presencial = occurrence.mode === "presencial";
+  if (presencial && !input.photoStorageKey) return { ok: false, reason: "photo_required" };
+  const db = getDatabase();
+  const confirmed = {
+    status: "confirmed",
+    confirmedAt: now,
+    confirmedBy: presencial ? input.brokerId : null,
+    photoStorageKey: presencial ? input.photoStorageKey : null,
+    photoTakenAt: presencial ? now : null,
+    updatedAt: now,
+  };
+  const [row] = await db.insert(schema.dutyPresenceConfirmations).values({
+    id: randomUUID(),
+    tenantId: input.tenantId,
+    scheduleId: occurrence.scheduleId,
+    assignmentId: occurrence.assignmentId,
+    brokerId: input.brokerId,
+    dutyDate: occurrence.window.dutyDate,
+    shiftStartsAt: occurrence.window.startsAt,
+    shiftEndsAt: occurrence.window.endsAt,
+    notificationStatus: "sent",
+    createdAt: now,
+    ...confirmed,
+  }).onConflictDoUpdate({
+    target: [schema.dutyPresenceConfirmations.tenantId, schema.dutyPresenceConfirmations.assignmentId, schema.dutyPresenceConfirmations.dutyDate, schema.dutyPresenceConfirmations.shiftStartsAt, schema.dutyPresenceConfirmations.shiftEndsAt],
+    set: confirmed,
+    setWhere: ne(schema.dutyPresenceConfirmations.status, "absent"),
+  }).returning({ id: schema.dutyPresenceConfirmations.id });
+  if (!row) return { ok: false, reason: "absent" };
+  await db.insert(schema.auditLogs).values({
+    id: randomUUID(), userId: input.brokerId, entidade: "duty_presence_confirmation",
+    entidadeId: row.id, acao: presencial ? "duty_presence_confirmed_photo" : "duty_presence_confirmed_app", createdAt: now,
+  });
+  return { ok: true, confirmationId: row.id };
+}

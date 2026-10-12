@@ -1476,6 +1476,9 @@ export const dutyPresenceConfirmations = pgTable(
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     /** Who released the broker without their click (null = the broker confirmed). */
     confirmedBy: text("confirmed_by").references(() => user.id, { onDelete: "set null" }),
+    /** Presencial: photo of the place taken by the broker in the app (R2 key); it releases the broker (confirmedBy = the broker). */
+    photoStorageKey: text("photo_storage_key"),
+    photoTakenAt: timestamp("photo_taken_at", { withTimezone: true }),
     notificationStatus: text("notification_status").notNull().default("pending"),
     notificationErrorCode: text("notification_error_code"),
     createdAt,

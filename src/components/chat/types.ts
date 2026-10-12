@@ -77,6 +77,8 @@ export type ChatBlock =
   | { type: "leadcard"; id: string; leadId: string; name: string; initials: string; stage: string; alert?: { tone: ChatTone; text: string } | null; rows: Array<{ label: string; value: string }>; whatsappHref?: string | null; href: string; fichaHref: string; updatedAt: string }
   /** LGPD: asked before the first use of AI; "question" is re-sent once the broker allows. */
   | { type: "consent"; id: string; question: string }
+  /** Plantão to confirm now (online: one tap; presencial: photo of the place). */
+  | { type: "presence"; id: string; ask: PresenceAskView }
   /** A whole assistant switched off for now: a calm hero with its mascot "resting". */
   | { type: "paused"; id: string; title: string; text: string; shape: MascotShape; hue: number }
   | { type: "question"; id: string; prompt: string; choices: ChatChoice[] }
@@ -85,6 +87,17 @@ export type ChatBlock =
 
 /** A guided flow ("Combinando a função · 0 de 5"). */
 export type ChatProgress = { title: string; done: number; total: number };
+
+/** The plantão the broker must confirm now, as the client sees it (ISO dates). */
+export type PresenceAskView = {
+  assignmentId: string;
+  scheduleName: string;
+  branchName: string | null;
+  mode: "online" | "presencial";
+  startsAt: string;
+  endsAt: string;
+  status: "pending" | "confirmed";
+};
 
 export type ChatTone = "info" | "success" | "warning" | "danger" | "neutral";
 export type ChatBlockIcon = "leads" | "reply" | "agenda" | "day";
