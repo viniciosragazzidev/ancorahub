@@ -1,0 +1,39 @@
+/* Welcome video on the broker's first access (Lite). Tokens: venancor-scope.css. */
+.backdrop {
+  position: fixed; inset: 0; z-index: 90; display: grid; place-items: center;
+  padding: max(12px, env(safe-area-inset-top, 0px)) 12px max(12px, env(safe-area-inset-bottom, 0px));
+  background: rgb(11 11 18 / 0.78);
+}
+.frame {
+  position: relative; overflow: hidden; background: #f7f7f9;
+  border-radius: 28px; box-shadow: 0 32px 80px rgb(0 0 0 / 0.35);
+}
+.frame[data-layout="phone"] { height: min(100%, calc((100vw - 24px) * 16 / 9)); aspect-ratio: 9 / 16; }
+.frame[data-layout="desktop"] { width: min(1200px, 92vw, calc((100dvh - 48px) * 16 / 9)); aspect-ratio: 16 / 9; }
+.video { display: block; width: 100%; height: 100%; object-fit: contain; background: #f7f7f9; cursor: pointer; }
+
+.center { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(11 11 18 / 0.18); }
+.play {
+  height: 60px; padding: 0 28px; border: 0; border-radius: 999px; display: inline-flex; align-items: center; gap: 12px;
+  font: inherit; font-size: 17px; font-weight: 600; color: #fff; cursor: pointer;
+  background: linear-gradient(180deg, oklch(64% 0.2 255), oklch(55% 0.21 258));
+  box-shadow: 0 14px 32px oklch(55% 0.21 258 / 0.4);
+  transition: transform 160ms cubic-bezier(.165, .84, .44, 1);
+}
+.play:active { transform: scale(0.96); }
+
+.top { position: absolute; left: 14px; right: 14px; top: 14px; display: flex; justify-content: space-between; align-items: center; }
+.skip, .round {
+  height: 44px; border: 0; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+  background: rgb(255 255 255 / 0.92); color: #0b0b12; box-shadow: 0 6px 18px rgb(16 16 40 / 0.16);
+}
+.skip { padding: 0 20px; }
+.round { width: 44px; display: grid; place-items: center; }
+.skip:active, .round:active { transform: scale(0.96); }
+
+.progress { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgb(16 16 40 / 0.08); }
+.progress i { display: block; width: 100%; height: 100%; background: oklch(62% 0.2 255); transform-origin: 0 50%; }
+
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+@media (prefers-reduced-motion: reduce) { .play, .skip, .round { transition: none; } }

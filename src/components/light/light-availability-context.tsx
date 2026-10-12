@@ -12,6 +12,8 @@ export type LightAvailabilityValue = {
   openMore?: () => void;
   /** Who uses the Lite: the broker (default) or the supervisor (team, no availability). */
   audience?: "broker" | "supervisor";
+  /** The welcome video plays first on the broker's first access (Super-admin flag). */
+  welcomeVideo?: boolean;
 };
 
 const LightAvailabilityContext = createContext<LightAvailabilityValue | null>(null);

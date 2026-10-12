@@ -912,6 +912,7 @@ const BROKER_NEWS_FLAGS = [
   { field: "brokerJourneyEnabled", flag: FEATURE_FLAGS.BROKER_JOURNEY },
   { field: "teamRankingEnabled", flag: FEATURE_FLAGS.TEAM_RANKING },
   { field: "engagementCampaignsEnabled", flag: FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS },
+  { field: "welcomeVideoEnabled", flag: FEATURE_FLAGS.WELCOME_VIDEO },
 ] as const;
 
 export async function updateBrokerNewsSettingsAction(formData: FormData) {

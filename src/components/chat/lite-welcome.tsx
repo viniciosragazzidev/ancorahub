@@ -7,11 +7,15 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AssistantAvatar } from "./assistant-avatar";
 import styles from "./lite-welcome.module.css";
 import { startLiteTour } from "./tour/lite-tour";
+import { WelcomeVideo } from "./welcome-video";
+import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 import type { MascotShape } from "./types";
 
 /** Bump the version to show the card again after a future redesign. */
 const STORAGE_KEY = "ancora:lite-welcome:2026-10-chat";
 const SUPERVISOR_STORAGE_KEY = "ancora:lite-welcome:2026-10-supervisor";
+/** The welcome video (broker, Super-admin flag): seen once per device, before the card. */
+const VIDEO_STORAGE_KEY = "ancora:welcome-video:2026-10-v2";
 
 const TEAM: Array<{ shape: MascotShape; hue: number | null }> = [
   { shape: "logo", hue: null },
@@ -57,16 +61,29 @@ function readSeen(key: string) {
 export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supervisor" } = {}) {
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
+  const [videoOpen, setVideoOpen] = useState(false);
+  const shell = useLightAvailabilityContext();
   const isSupervisor = variant === "supervisor";
+  const withVideo = !isSupervisor && Boolean(shell?.welcomeVideo);
   const storageKey = isSupervisor ? SUPERVISOR_STORAGE_KEY : STORAGE_KEY;
   const team = isSupervisor ? SUPERVISOR_TEAM : TEAM;
   const points = isSupervisor ? SUPERVISOR_POINTS : POINTS;
 
   useEffect(() => {
     // After mount only: the server render never shows it, so there is no flash or mismatch.
-    const timer = window.setTimeout(() => { if (!readSeen(storageKey)) setOpen(true); }, 350);
+    const timer = window.setTimeout(() => {
+      // First access: the video comes first, then the card (each remembered on its own).
+      if (withVideo && !readSeen(VIDEO_STORAGE_KEY)) setVideoOpen(true);
+      else if (!readSeen(storageKey)) setOpen(true);
+    }, 350);
     return () => window.clearTimeout(timer);
-  }, [storageKey]);
+  }, [storageKey, withVideo]);
+
+  function finishVideo() {
+    writeSeen(VIDEO_STORAGE_KEY, "1");
+    setVideoOpen(false);
+    if (!readSeen(storageKey)) window.setTimeout(() => setOpen(true), 220);
+  }
 
   function close() {
     writeSeen(storageKey, "1");
@@ -75,6 +92,7 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
 
   return (
     <AnimatePresence>
+      {videoOpen ? <WelcomeVideo key="welcome-video" onDone={finishVideo} /> : null}
       {open ? (
         <motion.div
           key="welcome"

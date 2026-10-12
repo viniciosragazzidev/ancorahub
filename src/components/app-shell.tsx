@@ -44,6 +44,7 @@ export function AppShell({
   showDutyCalendar = false,
   showRelationship = false,
   journeyEnabled = false,
+  welcomeVideoEnabled = false,
   teamRankingEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
   liteAudience = "broker",
@@ -59,6 +60,8 @@ export function AppShell({
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
   journeyEnabled?: boolean;
+  /** Welcome video on the broker's first access (Super-admin flag). */
+  welcomeVideoEnabled?: boolean;
   teamRankingEnabled?: boolean;
   /** Super admin "Ver como" (button and the strip while viewing as someone). */
   viewAs?: ViewAsState;
@@ -161,6 +164,7 @@ export function AppShell({
           showDutyCalendar={showDutyCalendar}
           showRelationship={showRelationship}
           journeyEnabled={journeyEnabled}
+          welcomeVideoEnabled={welcomeVideoEnabled}
           teamRankingEnabled={teamRankingEnabled}
           audience={liteAudience}
           showQuoteSimulator={showQuoteSimulator}

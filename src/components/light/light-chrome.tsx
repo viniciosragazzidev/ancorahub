@@ -37,6 +37,7 @@ export function LightChrome({
   showDutyCalendar = false,
   showRelationship = false,
   journeyEnabled = false,
+  welcomeVideoEnabled = false,
   teamRankingEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
   audience = "broker",
@@ -50,6 +51,7 @@ export function LightChrome({
   showDutyCalendar?: boolean;
   showRelationship?: boolean;
   journeyEnabled?: boolean;
+  welcomeVideoEnabled?: boolean;
   teamRankingEnabled?: boolean;
   viewAs?: ViewAsState;
   audience?: "broker" | "supervisor";
@@ -87,7 +89,7 @@ export function LightChrome({
   const withAssist = (content: ReactNode) => <A11yPrefsProvider>{audience === "broker"
     ? <AssistLayer pathname={pathname} capabilities={{ journey: journeyEnabled, quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship }}>{content}</AssistLayer>
     : content}</A11yPrefsProvider>;
-  const shell = { availability, isPending, setStatus, openMore: () => setMoreOpen(true), audience };
+  const shell = { availability, isPending, setStatus, openMore: () => setMoreOpen(true), audience, welcomeVideo: welcomeVideoEnabled };
   // Computers: the conversation list stays on the left and the screen opens at the center
   // (CSS .lite-split, venancor-scope.css); phones keep one screen at a time.
   const withRail = (content: ReactNode) => withAssist(

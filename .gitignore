@@ -69,3 +69,6 @@ public/downloads/
 plans/credenciais-*.json
 plans/production-neon-backup-*.json
 .codex-remote-attachments/
+
+# Projeto-fonte dos vídeos (HyperFrames, rascunhos de áudio e renders). Só os finais vão para public/onboarding/video.
+/video/

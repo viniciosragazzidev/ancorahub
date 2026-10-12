@@ -143,6 +143,11 @@ export const FEATURE_FLAGS = {
     description: "Liga a jornada do corretor: o coletor grava pontos por fatos do sistema (contato com mensagem enviada, aceite rápido, retorno em dia). Plano: docs/implementations/active/2026-10-10-central-relacionamento-corretor.md.",
   },
 
+  WELCOME_VIDEO: {
+    key: "feature_welcome_video_enabled", scope: "global", defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Mostra o vídeo de boas-vindas (1 min) no primeiro acesso do corretor ao app Lite.",
+  },
   BROKER_JOURNEY: {
     key: "feature_broker_journey_enabled", scope: "global", defaultValue: "false",
     allowedValues: ["true", "false"] as const,

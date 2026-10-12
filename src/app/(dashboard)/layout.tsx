@@ -52,6 +52,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const relationshipFlagPromise = context.role === "broker" || context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.RELATIONSHIP_CENTER).catch(() => "false")
     : Promise.resolve("false");
+  const welcomeVideoFlagPromise = context.role === "broker"
+    ? getFeatureFlag(FEATURE_FLAGS.WELCOME_VIDEO).catch(() => "false")
+    : Promise.resolve("false");
   const teamRankingFlagPromise = context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false")
     : Promise.resolve("false");
@@ -104,6 +107,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     relationshipFlag,
     teamRankingFlag,
     supervisorLiteAvailable,
+    welcomeVideoFlag,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -116,6 +120,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     relationshipFlagPromise,
     teamRankingFlagPromise,
     supervisorLitePromise,
+    welcomeVideoFlagPromise,
   ]);
 
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
@@ -197,6 +202,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
         journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
+        welcomeVideoEnabled={isLightBroker && welcomeVideoFlag === "true" && context.tenantId === process.env.WELCOME_VIDEO_TENANT_ID}
         teamRankingEnabled={isLightSupervisor && teamRankingFlag === "true"}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         showRelationship={(isLightBroker || isLightSupervisor) && relationshipFlag === "true"}
