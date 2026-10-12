@@ -227,7 +227,7 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe
         : <div className={`${noticeRowClass} ${styles.notice} ${styles.noticeStatic}`}>{body}</div>;
     }
     case "user":
-      return <p className={styles.user} style={{ margin: 0 }}>{block.text}</p>;
+      return <p className={styles.user}>{block.text}</p>;
     case "whatsapp": {
       const label = block.from === "client" ? "Cliente" : block.from === "qualification" ? "Qualificação" : "Você";
       const tone = block.from === "client" ? styles.bubbleClient : block.from === "qualification" ? styles.bubbleQualification : styles.bubbleBroker;
