@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { AssistantAvatar } from "./assistant-avatar";
+import { CameraCapture, canUseInPageCamera } from "./camera-capture";
 import styles from "./chat.module.css";
 import type { PresenceAskView } from "./types";
 
@@ -52,6 +53,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
         : { kind: "idle" },
   );
   const previewUrl = useRef<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
   const presencial = ask.mode === "presencial";
   const [started] = useState(() => new Date(ask.startsAt).getTime() <= Date.now());
 
@@ -96,7 +98,11 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
 
   function start() {
     if (state.kind === "sending") return;
-    if (presencial) camera.current?.click();
+    // In-page camera first (the system camera app can make low-memory Androids close the browser).
+    if (presencial) {
+      if (canUseInPageCamera()) setCameraOpen(true);
+      else camera.current?.click();
+    }
     else void send(null);
   }
 
@@ -193,6 +199,13 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
         </motion.button>
       )}
 
+      {cameraOpen ? (
+        <CameraCapture
+          onShot={(photo) => { setCameraOpen(false); void send(photo); }}
+          onClose={() => setCameraOpen(false)}
+          onFallback={() => { setCameraOpen(false); camera.current?.click(); }}
+        />
+      ) : null}
       {presencial ? (
         <input
           ref={camera}

@@ -69,4 +69,17 @@ describe("PresenceCallout", () => {
     rerender(<PresenceCallout ask={{ ...waiting, status: "confirmed" }} />);
     expect(screen.getByText("Presença confirmada")).toBeTruthy();
   });
+
+  it("presencial: opens the camera inside the app and falls back to the phone camera when it cannot", async () => {
+    const getUserMedia = vi.fn().mockRejectedValue(new Error("NotAllowedError"));
+    Object.defineProperty(navigator, "mediaDevices", { value: { getUserMedia }, configurable: true });
+    const { container } = render(<PresenceCallout ask={{ ...base, mode: "presencial" }} />);
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement;
+    const click = vi.spyOn(input, "click");
+    fireEvent.click(screen.getByRole("button", { name: /Tirar foto do local/ }));
+    expect(getUserMedia).toHaveBeenCalledWith(expect.objectContaining({ video: expect.objectContaining({ facingMode: { ideal: "environment" } }) }));
+    fireEvent.click(await screen.findByRole("button", { name: "Usar a câmera do celular" }));
+    expect(click).toHaveBeenCalled();
+    Object.defineProperty(navigator, "mediaDevices", { value: undefined, configurable: true });
+  });
 });
