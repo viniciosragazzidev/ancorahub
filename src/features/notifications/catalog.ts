@@ -18,6 +18,7 @@ export const notificationCapabilities = [
   { id: "lead_archived", label: "Lead arquivado", description: "Notifica quando um lead é arquivado (disponível para uso futuro).", channels: "Toast/in-app" },
   { id: "quick_reply_human", label: "Quick Reply e atendimento humano", description: "Aviso ao corretor quando uma mensagem foi resolvida automaticamente ou solicita atendimento humano.", channels: "Toast + push" },
   { id: "duty_assignment", label: "Escala de plantão", description: "Avisa o corretor quando a gestão o coloca em um plantão.", channels: "Toast + push" },
+  { id: "duty_presence_photo", label: "Foto do plantão presencial", description: "Avisa o diretor e o gerente do plantão quando o corretor envia a foto do local, para validar e liberar.", channels: "Toast + push" },
   { id: "supervisor_digest", label: "Resumo do dia para o supervisor", description: "Às 19h, o dia da equipe do supervisor em poucas linhas (leads, atrasos, destaque e meta).", channels: "Toast + push" },
   { id: "journey_near_completion", label: "Missão da equipe quase concluída", description: "Avisa o supervisor uma vez por corretor ao faltar um contato para concluir a missão do dia.", channels: "Toast/in-app" },
   { id: "supervisor_transfer", label: "Pedido de transferência entre equipes", description: "Avisa os gestores sobre pedidos de transferência de corretores entre equipes de supervisão.", channels: "Toast + push" },

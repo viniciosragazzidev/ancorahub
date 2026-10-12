@@ -282,7 +282,7 @@ describe("broker chat assistant scripts", () => {
   });
 
   it("plantão: asks to confirm presence, with a photo when the plantão is presencial", () => {
-    const presence = { assignmentId: "as-1", scheduleName: "PME Centro", branchName: "Centro", mode: "presencial" as const, startsAt: new Date("2026-10-09T09:00:00-03:00"), endsAt: new Date("2026-10-09T18:00:00-03:00"), status: "pending" as const };
+    const presence = { assignmentId: "as-1", scheduleName: "PME Centro", branchName: "Centro", mode: "presencial" as const, startsAt: new Date("2026-10-09T09:00:00-03:00"), endsAt: new Date("2026-10-09T18:00:00-03:00"), status: "pending" as const, photoId: null };
     const data = workspace({ duty: { active: activeDuty({ presenceStatus: "pending" }), next: null, readyToReceive: false, presence } });
     const script = buildAssistantScript("plantao", { data, now });
     expect(script.blocks).toContainEqual(expect.objectContaining({ type: "presence", ask: expect.objectContaining({ assignmentId: "as-1", mode: "presencial", startsAt: "2026-10-09T12:00:00.000Z" }) }));
@@ -291,6 +291,9 @@ describe("broker chat assistant scripts", () => {
     expect(thread).toMatchObject({ waitingYou: true, preview: "Confirme sua presença no PME Centro com uma foto do local." });
     const confirmed = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty(), next: null, readyToReceive: true, presence: { ...presence, status: "confirmed" } } }), now });
     expect(confirmed.blocks.some((block) => block.type === "presence")).toBe(false);
+    const waiting = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty({ presenceStatus: "pending" }), next: null, readyToReceive: false, presence: { ...presence, status: "awaiting_release", photoId: "c1" } } }), now });
+    expect(waiting.status?.label).toBe("Aguardando liberação");
+    expect(waiting.blocks).toContainEqual(expect.objectContaining({ type: "presence" }));
   });
 
   it("lists agenda items in São Paulo time and gives the requested next steps", () => {

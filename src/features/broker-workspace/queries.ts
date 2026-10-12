@@ -33,7 +33,10 @@ export type DutyPresenceAsk = {
   mode: "online" | "presencial";
   startsAt: Date;
   endsAt: Date;
-  status: "pending" | "confirmed";
+  /** awaiting_release: presencial photo sent, waiting for the director/manager to validate and release. */
+  status: "pending" | "awaiting_release" | "confirmed";
+  /** Confirmation id when a photo exists (the broker sees his own photo while waiting). */
+  photoId: string | null;
 };
 
 export type BrokerWorkspaceData = {
@@ -111,6 +114,8 @@ function buildDutySummary(input: {
     attendanceMode: string;
     confirmationStatus: string | null;
     confirmedBy: string | null;
+    confirmationId?: string | null;
+    hasPhoto?: boolean | null;
   }>;
   publishedRows: Array<{ scheduleId: string; dutyDate: string }>;
   now: Date;
@@ -170,7 +175,10 @@ function buildDutySummary(input: {
         mode: presenceMode,
         startsAt: presenceOccurrence.startsAt,
         endsAt: presenceOccurrence.endsAt,
-        status: presenceOccurrence.row.confirmationStatus === "confirmed" && (presenceMode === "online" || Boolean(presenceOccurrence.row.confirmedBy)) ? "confirmed" : "pending",
+        status: presenceOccurrence.row.confirmationStatus === "confirmed" && (presenceMode === "online" || Boolean(presenceOccurrence.row.confirmedBy))
+          ? "confirmed"
+          : presenceMode === "presencial" && presenceOccurrence.row.hasPhoto ? "awaiting_release" : "pending",
+        photoId: presenceOccurrence.row.hasPhoto ? presenceOccurrence.row.confirmationId ?? null : null,
       }
       : null;
     const paused = activeOccurrence ? Boolean(activeOccurrence.row.pausedAt) : false;
@@ -264,6 +272,8 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
       attendanceMode: schema.unitDutySchedules.attendanceMode,
       confirmationStatus: schema.dutyPresenceConfirmations.status,
       confirmedBy: schema.dutyPresenceConfirmations.confirmedBy,
+      confirmationId: schema.dutyPresenceConfirmations.id,
+      hasPhoto: sql<boolean>`${schema.dutyPresenceConfirmations.photoStorageKey} is not null`,
     })
       .from(schema.dutyRosterAssignments)
       .innerJoin(schema.unitDutySchedules, and(

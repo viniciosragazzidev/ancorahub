@@ -164,7 +164,7 @@ export function ChatHome({
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>
       </header>
-      {mode === "page" && presence?.status === "pending" ? <PresenceCallout ask={presence} /> : null}
+      {mode === "page" && (presence?.status === "pending" || presence?.status === "awaiting_release") ? <PresenceCallout ask={presence} /> : null}
       {mode === "page" && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
       {mode === "page" && highlights ? <WeekRanking data={highlights} /> : null}
       {list}

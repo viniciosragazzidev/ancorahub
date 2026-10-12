@@ -12,7 +12,12 @@ const TIME_ZONE = "America/Sao_Paulo";
 const hhmm = (iso: string) => new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
 const ease = [0.165, 0.84, 0.44, 1] as const;
 
-type State = { kind: "idle" } | { kind: "sending"; preview: string | null } | { kind: "done"; preview: string | null; at: string | null } | { kind: "error"; message: string };
+type State =
+  | { kind: "idle" }
+  | { kind: "sending"; preview: string | null }
+  | { kind: "waiting"; preview: string | null }
+  | { kind: "done"; preview: string | null; at: string | null }
+  | { kind: "error"; message: string };
 
 /** Phone photos are big: a 1600px JPEG is plenty to recognize the place and uploads fast. */
 async function shrink(file: File): Promise<Blob> {
@@ -33,17 +38,36 @@ async function shrink(file: File): Promise<Blob> {
 
 /**
  * "Confirme sua presença": shown in highlight on the Início and in the Plantão
- * conversation. Online: one tap. Presencial: the button opens the camera and the
- * photo of the place confirms (and releases the broker) at once.
+ * conversation. Online: one tap confirms. Presencial: the button opens the camera,
+ * the photo goes to the director/manager and the broker stays paused until they
+ * validate it and release him (decision of 2026-10-12).
  */
 export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskView; variant?: "home" | "chat" }) {
   const router = useRouter();
   const reduce = useReducedMotion();
   const camera = useRef<HTMLInputElement>(null);
-  const [state, setState] = useState<State>(ask.status === "confirmed" ? { kind: "done", preview: null, at: null } : { kind: "idle" });
+  const [state, setState] = useState<State>(
+    ask.status === "confirmed" ? { kind: "done", preview: null, at: null }
+      : ask.status === "awaiting_release" ? { kind: "waiting", preview: ask.photoId ? `/api/duty/presence/photo?id=${ask.photoId}` : null }
+        : { kind: "idle" },
+  );
   const previewUrl = useRef<string | null>(null);
   const presencial = ask.mode === "presencial";
   const [started] = useState(() => new Date(ask.startsAt).getTime() <= Date.now());
+
+  // Waiting for the director: check every 30 s; once released, the card turns into "confirmada".
+  useEffect(() => {
+    if (state.kind !== "waiting") return;
+    const timer = window.setInterval(() => router.refresh(), 30_000);
+    return () => window.clearInterval(timer);
+  }, [router, state.kind]);
+  const released = ask.status === "confirmed";
+  useEffect(() => {
+    if (!released) return;
+    // Adjusting to the server's answer after a refresh (the release happens on the manager's screen).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setState((current) => current.kind === "done" ? current : { kind: "done", preview: null, at: null });
+  }, [released]);
 
   // Frees the local photo preview when the card goes away.
   useEffect(() => () => {
@@ -60,9 +84,9 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
     if (photo) body.set("photo", photo, "local.jpg");
     try {
       const response = await fetch("/api/duty/presence", { method: "POST", body });
-      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      const result = (await response.json().catch(() => ({}))) as { ok?: boolean; error?: string; awaitingRelease?: boolean };
       if (!response.ok || !result.ok) throw new Error(result.error ?? "Não consegui confirmar agora. Tente de novo.");
-      setState({ kind: "done", preview, at: hhmm(new Date().toISOString()) });
+      setState(result.awaitingRelease ? { kind: "waiting", preview } : { kind: "done", preview, at: hhmm(new Date().toISOString()) });
       if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate?.(30);
       window.setTimeout(() => router.refresh(), 1600);
     } catch (error) {
@@ -77,8 +101,9 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
   }
 
   const done = state.kind === "done";
+  const waiting = state.kind === "waiting";
   const sending = state.kind === "sending";
-  const preview = state.kind === "sending" || state.kind === "done" ? state.preview : null;
+  const preview = state.kind === "sending" || state.kind === "done" || state.kind === "waiting" ? state.preview : null;
 
   return (
     <motion.section
@@ -93,7 +118,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
       {!done && !reduce ? <span className={styles.presenceHalo} aria-hidden="true" /> : null}
       <div className={styles.presenceHead}>
         <span className={styles.presenceMascot}>
-          <AssistantAvatar shape="onigiri" hue={28} size={44} state={sending ? "working" : done ? "idle" : "waiting"} />
+          <AssistantAvatar shape="onigiri" hue={28} size={44} state={sending || waiting ? "working" : done ? "idle" : "waiting"} />
         </span>
         <span className={styles.presenceText}>
           <span className={styles.presencePill} data-mode={ask.mode}>
@@ -102,12 +127,14 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
             ) : <span className={styles.presenceLive} aria-hidden="true" />}
             {presencial ? "Plantão presencial" : "Plantão online"} · {started ? `até ${hhmm(ask.endsAt)}` : `começa ${hhmm(ask.startsAt)}`}
           </span>
-          <span className={styles.presenceTitle}>{done ? "Presença confirmada" : "Confirme sua presença"}</span>
+          <span className={styles.presenceTitle}>{done ? "Presença confirmada" : waiting ? "Foto enviada" : "Confirme sua presença"}</span>
           <span className={styles.presenceDetail}>
             {done
               ? "Pronto. Você já pode receber leads deste plantão."
+              : waiting
+                ? "Agora o diretor valida a foto e libera você. Até lá você fica pausado, sem receber leads."
               : presencial
-                ? `${ask.scheduleName}${ask.branchName ? ` · ${ask.branchName}` : ""}. Plantão presencial: você precisa estar na unidade durante todo o plantão. Já na unidade, tire uma foto do local para confirmar.`
+                ? `${ask.scheduleName}${ask.branchName ? ` · ${ask.branchName}` : ""}. Plantão presencial: você precisa estar na unidade durante todo o plantão. Já na unidade, tire uma foto do local; o diretor valida e libera você.`
                 : `${ask.scheduleName}. Um toque e você começa a receber leads.`}
           </span>
         </span>
@@ -122,7 +149,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
             animate={{ opacity: 1, scale: 1, rotate: done ? 0 : -1.5 }}
             transition={{ type: "spring", visualDuration: 0.45, bounce: 0.3 }}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- local blob preview */}
+            {/* eslint-disable-next-line @next/next/no-img-element -- local preview or the private, auth-checked photo route */}
             <img src={preview} alt="Foto do local do plantão" />
             {sending ? <span className={styles.presenceScan} aria-hidden="true" /> : null}
           </motion.div>
@@ -144,6 +171,11 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
           </svg>
           {state.at ? `Confirmado às ${state.at}` : "Confirmado"}
         </motion.p>
+      ) : waiting ? (
+        <div className={styles.presenceWaiting}>
+          <p className={styles.presenceWaitingPill} role="status"><span className={styles.presenceClock} aria-hidden="true" />Aguardando o diretor liberar</p>
+          <button type="button" className={styles.presenceRetake} onClick={start}>Tirar outra foto</button>
+        </div>
       ) : (
         <motion.button
           type="button"

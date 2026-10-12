@@ -334,3 +334,9 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 .presenceDone { margin: 0; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; border-radius: 999px; font-size: var(--text-sm); font-weight: 500; color: var(--success); background: color-mix(in oklab, var(--success) 12%, var(--surface)); }
 .presenceError { margin: 0; font-size: var(--text-sm); color: var(--danger); }
 @media (prefers-reduced-motion: reduce) { .presenceHalo, .presenceLive, .presenceScan { animation: none; } }
+.presenceWaiting { display: grid; gap: 6px; justify-items: center; }
+.presenceWaitingPill { margin: 0; width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 999px; font-size: var(--text-sm); font-weight: 500; color: oklch(45% 0.13 var(--presence-hue)); background: oklch(95% 0.04 var(--presence-hue)); }
+.presenceClock { width: 9px; height: 9px; border-radius: 50%; background: oklch(66% 0.17 var(--presence-hue)); animation: presenceBreath 1.6s ease-in-out infinite; }
+.presenceRetake { border: 0; background: none; font: inherit; font-size: var(--text-xs); font-weight: 500; color: var(--text-secondary); cursor: pointer; padding: 6px 10px; border-radius: 999px; }
+.presenceRetake:hover { background: var(--surface-muted); }
+@media (prefers-reduced-motion: reduce) { .presenceClock { animation: none; } }

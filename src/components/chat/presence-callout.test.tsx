@@ -12,7 +12,7 @@ vi.mock("motion/react", async () => {
 import { PresenceCallout } from "./presence-callout";
 import type { PresenceAskView } from "./types";
 
-const base: PresenceAskView = { assignmentId: "as1", scheduleName: "PME Manhã", branchName: "Centro", mode: "online", startsAt: "2026-10-12T12:00:00.000Z", endsAt: "2026-10-12T21:00:00.000Z", status: "pending" };
+const base: PresenceAskView = { assignmentId: "as1", scheduleName: "PME Manhã", branchName: "Centro", mode: "online", startsAt: "2026-10-12T12:00:00.000Z", endsAt: "2026-10-12T21:00:00.000Z", status: "pending", photoId: null };
 const fetchMock = vi.fn();
 
 beforeEach(() => {
@@ -35,8 +35,8 @@ describe("PresenceCallout", () => {
     expect((init.body as FormData).get("photo")).toBeNull();
   });
 
-  it("presencial: says it is in person, opens the camera and sends the photo", async () => {
-    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
+  it("presencial: opens the camera, sends the photo and waits for the director (stays paused)", async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true, awaitingRelease: true }) });
     const { container } = render(<PresenceCallout ask={{ ...base, mode: "presencial" }} />);
     expect(screen.getByText(/você precisa estar na unidade durante todo o plantão/)).toBeTruthy();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
@@ -45,7 +45,10 @@ describe("PresenceCallout", () => {
     fireEvent.click(screen.getByRole("button", { name: /Tirar foto do local/ }));
     expect(click).toHaveBeenCalled();
     fireEvent.change(input, { target: { files: [new File(["x"], "local.jpg", { type: "image/jpeg" })] } });
-    expect(await screen.findByText("Presença confirmada")).toBeTruthy();
+    expect(await screen.findByText("Foto enviada")).toBeTruthy();
+    expect(screen.getByText("Aguardando o diretor liberar")).toBeTruthy();
+    expect(screen.getByText(/Até lá você fica pausado/)).toBeTruthy();
+    expect(screen.queryByText("Presença confirmada")).toBeNull();
     expect((fetchMock.mock.calls[0][1].body as FormData).get("photo")).toBeTruthy();
     expect(screen.getByAltText("Foto do local do plantão")).toBeTruthy();
   });
@@ -56,5 +59,14 @@ describe("PresenceCallout", () => {
     fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
     expect(await screen.findByRole("alert")).toBeTruthy();
     await waitFor(() => expect(screen.getByRole("button", { name: "Tentar de novo" })).toBeTruthy());
+  });
+
+  it("after a refresh, shows the photo already sent and turns into confirmed once released", () => {
+    const waiting = { ...base, mode: "presencial" as const, status: "awaiting_release" as const, photoId: "8b0f2a8e-1111-4c1d-9e1a-123456789abc" };
+    const { rerender } = render(<PresenceCallout ask={waiting} />);
+    expect(screen.getByText("Foto enviada")).toBeTruthy();
+    expect(screen.getByAltText("Foto do local do plantão").getAttribute("src")).toBe(`/api/duty/presence/photo?id=${waiting.photoId}`);
+    rerender(<PresenceCallout ask={{ ...waiting, status: "confirmed" }} />);
+    expect(screen.getByText("Presença confirmada")).toBeTruthy();
   });
 });

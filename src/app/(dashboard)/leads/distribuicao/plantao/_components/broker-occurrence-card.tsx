@@ -18,7 +18,7 @@ type LeadResult = Extract<Awaited<ReturnType<typeof getBrokerOccurrenceLeadsActi
 type AvailableResult = Extract<Awaited<ReturnType<typeof getDutyAvailableLeadsAction>>, { ok: true }>;
 type Tab = "received" | "available";
 
-export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending }: {
+export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null }: {
   children: ReactNode;
   scheduleId: string;
   assignmentId: string;
@@ -33,6 +33,8 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
   onSitePending: boolean;
   /** Presencial: the manager's "release" opens 30 min before the start (before that the broker just shows paused). */
   onSiteReleaseOpen?: boolean;
+  /** Presencial released without the photo: the reason written by the manager. */
+  presenceReleaseNote?: string | null;
   /** The broker's own unit. */
   branchName?: string | null;
   /** Management actions enabled: the "Leads disponíveis" tab can assign. */
@@ -141,7 +143,7 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
         {offers ? `${offers.offered} ${offers.offered === 1 ? "oferta enviada" : "ofertas enviadas"} / ${offers.accepted} ${offers.accepted === 1 ? "aceita" : "aceitas"}` : "Ofertas…"}
       </Badge>
     </div>} footer={<div className="flex flex-wrap justify-end gap-2">
-      {attendanceMode === "presencial" && onSitePending && onSiteReleaseOpen && !absent ? <BrokerPresenceReleaseButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} inUnit /> : null}
+      {attendanceMode === "presencial" && onSitePending && onSiteReleaseOpen && !absent ? <BrokerPresenceReleaseButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} inUnit withPhoto={Boolean(presencePhotoId)} /> : null}
       <Button type="button" size="sm" variant={absent ? "outline" : "destructive"} disabled={saving} onClick={changeAbsence}>{absent ? "Desfazer falta" : "Marcar falta"}</Button>
     </div>}>
       <section className="space-y-1 text-sm">
@@ -162,7 +164,8 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
           </a>
           <p className="text-xs text-muted-foreground">Se a foto não for da unidade, use &ldquo;Marcar falta&rdquo;.</p>
         </section>
-      ) : attendanceMode === "presencial" && !absent ? <p className="text-xs text-muted-foreground">Plantão presencial: a foto do local aparece aqui quando o corretor confirmar.</p> : null}
+      ) : presenceReleaseNote ? <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs"><span className="font-medium">Liberado sem foto.</span> Motivo: {presenceReleaseNote}</p>
+        : attendanceMode === "presencial" && !absent ? <p className="text-xs text-muted-foreground">Plantão presencial: a foto do local aparece aqui quando o corretor enviar. Valide a foto e libere.</p> : null}
       <div role="tablist" aria-label="Leads do corretor" className="grid grid-cols-2 rounded-[var(--radius-card)] border border-border bg-muted/40 p-0.5">
         {([["received", "Leads recebidos", leads?.length], ["available", "Leads disponíveis", available?.length]] as const).map(([value, label, count]) => (
           <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => chooseTab(value)}

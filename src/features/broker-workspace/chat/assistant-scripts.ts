@@ -234,6 +234,8 @@ export function buildAssistantThreads(input: {
     assistantThread("plantao", {
       preview: data.duty?.presence?.status === "pending"
         ? data.duty.presence.mode === "presencial" ? `Confirme sua presença no ${data.duty.presence.scheduleName} com uma foto do local.` : `Confirme sua presença no ${data.duty.presence.scheduleName}.`
+        : data.duty?.presence?.status === "awaiting_release"
+        ? `Foto enviada. Aguardando o diretor liberar no ${data.duty.presence.scheduleName}.`
         : activeDuty
         ? activeDuty.presenceStatus === "pending"
           ? `Aguardando liberação do plantão ${activeDuty.scheduleName}.`
@@ -407,10 +409,16 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
   const active = data.duty?.active;
   const ask = presenceAskOf(data);
   // Confirm first (also 30 min before the start): online with one tap, presencial with a photo of the place.
+  if (ask?.status === "awaiting_release") {
+    const blocks: ChatBlock[] = active ? [dutyFacts(active)] : [];
+    blocks.push(assistantMessage(`duty-presence-wait-${ask.assignmentId}`, "Sua foto chegou para o diretor. Assim que ele validar e liberar, os leads começam a chegar. Até lá você fica pausado."));
+    blocks.push({ type: "presence", id: `duty-presence-${ask.assignmentId}`, ask });
+    return { blocks, status: { label: "Aguardando liberação", tone: "idle" } };
+  }
   if (ask?.status === "pending") {
     const blocks: ChatBlock[] = active ? [dutyFacts(active)] : [];
     blocks.push(assistantMessage(`duty-presence-hint-${ask.assignmentId}`, ask.mode === "presencial"
-      ? "Seu plantão é presencial: você precisa estar na unidade, presencialmente, durante todo o plantão. Quando chegar, tire uma foto do local aqui embaixo para começar a receber leads."
+      ? "Seu plantão é presencial: você precisa estar na unidade, presencialmente, durante todo o plantão. Quando chegar, tire uma foto do local aqui embaixo. O diretor valida a foto e libera você para receber leads."
       : "Confirme sua presença para começar a receber leads."));
     blocks.push({ type: "presence", id: `duty-presence-${ask.assignmentId}`, ask });
     return { blocks, status: { label: "Esperando você", tone: "waiting" } };

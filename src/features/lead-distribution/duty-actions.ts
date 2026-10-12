@@ -631,10 +631,11 @@ export async function getBrokerDayHistoryAction(scheduleId: string, brokerId: st
 }
 
 /** Releases a broker on the plantão without their presence click (in-person check-in, etc.). */
-export async function releaseDutyPresenceAction(scheduleId: string, assignmentId: string): Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function releaseDutyPresenceAction(scheduleId: string, assignmentId: string, note?: string | null): Promise<{ ok: true } | { ok: false; reason: string; needsNote?: boolean }> {
   try {
     const { context } = await findScheduleForMutation(scheduleId);
-    return await releaseDutyPresenceManually({ tenantId: context.tenantId, assignmentId, releasedBy: context.userId });
+    const parsedNote = z.string().max(300).nullish().parse(note);
+    return await releaseDutyPresenceManually({ tenantId: context.tenantId, assignmentId, releasedBy: context.userId, note: parsedNote });
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível liberar o corretor." };
   }

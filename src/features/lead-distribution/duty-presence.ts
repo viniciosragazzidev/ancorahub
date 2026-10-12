@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gt, inArray, isNull, lte, lt, ne, or } from "drizzle-orm";
+import { and, eq, gt, inArray, isNull, lte, lt, ne, or, sql } from "drizzle-orm";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
@@ -227,8 +227,10 @@ export async function processDutyPresenceReminders(now = new Date()) {
  * their shift without the broker clicking the confirmation — e.g. an
  * in-person plantão checked on site. The broker is then eligible for offers
  * exactly as after their own click; who released it is kept.
+ * Presencial (2026-10-12): with the broker's photo it is the validation of the
+ * photo; without it, a written reason is required and kept (release_note).
  */
-export async function releaseDutyPresenceManually(input: { tenantId: string; assignmentId: string; releasedBy: string }, now = new Date()): Promise<{ ok: true } | { ok: false; reason: string }> {
+export async function releaseDutyPresenceManually(input: { tenantId: string; assignmentId: string; releasedBy: string; note?: string | null }, now = new Date()): Promise<{ ok: true } | { ok: false; reason: string; needsNote?: boolean }> {
   const db = getDatabase();
   const [assignment] = await db.select({
     id: schema.dutyRosterAssignments.id,
@@ -240,6 +242,7 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
     validFrom: schema.dutyRosterAssignments.validFrom,
     validUntil: schema.dutyRosterAssignments.validUntil,
     scheduleTimezone: schema.unitDutySchedules.timezone,
+    attendanceMode: schema.unitDutySchedules.attendanceMode,
   }).from(schema.dutyRosterAssignments)
     .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
     .where(and(eq(schema.dutyRosterAssignments.id, input.assignmentId), eq(schema.dutyRosterAssignments.tenantId, input.tenantId), eq(schema.dutyRosterAssignments.status, "active")))
@@ -255,6 +258,13 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
     eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt),
     eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
   );
+  const presencial = assignment.attendanceMode === "presencial";
+  const [current] = presencial
+    ? await db.select({ hasPhoto: sql<boolean>`${schema.dutyPresenceConfirmations.photoStorageKey} is not null` }).from(schema.dutyPresenceConfirmations).where(occurrence).limit(1)
+    : [];
+  const withPhoto = Boolean(current?.hasPhoto);
+  const note = input.note?.trim() ?? "";
+  if (presencial && !withPhoto && note.length < 5) return { ok: false, reason: "Sem a foto do local: escreva o motivo para liberar.", needsNote: true };
   const released = await db.transaction(async (tx) => {
     await tx.insert(schema.dutyPresenceConfirmations).values({
       id: randomUUID(), tenantId: input.tenantId, scheduleId: assignment.scheduleId, assignmentId: assignment.id, brokerId: assignment.brokerId,
@@ -262,11 +272,11 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
       status: "pending", notificationStatus: "pending", createdAt: now, updatedAt: now,
     }).onConflictDoNothing();
     const changed = await tx.update(schema.dutyPresenceConfirmations)
-      .set({ status: "confirmed", confirmedAt: now, confirmedBy: input.releasedBy, updatedAt: now })
+      .set({ status: "confirmed", confirmedAt: now, confirmedBy: input.releasedBy, releaseNote: presencial && !withPhoto ? note.slice(0, 300) : null, updatedAt: now })
       .where(and(occurrence, ne(schema.dutyPresenceConfirmations.status, "absent"), or(ne(schema.dutyPresenceConfirmations.status, "confirmed"), isNull(schema.dutyPresenceConfirmations.confirmedBy))))
       .returning({ id: schema.dutyPresenceConfirmations.id });
     if (!changed.length) return false;
-    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.releasedBy, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_presence.released_manually", createdAt: now });
+    await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: input.releasedBy, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: !presencial ? "duty_presence.released_manually" : withPhoto ? "duty_presence.photo_validated" : "duty_presence.released_without_photo", createdAt: now });
     return true;
   });
   if (!released) return { ok: false, reason: "Corretor já liberado ou com falta registrada." };
@@ -423,25 +433,30 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
 }
 
 /**
- * The broker confirms his own presence in the app. Online: one tap. Presencial
- * (decision of 2026-10-12): the photo of the place releases him, so confirmedBy
- * is the broker himself (the same rule the distribution already reads); the
- * manager sees the photo and can mark an absence. An absence is never overwritten.
+ * The broker answers the presence check in the app. Online: one tap confirms.
+ * Presencial (decision of 2026-10-12): the photo of the place is saved and the
+ * broker stays PAUSED until the director/manager validates it and releases him
+ * (releaseDutyPresenceManually sets confirmedBy). An absence is never overwritten,
+ * and a release already done is kept.
  */
-export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId: string; occurrence: OwnDutyOccurrence; photoStorageKey: string | null; now?: Date }): Promise<{ ok: true; confirmationId: string } | { ok: false; reason: "photo_required" | "absent" }> {
+export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId: string; occurrence: OwnDutyOccurrence; photoStorageKey: string | null; now?: Date }): Promise<{ ok: true; confirmationId: string; awaitingRelease: boolean } | { ok: false; reason: "photo_required" | "absent" }> {
   const now = input.now ?? new Date();
   const { occurrence } = input;
   const presencial = occurrence.mode === "presencial";
   if (presencial && !input.photoStorageKey) return { ok: false, reason: "photo_required" };
   const db = getDatabase();
-  const confirmed = {
-    status: "confirmed",
-    confirmedAt: now,
-    confirmedBy: presencial ? input.brokerId : null,
-    photoStorageKey: presencial ? input.photoStorageKey : null,
-    photoTakenAt: presencial ? now : null,
-    updatedAt: now,
-  };
+  const occurrenceWhere = and(
+    eq(schema.dutyPresenceConfirmations.tenantId, input.tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, occurrence.assignmentId),
+    eq(schema.dutyPresenceConfirmations.dutyDate, occurrence.window.dutyDate), eq(schema.dutyPresenceConfirmations.shiftStartsAt, occurrence.window.startsAt),
+    eq(schema.dutyPresenceConfirmations.shiftEndsAt, occurrence.window.endsAt),
+  );
+  const [existing] = await db.select({ id: schema.dutyPresenceConfirmations.id, status: schema.dutyPresenceConfirmations.status, confirmedBy: schema.dutyPresenceConfirmations.confirmedBy })
+    .from(schema.dutyPresenceConfirmations).where(occurrenceWhere).limit(1);
+  if (existing?.status === "absent") return { ok: false, reason: "absent" };
+  if (presencial && existing?.status === "confirmed" && existing.confirmedBy) return { ok: true, confirmationId: existing.id, awaitingRelease: false };
+  const answer = presencial
+    ? { status: "pending", confirmedAt: null, confirmedBy: null, photoStorageKey: input.photoStorageKey, photoTakenAt: now, updatedAt: now }
+    : { status: "confirmed", confirmedAt: now, confirmedBy: null, updatedAt: now };
   const [row] = await db.insert(schema.dutyPresenceConfirmations).values({
     id: randomUUID(),
     tenantId: input.tenantId,
@@ -453,16 +468,33 @@ export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId
     shiftEndsAt: occurrence.window.endsAt,
     notificationStatus: "sent",
     createdAt: now,
-    ...confirmed,
+    ...answer,
   }).onConflictDoUpdate({
     target: [schema.dutyPresenceConfirmations.tenantId, schema.dutyPresenceConfirmations.assignmentId, schema.dutyPresenceConfirmations.dutyDate, schema.dutyPresenceConfirmations.shiftStartsAt, schema.dutyPresenceConfirmations.shiftEndsAt],
-    set: confirmed,
-    setWhere: ne(schema.dutyPresenceConfirmations.status, "absent"),
+    set: answer,
+    setWhere: presencial
+      ? and(ne(schema.dutyPresenceConfirmations.status, "absent"), or(ne(schema.dutyPresenceConfirmations.status, "confirmed"), isNull(schema.dutyPresenceConfirmations.confirmedBy)))
+      : ne(schema.dutyPresenceConfirmations.status, "absent"),
   }).returning({ id: schema.dutyPresenceConfirmations.id });
   if (!row) return { ok: false, reason: "absent" };
   await db.insert(schema.auditLogs).values({
     id: randomUUID(), userId: input.brokerId, entidade: "duty_presence_confirmation",
-    entidadeId: row.id, acao: presencial ? "duty_presence_confirmed_photo" : "duty_presence_confirmed_app", createdAt: now,
+    entidadeId: row.id, acao: presencial ? "duty_presence_photo_sent" : "duty_presence_confirmed_app", createdAt: now,
   });
-  return { ok: true, confirmationId: row.id };
+  return { ok: true, confirmationId: row.id, awaitingRelease: presencial };
+}
+
+/** Who validates an in-person photo: the tenant's directors and the managers of the plantão's branch (all managers when the plantão has no branch). */
+export async function getDutyPhotoReviewers(tenantId: string, scheduleId: string) {
+  const db = getDatabase();
+  const [schedule] = await db.select({ branchId: schema.unitDutySchedules.branchId, name: schema.unitDutySchedules.name })
+    .from(schema.unitDutySchedules).where(and(eq(schema.unitDutySchedules.id, scheduleId), eq(schema.unitDutySchedules.tenantId, tenantId))).limit(1);
+  if (!schedule) return { scheduleName: null, reviewerIds: [] as string[] };
+  const members = await db.select({ userId: schema.tenantMemberships.userId, role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId })
+    .from(schema.tenantMemberships)
+    .where(and(eq(schema.tenantMemberships.tenantId, tenantId), eq(schema.tenantMemberships.status, "active"), inArray(schema.tenantMemberships.role, ["director", "manager"])));
+  const reviewerIds = members
+    .filter((member) => member.role === "director" || !schedule.branchId || !member.branchId || member.branchId === schedule.branchId)
+    .map((member) => member.userId);
+  return { scheduleName: schedule.name, reviewerIds: [...new Set(reviewerIds)] };
 }

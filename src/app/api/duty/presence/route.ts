@@ -4,7 +4,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { wakeLeadsAwaitingEligibleBroker } from "@/features/lead-distribution/jobs";
-import { confirmOwnDutyPresence, resolveOwnDutyOccurrence } from "@/features/lead-distribution/duty-presence";
+import { eq } from "drizzle-orm";
+
+import { confirmOwnDutyPresence, getDutyPhotoReviewers, resolveOwnDutyOccurrence } from "@/features/lead-distribution/duty-presence";
+import { publishNotification } from "@/features/notifications/send-push-helper";
+import { getDatabase, schema } from "@/shared/db";
 import { cleanPresencePhoto, isAllowedImage } from "@/features/lead-distribution/presence-photo";
 import { isR2StorageEnabled } from "@/features/storage/r2-storage-feature";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -60,11 +64,37 @@ export async function POST(request: Request) {
   try {
     const result = await confirmOwnDutyPresence({ tenantId: context.tenantId, brokerId: context.userId, occurrence, photoStorageKey });
     if (!result.ok) return fail(result.reason === "absent" ? "A gestão marcou falta neste plantão. Fale com ela." : "Tire a foto do local para confirmar.", 409);
-    // Confirmed brokers can receive leads from now on: retry those waiting.
-    await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
-    return NextResponse.json({ ok: true, mode: occurrence.mode }, { headers: { "Cache-Control": "no-store" } });
+    if (result.awaitingRelease) {
+      // Presencial: the broker stays paused; the director/manager validates the photo and releases him.
+      void notifyPhotoReviewers({ tenantId: context.tenantId, brokerId: context.userId, scheduleId: occurrence.scheduleId, confirmationId: result.confirmationId }).catch(() => undefined);
+    } else {
+      // Confirmed brokers can receive leads from now on: retry those waiting.
+      await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
+    }
+    return NextResponse.json({ ok: true, mode: occurrence.mode, awaitingRelease: result.awaitingRelease }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[duty-presence] self confirm failed", error);
     return fail("Não consegui confirmar agora. Tente de novo em alguns segundos.", 500);
   }
+}
+
+async function notifyPhotoReviewers(input: { tenantId: string; brokerId: string; scheduleId: string; confirmationId: string }) {
+  const [{ reviewerIds, scheduleName }, [broker]] = await Promise.all([
+    getDutyPhotoReviewers(input.tenantId, input.scheduleId),
+    getDatabase().select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, input.brokerId)).limit(1),
+  ]);
+  const firstName = broker?.name.split(/\s+/)[0] ?? "O corretor";
+  await Promise.all(reviewerIds.map((recipientUserId) => publishNotification({
+    capability: "duty_presence_photo",
+    tenantId: input.tenantId,
+    recipientUserId,
+    type: "duty_presence_photo",
+    title: `${firstName} enviou a foto do plantão presencial`,
+    message: `Valide a foto e libere ${firstName} no ${scheduleName ?? "plantão"}. Até lá ele fica pausado.`,
+    pushTitle: "Foto do plantão para validar",
+    pushBody: `${firstName} está esperando você liberar no ${scheduleName ?? "plantão"}.`,
+    url: `/leads/distribuicao/plantao/${input.scheduleId}`,
+    tag: `duty-photo-${input.confirmationId}`,
+    idempotencyKey: `duty-photo:${input.confirmationId}:${recipientUserId}`,
+  }).catch(() => false)));
 }

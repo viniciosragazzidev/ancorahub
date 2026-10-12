@@ -364,6 +364,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       releasedByName: sql<string | null>`(select u.name from "user" u where u.id = ${schema.dutyPresenceConfirmations.confirmedBy})`,
       confirmationId: schema.dutyPresenceConfirmations.id,
       hasPhoto: sql<boolean>`${schema.dutyPresenceConfirmations.photoStorageKey} is not null`,
+      releaseNote: schema.dutyPresenceConfirmations.releaseNote,
       notificationStatus: schema.dutyPresenceConfirmations.notificationStatus,
       notificationErrorCode: schema.dutyPresenceConfirmations.notificationErrorCode,
     }).from(schema.dutyPresenceConfirmations).where(and(
@@ -483,6 +484,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       phone,
       // Presencial confirmed by the broker with a photo of the place (2026-10-12).
       presencePhotoId: presence?.hasPhoto ? presence.confirmationId : null,
+      // Presencial released without the photo: the manager's written reason.
+      presenceReleaseNote: presence?.releaseNote ?? null,
       shift,
       shiftStartsAt: startsAt.slice(0, 5),
       shiftEndsAt: endsAt.slice(0, 5),

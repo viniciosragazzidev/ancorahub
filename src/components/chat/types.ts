@@ -96,7 +96,8 @@ export type PresenceAskView = {
   mode: "online" | "presencial";
   startsAt: string;
   endsAt: string;
-  status: "pending" | "confirmed";
+  status: "pending" | "awaiting_release" | "confirmed";
+  photoId: string | null;
 };
 
 export type ChatTone = "info" | "success" | "warning" | "danger" | "neutral";
