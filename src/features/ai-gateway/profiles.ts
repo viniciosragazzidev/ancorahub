@@ -40,9 +40,10 @@ type Env = Record<string, string | undefined>;
 
 /** Defaults from env (Coolify), so swapping a retired model needs no deploy of code. */
 export function defaultChains(env: Env): Record<AiProfile, ModelRef[]> {
-  const groqFast = env.AI_GROQ_FAST_MODEL || "llama-3.1-8b-instant";
-  const groqSmart = env.AI_GROQ_SMART_MODEL || env.GROQ_MODEL || "llama-3.3-70b-versatile";
-  const openrouterFree = env.AI_OPENROUTER_FREE_MODEL || "meta-llama/llama-3.3-70b-instruct:free";
+  // 2026-10-12: the Llama models below were retired (HTTP 404); checked live on each provider's /models.
+  const groqFast = env.AI_GROQ_FAST_MODEL || "openai/gpt-oss-20b";
+  const groqSmart = env.AI_GROQ_SMART_MODEL || "openai/gpt-oss-120b";
+  const openrouterFree = env.AI_OPENROUTER_FREE_MODEL || "google/gemma-4-31b-it:free";
   const gemini = env.AI_GEMINI_MODEL || "gemini-2.0-flash";
   const anthropic = env.AI_ANTHROPIC_MODEL || "claude-haiku-5-5";
   const openai = env.AI_OPENAI_MODEL || "gpt-4o-mini";

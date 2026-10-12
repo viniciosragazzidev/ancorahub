@@ -30,6 +30,17 @@ describe("profiles", () => {
   });
 });
 
+describe("default models", () => {
+  // 2026-10-12: the Llama defaults were retired by the providers (HTTP 404 on every call).
+  it("uses live models and never falls back to a retired one", () => {
+    const chains = defaultChains({ GROQ_MODEL: "llama-3.3-70b-versatile" });
+    const models = Object.values(chains).flat().map((ref) => ref.model);
+    expect(chains["chat-fast"][0]).toEqual({ provider: "groq", model: "openai/gpt-oss-20b" });
+    expect(chains["chat-smart"][0]).toEqual({ provider: "groq", model: "openai/gpt-oss-120b" });
+    expect(models.some((model) => /llama-3\.(1|3)/.test(model))).toBe(false);
+  });
+});
+
 describe("privacy", () => {
   it("masks phones, e-mails and CPFs and shortens names", () => {
     expect(maskPersonalData("Ligue (21) 99999-8888 ou maria@x.com, CPF 123.456.789-00")).toBe("Ligue [telefone] ou [e-mail], CPF [cpf]");

@@ -99,6 +99,8 @@ export async function runGateway<T>(input: {
           temperature: input.temperature ?? 0.3,
           max_tokens: input.maxTokens ?? 500,
           ...(ref.provider === "anthropic" ? {} : { response_format: { type: "json_object" } }),
+          // gpt-oss thinks before answering: low effort keeps the answer inside max_tokens and fast.
+          ...(ref.model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
         }),
         signal: AbortSignal.timeout(input.timeoutMs ?? 12_000),
       });
