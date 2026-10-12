@@ -12,6 +12,7 @@ import SegmentedControl from "@/components/arc/segmented-control/segmented-contr
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 import { PushNotificationManager } from "@/features/notifications/components/push-notification-manager";
 import { LightLeadToastToggle } from "./light-lead-toast-toggle";
+import { LightAiConsentToggle } from "./light-ai-consent-toggle";
 import { NoticeCardBody, noticeLink, noticePriority, noticeRowClass } from "@/components/notifications/notice-card";
 import css from "./light-notifications.module.css";
 import { loadMoreNotificationsAction, markAllNotificationsReadAction, markNotificationReadAction } from "@/app/(dashboard)/notificacoes/actions";
@@ -36,6 +37,8 @@ interface LightNotificationsProps {
   unreadCount: number;
   urgentCount: number;
   leadToastEnabled: boolean;
+  /** Only when the assistants' AI is on for the company (null hides the switch). */
+  aiConsentGranted?: boolean | null;
 }
 
 const FILTERS: Array<{ value: FilterType; label: string }> = [
@@ -136,6 +139,7 @@ export function LightNotifications({
   totalCount: serverTotalCount,
   urgentCount: serverUrgentCount,
   leadToastEnabled,
+  aiConsentGranted = null,
 }: LightNotificationsProps) {
   const reduceMotion = useReducedMotion();
   const [filter, setFilter] = useState<FilterType>("all");
@@ -265,6 +269,7 @@ export function LightNotifications({
           </div>
           <PushNotificationManager />
           <LightLeadToastToggle initialEnabled={leadToastEnabled} />
+          {aiConsentGranted !== null ? <LightAiConsentToggle initialGranted={aiConsentGranted} /> : null}
         </section>
       </div>
     </div>

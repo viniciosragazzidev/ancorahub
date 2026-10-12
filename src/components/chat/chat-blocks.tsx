@@ -9,6 +9,7 @@ import { NoticeCardBody, noticeLink, noticeRowClass } from "@/components/notific
 import styles from "./chat.module.css";
 import type { ChatBlock, ChatChoice, ChatLeadRow, ChatListItem } from "./types";
 import { LiveBlockView } from "./live-blocks";
+import { ConsentCard } from "./consent-card";
 
 const LETTERS = "ABCDEFGHIJ";
 const enter = { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
@@ -174,13 +175,15 @@ function SwipeRow({ item, disabled, onSwipe, children }: { item: ChatListItem & 
   );
 }
 
-export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe, swipeDisabled, onLeadOpen }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void; onItemSwipe?: (item: ChatListItem) => void; swipeDisabled?: boolean; onLeadOpen?: (row: ChatLeadRow) => void }) {
+export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe, swipeDisabled, onLeadOpen, onConsent }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void; onItemSwipe?: (item: ChatListItem) => void; swipeDisabled?: boolean; onLeadOpen?: (row: ChatLeadRow) => void; onConsent?: (block: Extract<ChatBlock, { type: "consent" }>, allow: boolean) => Promise<boolean> }) {
   const reduce = useReducedMotion();
   switch (block.type) {
     case "leads":
     case "stats":
     case "leadcard":
       return <LiveBlockView block={block} onLeadOpen={onLeadOpen} />;
+    case "consent":
+      return <ConsentCard block={block} onDecide={onConsent} />;
     case "button": {
       const external = /^https?:/.test(block.href);
       return (

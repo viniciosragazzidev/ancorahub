@@ -988,6 +988,13 @@
                         "when":  1791656000000,
                         "tag":  "0193_engagement_journey",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  141,
+                        "version":  "7",
+                        "when":  1791657000000,
+                        "tag":  "0194_ai_consents",
+                        "breakpoints":  true
                     }
                 ]
 }

@@ -75,6 +75,8 @@ export type ChatBlock =
   | { type: "stats"; id: string; title: string; icon: ChatBlockIcon; tiles: Array<{ label: string; value: number; tone?: ChatTone }>; goal?: { name: string; percentage: number; current: string; target: string } | null; updatedAt: string }
   /** The lead's quick card: what needs attention, the essentials, and one-tap actions. */
   | { type: "leadcard"; id: string; leadId: string; name: string; initials: string; stage: string; alert?: { tone: ChatTone; text: string } | null; rows: Array<{ label: string; value: string }>; whatsappHref?: string | null; href: string; fichaHref: string; updatedAt: string }
+  /** LGPD: asked before the first use of AI; "question" is re-sent once the broker allows. */
+  | { type: "consent"; id: string; question: string }
   | { type: "question"; id: string; prompt: string; choices: ChatChoice[] }
   /** A real link as a button (WhatsApp): opened by the tap itself, so phones never block it. */
   | { type: "button"; id: string; text?: string; label: string; href: string; tone?: "whatsapp" | "action" };

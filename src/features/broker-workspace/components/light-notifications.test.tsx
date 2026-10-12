@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const actions = vi.hoisted(() => ({ read: vi.fn(async () => {}), readAll: vi.fn(async () => {}), more: vi.fn() }));
 vi.mock("@/app/(dashboard)/notificacoes/actions", () => ({ markNotificationReadAction: actions.read, markAllNotificationsReadAction: actions.readAll, loadMoreNotificationsAction: actions.more }));
 vi.mock("@/features/notifications/components/push-notification-manager", () => ({ PushNotificationManager: () => null }));
+vi.mock("./light-ai-consent-toggle", () => ({ LightAiConsentToggle: () => null }));
 vi.mock("./light-lead-toast-toggle", () => ({ LightLeadToastToggle: () => null }));
 
 import { LightNotifications } from "./light-notifications";

@@ -15,6 +15,7 @@ import { getDatabase, schema } from "@/shared/db";
 
 import { AGENT_IDS, AGENT_REGISTRY, assistantReplySchema, buildMessages, replyToBlocks, type ActionTargets, type AgentId } from "./agents";
 import { runGateway } from "./gateway";
+import { readAiConsent } from "./consent";
 import { maskPersonalData, shortName } from "./privacy";
 
 const TIME_ZONE = "America/Sao_Paulo";
@@ -98,6 +99,9 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
 
   const context = await getRequiredTenantContext();
   if (context.role !== "broker") return fallback();
+  // LGPD: nothing goes to a model before the broker allows it (current terms version).
+  const consent = await readAiConsent(context.tenantId, context.userId).catch(() => ({ granted: false }));
+  if (!consent.granted) return { ok: false, blocks: [{ type: "consent", id: `ai-consent-${stamp}`, question: input.data.question }] };
   const agent = AGENT_REGISTRY[input.data.agentId];
   const built = input.data.agentId === "lead" && input.data.leadId
     ? await leadContext(input.data.leadId).catch(() => null)

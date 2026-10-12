@@ -274,3 +274,18 @@
 .leadCardAction:active { transform: scale(0.97); }
 .leadCardPrimary { background: var(--chat-action); color: white; }
 .leadCardWhatsapp { background: #1fa855; color: #fff; }
+
+/* AI consent card (LGPD, 2026-10-12). */
+.consentCard { padding: 16px 0 6px; }
+.consentHead { display: flex; gap: 12px; align-items: flex-start; padding: 0 16px; }
+.consentGlow { flex: none; width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; color: white; background: linear-gradient(135deg, oklch(70% 0.17 255), oklch(68% 0.19 300), oklch(78% 0.14 200)); background-size: 200% 200%; animation: consentShift 4s ease-in-out infinite alternate; }
+@keyframes consentShift { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+@media (prefers-reduced-motion: reduce) { .consentGlow { animation: none; } }
+.consentMore { margin: 8px 16px 0 64px; padding: 0; border: 0; background: none; font: inherit; font-size: var(--text-xs); font-weight: 500; color: var(--chat-action-text, var(--chat-action)); cursor: pointer; }
+.consentDetails { margin: 8px 16px 0; padding: 0; display: grid; gap: 8px; overflow: hidden; font-size: var(--text-xs); }
+.consentDetails > div { padding: 8px 10px; border-radius: var(--radius-control); background: var(--surface-muted); }
+.consentDetails dt { color: var(--text-muted); }
+.consentDetails dd { margin: 2px 0 0; color: var(--foreground); line-height: 1.45; }
+.consentDone { margin: 10px 16px 6px; font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); }
+button.leadCardAction { border: 0; font: inherit; font-size: var(--text-sm); font-weight: 500; cursor: pointer; }
+button.leadCardAction:disabled { opacity: 0.6; cursor: default; }

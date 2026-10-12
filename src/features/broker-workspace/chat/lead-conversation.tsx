@@ -71,7 +71,8 @@ export function LeadConversation({
           // A question ("...?") goes to the AI of this lead; anything else, or an AI failure, is a note.
           if (text.trim().endsWith("?")) {
             const answer = await askAssistantAction({ agentId: "lead", question: text, leadId });
-            if (answer.ok) return answer.blocks;
+            // The AI consent card is shown as is (the question is not saved as a note).
+            if (answer.ok || answer.blocks.some((block) => block.type === "consent")) return answer.blocks;
           }
           const result = await runChatServerAction("lead.addNote", { leadId, content: text });
           return [{ type: "assistant", id: `note-${Date.now()}`, text: result.message }];

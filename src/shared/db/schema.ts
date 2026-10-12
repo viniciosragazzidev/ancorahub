@@ -3744,6 +3744,18 @@ export const engagementCelebrations = pgTable("engagement_celebrations", {
   check("engagement_celebrations_kind_check", sql`${table.kind} in ('points','mission','achievement','level','daily_summary')`),
 ]);
 
+// LGPD consent for AI (0194): one row per decision; the latest per (tenant, user, scope) counts.
+export const aiConsents = pgTable("ai_consents", {
+  id: text("id").primaryKey(), tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull().references(() => user.id, { onDelete: "cascade" }), scope: text("scope").notNull(),
+  termsVersion: text("terms_version").notNull(), decision: text("decision").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("ai_consents_tenant_user_scope_created_idx").on(table.tenantId, table.userId, table.scope, table.createdAt),
+  check("ai_consents_scope_check", sql`${table.scope} in ('broker_assistants')`),
+  check("ai_consents_decision_check", sql`${table.decision} in ('granted','declined','revoked')`),
+]);
+
 export const relationshipBroadcasts = pgTable(
   "relationship_broadcasts",
   {

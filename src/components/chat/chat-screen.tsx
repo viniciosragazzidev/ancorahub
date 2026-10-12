@@ -250,14 +250,44 @@ export function ChatScreen({
     }
   }, [enqueue, onMention, working]);
 
+  // LGPD card: one tap records the decision; "Permitir" then answers the question that was waiting.
+  const consent = useCallback(async (block: Extract<ChatBlock, { type: "consent" }>, allow: boolean) => {
+    if (working) return false;
+    setWorking(true);
+    setStatus({ label: "Trabalhando...", tone: "working" });
+    try {
+      // Loaded on demand: only screens that show the card pull the server action.
+      const saved = await import("@/features/ai-gateway/consent-actions")
+        .then(({ decideAiConsentAction }) => decideAiConsentAction(allow ? "granted" : "declined"))
+        .catch(() => ({ ok: false }));
+      if (!saved.ok) {
+        enqueue([{ type: "assistant", id: `consent-error-${Date.now()}`, text: "Não consegui salvar sua escolha. Toque de novo em alguns segundos." }]);
+        setStatus({ label: "Esperando você", tone: "waiting" });
+        return false;
+      }
+      if (!allow) {
+        enqueue([{ type: "assistant", id: `consent-no-${Date.now()}`, text: "Tudo bem, sem IA. Continue pelas opções e pelo @. Se mudar de ideia, é só me perguntar de novo." }]);
+        setStatus({ label: "Pronto", tone: "idle" });
+        return true;
+      }
+      enqueue([{ type: "system", id: `consent-yes-${Date.now()}`, strong: "IA ligada.", text: "Você pode desligar em Notificações." }]);
+      if (onFreeText) enqueue(await onFreeText(block.question));
+      setStatus({ label: "Pronto", tone: "idle" });
+      return true;
+    } finally {
+      setWorking(false);
+    }
+  }, [enqueue, onFreeText, working]);
+
   // Rows are memoized: they get stable handlers that always call the latest ones.
-  const latest = useRef({ choose, swipeItem, onButtonOpen, mention });
-  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen, mention }; });
+  const latest = useRef({ choose, swipeItem, onButtonOpen, mention, consent });
+  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen, mention, consent }; });
   const rowHandlers = useMemo<RowHandlers>(() => ({
     choose: (question, choice) => { void latest.current.choose(question, choice); },
     swipe: (item) => latest.current.swipeItem(item),
     buttonOpen: (block, event) => latest.current.onButtonOpen?.(block, event),
     lead: (row) => { void latest.current.mention({ handle: `lead:${row.leadId}`, label: `@${row.name}`, note: "", group: "leads" }); },
+    consent: (block, allow) => latest.current.consent(block, allow),
   }), []);
 
   const answeredCount = Object.keys(answers).length;
@@ -333,6 +363,7 @@ type RowHandlers = {
   swipe: (item: ChatListItem) => void;
   buttonOpen: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void;
   lead: (row: ChatLeadRow) => void;
+  consent: (block: Extract<ChatBlock, { type: "consent" }>, allow: boolean) => Promise<boolean>;
 };
 
 /** Blocks from the server are plain data: equal JSON means nothing to redraw. */
@@ -346,7 +377,7 @@ const BlockRow = memo(function BlockRow({ block, chosenId, working, handlers }: 
     <MessageEnter>
       {block.type === "question"
         ? <ChoiceList block={block} chosenId={chosenId} disabled={working} onChoose={(choice) => handlers.choose(block, choice)} />
-        : <ChatBlockView block={block} onButtonOpen={handlers.buttonOpen} onItemSwipe={handlers.swipe} swipeDisabled={working} onLeadOpen={handlers.lead} onSystemAction={(system) => { if (system.action) handlers.choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
+        : <ChatBlockView block={block} onButtonOpen={handlers.buttonOpen} onItemSwipe={handlers.swipe} swipeDisabled={working} onLeadOpen={handlers.lead} onConsent={handlers.consent} onSystemAction={(system) => { if (system.action) handlers.choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
     </MessageEnter>
   );
 });

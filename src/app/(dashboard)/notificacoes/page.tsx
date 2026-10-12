@@ -8,6 +8,8 @@ import { LightNotifications } from "@/features/broker-workspace/components/light
 import { NotificationsClient } from "./notifications-client";
 import { getMyPendingSupervisorInvites, getMySupervisorTeamIdentity } from "@/features/supervisor-workspace/my-team-queries";
 import { SupervisorTeamInvites } from "@/features/broker-workspace/components/supervisor-team-invites";
+import { readAiConsent } from "@/features/ai-gateway/consent";
+import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 const PAGE_SIZE = 20;
 
@@ -92,6 +94,9 @@ export default async function NotificationsPage() {
   ]);
 
   if (isLightBroker) {
+    // The AI switch shows only for brokers, and only while the AI is on for the company.
+    const aiOn = context.role === "broker" && (await getFeatureFlag(FEATURE_FLAGS.BROKER_AI_ASSISTANTS).catch(() => "false")) === "true";
+    const aiConsentGranted = aiOn ? (await readAiConsent(context.tenantId, context.userId).catch(() => null))?.granted ?? null : null;
     return (
       <>
         {context.role === "broker" ? <SupervisorTeamInvites initialInvites={teamInvites ?? []} teamIdentity={teamIdentity} unavailable={teamInvites === null} /> : null}
@@ -103,6 +108,7 @@ export default async function NotificationsPage() {
           unreadCount={Number(unreadResult?.total ?? 0)}
           urgentCount={Number(urgentResult?.total ?? 0)}
           leadToastEnabled={membership?.leadToastEnabled ?? true}
+          aiConsentGranted={aiConsentGranted}
         />
       </>
     );
