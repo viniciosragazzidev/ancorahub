@@ -272,5 +272,5 @@
 .leadCardActions { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px 4px; }
 .leadCardAction { flex: 1 1 auto; min-height: 40px; padding: 0 14px; border-radius: 999px; display: inline-grid; place-items: center; font-size: var(--text-sm); font-weight: 500; text-decoration: none; color: var(--foreground); background: var(--surface-muted); transition: transform var(--duration-fast) var(--ease-standard); }
 .leadCardAction:active { transform: scale(0.97); }
-.leadCardPrimary { background: var(--chat-action); color: var(--chat-action-text); }
+.leadCardPrimary { background: var(--chat-action); color: white; }
 .leadCardWhatsapp { background: #1fa855; color: #fff; }
