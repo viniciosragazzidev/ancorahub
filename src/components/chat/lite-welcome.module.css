@@ -32,3 +32,11 @@
   background: linear-gradient(180deg, oklch(62% .2 255), oklch(55% .21 258));
   box-shadow: 0 10px 24px oklch(55% .21 258 / .32);
 }
+
+/* First access: "Não perca nenhum lead" (turn on notifications), 2026-10-12. */
+.pushStage { position: relative; height: 112px; display: grid; place-items: center; margin-bottom: 4px; }
+.pushBell { width: 72px; height: 72px; border-radius: 24px; display: grid; place-items: center; color: white; background: linear-gradient(135deg, oklch(66% 0.18 255), oklch(62% 0.2 285)); box-shadow: 0 14px 28px -14px oklch(55% 0.2 265 / 0.9); transform-origin: 50% 12%; }
+.pushBell[data-done="true"] { background: var(--success); box-shadow: 0 14px 28px -14px color-mix(in oklab, var(--success) 90%, transparent); }
+.pushToast { position: absolute; top: 0; left: 50%; translate: -50% 0; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; white-space: nowrap; font-size: 12px; font-weight: 500; color: var(--foreground); background: var(--surface); box-shadow: var(--shadow-floating, 0 8px 24px rgb(16 16 40 / 0.12)); }
+.pushToastDot { width: 8px; height: 8px; border-radius: 50%; background: oklch(62% 0.2 255); }
+.pushError { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--danger); }

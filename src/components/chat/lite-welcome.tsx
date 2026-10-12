@@ -8,6 +8,8 @@ import { AssistantAvatar } from "./assistant-avatar";
 import styles from "./lite-welcome.module.css";
 import { startLiteTour } from "./tour/lite-tour";
 import { WelcomeVideo } from "./welcome-video";
+import { PushNudge } from "./push-nudge";
+import { canAskForPush } from "@/features/notifications/push-ask";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 import type { MascotShape } from "./types";
 
@@ -16,6 +18,8 @@ const STORAGE_KEY = "ancora:lite-welcome:2026-10-chat";
 const SUPERVISOR_STORAGE_KEY = "ancora:lite-welcome:2026-10-supervisor";
 /** The welcome video (broker, Super-admin flag): seen once per device, before the card. */
 const VIDEO_STORAGE_KEY = "ancora:welcome-video:2026-10-v2";
+/** "Não perca nenhum lead": asked once per device (also for those who already saw the welcome). */
+const PUSH_STORAGE_KEY = "ancora:push-nudge:2026-10";
 
 const TEAM: Array<{ shape: MascotShape; hue: number | null }> = [
   { shape: "logo", hue: null },
@@ -62,6 +66,9 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
   const reduce = useReducedMotion();
   const [open, setOpen] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
+  const [pushOpen, setPushOpen] = useState(false);
+  // What runs after the push step (the tour, when the broker chose it).
+  const [afterPush, setAfterPush] = useState<(() => void) | null>(null);
   const shell = useLightAvailabilityContext();
   const isSupervisor = variant === "supervisor";
   const withVideo = !isSupervisor && Boolean(shell?.welcomeVideo);
@@ -75,9 +82,11 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
       // First access: the video comes first, then the card (each remembered on its own).
       if (withVideo && !readSeen(VIDEO_STORAGE_KEY)) setVideoOpen(true);
       else if (!readSeen(storageKey)) setOpen(true);
+      // Welcome already seen: still ask once to turn on notifications.
+      else if (!isSupervisor && !readSeen(PUSH_STORAGE_KEY)) void canAskForPush().then((ask) => { if (ask) setPushOpen(true); });
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [storageKey, withVideo]);
+  }, [isSupervisor, storageKey, withVideo]);
 
   function finishVideo() {
     writeSeen(VIDEO_STORAGE_KEY, "1");
@@ -85,14 +94,31 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
     if (!readSeen(storageKey)) window.setTimeout(() => setOpen(true), 220);
   }
 
-  function close() {
+  function close(next?: () => void) {
     writeSeen(storageKey, "1");
     setOpen(false);
+    // Then the push step (once), and only after it the tour.
+    // Broker only (the text speaks of the leads that reach him).
+    void (isSupervisor || readSeen(PUSH_STORAGE_KEY) ? Promise.resolve(false) : canAskForPush()).then((ask) => {
+      if (ask) {
+        setAfterPush(() => next ?? null);
+        window.setTimeout(() => setPushOpen(true), 240);
+      } else if (next) window.setTimeout(next, 260);
+    });
+  }
+
+  function closePush() {
+    writeSeen(PUSH_STORAGE_KEY, "1");
+    setPushOpen(false);
+    const next = afterPush;
+    setAfterPush(null);
+    if (next) window.setTimeout(next, 260);
   }
 
   return (
     <AnimatePresence>
       {videoOpen ? <WelcomeVideo key="welcome-video" onDone={finishVideo} /> : null}
+      {pushOpen ? <PushNudge key="push-nudge" onClose={closePush} /> : null}
       {open ? (
         <motion.div
           key="welcome"
@@ -100,7 +126,7 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.18 } }}
-          onClick={close}
+          onClick={() => close()}
         >
           <motion.section
             role="dialog"
@@ -160,13 +186,13 @@ export function LiteWelcome({ variant = "broker" }: { variant?: "broker" | "supe
               <motion.button
                 type="button"
                 className={styles.start}
-                onClick={() => { close(); window.setTimeout(startLiteTour, 260); }}
+                onClick={() => close(startLiteTour)}
                 autoFocus
                 whileTap={reduce ? undefined : { scale: 0.97 }}
               >
                 {isSupervisor ? "Fazer o tour (2 min)" : "Fazer o tour (3 min)"}
               </motion.button>
-              <button type="button" className={styles.later} onClick={close}>Agora não</button>
+              <button type="button" className={styles.later} onClick={() => close()}>Agora não</button>
             </motion.div>
           </motion.section>
         </motion.div>
