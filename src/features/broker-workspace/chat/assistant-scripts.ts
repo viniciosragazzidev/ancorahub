@@ -10,6 +10,7 @@ import type {
 } from "@/components/chat/types";
 import type { BrokerWorkspacePriority } from "@/features/broker-workspace/priority";
 import { DECLINE_REASONS } from "@/features/broker-workspace/components/light-lead-detail/types";
+import { QUOTE_PAUSED } from "../quote-availability";
 
 const TIME_ZONE = "America/Sao_Paulo";
 
@@ -269,7 +270,7 @@ export function buildAssistantThreads(input: {
 
   if (capabilities.quoteSimulator) {
     threads.push(assistantThread("cotacao", {
-      preview: "O simulador está pronto para uma nova cotação.",
+      preview: QUOTE_PAUSED ? "Em pausa por enquanto." : "O simulador está pronto para uma nova cotação.",
       at: null,
       unread: false,
       waitingYou: false,

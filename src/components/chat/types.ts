@@ -77,6 +77,8 @@ export type ChatBlock =
   | { type: "leadcard"; id: string; leadId: string; name: string; initials: string; stage: string; alert?: { tone: ChatTone; text: string } | null; rows: Array<{ label: string; value: string }>; whatsappHref?: string | null; href: string; fichaHref: string; updatedAt: string }
   /** LGPD: asked before the first use of AI; "question" is re-sent once the broker allows. */
   | { type: "consent"; id: string; question: string }
+  /** A whole assistant switched off for now: a calm hero with its mascot "resting". */
+  | { type: "paused"; id: string; title: string; text: string; shape: MascotShape; hue: number }
   | { type: "question"; id: string; prompt: string; choices: ChatChoice[] }
   /** A real link as a button (WhatsApp): opened by the tap itself, so phones never block it. */
   | { type: "button"; id: string; text?: string; label: string; href: string; tone?: "whatsapp" | "action" };

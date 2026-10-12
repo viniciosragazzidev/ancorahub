@@ -10,6 +10,7 @@ import styles from "./chat.module.css";
 import type { ChatBlock, ChatChoice, ChatLeadRow, ChatListItem } from "./types";
 import { LiveBlockView } from "./live-blocks";
 import { ConsentCard } from "./consent-card";
+import { PausedHero } from "./paused-hero";
 
 const LETTERS = "ABCDEFGHIJ";
 const enter = { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
@@ -184,6 +185,8 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe
       return <LiveBlockView block={block} onLeadOpen={onLeadOpen} />;
     case "consent":
       return <ConsentCard block={block} onDecide={onConsent} />;
+    case "paused":
+      return <PausedHero block={block} />;
     case "button": {
       const external = /^https?:/.test(block.href);
       return (
