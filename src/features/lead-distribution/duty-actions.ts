@@ -17,6 +17,7 @@ import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 import { assignLeadToBroker } from "./service";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { publishNotification } from "@/features/notifications/send-push-helper";
 
 export type DutyActionState = { success?: boolean; error?: string; message?: string; scheduleId?: string; scheduleIds?: string[] };
 
@@ -765,7 +766,7 @@ export async function setDutyAbsenceAction(scheduleId: string, assignmentId: str
     const parsedScheduleId = z.string().uuid().parse(scheduleId);
     const parsedAssignmentId = z.string().uuid().parse(assignmentId);
     if (typeof absent !== "boolean") throw new Error("Estado de falta inválido.");
-    const { context, db } = await findScheduleForMutation(parsedScheduleId);
+    const { context, db, schedule } = await findScheduleForMutation(parsedScheduleId);
     const profile = await getDutyScheduleProfile(context, parsedScheduleId);
     if (!profile.roster.some((entry) => entry.id === parsedAssignmentId)) return { ok: false, reason: "Corretor não está na escala efetiva desta ocorrência." };
     const [assignment] = await db.select({
@@ -786,12 +787,34 @@ export async function setDutyAbsenceAction(scheduleId: string, assignmentId: str
     const window = getRelevantDutyWindow(assignment, now, 24 * 60);
     if (!window || window.startsAt < assignment.validFrom || (assignment.validUntil && window.startsAt >= assignment.validUntil)) return { ok: false, reason: "Não há ocorrência atual ou próxima para este corretor." };
     const occurrence = and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, assignment.id), eq(schema.dutyPresenceConfirmations.dutyDate, window.dutyDate), eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt), eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt));
-    await db.transaction(async (tx) => {
+    const confirmationId = await db.transaction(async (tx) => {
       await tx.insert(schema.dutyPresenceConfirmations).values({ id: randomUUID(), tenantId: context.tenantId, scheduleId: parsedScheduleId, assignmentId: assignment.id, brokerId: assignment.brokerId, dutyDate: window.dutyDate, shiftStartsAt: window.startsAt, shiftEndsAt: window.endsAt, status: "pending", notificationStatus: "pending", createdAt: now, updatedAt: now }).onConflictDoNothing();
       const changed = await tx.update(schema.dutyPresenceConfirmations).set({ status: absent ? "absent" : "pending", confirmedAt: null, confirmedBy: null, updatedAt: now }).where(and(occurrence, absent ? ne(schema.dutyPresenceConfirmations.status, "absent") : eq(schema.dutyPresenceConfirmations.status, "absent"))).returning({ id: schema.dutyPresenceConfirmations.id });
       if (!changed.length) throw new Error(absent ? "Falta já registrada." : "Não há falta para desfazer.");
       await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_presence_confirmation", entidadeId: changed[0].id, acao: absent ? "duty_presence.absence_marked" : "duty_presence.absence_undone", createdAt: now });
+      return changed[0].id;
     });
+    // The broker always learns about it (2026-10-12): an absence, or that it was undone.
+    const when = new Intl.DateTimeFormat("pt-BR", { timeZone: assignment.timezone, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(window.startsAt);
+    void publishNotification({
+      capability: "duty_absence",
+      tenantId: context.tenantId,
+      recipientUserId: assignment.brokerId,
+      type: absent ? "duty_absence_marked" : "duty_absence_undone",
+      title: absent ? `Falta registrada no plantão ${schedule.name}` : `Falta desfeita no plantão ${schedule.name}`,
+      message: absent
+        ? `A gestão marcou falta no plantão de ${when}. Enquanto isso, você não recebe leads deste plantão. Se foi engano, fale com a gestão.`
+        : schedule.attendanceMode === "presencial"
+          ? `A gestão desfez a falta no plantão de ${when}. Plantão presencial: tire a foto do local no app e espere o diretor liberar.`
+          : `A gestão desfez a falta no plantão de ${when}. Confirme sua presença para voltar a receber leads.`,
+      pushTitle: absent ? "Falta no plantão" : "Falta desfeita",
+      pushBody: absent ? `${schedule.name}, ${when}: falta registrada pela gestão.` : `${schedule.name}, ${when}: a falta foi desfeita.`,
+      url: "/dashboard/c/plantao",
+      tag: `duty-absence-${confirmationId}`,
+      // Duplicates are already stopped by the conditional update above; the time keeps a later
+      // mark → undo → mark cycle notifying again (a key without it would swallow the repeat).
+      idempotencyKey: `duty-absence:${confirmationId}:${absent ? "marked" : "undone"}:${now.getTime()}`,
+    }).catch(() => false);
     if (!absent) await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
     revalidateDutyWorkspace();
     return { ok: true };
