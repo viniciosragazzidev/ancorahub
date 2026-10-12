@@ -81,7 +81,7 @@ function greeting(now: Date) {
   return "Boa noite";
 }
 
-function initials(name: string) {
+export function initials(name: string) {
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("");
 }
 
@@ -89,7 +89,7 @@ function minutesSince(date: Date, now: Date) {
   return Math.max(0, Math.floor((now.getTime() - date.getTime()) / 60_000));
 }
 
-function actionPreview(action: BrokerWorkspacePriority, now: Date) {
+export function actionPreview(action: BrokerWorkspacePriority, now: Date) {
   const name = action.title;
   switch (action.kind) {
     case "new_lead":

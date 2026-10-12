@@ -203,3 +203,74 @@
 .notice { border: 1px solid var(--border-subtle, rgb(16 16 40 / 0.08)); background: var(--surface); }
 .noticeStatic { cursor: default; }
 .noticeStatic:hover { background: var(--surface); }
+
+/* "@" with live data (2026-10-12): grouped menu, data blocks and the lead's quick card. */
+.mentionMenu { max-height: min(56vh, 420px); overflow-y: auto; overscroll-behavior: contain; gap: 1px; }
+.mentionMenu li { display: grid; }
+.mentionSection { padding: 10px 10px 4px; font-size: var(--text-xs); color: var(--text-muted); font-weight: 500; }
+.mentionLoading { padding: 10px; font-size: var(--text-sm); }
+.mentionMark { flex: none; width: 30px; height: 30px; border-radius: 999px; display: grid; place-items: center; font-size: var(--text-xs); font-weight: 500; background: var(--surface-muted); color: var(--text-secondary); }
+.mentionMark[data-group="atalhos"] { border-radius: 9px; background: var(--chat-action-soft); color: var(--chat-action); }
+.mentionMark[data-group="assistentes"] { color: var(--chat-action); }
+.mentionText { display: grid; min-width: 0; flex: 1; }
+.mentionText > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mentionItem[data-group="leads"] .mentionHandle, .mentionItem[data-group="atalhos"] .mentionHandle { color: var(--foreground); }
+.mentionCount { flex: none; min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; display: grid; place-items: center; font-size: var(--text-xs); font-weight: 500; font-variant-numeric: tabular-nums; background: var(--surface-muted); color: var(--text-muted); }
+.mentionItem { transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
+.mentionItem:active { transform: scale(0.98); }
+
+.mentionCount[data-tone="info"], .liveChip[data-tone="info"], .liveTile[data-tone="info"], .leadCardAlert[data-tone="info"] { --tone: var(--chat-action); }
+.mentionCount[data-tone="success"], .liveChip[data-tone="success"], .liveTile[data-tone="success"], .leadCardAlert[data-tone="success"] { --tone: var(--success); }
+.mentionCount[data-tone="warning"], .liveChip[data-tone="warning"], .liveTile[data-tone="warning"], .leadCardAlert[data-tone="warning"] { --tone: var(--warning); }
+.mentionCount[data-tone="danger"], .liveChip[data-tone="danger"], .liveTile[data-tone="danger"], .leadCardAlert[data-tone="danger"] { --tone: var(--danger); }
+.mentionCount[data-tone]:not([data-tone="neutral"]), .liveChip[data-tone]:not([data-tone="neutral"]) { color: var(--tone); background: color-mix(in oklab, var(--tone) 12%, transparent); }
+
+.shimmerText { color: transparent; background: linear-gradient(90deg, var(--text-muted) 0%, var(--text-muted) 35%, var(--foreground) 50%, var(--text-muted) 65%, var(--text-muted) 100%); background-size: 250% 100%; -webkit-background-clip: text; background-clip: text; animation: chatShimmer 1.6s linear infinite; font-size: var(--text-sm); }
+@keyframes chatShimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+.workingRow { display: flex; align-items: center; gap: 10px; }
+@media (prefers-reduced-motion: reduce) { .shimmerText { animation: none; color: var(--text-muted); } }
+
+.liveCard { padding-bottom: 4px; overflow: hidden; }
+.liveHeader { display: flex; align-items: center; gap: 10px; padding: 14px 16px 8px; }
+.liveIcon { width: 28px; height: 28px; border-radius: 9px; display: grid; place-items: center; background: var(--chat-action-soft); color: var(--chat-action); flex: none; }
+.liveCount { margin-left: auto; font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.liveRows { list-style: none; margin: 0; padding: 0 6px; display: grid; }
+.liveRow { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px; border: 0; background: none; border-radius: var(--radius-control); font: inherit; color: inherit; text-align: left; cursor: pointer; transition: background var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard); }
+.liveRow:hover { background: var(--surface-muted); }
+.liveRow:active { transform: scale(0.985); background: var(--surface-muted); }
+.liveAvatar { flex: none; width: 36px; height: 36px; border-radius: 999px; display: grid; place-items: center; background: var(--chat-action-soft); color: var(--chat-action); font-size: var(--text-xs); font-weight: 500; }
+.liveRowText { display: grid; min-width: 0; flex: 1; }
+.liveRowName { font-size: var(--text-sm); font-weight: 500; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liveRowContext { font-size: var(--text-xs); color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liveRowSide { display: grid; justify-items: end; gap: 4px; flex: none; }
+.liveRowTime { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.liveChip { font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 999px; background: var(--surface-muted); color: var(--text-secondary); white-space: nowrap; }
+.liveEmpty { margin: 0; padding: 6px 16px 10px; font-size: var(--text-sm); color: var(--text-muted); }
+.liveUpdated { margin: 0; padding: 6px 16px 10px; font-size: 11px; color: var(--text-muted); }
+
+.liveTiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 4px 16px 8px; }
+.liveTile { display: grid; gap: 2px; padding: 12px; border-radius: var(--radius-control); background: var(--surface-muted); }
+.liveTile[data-tone]:not([data-tone="neutral"]) { background: color-mix(in oklab, var(--tone) 9%, var(--surface)); }
+.liveTileValue { font-size: 24px; line-height: 1.1; font-weight: 500; color: var(--foreground); font-variant-numeric: tabular-nums; }
+.liveTile[data-tone]:not([data-tone="neutral"]) .liveTileValue { color: var(--tone); }
+.liveTileLabel { font-size: var(--text-xs); color: var(--text-muted); }
+.liveGoal { padding: 6px 16px 4px; display: grid; gap: 6px; }
+.liveGoalHead { display: flex; justify-content: space-between; gap: 8px; font-size: var(--text-xs); color: var(--text-secondary); }
+.liveGoalValue { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.liveGoalTrack { height: 8px; border-radius: 999px; background: var(--surface-muted); overflow: hidden; }
+.liveGoalFill { display: block; height: 100%; border-radius: inherit; background: var(--chat-action); transform-origin: left center; }
+
+.leadCardHeader { display: flex; align-items: center; gap: 12px; padding: 16px 16px 10px; }
+.leadCardAvatar { width: 44px; height: 44px; font-size: var(--text-sm); }
+.leadCardName { font-size: var(--text-base); font-weight: 500; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leadCardAlert { margin: 0 16px 8px; padding: 10px 12px; border-radius: var(--radius-control); font-size: var(--text-sm); font-weight: 500; color: var(--tone, var(--text-secondary)); background: color-mix(in oklab, var(--tone, var(--text-muted)) 11%, var(--surface)); }
+.leadCardFacts { margin: 0; padding: 2px 16px 6px; display: grid; }
+.leadCardFact { display: grid; grid-template-columns: minmax(96px, 38%) 1fr; gap: 10px; padding: 7px 0; border-top: 1px solid var(--border-subtle); font-size: var(--text-sm); }
+.leadCardFact:first-child { border-top: 0; }
+.leadCardFact dt { color: var(--text-muted); }
+.leadCardFact dd { margin: 0; color: var(--foreground); min-width: 0; overflow-wrap: anywhere; }
+.leadCardActions { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 16px 4px; }
+.leadCardAction { flex: 1 1 auto; min-height: 40px; padding: 0 14px; border-radius: 999px; display: inline-grid; place-items: center; font-size: var(--text-sm); font-weight: 500; text-decoration: none; color: var(--foreground); background: var(--surface-muted); transition: transform var(--duration-fast) var(--ease-standard); }
+.leadCardAction:active { transform: scale(0.97); }
+.leadCardPrimary { background: var(--chat-action); color: var(--chat-action-text); }
+.leadCardWhatsapp { background: #1fa855; color: #fff; }

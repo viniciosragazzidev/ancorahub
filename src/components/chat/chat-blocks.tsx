@@ -7,7 +7,8 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { NoticeCardBody, noticeLink, noticeRowClass } from "@/components/notifications/notice-card";
 
 import styles from "./chat.module.css";
-import type { ChatBlock, ChatChoice, ChatListItem } from "./types";
+import type { ChatBlock, ChatChoice, ChatLeadRow, ChatListItem } from "./types";
+import { LiveBlockView } from "./live-blocks";
 
 const LETTERS = "ABCDEFGHIJ";
 const enter = { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
@@ -173,9 +174,13 @@ function SwipeRow({ item, disabled, onSwipe, children }: { item: ChatListItem & 
   );
 }
 
-export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe, swipeDisabled }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void; onItemSwipe?: (item: ChatListItem) => void; swipeDisabled?: boolean }) {
+export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe, swipeDisabled, onLeadOpen }: { block: Exclude<ChatBlock, { type: "question" }>; onSystemAction?: (block: Extract<ChatBlock, { type: "system" }>) => void; onButtonOpen?: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void; onItemSwipe?: (item: ChatListItem) => void; swipeDisabled?: boolean; onLeadOpen?: (row: ChatLeadRow) => void }) {
   const reduce = useReducedMotion();
   switch (block.type) {
+    case "leads":
+    case "stats":
+    case "leadcard":
+      return <LiveBlockView block={block} onLeadOpen={onLeadOpen} />;
     case "button": {
       const external = /^https?:/.test(block.href);
       return (

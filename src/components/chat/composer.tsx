@@ -1,14 +1,24 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import styles from "./chat.module.css";
+import { fetchMentionMenu } from "./mention-client";
 import type { ChatProgress } from "./types";
 import { AssistantAvatar } from "./assistant-avatar";
 import type { MascotShape } from "./types";
 
-export type Mention = { handle: string; label: string; note: string };
+export type Mention = {
+  handle: string; label: string; note: string;
+  /** Section of the @ menu: shortcuts bring live blocks, leads open the quick card, assistants open the conversation. */
+  group?: "atalhos" | "leads" | "assistentes";
+  /** Live count shown at the end of a shortcut (e.g. 3 waiting). */
+  count?: number;
+  tone?: "info" | "success" | "warning" | "danger" | "neutral";
+  /** Leads: initials instead of the @ mark. */
+  initials?: string;
+};
 
 /** The @ commands of the broker chat; each opens a card with that data. */
 export const BROKER_MENTIONS: Mention[] = [
@@ -21,6 +31,28 @@ export const BROKER_MENTIONS: Mention[] = [
 
 function Icon({ d }: { d: string }) {
   return <svg viewBox="0 0 16 16" aria-hidden="true"><path d={d} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
+const SECTION_LABEL = { atalhos: "Atalhos", leads: "Leads", assistentes: "Assistentes" } as const;
+
+/** Accent- and case-insensitive match for the @ search. */
+function fold(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+const SHORTCUT_ICON: Record<string, string> = {
+  "block:precisa": "M8 2.5a4 4 0 0 0-4 4v2.2L2.8 11h10.4L12 8.7V6.5a4 4 0 0 0-4-4ZM6.5 13a1.5 1.5 0 0 0 3 0",
+  "block:responderam": "M3 4.5h10v6H8l-3 2.5v-2.5H3z",
+  "block:retornos": "M4 2.5v2M12 2.5v2M2.8 6.5h10.4M3.5 4h9a.7.7 0 0 1 .7.7v8.1a.7.7 0 0 1-.7.7h-9a.7.7 0 0 1-.7-.7V4.7a.7.7 0 0 1 .7-.7Z",
+  "block:meu-dia": "M3 13V9M6.3 13V6M9.6 13V8M13 13V3.5",
+};
+
+function ShortcutIcon({ handle }: { handle: string }) {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+      <path d={SHORTCUT_ICON[handle] ?? SHORTCUT_ICON["block:precisa"]} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 /**
@@ -60,12 +92,33 @@ export function Composer({
   const [text, setText] = useState("");
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const query = /(^|\s)@(\w*)$/.exec(text)?.[2] ?? null;
-  const matches = useMemo(() => (query === null ? [] : mentions.filter((item) => item.handle.startsWith(query.toLowerCase()))), [mentions, query]);
-  const menuOpen = matches.length > 0;
+  const menuId = useId();
+  const query = /(^|\s)@([\p{L}\w]*)$/u.exec(text)?.[2] ?? null;
+  // Live shortcuts and leads, loaded the first time the @ menu opens (assistants stay local).
+  const [live, setLive] = useState<Mention[] | null>(null);
+  const menuWanted = query !== null;
+  useEffect(() => {
+    if (!menuWanted) return;
+    // Refreshes on every open (the client caches for 30s); the last menu stays on screen meanwhile.
+    let alive = true;
+    void fetchMentionMenu().then((menu) => { if (alive) setLive(menu); });
+    return () => { alive = false; };
+  }, [menuWanted]);
+  const matches = useMemo(() => {
+    if (query === null) return [];
+    const q = fold(query);
+    const all = [...(live ?? []), ...mentions.map((item) => ({ ...item, group: item.group ?? ("assistentes" as const) }))];
+    const found = all.filter((item) => !q || fold(`${item.handle} ${item.label} ${item.note}`).includes(q));
+    // With nothing typed: every shortcut, the first leads and the assistants.
+    if (!q) return [...found.filter((i) => i.group === "atalhos"), ...found.filter((i) => i.group === "leads").slice(0, 4), ...found.filter((i) => i.group === "assistentes")];
+    return found.slice(0, 10);
+  }, [live, mentions, query]);
+  const loadingLive = query !== null && live === null;
+  const menuOpen = matches.length > 0 || loadingLive;
 
-  function pick(mention: Mention) {
-    setText((current) => current.replace(/@\w*$/, ""));
+  function pick(mention: Mention | undefined) {
+    if (!mention) return;
+    setText((current) => current.replace(/@[\p{L}\w]*$/u, ""));
     onMention?.(mention);
     inputRef.current?.focus();
   }
@@ -84,6 +137,7 @@ export function Composer({
           {menuOpen ? (
             <motion.ul
               className={styles.mentionMenu}
+              id={menuId}
               role="listbox"
               aria-label="Comandos"
               initial={reduce ? false : { opacity: 0, y: 6 }}
@@ -91,14 +145,38 @@ export function Composer({
               exit={reduce ? undefined : { opacity: 0, y: 4, transition: { duration: 0.12 } }}
               transition={{ duration: 0.16, ease: [0.16, 1, 0.3, 1] }}
             >
-              {matches.map((item, index) => (
-                <li key={item.handle}>
-                  <button type="button" role="option" aria-selected={index === active} data-active={index === active} className={styles.mentionItem} onMouseDown={(event) => { event.preventDefault(); pick(item); }}>
-                    <span className={styles.mentionHandle}>{item.label}</span>
-                    <span className={styles.mentionNote}>{item.note}</span>
-                  </button>
-                </li>
-              ))}
+              {loadingLive ? <li role="presentation" className={styles.mentionLoading} aria-live="polite"><span className={styles.shimmerText}>Buscando seus leads…</span></li> : null}
+              {matches.map((item, index) => {
+                const section = item.group ?? "assistentes";
+                const first = index === 0 || (matches[index - 1].group ?? "assistentes") !== section;
+                return (
+                  <li key={item.handle} role="presentation">
+                    {first ? <span className={styles.mentionSection} aria-hidden="true">{SECTION_LABEL[section]}</span> : null}
+                    <motion.button
+                      type="button"
+                      id={`${menuId}-${index}`}
+                      role="option"
+                      aria-selected={index === active}
+                      data-active={index === active}
+                      data-group={section}
+                      className={styles.mentionItem}
+                      initial={reduce ? false : { opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.18, delay: reduce ? 0 : Math.min(index, 8) * 0.025, ease: [0.165, 0.84, 0.44, 1] }}
+                      onMouseDown={(event) => { event.preventDefault(); pick(item); }}
+                    >
+                      <span className={styles.mentionMark} data-group={section} aria-hidden="true">
+                        {section === "leads" ? (item.initials ?? "?") : section === "atalhos" ? <ShortcutIcon handle={item.handle} /> : "@"}
+                      </span>
+                      <span className={styles.mentionText}>
+                        <span className={styles.mentionHandle}>{section === "assistentes" ? item.label : item.label.replace(/^@/, "")}</span>
+                        <span className={styles.mentionNote}>{item.note}</span>
+                      </span>
+                      {typeof item.count === "number" ? <span className={styles.mentionCount} data-tone={item.count > 0 ? item.tone ?? "info" : "neutral"}>{item.count}</span> : null}
+                    </motion.button>
+                  </li>
+                );
+              })}
             </motion.ul>
           ) : null}
         </AnimatePresence>
@@ -119,6 +197,11 @@ export function Composer({
             value={text}
             placeholder={placeholder}
             aria-label={inputLabel ?? placeholder}
+            role="combobox"
+            aria-expanded={menuOpen}
+            aria-controls={menuOpen ? menuId : undefined}
+            aria-autocomplete="list"
+            aria-activedescendant={menuOpen && matches[active] ? `${menuId}-${active}` : undefined}
             inputMode={inputMode}
             disabled={disabled}
             onChange={(event) => {
@@ -128,7 +211,7 @@ export function Composer({
               event.target.style.height = `${Math.min(140, event.target.scrollHeight)}px`;
             }}
             onKeyDown={(event) => {
-              if (menuOpen && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+              if (matches.length > 0 && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
                 event.preventDefault();
                 setActive((current) => (current + (event.key === "ArrowDown" ? 1 : matches.length - 1)) % matches.length);
               } else if (event.key === "Enter" && !event.shiftKey) {
@@ -136,7 +219,7 @@ export function Composer({
                 if (menuOpen) pick(matches[active]);
                 else submit();
               } else if (event.key === "Escape" && menuOpen) {
-                setText((current) => current.replace(/@\w*$/, ""));
+                setText((current) => current.replace(/@[\p{L}\w]*$/u, ""));
               }
             }}
           />

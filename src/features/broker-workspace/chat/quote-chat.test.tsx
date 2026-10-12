@@ -15,7 +15,7 @@ configure({ asyncUtilTimeout: 4000 });
 afterEach(() => cleanup());
 
 function send(text: string) {
-  const box = screen.getByRole("textbox");
+  const box = screen.getByRole("combobox");
   fireEvent.change(box, { target: { value: text } });
   fireEvent.keyDown(box, { key: "Enter" });
 }

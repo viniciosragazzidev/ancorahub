@@ -69,12 +69,23 @@ export type ChatBlock =
   | { type: "list"; id: string; title: string; subtitle?: string; items: ChatListItem[]; emptyText?: string }
   | { type: "bars"; id: string; title: string; subtitle?: string; values: Array<{ label: string; value: number; highlight?: boolean }>; format?: "count" | "currency" }
   | { type: "steps"; id: string; title: string; steps: Array<{ id: string; text: string; done: boolean }> }
+  /** A live list of leads brought by "@" (one tap on a row opens the lead's quick card). */
+  | { type: "leads"; id: string; title: string; icon: ChatBlockIcon; rows: ChatLeadRow[]; emptyText: string; updatedAt: string }
+  /** The broker's numbers of the day ("@Meu dia"): tiles count up, the goal bar fills. */
+  | { type: "stats"; id: string; title: string; icon: ChatBlockIcon; tiles: Array<{ label: string; value: number; tone?: ChatTone }>; goal?: { name: string; percentage: number; current: string; target: string } | null; updatedAt: string }
+  /** The lead's quick card: what needs attention, the essentials, and one-tap actions. */
+  | { type: "leadcard"; id: string; leadId: string; name: string; initials: string; stage: string; alert?: { tone: ChatTone; text: string } | null; rows: Array<{ label: string; value: string }>; whatsappHref?: string | null; href: string; fichaHref: string; updatedAt: string }
   | { type: "question"; id: string; prompt: string; choices: ChatChoice[] }
   /** A real link as a button (WhatsApp): opened by the tap itself, so phones never block it. */
   | { type: "button"; id: string; text?: string; label: string; href: string; tone?: "whatsapp" | "action" };
 
 /** A guided flow ("Combinando a função · 0 de 5"). */
 export type ChatProgress = { title: string; done: number; total: number };
+
+export type ChatTone = "info" | "success" | "warning" | "danger" | "neutral";
+export type ChatBlockIcon = "leads" | "reply" | "agenda" | "day";
+/** One lead in a live list block. */
+export type ChatLeadRow = { leadId: string; name: string; initials: string; context: string; time?: string; chip?: { label: string; tone: ChatTone } };
 
 export type ChatScript = {
   blocks: ChatBlock[];

@@ -9,7 +9,8 @@ import { AssistantAvatar } from "./assistant-avatar";
 import { ChatBlockView, ChoiceList, MessageEnter, TypingIndicator } from "./chat-blocks";
 import { Composer, type Mention } from "./composer";
 import styles from "./chat.module.css";
-import type { ChatAction, ChatBlock, ChatChoice, ChatProgress, ChatScript, MascotShape, ChatListItem } from "./types";
+import type { ChatAction, ChatBlock, ChatChoice, ChatLeadRow, ChatProgress, ChatScript, MascotShape, ChatListItem } from "./types";
+import { fetchMentionBlocks, isDataMention } from "./mention-client";
 
 /** Result of a server action run from a reply. A message is shown as the assistant's answer. */
 export type ChatActionResult = { ok: boolean; message?: string; followUp?: ChatBlock[]; warning?: boolean };
@@ -93,6 +94,7 @@ export function ChatScreen({
   const firstScroll = useRef(true);
   const [typing, setTyping] = useState(false);
   const [working, setWorking] = useState(false);
+  const [workingLabel, setWorkingLabel] = useState<string | null>(null);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [status, setStatus] = useState(script.status ?? null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -228,13 +230,34 @@ export function ChatScreen({
     });
   }, [choose, script.blocks, working]);
 
+  // "@": shortcuts and leads come back as live blocks in this conversation; the rest is up to the screen.
+  const mention = useCallback(async (picked: Mention) => {
+    if (!isDataMention(picked.handle)) {
+      if (onMention) enqueue(await onMention(picked));
+      return;
+    }
+    if (working) return;
+    setShown((current) => [...current, { type: "user", id: `mention-${Date.now()}`, text: picked.label.startsWith("@") ? picked.label : `@${picked.label}`, at: nowLabel() }]);
+    setWorking(true);
+    setWorkingLabel(picked.handle.startsWith("lead:") ? "Buscando a ficha…" : "Buscando…");
+    setStatus({ label: "Trabalhando...", tone: "working" });
+    try {
+      enqueue(await fetchMentionBlocks(picked.handle));
+      setStatus({ label: "Pronto", tone: "idle" });
+    } finally {
+      setWorking(false);
+      setWorkingLabel(null);
+    }
+  }, [enqueue, onMention, working]);
+
   // Rows are memoized: they get stable handlers that always call the latest ones.
-  const latest = useRef({ choose, swipeItem, onButtonOpen });
-  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen }; });
+  const latest = useRef({ choose, swipeItem, onButtonOpen, mention });
+  useEffect(() => { latest.current = { choose, swipeItem, onButtonOpen, mention }; });
   const rowHandlers = useMemo<RowHandlers>(() => ({
     choose: (question, choice) => { void latest.current.choose(question, choice); },
     swipe: (item) => latest.current.swipeItem(item),
     buttonOpen: (block, event) => latest.current.onButtonOpen?.(block, event),
+    lead: (row) => { void latest.current.mention({ handle: `lead:${row.leadId}`, label: `@${row.name}`, note: "", group: "leads" }); },
   }), []);
 
   const answeredCount = Object.keys(answers).length;
@@ -273,7 +296,14 @@ export function ChatScreen({
             <BlockRow key={block.id} block={block} chosenId={block.type === "question" ? answers[block.id] ?? null : null} working={working} handlers={rowHandlers} />
           ))}
           <AnimatePresence>{typing ? <MessageEnter key="typing"><TypingIndicator /></MessageEnter> : null}</AnimatePresence>
-          {working ? <MessageEnter key="working"><AssistantAvatar shape={identity.shape} hue={identity.hue} size={40} state="working" /></MessageEnter> : null}
+          {working ? (
+            <MessageEnter key="working">
+              <div className={styles.workingRow}>
+                <AssistantAvatar shape={identity.shape} hue={identity.hue} size={40} state="working" />
+                {workingLabel ? <span className={styles.shimmerText} role="status">{workingLabel}</span> : null}
+              </div>
+            </MessageEnter>
+          ) : null}
         </div>
       </div>
 
@@ -292,7 +322,7 @@ export function ChatScreen({
           setWorking(true);
           try { enqueue(await onFreeText(text)); } finally { setWorking(false); }
         }}
-        onMention={onMention ? async (mention) => { enqueue(await onMention(mention)); } : undefined}
+        onMention={mention}
       />
     </div>
   );
@@ -302,6 +332,7 @@ type RowHandlers = {
   choose: (question: Extract<ChatBlock, { type: "question" }>, choice: ChatChoice) => void;
   swipe: (item: ChatListItem) => void;
   buttonOpen: (block: Extract<ChatBlock, { type: "button" }>, event: React.MouseEvent<HTMLAnchorElement>) => void;
+  lead: (row: ChatLeadRow) => void;
 };
 
 /** Blocks from the server are plain data: equal JSON means nothing to redraw. */
@@ -315,7 +346,7 @@ const BlockRow = memo(function BlockRow({ block, chosenId, working, handlers }: 
     <MessageEnter>
       {block.type === "question"
         ? <ChoiceList block={block} chosenId={chosenId} disabled={working} onChoose={(choice) => handlers.choose(block, choice)} />
-        : <ChatBlockView block={block} onButtonOpen={handlers.buttonOpen} onItemSwipe={handlers.swipe} swipeDisabled={working} onSystemAction={(system) => { if (system.action) handlers.choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
+        : <ChatBlockView block={block} onButtonOpen={handlers.buttonOpen} onItemSwipe={handlers.swipe} swipeDisabled={working} onLeadOpen={handlers.lead} onSystemAction={(system) => { if (system.action) handlers.choose({ type: "question", id: `sys-${system.id}`, prompt: "", choices: [] }, { id: system.id, label: system.action.label, action: system.action.choiceAction }); }} />}
     </MessageEnter>
   );
 });
