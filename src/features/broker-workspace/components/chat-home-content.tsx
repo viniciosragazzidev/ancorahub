@@ -37,7 +37,7 @@ function presenceNext(data: BrokerWorkspaceData): HomeSummary["next"] {
   if (presence?.status !== "pending") return null;
   return {
     label: presence.mode === "presencial" ? "Tirar a foto do plantão" : "Confirmar presença",
-    detail: presence.mode === "presencial" ? `O ${presence.scheduleName} é presencial: a foto do local libera seus leads.` : `Confirme o ${presence.scheduleName} para começar a receber leads.`,
+    detail: presence.mode === "presencial" ? `O ${presence.scheduleName} é presencial: esteja na unidade e tire a foto do local para liberar seus leads.` : `Confirme o ${presence.scheduleName} para começar a receber leads.`,
     href: "/dashboard/c/plantao",
     urgent: true,
   };

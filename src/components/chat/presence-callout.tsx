@@ -107,7 +107,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
             {done
               ? "Pronto. Você já pode receber leads deste plantão."
               : presencial
-                ? `${ask.scheduleName}${ask.branchName ? ` · ${ask.branchName}` : ""}. Este plantão é presencial: tire uma foto do local para mostrar que você está lá.`
+                ? `${ask.scheduleName}${ask.branchName ? ` · ${ask.branchName}` : ""}. Plantão presencial: você precisa estar na unidade durante todo o plantão. Já na unidade, tire uma foto do local para confirmar.`
                 : `${ask.scheduleName}. Um toque e você começa a receber leads.`}
           </span>
         </span>

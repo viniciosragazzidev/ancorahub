@@ -38,7 +38,7 @@ describe("PresenceCallout", () => {
   it("presencial: says it is in person, opens the camera and sends the photo", async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
     const { container } = render(<PresenceCallout ask={{ ...base, mode: "presencial" }} />);
-    expect(screen.getByText(/Este plantão é presencial: tire uma foto do local/)).toBeTruthy();
+    expect(screen.getByText(/você precisa estar na unidade durante todo o plantão/)).toBeTruthy();
     const input = container.querySelector('input[type="file"]') as HTMLInputElement;
     expect(input.getAttribute("capture")).toBe("environment");
     const click = vi.spyOn(input, "click");

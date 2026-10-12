@@ -464,7 +464,10 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       // Same prerequisites the distribution engine applies before offering a lead.
       const blockedReason = presence?.status === "absent" ? "Falta registrada neste plantão" : !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : schedule.attendanceMode === "presencial" && (!presence || presence.status !== "confirmed" || !presence.confirmedBy) ? "Aguardando presença na unidade" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
       const absent = presence?.status === "absent";
-      const onSitePending = schedule.attendanceMode === "presencial" && Boolean(occurrence && occurrence.startsAt <= new Date(now.getTime() + 30 * 60_000)) && (!presence || presence.status !== "confirmed" || !presence.confirmedBy);
+      // Presencial starts paused (2026-10-12): paused until the photo of the place (or the manager) releases the broker.
+      const onSitePending = schedule.attendanceMode === "presencial" && Boolean(occurrence) && (!presence || presence.status !== "confirmed" || !presence.confirmedBy);
+      // The manager can release from 30 minutes before the start (same window as the broker's own confirmation).
+      const onSiteReleaseOpen = onSitePending && Boolean(occurrence && occurrence.startsAt <= new Date(now.getTime() + 30 * 60_000));
       const liveStatus = combineLiveStatusAcrossQueues((statusQueues.length ? statusQueues : [null]).map((queue) => classifyBrokerLiveOfferStatus({
         paused: Boolean(entry.pausedAt) || onSitePending,
         blockedReason,
@@ -489,6 +492,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       blockedReason,
       absent,
       onSitePending,
+      onSiteReleaseOpen,
       presenceStatus: absent ? "absent" as const : !occurrence || (!presenceEnabled && schedule.attendanceMode !== "presencial") ? "not_requested" as const : presence?.status === "confirmed" && !onSitePending ? "confirmed" as const : "pending" as const,
       confirmedAt: presence?.confirmedAt ?? null,
       /** Released by a director/manager (not the broker's own click). */

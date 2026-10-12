@@ -18,7 +18,7 @@ type LeadResult = Extract<Awaited<ReturnType<typeof getBrokerOccurrenceLeadsActi
 type AvailableResult = Extract<Awaited<ReturnType<typeof getDutyAvailableLeadsAction>>, { ok: true }>;
 type Tab = "received" | "available";
 
-export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null }: {
+export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending }: {
   children: ReactNode;
   scheduleId: string;
   assignmentId: string;
@@ -31,6 +31,8 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
   absent: boolean;
   attendanceMode: string;
   onSitePending: boolean;
+  /** Presencial: the manager's "release" opens 30 min before the start (before that the broker just shows paused). */
+  onSiteReleaseOpen?: boolean;
   /** The broker's own unit. */
   branchName?: string | null;
   /** Management actions enabled: the "Leads disponíveis" tab can assign. */
@@ -139,7 +141,7 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
         {offers ? `${offers.offered} ${offers.offered === 1 ? "oferta enviada" : "ofertas enviadas"} / ${offers.accepted} ${offers.accepted === 1 ? "aceita" : "aceitas"}` : "Ofertas…"}
       </Badge>
     </div>} footer={<div className="flex flex-wrap justify-end gap-2">
-      {attendanceMode === "presencial" && onSitePending && !absent ? <BrokerPresenceReleaseButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} inUnit /> : null}
+      {attendanceMode === "presencial" && onSitePending && onSiteReleaseOpen && !absent ? <BrokerPresenceReleaseButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} inUnit /> : null}
       <Button type="button" size="sm" variant={absent ? "outline" : "destructive"} disabled={saving} onClick={changeAbsence}>{absent ? "Desfazer falta" : "Marcar falta"}</Button>
     </div>}>
       <section className="space-y-1 text-sm">
@@ -147,6 +149,20 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
         <p><span className="text-muted-foreground">Confirmação:</span> {confirmedAt ? dateTime.format(new Date(confirmedAt)) : "Ainda não confirmada"}</p>
         <BrokerDayHistoryTrigger scheduleId={scheduleId} brokerId={brokerId} brokerName={brokerName} />
       </section>
+      {presencePhotoId ? (
+        <section className="space-y-2" aria-label="Foto do local">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-medium">Foto do local</p>
+            <p className="text-xs text-muted-foreground">{confirmedAt ? `Tirada em ${dateTime.format(new Date(confirmedAt))}` : null}</p>
+          </div>
+          {/* Opened only when the drawer is open: the manager checks the broker is really at the unit. */}
+          <a href={`/api/duty/presence/photo?id=${presencePhotoId}`} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-xl border border-border bg-muted/40" aria-label="Abrir a foto do local em tamanho grande">
+            {/* eslint-disable-next-line @next/next/no-img-element -- private, auth-checked photo route */}
+            <img src={`/api/duty/presence/photo?id=${presencePhotoId}`} alt={`Foto do local tirada por ${brokerName}`} loading="lazy" className="max-h-80 w-full object-contain" />
+          </a>
+          <p className="text-xs text-muted-foreground">Se a foto não for da unidade, use &ldquo;Marcar falta&rdquo;.</p>
+        </section>
+      ) : attendanceMode === "presencial" && !absent ? <p className="text-xs text-muted-foreground">Plantão presencial: a foto do local aparece aqui quando o corretor confirmar.</p> : null}
       <div role="tablist" aria-label="Leads do corretor" className="grid grid-cols-2 rounded-[var(--radius-card)] border border-border bg-muted/40 p-0.5">
         {([["received", "Leads recebidos", leads?.length], ["available", "Leads disponíveis", available?.length]] as const).map(([value, label, count]) => (
           <button key={value} type="button" role="tab" aria-selected={tab === value} onClick={() => chooseTab(value)}

@@ -410,7 +410,7 @@ function dutyScript(data: BrokerWorkspaceData): ChatScript {
   if (ask?.status === "pending") {
     const blocks: ChatBlock[] = active ? [dutyFacts(active)] : [];
     blocks.push(assistantMessage(`duty-presence-hint-${ask.assignmentId}`, ask.mode === "presencial"
-      ? "Seu plantão é presencial. Para começar a receber leads, tire uma foto do local aqui embaixo."
+      ? "Seu plantão é presencial: você precisa estar na unidade, presencialmente, durante todo o plantão. Quando chegar, tire uma foto do local aqui embaixo para começar a receber leads."
       : "Confirme sua presença para começar a receber leads."));
     blocks.push({ type: "presence", id: `duty-presence-${ask.assignmentId}`, ask });
     return { blocks, status: { label: "Esperando você", tone: "waiting" } };

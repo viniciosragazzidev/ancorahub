@@ -144,7 +144,8 @@ export async function processDutyPresenceReminders(now = new Date()) {
   let failed = 0;
   for (const assignment of assignments) {
     const schedule = scheduleById.get(assignment.scheduleId);
-    if (!schedule || schedule.tenantId !== assignment.tenantId || schedule.attendanceMode === "presencial") continue;
+    // Presencial also gets the WhatsApp reminder (2026-10-12): its link opens the app, where the photo of the place confirms.
+    if (!schedule || schedule.tenantId !== assignment.tenantId) continue;
     const window = getWindow({
       id: schedule.id, dayOfWeek: assignment.dayOfWeek, startsAt: assignment.startsAt,
       endsAt: assignment.endsAt, timezone: schedule.timezone,
