@@ -202,7 +202,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
         journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
-        welcomeVideoEnabled={isLightBroker && welcomeVideoFlag === "true" && context.tenantId === process.env.WELCOME_VIDEO_TENANT_ID}
+        welcomeVideoEnabled={isLightBroker && welcomeVideoFlag === "true" && (process.env.WELCOME_VIDEO_TENANT_ID ?? "").split(",").map((id) => id.trim()).filter(Boolean).includes(context.tenantId)}
         teamRankingEnabled={isLightSupervisor && teamRankingFlag === "true"}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         showRelationship={(isLightBroker || isLightSupervisor) && relationshipFlag === "true"}

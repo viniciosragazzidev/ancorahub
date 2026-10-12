@@ -1,6 +1,6 @@
 # Vídeo de boas-vindas do corretor: créditos e licenças
 
-Arquivos no app: `public/onboarding/video/boas-vindas-celular.mp4`, `boas-vindas-computador.mp4` e os pôsteres. Mostrado no primeiro acesso do corretor ao Lite quando a flag `feature_welcome_video_enabled` está ligada (Super-admin) **e** a empresa do corretor é a da variável `WELCOME_VIDEO_TENANT_ID` (Coolify, em tempo de execução). Sem a variável, o vídeo não aparece para ninguém. A restrição garante o uso interno só na Âncora (ver a licença abaixo).
+Arquivos no app: `public/onboarding/video/boas-vindas-celular.mp4`, `boas-vindas-computador.mp4` e os pôsteres. Mostrado no primeiro acesso do corretor ao Lite quando a flag `feature_welcome_video_enabled` está ligada (Super-admin) **e** a empresa do corretor está na variável `WELCOME_VIDEO_TENANT_ID` (um ou mais ids separados por vírgula) (Coolify, em tempo de execução). Sem a variável, o vídeo não aparece para ninguém. A restrição garante o uso interno só na Âncora (ver a licença abaixo).
 
 | Parte | Origem | Licença / condição |
 |---|---|---|
