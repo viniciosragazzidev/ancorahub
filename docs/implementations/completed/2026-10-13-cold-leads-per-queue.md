@@ -19,3 +19,9 @@ Quando `holdColdLeads` estiver ligado na política da fila, a distribuição aut
 - `npx tsc --noEmit`: passou.
 - ESLint dos arquivos TypeScript alterados: sem erros; um aviso preexistente `no-explicit-any` em `src/app/(dashboard)/leads/distribuicao/page.tsx:554`.
 - `git diff --check`: passou. Suíte completa, `agent:verify` e build não executados conforme solicitado.
+
+## Ajustes T121b
+
+- A execução opt-in original usou a URL de produção presente em `.env.local`, com rollback da transação. O teste agora exige `COLD_LEAD_HOLD_DB_URL`, bloqueia a referência do projeto de produção e cria usuário, tenant e membership de teste dentro da transação. Não foi reexecutado após essa correção.
+- Simulação lê `holdColdLeads` da política da fila mesmo quando desabilitada e aplica `enabled = true` aos demais filtros. No fluxo real, a retenção fria continua independente do estado enabled, enquanto as outras opções permanecem pausadas junto com a política.
+- `audit_logs.acao` permanece exatamente `queue.updated`; quando `holdColdLeads` muda, o de/para estruturado é gravado em `platform_audit_logs.metadata` junto ao `tenantId` e à fila, sem migration.

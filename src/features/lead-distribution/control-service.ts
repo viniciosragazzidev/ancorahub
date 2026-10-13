@@ -367,10 +367,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
       .where(and(eq(schema.leadQueues.id, queueId), eq(schema.leadQueues.tenantId, context.tenantId))).limit(1);
     if (!queue) throw new AuthorizationError("Fila não encontrada no seu escopo.");
     await db.update(schema.leadQueues).set(values).where(eq(schema.leadQueues.id, queue.id));
-    const auditAction = previousHoldColdLeads === input.holdColdLeads
-      ? "queue.updated"
-      : `queue.updated: holdColdLeads ${previousHoldColdLeads} -> ${input.holdColdLeads}`;
-    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queue.id, acao: auditAction });
+    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead_queue", entidadeId: queue.id, acao: "queue.updated" });
     // Destination went from "none" to distributing: the leads that were
     // waiting in the queue are distributed now, not at the next retry.
     if (queue.assignmentMode !== "automatic" && input.assignmentMode === "automatic" && input.status === "active") {
@@ -425,6 +422,19 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
       updatedBy: context.userId,
       createdAt: now,
       updatedAt: now,
+    });
+  }
+  if (input.id && previousHoldColdLeads !== input.holdColdLeads) {
+    await db.insert(schema.platformAuditLogs).values({
+      id: randomUUID(),
+      actorUserId: context.userId,
+      action: "queue.updated",
+      targetType: "lead_queue",
+      targetId: input.id,
+      metadata: {
+        tenantId: context.tenantId,
+        changes: { holdColdLeads: { from: previousHoldColdLeads, to: input.holdColdLeads } },
+      },
     });
   }
 
@@ -656,11 +666,19 @@ export async function simulateDistribution(context: TenantContext, rawInput: unk
   const effectiveQueue = queue ?? fallbackQueue[0];
   if (!effectiveQueue || effectiveQueue.status !== "active") return { queue: null, eligible: [], selected: null, reason: "Não existe uma fila ativa para esta unidade." };
 
-  const [policyRow] = await db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
-    .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), eq(schema.leadDistributionPolicies.queueId, effectiveQueue.id), isNull(schema.leadDistributionPolicies.profileKey))).limit(1);
-
+  const queuePolicyScope = and(
+    eq(schema.leadDistributionPolicies.tenantId, context.tenantId),
+    eq(schema.leadDistributionPolicies.queueId, effectiveQueue.id),
+    isNull(schema.leadDistributionPolicies.profileKey),
+  );
+  const [[policyRow], [queueHoldRow]] = await Promise.all([
+    db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
+      .where(and(queuePolicyScope, eq(schema.leadDistributionPolicies.enabled, true))).limit(1),
+    db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies)
+      .where(queuePolicyScope).limit(1),
+  ]);
   const policy = readPolicy(policyRow?.policy);
-  if (input.temperature === "cold" && policy.holdColdLeads) {
+  if (input.temperature === "cold" && readPolicy(queueHoldRow?.policy).holdColdLeads) {
     return { queue: effectiveQueue, eligible: [], selected: null, reason: "Lead frio fica na fila, sem corretor, para distribuição manual." };
   }
   const activeDutyRoster = await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: effectiveQueue.id, webhookCredentialId: null });

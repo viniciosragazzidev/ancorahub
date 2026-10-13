@@ -704,6 +704,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // DDD, no identifiable DDD — may send the lead to a configured queue before
   // any offer. Idempotent: once in that queue the lead is not moved again.
   const sourceQueueId = lead.queueId;
+  // Queue-level holdColdLeads stays active when the rest of distribution policy is paused.
   if (sourceQueueId && shouldHoldColdLead(lead.qualificationStatus, (await loadDistributionPolicy(context.tenantId, sourceQueueId, null)).value.holdColdLeads)) {
     return { status: "queued", leadId, reason: COLD_HELD_BY_QUEUE_REASON };
   }

@@ -1,13 +1,13 @@
 /**
  * Exercises processQueuedLead against the real schema in a transaction that is
  * rolled back. Opt-in only:
- * RUN_COLD_LEAD_HOLD_DB_E2E=1 npx vitest run src/features/lead-distribution/cold-lead-hold.db.test.ts
+ * RUN_COLD_LEAD_HOLD_DB_E2E=1 and COLD_LEAD_HOLD_DB_URL=<isolated-test-db-url>
+ * npx vitest run src/features/lead-distribution/cold-lead-hold.db.test.ts
  */
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
 import { afterAll, describe, expect, it, vi } from "vitest";
 
 import * as realSchema from "@/shared/db/schema";
@@ -19,13 +19,28 @@ vi.mock("@/shared/db", () => ({ schema: realSchema, getDatabase: () => state.tx 
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: async () => null }));
 
 const enabled = process.env.RUN_COLD_LEAD_HOLD_DB_E2E === "1";
-function readLocalEnv(name: string) {
-  if (!existsSync(".env.local")) return "";
-  const line = readFileSync(".env.local", "utf8").split(String.fromCharCode(10)).map((entry) => entry.trim()).find((entry) => entry.startsWith(`${name}=`));
-  return line ? line.slice(name.length + 1).trim().replace(/^['"]|['"]$/g, "") : "";
+function getOptInDatabaseUrl() {
+  if (!enabled) return null;
+  const candidate = process.env.COLD_LEAD_HOLD_DB_URL?.trim();
+  if (!candidate) throw new Error("RUN_COLD_LEAD_HOLD_DB_E2E exige uma URL isolada em COLD_LEAD_HOLD_DB_URL.");
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error("COLD_LEAD_HOLD_DB_URL precisa ser uma URL PostgreSQL válida.");
+  }
+  if (!["postgres:", "postgresql:"].includes(parsed.protocol)) {
+    throw new Error("COLD_LEAD_HOLD_DB_URL precisa usar o protocolo PostgreSQL.");
+  }
+  const productionProjectRef = "vyxqfyfeocbhrffenlqr";
+  const target = `${parsed.hostname} ${parsed.username} ${parsed.pathname}`.toLowerCase();
+  if (target.includes(productionProjectRef)) {
+    throw new Error("Teste bloqueado: COLD_LEAD_HOLD_DB_URL aponta para o projeto de produção.");
+  }
+  return candidate;
 }
-const url = enabled ? (readLocalEnv("SUPABASE_DB_URL") || readLocalEnv("DATABASE_URL")) : "";
-const client = enabled && url ? postgres(url, { prepare: false, max: 1 }) : null;
+const url = getOptInDatabaseUrl();
+const client = url ? postgres(url, { prepare: false, max: 1 }) : null;
 const db = client ? drizzle(client, { schema: realSchema }) : null;
 afterAll(async () => { await client?.end({ timeout: 5 }); });
 
@@ -34,10 +49,14 @@ describe.skipIf(!enabled || !db)("processQueuedLead: retenção fria por fila (r
     await db!.transaction(async (tx) => {
       state.tx = tx;
       const s = realSchema;
-      const [director] = await tx.select({ tenantId: s.tenantMemberships.tenantId, userId: s.tenantMemberships.userId }).from(s.tenantMemberships)
-        .where(and(eq(s.tenantMemberships.role, "director"), eq(s.tenantMemberships.status, "active"))).limit(1);
-      expect(director).toBeTruthy();
-      const context: TenantContext = { userId: director!.userId, tenantId: director!.tenantId, role: "director", jobTitle: "director", branchId: null };
+      const tenantId = randomUUID();
+      const directorId = randomUUID();
+      await tx.insert(s.user).values({ id: directorId, name: "T121 DB test", email: `t121-db-${directorId}@example.test` });
+      await tx.insert(s.tenants).values({ id: tenantId, name: "Tenant isolado T121", slug: `t121-${tenantId}` });
+      await tx.insert(s.tenantMemberships).values({
+        id: randomUUID(), tenantId, userId: directorId, role: "director", jobTitle: "director", status: "active",
+      });
+      const context: TenantContext = { userId: directorId, tenantId, role: "director", jobTitle: "director", branchId: null };
       const targetQueueId = randomUUID();
       const heldQueueId = randomUUID();
       const openQueueId = randomUUID();
