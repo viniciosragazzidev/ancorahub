@@ -180,10 +180,10 @@ export const TOUR_STEPS: TourStep[] = [
     id: "08-insights",
     kind: "spotlight",
     target: "thread-insights",
-    title: "Insights: o que fazer na conversa",
+    title: "Dicas de Atendimento: o que fazer na conversa",
     body: "A IA lê suas conversas e te diz quem responder primeiro, o próximo passo e dicas práticas.",
     narration:
-      "Insights é o seu analista. A inteligência artificial lê as conversas com os clientes e te diz quem responder primeiro, qual é o próximo passo e dá dicas práticas, como tratar uma objeção ou quando propor o fechamento.",
+      "Dicas de Atendimento é o seu analista. A inteligência artificial lê as conversas com os clientes e te diz quem responder primeiro, qual é o próximo passo e dá dicas práticas, como tratar uma objeção ou quando propor o fechamento.",
     xp: 10,
     mascot: { shape: "salte", hue: 200 },
   },

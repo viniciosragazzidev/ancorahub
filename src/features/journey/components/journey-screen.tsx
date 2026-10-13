@@ -44,7 +44,8 @@ export function JourneyScreen({ data }: { data: JourneyScreenData }) {
   const reduce = useReducedMotionConfig();
   const rise = (index: number): Transition => (reduce ? { duration: 0 } : { duration: 0.45, ease: EASE, delay: 0.06 * index });
   const enter = reduce ? false : { opacity: 0, y: 10 };
-  const daily = data.missions.filter((mission) => mission.kind === "daily" || mission.kind === "campaign" || mission.kind === "team");
+  // Today's missions that apply to the broker (e.g. "Zerar retornos vencidos" only with a return due); done ones stay.
+  const daily = data.missions.filter((mission) => (mission.kind === "daily" || mission.kind === "campaign" || mission.kind === "team") && (mission.progress.eligible || mission.progress.completed));
   const weekly = data.missions.filter((mission) => mission.kind === "weekly");
 
   return (
@@ -68,7 +69,7 @@ export function JourneyScreen({ data }: { data: JourneyScreenData }) {
             <ul className={styles.missionList}>
               {daily.map((mission, index) => <MissionCard key={mission.id} mission={mission} index={index} />)}
             </ul>
-          ) : <p className={styles.quiet}>As missões aparecem quando o seu dia começa.</p>}
+          ) : <p className={styles.quiet}>Nenhuma missão para você hoje. Elas aparecem conforme seus leads e retornos chegam.</p>}
         </motion.section>
 
         {weekly.length ? (

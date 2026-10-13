@@ -139,7 +139,13 @@ export async function analyzeLeadConversation(
     openrouterKey: aiSettings.openrouterApiKey,
   };
 
+  // Paid models through OpenRouter first (decision of 2026-10-12): they do not train on the
+  // client's conversation (LGPD) and the free ones were retired. Then the Super-admin choice.
   const candidateModels: Array<{ provider: any; model: string }> = [
+    ...(keys.openrouterKey ? [
+      { provider: "openrouter", model: process.env.AI_OPENROUTER_MODEL || "anthropic/claude-haiku-5.5" },
+      { provider: "openrouter", model: process.env.AI_OPENROUTER_FALLBACK_MODEL || "openai/gpt-oss-120b" },
+    ] : []),
     { provider: aiSettings.primaryProvider, model: aiSettings.primaryModel },
   ];
 
@@ -148,9 +154,9 @@ export async function analyzeLeadConversation(
   }
 
   candidateModels.push(
-    { provider: "groq", model: "llama-3.3-70b-versatile" },
+    // 2026-10-12: llama-3.3-70b-versatile and gemini-2.0-flash were retired (HTTP 404).
     { provider: "openrouter", model: "meta-llama/llama-3.1-70b-instruct" },
-    { provider: "google", model: "gemini-2.0-flash" },
+    { provider: "groq", model: "openai/gpt-oss-120b" },
   );
 
   const seenCandidates = new Set<string>();

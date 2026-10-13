@@ -30,7 +30,7 @@ export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
   agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
   cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },
   desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/dashboard/c/desempenho" },
-  insights: { name: "Insights", shape: "salte", hue: 200, href: "/conversas/broker" },
+  insights: { name: "Dicas de Atendimento", shape: "salte", hue: 200, href: "/conversas/broker" },
   jornada: { name: "Jornada", shape: "favo", hue: 85, href: "/dashboard/c/jornada" },
   equipe: { name: "Equipe", shape: "mochi", hue: 150, href: "/dashboard/c/equipe" },
   "equipe-leads": { name: "Leads da equipe", shape: "cubo", hue: 212, href: "/dashboard/c/equipe-leads" },

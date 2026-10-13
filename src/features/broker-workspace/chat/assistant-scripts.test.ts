@@ -143,7 +143,7 @@ describe("broker chat assistant scripts", () => {
       agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
       cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },
       desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/dashboard/c/desempenho" },
-      insights: { name: "Insights", shape: "salte", hue: 200, href: "/conversas/broker" },
+      insights: { name: "Dicas de Atendimento", shape: "salte", hue: 200, href: "/conversas/broker" },
     });
   });
 

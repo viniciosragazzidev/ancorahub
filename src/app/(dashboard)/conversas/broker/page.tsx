@@ -1,5 +1,9 @@
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
+
+import { RefreshSoon } from "@/components/chat/refresh-soon";
+import { requestLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 
 import { LightConversationsView, type BrokerConversationInsight, type BrokerInsightMessage } from "@/features/broker-workspace/components/light-conversations-view";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
@@ -9,7 +13,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
-import { buildInsightThreads, buildInsightsScript, buildLeadInsightScript } from "@/features/broker-workspace/chat/insights-script";
+import { buildInsightThreads, buildInsightsScript, buildLeadInsightScript, isWaitingForBroker } from "@/features/broker-workspace/chat/insights-script";
 import { ThreadListScreen } from "@/components/chat/thread-list-screen";
 import { readLeadIntelligence as readIntelligence } from "@/features/broker-workspace/chat/intelligence";
 import { canRevealLightContact } from "@/features/broker-workspace/lead-contact-privacy";
@@ -87,27 +91,45 @@ export default async function BrokerConversationsPage({ searchParams }: { search
     .sort((a, b) => toTimestamp(b.latestMessage?.sentAt) - toTimestamp(a.latestMessage?.sentAt));
 
   const connection = connectionRows[0];
+  // On demand (2026-10-12): a lead conversation without an analysis, or with messages newer
+  // than it, is read now in the background (at most once per 15 min per lead).
+  const needsAnalysis = (item: (typeof insights)[number]) => item.kind === "lead"
+    && (!item.intelligence?.lastAnalyzedAt || toTimestamp(item.latestMessage?.sentAt) > toTimestamp(item.intelligence.lastAnalyzedAt));
+  const analyze = (items: (typeof insights)) => {
+    const ids = items.filter(needsAnalysis).slice(0, 3).map((item) => item.id);
+    if (ids.length) after(async () => { for (const id of ids) await requestLeadConversationAnalysis(id, context.tenantId, context.userId); });
+    return ids.length > 0;
+  };
   // One conversation's analysis: insights and next step, not the transcript.
   const insightItem = insight ? insights.find((item) => item.id === insight) : null;
   if (insightItem) {
     const insightsAssistant = ASSISTANTS.insights;
+    const analyzing = analyze([insightItem]);
     return (
-      <AssistantChat
-        identity={{ name: `Análise · ${insightItem.name.split(" ")[0]}`, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
-        script={buildLeadInsightScript({ item: insightItem, now: new Date() })}
-        agentId="insights"
-      />
+      <>
+        <AssistantChat
+          identity={{ name: `Análise · ${insightItem.name.split(" ")[0]}`, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
+          script={buildLeadInsightScript({ item: insightItem, now: new Date(), analyzing })}
+          agentId="insights"
+        />
+        {analyzing ? <RefreshSoon /> : null}
+      </>
     );
   }
   // Broker chat (2026-10-09): Insights opens with who is waiting for an answer; the mirror stays one tap away.
   if (!leadId && todas !== "1") {
     const insightsAssistant = ASSISTANTS.insights;
+    // The ones waiting for the broker first: their tips matter now.
+    const analyzing = analyze(insights.filter(isWaitingForBroker));
     return (
-      <AssistantChat
-        identity={{ name: insightsAssistant.name, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
-        script={buildInsightsScript({ insights, whatsappConnected: connection?.status === "ready", now: new Date() })}
-        agentId="insights"
-      />
+      <>
+        <AssistantChat
+          identity={{ name: insightsAssistant.name, shape: insightsAssistant.shape, hue: insightsAssistant.hue }}
+          script={buildInsightsScript({ insights, whatsappConnected: connection?.status === "ready", now: new Date() })}
+          agentId="insights"
+        />
+        {analyzing ? <RefreshSoon times={2} afterMs={12_000} /> : null}
+      </>
     );
   }
   // All conversations: the same chat rows as the Início; each opens the lead's chat.

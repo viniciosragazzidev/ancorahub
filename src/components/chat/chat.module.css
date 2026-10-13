@@ -354,3 +354,19 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 .cameraPrimary { min-height: 48px; padding: 0 22px; border: 0; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 500; color: #fff; background: oklch(62% 0.18 28); cursor: pointer; }
 .cameraGhost { justify-self: start; border: 0; background: none; font: inherit; font-size: 15px; color: #fff; cursor: pointer; padding: 10px 6px; }
 .cameraSpacer { justify-self: end; }
+
+/* Quick tip that pops up (2026-10-12): the Insights mascot with one thing to do now. */
+.tip { position: fixed; z-index: 60; right: max(16px, env(safe-area-inset-right)); bottom: calc(env(safe-area-inset-bottom) + 84px); width: min(360px, calc(100vw - 32px)); display: flex; gap: 12px; align-items: flex-start; padding: 14px 14px 16px; border-radius: 20px; background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-floating, 0 18px 40px -12px rgb(16 16 40 / 0.28)); border: 1px solid var(--border-subtle, rgb(16 16 40 / 0.08)); overflow: hidden; }
+.tip[data-tone="urgent"] { border-color: color-mix(in oklab, var(--chat-action) 35%, transparent); }
+@media (min-width: 1024px) { .tip { bottom: 24px; right: 24px; } }
+.tipMascot { flex: none; display: grid; }
+.tipBody { display: grid; gap: 3px; min-width: 0; }
+.tipLabel { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--chat-action-text, var(--chat-action)); }
+.tipTitle { font-size: var(--text-sm); font-weight: 500; color: var(--foreground); }
+.tipText { font-size: var(--text-sm); line-height: 1.45; color: var(--text-secondary); overflow-wrap: anywhere; }
+.tipActions { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.tipCta { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 999px; font-size: var(--text-sm); font-weight: 500; text-decoration: none; color: white; background: var(--chat-action); transition: transform var(--duration-fast) var(--ease-standard); }
+.tipCta:active { transform: scale(0.97); }
+.tipLater { border: 0; background: none; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; padding: 8px; border-radius: 999px; }
+.tipLater:hover { background: var(--surface-muted); }
+.tipTimer { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--chat-action); opacity: 0.35; transform-origin: left center; }

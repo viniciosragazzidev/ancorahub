@@ -72,7 +72,7 @@ export type LightTab = { id: Exclude<LightTabId, "mais">; href: string; label: s
 export const LIGHT_TABS: readonly LightTab[] = [
   { id: "inicio", href: "/dashboard", label: "Início" },
   { id: "fila", href: "/minha-fila", label: "Fila" },
-  { id: "insights", href: "/conversas/broker", label: "Insights" },
+  { id: "insights", href: "/conversas/broker", label: "Dicas de Atendimento" },
 ];
 
 export type LightMoreDestination = {
@@ -168,7 +168,7 @@ const RULES: readonly RouteRule[] = [
         : search?.get("todas") === "1"
           ? { title: "Conversas", tab: "insights", isRoot: false, parentHref: "/conversas/broker", backToParent: true, chat: true, hidesTabBar: true }
           // The Insights assistant is a chat (2026-10-09) with its own header.
-          : { title: "Insights", tab: "insights", isRoot: true, parentHref: null, chat: true, hidesTabBar: true },
+          : { title: "Dicas de Atendimento", tab: "insights", isRoot: true, parentHref: null, chat: true, hidesTabBar: true },
   },
   { test: under("/conversas"), route: { title: "Conversa", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },
   { test: exact("/conversas"), route: { title: "Insights", tab: "insights", isRoot: false, parentHref: "/conversas/broker" } },

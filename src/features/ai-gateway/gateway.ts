@@ -5,7 +5,7 @@ import type { z } from "zod";
 import { logAiUsage } from "@/features/ai-agent/ai-usage-log";
 import { getSystemSetting } from "@/features/system-settings/queries";
 
-import { FREE_TIER_PROVIDERS, PROVIDER_ENDPOINT, PROVIDER_KEY_ENV, resolveChain, type AiProfile, type AiProvider, type ModelRef } from "./profiles";
+import { PROVIDER_ENDPOINT, PROVIDER_KEY_ENV, isFreeTier, resolveChain, type AiProfile, type AiProvider, type ModelRef } from "./profiles";
 import { maskPersonalData } from "./privacy";
 
 export type GatewayMessage = { role: "system" | "user" | "assistant"; content: string };
@@ -75,14 +75,15 @@ export async function runGateway<T>(input: {
     if (key) keys.set(provider, key);
   }
   const overrides = await getSystemSetting("ai_gateway_profiles").then((value) => (value ? JSON.parse(value) : undefined)).catch(() => undefined);
-  const chain = resolveChain(input.profile, { env: process.env, overrides, hasKey: (provider) => keys.has(provider) && !(input.sensitive && FREE_TIER_PROVIDERS.has(provider)) });
+  // Sensitive (client conversation): only paid models, which do not train on the data (LGPD art. 11).
+  const chain = resolveChain(input.profile, { env: process.env, overrides, hasKey: (provider) => keys.has(provider), allow: (ref) => !(input.sensitive && isFreeTier(ref)) });
   if (!chain.length) return { ok: false, reason: "no_provider", attempts: 0 };
 
   let attempts = 0;
   for (const ref of chain) {
     attempts += 1;
     const startedAt = Date.now();
-    const messages = FREE_TIER_PROVIDERS.has(ref.provider)
+    const messages = isFreeTier(ref)
       ? input.messages.map((message) => ({ ...message, content: maskPersonalData(message.content) }))
       : input.messages;
     try {
@@ -99,6 +100,9 @@ export async function runGateway<T>(input: {
           temperature: input.temperature ?? 0.3,
           max_tokens: input.maxTokens ?? 500,
           ...(ref.provider === "anthropic" ? {} : { response_format: { type: "json_object" } }),
+          // LGPD: paid OpenRouter calls only go to providers that neither keep nor train on the data
+          // (same rule as withNoDataCollection in features/ai/providers.ts, for the AI SDK clients).
+          ...(ref.provider === "openrouter" && !isFreeTier(ref) ? { provider: { data_collection: "deny" } } : {}),
           // gpt-oss thinks before answering: low effort keeps the answer inside max_tokens and fast.
           ...(ref.model.startsWith("openai/gpt-oss") ? { reasoning_effort: "low" } : {}),
         }),

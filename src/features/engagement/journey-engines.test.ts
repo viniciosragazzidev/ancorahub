@@ -37,6 +37,11 @@ describe("missions", () => {
     const result = evaluateMission({ mission: mission(metric), subject, now, date: "2026-10-09", days: [day("2026-10-09")] });
     expect(result.completed).toBe(false); expect(missionBonus(mission(metric), result)).toBeNull();
   });
+  it("returns.cleared does not apply on a day without any return due", () => {
+    const result = evaluateMission({ mission: mission("returns.cleared"), subject, now, date: "2026-10-09", days: [day("2026-10-09")] });
+    expect(result.eligible).toBe(false);
+    expect(result.completed).toBe(false);
+  });
   it.each([
     ["contacts.fast_coverage", { receivedLeads: 2, fastContacts: 2 }],
     ["offers.fast_coverage", { offers: 2, fastAcceptedOffers: 2 }],

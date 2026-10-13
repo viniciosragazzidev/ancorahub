@@ -12,12 +12,12 @@ try {
   console.log("Flag confirmação de presença:", flags.map((row) => `${row.key}=${row.value}`).join(", ") || "não gravada (padrão false)");
   const confirmations = await sql`
     select left(c.id::text, 8) as id, s.name as plantao, s.attendance_mode as modo, c.shift_starts_at, c.status, c.notification_status, c.notification_error_code,
-           false as foto, c.created_at, c.updated_at
+           c.photo_storage_key is not null as foto, c.release_note is not null as com_motivo, c.created_at, c.updated_at
     from duty_presence_confirmations c join unit_duty_schedules s on s.id = c.schedule_id
     where c.created_at > now() - interval '24 hours' or c.shift_ends_at > now()
     order by c.shift_starts_at desc limit 20`;
   console.log(confirmations.length ? "Confirmações (24h / em aberto):" : "Nenhuma confirmação criada nas últimas 24h.");
-  for (const row of confirmations) console.log(`- ${row.id} · ${row.plantao} (${row.modo}) · início ${row.shift_starts_at.toISOString()} · ${row.status} · envio ${row.notification_status}${row.notification_error_code ? ` (${row.notification_error_code})` : ""}${row.foto ? " · com foto" : ""} · criada ${row.created_at.toISOString()}`);
+  for (const row of confirmations) console.log(`- ${row.id} · ${row.plantao} (${row.modo}) · início ${row.shift_starts_at.toISOString()} · ${row.status} · envio ${row.notification_status}${row.notification_error_code ? ` (${row.notification_error_code})` : ""}${row.foto ? " · com foto" : ""}${row.com_motivo ? " · liberado com motivo" : ""} · criada ${row.created_at.toISOString()}`);
   const outbound = await sql`
     select left(id, 8) as id, status, template_name, provider_error_code, left(provider_error_message, 120) as error, created_at, updated_at
     from whatsapp_outbound_messages where purpose = 'dutyPresenceConfirmation' and created_at > now() - interval '48 hours'

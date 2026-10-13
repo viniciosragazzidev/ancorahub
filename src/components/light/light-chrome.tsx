@@ -1,6 +1,7 @@
 "use client";
 
 import { CHAT_RAIL_REFRESH_EVENT } from "@/components/chat/chat-events";
+import { TipHost } from "@/components/chat/tip-host";
 import { Suspense, useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import "@/components/arc/venancor-scope.css";
@@ -109,6 +110,7 @@ export function LightChrome({
       </div>
       {/* Points, missions and achievements of the broker show up here, never over a lead offer. */}
       {journeyEnabled && audience === "broker" ? <CelebrationHost /> : null}
+      {audience === "broker" ? <TipHost /> : null}
       {audience === "broker" ? <Suspense fallback={null}><LiteMicroTour pathname={pathname} /></Suspense> : null}
     </LightAvailabilityProvider>
   );

@@ -143,7 +143,7 @@ export function LightConversationsView({
     <div className="arc-venancor flex min-h-full flex-col" style={{ color: "var(--foreground)" }}>
       <div className="mx-auto w-full max-w-4xl flex-1 px-4 pb-6 pt-2 sm:px-6">
         <header className={cn("space-y-1", selected && "hidden md:block")}>
-          <h1 className="sr-only">Insights</h1>
+          <h1 className="sr-only">Dicas de Atendimento</h1>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             {insights.length === 1 ? "1 conversa ativa" : `${insights.length} conversas ativas`}
             <span className="mx-2" aria-hidden="true">·</span>

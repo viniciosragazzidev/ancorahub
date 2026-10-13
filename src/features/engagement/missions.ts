@@ -49,7 +49,8 @@ export function evaluateMission(input: { mission: JourneyMission; subject: Missi
     case "offers.fast_coverage": target = sum("offers"); progress = sum("fastAcceptedOffers"); closedRequired = true; break;
     case "notes.coverage": target = sum("serviceLeads"); progress = sum("validNotes"); closedRequired = true; break;
     case "steps.coverage": target = sum("stageEligibleLeads"); progress = sum("stagedLeads"); closedRequired = true; break;
-    case "returns.cleared": target = Math.max(1, sum("returnsDue")); progress = sum("overdueReturns") === 0 ? sum("returnsDue") : Math.max(0, target - sum("overdueReturns")); closedRequired = true; break;
+    // No return due that day: nothing to clear, so the mission does not apply (it used to show "0 de 1").
+    case "returns.cleared": target = sum("returnsDue"); progress = sum("overdueReturns") === 0 ? sum("returnsDue") : Math.max(0, target - sum("overdueReturns")); closedRequired = true; break;
     case "contacts.days_on_time": progress = days.filter((d) => d.onTimeContacts > 0).length; break;
     case "contacts.evidenced": progress = sum("evidencedContacts"); break;
     case "contacts.on_time": progress = sum("onTimeContacts"); break;

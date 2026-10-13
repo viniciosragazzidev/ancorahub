@@ -9,7 +9,7 @@ import type { ChatBlock } from "./types";
 type ConsentBlock = Extract<ChatBlock, { type: "consent" }>;
 
 const DETAILS = [
-  { label: "Quem processa", text: "Groq, OpenRouter e Google. Na conversa do lead, só Anthropic ou OpenAI, em plano pago." },
+  { label: "Quem processa", text: "OpenRouter, que repassa para provedores pagos (Claude, da Anthropic, ou o modelo aberto da OpenAI) que não guardam nem treinam com os dados. Só se eles falharem: Groq ou Google, nunca na conversa do lead." },
   { label: "Que dados", text: "Sua pergunta e o resumo do seu dia. Na conversa do lead, também o resumo e as últimas mensagens. Nomes vão abreviados; telefone, e-mail e CPF vão escondidos." },
   { label: "Onde", text: "Em servidores fora do Brasil." },
   { label: "Até quando", text: "Você pode desligar quando quiser, em Notificações." },

@@ -45,6 +45,20 @@ function lastInbound(item: BrokerConversationInsight) {
   return [...item.messages].reverse().find((message) => !isOutboundMessage(message.direction)) ?? null;
 }
 
+/**
+ * A practical tip from the messages alone, while the AI has not read the
+ * conversation yet: who spoke last and how long ago.
+ */
+export function quickTip(item: BrokerConversationInsight, now: Date) {
+  const last = item.latestMessage;
+  if (!last) return "Ainda sem conversa: mande um oi se apresentando e pergunte a melhor hora para falar.";
+  const ago = waited(last.sentAt, now);
+  if (!isOutboundMessage(last.direction)) return `O cliente escreveu há ${ago}. Responda agora, mesmo que curto: quem responde rápido vende mais.`;
+  const hours = (now.getTime() - Date.parse(last.sentAt)) / 3_600_000;
+  if (hours >= 24) return `Sua última mensagem foi há ${ago} e ficou sem resposta. Mande uma retomada leve, tipo: "Conseguiu ver o que te mandei?"`;
+  return "Você já respondeu. Combine o próximo passo com data, por exemplo um horário para apresentar a cotação.";
+}
+
 /** Each conversation opens its analysis (insights and next step), never a copy of the lead screen. */
 function detailHref(item: BrokerConversationInsight) {
   return `/conversas/broker?insight=${encodeURIComponent(item.id)}`;
@@ -129,7 +143,7 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
   if (first.intelligence?.summary) blocks.push({ type: "assistant", id: "i-summary", text: first.intelligence.summary });
   else if (inbound) blocks.push({ type: "system", id: "i-last", strong: name, text: `escreveu às ${time(inbound.sentAt)}` });
   const step = nextStepText(first.intelligence?.nextBestAction);
-  if (step) blocks.push({ type: "assistant", id: "i-next", text: `Próximo passo: ${step}` });
+  blocks.push({ type: "assistant", id: "i-next", text: step ? `Próximo passo: ${step}` : `Dica: ${quickTip(first, now)}` });
 
   const whatsapp = buildWhatsAppUrl(first.phone);
   const choices: ChatChoice[] = [
@@ -145,7 +159,7 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
       id: "i-others",
       title: "Depois",
       subtitle: "Também esperando você",
-      items: rest.slice(0, OTHERS_SHOWN).map(({ item, since: at }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : "A IA ainda não analisou esta conversa"), trailing: waited(at, now), href: detailHref(item) })),
+      items: rest.slice(0, OTHERS_SHOWN).map(({ item, since: at }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 80)), trailing: waited(at, now), href: detailHref(item) })),
     });
   }
 
@@ -168,7 +182,7 @@ function analyzedLabel(iso: string | null | undefined, now: Date) {
  * next step and practical tips. No message transcript: the conversation itself
  * lives in the lead screen.
  */
-export function buildLeadInsightScript(input: { item: BrokerConversationInsight; now: Date }): ChatScript {
+export function buildLeadInsightScript(input: { item: BrokerConversationInsight; now: Date; analyzing?: boolean }): ChatScript {
   const { item, now } = input;
   const ai = item.intelligence ?? null;
   const name = firstName(item.name);
@@ -182,10 +196,11 @@ export function buildLeadInsightScript(input: { item: BrokerConversationInsight;
   if (!ai || (!ai.summary && !ai.nextBestAction)) {
     return {
       blocks: [
-        { type: "assistant", id: "n-empty", text: `A IA ainda não analisou a conversa com ${name}. Envie e receba mais mensagens no WhatsApp para ver o resumo aqui.` },
-        { type: "question", id: "n-choice", prompt: "Enquanto isso:", choices: actions },
+        { type: "assistant", id: "n-empty", text: input.analyzing ? `Estou lendo a conversa com ${name} agora. Em alguns segundos a análise aparece aqui.` : `Ainda não li a conversa com ${name}.` },
+        { type: "assistant", id: "n-quick", text: `Enquanto isso, uma dica: ${quickTip(item, now)}` },
+        { type: "question", id: "n-choice", prompt: "Como quer seguir?", choices: actions },
       ],
-      status: { label: "Análise em andamento", tone: "idle" },
+      status: { label: input.analyzing ? "Lendo a conversa…" : "Esperando você", tone: input.analyzing ? "working" : "idle" },
     };
   }
 

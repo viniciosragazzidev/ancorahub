@@ -30,7 +30,7 @@ describe("Light routes", () => {
     expect(LIGHT_TABS.map((tab) => [tab.label, tab.href])).toEqual([
       ["Início", "/dashboard"],
       ["Fila", "/minha-fila"],
-      ["Insights", "/conversas/broker"],
+      ["Dicas de Atendimento", "/conversas/broker"],
     ]);
   });
 
@@ -62,7 +62,7 @@ describe("Light routes", () => {
     const table: Array<[string, { title: string; tab: string; isRoot: boolean; parentHref: string | null }]> = [
       ["/dashboard", { title: "Início", tab: "inicio", isRoot: true, parentHref: null }],
       ["/minha-fila", { title: "Fila", tab: "fila", isRoot: false, parentHref: "/dashboard" }],
-      ["/conversas/broker", { title: "Insights", tab: "insights", isRoot: true, parentHref: null }],
+      ["/conversas/broker", { title: "Dicas de Atendimento", tab: "insights", isRoot: true, parentHref: null }],
       ["/notificacoes", { title: "Notificações", tab: "mais", isRoot: false, parentHref: "/dashboard" }],
       ["/clientes", { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" }],
       ["/clientes/abc", { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" }],

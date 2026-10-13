@@ -5,7 +5,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 
 /** Bump when the consent text changes: everyone is asked again. */
-export const AI_CONSENT_VERSION = "2026-10-12";
+export const AI_CONSENT_VERSION = "2026-10-13";
 export const AI_CONSENT_SCOPE = "broker_assistants" as const;
 
 export type AiConsentDecision = "granted" | "declined" | "revoked";

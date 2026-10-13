@@ -57,3 +57,30 @@ export async function forceLeadConversationAnalysis(
 
   return analyzeLeadConversation(leadId, tenantId);
 }
+
+const recentRequests = new Map<string, number>();
+const REQUEST_COOLDOWN_MS = 15 * 60_000;
+
+/**
+ * On-demand analysis (Insights opened, a tip about this lead): runs at most once
+ * every 15 min per lead in this instance, so opening screens never floods the AI.
+ * Returns false when it was skipped.
+ */
+const perUser = new Map<string, number[]>();
+const PER_USER_PER_HOUR = 20;
+
+export async function requestLeadConversationAnalysis(leadId: string, tenantId: string, userId?: string) {
+  const now = Date.now();
+  const last = recentRequests.get(leadId);
+  if (last && now - last < REQUEST_COOLDOWN_MS) return false;
+  // At most 20 on-demand analyses per broker per hour (opening screens never runs up the AI bill).
+  if (userId) {
+    const recent = (perUser.get(userId) ?? []).filter((at) => now - at < 60 * 60_000);
+    if (recent.length >= PER_USER_PER_HOUR) return false;
+    perUser.set(userId, [...recent, now]);
+  }
+  recentRequests.set(leadId, now);
+  if (recentRequests.size > 2_000) for (const [key, at] of recentRequests) if (now - at > REQUEST_COOLDOWN_MS) recentRequests.delete(key);
+  await analyzeLeadConversation(leadId, tenantId).catch((error) => console.error("[conversation-intelligence] on-demand analysis failed", leadId, error));
+  return true;
+}

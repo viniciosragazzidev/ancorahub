@@ -10,17 +10,25 @@ vi.mock("@/features/ai-agent/ai-usage-log", () => ({ logAiUsage: usage.log }));
 import { AGENT_REGISTRY, assistantReplySchema, buildMessages, replyToBlocks } from "./agents";
 import { extractJson, runGateway } from "./gateway";
 import { maskPersonalData, shortName } from "./privacy";
-import { defaultChains, resolveChain } from "./profiles";
+import { defaultChains, isFreeTier, resolveChain } from "./profiles";
 
 const env = { ...process.env };
 beforeEach(() => { settings.values.clear(); usage.log.mockReset(); process.env = { ...env, GROQ_API_KEY: "g", OPENROUTER_API_KEY: "o", GOOGLE_API_KEY: "", OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "" }; });
 afterEach(() => { vi.unstubAllGlobals(); process.env = env; });
 
 describe("profiles", () => {
-  it("chains free models first and skips providers without a key", () => {
+  it("chains the paid OpenRouter models first and skips providers without a key", () => {
     const chain = resolveChain("chat-smart", { env: { AI_GROQ_SMART_MODEL: "modelo-grande" }, hasKey: (provider) => provider === "groq" || provider === "openrouter" });
-    expect(chain[0]).toEqual({ provider: "groq", model: "modelo-grande" });
-    expect(chain.map((ref) => ref.provider)).toEqual(["groq", "openrouter"]);
+    expect(chain.slice(0, 2)).toEqual([{ provider: "openrouter", model: "anthropic/claude-haiku-5.5" }, { provider: "openrouter", model: "openai/gpt-oss-120b" }]);
+    expect(chain).toContainEqual({ provider: "groq", model: "modelo-grande" });
+    expect(chain.every((ref) => ref.provider === "groq" || ref.provider === "openrouter")).toBe(true);
+  });
+
+  it("knows which models are free tier (OpenRouter only with :free)", () => {
+    expect(isFreeTier({ provider: "openrouter", model: "anthropic/claude-haiku-5.5" })).toBe(false);
+    expect(isFreeTier({ provider: "openrouter", model: "google/gemma-4-31b-it:free" })).toBe(true);
+    expect(isFreeTier({ provider: "groq", model: "openai/gpt-oss-20b" })).toBe(true);
+    expect(isFreeTier({ provider: "anthropic", model: "claude-haiku-5-5" })).toBe(false);
   });
 
   it("uses a valid super-admin override and ignores an invalid one", () => {
@@ -35,8 +43,8 @@ describe("default models", () => {
   it("uses live models and never falls back to a retired one", () => {
     const chains = defaultChains({ GROQ_MODEL: "llama-3.3-70b-versatile" });
     const models = Object.values(chains).flat().map((ref) => ref.model);
-    expect(chains["chat-fast"][0]).toEqual({ provider: "groq", model: "openai/gpt-oss-20b" });
-    expect(chains["chat-smart"][0]).toEqual({ provider: "groq", model: "openai/gpt-oss-120b" });
+    expect(chains["chat-fast"]).toContainEqual({ provider: "groq", model: "openai/gpt-oss-20b" });
+    expect(chains["chat-smart"]).toContainEqual({ provider: "groq", model: "openai/gpt-oss-120b" });
     expect(models.some((model) => /llama-3\.(1|3)/.test(model))).toBe(false);
   });
 });
@@ -72,6 +80,8 @@ describe("agents", () => {
 
 describe("runGateway", () => {
   const schema = z.object({ text: z.string() });
+  // Only the Groq key: the free tier path (masking, fallback between its models).
+  const freeOnly = () => { process.env = { ...env, GROQ_API_KEY: "g", OPENROUTER_API_KEY: "", GOOGLE_API_KEY: "", OPENAI_API_KEY: "", ANTHROPIC_API_KEY: "" }; };
   const call = () => runGateway({ profile: "chat-fast", purpose: "test", tenantId: "t", userId: `u-${Math.random()}`, messages: [{ role: "user", content: "fone 21 99999-8888" }], schema });
 
   it("falls back to the next model when one fails and logs the real provider", async () => {
@@ -79,6 +89,7 @@ describe("runGateway", () => {
       .mockResolvedValueOnce(new Response("down", { status: 503 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ choices: [{ message: { content: "```json\n{\"text\":\"ok\"}\n```" } }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
+    freeOnly();
     const result = await call();
     expect(result).toMatchObject({ ok: true, value: { text: "ok" }, attempts: 2 });
     // Free tier: personal data masked before leaving.
@@ -89,6 +100,7 @@ describe("runGateway", () => {
   it("never sends sensitive context to a free-tier provider", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
+    freeOnly();
     const result = await runGateway({ profile: "chat-smart", purpose: "test", tenantId: "t", userId: "sensitive", messages: [{ role: "user", content: "x" }], schema, sensitive: true });
     expect(result).toMatchObject({ ok: false, reason: "no_provider" });
     expect(fetchMock).not.toHaveBeenCalled();
@@ -103,5 +115,17 @@ describe("runGateway", () => {
   it("extracts the JSON object from wrapped text", () => {
     expect(extractJson("Aqui: {\"a\":1} fim")).toEqual({ a: 1 });
     expect(extractJson("sem json")).toBeNull();
+  });
+});
+
+describe("runGateway with the paid router", () => {
+  it("sends sensitive context only to a paid OpenRouter model, unmasked", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "{\"text\":\"ok\"}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await runGateway({ profile: "chat-smart", purpose: "test", tenantId: "t", userId: "paid", messages: [{ role: "user", content: "fone 21 99999-8888" }], schema: z.object({ text: z.string() }), sensitive: true });
+    expect(result).toMatchObject({ ok: true, model: { provider: "openrouter", model: "anthropic/claude-haiku-5.5" } });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).messages[0].content).toBe("fone 21 99999-8888");
+    // LGPD: the paid route only goes to providers that neither keep nor train on the data.
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).provider).toEqual({ data_collection: "deny" });
   });
 });
