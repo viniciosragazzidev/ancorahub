@@ -59,7 +59,10 @@ export type ChatListItem = {
 export type ChatBlock =
   | { type: "date"; id: string; label: string }
   | { type: "system"; id: string; text: string; strong?: string; action?: { label: string; choiceAction: ChatAction } }
-  | { type: "assistant"; id: string; text: string; at?: string }
+  /** variant "tip": a tip bubble (lamp + "Dica"), used by Dicas de Atendimento. */
+  | { type: "assistant"; id: string; text: string; at?: string; variant?: "tip" }
+  /** The client in focus: name in highlight and a few facts as chips. */
+  | { type: "client"; id: string; name: string; initials: string; chips: Array<{ label: string; tone?: ChatTone }> }
   /** A notification shown as in Notificações (Âncora conversation): icon by category, tag, link, unread dot. */
   | { type: "notice"; id: string; noticeType: string; leadId: string | null; title: string; message: string | null; at: string; atIso: string; unread: boolean }
   | { type: "user"; id: string; text: string; at?: string }

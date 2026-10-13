@@ -2,6 +2,8 @@ import type { ChatBlock, ChatChoice, ChatScript, ThreadSummary } from "@/compone
 import type { BrokerConversationInsight } from "@/features/broker-workspace/components/light-conversations-view";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
+import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
+
 import { intelligenceLabel, intelligenceTips, isOutboundMessage, nextStepText } from "./intelligence";
 
 const TIME_ZONE = "America/Sao_Paulo";
@@ -59,6 +61,19 @@ export function quickTip(item: BrokerConversationInsight, now: Date) {
   const hours = (now.getTime() - Date.parse(last.sentAt)) / 3_600_000;
   if (hours >= 24) return `Sua última mensagem foi há ${ago} e ficou sem resposta. Mande uma retomada leve, tipo: "Conseguiu ver o que te mandei?"`;
   return "Você já respondeu. Combine o próximo passo com data, por exemplo um horário para apresentar a cotação.";
+}
+
+/** The client in focus: name in highlight, stage, how long they wait and when they last wrote. */
+function clientCard(id: string, item: BrokerConversationInsight, now: Date): ChatBlock {
+  const chips: Array<{ label: string; tone?: "info" | "success" | "warning" | "danger" | "neutral" }> = [];
+  // One chromatic color per card: only the delay is red; the rest stay neutral.
+  chips.push({ label: item.kind === "client" ? "Cliente" : LEAD_STATUS_LABELS[item.status] ?? item.status, tone: "neutral" });
+  const inbound = lastInbound(item);
+  if (isWaitingForBroker(item) && inbound) chips.push({ label: `Esperando há ${waited(inbound.sentAt, now)}`, tone: "danger" });
+  else if (item.latestMessage) chips.push({ label: `Última mensagem às ${time(item.latestMessage.sentAt)}`, tone: "neutral" });
+  const intent = item.intelligence?.customerIntent ? intelligenceLabel.intent(item.intelligence.customerIntent) : null;
+  if (intent) chips.push({ label: `Intenção: ${intent}`, tone: "neutral" });
+  return { type: "client", id, name: item.name, initials: initialsOf(item.name), chips };
 }
 
 /** Each conversation opens its analysis (insights and next step), never a copy of the lead screen. */
@@ -142,10 +157,11 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
     id: "i-count",
     text: `${OPENERS[(Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now)) + Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, day: "2-digit" }).format(now))) % OPENERS.length]} ${waiting.length === 1 ? `${name} está esperando sua resposta há ${waited(since, now)}.` : `${waiting.length} clientes esperando sua resposta. Comece por ${name}, que espera há ${waited(since, now)}.`}`,
   });
+  blocks.push(clientCard("i-client", first, now));
   if (first.intelligence?.summary) blocks.push({ type: "assistant", id: "i-summary", text: first.intelligence.summary });
   else if (inbound) blocks.push({ type: "system", id: "i-last", strong: name, text: `escreveu às ${time(inbound.sentAt)}` });
   const step = nextStepText(first.intelligence?.nextBestAction);
-  blocks.push({ type: "assistant", id: "i-next", text: step ? `Próximo passo: ${step}` : `Dica: ${quickTip(first, now)}` });
+  blocks.push({ type: "assistant", id: "i-next", variant: "tip", text: step ? `Próximo passo: ${step}` : quickTip(first, now) });
 
   const whatsapp = buildWhatsAppUrl(first.phone);
   const choices: ChatChoice[] = [
@@ -210,15 +226,16 @@ export function buildLeadInsightScript(input: { item: BrokerConversationInsight;
   if (!ai || (!ai.summary && !ai.nextBestAction)) {
     return {
       blocks: [
+        clientCard("n-client", item, now),
         { type: "assistant", id: "n-empty", text: input.analyzing ? `Estou lendo a conversa com ${name} agora. Em alguns segundos a análise aparece aqui.` : `Ainda não li a conversa com ${name}.` },
-        { type: "assistant", id: "n-quick", text: `Enquanto isso, uma dica: ${quickTip(item, now)}` },
+        { type: "assistant", id: "n-quick", variant: "tip", text: quickTip(item, now) },
         { type: "question", id: "n-choice", prompt: "Como quer seguir?", choices: actions },
       ],
       status: { label: input.analyzing ? "Lendo a conversa…" : "Esperando você", tone: input.analyzing ? "working" : "idle" },
     };
   }
 
-  const blocks: ChatBlock[] = [{ type: "date", id: "n-date", label: analyzedLabel(ai.lastAnalyzedAt, now) }];
+  const blocks: ChatBlock[] = [{ type: "date", id: "n-date", label: analyzedLabel(ai.lastAnalyzedAt, now) }, clientCard("n-client", item, now)];
   if (ai.summary) blocks.push({ type: "assistant", id: "n-summary", text: ai.summary });
 
   const rows = [
@@ -238,8 +255,8 @@ export function buildLeadInsightScript(input: { item: BrokerConversationInsight;
   if (ai.opportunity) blocks.push({ type: "system", id: "n-opportunity", strong: "Oportunidade:", text: clip(ai.opportunity, 200) });
 
   const step = nextStepText(ai.nextBestAction);
-  if (step) blocks.push({ type: "assistant", id: "n-step", text: `Próximo passo: ${step}` });
-  intelligenceTips(ai).forEach((tip, index) => blocks.push({ type: "assistant", id: `n-tip-${index}`, text: `Dica: ${tip}` }));
+  if (step) blocks.push({ type: "assistant", id: "n-step", variant: "tip", text: `Próximo passo: ${step}` });
+  intelligenceTips(ai).forEach((tip, index) => blocks.push({ type: "assistant", id: `n-tip-${index}`, variant: "tip", text: tip }));
 
   blocks.push({ type: "question", id: "n-choice", prompt: "Como quer seguir?", choices: actions });
   return { blocks, status: ai.pendingFrom === "BROKER" ? { label: "Esperando você", tone: "waiting" } : { label: "Analisado", tone: "idle" } };

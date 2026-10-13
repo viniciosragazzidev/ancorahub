@@ -114,6 +114,9 @@ describe("buildLeadInsightScript", () => {
 
   it("explains when there is no analysis yet", () => {
     const script = buildLeadInsightScript({ now, item: conversation("b") });
-    expect(script.blocks[0]).toMatchObject({ id: "n-empty" });
+    // The client in focus first (name in highlight + chips), then the reading and a tip bubble.
+    expect(script.blocks[0]).toMatchObject({ type: "client", id: "n-client", initials: expect.any(String) });
+    expect(script.blocks[1]).toMatchObject({ id: "n-empty" });
+    expect(script.blocks[2]).toMatchObject({ id: "n-quick", variant: "tip" });
   });
 });

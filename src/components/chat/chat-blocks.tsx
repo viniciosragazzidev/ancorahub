@@ -113,6 +113,17 @@ export function ChoiceList({
 
 function AssistantText({ block }: { block: Extract<ChatBlock, { type: "assistant" }> }) {
   const [copied, setCopied] = useState(false);
+  if (block.variant === "tip") {
+    return (
+      <div className={styles.tipBubble}>
+        <span className={styles.tipBubbleLabel}>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M8 1.8a4.6 4.6 0 0 0-2.7 8.3c.5.4.8.9.8 1.5v.4h3.8v-.4c0-.6.3-1.1.8-1.5A4.6 4.6 0 0 0 8 1.8ZM6.3 13.6h3.4M6.8 15h2.4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          Dica
+        </span>
+        <p className={styles.tipBubbleText}>{block.text}</p>
+      </div>
+    );
+  }
   return (
     <div>
       <p className={styles.assistant} style={{ margin: 0 }}>{block.text}</p>
@@ -188,6 +199,18 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe
       return <ConsentCard block={block} onDecide={onConsent} />;
     case "paused":
       return <PausedHero block={block} />;
+    case "client":
+      return (
+        <section className={styles.clientCard} aria-label={`Cliente ${block.name}`}>
+          <span className={styles.clientAvatar} aria-hidden="true">{block.initials}</span>
+          <span className={styles.clientMain}>
+            <span className={styles.clientName}>{block.name}</span>
+            <span className={styles.clientChips}>
+              {block.chips.map((chip) => <span key={chip.label} className={styles.liveChip} data-tone={chip.tone ?? "neutral"}>{chip.label}</span>)}
+            </span>
+          </span>
+        </section>
+      );
     case "presence":
       return <PresenceCallout ask={block.ask} variant="chat" />;
     case "button": {

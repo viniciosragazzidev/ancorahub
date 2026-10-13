@@ -9,6 +9,10 @@
   --chat-action-soft: oklch(62% 0.2 255 / 0.1);
   --chat-unread: oklch(62% 0.2 255);
   --chat-online: oklch(68% 0.17 150);
+  /* Tip bubble (Dicas de Atendimento): soft yellow; the label passes 4.5:1 on it. */
+  --chat-tip: oklch(96% 0.05 90);
+  --chat-tip-border: oklch(86% 0.09 85);
+  --chat-tip-text: oklch(42% 0.1 65);
   --chat-gutter: 20px;
   --chat-maxw: 720px;
   color: var(--foreground);
@@ -20,6 +24,9 @@
   --chat-action-strong: oklch(76% 0.15 255);
   --chat-action-soft: oklch(70% 0.17 255 / 0.16);
   --chat-unread: oklch(70% 0.17 255);
+  --chat-tip: oklch(30% 0.05 85);
+  --chat-tip-border: oklch(44% 0.07 85);
+  --chat-tip-text: oklch(86% 0.11 88);
 }
 
 /* ---------- WhatsApp mirror: light bubbles tell the client from the qualification and the broker ---------- */
@@ -370,3 +377,13 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 .tipLater { border: 0; background: none; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; padding: 8px; border-radius: 999px; }
 .tipLater:hover { background: var(--surface-muted); }
 .tipTimer { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--chat-action); opacity: 0.35; transform-origin: left center; }
+
+/* Dicas de Atendimento (2026-10-13): a tip bubble and the client in focus. */
+.tipBubble { width: fit-content; max-width: min(88%, 62ch); padding: 10px 14px 12px; border-radius: 4px 18px 18px 18px; background: var(--chat-tip); border: 1px solid var(--chat-tip-border); }
+.tipBubbleLabel { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 3px; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--chat-tip-text); }
+.tipBubbleText { margin: 0; font-size: var(--text-base); line-height: 1.5; color: var(--foreground); white-space: pre-line; }
+.clientCard { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-panel); background: var(--surface); border: 1px solid var(--border-subtle, rgb(16 16 40 / 0.08)); box-shadow: var(--shadow-resting); }
+.clientAvatar { flex: none; width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; font-size: var(--text-sm); font-weight: 600; color: var(--chat-action); background: var(--chat-action-soft); }
+.clientMain { display: grid; gap: 6px; min-width: 0; }
+.clientName { font-size: 17px; font-weight: 600; color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clientChips { display: flex; flex-wrap: wrap; gap: 6px; }
