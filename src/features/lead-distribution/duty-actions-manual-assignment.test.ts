@@ -41,7 +41,7 @@ vi.mock("./monthly-duty-plan", () => ({}));
 vi.mock("./duty-presence", () => ({}));
 vi.mock("./jobs", () => ({}));
 vi.mock("./broker-day-history", () => ({}));
-vi.mock("./duty-presence-domain", () => ({}));
+vi.mock("./duty-presence-domain", () => ({ parseDutyLeadsSince: () => "plantao" }));
 
 import { assignLeadToBroker } from "./service";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";

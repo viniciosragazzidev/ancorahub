@@ -1463,6 +1463,27 @@ export const dutyRosterAssignments = pgTable(
   ],
 );
 
+/**
+ * A broker invited but without an account yet, already put on a plantão
+ * (13/10). It cannot receive leads; when the invite is accepted it becomes a
+ * real duty_roster_assignments row of the plantão and leaves this table.
+ */
+export const dutyRosterPending = pgTable(
+  "duty_roster_pending",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    scheduleId: text("schedule_id").notNull().references(() => unitDutySchedules.id, { onDelete: "cascade" }),
+    brokerProfileId: text("broker_profile_id").notNull().references(() => brokerProfiles.id, { onDelete: "cascade" }),
+    createdBy: text("created_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("duty_roster_pending_schedule_profile_unique").on(table.scheduleId, table.brokerProfileId),
+    index("duty_roster_pending_profile_idx").on(table.tenantId, table.brokerProfileId),
+  ],
+);
+
 export const dutyPresenceConfirmations = pgTable(
   "duty_presence_confirmations",
   {

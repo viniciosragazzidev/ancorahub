@@ -37,6 +37,8 @@ import { BrokerPresenceReleaseButton } from "../_components/broker-presence-rele
 import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
 import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigger";
 import { BrokerOccurrenceCard } from "../_components/broker-occurrence-card";
+import { PendingRoster } from "../_components/pending-roster";
+import { listInvitedBrokers, listPendingRosterEntries } from "@/features/lead-distribution/duty-roster-pending";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { dutyShifts, worksInShift } from "@/features/lead-distribution/duty-shifts";
 import { getDutyLeadQueueTabs, resolveDutyLeadQueueId, selectDutyLeadsForQueue } from "@/features/lead-distribution/duty-lead-queue-tabs";
@@ -96,6 +98,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   }
 
   const { schedule, roster, linkedQueues, leads: allLeads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled } = profile;
+  // Invited brokers without an account yet: on the plantão as "Convite pendente".
+  const [pendingRoster, invitedBrokers] = await Promise.all([
+    listPendingRosterEntries(context.tenantId, schedule.id),
+    listInvitedBrokers(context.tenantId, context.role === "manager" ? context.branchId ?? null : schedule.branchId ?? null),
+  ]);
   const historyEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY)) === "true";
   // A plantão lasts one day: there is no "other occurrence" to browse.
   const singleDay = isSingleOccurrencePlantao(schedule);
@@ -583,6 +590,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 </section>) : <p className="text-sm text-muted-foreground">Ninguém escalado neste turno.</p>}
               </section>
             )) : <p className="text-sm text-muted-foreground">Nenhum corretor escalado neste plantão.</p>}
+            <PendingRoster
+              scheduleId={schedule.id}
+              entries={pendingRoster.map((entry) => ({ entryId: entry.id, id: entry.brokerProfileId, name: entry.name, internalCode: entry.internalCode, branchName: entry.branchName }))}
+              candidates={invitedBrokers}
+            />
           </CardContent>
         </Card>
       </div>

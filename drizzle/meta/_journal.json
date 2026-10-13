@@ -1016,6 +1016,13 @@
                         "when":  1791660000000,
                         "tag":  "0197_qualification_question_texts",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  145,
+                        "version":  "7",
+                        "when":  1791661000000,
+                        "tag":  "0198_duty_roster_pending",
+                        "breakpoints":  true
                     }
                 ]
 }

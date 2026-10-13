@@ -10,6 +10,7 @@ import { buildCredentialAccount } from "@/shared/auth/credential-account";
 import { classifyExistingTeamIdentity } from "@/features/team/identity-reuse-policy";
 import { enqueueBrokerAccountActivationNotice, type BrokerAccountActivationNoticeStatus } from "@/features/team/broker-account-activation-delivery";
 import { isOnboardingPasswordLongEnough } from "@/features/team/onboarding-password-policy";
+import { promotePendingRosterEntries } from "@/features/lead-distribution/duty-roster-pending";
 
 const completeOnboardingSchema = z.object({
   invitationId: z.string().uuid(),
@@ -223,6 +224,9 @@ export async function completeOnboardingAction(
           updatedAt: new Date(),
         })
         .where(and(eq(schema.brokerProfiles.id, profile.id), eq(schema.brokerProfiles.tenantId, invitation.tenantId)));
+
+      // Plantões the broker was put on before having an account become real roster rows now.
+      await promotePendingRosterEntries(tx, { tenantId: invitation.tenantId, brokerProfileId: profile.id, userId, branchId: invitation.branchId ?? profile.branchId });
 
       // Accept invitation
       await tx
