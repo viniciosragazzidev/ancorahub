@@ -89,12 +89,15 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
         supervisorId: schema.tenantMemberships.supervisorId,
       })
       .from(schema.brokerProfiles)
-      .leftJoin(schema.branches, eq(schema.brokerProfiles.branchId, schema.branches.id))
       .leftJoin(schema.user, eq(schema.brokerProfiles.userId, schema.user.id))
       .leftJoin(schema.tenantMemberships, and(
         eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId),
         eq(schema.tenantMemberships.tenantId, context.tenantId),
       ))
+      // The unit name follows the same unit as branchId (the membership's once
+      // the access exists): joined on the profile, the list kept showing the
+      // old unit after an edit.
+      .leftJoin(schema.branches, sql`${schema.branches.id} = case when ${schema.tenantMemberships.id} is null then ${schema.brokerProfiles.branchId} else ${schema.tenantMemberships.branchId} end`)
       .leftJoin(schema.brokerInvitations, and(
         eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId),
         eq(schema.brokerInvitations.status, "PENDING")

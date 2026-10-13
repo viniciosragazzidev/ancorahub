@@ -351,6 +351,10 @@ export async function updateTeamMemberAction(
         await tx.update(schema.brokerProfiles).set({
           professionalName: input.name,
           invitedEmail: input.email || null,
+          // The unit lives on the membership and on the broker profile: keep both
+          // (the profile kept the old unit, so Conversas still filtered by it).
+          // The profile's unit is required: "whole company" leaves it as it was.
+          ...(normalizedBranchId ? { branchId: normalizedBranchId } : {}),
           updatedAt: new Date(),
         }).where(and(
           eq(schema.brokerProfiles.id, member.profileId),
