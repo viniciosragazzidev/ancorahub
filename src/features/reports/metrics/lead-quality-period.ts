@@ -7,7 +7,11 @@ import { PERIOD_OPTIONS, DEFAULT_PERIOD, periodStart, type PeriodValue } from "@
  */
 export type LeadQualityPeriod = PeriodValue | 3 | "today" | LeadQualityRange;
 
-/** A chosen range, "2026-10-01_2026-10-13": from the first day 00:00 to the end of the last one. */
+/**
+ * A chosen range, "2026-10-01_2026-10-13", in operation days: each day starts
+ * with its first shift at 19:00 of the day before and ends at 19:00 (like
+ * "Hoje"). So 01/10 to 13/10 = 30/09 19:00 to 13/10 19:00.
+ */
 export type LeadQualityRange = `${string}_${string}`;
 
 const RANGE = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/;
@@ -79,10 +83,11 @@ export function leadQualityWindow(period: LeadQualityPeriod, now = new Date()): 
     const { from, to } = rangeDays(period);
     const [fy, fm, fd] = from.split("-").map(Number) as [number, number, number];
     const [ty, tm, td] = to.split("-").map(Number) as [number, number, number];
-    // Up to the midnight after the last day (Date.UTC rolls the day over).
-    const dayAfter = new Date(Date.UTC(ty, tm - 1, td + 1));
-    const until = wallClockToUtc(dayAfter.getUTCFullYear(), dayAfter.getUTCMonth() + 1, dayAfter.getUTCDate(), "00:00", LEAD_QUALITY_TIMEZONE);
-    return { since: wallClockToUtc(fy, fm, fd, "00:00", LEAD_QUALITY_TIMEZONE), until: until > now ? null : until };
+    // From 19:00 of the day before the first day to 19:00 of the last one (Date.UTC rolls the day over).
+    const dayBefore = new Date(Date.UTC(fy, fm - 1, fd - 1));
+    const since = wallClockToUtc(dayBefore.getUTCFullYear(), dayBefore.getUTCMonth() + 1, dayBefore.getUTCDate(), OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
+    const until = wallClockToUtc(ty, tm, td, OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
+    return { since, until: until > now ? null : until };
   }
   if (period !== "today") {
     if (period === 3) {

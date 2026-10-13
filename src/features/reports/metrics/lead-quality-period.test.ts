@@ -47,10 +47,10 @@ describe("intervalo de datas (de x até y)", () => {
     expect(leadQualityRange("2025-01-01", "2026-10-13")).toBeNull();
   });
 
-  it("covers from the first day 00:00 to the midnight after the last, in São Paulo", () => {
+  it("covers operation days: from 19h of the day before the first to 19h of the last, in São Paulo", () => {
     const window = leadQualityWindow("2026-10-01_2026-10-12", new Date("2026-10-13T15:00:00Z"));
-    expect(window.since.toISOString()).toBe("2026-10-01T03:00:00.000Z");
-    expect(window.until?.toISOString()).toBe("2026-10-13T03:00:00.000Z");
+    expect(window.since.toISOString()).toBe("2026-09-30T22:00:00.000Z");
+    expect(window.until?.toISOString()).toBe("2026-10-12T22:00:00.000Z");
   });
 
   it("stays open when the range reaches today", () => {

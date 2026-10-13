@@ -89,6 +89,11 @@ export async function runMetaTenantSync(
     return count + 1;
   }, 0);
   const latestLog = recentLogs[0];
+  // One sync at a time: the cron and the "Sincronizar" button could start two
+  // full syncs together. A recent "in_progress" means another one is running.
+  if (latestLog?.status === "in_progress" && startTime - latestLog.startedAt.getTime() < 15 * 60_000) {
+    return { success: false, itemsSynced: 0, error: "Já existe uma sincronização da Meta em andamento. Aguarde ela terminar." };
+  }
   if (consecutiveRateLimitFailures > 0 && latestLog) {
     const backoffMs = Math.min(
       META_RATE_LIMIT_MAX_COOLDOWN_MS,

@@ -80,7 +80,10 @@ export function LeadQualityRangePicker({ period }: { period: LeadQualityPeriod }
         <span className="max-[1279px]:hidden">{isLeadQualityRange(period) ? leadQualityPeriodLabel(period) : "De / até"}</span>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-72 space-y-3">
-        <p className="text-sm font-semibold">Escolher o intervalo</p>
+        <div>
+          <p className="text-sm font-semibold">Escolher o intervalo</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Cada dia começa no Turno 1, às 19h da véspera, e vai até as 19h.</p>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1 text-xs font-medium text-muted-foreground">
             De
