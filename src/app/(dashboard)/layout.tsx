@@ -221,8 +221,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       >
         <TenantOnboardingDialogLoader />
         <DirectorWizardLoader />
-        <RouteOnboardingLoader />
-        <BrokerAvailabilityOnboardingLoader />
+        {/* Lite (broker or supervisor) has its own guided tour: the old step-by-step dialogs would show on top of it. */}
+        {isLightBroker || isLightSupervisor ? null : <RouteOnboardingLoader />}
+        {isLightBroker || isLightSupervisor ? null : <BrokerAvailabilityOnboardingLoader />}
         <RealtimeSyncProvider
           tenantId={context.tenantId}
           userId={context.userId}

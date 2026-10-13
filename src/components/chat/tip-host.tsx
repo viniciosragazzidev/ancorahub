@@ -87,12 +87,14 @@ export function TipHost() {
     setTip(null);
   }
 
+  // The tip lives outside the chat screens: it brings the Lite tokens (surface, action color) with it.
   return (
+    <div className="arc-venancor">
     <AnimatePresence>
       {tip ? (
         <motion.aside
           key={tip.id}
-          className={styles.tip}
+          className={`${styles.root} ${styles.tip}`}
           data-tone={tip.tone}
           role="status"
           aria-live="polite"
@@ -126,5 +128,6 @@ export function TipHost() {
         </motion.aside>
       ) : null}
     </AnimatePresence>
+    </div>
   );
 }
