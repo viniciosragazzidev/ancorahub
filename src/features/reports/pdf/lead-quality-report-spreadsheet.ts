@@ -13,12 +13,12 @@ function safeCell(value: unknown) {
   return /^[=+\-@]/.test(text) ? `'${text}` : text;
 }
 
-const SEGMENT_HEADER = ["Leads", "Quentes", "Mornos", "Frios", "Sem classificação", "Quentes + mornos (%)", "Distribuídos", "Convertidos", "Conversão (%)", "1º contato médio (min)"];
+const SEGMENT_HEADER = ["Leads", "Quentes", "Mornos", "Frios", "Sem classificação", "Quentes + mornos (%)", "Distribuídos", "Distribuídos no turno", "Convertidos", "Conversão (%)", "1º contato médio (min)"];
 
 function segmentValues(segment: LeadQualitySegment) {
   return [
     segment.total, segment.hot, segment.warm, segment.cold, segment.unclassified,
-    Number(segment.hotWarmShare.toFixed(1)), segment.assigned, segment.converted, Number(segment.conversionRate.toFixed(1)),
+    Number(segment.hotWarmShare.toFixed(1)), segment.assigned, segment.assignedInShift, segment.converted, Number(segment.conversionRate.toFixed(1)),
     segment.averageFirstContactSeconds == null ? "" : Math.round(segment.averageFirstContactSeconds / 60),
   ];
 }
@@ -53,6 +53,8 @@ export function encodeLeadQualitySpreadsheet(input: LeadQualityExport & { tenant
     ["Quentes + mornos (%)", Number(s.hotWarmShare.toFixed(1))],
     ["Distribuídos", s.assigned],
     ["Distribuídos (%)", Number(s.assignedRate.toFixed(1))],
+    ["Distribuídos no turno (entraram e foram atribuídos até o fim do próprio turno; pela atribuição mais recente)", s.assignedInShift],
+    ["Distribuídos no turno (%)", Number(s.assignedInShiftRate.toFixed(1))],
     ["Convertidos", s.converted],
     ["Conversão (%)", Number(s.conversionRate.toFixed(1))],
     ["Conversão de quentes + mornos (%)", Number(s.hotWarmConversionRate.toFixed(1))],

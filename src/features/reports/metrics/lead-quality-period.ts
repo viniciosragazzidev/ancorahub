@@ -5,7 +5,34 @@ import { PERIOD_OPTIONS, DEFAULT_PERIOD, periodStart, type PeriodValue } from "@
  * the operation's day, from 19:00 of the day before to 19:00 of today
  * (a lead at 19:30 already belongs to tomorrow's "today").
  */
-export type LeadQualityPeriod = PeriodValue | 3 | "today";
+export type LeadQualityPeriod = PeriodValue | 3 | "today" | LeadQualityRange;
+
+/** A chosen range, "2026-10-01_2026-10-13": from the first day 00:00 to the end of the last one. */
+export type LeadQualityRange = `${string}_${string}`;
+
+const RANGE = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/;
+const MAX_RANGE_DAYS = 366;
+
+export function isLeadQualityRange(period: LeadQualityPeriod): period is LeadQualityRange {
+  return typeof period === "string" && RANGE.test(period);
+}
+
+function validDay(value: string) {
+  const date = new Date(`${value}T12:00:00Z`);
+  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+/** The range "de" to "até", or null when a day is invalid, reversed or the range is over a year. */
+export function leadQualityRange(from: string, to: string): LeadQualityRange | null {
+  if (!validDay(from) || !validDay(to) || from > to) return null;
+  const days = (Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000 + 1;
+  return days <= MAX_RANGE_DAYS ? `${from}_${to}` : null;
+}
+
+export function rangeDays(period: LeadQualityRange) {
+  const [, from = "", to = ""] = period.match(RANGE) ?? [];
+  return { from, to };
+}
 
 export const LEAD_QUALITY_TIMEZONE = "America/Sao_Paulo";
 /** The operation's day turns at 19:00; the first shift runs until 13:30. */
@@ -21,6 +48,8 @@ export type LeadShift = (typeof LEAD_SHIFTS)[number]["key"];
 export function parseLeadQualityPeriod(raw: unknown): LeadQualityPeriod {
   if (raw === "today" || raw === "hoje") return "today";
   if (typeof raw !== "string") return DEFAULT_PERIOD;
+  const range = raw.match(RANGE);
+  if (range) return leadQualityRange(range[1]!, range[2]!) ?? DEFAULT_PERIOD;
   const days = Number.parseInt(raw, 10);
   if (raw === "3") return 3;
   return (PERIOD_OPTIONS as readonly number[]).includes(days) ? (days as PeriodValue) : DEFAULT_PERIOD;
@@ -46,6 +75,15 @@ function wallClockToUtc(year: number, month: number, day: number, clock: string,
 export type LeadQualityWindow = { since: Date; until: Date | null };
 
 export function leadQualityWindow(period: LeadQualityPeriod, now = new Date()): LeadQualityWindow {
+  if (isLeadQualityRange(period)) {
+    const { from, to } = rangeDays(period);
+    const [fy, fm, fd] = from.split("-").map(Number) as [number, number, number];
+    const [ty, tm, td] = to.split("-").map(Number) as [number, number, number];
+    // Up to the midnight after the last day (Date.UTC rolls the day over).
+    const dayAfter = new Date(Date.UTC(ty, tm - 1, td + 1));
+    const until = wallClockToUtc(dayAfter.getUTCFullYear(), dayAfter.getUTCMonth() + 1, dayAfter.getUTCDate(), "00:00", LEAD_QUALITY_TIMEZONE);
+    return { since: wallClockToUtc(fy, fm, fd, "00:00", LEAD_QUALITY_TIMEZONE), until: until > now ? null : until };
+  }
   if (period !== "today") {
     if (period === 3) {
       const local = zonedParts(now, LEAD_QUALITY_TIMEZONE);
@@ -77,7 +115,13 @@ export function leadShiftOf(createdAt: Date): LeadShift {
   return minutes >= splitHour * 60 + splitMinute && minutes < dayHour * 60 + dayMinute ? 2 : 1;
 }
 
+const dayMonth = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}`;
+
 export function leadQualityPeriodLabel(period: LeadQualityPeriod) {
+  if (isLeadQualityRange(period)) {
+    const { from, to } = rangeDays(period);
+    return from === to ? `Dia ${dayMonth(from)}` : `De ${dayMonth(from)} a ${dayMonth(to)}`;
+  }
   return period === "today" ? "Hoje (19h de ontem às 19h)" : `Últimos ${period} dias`;
 }
 

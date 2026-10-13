@@ -2,13 +2,13 @@
 
 import { useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, Download, FileSpreadsheet } from "lucide-react";
+import { CalendarRange, ChevronDown, Download, FileSpreadsheet } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AppSelect } from "@/components/ui/select";
 import { LEAD_ORIGINS } from "../metrics/lead-quality-contract";
-import type { LeadQualityPeriod } from "../metrics/lead-quality-period";
+import { isLeadQualityRange, leadQualityPeriodLabel, leadQualityRange, rangeDays, type LeadQualityPeriod } from "../metrics/lead-quality-period";
 
 type Queue = { id: string; name: string };
 
@@ -39,6 +39,65 @@ export function QualityQueueSelect({ queues, value }: { queues: Queue[]; value: 
         startTransition(() => router.replace(`${pathname}?${params.toString()}`, { scroll: false }));
       }}
     />
+  );
+}
+
+/**
+ * "De x até y": a chosen range of days for the whole page (?period=de_ate).
+ * Starts from the range on screen, or from the last 7 days.
+ */
+export function LeadQualityRangePicker({ period }: { period: LeadQualityPeriod }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [isPending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  // Days in São Paulo, read once when the picker mounts.
+  const [defaults] = useState(() => {
+    const day = (offset: number) => new Date(Date.now() - offset * 86_400_000).toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+    return { today: day(0), weekAgo: day(6) };
+  });
+  const today = defaults.today;
+  const current = isLeadQualityRange(period) ? rangeDays(period) : { from: defaults.weekAgo, to: today };
+  const [from, setFrom] = useState(current.from);
+  const [to, setTo] = useState(current.to);
+  const range = leadQualityRange(from, to);
+
+  function go(next: string | null) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next) params.set("period", next);
+    else params.delete("period");
+    params.delete("dimension");
+    params.delete("key");
+    setOpen(false);
+    startTransition(() => router.replace(`${pathname}?${params.toString()}`, { scroll: false }));
+  }
+
+  return (
+    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (next) { setFrom(current.from); setTo(current.to); } }}>
+      <PopoverTrigger render={<Button variant={isLeadQualityRange(period) ? "secondary" : "outline"} size="sm" className="gap-1.5" disabled={isPending} />}>
+        <CalendarRange className="size-3.5" aria-hidden="true" />
+        <span className="max-[1279px]:hidden">{isLeadQualityRange(period) ? leadQualityPeriodLabel(period) : "De / até"}</span>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-72 space-y-3">
+        <p className="text-sm font-semibold">Escolher o intervalo</p>
+        <div className="grid grid-cols-2 gap-2">
+          <label className="space-y-1 text-xs font-medium text-muted-foreground">
+            De
+            <input type="date" value={from} max={today} onChange={(event) => setFrom(event.target.value)} className="h-9 w-full rounded-lg border border-border bg-card px-2 text-sm text-foreground" />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-muted-foreground">
+            Até
+            <input type="date" value={to} max={today} onChange={(event) => setTo(event.target.value)} className="h-9 w-full rounded-lg border border-border bg-card px-2 text-sm text-foreground" />
+          </label>
+        </div>
+        {range ? null : <p className="text-xs text-destructive">A data inicial vem antes da final, em até um ano.</p>}
+        <div className="flex justify-between gap-2">
+          {isLeadQualityRange(period) ? <Button size="sm" variant="ghost" onClick={() => go(null)}>Limpar</Button> : <span />}
+          <Button size="sm" disabled={!range} onClick={() => range && go(range)}>Aplicar</Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -89,7 +148,7 @@ export function LeadQualityExportMenu({ queues, period, queueId }: { queues: Que
         </div>
         <label className="block space-y-1 text-xs font-medium text-muted-foreground">
           Período
-          <AppSelect aria-label="Período do relatório" value={selectedPeriod} onValueChange={setSelectedPeriod} options={PERIODS} />
+          <AppSelect aria-label="Período do relatório" value={selectedPeriod} onValueChange={setSelectedPeriod} options={isLeadQualityRange(period) ? [{ value: period, label: leadQualityPeriodLabel(period) }, ...PERIODS] : PERIODS} />
         </label>
         <label className="block space-y-1 text-xs font-medium text-muted-foreground">
           Fila

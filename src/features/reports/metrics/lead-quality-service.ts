@@ -31,6 +31,8 @@ export type LeadQualitySegment = {
   converted: number;
   hotWarmConverted: number;
   assigned: number;
+  /** Received in this cut and handed to a broker before its shift ended. */
+  assignedInShift: number;
   metaAttributed: number;
   averageFirstContactSeconds: number | null;
   hotWarmShare: number;
@@ -64,6 +66,9 @@ export type LeadQualityReport = {
     converted: number;
     hotWarmConverted: number;
     assigned: number;
+    /** Handed to a broker before the end of the shift the lead arrived in. */
+    assignedInShift: number;
+    assignedInShiftRate: number;
     metaAttributed: number;
     averageFirstContactSeconds: number | null;
     classificationCoverage: number;
@@ -121,6 +126,19 @@ export function leadShiftExpression() {
      AND timezone('America/Sao_Paulo', ${schema.leads.createdAt})::time < time '19:00' THEN 2
     ELSE 1
   END`;
+}
+
+/**
+ * End of the shift a lead arrived in: 13:30–19:00 ends at 19:00 that day;
+ * 19:00–24:00 at 13:30 of the next day; 00:00–13:30 at 13:30 that day (São Paulo).
+ */
+export function leadShiftEndExpression() {
+  const local = sql`timezone('America/Sao_Paulo', ${schema.leads.createdAt})`;
+  return sql`timezone('America/Sao_Paulo', CASE
+    WHEN ${local}::time >= time '13:30' AND ${local}::time < time '19:00' THEN date_trunc('day', ${local}) + interval '19 hours'
+    WHEN ${local}::time >= time '19:00' THEN date_trunc('day', ${local}) + interval '1 day 13 hours 30 minutes'
+    ELSE date_trunc('day', ${local}) + interval '13 hours 30 minutes'
+  END)`;
 }
 
 /** Window + queue + origin conditions shared by every query of the report. */
@@ -209,7 +227,7 @@ function numberValue(value: unknown): number {
 
 function aggregateFromSegment(segment: Pick<LeadQualitySegment,
   "total" | "hot" | "warm" | "cold" | "unclassified" | "converted" |
-  "hotWarmConverted" | "assigned" | "metaAttributed" | "averageFirstContactSeconds"
+  "hotWarmConverted" | "assigned" | "assignedInShift" | "metaAttributed" | "averageFirstContactSeconds"
 >) {
   const counts = {
     total: segment.total,
@@ -226,6 +244,8 @@ function aggregateFromSegment(segment: Pick<LeadQualitySegment,
     unclassified: segment.unclassified,
     classified: segment.hot + segment.warm + segment.cold,
     averageFirstContactSeconds: segment.averageFirstContactSeconds,
+    assignedInShift: segment.assignedInShift,
+    assignedInShiftRate: percentage(segment.assignedInShift, segment.total),
     ...leadQualityRates(counts),
   };
 }
@@ -249,7 +269,7 @@ export async function getLeadQualityReport(
   if (!enabled) {
     return {
       enabled: false, period, window: serializedWindow, filters, generatedAt: new Date().toISOString(),
-      summary: { total: 0, hot: 0, warm: 0, cold: 0, unclassified: 0, classified: 0, converted: 0, hotWarmConverted: 0, assigned: 0, metaAttributed: 0, averageFirstContactSeconds: null, classificationCoverage: 0, hotWarmShare: 0, hotWarmConversionRate: 0, conversionRate: 0, assignedRate: 0, metaAdAttributionCoverage: 0, temperatureDistribution: { hot: 0, warm: 0, cold: 0, unclassified: 0 } },
+      summary: { total: 0, hot: 0, warm: 0, cold: 0, unclassified: 0, classified: 0, converted: 0, hotWarmConverted: 0, assigned: 0, assignedInShift: 0, assignedInShiftRate: 0, metaAttributed: 0, averageFirstContactSeconds: null, classificationCoverage: 0, hotWarmShare: 0, hotWarmConversionRate: 0, conversionRate: 0, assignedRate: 0, metaAdAttributionCoverage: 0, temperatureDistribution: { hot: 0, warm: 0, cold: 0, unclassified: 0 } },
       segments: emptySegments(), focus, focusedLeads: [], focusedLeadCount: 0,
     };
   }
@@ -279,6 +299,7 @@ export async function getLeadQualityReport(
       hour: sql<number>`extract(hour from timezone('America/Sao_Paulo', ${schema.leads.createdAt}))::int`.as("hour"),
       origin: leadOriginExpression().as("origin"),
       shift: leadShiftExpression().as("shift"),
+      assignedInShift: sql<boolean>`(${schema.leads.assignedAt} IS NOT NULL AND ${schema.leads.assignedAt} <= ${leadShiftEndExpression()})`.as("assignedInShift"),
       qualificationStatus: schema.leads.qualificationStatus,
       status: schema.leads.status,
       hasMetaAd: sql<boolean>`${schema.leads.metaAdId} IS NOT NULL`.as("hasMetaAd"),
@@ -388,6 +409,7 @@ export async function getLeadQualityReport(
     converted: sql<number>`count(*) FILTER (WHERE ${cohort.status} = 'converted')::int`,
     hotWarmConverted: sql<number>`count(*) FILTER (WHERE ${cohort.status} = 'converted' AND ${cohort.qualificationStatus} IN ('hot', 'warm'))::int`,
     assigned: sql<number>`count(*) FILTER (WHERE ${cohort.brokerId} IS NOT NULL)::int`,
+    assignedInShift: sql<number>`count(*) FILTER (WHERE ${cohort.assignedInShift})::int`,
     metaAttributed: sql<number>`count(*) FILTER (WHERE ${cohort.hasMetaAd})::int`,
     averageFirstContactSeconds: sql<number | null>`avg(${cohort.firstContactSeconds}) FILTER (WHERE ${cohort.firstContactSeconds} IS NOT NULL)`,
   }).from(cohort).groupBy(groupingSets).orderBy(desc(count()));
@@ -402,6 +424,7 @@ export async function getLeadQualityReport(
         hot: numberValue(row.hot), warm: numberValue(row.warm), cold: numberValue(row.cold),
         unclassified: numberValue(row.unclassified), converted: numberValue(row.converted),
         hotWarmConverted: numberValue(row.hotWarmConverted), assigned: numberValue(row.assigned),
+        assignedInShift: numberValue(row.assignedInShift),
         metaAttributed: numberValue(row.metaAttributed),
         averageFirstContactSeconds: row.averageFirstContactSeconds == null ? null : numberValue(row.averageFirstContactSeconds),
       };
@@ -434,6 +457,7 @@ export async function getLeadQualityReport(
       converted: numberValue(row.converted),
       hotWarmConverted: numberValue(row.hotWarmConverted),
       assigned: numberValue(row.assigned),
+      assignedInShift: numberValue(row.assignedInShift),
       metaAttributed: numberValue(row.metaAttributed),
       averageFirstContactSeconds: row.averageFirstContactSeconds == null ? null : numberValue(row.averageFirstContactSeconds),
     };
@@ -448,7 +472,7 @@ export async function getLeadQualityReport(
 
   const resolvedSummary = summary ?? {
     total: 0, hot: 0, warm: 0, cold: 0, unclassified: 0, classified: 0, converted: 0,
-    hotWarmConverted: 0, assigned: 0, metaAttributed: 0, averageFirstContactSeconds: null,
+    hotWarmConverted: 0, assigned: 0, assignedInShift: 0, assignedInShiftRate: 0, metaAttributed: 0, averageFirstContactSeconds: null,
     classificationCoverage: 0, hotWarmShare: 0, hotWarmConversionRate: 0, conversionRate: 0,
     assignedRate: 0, metaAdAttributionCoverage: 0, temperatureDistribution: { hot: 0, warm: 0, cold: 0, unclassified: 0 },
   };

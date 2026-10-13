@@ -17,8 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DashboardSectionTabs } from "@/features/dashboard/components/dashboard-section-tabs";
-import { leadQualityPeriodLabel, leadQualityWindowLabel, type LeadQualityPeriod } from "../metrics/lead-quality-period";
-import { LeadQualityExportMenu, QualityQueueSelect } from "./lead-quality-filters";
+import { isLeadQualityRange, leadQualityPeriodLabel, leadQualityWindowLabel, type LeadQualityPeriod } from "../metrics/lead-quality-period";
+import { LeadQualityExportMenu, LeadQualityRangePicker, QualityQueueSelect } from "./lead-quality-filters";
 import type { LeadQualityDimension, LeadQualityReport, LeadQualitySegment } from "../metrics/lead-quality-service";
 
 const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -407,13 +407,15 @@ export function LeadQualityCenter({ report, showQualityTab = true, queues = [] }
           <div className="flex min-w-0 items-center gap-2">
             <div className="w-28 shrink-0">
               <PeriodSelect
-                value={report.period}
+                value={isLeadQualityRange(report.period) ? "custom" : report.period}
                 includeToday
                 includeThreeDays
+                includeCustom={isLeadQualityRange(report.period)}
                 label="Período da análise de qualidade"
                 triggerClassName="h-8 rounded-lg border border-border bg-card px-3 text-sm text-foreground hover:bg-muted"
               />
             </div>
+            <LeadQualityRangePicker period={report.period} />
             {report.enabled ? <QualityQueueSelect queues={queues} value={report.filters.queueId} /> : null}
             {report.enabled ? <LeadQualityExportMenu queues={queues} period={report.period} queueId={report.filters.queueId} /> : null}
           </div>
@@ -470,6 +472,11 @@ export function LeadQualityCenter({ report, showQualityTab = true, queues = [] }
                     <p className="text-xs text-muted-foreground">Quentes/mornos convertidos</p>
                     <p className="mt-2 text-2xl font-semibold tabular-nums">{numberLabel(report.summary.hotWarmConverted)}</p>
                     <p className="mt-1 text-xs text-muted-foreground">{percent(report.summary.hotWarmConversionRate)} de quentes/mornos</p>
+                  </div>
+                  <div className="rounded-xl border border-border/70 bg-muted/25 p-4">
+                    <p className="text-xs text-muted-foreground">Distribuídos no turno</p>
+                    <p className="mt-2 text-2xl font-semibold tabular-nums">{numberLabel(report.summary.assignedInShift)} <span className="text-sm font-normal text-muted-foreground">de {numberLabel(report.summary.total)}</span></p>
+                    <p className="mt-1 text-xs text-muted-foreground">{percent(report.summary.assignedInShiftRate)} entraram e foram atribuídos até o fim do próprio turno</p>
                   </div>
                   <div className="rounded-xl border border-border/70 bg-muted/25 p-4">
                     <p className="text-xs text-muted-foreground">Com corretor atual</p>
@@ -566,7 +573,7 @@ function Intro({ period, windowLabel }: { period: LeadQualityPeriod; windowLabel
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-xl border border-border/70 bg-background/70 px-3 py-2 text-xs text-muted-foreground">
-          <Clock3 aria-hidden="true" className="size-3.5" /> {period === "today" ? `Hoje · ${windowLabel}` : `Últimos ${period} dias`}
+          <Clock3 aria-hidden="true" className="size-3.5" /> {period === "today" ? `Hoje · ${windowLabel}` : leadQualityPeriodLabel(period)}
         </div>
       </div>
     </section>

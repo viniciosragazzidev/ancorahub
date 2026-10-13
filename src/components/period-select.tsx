@@ -29,11 +29,14 @@ export function PeriodSelect({
   includeAll = false,
   includeToday = false,
   includeThreeDays = false,
+  includeCustom = false,
   label = "Período",
   triggerClassName,
 }: {
-  value: PeriodValue | 3 | "all" | "today";
+  value: PeriodValue | 3 | "all" | "today" | "custom";
   includeAll?: boolean;
+  /** Shows "Personalizado" while a chosen range (de/até) is applied. */
+  includeCustom?: boolean;
   /** "Hoje" option (`?period=today`) — the lead quality center's 18h-to-18h day. */
   includeToday?: boolean;
   /** Add the lead quality center's three-day window (`?period=3`). */
@@ -89,6 +92,7 @@ export function PeriodSelect({
       </SelectTrigger>
       <SelectContent>
         {includeAll ? <SelectItem value="all">Geral</SelectItem> : null}
+        {includeCustom ? <SelectItem value="custom" disabled>Personalizado</SelectItem> : null}
         {includeToday ? <SelectItem value="today">Hoje</SelectItem> : null}
         {includeThreeDays ? <SelectItem value="3">3 dias</SelectItem> : null}
         {PERIOD_OPTIONS.map((p) => (

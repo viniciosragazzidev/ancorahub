@@ -82,7 +82,7 @@ type SegmentRow = {
   label: string; total: string; share: string; hot: string; warm: string; cold: string; assigned: string; converted: string; conversion: string; firstContact: string;
 };
 
-function segmentRow(segment: Pick<LeadQualitySegment, "total" | "hot" | "warm" | "cold" | "assigned" | "converted" | "hotWarmShare" | "conversionRate" | "averageFirstContactSeconds">, label: string): SegmentRow {
+function segmentRow(segment: Pick<LeadQualitySegment, "total" | "hot" | "warm" | "cold" | "assigned" | "assignedInShift" | "converted" | "hotWarmShare" | "conversionRate" | "averageFirstContactSeconds">, label: string): SegmentRow {
   return {
     label,
     total: numberLabel(segment.total),
@@ -90,7 +90,7 @@ function segmentRow(segment: Pick<LeadQualitySegment, "total" | "hot" | "warm" |
     hot: numberLabel(segment.hot),
     warm: numberLabel(segment.warm),
     cold: numberLabel(segment.cold),
-    assigned: numberLabel(segment.assigned),
+    assigned: numberLabel(segment.assignedInShift),
     converted: numberLabel(segment.converted),
     conversion: percentLabel(segment.conversionRate),
     firstContact: durationLabel(segment.averageFirstContactSeconds),
@@ -104,7 +104,7 @@ const segmentColumns = (first: string): DataTableColumn<SegmentRow>[] => [
   { key: "hot", header: "Quentes", align: "right", width: "8.5%" },
   { key: "warm", header: "Mornos", align: "right", width: "8.5%" },
   { key: "cold", header: "Frios", align: "right", width: "7%" },
-  { key: "assigned", header: "Distrib.", align: "right", width: "8.5%" },
+  { key: "assigned", header: "Distrib. no turno", align: "right", width: "8.5%" },
   { key: "converted", header: "Conv.", align: "right", width: "7%" },
   { key: "conversion", header: "Taxa", align: "right", width: "8%" },
   { key: "firstContact", header: "1º contato", align: "right", width: "13.5%" },
@@ -148,7 +148,7 @@ function SummaryTiles({ input }: { input: LeadQualityPdfInput }) {
         <Tile label="Leads recebidos" value={numberLabel(s.total)} detail={`${numberLabel(s.classified)} classificados`} highlight />
         <Tile label="Quentes + mornos" value={percentLabel(s.hotWarmShare)} detail={`${numberLabel(s.hot + s.warm)} leads`} />
         <Tile label="Conversão" value={percentLabel(s.conversionRate)} detail={`${numberLabel(s.converted)} convertidos`} />
-        <Tile label="Distribuídos" value={percentLabel(s.assignedRate)} detail={`${numberLabel(s.assigned)} com corretor`} />
+        <Tile label="Distribuídos no turno" value={`${numberLabel(s.assignedInShift)} de ${numberLabel(s.total)}`} detail={`${percentLabel(s.assignedInShiftRate)} entraram e foram atribuídos até o fim do próprio turno · ${numberLabel(s.assigned)} com corretor hoje`} />
       </Row>
       <Row>
         <Tile label="1º contato (média)" value={durationLabel(s.averageFirstContactSeconds)} detail="Do recebimento ao primeiro contato" />
@@ -208,7 +208,7 @@ function OriginCards({ input }: { input: LeadQualityPdfInput }) {
               <View style={{ gap: 2, marginTop: 2 }}>
                 {[
                   ["Quentes + mornos", segment ? percentLabel(segment.hotWarmShare) : "—"],
-                  ["Distribuídos", segment ? numberLabel(segment.assigned) : "—"],
+                  ["Distribuídos no turno", segment ? `${numberLabel(segment.assignedInShift)} de ${numberLabel(segment.total)}` : "—"],
                   ["Convertidos", segment ? `${numberLabel(segment.converted)} (${percentLabel(segment.conversionRate)})` : "—"],
                   ["1º contato (média)", durationLabel(segment?.averageFirstContactSeconds ?? null)],
                 ].map(([label, value]) => (
@@ -246,7 +246,7 @@ function ShiftBlock({ input }: { input: LeadQualityPdfInput }) {
   return (
     <View>
       <View wrap={false}>
-        <SectionTitle title="Por turno" description="Turno 1: das 19h do dia anterior às 13h30 · Turno 2: das 13h30 às 19h." />
+        <SectionTitle title="Por turno" description="Turno 1: das 19h do dia anterior às 13h30 · Turno 2: das 13h30 às 19h. O turno é o de entrada do lead. Distribuídos no turno: atribuídos a um corretor até o fim desse turno (pela atribuição mais recente; um lead redistribuído depois conta como fora)." />
         <Row>
           {LEAD_SHIFTS.map((shift) => {
             const total = shiftTotals.get(shift.key);
@@ -258,6 +258,10 @@ function ShiftBlock({ input }: { input: LeadQualityPdfInput }) {
                     <Span style={{ fontSize: 7.5, color: C.mutedForeground }}>{shift.hours}</Span>
                   </View>
                   <Span style={{ fontSize: 18, fontWeight: 600, color: C.accent }}>{numberLabel(total?.total ?? 0)}</Span>
+                </Row>
+                <Row style={{ justifyContent: "space-between" }}>
+                  <Span style={{ fontSize: 8, color: C.mutedForeground }}>{`Entraram ${numberLabel(total?.total ?? 0)} · atribuídos até o fim do turno`}</Span>
+                  <Span style={{ fontSize: 8, fontWeight: 600, color: C.foreground }}>{`${numberLabel(total?.assignedInShift ?? 0)} (${percentLabel(total && total.total ? (total.assignedInShift / total.total) * 100 : 0)})`}</Span>
                 </Row>
                 {origins.map((origin) => {
                   const segment = byOriginShift.get(`${origin.key}:${shift.key}`);

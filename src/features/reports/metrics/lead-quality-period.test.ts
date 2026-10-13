@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { leadQualityWindow, leadShiftOf, parseLeadQualityPeriod } from "./lead-quality-period";
+import { leadQualityPeriodLabel, leadQualityRange, leadQualityWindow, leadShiftOf, parseLeadQualityPeriod } from "./lead-quality-period";
 
 describe("lead quality period", () => {
   it("parses today and the shared day options", () => {
@@ -36,5 +36,29 @@ describe("lead quality period", () => {
     expect(leadShiftOf(new Date("2026-10-02T21:00:00.000Z"))).toBe(2); // 18:00
     expect(leadShiftOf(new Date("2026-10-02T21:59:00.000Z"))).toBe(2); // 18:59
     expect(leadShiftOf(new Date("2026-10-02T22:00:00.000Z"))).toBe(1); // 19:00
+  });
+});
+
+describe("intervalo de datas (de x até y)", () => {
+  it("reads a valid range and rejects reversed, invalid or over a year", () => {
+    expect(parseLeadQualityPeriod("2026-10-01_2026-10-13")).toBe("2026-10-01_2026-10-13");
+    expect(parseLeadQualityPeriod("2026-10-13_2026-10-01")).toBe(30);
+    expect(parseLeadQualityPeriod("2026-02-30_2026-03-01")).toBe(30);
+    expect(leadQualityRange("2025-01-01", "2026-10-13")).toBeNull();
+  });
+
+  it("covers from the first day 00:00 to the midnight after the last, in São Paulo", () => {
+    const window = leadQualityWindow("2026-10-01_2026-10-12", new Date("2026-10-13T15:00:00Z"));
+    expect(window.since.toISOString()).toBe("2026-10-01T03:00:00.000Z");
+    expect(window.until?.toISOString()).toBe("2026-10-13T03:00:00.000Z");
+  });
+
+  it("stays open when the range reaches today", () => {
+    expect(leadQualityWindow("2026-10-10_2026-10-13", new Date("2026-10-13T15:00:00Z")).until).toBeNull();
+  });
+
+  it("labels the range", () => {
+    expect(leadQualityPeriodLabel("2026-10-01_2026-10-13")).toBe("De 01/10 a 13/10");
+    expect(leadQualityPeriodLabel("2026-10-13_2026-10-13")).toBe("Dia 13/10");
   });
 });
