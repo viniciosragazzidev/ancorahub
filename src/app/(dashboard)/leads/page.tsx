@@ -217,6 +217,8 @@ async function LeadsPageContent({
         city: readStr("cidade"),
         summary: readStr("resumoAtendimento") ?? readStr("resumoNecessidade"),
         createdAt: lead.createdAt,
+        // When it reached this broker, like the Fila: a lead created days ago and handed out today is today's.
+        arrivedAt: lead.assignedAt ?? lead.createdAt,
         updatedAt: lead.stageEnteredAt,
         dueAt,
         isOverdue: dueAt ? dueAt.getTime() < Date.now() : false,

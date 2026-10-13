@@ -81,7 +81,7 @@ const STATUS_LABEL: Record<string, string> = {
 type LeadState = { tone: BadgeTone; chip: string; context: string };
 
 function describeLead(lead: LightLeadItem): LeadState {
-  if (isLostLead(lead)) return { tone: "neutral", chip: "Perdido", context: lead.lostReason || "Redistribuído por inatividade" };
+  if (isLostLead(lead)) return { tone: "neutral", chip: "Perdido", context: lead.lostReason || "Marcado como perdido" };
   if (isWonLead(lead)) return { tone: "success", chip: "Venda concluída", context: "Venda concluída" };
   if (isNewLead(lead)) return { tone: "info", chip: "Novo", context: "Aguardando seu aceite" };
   if (lead.isAwaitingResponse) return { tone: "success", chip: "Respondeu", context: "O cliente respondeu e aguarda você" };
