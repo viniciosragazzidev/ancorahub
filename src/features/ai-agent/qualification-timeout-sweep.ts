@@ -1,6 +1,6 @@
 ﻿import "server-only";
 
-import { and, desc, eq, isNotNull, isNull, ne, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, isNull, ne, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
@@ -157,7 +157,10 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       timedOutLeadsCount += 1;
       const updateTime = new Date();
 
-      // Verificar se o lead interagiu (respondeu ao menos uma mensagem)
+      // Verificar se o lead interagiu: uma mensagem do cliente DEPOIS da primeira.
+      // Um lead de WhatsApp nasce da mensagem do próprio cliente; contá-la deixava
+      // todo lead de WhatsApp como Morno sem ter respondido a qualificação (13/10).
+      const repliedAfter = new Date((lead.createdAt ?? new Date(0)).getTime() + 5_000);
       const [incomingMessage] = await db
         .select({ id: schema.whatsappMessages.id })
         .from(schema.whatsappMessages)
@@ -168,7 +171,8 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
               eq(schema.whatsappMessages.leadId, lead.id),
               and(isNotNull(schema.whatsappMessages.phone), eq(schema.whatsappMessages.phone, lead.telefone ?? ""))
             ),
-            notInArray(schema.whatsappMessages.direction, ["outbound", "outgoing"])
+            notInArray(schema.whatsappMessages.direction, ["outbound", "outgoing"]),
+            gt(schema.whatsappMessages.sentAt, repliedAfter)
           )
         )
         .limit(1);
