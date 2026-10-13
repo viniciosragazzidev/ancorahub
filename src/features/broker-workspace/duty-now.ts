@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, gte, isNull, lt, ne } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, lt, ne, or } from "drizzle-orm";
 
 import { getCachedBrokerWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
@@ -97,6 +97,12 @@ export async function getDutyNow(now = new Date(), scheduleId?: string | null): 
         eq(schema.leads.tenantId, context.tenantId),
         eq(schema.leads.corretorId, context.userId),
         isNull(schema.leads.deletedAt),
+        // Only leads of this plantão (or with no plantão): with PME and Presencial
+        // at once, a lead offered in one showed up in the other as "atribuído".
+        // A lead with no plantão shows in the first one only, never twice.
+        active.scheduleId === running[0]?.scheduleId
+          ? or(isNull(schema.leads.dutyScheduleId), eq(schema.leads.dutyScheduleId, active.scheduleId))
+          : eq(schema.leads.dutyScheduleId, active.scheduleId),
         gte(schema.leads.assignedAt, active.startsAt),
         lt(schema.leads.assignedAt, active.endsAt),
       ))
