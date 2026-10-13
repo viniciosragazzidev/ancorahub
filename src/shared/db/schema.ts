@@ -498,6 +498,8 @@ export const aiQualificationConfigs = pgTable(
     businessHoursEnd: text("business_hours_end"),
     businessDays: text("business_days"),
     requiredFields: jsonb("required_fields"),
+    /** Director's own wording per qualification question ({ city: "Em que cidade..." }); missing keys keep the built-in wording. */
+    questionTexts: jsonb("question_texts"),
     customInstructions: text("custom_instructions"),
     pauseMode: text("pause_mode").notNull().default("handoff_active"),
     version: integer("version").notNull().default(1),

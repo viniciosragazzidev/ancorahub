@@ -209,7 +209,7 @@ export function resolveDeterministicQualificationTurn(input: {
     ? []
     : (input.answered ?? []).filter((field): field is QualificationFieldKey => field in ALL_QUESTIONS_DEFINITIONS);
   const repeated = answered.length === 0
-    && wasQuestionAsked(key, input.memory, nextQuestion.text, input.pastOutboundTexts ?? []);
+    && wasQuestionAsked(key, input.memory, nextQuestion.text, input.pastOutboundTexts ?? [], input.policy.questionTexts?.[key]);
 
   return {
     kind: "collecting",
@@ -221,6 +221,7 @@ export function resolveDeterministicQualificationTurn(input: {
       seed: input.seed ?? `${key}:${evaluation.completedFields.length}`,
       repeated,
       last: evaluation.missingFields.length === 1 && (input.policy.requiredFields?.length ?? 0) >= 3,
+      customText: input.policy.questionTexts?.[key],
     }),
     evaluation,
     nextQuestion,

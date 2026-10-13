@@ -23,6 +23,19 @@ describe("scripted reply acknowledgement", () => {
   });
 });
 
+describe("flow chosen by the director (Atendimento > Fluxo)", () => {
+  it("asks in the saved order and with the director's text", () => {
+    const custom: AgentBehaviorPolicy = { ...policy, requiredFields: ["city", "customerName"], questionTexts: { city: "De qual cidade você fala?" } };
+    expect(resolveDeterministicQualificationTurn({ memory: createEmptyMemory(), policy: custom }).reply).toBe("De qual cidade você fala?");
+  });
+
+  it("recognizes the director's text as already asked and rephrases it", () => {
+    const custom: AgentBehaviorPolicy = { ...policy, requiredFields: ["city", "customerName"], questionTexts: { city: "De qual cidade você fala?" } };
+    const reply = resolveDeterministicQualificationTurn({ memory: createEmptyMemory(), policy: custom, pastOutboundTexts: new Set(["De qual cidade você fala?"]) }).reply;
+    expect(reply).toMatch(/: de qual cidade você fala\?$/);
+  });
+});
+
 describe("lead columns during a live AI conversation", () => {
   it("keeps the lead in qualification while nothing was collected, so distribution waits", () => {
     const empty = evaluateQualification(createEmptyMemory(), policy);

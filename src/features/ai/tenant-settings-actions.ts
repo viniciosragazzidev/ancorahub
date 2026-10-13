@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { keepChosenOrder } from "@/features/qualification-flow/domain";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -62,8 +63,9 @@ export async function updateTenantAiSettingsAction(_prev: { success: boolean; er
     if (!parsed.success) return { success: false, error: "Revise os campos: mensagens, limites e objetivos precisam estar preenchidos corretamente." };
     const db = getDatabase();
     const now = new Date();
-    const existing = await db.select({ id: schema.aiQualificationConfigs.id, version: schema.aiQualificationConfigs.version }).from(schema.aiQualificationConfigs).where(eq(schema.aiQualificationConfigs.tenantId, context.tenantId)).limit(1);
-    const values = { ...parsed.data, version: (existing[0]?.version ?? 0) + 1, updatedBy: context.userId, updatedAt: now };
+    const existing = await db.select({ id: schema.aiQualificationConfigs.id, version: schema.aiQualificationConfigs.version, requiredFields: schema.aiQualificationConfigs.requiredFields }).from(schema.aiQualificationConfigs).where(eq(schema.aiQualificationConfigs.tenantId, context.tenantId)).limit(1);
+    // The checkboxes say which questions are on, not their order: keep the order chosen in Atendimento > Fluxo.
+    const values = { ...parsed.data, requiredFields: keepChosenOrder(existing[0]?.requiredFields, parsed.data.requiredFields), version: (existing[0]?.version ?? 0) + 1, updatedBy: context.userId, updatedAt: now };
     await db.transaction(async (tx) => {
       if (existing[0]) await tx.update(schema.aiQualificationConfigs).set(values).where(eq(schema.aiQualificationConfigs.id, existing[0].id));
       else await tx.insert(schema.aiQualificationConfigs).values({ id: randomUUID(), tenantId: context.tenantId, enabled: false, timeoutMinutes: parsed.data.maxConversationMinutes, maxRetries: 2, createdAt: now, ...values });

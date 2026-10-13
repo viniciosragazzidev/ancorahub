@@ -15,6 +15,8 @@ export const agentBehaviorPolicySchema = z.object({
   businessDays: z.string().max(40).optional().default(""),
   handoffMessage: z.string().trim().min(1).max(1000),
   quickReplyTemplates: z.record(z.string().max(80), z.string().trim().min(1).max(1000)).default({}),
+  /** The director's wording per question (Atendimento > Fluxo); a missing key keeps the built-in wording. */
+  questionTexts: z.partialRecord(z.enum(["customerName", "planType", "numberOfLives", "age", "city", "email"]), z.string().trim().min(1).max(300)).optional(),
   knowledgePolicy: z.object({ enabled: z.boolean().default(false), requireSourceForCommercialClaims: z.literal(true) }),
   qualification: z.object({
     profileKey: z.string().trim().min(1).max(60).default("general"),

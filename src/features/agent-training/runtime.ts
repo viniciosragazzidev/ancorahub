@@ -45,6 +45,9 @@ export async function resolvePublishedAgentBehavior(tenantId: string, pinnedVers
     if (configRow.maxQuestions) {
       policy.maxQuestions = configRow.maxQuestions;
     }
+    if (configRow.questionTexts && typeof configRow.questionTexts === "object" && !Array.isArray(configRow.questionTexts)) {
+      policy.questionTexts = configRow.questionTexts as AgentBehaviorPolicy["questionTexts"];
+    }
     if (configRow.handoffMessage) {
       policy.handoffMessage = configRow.handoffMessage;
     }

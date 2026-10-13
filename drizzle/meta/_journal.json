@@ -1009,6 +1009,13 @@
                         "when":  1791659000000,
                         "tag":  "0196_duty_presence_release_note",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  144,
+                        "version":  "7",
+                        "when":  1791660000000,
+                        "tag":  "0197_qualification_question_texts",
+                        "breakpoints":  true
                     }
                 ]
 }

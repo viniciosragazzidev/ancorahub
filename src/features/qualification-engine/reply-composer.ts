@@ -30,6 +30,8 @@ export type ComposeQuestionInput = {
   repeated?: boolean;
   /** This is the last missing field. */
   last?: boolean;
+  /** The director's own wording for this question (Atendimento > Fluxo); replaces the built-in ones. */
+  customText?: string | null;
 };
 
 function stableHash(value: string) {
@@ -179,7 +181,8 @@ function acknowledgement(input: ComposeQuestionInput, name: string | null): stri
 /** One qualification question with its confirmation, progress cue and rephrasing. */
 export function composeQuestionReply(input: ComposeQuestionInput): string {
   const name = input.memory.customerFirstName?.value?.trim() || input.memory.customerName?.value?.trim().split(/\s+/)[0] || null;
-  const variants = questionVariants(input.key, input.memory);
+  const custom = input.customText?.trim();
+  const variants = custom ? [custom] : questionVariants(input.key, input.memory);
   const question = pick(variants, `${input.seed}:q`);
   if (input.repeated) {
     const lead = pick(["Só para eu registrar certinho:", "Para eu seguir com a cotação:", "Me ajuda com uma informação:"], `${input.seed}:r`);
@@ -191,8 +194,8 @@ export function composeQuestionReply(input: ComposeQuestionInput): string {
 }
 
 /** True when any wording of this question (current or legacy) was already sent. */
-export function wasQuestionAsked(key: QualificationFieldKey, memory: ConversationMemory, legacyText: string, pastOutboundTexts: Iterable<string>) {
-  const needles = [legacyText, ...questionVariants(key, memory)].map((text) => normalize(text));
+export function wasQuestionAsked(key: QualificationFieldKey, memory: ConversationMemory, legacyText: string, pastOutboundTexts: Iterable<string>, customText?: string | null) {
+  const needles = [legacyText, ...questionVariants(key, memory), ...(customText?.trim() ? [customText.trim()] : [])].map((text) => normalize(text));
   for (const sent of pastOutboundTexts) {
     const haystack = normalize(sent);
     if (needles.some((needle) => haystack.includes(needle) || haystack.includes(lowerFirst(needle)))) return true;
