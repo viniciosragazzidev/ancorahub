@@ -212,6 +212,8 @@ function nextStep(lead: LeadConversationLead, now: Date, whatsappUrl: string | n
   if (IN_SERVICE.has(lead.status)) {
     const stage = LEAD_STATUS_LABELS[lead.status] ?? lead.status;
     const choices: ChatChoice[] = [...whatsappChoice(whatsappUrl)];
+    // The step before the quote: the broker wrote and is waiting (kept in the lead's history).
+    if (lead.status === "in_contact") choices.push({ id: "waiting-reply", label: "Enviei mensagem, aguardando resposta", reply: "Enviei mensagem, estou aguardando a resposta", action: { kind: "server", name: "lead.addNote", payload: { leadId: lead.id, content: "Mensagem enviada, aguardando resposta do cliente." } } });
     if (lead.status !== "quote_sent") choices.push({ id: "quote", label: "Enviei a cotação", action: { kind: "next", questionId: "q-quote" } });
     if (lead.status !== "negotiation") choices.push({ id: "negotiation", label: "Estamos negociando", action: { kind: "server", name: "lead.changeStep", payload: { leadId: lead.id, status: "negotiation" } } });
     choices.push({ id: "return", label: "Agendar retorno", action: { kind: "next", questionId: "q-return" } });

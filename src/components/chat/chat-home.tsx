@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 
@@ -9,6 +10,8 @@ import BottomSheet from "@/components/arc/bottom-sheet/bottom-sheet";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 
+// Loaded on the client only: it reads the broker's WhatsApp session (server actions).
+const WhatsAppStatusButton = dynamic(() => import("@/components/whatsapp/whatsapp-status-button").then((mod) => mod.WhatsAppStatusButton), { ssr: false });
 import { AssistantAvatar } from "./assistant-avatar";
 import { PresenceCallout } from "./presence-callout";
 import styles from "./chat.module.css";
@@ -160,6 +163,7 @@ export function ChatHome({
         <button type="button" className={home.me} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</button>
         <Link href="/dashboard" className={home.helloLink}><h1 className={home.hello}>Olá, {firstName}</h1></Link>
         <div className={home.headerTools} data-tour="home-tools">
+          {isSupervisor ? null : <WhatsAppStatusButton />}
           <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>

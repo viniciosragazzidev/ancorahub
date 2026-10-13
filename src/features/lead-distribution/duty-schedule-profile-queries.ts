@@ -5,6 +5,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
+import { selectEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
 import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
@@ -167,13 +168,16 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   const { since, until } = resolveDutyLeadWindowBounds(occurrenceWindow, now);
   const upcomingStartsAt = occurrenceWindow.upcomingStartsAt ?? null;
 
-  // Same rule as the runtime (DEC-123): on a date with a published escala, its
-  // brokers replace the weekly roster; any other date keeps the weekly roster.
+  // Same rule as the distribution (2026-10-09, weekly and published ADD UP): on a
+  // date with a published escala, its brokers plus the weekly ones not already in
+  // it; any other date keeps the weekly roster. (It used to replace the weekly
+  // roster here, so weekly brokers vanished from this page while still receiving leads.)
   const monthlyEnabled = (await getFeatureFlag(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING)) === "true";
   const occurrenceStart = upcomingStartsAt ?? getRelevantDutyWindow(schedule, referenceNow, 0)?.startsAt ?? since;
   const occurrenceDate = getSaoPauloDateKey(occurrenceStart);
   const publishedHere = monthlyEnabled ? rosterRows.filter((row) => row.dutyDate === occurrenceDate) : [];
-  const roster = publishedHere.length ? publishedHere : rosterRows.filter((row) => row.dutyDate === null);
+  const publishedBrokers = new Set(publishedHere.map((row) => row.brokerId));
+  const roster = [...publishedHere, ...rosterRows.filter((row) => row.dutyDate === null && !publishedBrokers.has(row.brokerId))];
 
   // Before dutyScheduleId was persisted, shared queues still have enough
   // context to restore assigned leads to one occurrence: the broker's roster,
@@ -209,12 +213,12 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     rows.push(row);
     assignmentsBySchedule.set(row.scheduleId, rows);
   }
-  const attributionAssignments = siblingAssignmentRows.filter((row) => {
-    const rows = assignmentsBySchedule.get(row.scheduleId) ?? [];
-    return monthlyEnabled && rows.some((candidate) => candidate.dutyDate === occurrenceDate)
-      ? row.dutyDate === occurrenceDate
-      : row.dutyDate === null;
-  });
+  // Same add-up rule for the sibling plantões used to attribute old leads.
+  const attributionAssignments = selectEffectiveDutyAssignments(
+    siblingAssignmentRows,
+    occurrenceDate,
+    monthlyEnabled ? new Set([...assignmentsBySchedule].filter(([, rows]) => rows.some((candidate) => candidate.dutyDate === occurrenceDate)).map(([id]) => id)) : null,
+  );
   const attributionAssignmentIds = attributionAssignments.map((row) => row.id);
   const attributionPresenceRows = attributionAssignmentIds.length
     ? await db.select({

@@ -63,7 +63,10 @@ export function WhatsAppConnectDialog({
   connectedLabel = "WhatsApp conectado",
   onConnectionChanged,
   onOpenChange,
+  trigger,
 }: {
+  /** A custom trigger (e.g. the round status button of the Lite); default is the labeled button. */
+  trigger?: React.ReactElement;
   initial: Connection;
   returnTo?: string;
   triggerLabel?: string;
@@ -542,7 +545,7 @@ export function WhatsAppConnectDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button variant={ready ? "outline" : "default"}><WhatsappLogo /> {ready ? connectedLabel : triggerLabel}</Button>} />
+      <DialogTrigger render={trigger ?? <Button variant={ready ? "outline" : "default"}><WhatsappLogo /> {ready ? connectedLabel : triggerLabel}</Button>} />
       <DialogPopup className="max-w-2xl">
         <div className="flex items-start justify-between gap-ds-16">
           <div className="min-w-0 flex-1">

@@ -59,7 +59,7 @@ describe("buildLeadConversationScript", () => {
   it("guides the attendance with WhatsApp, stage, return and loss", () => {
     const { blocks } = build({ status: "in_contact", telefone: "(21) 99999-9999" });
     const main = question(blocks, "q-main");
-    expect(main.choices.map((choice) => choice.id)).toEqual(["whatsapp", "quote", "negotiation", "return", "ficha#venda", "lost"]);
+    expect(main.choices.map((choice) => choice.id)).toEqual(["whatsapp", "waiting-reply", "quote", "negotiation", "return", "ficha#venda", "lost"]);
     expect(question(blocks, "q-quote").choices[0].action).toEqual({ kind: "server", name: "lead.changeStep", payload: { leadId: "l1", status: "quote_sent", when: "tomorrow" } });
     // "Chamar no WhatsApp" opens WhatsApp in the same tap: no green button below (2026-10-12).
     expect(main.choices[0]?.action).toEqual({ kind: "local", value: "whatsapp:https://wa.me/5521999999999" });

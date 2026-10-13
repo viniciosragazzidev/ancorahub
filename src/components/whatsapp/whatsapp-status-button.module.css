@@ -1,0 +1,10 @@
+/* Lite top right: WhatsApp connection at a glance (2026-10-13). */
+.button { --wa-cut: var(--surface, #fff); position: relative; width: 40px; height: 40px; border-radius: 999px; border: 1px solid var(--border-subtle, rgb(16 16 40 / 0.08)); display: grid; place-items: center; cursor: pointer; transition: transform var(--duration-fast, 120ms) ease, background-color var(--duration-fast, 120ms) ease; }
+.button:active { transform: scale(0.94); }
+.button[data-connected="true"] { color: #1fa855; background: color-mix(in oklab, #1fa855 12%, var(--surface, #fff)); }
+.button[data-connected="false"] { --wa-cut: color-mix(in oklab, var(--danger, #d92d20) 12%, var(--surface, #fff)); color: var(--danger, #d92d20); background: var(--wa-cut); border-color: color-mix(in oklab, var(--danger, #d92d20) 35%, transparent); }
+.dot { position: absolute; right: 1px; top: 1px; width: 10px; height: 10px; border-radius: 999px; box-shadow: 0 0 0 2px var(--surface, #fff); }
+.button[data-connected="true"] .dot { background: #1fa855; }
+.button[data-connected="false"] .dot { background: var(--danger, #d92d20); animation: waPulse 1.8s ease-in-out infinite; }
+@keyframes waPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
+@media (prefers-reduced-motion: reduce) { .button[data-connected="false"] .dot { animation: none; } }

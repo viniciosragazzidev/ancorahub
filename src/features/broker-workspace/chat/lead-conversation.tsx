@@ -62,15 +62,28 @@ export function LeadConversation({
           </Link>
         }
         onLocalChoice={(_choice, value): ChatBlock[] => {
+          const stamp = Date.now();
+          if (value === "wa-later") return [{ type: "assistant", id: `wa-later-${stamp}`, text: "Sem problema. Quando falar, me conta aqui que eu registro." }];
           if (!value.startsWith(WHATSAPP_LOCAL_PREFIX)) return [];
           // Same tap as the reply: the phone opens WhatsApp (never a blocked popup); the computer opens the dialog.
           void recordWhatsAppOpenedAction(leadId);
-          if (desktop) {
-            setFirstMessageOpen(true);
-            return [{ type: "assistant", id: `wa-open-${Date.now()}`, text: "Abrindo a mensagem…" }];
-          }
-          window.open(value.slice(WHATSAPP_LOCAL_PREFIX.length), "_blank", "noopener");
-          return [{ type: "assistant", id: `wa-open-${Date.now()}`, text: "Abrindo o WhatsApp…" }];
+          if (desktop) setFirstMessageOpen(true);
+          else window.open(value.slice(WHATSAPP_LOCAL_PREFIX.length), "_blank", "noopener");
+          // Back from WhatsApp: one tap confirms the contact (kept in the lead's history).
+          const first = name.split(/\s+/)[0] || name;
+          return [
+            { type: "assistant", id: `wa-open-${stamp}`, text: desktop ? "Abrindo a mensagem…" : "Abrindo o WhatsApp…" },
+            {
+              type: "question",
+              id: `wa-confirm-${stamp}`,
+              prompt: `Conseguiu falar com ${first}?`,
+              choices: [
+                { id: "wa-yes", label: `Sim, falei com ${first}`, reply: `Falei com ${first}`, action: { kind: "server", name: "lead.addNote", payload: { leadId, content: "Contato feito pelo WhatsApp (confirmado pelo corretor)." } } },
+                { id: "wa-sent", label: "Enviei mensagem, aguardando resposta", reply: "Enviei mensagem, estou aguardando", action: { kind: "server", name: "lead.addNote", payload: { leadId, content: "Mensagem enviada pelo WhatsApp, aguardando resposta do cliente." } } },
+                { id: "wa-no", label: "Ainda não", action: { kind: "local", value: "wa-later" } },
+              ],
+            },
+          ];
         }}
         runAction={async (action) => {
           const result = await runChatServerAction(action.name, action.payload);
