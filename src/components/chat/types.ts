@@ -137,6 +137,8 @@ export type ThreadSummary = {
   unread: boolean;
   /** The conversation is waiting for the broker: preview in blue, sorted first. */
   waitingYou: boolean;
+  /** A new lead waits for acceptance: the row pulses to call attention. */
+  attention?: boolean;
   href: string;
   shape: MascotShape;
   /** 0-359 color of the mascot; null for the logo/lead initials. */

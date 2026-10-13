@@ -19,6 +19,10 @@ describe("nextActionOf", () => {
     expect(nextActionOf(priority({ kind: "sla_overdue", severity: "critical" }), null, now)).toMatchObject({ label: "Atender Carla", urgent: true });
   });
 
+  it("a new lead becomes 'Aceitar Atendimento', urgent, accepting it right there", () => {
+    expect(nextActionOf(priority({ kind: "new_lead", title: "Amilton Damasceno" }), null, now)).toMatchObject({ label: "Aceitar Atendimento", urgent: true, acceptLeadId: "l1" });
+  });
+
   it("falls back to a mission one step from done, the richest first", () => {
     const result = nextActionOf(null, journey([mission(1), mission(1, { id: "n", title: "Equipe sem SLA", bonusPoints: 40 } as Partial<JourneyMissionCard>), mission(3)]), now);
     expect(result).toMatchObject({ label: "Fechar a missão", href: "/jornada" });

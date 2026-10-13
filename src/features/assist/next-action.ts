@@ -1,7 +1,14 @@
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
 import type { BrokerWorkspacePriority } from "@/features/broker-workspace/priority";
 
-export type NextAction = { label: string; detail: string; href: string; urgent: boolean };
+export type NextAction = {
+  label: string;
+  detail: string;
+  href: string;
+  urgent: boolean;
+  /** A new lead waiting for acceptance: the button accepts it right there (and pulses). */
+  acceptLeadId?: string;
+};
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
 
@@ -28,7 +35,7 @@ export function nextActionOf(priority: BrokerWorkspacePriority | null, journey: 
       case "awaiting_response": return { label: `Responder ${name}`, detail: `Está esperando sua resposta ${since}.`, href: priority.href, urgent };
       case "task_overdue": return { label: priority.title, detail: "Esse retorno já passou do horário.", href: priority.href, urgent: true };
       case "return_due": return { label: priority.title, detail: "Está na hora deste retorno.", href: priority.href, urgent };
-      case "new_lead": return { label: `Chamar ${name}`, detail: "Lead novo com você. Mande a primeira mensagem.", href: priority.href, urgent };
+      case "new_lead": return { label: "Aceitar Atendimento", detail: `${name} chegou para você. Aceite para liberar o contato.`, href: priority.href, urgent: true, acceptLeadId: priority.leadId };
       case "proposal_pending": return { label: `Retomar a cotação de ${name}`, detail: priority.description, href: priority.href, urgent };
       case "document_pending": return { label: `Documentos de ${name}`, detail: priority.description, href: priority.href, urgent };
       default: return { label: `Retomar ${name}`, detail: priority.description, href: priority.href, urgent };

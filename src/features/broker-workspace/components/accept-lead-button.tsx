@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition, type ReactNode } from "react";
+import { useTransition, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
@@ -11,7 +11,7 @@ import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
  * opens the lead. Keeps the caller's visual classes so each surface looks the
  * same as its former link.
  */
-export function AcceptLeadButton({ leadId, className, children }: { leadId: string; className?: string; children: ReactNode }) {
+export function AcceptLeadButton({ leadId, className, children, style, "data-tour": dataTour }: { leadId: string; className?: string; children: ReactNode; style?: CSSProperties; "data-tour"?: string }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -30,7 +30,7 @@ export function AcceptLeadButton({ leadId, className, children }: { leadId: stri
   }
 
   return (
-    <button type="button" className={className} disabled={pending} aria-busy={pending} onClick={handleClick}>
+    <button type="button" className={className} style={style} data-tour={dataTour} disabled={pending} aria-busy={pending} onClick={handleClick}>
       {children}
     </button>
   );

@@ -201,6 +201,19 @@
   box-shadow: 0 10px 24px oklch(55% 0.21 258 / 0.32); cursor: pointer; text-decoration: none;
 }
 .pill svg { width: 18px; height: 18px; }
+/* A new lead waiting for acceptance: the button and its row pulse until accepted. */
+.pillPulse { animation: acceptPulse 1.8s var(--ease-standard, ease-out) infinite; }
+.thread[data-attention="true"] { animation: rowPulse 1.8s var(--ease-standard, ease-out) infinite; }
+@keyframes acceptPulse {
+  0% { box-shadow: 0 10px 24px oklch(55% 0.21 258 / 0.32), 0 0 0 0 oklch(62% 0.2 258 / 0.55); }
+  70% { box-shadow: 0 10px 24px oklch(55% 0.21 258 / 0.32), 0 0 0 14px oklch(62% 0.2 258 / 0); }
+  100% { box-shadow: 0 10px 24px oklch(55% 0.21 258 / 0.32), 0 0 0 0 oklch(62% 0.2 258 / 0); }
+}
+@keyframes rowPulse {
+  0%, 100% { background: transparent; }
+  50% { background: color-mix(in oklch, var(--chat-action) 12%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { .pillPulse, .thread[data-attention="true"] { animation: none; } }
 
 @media (prefers-reduced-motion: reduce) {
   .thread, .choice { transition: none; }

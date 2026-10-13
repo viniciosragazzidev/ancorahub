@@ -35,7 +35,7 @@ export function ThreadRow({ thread, now, index = 0, active = false }: { thread: 
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1], delay: reduce ? 0 : Math.min(index, 8) * 0.035 }}
     >
-      <Link href={thread.href} className={`${styles.thread} ${active ? styles.threadActive : ""}`} aria-current={active ? "page" : undefined} data-tour={thread.assistant ? `thread-${thread.assistant}` : undefined} aria-label={`${thread.name}: ${thread.preview}${thread.waitingYou ? " (esperando você)" : ""}`}>
+      <Link href={thread.href} className={`${styles.thread} ${active ? styles.threadActive : ""}`} aria-current={active ? "page" : undefined} data-attention={thread.attention ? "true" : undefined} data-tour={thread.assistant ? `thread-${thread.assistant}` : undefined} aria-label={`${thread.name}: ${thread.preview}${thread.waitingYou ? " (esperando você)" : ""}`}>
         <AssistantAvatar shape={thread.shape} hue={thread.hue} initials={thread.initials} temperature={thread.temperature} />
         <span className={styles.threadMain}>
           <span className={styles.threadTop}>

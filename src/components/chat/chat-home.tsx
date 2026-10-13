@@ -11,6 +11,8 @@ import SegmentedControl from "@/components/arc/segmented-control/segmented-contr
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 
 // Loaded on the client only: it reads the broker's WhatsApp session (server actions).
+// Server action inside: loaded on demand so the screen (and its tests) stay client-only.
+const AcceptLeadButton = dynamic(() => import("@/features/broker-workspace/components/accept-lead-button").then((mod) => mod.AcceptLeadButton), { ssr: false });
 const WhatsAppStatusButton = dynamic(() => import("@/components/whatsapp/whatsapp-status-button").then((mod) => mod.WhatsAppStatusButton), { ssr: false });
 import { AssistantAvatar } from "./assistant-avatar";
 import { PresenceCallout } from "./presence-callout";
@@ -58,7 +60,7 @@ export type HomeSummary = {
   /** Replaces the four broker numbers (supervisor: the team's day). */
   stats?: { label: string; value: number; alert?: boolean }[];
   /** "A próxima coisa é": the one most important thing now (offer > SLA > reply > return > mission). */
-  next?: { label: string; detail: string; href: string; urgent: boolean } | null;
+  next?: { label: string; detail: string; href: string; urgent: boolean; acceptLeadId?: string } | null;
 };
 
 export type { HomeHighlights } from "./week-ranking";
@@ -225,7 +227,9 @@ export function ChatHome({
                 ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
                 : "Tudo em dia. Escolha uma conversa à esquerda para começar."}
           </p>}
-          {next ? (
+          {next?.acceptLeadId ? (
+            <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} style={{ marginTop: 6 }}>{next.label}</AcceptLeadButton>
+          ) : next ? (
             <Link href={next.href} className={styles.pill} style={{ marginTop: 6 }}>{next.label}</Link>
           ) : nextLead ? (
             <Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
@@ -274,7 +278,9 @@ export function ChatHome({
       </section>
 
       <div className={styles.pillWrap} data-mobile-only>
-        {next ? (
+        {next?.acceptLeadId ? (
+          <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} data-tour="home-pill">{next.label}</AcceptLeadButton>
+        ) : next ? (
           <Link href={next.href} className={styles.pill} data-tour="home-pill" aria-label={`A próxima coisa é: ${next.label}. ${next.detail}`}>{next.urgent ? <span className={home.urgentDot} aria-hidden="true" /> : null}{next.label}</Link>
         ) : nextLead ? (
           <Link href={nextLead.href} className={styles.pill} data-tour="home-pill">{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>

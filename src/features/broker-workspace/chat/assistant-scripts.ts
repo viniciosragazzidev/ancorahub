@@ -145,6 +145,7 @@ function threadForLead(lead: LeadQueueItem, now: Date): ThreadSummary {
     at: iso(action?.referenceAt),
     unread,
     waitingYou,
+    attention: action?.kind === "new_lead",
     href: `/leads/${lead.id}`,
     shape: "mochi",
     hue: null,
@@ -153,7 +154,7 @@ function threadForLead(lead: LeadQueueItem, now: Date): ThreadSummary {
   };
 }
 
-function assistantThread(id: AssistantId, values: Pick<ThreadSummary, "preview" | "at" | "unread" | "waitingYou">): ThreadSummary {
+function assistantThread(id: AssistantId, values: Pick<ThreadSummary, "preview" | "at" | "unread" | "waitingYou"> & Partial<Pick<ThreadSummary, "attention">>): ThreadSummary {
   const assistant = ASSISTANTS[id];
   return {
     id: `assistant:${id}`,
@@ -233,6 +234,7 @@ export function buildAssistantThreads(input: {
       at: latestIso(leads.map((lead) => lead.at ? new Date(lead.at) : null)),
       unread: leads.some((lead) => lead.unread),
       waitingYou: leads.some((lead) => lead.waitingYou),
+      attention: leads.some((lead) => lead.attention),
     }),
     assistantThread("plantao", {
       preview: data.duty?.presence?.status === "pending"
