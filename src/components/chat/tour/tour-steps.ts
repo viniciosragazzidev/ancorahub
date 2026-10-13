@@ -196,7 +196,7 @@ export const TOUR_STEPS: TourStep[] = [
     narration:
       "Este é o Jack, o assistente verificado da Âncora. Os avisos da empresa chegam aqui, e é aqui que você pode escrever e perguntar o que quiser: quem atender primeiro, seu plantão, seus retornos, sua meta.",
     xp: 10,
-    mascot: { shape: "jack", hue: null },
+    mascot: { shape: "jack", hue: 175 },
   },
   {
     id: "10-desafio",
@@ -353,7 +353,7 @@ export const SUPERVISOR_TOUR_STEPS: TourStep[] = [
     narration:
       "No Jack chegam os avisos da empresa e os alertas da sua equipe, como lead sem contato no prazo. E todo dia às sete da noite chega aqui o resumo do dia da equipe.",
     xp: 10,
-    mascot: { shape: "jack", hue: null },
+    mascot: { shape: "jack", hue: 175 },
   },
   {
     id: "sup-07-acoes",

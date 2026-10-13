@@ -124,6 +124,8 @@ export type ThreadSummary = {
   leadId?: string;
   name: string;
   verified?: boolean;
+  /** Always first in the list (Jack), with a pin. */
+  pinned?: boolean;
   /** Last line of the conversation. */
   preview: string;
   /** ISO time of the last event (null when nothing happened yet). */

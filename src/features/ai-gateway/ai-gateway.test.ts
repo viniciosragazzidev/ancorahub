@@ -105,6 +105,7 @@ describe("runGateway", () => {
     expect(result).toMatchObject({ ok: false, reason: "no_provider" });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(AGENT_REGISTRY.lead.sensitive).toBe(true);
+    expect(AGENT_REGISTRY.ancora.sensitive).toBe(true);
   });
 
   it("reports no provider when no key exists", async () => {

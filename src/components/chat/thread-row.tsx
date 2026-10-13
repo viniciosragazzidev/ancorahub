@@ -45,7 +45,10 @@ export function ThreadRow({ thread, now, index = 0, active = false }: { thread: 
           <span className={`${styles.threadPreview} ${thread.waitingYou ? styles.threadPreviewWaiting : ""}`}>{thread.preview}</span>
         </span>
         <span className={styles.threadMeta}>
-          <span className={styles.threadTime}>{threadTime(thread.at, now)}</span>
+          <span className={styles.threadTime}>
+            {thread.pinned ? <svg viewBox="0 0 16 16" width="12" height="12" aria-label="Fixado" role="img" style={{ verticalAlign: "-1px", marginRight: 4 }}><path d="M9.6 2.2 13.8 6.4l-1.4.4-2.3 2.3.3 3-1.1 1.1-2.8-2.8L3 14l-.9-.9 3.5-3.5-2.8-2.8L3.9 5.7l3 .3 2.3-2.3.4-1.4Z" fill="currentColor" /></svg> : null}
+            {threadTime(thread.at, now)}
+          </span>
           {thread.unread || thread.waitingYou ? (
             <motion.span
               className={styles.unreadDot}

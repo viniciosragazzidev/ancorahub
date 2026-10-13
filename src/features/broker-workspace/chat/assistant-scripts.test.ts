@@ -25,7 +25,8 @@ describe("Jornada assistant", () => {
     const data = journey(); data.celebrations = [{ ...dailySummary, seenAt: null }];
     data.ledger = [{ id: "points", ruleKey: "contact.first", label: "Contato", detail: null, points: 15, occurredAt: now.toISOString(), reversed: false }];
     const threads = buildAssistantThreads({ data: workspace({ queue: [lead()] }), now, journey: data, capabilities: { quoteSimulator: false, dutyCalendar: false, journey: true } });
-    expect(threads[0]?.assistant).toBe("leads");
+    expect(threads[0]?.assistant).toBe("ancora");
+    expect(threads[1]?.assistant).toBe("leads");
     expect(threads.find((t) => t.assistant === "jornada")).toMatchObject({ unread: true, at: now.toISOString() });
   });
   it("summarizes level, points and open missions with exact journey and ledger links", () => {
@@ -137,7 +138,7 @@ function questionBlocks(script: ChatScript) {
 describe("broker chat assistant scripts", () => {
   it("declares assistant identities, mascots, hues and routes from the contract", () => {
     expect(ASSISTANTS).toMatchObject({
-      ancora: { name: "Jack", shape: "jack", verified: true, href: "/dashboard/c/ancora" },
+      ancora: { name: "Jack", shape: "jack", hue: 175, verified: true, href: "/dashboard/c/ancora" },
       leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
       plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
       agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
@@ -181,9 +182,10 @@ describe("broker chat assistant scripts", () => {
       today: { ...workspace().today, unreadNotifications: 1, receivedToday: 1 },
     });
     const threads = buildAssistantThreads({ data, capabilities: { quoteSimulator: false, dutyCalendar: true }, now });
-    expect(threads[0]?.assistant).toBe("leads");
-    expect(threads[1]?.assistant).toBe("plantao");
-    expect(threads[2]).toMatchObject({ assistant: "ancora", unread: true, waitingYou: false });
+    // Jack is pinned first; then waiting, unread, latest.
+    expect(threads[0]).toMatchObject({ assistant: "ancora", pinned: true, unread: true, waitingYou: false });
+    expect(threads[1]?.assistant).toBe("leads");
+    expect(threads[2]?.assistant).toBe("plantao");
     expect(threads.findIndex((thread) => thread.assistant === "ancora")).toBeLessThan(threads.findIndex((thread) => thread.assistant === "agenda"));
     expect(threads.findIndex((thread) => thread.assistant === "agenda")).toBeLessThan(threads.findIndex((thread) => thread.assistant === "desempenho"));
   });

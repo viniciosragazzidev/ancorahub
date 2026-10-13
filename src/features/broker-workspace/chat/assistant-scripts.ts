@@ -24,7 +24,7 @@ type AssistantDefinition = {
 };
 
 export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
-  ancora: { name: "Jack", shape: "jack", hue: null, verified: true, href: "/dashboard/c/ancora" },
+  ancora: { name: "Jack", shape: "jack", hue: 175, verified: true, href: "/dashboard/c/ancora" },
   leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
   plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
   agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
@@ -161,6 +161,8 @@ function assistantThread(id: AssistantId, values: Pick<ThreadSummary, "preview" 
     assistant: id,
     name: assistant.name,
     verified: assistant.verified,
+    // Jack is pinned to the top: the one conversation where the broker writes.
+    pinned: id === "ancora",
     href: assistant.href,
     shape: assistant.shape,
     hue: assistant.hue,
@@ -192,6 +194,7 @@ function isOverdueReturn(data: BrokerWorkspaceData, now: Date) {
 }
 
 function threadSort(left: ThreadSummary, right: ThreadSummary) {
+  if (Boolean(left.pinned) !== Boolean(right.pinned)) return left.pinned ? -1 : 1;
   if (left.waitingYou !== right.waitingYou) return left.waitingYou ? -1 : 1;
   if (left.unread !== right.unread) return left.unread ? -1 : 1;
   const leftAt = left.at ? Date.parse(left.at) : Number.NEGATIVE_INFINITY;
