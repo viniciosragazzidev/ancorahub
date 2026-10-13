@@ -7,6 +7,7 @@ export const buttonVariants = cva(
       variant: {
         default: "bg-primary text-primary-foreground shadow-none hover:bg-primary/90",
         primary: "bg-primary text-primary-foreground shadow-none hover:bg-primary/90",
+        "deep-sapphire": "bg-deep-sapphire text-white shadow-none hover:bg-deep-sapphire/90",
         success:
           "bg-[color-mix(in_oklab,var(--success)_85%,black)] text-success-foreground shadow-[var(--shadow-action)] hover:bg-[color-mix(in_oklab,var(--success)_75%,black)] dark:bg-success dark:hover:bg-success/90",
         outline:

@@ -96,6 +96,7 @@
 .statusWaiting { color: var(--chat-action-text, var(--chat-action-strong)); }
 
 .scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+.topNotice { position: sticky; top: 0; z-index: 2; max-width: var(--chat-maxw); margin-inline: auto; padding: 8px var(--chat-gutter); background: var(--surface); }
 .thread_ { width: 100%; max-width: var(--chat-maxw); margin-inline: auto; padding: 12px var(--chat-gutter) 24px; display: grid; gap: 16px; }
 
 /* ---------- blocks ---------- */

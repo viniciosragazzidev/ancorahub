@@ -60,7 +60,7 @@ export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindow
           </Button>
           <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Primeira configuração</p>
           <DialogTitle className="mt-2 text-xl">Prepare seu recebimento de leads</DialogTitle>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">Você pode informar seus horários agora ou configurar depois em Configurações. A conexão do WhatsApp também é recomendada e opcional.</p>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">A partir de 20/10, o WhatsApp conectado será necessário para receber os leads do plantão.</p>
           <p className="mt-3 text-sm font-medium">Etapa {step} de 2 · {step === 1 ? "Disponibilidade" : "WhatsApp de atendimento"}</p>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-6">
@@ -68,7 +68,7 @@ export function BrokerAvailabilityOnboarding({ initialWindows }: { initialWindow
             <div className="space-y-5">
               <div className="flex gap-3 rounded-lg border border-primary/20 bg-primary/[0.04] p-4">
                 <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><WhatsappLogo className="size-4" aria-hidden="true" /></span>
-                <div><h2 className="font-semibold">Conecte seu WhatsApp pessoal</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">É recomendado para receber e responder seus atendimentos no CRM. A conexão é pessoal e não altera o número oficial da corretora.</p></div>
+                <div><h2 className="font-semibold">Conecte seu WhatsApp pessoal</h2><p className="mt-1 text-sm leading-5 text-muted-foreground">A partir de 20/10, o WhatsApp conectado será necessário para receber os leads do plantão. A conexão é pessoal e não altera o número oficial da corretora.</p></div>
               </div>
               {desktop === null ? <p className="text-sm text-muted-foreground">Verificando o melhor modo de conexão…</p> : desktop ? <div className="rounded-lg border border-border p-4"><div className="flex items-center gap-2"><Monitor className="size-4 text-primary" aria-hidden="true" /><p className="font-medium">Você está em um computador</p></div><p className="mt-1 text-sm text-muted-foreground">Abra as configurações para escanear o QR Code e deixar seu atendimento pronto.</p><Button className="mt-3" variant="outline" onClick={() => window.location.assign("/settings?tab=whatsapp")}>Conectar WhatsApp agora</Button></div> : <div className="rounded-lg border border-border p-4"><p className="font-medium">A conexão é melhor no computador</p><p className="mt-1 text-sm text-muted-foreground">Você pode finalizar agora e conectar seu WhatsApp mais tarde em Configurações, usando um computador para escanear o QR Code.</p></div>}
               <div className="flex items-start gap-2 rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground"><CheckCircle className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />A agenda salva na etapa anterior já está valendo para a distribuição automática.</div>

@@ -15,7 +15,7 @@ import type { Mention } from "./composer";
 import type { ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Jack's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, topNotice, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; topNotice?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Jack's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
   const ask = async (text: string): Promise<ChatBlock[]> => {
@@ -32,6 +32,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
       script={script}
       instant={instant}
       headerAction={headerAction}
+      topNotice={topNotice}
       runAction={async (action) => {
         const result = await runChatServerAction(action.name, action.payload);
         // An accepted lead continues in its own conversation: offer it as the next reply.

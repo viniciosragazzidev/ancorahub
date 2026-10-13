@@ -1,3 +1,17 @@
+## 2026-10-13: T120, aviso de conexão do WhatsApp para o plantão
+
+Papel: corretor (`broker`); objetivo: conectar o WhatsApp pessoal antes de 20/10;
+ação principal: abrir o pareamento por QR no computador. Estados: conexão ausente,
+aviso diário, aviso fechado até amanhã, orientação no celular, QR aberto e conectado.
+O lembrete fixo fica no topo da conversa com Jack e não tem fechamento. O aviso diário
+fica no topo do conteúdo do dashboard. A flag global do Super-admin controla ambos;
+desativá-la não muda a distribuição. Reutiliza `DsCallout`, `Button` e o diálogo de
+conexão existentes, sem animação. Gap: o token Deep Sapphire `#1e40af` descrito em
+`docs/design-system.md` ainda não estava ligado à primitiva `Button`. Decisão: expor o
+token documentado por uma variante compartilhada `deep-sapphire` e usá-la neste único
+CTA. Registro:
+`docs/implementations/completed/2026-10-13-whatsapp-plantao-notice.md`.
+
 ## 2026-10-10: T54, ligações da Jornada no corretor Lite
 
 Papel: corretor no Lite; escopo autorizado pela Onda B do plano de Jornada. Ação principal em Configurações, Placar: escolher presença no placar da unidade. Switch Arc instalado, finalidade da exposição, estados pendente/sucesso/erro/indisponibilidade, confirmação no controle e foco de teclado compartilhado. Divulgação progressiva: seção no índice de Configurações, conversa Jornada e detalhes em `/jornada`. Sem token ou primitive nova. A missão de etapa reutiliza a barra e os tokens de movimento existentes, com reduced motion. Diretor/Gestor mantêm suas configurações normais. Registro: `docs/implementations/active/2026-10-10-jornada-ranking-v2-onda-b-ligacoes.md`.

@@ -29,6 +29,13 @@ export type FeatureFlagDefinition<T extends string = string> = {
 // ─── Feature Flags Globais (Super-admin) ─────────────────────────────────────
 
 export const FEATURE_FLAGS = {
+  WHATSAPP_PLANTAO_NOTICE: {
+    key: "feature_whatsapp_plantao_notice_enabled",
+    scope: "global",
+    defaultValue: "true",
+    allowedValues: ["true", "false"] as const,
+    description: "Mostra aos corretores sem WhatsApp conectado o aviso sobre os leads do plantão a partir de 20/10.",
+  },
   // ── WhatsApp / WAHA ──────────────────────────────────────────────────────
   WAHA_CONNECTIONS: {
     key: "feature_waha_connections_enabled",

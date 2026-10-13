@@ -1690,3 +1690,10 @@ componentes vêm do Arc UI (bottom-sheet, segmented-control, skeleton, avatar, b
 com os tokens do Arc escopados na classe `.arc-venancor` (`arc/venancor-scope.css`) e
 mapeados para o Venancor, para não alterar o resto do CRM. Sem gradiente, sem sombra
 empilhada, pesos 400 a 700, sentence case, alvos de 44px.
+
+## DEC-139 - WhatsApp conectado para leads do plantão a partir de 20/10
+
+**Estado:** Aceita
+**Data:** 2026-10-13
+
+A partir de 2026-10-20, o WhatsApp pessoal do corretor precisa estar conectado ao CRM para que ele receba os leads do plantão em que está escalado. Nesta entrega, a regra é apenas comunicada pelo aviso diário e pelo lembrete fixo na conversa com Jack. A distribuição de leads permanece inalterada. A flag global `feature_whatsapp_plantao_notice_enabled`, controlada e auditada pelo Super-admin, pode ocultar ambos os avisos. A configuração usa `system_settings` existente e não requer migration.

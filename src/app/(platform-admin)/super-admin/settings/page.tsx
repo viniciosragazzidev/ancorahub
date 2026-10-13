@@ -116,6 +116,7 @@ export default async function SuperAdminSettingsPage() {
     FEATURE_FLAGS.DUTY_INACTIVE_BROKERS.key,
     FEATURE_FLAGS.BROKER_DUTY_CALENDAR.key,
     FEATURE_FLAGS.RELATIONSHIP_CENTER.key,
+    FEATURE_FLAGS.WHATSAPP_PLANTAO_NOTICE.key,
     FEATURE_FLAGS.BROKER_ENGAGEMENT.key,
     FEATURE_FLAGS.BROKER_AI_ASSISTANTS.key,
     FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE.key,
@@ -195,6 +196,7 @@ export default async function SuperAdminSettingsPage() {
   const dutyOccurrenceHistoryEnabled = (settingMap.get(FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.key) ?? FEATURE_FLAGS.DUTY_OCCURRENCE_HISTORY.defaultValue) === "true";
   const flagOn = (flag: { key: string; defaultValue: string }) => (settingMap.get(flag.key) ?? flag.defaultValue) === "true";
   const brokerNews = [
+    { field: "whatsappPlantaoNoticeEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.WHATSAPP_PLANTAO_NOTICE), title: "Aviso de WhatsApp para leads do plantão", detail: "Mostra ao corretor sem conexão o aviso diário e o lembrete fixo na conversa com Jack. Desativar esconde os dois avisos sem alterar a distribuição de leads." },
     { field: "relationshipCenterEnabled", needsTables: true, enabled: flagOn(FEATURE_FLAGS.RELATIONSHIP_CENTER), title: "Central de relacionamento", detail: "Rota /relacionamento: direção manda avisos para corretores, unidades, plantões ou equipes e vê quem leu; corretor ganha o Mural da gestão." },
     { field: "brokerEngagementEnabled", needsTables: true, enabled: flagOn(FEATURE_FLAGS.BROKER_ENGAGEMENT), title: "Jornada do corretor (pontos, ranking e missão de etapa)", detail: "Liga o extrato de pontos (cron /api/internal/jobs/engagement), a posição do próprio corretor no Início e no perfil, e a missão \"registre a etapa\". Requer parecer jurídico antes de ligar para todos (ranking e corretor autônomo)." },
     { field: "supervisorTeamScopeEnabled", needsTables: false, enabled: flagOn(FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE), title: "Supervisor vê só a equipe dele", detail: "Leads, clientes, busca, central de atenção, Equipe, perfil e metas do supervisor ficam limitados aos corretores que ele supervisiona (Equipe → Editar membro). Avise os supervisores antes: leads de fora da equipe somem da lista deles." },
