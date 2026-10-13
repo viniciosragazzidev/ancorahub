@@ -72,3 +72,6 @@ plans/production-neon-backup-*.json
 
 # Projeto-fonte dos vídeos (HyperFrames, rascunhos de áudio e renders). Só os finais vão para public/onboarding/video.
 /video/
+
+# Backups gerados por scripts de correção de dados
+scripts/backups/
