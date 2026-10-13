@@ -8,7 +8,7 @@ import { SupervisorHomeContent } from "@/features/supervisor-workspace/superviso
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getCommandCenterData } from "@/features/dashboard/today";
 import { CommandCenter } from "@/features/dashboard/components/command-center";
-import { canAccessLeadQualityCenter, getLeadQualityReport, parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
+import { canAccessLeadQualityCenter, getLeadQualityReport, getSimpleLeadQualityReport, parseLeadQualityFocus } from "@/features/reports/metrics/lead-quality-service";
 import { parseLeadQualityPeriod } from "@/features/reports/metrics/lead-quality-period";
 import { listLeadQualityQueues } from "@/features/reports/metrics/lead-quality-export";
 import { LeadQualityCenter } from "@/features/reports/components/lead-quality-center";
@@ -68,7 +68,10 @@ export default async function DashboardPage({
       const rawQueue = singleParam(resolvedSearchParams.queue);
       const queueId = rawQueue && queues.some((queue) => queue.id === rawQueue) ? rawQueue : null;
       const report = await getLeadQualityReport(context, qualityPeriod, focus, { queueId, origin: null });
-      return <LeadQualityCenter report={report} showQualityTab={report.enabled} queues={queues} />;
+      // The simple, explained report by default; the detailed analysis on request (or when drilling down).
+      const detailed = singleParam(resolvedSearchParams.vista) === "detalhada" || Boolean(focus);
+      const simple = report.enabled && !detailed ? await getSimpleLeadQualityReport(context, qualityPeriod, { queueId, origin: null }) : null;
+      return <LeadQualityCenter report={report} showQualityTab={report.enabled} queues={queues} simple={simple} />;
     }
 
     const [data, reportingEnabled] = await Promise.all([

@@ -13,6 +13,7 @@ import { listEffectiveCapabilities } from "@/features/custom-roles/service";
 import { resolveReportDataScope } from "./metric-scope";
 import { LEAD_ORIGINS, LEAD_QUALITY_DIMENSIONS, type LeadOrigin, type LeadQualityDimension, type LeadQualityFilters, type LeadQualityFocus } from "./lead-quality-contract";
 import { leadQualityRates, percentage } from "./metrics-math";
+import { buildSimpleQualityReport, type SimpleLeadClass } from "./lead-quality-simple";
 
 export { LEAD_QUALITY_DIMENSIONS } from "./lead-quality-contract";
 export { parseLeadQualityFocus } from "./lead-quality-contract";
@@ -550,3 +551,59 @@ export async function getLeadQualityReport(
     focusedLeadCount,
   };
 }
+
+/** Leads read for the simple report: enough for months of a tenant, never unbounded. */
+const SIMPLE_REPORT_MAX_ROWS = 50_000;
+
+/**
+ * How good a lead is, for the simple report: hot/warm = good, except a
+ * WhatsApp lead that never answered the qualification (it arrives as warm by
+ * default: only a message from the client after the first one validates it).
+ */
+export function simpleLeadQualityExpression() {
+  return sql<string>`CASE
+    WHEN ${schema.leads.qualificationStatus} IN ('hot', 'warm') AND ${leadOriginExpression()} = 'whatsapp'
+      AND NOT EXISTS (
+        SELECT 1 FROM ${schema.whatsappMessages}
+        WHERE ${schema.whatsappMessages.leadId} = ${schema.leads.id}
+          AND ${schema.whatsappMessages.direction} = 'incoming'
+          AND ${schema.whatsappMessages.sentAt} > ${schema.leads.createdAt} + interval '5 seconds'
+      ) THEN 'no_reply'
+    WHEN ${schema.leads.qualificationStatus} IN ('hot', 'warm') THEN 'good'
+    WHEN ${schema.leads.qualificationStatus} = 'cold' THEN 'cold'
+    ELSE 'other'
+  END`;
+}
+
+/** The simple, explained report of the quality center (same access, period, queue and origin filters). */
+export async function getSimpleLeadQualityReport(context: TenantContext, period: LeadQualityPeriod, filters: LeadQualityFilters = { queueId: null, origin: null }, now = new Date()) {
+  if (!(await canAccessLeadQualityCenter(context))) throw new Error("Você não tem permissão para acessar esta análise.");
+  const window = leadQualityWindow(period, now);
+  const scope = await resolveReportDataScope(context);
+  const rows = await getDatabase()
+    .select({
+      createdAt: schema.leads.createdAt,
+      readyAt: schema.leads.qualificationCompletedAt,
+      assignedAt: schema.leads.assignedAt,
+      quality: simpleLeadQualityExpression(),
+      queueName: schema.leadQueues.name,
+      brokerId: schema.leads.corretorId,
+      converted: sql<boolean>`${schema.leads.status} = 'converted'`,
+    })
+    .from(schema.leads)
+    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, schema.leads.queueId)))
+    .where(and(
+      eq(schema.leads.tenantId, scope.tenantId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+      leadQualityCohortWhere(window, filters),
+      scope.leadScope,
+    ))
+    // The most recent ones when a very long period passes the limit (flagged as truncated).
+    .orderBy(desc(schema.leads.createdAt))
+    .limit(SIMPLE_REPORT_MAX_ROWS);
+  const report = buildSimpleQualityReport(rows.map((row) => ({ ...row, quality: (["good", "cold", "no_reply"].includes(row.quality) ? row.quality : "other") as SimpleLeadClass, converted: Boolean(row.converted) })), window, now);
+  return { period, window: { since: window.since.toISOString(), until: window.until?.toISOString() ?? null }, filters, truncated: rows.length >= SIMPLE_REPORT_MAX_ROWS, ...report };
+}
+
+export type SimpleLeadQualityReportData = Awaited<ReturnType<typeof getSimpleLeadQualityReport>>;

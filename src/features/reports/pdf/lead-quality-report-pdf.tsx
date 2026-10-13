@@ -13,7 +13,7 @@ import { PdfcnThemeProvider } from "@/components/pdf/theme-provider";
 import { Document, Page, View, Text as Span } from "@/lib/pdf-primitives";
 
 import { LEAD_ORIGINS, type LeadOrigin } from "../metrics/lead-quality-contract";
-import type { LeadQualitySegment } from "../metrics/lead-quality-service";
+import type { LeadQualitySegment, SimpleLeadQualityReportData } from "../metrics/lead-quality-service";
 import type { LeadQualityExport } from "../metrics/lead-quality-export";
 import { LEAD_SHIFTS, leadQualityPeriodLabel, leadQualityWindowLabel } from "../metrics/lead-quality-period";
 import { ancoraPdfTheme } from "./ancora-pdf-theme";
@@ -29,6 +29,8 @@ export type LeadQualityPdfInput = LeadQualityExport & {
   tenantName: string;
   generatedAt: Date;
   originLabelFilter: string;
+  /** The simple, explained report (default). Null: the detailed analysis. */
+  simple?: SimpleLeadQualityReportData | null;
 };
 
 // ─── Small building blocks ────────────────────────────────────────────────
@@ -358,6 +360,88 @@ function LeadList({ input }: { input: LeadQualityPdfInput }) {
   );
 }
 
+type SimpleQueueRow = { queue: string; arrived: string; good: string; weak: string; distributed: string; distributedWeak: string; ranOut: string };
+type SimpleHourRow = { label: string; arrivedGood: string; arrivedWeak: string; sentGood: string; sentWeak: string; waiting: string };
+const pctOf = (part: number, total: number) => (total ? `${Math.round((part / total) * 100)}%` : "0%");
+
+/** The simple report: the four answers the owner needs, in plain numbers. */
+function SimpleBody({ simple, queueName }: { simple: SimpleLeadQualityReportData; queueName: string | null }) {
+  const arrivedWeak = simple.arrived.cold + simple.arrived.noReply;
+  const sentWeak = simple.distributed.cold + simple.distributed.noReply;
+  const runOuts = simple.byQueue.filter((queue) => queue.goodRanOut);
+  const inversions = simple.byQueue.filter((queue) => queue.weakWhileGoodWaiting > 0);
+  const timeline = simple.hourly === "timeline";
+  const queueColumns: DataTableColumn<SimpleQueueRow>[] = [
+    { key: "queue", header: "Fila", width: "28%" },
+    { key: "arrived", header: "Entraram", align: "right", width: "11%" },
+    { key: "good", header: "Bons", align: "right", width: "13%" },
+    { key: "weak", header: "Frios", align: "right", width: "10%" },
+    { key: "distributed", header: "Distribuídos", align: "right", width: "13%" },
+    { key: "distributedWeak", header: "Frios distrib.", align: "right", width: "12%" },
+    { key: "ranOut", header: "Bons acabaram", align: "right", width: "13%" },
+  ];
+  const hourColumns: DataTableColumn<SimpleHourRow>[] = [
+    { key: "label", header: "Hora", width: "20%" },
+    { key: "arrivedGood", header: "Entraram bons", align: "right", width: "16%" },
+    { key: "arrivedWeak", header: "Entraram frios", align: "right", width: "16%" },
+    { key: "sentGood", header: "Foram bons", align: "right", width: "16%" },
+    { key: "sentWeak", header: "Foram frios", align: "right", width: "16%" },
+    ...(timeline ? [{ key: "waiting" as const, header: "Bons esperando", align: "right" as const, width: "16%" }] : []),
+  ];
+  return (
+    <View>
+      {simple.truncated ? <Text variant="xs" color="mutedForeground" style={{ marginTop: 8 }}>Período muito longo: o relatório usa só os leads mais recentes. Escolha um intervalo menor para ver tudo.</Text> : null}
+      <SectionTitle title="1. Quantos leads entraram e quantos são bons" description="Bom = quente ou morno validado. Lead de WhatsApp só conta como bom se o cliente respondeu a qualificação." />
+      <Row>
+        <Tile label="Entraram" value={numberLabel(simple.arrived.total)} detail={queueName ? `Fila ${queueName}` : "Todas as filas"} highlight />
+        <Tile label="Bons (quentes + mornos)" value={numberLabel(simple.arrived.good)} detail={`${pctOf(simple.arrived.good, simple.arrived.total)} do que entrou`} />
+        <Tile label="Frios" value={numberLabel(arrivedWeak)} detail={`${numberLabel(simple.arrived.cold)} frios + ${numberLabel(simple.arrived.noReply)} sem resposta no WhatsApp`} />
+        <Tile label="Descartados ou em qualificação" value={numberLabel(simple.arrived.other)} detail={pctOf(simple.arrived.other, simple.arrived.total)} />
+      </Row>
+
+      <SectionTitle title="2. Por fila" />
+      <DataTable size="compact" stripe columns={queueColumns} data={simple.byQueue.map((queue) => ({
+        queue: queue.queue, arrived: numberLabel(queue.arrived), good: `${numberLabel(queue.good)} (${pctOf(queue.good, queue.arrived)})`, weak: numberLabel(queue.weak),
+        distributed: numberLabel(queue.distributed), distributedWeak: numberLabel(queue.distributedWeak), ranOut: timeline ? queue.goodRanOut ?? "Não acabaram" : "—",
+      }))} />
+
+      <View wrap={false}>
+        <SectionTitle
+          title="3. Hora a hora: quando os bons acabaram"
+          description={timeline
+            ? runOuts.length ? `${runOuts.map((queue) => `${queue.queue}: às ${queue.goodRanOut}`).join(" · ")}. Dali em diante só havia frios para entregar.` : "Em nenhuma hora os bons acabaram: sempre havia lead bom qualificado esperando."
+            : "Período longo: cada linha soma a mesma hora de todos os dias."}
+        />
+        <DataTable size="compact" stripe columns={hourColumns} data={simple.hours.map((hour) => ({
+          label: hour.label, arrivedGood: numberLabel(hour.arrived.good), arrivedWeak: numberLabel(hour.arrived.cold + hour.arrived.noReply),
+          sentGood: numberLabel(hour.distributed.good), sentWeak: numberLabel(hour.distributed.cold + hour.distributed.noReply),
+          waiting: hour.goodWaiting === 0 ? "0 · acabaram" : numberLabel(hour.goodWaiting ?? 0),
+        }))} />
+        {inversions.length ? (
+          <Text variant="xs" color="mutedForeground" style={{ marginTop: 6 }}>
+            {`Atenção: ${inversions.map((queue) => `${queue.queue} mandou ${numberLabel(queue.weakWhileGoodWaiting)} frios com lead bom esperando na mesma fila`).join(" · ")}. Aqui não faltou lead bom.`}
+          </Text>
+        ) : null}
+      </View>
+
+      <View wrap={false}>
+        <SectionTitle title="4. E se não mandasse os frios? (estimativa)" description="Estimativa: tira os frios do que foi entregue e supõe que os bons seriam entregues igual." />
+        <Row>
+          <Tile label="Foram para os corretores" value={numberLabel(simple.distributed.total)} detail={`${numberLabel(simple.distributed.good)} bons + ${numberLabel(sentWeak)} frios · ${numberLabel(simple.brokers)} corretores`} highlight />
+          <Tile label="Sem os frios seriam (estimativa)" value={numberLabel(simple.withoutWeak.distributed)} detail={`${numberLabel(simple.withoutWeak.removed)} leads a menos (${simple.withoutWeak.removedShare.toLocaleString("pt-BR")}%)`} />
+          <Tile label="Média por corretor" value={`${simple.withoutWeak.perBrokerNow?.toLocaleString("pt-BR") ?? "—"} → ${simple.withoutWeak.perBrokerWithout?.toLocaleString("pt-BR") ?? "—"}`} detail="Hoje → sem os frios" />
+        </Row>
+        <Row style={{ marginTop: 8 }}>
+          {simple.shifts.map((shift) => (
+            <Tile key={shift.key} label={shift.label} value={`${numberLabel(shift.distributedGood + shift.distributedWeak)} → ${numberLabel(shift.distributedGood)}`} detail={`${numberLabel(shift.distributedGood)} bons + ${numberLabel(shift.distributedWeak)} frios; sem os frios, só os bons`} />
+          ))}
+        </Row>
+        <Text variant="xs" color="mutedForeground" style={{ marginTop: 6 }}>{`Vendas vindas de leads frios no período: ${numberLabel(simple.converted.weak)} · de leads bons: ${numberLabel(simple.converted.good)}.`}</Text>
+      </View>
+    </View>
+  );
+}
+
 function LeadQualityReportDocument({ input }: { input: LeadQualityPdfInput }) {
   const { segments } = input.report;
   const topHours = [...segments.hour].sort((a, b) => b.total - a.total).slice(0, 10);
@@ -367,7 +451,9 @@ function LeadQualityReportDocument({ input }: { input: LeadQualityPdfInput }) {
         <PdfcnThemeProvider theme={ancoraPdfTheme}>
           <View style={{ fontFamily: "Inter", color: C.foreground }}>
             <Cover input={input} />
-            {input.report.summary.total === 0 ? (
+            {input.simple ? (
+              <SimpleBody simple={input.simple} queueName={input.queueName} />
+            ) : input.report.summary.total === 0 ? (
               <View style={{ marginTop: 24, borderWidth: 1, borderColor: C.border, borderRadius: 12, padding: 16 }}>
                 <Span style={{ fontSize: 10, color: C.mutedForeground }}>Nenhum lead nesta seleção.</Span>
               </View>

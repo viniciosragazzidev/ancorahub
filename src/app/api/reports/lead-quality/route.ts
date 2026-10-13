@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { canAccessLeadQualityCenter, parseLeadOrigin } from "@/features/reports/metrics/lead-quality-service";
+import { canAccessLeadQualityCenter, getSimpleLeadQualityReport, parseLeadOrigin } from "@/features/reports/metrics/lead-quality-service";
 import { getLeadQualityExport } from "@/features/reports/metrics/lead-quality-export";
 import { parseLeadQualityPeriod } from "@/features/reports/metrics/lead-quality-period";
 import { originLabel } from "@/features/reports/pdf/lead-quality-report-labels";
@@ -36,10 +36,12 @@ export async function GET(request: Request) {
     const generatedAt = new Date();
     const data = await getLeadQualityExport(context, period, { queueId, origin }, generatedAt);
     if (!data.report.enabled) return NextResponse.json({ error: "A central de qualidade está desativada." }, { status: 404 });
+    // The simple, explained report by default; ?vista=detalhada keeps the full analysis.
+    const simple = params.get("vista") === "detalhada" ? null : await getSimpleLeadQualityReport(context, period, { queueId, origin }, generatedAt);
 
     const db = getDatabase();
     const [tenant] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
-    const input = { ...data, tenantName: tenant?.name ?? "AncoraHub", generatedAt, originLabelFilter: origin ? originLabel(origin) : "Todas as origens" };
+    const input = { ...data, simple, tenantName: tenant?.name ?? "AncoraHub", generatedAt, originLabelFilter: origin ? originLabel(origin) : "Todas as origens" };
 
     const body = format === "xlsx" ? encodeLeadQualitySpreadsheet(input) : await renderLeadQualityReportPdf(input);
     await db.insert(schema.auditLogs).values({
@@ -48,7 +50,8 @@ export async function GET(request: Request) {
     });
 
     const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(generatedAt);
-    const fileName = `qualidade-leads-${period === "today" ? "hoje" : `${period}d`}-${day}.${format}`;
+    const periodName = period === "today" ? "hoje" : typeof period === "string" ? period.replace(/[^0-9_-]/g, "") : `${period}d`;
+    const fileName = `qualidade-leads-${periodName}-${day}.${format}`;
     return new NextResponse(body.slice().buffer as ArrayBuffer, {
       headers: {
         "Content-Type": format === "xlsx" ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" : "application/pdf",

@@ -19,6 +19,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { DashboardSectionTabs } from "@/features/dashboard/components/dashboard-section-tabs";
 import { isLeadQualityRange, leadQualityPeriodLabel, leadQualityWindowLabel, type LeadQualityPeriod } from "../metrics/lead-quality-period";
 import { LeadQualityExportMenu, LeadQualityRangePicker, QualityQueueSelect } from "./lead-quality-filters";
+import { LeadQualitySimple } from "./lead-quality-simple";
+import type { SimpleLeadQualityReportData } from "../metrics/lead-quality-service";
 import type { LeadQualityDimension, LeadQualityReport, LeadQualitySegment } from "../metrics/lead-quality-service";
 
 const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
@@ -386,7 +388,7 @@ function FocusBanner({ report }: { report: LeadQualityReport }) {
   );
 }
 
-export function LeadQualityCenter({ report, showQualityTab = true, queues = [] }: { report: LeadQualityReport; showQualityTab?: boolean; queues?: { id: string; name: string }[] }) {
+export function LeadQualityCenter({ report, showQualityTab = true, queues = [], simple = null }: { report: LeadQualityReport; showQualityTab?: boolean; queues?: { id: string; name: string }[]; simple?: SimpleLeadQualityReportData | null }) {
   const warmHot = report.summary.hot + report.summary.warm;
   const period = linkOf(report);
   const windowLabel = leadQualityWindowLabel({ since: new Date(report.window.since), until: report.window.until ? new Date(report.window.until) : null });
@@ -424,7 +426,12 @@ export function LeadQualityCenter({ report, showQualityTab = true, queues = [] }
       <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         {report.enabled ? <DashboardSectionTabs active="quality" period={report.period} showQuality={showQualityTab} /> : null}
 
-        {!report.enabled ? (
+        {report.enabled && simple ? (
+          <>
+            <LeadQualitySimple report={simple} queueName={queues.find((queue) => queue.id === report.filters.queueId)?.name ?? null} />
+            <Link href={`/dashboard?${new URLSearchParams({ ...Object.fromEntries(qualityParams(period)), vista: "detalhada" }).toString()}`} className="self-start text-sm font-medium text-primary underline-offset-4 hover:underline">Ver a análise detalhada (campanhas, anúncios, cidades)</Link>
+          </>
+        ) : !report.enabled ? (
           <Card className="mx-auto w-full max-w-2xl gap-3 border-dashed py-10 text-center">
             <span className="mx-auto grid size-12 place-items-center rounded-2xl bg-muted text-muted-foreground"><Activity aria-hidden="true" className="size-5" /></span>
             <CardTitle>Central temporariamente indisponível</CardTitle>

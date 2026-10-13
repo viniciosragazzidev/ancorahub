@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import { LEAD_ORIGINS } from "../metrics/lead-quality-contract";
 import type { LeadQualityExport } from "../metrics/lead-quality-export";
 import { LEAD_SHIFTS, leadQualityPeriodLabel, leadQualityWindowLabel } from "../metrics/lead-quality-period";
-import type { LeadQualitySegment } from "../metrics/lead-quality-service";
+import type { LeadQualitySegment, SimpleLeadQualityReportData } from "../metrics/lead-quality-service";
 import { dateTimeLabel, hourSlotLabel, leadStatusLabel, originLabel, sourceLabel, temperatureLabel } from "./lead-quality-report-labels";
 
 /** Cells starting with = + - @ would run as formulas in Excel. */
@@ -29,11 +29,53 @@ function sheet(rows: Array<Array<string | number>>, widths: number[]) {
   return result;
 }
 
-export function encodeLeadQualitySpreadsheet(input: LeadQualityExport & { tenantName: string; generatedAt: Date; originLabelFilter: string }) {
+export function encodeLeadQualitySpreadsheet(input: LeadQualityExport & { tenantName: string; generatedAt: Date; originLabelFilter: string; simple?: SimpleLeadQualityReportData | null }) {
   const { report } = input;
   const window = { since: new Date(report.window.since), until: report.window.until ? new Date(report.window.until) : null };
   const s = report.summary;
   const workbook = XLSX.utils.book_new();
+
+  // The simple report (default): the four answers, then the leads.
+  if (input.simple) {
+    const simple = input.simple;
+    const weakIn = simple.arrived.cold + simple.arrived.noReply;
+    const weakOut = simple.distributed.cold + simple.distributed.noReply;
+    XLSX.utils.book_append_sheet(workbook, sheet([
+      ["Relatório de qualidade de leads", input.tenantName],
+      ["Período", leadQualityPeriodLabel(report.period)],
+      ["Janela", `${leadQualityWindowLabel(window, input.generatedAt)} (horário de Brasília)`],
+      ["Fila", input.queueName ?? "Todas as filas"],
+      ["Bom", "Quente ou morno validado (WhatsApp só se o cliente respondeu a qualificação)"],
+      [],
+      ["Entraram", simple.arrived.total],
+      ["Bons (quentes + mornos)", simple.arrived.good],
+      ["Frios", simple.arrived.cold],
+      ["WhatsApp sem resposta", simple.arrived.noReply],
+      ["Descartados ou em qualificação", simple.arrived.other],
+      [],
+      ["Foram para os corretores", simple.distributed.total],
+      ["  bons", simple.distributed.good],
+      ["  frios (inclui WhatsApp sem resposta)", weakOut],
+      ["Corretores que receberam", simple.brokers],
+      ["Sem os frios seriam", simple.withoutWeak.distributed],
+      ["Leads a menos sem os frios", simple.withoutWeak.removed],
+      ["Média por corretor hoje", simple.withoutWeak.perBrokerNow ?? ""],
+      ["Média por corretor sem os frios", simple.withoutWeak.perBrokerWithout ?? ""],
+      ...simple.shifts.map((shift) => [`${shift.label}: bons / frios`, `${shift.distributedGood} / ${shift.distributedWeak}`]),
+      ["Vendas de leads frios / bons", `${simple.converted.weak} / ${simple.converted.good}`],
+      ["Frios que entraram (todos)", weakIn],
+    ], [40, 60]), "Resumo");
+    XLSX.utils.book_append_sheet(workbook, sheet([
+      ["Fila", "Entraram", "Bons", "Frios", "Distribuídos", "Frios distribuídos", "Bons acabaram", "Frios com bom esperando"],
+      ...simple.byQueue.map((queue) => [queue.queue, queue.arrived, queue.good, queue.weak, queue.distributed, queue.distributedWeak, queue.goodRanOut ?? "", queue.weakWhileGoodWaiting]),
+    ], [28, 10, 8, 8, 12, 16, 16, 22]), "Por fila");
+    XLSX.utils.book_append_sheet(workbook, sheet([
+      ["Hora", "Entraram bons", "Entraram frios", "Foram bons", "Foram frios", "Bons esperando"],
+      ...simple.hours.map((hour) => [hour.label, hour.arrived.good, hour.arrived.cold + hour.arrived.noReply, hour.distributed.good, hour.distributed.cold + hour.distributed.noReply, hour.goodWaiting ?? ""]),
+    ], [14, 14, 14, 12, 12, 16]), "Hora a hora");
+    appendLeadsSheet(workbook, input);
+    return new Uint8Array(XLSX.write(workbook, { type: "array", bookType: "xlsx" }));
+  }
 
   XLSX.utils.book_append_sheet(workbook, sheet([
     ["Relatório de qualidade de leads", input.tenantName],
@@ -97,6 +139,11 @@ export function encodeLeadQualitySpreadsheet(input: LeadQualityExport & { tenant
   for (const [title, rows, label] of detail) for (const segment of rows) detailRows.push([title, label(segment), ...segmentValues(segment)]);
   XLSX.utils.book_append_sheet(workbook, sheet(detailRows, [20, 36, 8, 9, 9, 8, 16, 18, 13, 12, 13, 20]), "Detalhamento");
 
+  appendLeadsSheet(workbook, input);
+  return new Uint8Array(XLSX.write(workbook, { type: "array", bookType: "xlsx" }));
+}
+
+function appendLeadsSheet(workbook: XLSX.WorkBook, input: LeadQualityExport) {
   const leadRows: Array<Array<string | number>> = [["Recebido em", "Lead", "Origem", "Turno", "Fila", "Corretor", "Temperatura", "Etapa", "Campanha", "Cidade", "Plano"]];
   for (const lead of input.leads) {
     leadRows.push([
@@ -107,6 +154,4 @@ export function encodeLeadQualitySpreadsheet(input: LeadQualityExport & { tenant
   const leadsSheet = sheet(leadRows, [16, 30, 12, 9, 22, 24, 16, 20, 28, 18, 16]);
   leadsSheet["!autofilter"] = { ref: `A1:K${Math.max(leadRows.length, 1)}` };
   XLSX.utils.book_append_sheet(workbook, leadsSheet, "Leads");
-
-  return new Uint8Array(XLSX.write(workbook, { type: "array", bookType: "xlsx" }));
 }
