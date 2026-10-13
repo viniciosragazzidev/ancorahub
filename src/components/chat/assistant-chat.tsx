@@ -8,17 +8,25 @@ import { bestAssistMatch } from "@/features/assist/catalog";
 import { useAssist } from "@/features/assist/components/assist-layer";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import type { AgentId } from "@/features/ai-gateway/agents";
+import { JACK_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 
 import { ChatScreen } from "./chat-screen";
 import type { Mention } from "./composer";
 import type { ChatBlock, ChatScript, MascotShape } from "./types";
 
 /** An assistant conversation: the script plays, replies run the broker's actions. */
-export function AssistantChat({ identity, script, instant = false, headerAction, agentId }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId }) {
+export function AssistantChat({ identity, script, instant = false, headerAction, agentId, canWrite = false }: { identity: { name: string; shape: MascotShape; hue: number | null }; script: ChatScript; instant?: boolean; headerAction?: ReactNode; /** Free text goes to this AI agent (when the flag is on). */ agentId?: AgentId; /** Only Jack's conversation takes typed text (2026-10-12); the others work by the suggested replies. */ canWrite?: boolean }) {
   const router = useRouter();
   const assist = useAssist();
+  const ask = async (text: string): Promise<ChatBlock[]> => {
+    if (agentId) return (await askAssistantAction({ agentId, question: text })).blocks;
+    return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Não achei isso. Tente com outras palavras ou toque em \"?\" no topo para a ajuda da tela." }];
+  };
   return (
     <ChatScreen
+      composerDisabled={!canWrite}
+      placeholder={canWrite ? undefined : "Escolha uma opção acima. Para perguntar, fale com o Jack."}
+      onLocalChoice={async (_choice, value): Promise<ChatBlock[]> => (value.startsWith(JACK_ASK_PREFIX) ? ask(value.slice(JACK_ASK_PREFIX.length)) : [])}
       identity={identity}
       backHref="/dashboard"
       script={script}
@@ -50,8 +58,7 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
             { type: "button", id: `where-go-${stamp}`, label: where.kind === "action" ? "Me leva lá" : `Abrir ${where.title}`, href: where.href },
           ];
         }
-        if (agentId) return (await askAssistantAction({ agentId, question: text })).blocks;
-        return [{ type: "assistant", id: `free-answer-${Date.now()}`, text: "Não achei isso. Tente com outras palavras, toque em \"?\" no topo para a ajuda da tela ou use @ para abrir outra conversa." }];
+        return ask(text);
       }}
     />
   );

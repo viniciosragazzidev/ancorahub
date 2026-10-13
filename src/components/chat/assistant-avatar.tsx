@@ -5,7 +5,7 @@ import { motion, useReducedMotion } from "motion/react";
 
 import type { MascotShape } from "./types";
 
-const SHAPES: Record<Exclude<MascotShape, "logo">, string> = {
+const SHAPES: Record<Exclude<MascotShape, "logo" | "jack">, string> = {
   // 64x64 viewBox; every body leaves room under it for the soft shadow.
   mochi: "M8 40c0-15 10.7-26 24-26s24 11 24 26c0 6-4 9-10 9H18c-6 0-10-3-10-9Z",
   onigiri: "M28.6 13.8c1.6-2.6 5.2-2.6 6.8 0l17.4 28.9c1.6 2.7-.3 6.3-3.4 6.3H14.6c-3.1 0-5-3.6-3.4-6.3l17.4-28.9Z",
@@ -56,6 +56,21 @@ export function AssistantAvatar({
         }}
       >
         {initials}
+      </span>
+    );
+  }
+
+  // Jack (2026-10-12): the pirate photo, round, with a thin ring.
+  if (shape === "jack") {
+    return (
+      <span
+        role={label ? "img" : undefined}
+        aria-label={label}
+        aria-hidden={label ? undefined : true}
+        style={{ width: size, height: size, borderRadius: 999, flex: "none", display: "inline-block", overflow: "hidden", boxShadow: "0 0 0 2px var(--surface, #fff), 0 0 0 3px oklch(62% 0.18 255 / 0.35)", background: "var(--surface-muted)" }}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element -- tiny static avatar */}
+        <img src="/pirate.jpg" alt="" width={size} height={size} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
       </span>
     );
   }

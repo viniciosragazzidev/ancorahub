@@ -20,7 +20,7 @@ export default function AncoraShowcasePage() {
   if (process.env.NODE_ENV !== "development") notFound();
   return (
     <main className="arc-venancor h-dvh bg-[var(--surface)]">
-      <AssistantChat identity={{ name: "Âncora", shape: "logo", hue: null }} script={buildAncoraScript({ notifications, now: at("2026-10-10T15:00:00Z") })} instant />
+      <AssistantChat identity={{ name: "Jack", shape: "jack", hue: null }} script={buildAncoraScript({ notifications, now: at("2026-10-10T15:00:00Z") })} instant />
     </main>
   );
 }

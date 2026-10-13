@@ -137,7 +137,7 @@ function questionBlocks(script: ChatScript) {
 describe("broker chat assistant scripts", () => {
   it("declares assistant identities, mascots, hues and routes from the contract", () => {
     expect(ASSISTANTS).toMatchObject({
-      ancora: { name: "Âncora", shape: "logo", verified: true, href: "/dashboard/c/ancora" },
+      ancora: { name: "Jack", shape: "jack", verified: true, href: "/dashboard/c/ancora" },
       leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
       plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
       agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
@@ -382,7 +382,9 @@ describe("buildAncoraScript", () => {
     expect(script.blocks.find((block) => block.id === "ancora-unread")).toMatchObject({ text: "2 avisos novos" });
     expect(script.blocks.find((block) => block.id === "ancora-3")).toMatchObject({ type: "notice", title: "Aviso 3", message: "Detalhe 3", at: "10:00", unread: true, leadId: "lead-7" });
     expect(script.blocks.find((block) => block.id === "ancora-1")).toMatchObject({ type: "notice", unread: false });
-    expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["open-lead", "mark-all", "settings"]);
+    expect(questionBlocks(script)[0]?.choices.map(({ id }) => id)).toEqual(["open-lead", "mark-all", "jack-first", "jack-day", "settings"]);
+    expect(questionBlocks(script)[0]?.choices[2]?.action).toEqual({ kind: "local", value: "ask:Quem eu atendo primeiro agora?" });
+    expect(script.composerPlaceholder).toBe("Pergunte ao Jack");
     expect(questionBlocks(script)[0]?.choices[0]?.action).toEqual({ kind: "href", href: "/leads/lead-7" });
     expect(questionBlocks(script)[0]?.choices[1]?.action).toEqual({ kind: "server", name: "notifications.markRead", payload: {} });
     expect(script.status).toMatchObject({ label: "2 avisos novos", tone: "waiting" });
@@ -392,7 +394,7 @@ describe("buildAncoraScript", () => {
   it("explains the thread when there is nothing yet and stays calm when all is read", () => {
     expect(buildAncoraScript({ now, notifications: [] }).blocks[0]).toMatchObject({ id: "ancora-empty" });
     const read = buildAncoraScript({ now, notifications: [notification("1", "2026-10-09T08:00:00-03:00", true)] });
-    expect(questionBlocks(read)[0]?.choices.map(({ id }) => id)).toEqual(["settings"]);
+    expect(questionBlocks(read)[0]?.choices.map(({ id }) => id)).toEqual(["jack-first", "jack-day", "settings"]);
     expect(read.status?.tone).toBe("idle");
   });
 

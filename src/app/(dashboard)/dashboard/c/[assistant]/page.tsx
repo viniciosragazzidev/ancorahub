@@ -55,7 +55,7 @@ export default async function AssistantConversationPage({ params }: { params: Pr
     const hasUnread = notifications.some((item) => !item.readAt);
     return (
       <>
-        <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} />
+        <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} canWrite={audience === "broker"} />
         {hasUnread ? <MarkSeenOnView kind="ancora" /> : null}
       </>
     );

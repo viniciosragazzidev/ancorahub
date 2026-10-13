@@ -10,7 +10,7 @@ export type AssistantId = "ancora" | "leads" | "plantao" | "agenda" | "cotacao" 
   | "equipe" | "equipe-leads" | "equipe-plantao" | "equipe-desempenho";
 
 /** Mascot drawn by AssistantAvatar. "logo" is the company mark (verified Âncora thread). */
-export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "salte" | "logo";
+export type MascotShape = "mochi" | "onigiri" | "cubo" | "favo" | "nuvem" | "salte" | "logo" | "jack";
 
 /** What a chosen reply does. Server actions are run by the screen through a registry, never by the script. */
 export type ChatAction =

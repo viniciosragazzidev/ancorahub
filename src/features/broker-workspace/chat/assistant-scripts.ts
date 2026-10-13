@@ -24,7 +24,7 @@ type AssistantDefinition = {
 };
 
 export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
-  ancora: { name: "Âncora", shape: "logo", hue: null, verified: true, href: "/dashboard/c/ancora" },
+  ancora: { name: "Jack", shape: "jack", hue: null, verified: true, href: "/dashboard/c/ancora" },
   leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
   plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
   agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
@@ -623,12 +623,23 @@ function dayLabel(date: Date, now: Date) {
  * The Âncora thread: the broker's notifications as messages from the company,
  * oldest first and grouped by day, with a marker before the unread ones.
  */
+/** Questions ready to tap in Jack's conversation: the reply value is sent to the AI as if typed. */
+export const JACK_ASK_PREFIX = "ask:";
+const JACK_ASKS: ChatChoice[] = [
+  { id: "jack-first", label: "Quem eu atendo primeiro?", action: { kind: "local", value: `${JACK_ASK_PREFIX}Quem eu atendo primeiro agora?` } },
+  { id: "jack-day", label: "Como está meu dia?", action: { kind: "local", value: `${JACK_ASK_PREFIX}Como está o meu dia até agora?` } },
+];
+
 export function buildAncoraScript(input: { notifications: AncoraNotification[]; now: Date }): ChatScript {
   const { now } = input;
   const items = [...input.notifications].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   if (!items.length) {
     return {
-      blocks: [assistantMessage("ancora-empty", "Por aqui chegam os avisos da Âncora: escala publicada, recados da gestão e alertas dos seus leads. Nada novo por enquanto.")],
+      blocks: [
+        assistantMessage("ancora-empty", "Oi, eu sou o Jack! Aqui chegam os avisos da Âncora e você pode me perguntar o que quiser sobre o seu dia: quem atender primeiro, seu plantão, seus retornos, sua meta. É só escrever aqui embaixo."),
+        question("ancora-choice", "Quer começar por uma destas?", [...JACK_ASKS]),
+      ],
+      composerPlaceholder: "Pergunte ao Jack",
       status: { label: "Sem avisos novos", tone: "idle" },
     };
   }
@@ -657,11 +668,14 @@ export function buildAncoraScript(input: { notifications: AncoraNotification[]; 
     choices.push({ id: "relationship-ack", label: "Ciente", reply: "Ciente", action: { kind: "server", name: "relationship.ack", payload: {} } });
   }
   if (unread.length) choices.push({ id: "mark-all", label: "Marcar tudo como lido", reply: "Já vi, pode marcar como lido", action: { kind: "server", name: "notifications.markRead", payload: {} } });
+  // Jack answers in this same conversation: two questions ready to tap (the AI answers them).
+  choices.push(...JACK_ASKS);
   choices.push({ id: "settings", label: "Configurar avisos", hint: "Notificações no celular e pop-up de lead", action: { kind: "href", href: "/notificacoes" } });
-  blocks.push(question("ancora-choice", unread.length ? "O que você quer fazer?" : "Tudo lido. Quer ajustar seus avisos?", choices));
+  blocks.push(question("ancora-choice", unread.length ? "O que você quer fazer?" : "Tudo lido. Quer me perguntar algo?", choices));
 
   return {
     blocks,
+    composerPlaceholder: "Pergunte ao Jack",
     status: unread.length ? { label: unread.length === 1 ? "1 aviso novo" : `${unread.length} avisos novos`, tone: "waiting" } : { label: "Tudo lido", tone: "idle" },
   };
 }

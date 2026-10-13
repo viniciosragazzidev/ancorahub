@@ -191,12 +191,12 @@ export const TOUR_STEPS: TourStep[] = [
     id: "09-ancora",
     kind: "spotlight",
     target: "thread-ancora",
-    title: "Âncora: os avisos da empresa",
-    body: "Escala publicada, recados da gestão e alertas chegam aqui, em ordem, como mensagens.",
+    title: "Jack: avisos e suas perguntas",
+    body: "Os avisos da Âncora chegam aqui, e é aqui que você escreve: pergunte ao Jack o que quiser sobre o seu dia.",
     narration:
-      "Este é o canal oficial da Âncora. Escala publicada, recados da gestão e alertas importantes chegam aqui, em ordem, como mensagens. O selo azul mostra que é a empresa falando.",
+      "Este é o Jack, o assistente verificado da Âncora. Os avisos da empresa chegam aqui, e é aqui que você pode escrever e perguntar o que quiser: quem atender primeiro, seu plantão, seus retornos, sua meta.",
     xp: 10,
-    mascot: { shape: "logo", hue: null },
+    mascot: { shape: "jack", hue: null },
   },
   {
     id: "10-desafio",
@@ -348,12 +348,12 @@ export const SUPERVISOR_TOUR_STEPS: TourStep[] = [
     id: "sup-06-ancora",
     kind: "spotlight",
     target: "thread-ancora",
-    title: "Âncora",
+    title: "Jack",
     body: "Os avisos da empresa e os alertas da sua equipe. Às 19h chega aqui o resumo do dia.",
     narration:
-      "Na Âncora chegam os avisos da empresa e os alertas da sua equipe, como lead sem contato no prazo. E todo dia às sete da noite chega aqui o resumo do dia da equipe.",
+      "No Jack chegam os avisos da empresa e os alertas da sua equipe, como lead sem contato no prazo. E todo dia às sete da noite chega aqui o resumo do dia da equipe.",
     xp: 10,
-    mascot: { shape: "logo", hue: null },
+    mascot: { shape: "jack", hue: null },
   },
   {
     id: "sup-07-acoes",

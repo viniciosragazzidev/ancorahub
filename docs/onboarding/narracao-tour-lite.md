@@ -89,7 +89,7 @@ Dica de voz: tom de colega, animado e calmo, 150 a 165 palavras por minuto; cada
 
 > Desempenho mostra o seu dia em números: quantos leads chegaram, quantos você aceitou e como está a sua meta. Ele ainda comenta o seu ritmo, para você saber onde focar.
 
-## 08-insights.mp3 · Insights: o que fazer na conversa
+## 08-insights.mp3 · Dicas de Atendimento: o que fazer na conversa
 
 - Tipo: spotlight · destaque: `thread-insights` · 10 XP
 - Texto na tela: A IA lê suas conversas e te diz quem responder primeiro, o próximo passo e dicas práticas.
@@ -97,17 +97,17 @@ Dica de voz: tom de colega, animado e calmo, 150 a 165 palavras por minuto; cada
 
 **Narração:**
 
-> Insights é o seu analista. A inteligência artificial lê as conversas com os clientes e te diz quem responder primeiro, qual é o próximo passo e dá dicas práticas, como tratar uma objeção ou quando propor o fechamento.
+> Dicas de Atendimento é o seu analista. A inteligência artificial lê as conversas com os clientes e te diz quem responder primeiro, qual é o próximo passo e dá dicas práticas, como tratar uma objeção ou quando propor o fechamento.
 
-## 09-ancora.mp3 · Âncora: os avisos da empresa
+## 09-ancora.mp3 · Jack: avisos e suas perguntas
 
 - Tipo: spotlight · destaque: `thread-ancora` · 10 XP
-- Texto na tela: Escala publicada, recados da gestão e alertas chegam aqui, em ordem, como mensagens.
-- Duração estimada: 11s (30 palavras)
+- Texto na tela: Os avisos da Âncora chegam aqui, e é aqui que você escreve: pergunte ao Jack o que quiser sobre o seu dia.
+- Duração estimada: 12s (36 palavras)
 
 **Narração:**
 
-> Este é o canal oficial da Âncora. Escala publicada, recados da gestão e alertas importantes chegam aqui, em ordem, como mensagens. O selo azul mostra que é a empresa falando.
+> Este é o Jack, o assistente verificado da Âncora. Os avisos da empresa chegam aqui, e é aqui que você pode escrever e perguntar o que quiser: quem atender primeiro, seu plantão, seus retornos, sua meta.
 
 ## 10-desafio.mp3 · Desafio rápido
 
