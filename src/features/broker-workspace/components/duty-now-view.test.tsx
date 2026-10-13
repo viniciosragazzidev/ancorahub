@@ -12,6 +12,8 @@ import { DutyNowView, type DutyNowViewData } from "./duty-now-view";
 afterEach(() => cleanup());
 
 const data: DutyNowViewData = {
+  scheduleId: "s-tarde",
+  choices: [{ scheduleId: "s-tarde", scheduleName: "PRESENCIAL TARDE", presencial: true }],
   scheduleName: "PRESENCIAL TARDE",
   queueName: "PME",
   branchName: "Nova Iguaçu",
@@ -44,5 +46,16 @@ describe("DutyNowView", () => {
   it("says when no lead arrived yet", () => {
     render(<DutyNowView data={{ ...data, leads: [], totals: { offered: 0, accepted: 0, missed: 0, started: 0, medianAcceptSeconds: null } }} nowIso="2026-10-10T17:00:00.000Z" />);
     expect(screen.getByText(/Nenhum lead ainda/)).toBeTruthy();
+  });
+  it("lets a broker in two plantões at once pick which one to see", () => {
+    render(<DutyNowView nowIso="2026-10-10T18:00:00.000Z" data={{ ...data, choices: [{ scheduleId: "s-pme", scheduleName: "PME 13/10", presencial: false }, ...data.choices] }} />);
+    const nav = screen.getByRole("navigation", { name: "Seus plantões agora" });
+    expect(nav.querySelector('a[aria-current="page"]')?.textContent).toBe("PRESENCIAL TARDE · presencial");
+    expect(screen.getByRole("link", { name: "PME 13/10" }).getAttribute("href")).toBe("/plantoes/agora?plantao=s-pme");
+  });
+
+  it("shows no choice with a single plantão", () => {
+    render(<DutyNowView nowIso="2026-10-10T18:00:00.000Z" data={data} />);
+    expect(screen.queryByRole("navigation", { name: "Seus plantões agora" })).toBeNull();
   });
 });

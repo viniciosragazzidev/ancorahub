@@ -138,6 +138,7 @@ async function MinhaFilaContent() {
       firstContactAt: schema.leads.firstContactAt,
       slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes,
       stageEnteredAt: schema.leads.stageEnteredAt,
+      dutyName: schema.unitDutySchedules.name,
     })
     .from(schema.leads)
     .where(
@@ -149,6 +150,7 @@ async function MinhaFilaContent() {
       ),
     )
     .innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id))
+    .leftJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.leads.dutyScheduleId), eq(schema.unitDutySchedules.tenantId, schema.leads.tenantId)))
     .orderBy(desc(schema.leads.createdAt));
 
   // Interactions per lead
@@ -390,6 +392,7 @@ async function MinhaFilaContent() {
         createdAt: l.createdAt,
         // When it reached this broker (distribution), the lead's creation otherwise.
         arrivedAt: l.assignedAt ?? l.createdAt,
+        dutyName: l.dutyName,
         updatedAt: l.stageEnteredAt,
         dueAt,
         isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",

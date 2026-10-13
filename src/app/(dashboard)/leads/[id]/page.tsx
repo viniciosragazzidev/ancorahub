@@ -124,11 +124,14 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       corretorImage: schema.user.image,
       branchNome: schema.branches.name,
       productName: schema.carrierPlans.name,
+      // The plantão that handed the lead out ("PME", "PRESENCIAL TARDE").
+      dutyScheduleName: schema.unitDutySchedules.name,
     })
     .from(schema.leads)
     .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
     .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
     .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
+    .leftJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.leads.dutyScheduleId), eq(schema.unitDutySchedules.tenantId, schema.leads.tenantId)))
     .where(and(
       eq(schema.leads.id, id),
       isNull(schema.leads.deletedAt),
@@ -277,6 +280,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
           urgency: lightLead.urgency,
           summary: lightLead.summary,
           branchName: lead.branchNome,
+          dutyName: lead.dutyScheduleName,
           motivoPerda: lead.motivoPerda,
           createdAt: lead.createdAt,
           assignedAt: lead.assignedAt,

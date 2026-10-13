@@ -20,6 +20,8 @@ export type LeadConversationLead = {
   urgency?: string | null;
   summary?: string | null;
   branchName?: string | null;
+  /** The plantão that handed the lead out. */
+  dutyName?: string | null;
   motivoPerda?: string | null;
   createdAt: Date;
   assignedAt?: Date | null;
@@ -91,6 +93,7 @@ function factRows(lead: LeadConversationLead): ChatFactRow[] {
   if (lead.city) rows.push({ label: "Cidade", value: lead.city });
   if (lead.urgency) rows.push({ label: "Urgência", value: lead.urgency });
   if (lead.telefone) rows.push({ label: "Telefone", value: lead.telefone });
+  if (lead.dutyName) rows.push({ label: "Plantão", value: lead.dutyName });
   if (lead.branchName) rows.push({ label: "Unidade", value: lead.branchName });
   const shown = new Set(rows.map((row) => row.label.toLocaleLowerCase("pt-BR")));
   for (const info of lead.clientInfo ?? []) {

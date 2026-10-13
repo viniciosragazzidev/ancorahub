@@ -8,11 +8,12 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 export const dynamic = "force-dynamic";
 
 /** The broker's plantão happening now (opened from the Plantão conversation). */
-export default async function DutyNowPage() {
+export default async function DutyNowPage({ searchParams }: { searchParams: Promise<{ plantao?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role !== "broker") notFound();
   const now = new Date();
-  const duty = await getDutyNow(now).catch(() => null);
+  const { plantao } = await searchParams;
+  const duty = await getDutyNow(now, plantao).catch(() => null);
 
   if (!duty) {
     return (

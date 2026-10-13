@@ -1,6 +1,11 @@
 .page { min-height: 100%; background: var(--surface); color: var(--foreground); }
 .inner { width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 16px 40px; display: grid; gap: 16px; }
 
+/* Two plantões at once (PME online + Presencial): pick which one to see. */
+.choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: 999px; font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary); background: var(--surface-muted); text-decoration: none; }
+.choice[aria-current="page"] { color: var(--foreground); background: var(--surface); box-shadow: var(--shadow-resting); }
+
 .hero { display: grid; gap: 16px; padding: 20px; border-radius: var(--radius-panel); background: linear-gradient(150deg, color-mix(in oklch, oklch(70% 0.17 45) 14%, var(--surface)), var(--surface-muted)); }
 .heroTop { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; }
 .heroText { min-width: 0; }

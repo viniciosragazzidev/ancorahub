@@ -23,6 +23,9 @@ export type DutyNowLead = {
 };
 
 export type DutyNow = {
+  scheduleId: string;
+  /** The other plantões running now, to switch between them (PME online + Presencial at once). */
+  choices: Array<{ scheduleId: string; scheduleName: string; presencial: boolean }>;
   scheduleName: string;
   queueName: string | null;
   branchName: string | null;
@@ -57,9 +60,11 @@ const median = (values: number[]) => {
  * (offers of this plantão and direct assignments inside the window). Only the
  * logged broker's own data. Null when no plantão is active.
  */
-export async function getDutyNow(now = new Date()): Promise<DutyNow | null> {
+export async function getDutyNow(now = new Date(), scheduleId?: string | null): Promise<DutyNow | null> {
   const [context, data] = await Promise.all([getRequiredTenantContext(), getCachedBrokerWorkspaceData()]);
-  const active = data.duty?.active;
+  const running = data.duty?.activeAll?.length ? data.duty.activeAll : data.duty?.active ? [data.duty.active] : [];
+  // The plantão asked for (?plantao=), else the first one running.
+  const active = running.find((duty) => duty.scheduleId === scheduleId) ?? running[0];
   if (!active || context.role !== "broker") return null;
   const db = getDatabase();
 
@@ -130,6 +135,8 @@ export async function getDutyNow(now = new Date()): Promise<DutyNow | null> {
   const offerRows = leads.filter((lead) => lead.origin === "oferta");
 
   return {
+    scheduleId: active.scheduleId,
+    choices: running.map((duty) => ({ scheduleId: duty.scheduleId, scheduleName: duty.scheduleName, presencial: duty.attendanceMode === "presencial" })),
     scheduleName: active.scheduleName,
     queueName: active.queueName,
     branchName: active.branchName,

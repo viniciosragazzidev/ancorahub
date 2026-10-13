@@ -39,11 +39,15 @@ export type DutyPresenceAsk = {
   photoId: string | null;
 };
 
+export type BrokerActiveDuty = { scheduleId: string; scheduleName: string; queueName: string | null; branchName: string | null; dutyDate: string; startsAt: Date; endsAt: Date; paused: boolean; presenceStatus: "confirmed" | "pending" | "not_required"; attendanceMode?: string };
+
 export type BrokerWorkspaceData = {
   viewer: { tenantId: string; userId: string; name: string; branchName: string; availabilityStatus: "available" | "paused" | "offline" };
   nextAction: BrokerWorkspacePriority | null;
   duty: {
-    active: { scheduleId: string; scheduleName: string; queueName: string | null; branchName: string | null; dutyDate: string; startsAt: Date; endsAt: Date; paused: boolean; presenceStatus: "confirmed" | "pending" | "not_required" } | null;
+    active: BrokerActiveDuty | null;
+    /** Every plantão running now (a broker can be in PME and Presencial at once); the first one is `active`. */
+    activeAll?: BrokerActiveDuty[];
     next: { scheduleName: string; queueName: string | null; dutyDate: string; startsAt: Date; endsAt: Date; paused: boolean } | null;
     readyToReceive: boolean;
     /** The plantão the broker must confirm now (from 30 min before until the end); null when nothing to confirm. */
@@ -147,25 +151,30 @@ function buildDutySummary(input: {
 
   return Promise.all(occurrences).then((resolved) => {
     const allOccurrences = resolved.flat();
-    const activeOccurrence = allOccurrences
+    const activeOccurrences = allOccurrences
       .filter((occurrence) => occurrence.startsAt <= input.now && input.now < occurrence.endsAt)
-      .sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime() || left.row.scheduleId.localeCompare(right.row.scheduleId))[0];
+      .sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime() || left.row.scheduleId.localeCompare(right.row.scheduleId));
+    const activeOccurrence = activeOccurrences[0];
     const nextOccurrence = allOccurrences
       .filter((occurrence) => occurrence.startsAt > input.now)
       .sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime() || left.row.scheduleId.localeCompare(right.row.scheduleId))[0];
 
     if (!activeOccurrence && !nextOccurrence) return null;
 
-    const activePresenceStatus = activeOccurrence
-      ? activeOccurrence.row.confirmationStatus === "confirmed" && (activeOccurrence.row.attendanceMode !== "presencial" || Boolean(activeOccurrence.row.confirmedBy))
+    type Occurrence = (typeof allOccurrences)[number];
+    const presenceStatusOf = (occurrence: Occurrence) =>
+      occurrence.row.confirmationStatus === "confirmed" && (occurrence.row.attendanceMode !== "presencial" || Boolean(occurrence.row.confirmedBy))
         ? "confirmed" as const
-        : activeOccurrence.row.attendanceMode === "presencial" || input.presenceRequired
+        : occurrence.row.attendanceMode === "presencial" || input.presenceRequired
           ? "pending" as const
-          : "not_required" as const
-      : null;
-    // To confirm: the shift in progress, or the next one when it starts within 30 minutes.
-    const presenceOccurrence = activeOccurrence
-      ?? (nextOccurrence && nextOccurrence.startsAt.getTime() - input.now.getTime() <= 30 * 60_000 ? nextOccurrence : undefined);
+          : "not_required" as const;
+    // To confirm: a shift in progress, or one starting within 30 minutes. With two
+    // at once (PME online + Presencial), the one still waiting for confirmation
+    // comes first: asking the already confirmed PME hid the Presencial photo.
+    const startingSoon = allOccurrences.filter((occurrence) => occurrence.startsAt > input.now && occurrence.startsAt.getTime() - input.now.getTime() <= 30 * 60_000)
+      .sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime());
+    const presenceCandidates = [...activeOccurrences, ...startingSoon];
+    const presenceOccurrence = presenceCandidates.find((occurrence) => presenceStatusOf(occurrence) === "pending") ?? presenceCandidates[0];
     const presenceMode = presenceOccurrence?.row.attendanceMode === "presencial" ? "presencial" as const : "online" as const;
     const presence: DutyPresenceAsk | null = presenceOccurrence && (presenceMode === "presencial" || input.presenceRequired)
       ? {
@@ -182,17 +191,19 @@ function buildDutySummary(input: {
       }
       : null;
     const paused = activeOccurrence ? Boolean(activeOccurrence.row.pausedAt) : false;
-    const active = activeOccurrence ? {
-      scheduleId: activeOccurrence.row.scheduleId,
-      scheduleName: activeOccurrence.row.scheduleName,
-      queueName: activeOccurrence.row.queueName,
-      branchName: activeOccurrence.row.branchName,
-      dutyDate: activeOccurrence.dutyDate,
-      startsAt: activeOccurrence.startsAt,
-      endsAt: activeOccurrence.endsAt,
-      paused,
-      presenceStatus: activePresenceStatus!,
-    } : null;
+    const toActive = (occurrence: Occurrence): BrokerActiveDuty => ({
+      scheduleId: occurrence.row.scheduleId,
+      scheduleName: occurrence.row.scheduleName,
+      queueName: occurrence.row.queueName,
+      branchName: occurrence.row.branchName,
+      dutyDate: occurrence.dutyDate,
+      startsAt: occurrence.startsAt,
+      endsAt: occurrence.endsAt,
+      paused: Boolean(occurrence.row.pausedAt),
+      presenceStatus: presenceStatusOf(occurrence),
+      attendanceMode: occurrence.row.attendanceMode,
+    });
+    const active = activeOccurrence ? toActive(activeOccurrence) : null;
     const next = nextOccurrence ? {
       scheduleName: nextOccurrence.row.scheduleName,
       queueName: nextOccurrence.row.queueName,
@@ -204,6 +215,7 @@ function buildDutySummary(input: {
 
     return {
       active,
+      activeAll: activeOccurrences.map(toActive),
       next,
       readyToReceive: active ? isBrokerReadyToReceive({ availabilityStatus: input.availabilityStatus, paused, presenceStatus: active.presenceStatus }) : false,
       presence,

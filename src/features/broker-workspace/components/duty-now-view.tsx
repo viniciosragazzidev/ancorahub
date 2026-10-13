@@ -10,6 +10,8 @@ import { formatDuration } from "@/features/engagement/ranking";
 import css from "./duty-now-view.module.css";
 
 export type DutyNowViewData = {
+  scheduleId: string;
+  choices: Array<{ scheduleId: string; scheduleName: string; presencial: boolean }>;
   scheduleName: string;
   queueName: string | null;
   branchName: string | null;
@@ -61,6 +63,21 @@ export function DutyNowView({ data, nowIso }: { data: DutyNowViewData; nowIso: s
   return (
     <div className={`arc-venancor ${css.page}`}>
       <div className={css.inner}>
+        {data.choices.length > 1 ? (
+          <nav aria-label="Seus plantões agora" className={css.choices}>
+            {data.choices.map((choice) => (
+              <Link
+                key={choice.scheduleId}
+                href={`/plantoes/agora?plantao=${choice.scheduleId}`}
+                className={css.choice}
+                aria-current={choice.scheduleId === data.scheduleId ? "page" : undefined}
+                replace
+              >
+                {choice.scheduleName}{choice.presencial ? " · presencial" : ""}
+              </Link>
+            ))}
+          </nav>
+        ) : null}
         <motion.section className={css.hero} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease }} aria-label="Seu plantão agora">
           <div className={css.heroTop}>
             <AssistantAvatar shape="onigiri" hue={28} size={48} />

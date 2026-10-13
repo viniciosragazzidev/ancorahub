@@ -145,9 +145,12 @@ async function LeadsPageContent({
         createdAt: schema.leads.createdAt,
         stageEnteredAt: schema.leads.stageEnteredAt,
         assignedAt: schema.leads.assignedAt,
+        motivoPerda: schema.leads.motivoPerda,
+        dutyName: schema.unitDutySchedules.name,
       })
       .from(schema.leads)
       .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
+      .leftJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.leads.dutyScheduleId), eq(schema.unitDutySchedules.tenantId, schema.leads.tenantId)))
       .where(
         and(
           eq(schema.leads.tenantId, context.tenantId),
@@ -219,6 +222,8 @@ async function LeadsPageContent({
         createdAt: lead.createdAt,
         // When it reached this broker, like the Fila: a lead created days ago and handed out today is today's.
         arrivedAt: lead.assignedAt ?? lead.createdAt,
+        dutyName: lead.dutyName,
+        lostReason: lead.status === "lost" ? lead.motivoPerda : null,
         updatedAt: lead.stageEnteredAt,
         dueAt,
         isOverdue: dueAt ? dueAt.getTime() < Date.now() : false,

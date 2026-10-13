@@ -37,6 +37,11 @@ function question(blocks: ChatBlock[], id: string) {
 }
 
 describe("buildLeadConversationScript", () => {
+  it("shows which plantão the lead came from in the facts card", () => {
+    const facts = build({ dutyName: "PRESENCIAL TARDE" }).blocks.find((block) => block.type === "facts");
+    expect(facts).toMatchObject({ rows: expect.arrayContaining([{ label: "Plantão", value: "PRESENCIAL TARDE" }]) });
+  });
+
   it("opens with the arrival, the facts card and the SLA for a new lead", () => {
     const script = build();
     expect(script.blocks[0]).toMatchObject({ type: "date", label: "Hoje, 11:50" });
@@ -111,7 +116,7 @@ describe("buildLeadConversationScript", () => {
       { id: "a3", tipo: "system_alert", conteudo: `[IA Feedback] ${"Texto sem marcador ".repeat(20)}`, userId: "me", userName: "Eu", createdAt: new Date("2026-10-13T14:59:00.000Z") },
     ]);
     const block = blocks.find((item) => item.id === "ev-a3");
-    const text = block && "text" in block ? block.text : "";
+    const text = (block && "text" in block ? block.text : "") ?? "";
     expect(text.startsWith("Texto sem marcador")).toBe(true);
     expect(text.split(" · ")[0]?.length).toBeLessThanOrEqual(180);
   });

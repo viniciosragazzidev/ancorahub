@@ -35,6 +35,8 @@ export type LightLeadItem = {
   isSlaAtRisk?: boolean;
   isLost?: boolean;
   lostReason?: string | null;
+  /** The plantão that handed the lead out ("PME", "PRESENCIAL TARDE"). */
+  dutyName?: string | null;
 };
 
 type FilterTab = "new" | "active" | "returns" | "risk" | "closed";
@@ -79,6 +81,9 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 type LeadState = { tone: BadgeTone; chip: string; context: string };
+
+/** "Aguardando seu aceite · PME": which plantão the lead came from. */
+const withDuty = (context: string, lead: LightLeadItem) => (lead.dutyName ? `${context} · ${lead.dutyName}` : context);
 
 function describeLead(lead: LightLeadItem): LeadState {
   if (isLostLead(lead)) return { tone: "neutral", chip: "Perdido", context: lead.lostReason || "Marcado como perdido" };
@@ -156,7 +161,7 @@ function NeedsYouCard({ lead, dataTour }: { lead: LightLeadItem; dataTour?: stri
         <Avatar name={lead.name} size="lg" className="light-avatar" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold text-(--foreground)">{lead.name}</p>
-          <p className="mt-0.5 text-sm text-(--text-secondary)">{state.context}</p>
+          <p className="mt-0.5 text-sm text-(--text-secondary)">{withDuty(state.context, lead)}</p>
           <p className="mt-0.5 text-xs text-(--text-muted)" suppressHydrationWarning>{arrivalPhrase(lead)}</p>
         </div>
         <Badge tone={state.tone}>{state.chip}</Badge>
@@ -185,7 +190,7 @@ function CompactRow({ lead, dataTour }: { lead: LightLeadItem; dataTour?: string
         <Avatar name={lead.name} size="md" className="light-avatar" />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-medium text-(--foreground)">{lead.name}</span>
-          <span className="block truncate text-sm text-(--text-secondary)">{state.context}</span>
+          <span className="block truncate text-sm text-(--text-secondary)">{withDuty(state.context, lead)}</span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
           <ArrivalTime lead={lead} />
