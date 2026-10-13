@@ -12,8 +12,8 @@ const TRANSCRIPT =
   "Olá, corretor! Seu dia de corretor acabou de mudar. Apresentamos o novo app do corretor da Âncora. Tudo o que importa agora cabe numa conversa. Seus assistentes acompanham cada lead, cada prazo e cada plantão, e te dizem qual é a próxima coisa a fazer. O lead chega, você aceita com um toque, e já está falando com o cliente. Conecte o seu WhatsApp, e a mensagem sai direto do app, com toda a conversa num lugar só. Seus retornos ficam na Agenda. Seus plantões, na escala. E a sua fila, organizada por dia e horário. E cada etapa que você registra conta. Mostra o seu trabalho para a gestão, ajuda a entender o que funciona, e vira pontos, missões e conquistas na sua jornada. Ficou com dúvida? Pergunte onde fica, e o app te leva até lá. A Âncora está sempre evoluindo, pensando em quem está na linha de frente: você. Bem-vindo. Vamos juntos.";
 
 const SOURCES = {
-  phone: { src: "/onboarding/video/boas-vindas-celular.mp4", poster: "/onboarding/video/poster-celular.jpg" },
-  desktop: { src: "/onboarding/video/boas-vindas-computador.mp4", poster: "/onboarding/video/poster-computador.jpg" },
+  phone: { src: "/onboarding/video/boas-vindas-v3-celular.mp4", poster: "/onboarding/video/poster-v3-celular.jpg" },
+  desktop: { src: "/onboarding/video/boas-vindas-v3-computador.mp4", poster: "/onboarding/video/poster-v3-computador.jpg" },
 };
 
 /**

@@ -17,7 +17,8 @@ import type { MascotShape } from "./types";
 const STORAGE_KEY = "ancora:lite-welcome:2026-10-chat";
 const SUPERVISOR_STORAGE_KEY = "ancora:lite-welcome:2026-10-supervisor";
 /** The welcome video (broker, Super-admin flag): seen once per device, before the card. */
-const VIDEO_STORAGE_KEY = "ancora:welcome-video:2026-10-v2";
+/** v3 (2026-10-13): Jack, Dicas de Atendimento, pontos. New key: everyone sees the new video once. */
+const VIDEO_STORAGE_KEY = "ancora:welcome-video:2026-10-v3";
 /** "Não perca nenhum lead": asked once per device (also for those who already saw the welcome). */
 const PUSH_STORAGE_KEY = "ancora:push-nudge:2026-10";
 

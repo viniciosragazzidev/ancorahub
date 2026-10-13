@@ -12,7 +12,7 @@ import { LightAvailabilityProvider } from "@/components/light/light-availability
 
 import { LiteWelcome } from "./lite-welcome";
 
-const VIDEO_KEY = "ancora:welcome-video:2026-10-v2";
+const VIDEO_KEY = "ancora:welcome-video:2026-10-v3";
 const shell = (welcomeVideo: boolean) => ({ availability: "available" as const, isPending: false, setStatus: () => {}, welcomeVideo });
 
 function renderWelcome(welcomeVideo: boolean, variant: "broker" | "supervisor" = "broker") {
