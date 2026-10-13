@@ -6,6 +6,8 @@ import { intelligenceLabel, intelligenceTips, isOutboundMessage, nextStepText } 
 
 const TIME_ZONE = "America/Sao_Paulo";
 const OTHERS_SHOWN = 5;
+/** Varied openers (stable within the hour), so the tips feel like a person reading the chats. */
+const OPENERS = ["Li suas conversas.", "Dei uma olhada no WhatsApp.", "Olha quem precisa de você.", "Separei a próxima conversa."];
 const LAST_MESSAGE_CHARS = 140;
 
 function firstName(name: string) {
@@ -138,7 +140,7 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
   blocks.push({
     type: "assistant",
     id: "i-count",
-    text: waiting.length === 1 ? `${name} está esperando sua resposta há ${waited(since, now)}.` : `${waiting.length} clientes esperando sua resposta. Comece por ${name}, que espera há ${waited(since, now)}.`,
+    text: `${OPENERS[(Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now)) + Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, day: "2-digit" }).format(now))) % OPENERS.length]} ${waiting.length === 1 ? `${name} está esperando sua resposta há ${waited(since, now)}.` : `${waiting.length} clientes esperando sua resposta. Comece por ${name}, que espera há ${waited(since, now)}.`}`,
   });
   if (first.intelligence?.summary) blocks.push({ type: "assistant", id: "i-summary", text: first.intelligence.summary });
   else if (inbound) blocks.push({ type: "system", id: "i-last", strong: name, text: `escreveu às ${time(inbound.sentAt)}` });

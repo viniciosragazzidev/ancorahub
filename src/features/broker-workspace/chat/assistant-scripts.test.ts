@@ -217,7 +217,7 @@ describe("broker chat assistant scripts", () => {
     const script = buildAssistantScript("leads", { data, now });
     const questions = questionBlocks(script);
     expect(script.blocks[0]).toMatchObject({ type: "date", label: "Hoje, 12:00" });
-    expect(script.blocks[1]).toMatchObject({ type: "assistant", text: "Boa tarde, Ana Lima." });
+    expect(script.blocks[1]).toMatchObject({ type: "assistant", text: expect.stringMatching(/^Boa tarde, Ana! /) });
     expect(questions[0]?.choices.map(({ label }) => label)).toEqual(["Aceitar", "Ver a ficha", "Recusar"]);
     expect(questions[0]?.choices[0]?.action).toEqual({ kind: "server", name: "lead.accept", payload: { leadId: "lead-1" } });
     expect(questions[0]?.choices[1]?.action).toEqual({ kind: "href", href: "/leads/lead-1" });
@@ -276,7 +276,8 @@ describe("broker chat assistant scripts", () => {
     expect(questionBlocks(pending)[0]?.choices.map(({ id }) => id)).toEqual(["duty-now", "schedule"]);
 
     const next = buildAssistantScript("plantao", { data: workspace({ duty: { active: null, next: { scheduleName: "PME Centro", queueName: "Fila PME", dutyDate: "2026-10-10", startsAt: new Date("2026-10-10T09:00:00-03:00"), endsAt: new Date("2026-10-10T18:00:00-03:00"), paused: false }, readyToReceive: false } }), now });
-    expect(next.blocks[1]).toMatchObject({ type: "facts", title: "Próximo plantão" });
+    expect(next.blocks[0]).toMatchObject({ type: "assistant", id: "plantao-intro" });
+    expect(next.blocks.find((block) => block.type === "facts")).toMatchObject({ type: "facts", title: "Próximo plantão" });
     const emptyDuty = buildAssistantScript("plantao", { data: workspace(), now });
     expect(emptyDuty.blocks).toContainEqual({ type: "assistant", id: "duty-empty", text: "Você não tem plantão marcado. Quando o supervisor colocar você na escala, eu aviso aqui." });
     expect(questionBlocks(emptyDuty)[0]?.choices[0]).toMatchObject({ label: "Ver plantões", action: { kind: "href", href: "/plantoes" } });
@@ -379,7 +380,7 @@ describe("buildAncoraScript", () => {
       ],
     });
     const ids = script.blocks.map((block) => block.id);
-    expect(ids).toEqual(["ancora-day-2026-10-08", "ancora-1", "ancora-day-2026-10-09", "ancora-unread", "ancora-2", "ancora-3", "ancora-choice"]);
+    expect(ids).toEqual(["ancora-day-2026-10-08", "ancora-1", "ancora-day-2026-10-09", "ancora-unread", "ancora-2", "ancora-3", "ancora-jack-hint", "ancora-choice"]);
     expect(script.blocks[0]).toMatchObject({ label: "Ontem" });
     expect(script.blocks.find((block) => block.id === "ancora-unread")).toMatchObject({ text: "2 avisos novos" });
     expect(script.blocks.find((block) => block.id === "ancora-3")).toMatchObject({ type: "notice", title: "Aviso 3", message: "Detalhe 3", at: "10:00", unread: true, leadId: "lead-7" });
@@ -404,5 +405,15 @@ describe("buildAncoraScript", () => {
     const script = buildAncoraScript({ now, notifications: [{ ...notification("9", "2026-10-09T08:00:00-03:00", false), type: "relationship.confirmation" }] });
     const ack = questionBlocks(script)[0]?.choices.find(({ id }) => id === "relationship-ack");
     expect(ack?.action).toEqual({ kind: "server", name: "relationship.ack", payload: {} });
+  });
+
+  it("opens each conversation with a varied line and a smart reading of the moment", () => {
+    const duty = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty(), next: null, readyToReceive: true } }), now });
+    expect(duty.blocks[0]).toMatchObject({ type: "assistant", id: "plantao-intro", text: expect.stringMatching(/Faltam \d/) });
+    const perf = buildAssistantScript("desempenho", { data: workspace({ today: { ...workspace().today, receivedToday: 4, acceptedToday: 2 } }), now });
+    expect(perf.blocks[0]).toMatchObject({ id: "desempenho-intro", text: expect.stringContaining("50%") });
+    const leads = buildAssistantScript("leads", { data: workspace({ queue: [lead()] }), now });
+    expect(leads.blocks.find((block) => block.type === "stats")).toMatchObject({ id: "leads-pulse", title: "Seus leads agora" });
+    expectNoEmDash([duty, perf, leads]);
   });
 });

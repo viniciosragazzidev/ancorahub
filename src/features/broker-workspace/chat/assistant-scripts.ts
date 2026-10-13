@@ -313,10 +313,54 @@ function factSheet(id: string, title: string, rows: Array<{ label: string; value
   return { type: "facts", id, title, rows };
 }
 
+const LEADS_OPENERS = [
+  "Dei uma olhada nos seus leads.",
+  "Separei o que importa agora.",
+  "Olha como está a sua carteira.",
+  "Bora vender? Aqui vai o resumo.",
+  "Seus leads, em uma olhada.",
+];
+
+/** The pulse of the broker's leads: numbers, one reading of the funnel and why this is a conversation, not just the list. */
+function leadsPulse(data: BrokerWorkspaceData, now: Date): ChatBlock[] {
+  const queue = data.queue;
+  if (!queue.length) return [];
+  const count = (statuses: string[]) => queue.filter((lead) => statuses.includes(lead.status)).length;
+  const waiting = queue.filter((lead) => isWaitingPriority(lead.nextAction, now)).length;
+  const inService = count(["in_contact", "negotiation", "documentation_pending", "under_analysis"]);
+  const quotes = count(["quote_sent"]);
+  const negotiation = count(["negotiation"]);
+  const stalled = queue.filter((lead) => lead.nextAction?.kind === "follow_up_stalled").length;
+  const blocks: ChatBlock[] = [{
+    type: "stats", id: "leads-pulse", title: "Seus leads agora", icon: "leads", updatedAt: formatTime(now), goal: null,
+    tiles: [
+      { label: "Esperando você", value: waiting, tone: "danger" },
+      { label: "Em atendimento", value: inService, tone: "info" },
+      { label: "Cotação enviada", value: quotes, tone: "warning" },
+      { label: "Recebidos hoje", value: data.today.receivedToday, tone: "success" },
+    ],
+  }];
+  const reading = stalled
+    ? `${stalled === 1 ? "1 lead está parado" : `${stalled} leads estão parados`} há dias. Uma mensagem leve hoje já reaquece.`
+    : quotes
+      ? `${quotes === 1 ? "1 cotação enviada" : `${quotes} cotações enviadas`}: hoje é um bom dia para perguntar o que acharam.`
+      : negotiation
+        ? `${negotiation === 1 ? "1 lead em negociação" : `${negotiation} leads em negociação`}: foque neles para fechar.`
+        : data.today.receivedToday === 0
+          ? "Nenhum lead novo hoje ainda. Fique disponível no plantão para receber os próximos."
+          : "Ritmo bom. Mantenha o primeiro contato rápido em cada lead novo.";
+  blocks.push(assistantMessage("leads-reading", reading));
+  return blocks;
+}
+
 function leadScript(data: BrokerWorkspaceData, now: Date): ChatScript {
+  const firstName = data.viewer.name.split(/\s+/)[0] || data.viewer.name;
+  // A different opener now and then (by day and hour), so the conversation feels alive.
+  const opener = vary(LEADS_OPENERS, now, 0);
   const blocks: ChatBlock[] = [
     { type: "date", id: "leads-date", label: `Hoje, ${formatTime(now)}` },
-    assistantMessage("leads-greeting", `${greeting(now)}, ${data.viewer.name}.`),
+    assistantMessage("leads-greeting", `${greeting(now)}, ${firstName}! ${opener}`),
+    ...leadsPulse(data, now),
   ];
   const action = data.nextAction;
 
@@ -568,17 +612,81 @@ function performanceScript(data: BrokerWorkspaceData): ChatScript {
   return { blocks, status: { label: "Esperando você", tone: "waiting" } };
 }
 
+function localHour(now: Date) {
+  return Number(new Intl.DateTimeFormat("en-US", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now));
+}
+
+/**
+ * A varied line, stable within the same São Paulo hour (a refresh does not reshuffle
+ * the conversation). Built on the server with the page's "now": the screen gets the text.
+ */
+function vary(options: readonly string[], now: Date, salt: number) {
+  return options[(Number(localDateKey(now).replace(/-/g, "")) + localHour(now) + salt) % options.length]!;
+}
+
+function durationText(minutes: number) {
+  if (minutes < 60) return `${Math.max(1, minutes)} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours}h${String(rest).padStart(2, "0")}` : `${hours}h`;
+}
+
+const OPENERS = {
+  plantao: ["Olhei o seu plantão.", "Aqui está o seu plantão.", "Bora ver a escala?", "Seu plantão, rapidinho."],
+  agenda: ["Olhei a sua agenda.", "Seus retornos de hoje.", "Bora organizar o dia?", "Aqui está o que você combinou com os clientes."],
+  desempenho: ["Seus números de hoje.", "Olha como está o seu dia.", "Dei uma olhada no seu desempenho.", "Bora ver o placar?"],
+} as const;
+
+/**
+ * One smart line per conversation, read from the broker's own data: time left on
+ * the plantão, the next return, the acceptance rate. Short and different each time.
+ */
+function smartIntro(id: "plantao" | "agenda" | "desempenho", data: BrokerWorkspaceData, now: Date): ChatBlock[] {
+  const opener = vary(OPENERS[id], now, id.length);
+  let insight: string | null = null;
+  if (id === "plantao") {
+    const active = data.duty?.active;
+    const next = data.duty?.next;
+    if (active) {
+      const left = Math.round((active.endsAt.getTime() - now.getTime()) / 60_000);
+      insight = active.paused ? "Você está pausado: nenhum lead chega até você voltar." : `Faltam ${durationText(left)} para acabar. ${data.today.receivedToday ? `Já chegaram ${data.today.receivedToday} hoje.` : "Fique de olho: o primeiro lead pode chegar a qualquer momento."}`;
+    } else if (next) {
+      const until = Math.round((next.startsAt.getTime() - now.getTime()) / 60_000);
+      insight = until <= 24 * 60 ? `O próximo começa em ${durationText(until)}.` : null;
+    }
+  } else if (id === "agenda") {
+    const upcoming = data.agenda.filter((item) => item.dueAt && item.dueAt.getTime() > now.getTime()).sort((a, b) => a.dueAt!.getTime() - b.dueAt!.getTime())[0];
+    const overdue = data.agenda.filter((item) => item.dueAt && item.dueAt.getTime() <= now.getTime()).length;
+    insight = overdue
+      ? `${overdue === 1 ? "1 retorno passou da hora" : `${overdue} retornos passaram da hora`}: cliente lembrado é cliente quente.`
+      : upcoming?.dueAt
+        ? `O próximo é com ${upcoming.leadName.split(" ")[0]} daqui a ${durationText(Math.round((upcoming.dueAt.getTime() - now.getTime()) / 60_000))}.`
+        : null;
+  } else {
+    const { receivedToday, acceptedToday } = data.today;
+    const rate = receivedToday ? Math.round((acceptedToday / receivedToday) * 100) : null;
+    insight = rate === null
+      ? null
+      : rate >= 90 ? `Você aceitou ${rate}% do que chegou. Excelente!` : `Você aceitou ${rate}% do que chegou hoje. Cada oferta aceita rápido é mais chance de venda.`;
+  }
+  return [assistantMessage(`${id}-intro`, insight ? `${opener} ${insight}` : opener)];
+}
+
 export function buildAssistantScript(
   id: ScriptAssistantId,
   input: { data: BrokerWorkspaceData; now: Date; journey?: BrokerJourneyData | null; dailySummaries?: JourneyCelebration[] },
 ): ChatScript {
   switch (id) {
     case "leads": return leadScript(input.data, input.now);
-    case "plantao": return dutyScript(input.data);
-    case "agenda": return agendaScript(input.data, input.now);
-    case "desempenho": return performanceScript(input.data);
+    case "plantao": return withIntro(smartIntro("plantao", input.data, input.now), dutyScript(input.data));
+    case "agenda": return withIntro(smartIntro("agenda", input.data, input.now), agendaScript(input.data, input.now));
+    case "desempenho": return withIntro(smartIntro("desempenho", input.data, input.now), performanceScript(input.data));
     case "jornada": return buildJourneyScript({ journey: input.journey ?? null, dailySummaries: input.dailySummaries ?? [], now: input.now });
   }
+}
+
+function withIntro(intro: ChatBlock[], script: ChatScript): ChatScript {
+  return { ...script, blocks: [...intro, ...script.blocks] };
 }
 
 export function buildJourneyScript(input: { journey: BrokerJourneyData | null; dailySummaries: JourneyCelebration[]; now: Date }): ChatScript {
@@ -595,7 +703,12 @@ export function buildJourneyScript(input: { journey: BrokerJourneyData | null; d
     return { blocks, status: { label: "Preparando", tone: "idle" } };
   }
   const open = journey.missions.filter((m) => m.progress.eligible && !m.progress.completed);
-  blocks.push(assistantMessage("journey-greeting", `${greeting(now)}. Vamos ver sua jornada?`));
+  // A varied opener and the one thing that moves the level up now.
+  const nextLevel = journey.level.nextLevel;
+  const closest = [...open].sort((a, b) => a.progress.remaining - b.progress.remaining)[0];
+  const push = closest ? `Mais perto agora: ${closest.title.toLowerCase()}, falta ${closest.progress.remaining} para ganhar ${closest.bonusPoints} pts.` : null;
+  const levelLine = nextLevel ? `Faltam ${journey.level.pointsToNext} pts para virar ${nextLevel.name}.` : "Você está no nível mais alto. Que fase!";
+  blocks.push(assistantMessage("journey-greeting", `${greeting(now)}! ${vary(["Bora subir de nível?", "Olha a sua jornada.", "Sua jornada, rapidinho.", "Vamos ver seus pontos?"], now, 7)} ${push ?? levelLine}`));
   blocks.push(factSheet("journey-current", "Sua jornada", [
     { label: "Nível", value: journey.level.level.name },
     { label: "Pontos na semana", value: String(journey.week.points) },
@@ -672,6 +785,7 @@ export function buildAncoraScript(input: { notifications: AncoraNotification[]; 
   }
   if (unread.length) choices.push({ id: "mark-all", label: "Marcar tudo como lido", reply: "Já vi, pode marcar como lido", action: { kind: "server", name: "notifications.markRead", payload: {} } });
   // Jack answers in this same conversation: two questions ready to tap (the AI answers them).
+  blocks.push(assistantMessage("ancora-jack-hint", vary(["Precisa de algo? É só me perguntar aqui embaixo.", "Me pergunte o que quiser sobre o seu dia.", "Quer saber quem atender primeiro? Toque abaixo ou escreva.", "Estou por aqui para o que precisar."], now, 3)));
   choices.push(...JACK_ASKS);
   choices.push({ id: "settings", label: "Configurar avisos", hint: "Notificações no celular e pop-up de lead", action: { kind: "href", href: "/notificacoes" } });
   blocks.push(question("ancora-choice", unread.length ? "O que você quer fazer?" : "Tudo lido. Quer me perguntar algo?", choices));

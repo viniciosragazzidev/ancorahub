@@ -41,7 +41,7 @@ describe("buildInsightsScript", () => {
         conversation("c", { outbound: true }),
       ],
     });
-    expect(script.blocks[0]).toMatchObject({ id: "i-count", text: "2 clientes esperando sua resposta. Comece por Cliente, que espera há 2h." });
+    expect(script.blocks[0]).toMatchObject({ id: "i-count", text: expect.stringMatching(/ 2 clientes esperando sua resposta. Comece por Cliente, que espera há 2h.$/) });
     expect(script.blocks.find((block) => block.id === "i-next")).toMatchObject({ text: "Próximo passo: Mandar a tabela da Amil" });
     // Insights never copies the transcript: no client message quoted.
     expect(JSON.stringify(script.blocks)).not.toContain("quanto fica o plano");
