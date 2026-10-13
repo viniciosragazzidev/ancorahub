@@ -255,6 +255,30 @@ function previousEveningOf(occurrence: DutyWindow, timezone: string) {
   );
 }
 
+/** "Considerar leads sem distribuição a partir de": the manager's choice on the plantão page. */
+export const DUTY_LEADS_SINCE_OPTIONS = ["plantao", "hoje", "ontem", "sexta"] as const;
+export type DutyLeadsSinceOption = (typeof DUTY_LEADS_SINCE_OPTIONS)[number];
+
+export function parseDutyLeadsSince(value: string | null | undefined): DutyLeadsSinceOption {
+  return (DUTY_LEADS_SINCE_OPTIONS as readonly string[]).includes(value ?? "") ? (value as DutyLeadsSinceOption) : "plantao";
+}
+
+/**
+ * Start of the lead window for a choice other than the plantão's own window:
+ * today 00:00, yesterday 19:00 or the last Friday 19:00 (before today), in the
+ * plantão's timezone. Null keeps the plantão window.
+ */
+export function dutyLeadsSinceStart(option: DutyLeadsSinceOption, now: Date, timezone = "America/Sao_Paulo"): Date | null {
+  if (option === "plantao") return null;
+  const today = zonedParts(now, timezone);
+  const todayKey = dateKey(today.year, today.month, today.day);
+  if (option === "hoje") return localTimeToUtc(todayKey, "00:00", timezone);
+  if (option === "ontem") return localTimeToUtc(addCalendarDays(todayKey, -1), DUTY_LEADS_FROM_PREVIOUS_DAY_AT, timezone);
+  const weekday = new Date(`${todayKey}T12:00:00Z`).getUTCDay();
+  const back = ((weekday - 5 + 7) % 7) || 7;
+  return localTimeToUtc(addCalendarDays(todayKey, -back), DUTY_LEADS_FROM_PREVIOUS_DAY_AT, timezone);
+}
+
 export function isDutyWindowActive(window: DutyWindow | null, now: Date) {
   return Boolean(window && window.startsAt <= now && window.endsAt > now);
 }

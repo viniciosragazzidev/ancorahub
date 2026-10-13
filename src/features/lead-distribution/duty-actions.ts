@@ -12,7 +12,7 @@ import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history";
-import { getRelevantDutyWindow } from "./duty-presence-domain";
+import { getRelevantDutyWindow, parseDutyLeadsSince } from "./duty-presence-domain";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 import { assignLeadToBroker } from "./service";
@@ -694,7 +694,7 @@ function availableDutyLeadConditions(context: Awaited<ReturnType<typeof getRequi
   );
 }
 
-export async function getDutyAvailableLeadsAction(scheduleId: string): Promise<
+export async function getDutyAvailableLeadsAction(scheduleId: string, leadsSince?: string): Promise<
   | { ok: true; leads: Array<{ id: string; name: string; phone: string | null; queueName: string | null; temperature: string | null; createdAt: string }> }
   | { ok: false; reason: string }
 > {
@@ -703,9 +703,12 @@ export async function getDutyAvailableLeadsAction(scheduleId: string): Promise<
     if (!parsedScheduleId.success) return { ok: false, reason: "Plantão inválido." };
     const { context, db, schedule } = await findScheduleForMutation(parsedScheduleId.data);
     if (schedule.status !== "active") return { ok: false, reason: "Plantão inativo." };
-    const profile = await getDutyScheduleProfile(context, parsedScheduleId.data);
+    const leadsSinceOption = parseDutyLeadsSince(leadsSince);
+    const profile = await getDutyScheduleProfile(context, parsedScheduleId.data, { leadsSince: leadsSinceOption });
     const queueIds = profile.linkedQueues.map((queue) => queue.id);
     if (!queueIds.length) return { ok: true, leads: [] };
+    // A date chosen on the page limits the list too, by arrival like the page; the default keeps every waiting lead.
+    const sinceCondition = leadsSinceOption === "plantao" ? undefined : sql`coalesce(${schema.leads.assignedAt}, ${schema.leads.createdAt}) >= ${profile.leadsSince.toISOString()}`;
     const rows = await db.select({
       id: schema.leads.id,
       name: schema.leads.nome,
@@ -715,7 +718,7 @@ export async function getDutyAvailableLeadsAction(scheduleId: string): Promise<
       createdAt: schema.leads.createdAt,
     }).from(schema.leads)
       .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.leads.queueId), eq(schema.leadQueues.tenantId, context.tenantId)))
-      .where(availableDutyLeadConditions(context, queueIds))
+      .where(and(availableDutyLeadConditions(context, queueIds), sinceCondition))
       .orderBy(asc(schema.leads.createdAt))
       .limit(100);
     return { ok: true, leads: rows.map((lead) => ({

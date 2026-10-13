@@ -6,7 +6,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { selectEffectiveDutyAssignments } from "./dated-duty-roster";
-import { getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, resolveDutyLeadWindowBounds } from "./duty-presence-domain";
+import { dutyLeadsSinceStart, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
 import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
 import { normalizeOfferPacing } from "./offer-pacing";
@@ -28,7 +28,7 @@ export type DutyScheduleProfile = Awaited<ReturnType<typeof getDutyScheduleProfi
  * can be wired to a queue through any of the three), and the leads that
  * actually landed with one of its rostered brokers recently.
  */
-export async function getDutyScheduleProfile(context: TenantContext, scheduleId: string) {
+export async function getDutyScheduleProfile(context: TenantContext, scheduleId: string, options: { leadsSince?: DutyLeadsSinceOption } = {}) {
   const db = getDatabase();
 
   const [schedule] = await db
@@ -165,7 +165,10 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   const occurrenceWindow: { since: Date; until: Date | null; upcomingStartsAt?: Date } = firstShift && firstShift.start > referenceNow
     ? { since: firstShift.start, until: firstShift.end, upcomingStartsAt: firstShift.start }
     : getDutyOccurrenceLeadWindow({ dayOfWeek: schedule.dayOfWeek, startsAt: schedule.startsAt, endsAt: schedule.endsAt, timezone: schedule.timezone }, familySchedules, referenceNow);
-  const { since, until } = resolveDutyLeadWindowBounds(occurrenceWindow, now);
+  // The manager may widen or narrow it ("considerar leads a partir de"): then
+  // every lead since that moment counts, with no end.
+  const leadsSinceOverride = dutyLeadsSinceStart(options.leadsSince ?? "plantao", now, schedule.timezone ?? undefined);
+  const { since, until } = leadsSinceOverride ? { since: leadsSinceOverride, until: null } : resolveDutyLeadWindowBounds(occurrenceWindow, now);
   const upcomingStartsAt = occurrenceWindow.upcomingStartsAt ?? null;
 
   // Same rule as the distribution (2026-10-09, weekly and published ADD UP): on a

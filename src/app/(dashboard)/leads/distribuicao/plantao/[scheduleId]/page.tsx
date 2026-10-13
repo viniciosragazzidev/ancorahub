@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getDutyScheduleProfile } from "@/features/lead-distribution/duty-schedule-profile-queries";
 import { getDutyOccurrenceHistory } from "@/features/lead-distribution/duty-occurrence-history";
 import { firstValidShift, isSingleOccurrencePlantao } from "@/features/lead-distribution/monthly-duty-plan";
-import { getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows } from "@/features/lead-distribution/duty-presence-domain";
+import { getDutyWindowOnDate, getRelevantDutyWindow, isDutyWindowActive, listCompletedDutyWindows, parseDutyLeadsSince, type DutyLeadsSinceOption } from "@/features/lead-distribution/duty-presence-domain";
 import { getFeatureFlag, getSystemSetting, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui";
@@ -74,15 +74,23 @@ function DutyProfileHeader({
   </section>;
 }
 
-export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string; canal?: string; fila?: string }> }) {
+const LEADS_SINCE_CHOICES: Array<{ value: DutyLeadsSinceOption; label: string }> = [
+  { value: "plantao", label: "Janela do plantão" },
+  { value: "hoje", label: "Hoje" },
+  { value: "ontem", label: "Ontem 19h" },
+  { value: "sexta", label: "Sexta 19h" },
+];
+
+export default async function DutyScheduleProfilePage({ params, searchParams }: { params: Promise<{ scheduleId: string }>; searchParams: Promise<{ situacao?: string; data?: string; canal?: string; fila?: string; desde?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { scheduleId } = await params;
-  const { situacao, data, canal, fila } = await searchParams;
+  const { situacao, data, canal, fila, desde } = await searchParams;
+  const leadsSinceOption = parseDutyLeadsSince(desde);
 
   let profile: Awaited<ReturnType<typeof getDutyScheduleProfile>>;
   try {
-    profile = await getDutyScheduleProfile(context, scheduleId);
+    profile = await getDutyScheduleProfile(context, scheduleId, { leadsSince: leadsSinceOption });
   } catch {
     redirect("/leads/distribuicao?view=plantao");
   }
@@ -243,7 +251,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   // (not disqualified/blocked/qualifying ones, nor the other plantão's).
   const plantaoLeads = allLeads.filter((lead) => isWaiting(lead) || isDistributed(lead));
   const whatsappLeadCount = plantaoLeads.filter((lead) => whatsappEntryOf(lead)).length;
-  const leadsHref = (next: { situacao?: string; canal?: string; fila?: string }) => {
+  const leadsHref = (next: { situacao?: string; canal?: string; fila?: string; desde?: string }) => {
     const query = new URLSearchParams();
     const nextSituacao = next.situacao ?? situacao;
     const nextCanal = next.canal ?? channel;
@@ -251,6 +259,8 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     if (nextCanal !== "todos") query.set("canal", nextCanal);
     const nextQueueId = next.fila ?? selectedQueueId;
     if (nextQueueId) query.set("fila", nextQueueId);
+    const nextDesde = next.desde ?? leadsSinceOption;
+    if (nextDesde !== "plantao") query.set("desde", nextDesde);
     const search = query.toString();
     return `/leads/distribuicao/plantao/${schedule.id}${search ? `?${search}` : ""}`;
   };
@@ -280,7 +290,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     { key: "distribuidos", label: "Distribuídos", count: distributedCount },
   ] as const;
   const totalWaitingCount = allWaitingLeads.length;
-  const sinceLabel = leadsSince.getTime() === 0
+  const sinceLabel = leadsSinceOption !== "plantao"
+    ? `desde ${dateTime.format(leadsSince)} (escolhido acima)`
+    : leadsSince.getTime() === 0
     ? "desde a criação deste plantão"
     : leadsUpcomingStartsAt
       ? `aguardando o início ${dayKey.format(leadsUpcomingStartsAt) === dayKey.format(now) ? "de hoje" : `em ${dayMonth.format(leadsUpcomingStartsAt)}`} às ${timeOnly.format(leadsUpcomingStartsAt)}`
@@ -350,7 +362,22 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             title="Leads do plantão"
             badge={<Badge variant="secondary">{waitingCount + distributedCount}</Badge>}
             description={`Leads das filas vinculadas ${sinceLabel}.`}
-            actions={<nav aria-label="Filtrar leads por situação" className="flex flex-wrap gap-2">
+            actions={<div className="flex flex-col items-end gap-2">
+            <nav aria-label="Considerar leads sem distribuição a partir de" className="flex flex-wrap items-center justify-end gap-2">
+              <span className="text-xs text-muted-foreground" title="Muda só o que você vê aqui e o que atribui à mão. A distribuição automática segue a janela do plantão.">Considerar leads a partir de (só para ver e atribuir à mão)</span>
+              {LEADS_SINCE_CHOICES.map((choice) => (
+                <Button
+                  key={choice.value}
+                  render={<Link href={leadsHref({ desde: choice.value })} />}
+                  size="sm"
+                  variant={leadsSinceOption === choice.value ? "secondary" : "ghost"}
+                  aria-current={leadsSinceOption === choice.value ? "true" : undefined}
+                >
+                  {choice.label}
+                </Button>
+              ))}
+            </nav>
+            <nav aria-label="Filtrar leads por situação" className="flex flex-wrap gap-2">
               {filters.map((item) => (
                 <Button
                   key={item.key}
@@ -361,7 +388,8 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   {item.label} <Badge variant="outline">{item.count}</Badge>
                 </Button>
               ))}
-            </nav>}
+            </nav>
+            </div>}
           />
           <CardContent className="p-0">
             {filter === "aguardando" && queueTabs.length > 1 ? (
@@ -526,7 +554,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 ]).map((group) => <section key={group.key} aria-label={group.label} className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground">{group.label} <Badge variant="outline">{group.entries.length}</Badge></h4>
                   {group.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{group.entries.map((entry) => (
-              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={schedule.attendanceMode} onSitePending={entry.onSitePending} onSiteReleaseOpen={entry.onSiteReleaseOpen} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting !== "false"} presencePhotoId={entry.presencePhotoId ?? null} presenceReleaseNote={entry.presenceReleaseNote ?? null}>
+              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} leadsSince={leadsSinceOption} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={schedule.attendanceMode} onSitePending={entry.onSitePending} onSiteReleaseOpen={entry.onSiteReleaseOpen} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting !== "false"} presencePhotoId={entry.presencePhotoId ?? null} presenceReleaseNote={entry.presenceReleaseNote ?? null}>
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-sm font-medium">{entry.brokerName}</span>

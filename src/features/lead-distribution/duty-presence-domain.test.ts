@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findRunningDutySchedule, formatDutyStartHour, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, listCompletedDutyWindows } from "./duty-presence-domain";
+import { dutyLeadsSinceStart, findRunningDutySchedule, parseDutyLeadsSince, formatDutyStartHour, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, listCompletedDutyWindows } from "./duty-presence-domain";
 
 describe("completed duty history", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
@@ -192,5 +192,26 @@ describe("lead window after weekends and holidays", () => {
     expect(daysBackForLeadWindowOn("2026-10-09")).toBe(1); // Friday → Thursday
     expect(daysBackForLeadWindowOn("2026-10-19")).toBe(3); // Monday → Friday
     expect(daysBackForLeadWindowOn("2026-10-13")).toBe(4); // Tuesday after the Monday holiday → Friday
+  });
+});
+
+describe("considerar leads a partir de", () => {
+  // Tuesday 13/10/2026, 12:00 in São Paulo.
+  const now = new Date("2026-10-13T15:00:00.000Z");
+
+  it("keeps the plantão window by default and for unknown values", () => {
+    expect(parseDutyLeadsSince(undefined)).toBe("plantao");
+    expect(parseDutyLeadsSince("qualquer")).toBe("plantao");
+    expect(dutyLeadsSinceStart("plantao", now)).toBeNull();
+  });
+
+  it("starts today at midnight, yesterday at 19h or last Friday at 19h", () => {
+    expect(dutyLeadsSinceStart("hoje", now)?.toISOString()).toBe("2026-10-13T03:00:00.000Z");
+    expect(dutyLeadsSinceStart("ontem", now)?.toISOString()).toBe("2026-10-12T22:00:00.000Z");
+    expect(dutyLeadsSinceStart("sexta", now)?.toISOString()).toBe("2026-10-09T22:00:00.000Z");
+  });
+
+  it("on a Friday, 'sexta' means the previous Friday", () => {
+    expect(dutyLeadsSinceStart("sexta", new Date("2026-10-16T15:00:00.000Z"))?.toISOString()).toBe("2026-10-09T22:00:00.000Z");
   });
 });

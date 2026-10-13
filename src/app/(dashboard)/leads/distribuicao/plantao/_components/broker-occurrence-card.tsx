@@ -18,9 +18,11 @@ type LeadResult = Extract<Awaited<ReturnType<typeof getBrokerOccurrenceLeadsActi
 type AvailableResult = Extract<Awaited<ReturnType<typeof getDutyAvailableLeadsAction>>, { ok: true }>;
 type Tab = "received" | "available";
 
-export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null }: {
+export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null }: {
   children: ReactNode;
   scheduleId: string;
+  /** The page's "considerar leads a partir de" choice. */
+  leadsSince?: string;
   assignmentId: string;
   brokerId: string;
   brokerName: string;
@@ -77,7 +79,7 @@ export function BrokerOccurrenceCard({ children, scheduleId, assignmentId, broke
     setAvailable(null);
     setAvailableError(null);
     startLoadingAvailable(async () => {
-      const result = await getDutyAvailableLeadsAction(scheduleId);
+      const result = await getDutyAvailableLeadsAction(scheduleId, leadsSince);
       if (result.ok) setAvailable(result.leads);
       else setAvailableError(result.reason);
     });
