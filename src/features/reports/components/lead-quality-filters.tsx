@@ -58,10 +58,13 @@ export function LeadQualityRangePicker({ period }: { period: LeadQualityPeriod }
     return { today: day(0), weekAgo: day(6) };
   });
   const today = defaults.today;
-  const current = isLeadQualityRange(period) ? rangeDays(period) : { from: defaults.weekAgo, to: today };
+  const current = isLeadQualityRange(period) ? rangeDays(period) : { from: defaults.weekAgo, fromTime: null, to: today, toTime: null };
   const [from, setFrom] = useState(current.from);
   const [to, setTo] = useState(current.to);
-  const range = leadQualityRange(from, to);
+  // Optional times: empty keeps the operation day (19h of the day before / 19h).
+  const [fromTime, setFromTime] = useState(current.fromTime ?? "");
+  const [toTime, setToTime] = useState(current.toTime ?? "");
+  const range = leadQualityRange(from, to, fromTime || null, toTime || null);
 
   function go(next: string | null) {
     const params = new URLSearchParams(searchParams.toString());
@@ -74,7 +77,7 @@ export function LeadQualityRangePicker({ period }: { period: LeadQualityPeriod }
   }
 
   return (
-    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (next) { setFrom(current.from); setTo(current.to); } }}>
+    <Popover open={open} onOpenChange={(next) => { setOpen(next); if (next) { setFrom(current.from); setTo(current.to); setFromTime(current.fromTime ?? ""); setToTime(current.toTime ?? ""); } }}>
       <PopoverTrigger render={<Button variant={isLeadQualityRange(period) ? "secondary" : "outline"} size="sm" className="gap-1.5" disabled={isPending} />}>
         <CalendarRange className="size-3.5" aria-hidden="true" />
         <span className="max-[1279px]:hidden">{isLeadQualityRange(period) ? leadQualityPeriodLabel(period) : "De / até"}</span>
@@ -82,7 +85,7 @@ export function LeadQualityRangePicker({ period }: { period: LeadQualityPeriod }
       <PopoverContent align="end" className="w-72 space-y-3">
         <div>
           <p className="text-sm font-semibold">Escolher o intervalo</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Cada dia começa no Turno 1, às 19h da véspera, e vai até as 19h.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Sem horário, o início é 19h da véspera e o fim 19h. O Turno 1 vai do início até 13h30 do último dia; o Turno 2, de lá até o fim.</p>
         </div>
         <div className="grid grid-cols-2 gap-2">
           <label className="space-y-1 text-xs font-medium text-muted-foreground">
@@ -93,8 +96,16 @@ export function LeadQualityRangePicker({ period }: { period: LeadQualityPeriod }
             Até
             <input type="date" value={to} max={today} onChange={(event) => setTo(event.target.value)} className="h-9 w-full rounded-lg border border-border bg-card px-2 text-sm text-foreground" />
           </label>
+          <label className="space-y-1 text-xs font-medium text-muted-foreground">
+            Hora (opcional)
+            <input type="time" value={fromTime} onChange={(event) => setFromTime(event.target.value)} className="h-9 w-full rounded-lg border border-border bg-card px-2 text-sm text-foreground" />
+          </label>
+          <label className="space-y-1 text-xs font-medium text-muted-foreground">
+            Hora (opcional)
+            <input type="time" value={toTime} onChange={(event) => setToTime(event.target.value)} className="h-9 w-full rounded-lg border border-border bg-card px-2 text-sm text-foreground" />
+          </label>
         </div>
-        {range ? null : <p className="text-xs text-destructive">A data inicial vem antes da final, em até um ano.</p>}
+        {range ? null : <p className="text-xs text-destructive">O início vem antes do fim, em até um ano.</p>}
         <div className="flex justify-between gap-2">
           {isLeadQualityRange(period) ? <Button size="sm" variant="ghost" onClick={() => go(null)}>Limpar</Button> : <span />}
           <Button size="sm" disabled={!range} onClick={() => range && go(range)}>Aplicar</Button>

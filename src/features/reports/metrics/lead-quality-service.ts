@@ -33,6 +33,8 @@ export type LeadQualitySegment = {
   assigned: number;
   /** Received in this cut and handed to a broker before its shift ended. */
   assignedInShift: number;
+  /** Left over from its shift and handed out afterwards (Turno 1 leads taken in Turno 2). */
+  assignedAfterShift: number;
   metaAttributed: number;
   averageFirstContactSeconds: number | null;
   hotWarmShare: number;
@@ -69,6 +71,7 @@ export type LeadQualityReport = {
     /** Handed to a broker before the end of the shift the lead arrived in. */
     assignedInShift: number;
     assignedInShiftRate: number;
+    assignedAfterShift: number;
     metaAttributed: number;
     averageFirstContactSeconds: number | null;
     classificationCoverage: number;
@@ -119,8 +122,12 @@ export function leadOriginExpression() {
   END`;
 }
 
-/** Turno 2 = 13:30–19:00 (São Paulo); everything else (19:00–13:30) is Turno 1. */
-export function leadShiftExpression() {
+/**
+ * Turno 2 = 13:30–19:00 (São Paulo); everything else (19:00–13:30) is Turno 1.
+ * In a chosen range, Turno 1 is everything before 13:30 of its last day.
+ */
+export function leadShiftExpression(window?: Pick<LeadQualityWindow, "shiftSplit">) {
+  if (window?.shiftSplit) return sql<number>`CASE WHEN ${schema.leads.createdAt} < ${window.shiftSplit.toISOString()} THEN 1 ELSE 2 END`;
   return sql<number>`CASE
     WHEN timezone('America/Sao_Paulo', ${schema.leads.createdAt})::time >= time '13:30'
      AND timezone('America/Sao_Paulo', ${schema.leads.createdAt})::time < time '19:00' THEN 2
@@ -132,7 +139,10 @@ export function leadShiftExpression() {
  * End of the shift a lead arrived in: 13:30–19:00 ends at 19:00 that day;
  * 19:00–24:00 at 13:30 of the next day; 00:00–13:30 at 13:30 that day (São Paulo).
  */
-export function leadShiftEndExpression() {
+export function leadShiftEndExpression(window?: Pick<LeadQualityWindow, "shiftSplit" | "end">) {
+  if (window?.shiftSplit && window.end) {
+    return sql`CASE WHEN ${schema.leads.createdAt} < ${window.shiftSplit.toISOString()} THEN ${window.shiftSplit.toISOString()}::timestamptz ELSE ${window.end.toISOString()}::timestamptz END`;
+  }
   const local = sql`timezone('America/Sao_Paulo', ${schema.leads.createdAt})`;
   return sql`timezone('America/Sao_Paulo', CASE
     WHEN ${local}::time >= time '13:30' AND ${local}::time < time '19:00' THEN date_trunc('day', ${local}) + interval '19 hours'
@@ -172,7 +182,7 @@ function ageBandExpression() {
   END`;
 }
 
-function focusWhere(focus: LeadQualityFocus | null): SQL | undefined {
+function focusWhere(focus: LeadQualityFocus | null, window?: LeadQualityWindow): SQL | undefined {
   if (!focus) return undefined;
   const unknown = focus.key === UNKNOWN_KEY;
   switch (focus.dimension) {
@@ -205,10 +215,10 @@ function focusWhere(focus: LeadQualityFocus | null): SQL | undefined {
     case "origin":
       return sql`${leadOriginExpression()} = ${focus.key}`;
     case "shift":
-      return sql`${leadShiftExpression()} = ${Number(focus.key)}`;
+      return sql`${leadShiftExpression(window)} = ${Number(focus.key)}`;
     case "origin_shift": {
       const [origin, shift] = focus.key.split(":");
-      return and(sql`${leadOriginExpression()} = ${origin}`, sql`${leadShiftExpression()} = ${Number(shift)}`);
+      return and(sql`${leadOriginExpression()} = ${origin}`, sql`${leadShiftExpression(window)} = ${Number(shift)}`);
     }
     case "hour": {
       const [day, hour] = focus.key.split(":").map(Number);
@@ -227,7 +237,7 @@ function numberValue(value: unknown): number {
 
 function aggregateFromSegment(segment: Pick<LeadQualitySegment,
   "total" | "hot" | "warm" | "cold" | "unclassified" | "converted" |
-  "hotWarmConverted" | "assigned" | "assignedInShift" | "metaAttributed" | "averageFirstContactSeconds"
+  "hotWarmConverted" | "assigned" | "assignedInShift" | "assignedAfterShift" | "metaAttributed" | "averageFirstContactSeconds"
 >) {
   const counts = {
     total: segment.total,
@@ -245,6 +255,7 @@ function aggregateFromSegment(segment: Pick<LeadQualitySegment,
     classified: segment.hot + segment.warm + segment.cold,
     averageFirstContactSeconds: segment.averageFirstContactSeconds,
     assignedInShift: segment.assignedInShift,
+    assignedAfterShift: segment.assignedAfterShift,
     assignedInShiftRate: percentage(segment.assignedInShift, segment.total),
     ...leadQualityRates(counts),
   };
@@ -269,7 +280,7 @@ export async function getLeadQualityReport(
   if (!enabled) {
     return {
       enabled: false, period, window: serializedWindow, filters, generatedAt: new Date().toISOString(),
-      summary: { total: 0, hot: 0, warm: 0, cold: 0, unclassified: 0, classified: 0, converted: 0, hotWarmConverted: 0, assigned: 0, assignedInShift: 0, assignedInShiftRate: 0, metaAttributed: 0, averageFirstContactSeconds: null, classificationCoverage: 0, hotWarmShare: 0, hotWarmConversionRate: 0, conversionRate: 0, assignedRate: 0, metaAdAttributionCoverage: 0, temperatureDistribution: { hot: 0, warm: 0, cold: 0, unclassified: 0 } },
+      summary: { total: 0, hot: 0, warm: 0, cold: 0, unclassified: 0, classified: 0, converted: 0, hotWarmConverted: 0, assigned: 0, assignedInShift: 0, assignedInShiftRate: 0, assignedAfterShift: 0, metaAttributed: 0, averageFirstContactSeconds: null, classificationCoverage: 0, hotWarmShare: 0, hotWarmConversionRate: 0, conversionRate: 0, assignedRate: 0, metaAdAttributionCoverage: 0, temperatureDistribution: { hot: 0, warm: 0, cold: 0, unclassified: 0 } },
       segments: emptySegments(), focus, focusedLeads: [], focusedLeadCount: 0,
     };
   }
@@ -298,8 +309,10 @@ export async function getLeadQualityReport(
       weekday: sql<number>`extract(dow from timezone('America/Sao_Paulo', ${schema.leads.createdAt}))::int`.as("weekday"),
       hour: sql<number>`extract(hour from timezone('America/Sao_Paulo', ${schema.leads.createdAt}))::int`.as("hour"),
       origin: leadOriginExpression().as("origin"),
-      shift: leadShiftExpression().as("shift"),
-      assignedInShift: sql<boolean>`(${schema.leads.assignedAt} IS NOT NULL AND ${schema.leads.assignedAt} <= ${leadShiftEndExpression()})`.as("assignedInShift"),
+      shift: leadShiftExpression(window).as("shift"),
+      assignedInShift: sql<boolean>`(${schema.leads.assignedAt} IS NOT NULL AND ${schema.leads.assignedAt} <= ${leadShiftEndExpression(window)})`.as("assignedInShift"),
+      // Left over from its shift and handed out afterwards (a Turno 1 lead taken in Turno 2).
+      assignedAfterShift: sql<boolean>`(${schema.leads.assignedAt} IS NOT NULL AND ${schema.leads.assignedAt} > ${leadShiftEndExpression(window)}${(window.end ?? window.until) ? sql` AND ${schema.leads.assignedAt} <= ${(window.end ?? window.until)!.toISOString()}` : sql``})`.as("assignedAfterShift"),
       qualificationStatus: schema.leads.qualificationStatus,
       status: schema.leads.status,
       hasMetaAd: sql<boolean>`${schema.leads.metaAdId} IS NOT NULL`.as("hasMetaAd"),
@@ -318,7 +331,7 @@ export async function getLeadQualityReport(
         isNull(schema.leads.archivedAt),
         leadQualityCohortWhere(window, filters),
         scope.leadScope,
-        focusWhere(focus),
+        focusWhere(focus, window),
       )),
   );
 
@@ -410,6 +423,7 @@ export async function getLeadQualityReport(
     hotWarmConverted: sql<number>`count(*) FILTER (WHERE ${cohort.status} = 'converted' AND ${cohort.qualificationStatus} IN ('hot', 'warm'))::int`,
     assigned: sql<number>`count(*) FILTER (WHERE ${cohort.brokerId} IS NOT NULL)::int`,
     assignedInShift: sql<number>`count(*) FILTER (WHERE ${cohort.assignedInShift})::int`,
+    assignedAfterShift: sql<number>`count(*) FILTER (WHERE ${cohort.assignedAfterShift})::int`,
     metaAttributed: sql<number>`count(*) FILTER (WHERE ${cohort.hasMetaAd})::int`,
     averageFirstContactSeconds: sql<number | null>`avg(${cohort.firstContactSeconds}) FILTER (WHERE ${cohort.firstContactSeconds} IS NOT NULL)`,
   }).from(cohort).groupBy(groupingSets).orderBy(desc(count()));
@@ -425,6 +439,7 @@ export async function getLeadQualityReport(
         unclassified: numberValue(row.unclassified), converted: numberValue(row.converted),
         hotWarmConverted: numberValue(row.hotWarmConverted), assigned: numberValue(row.assigned),
         assignedInShift: numberValue(row.assignedInShift),
+        assignedAfterShift: numberValue(row.assignedAfterShift),
         metaAttributed: numberValue(row.metaAttributed),
         averageFirstContactSeconds: row.averageFirstContactSeconds == null ? null : numberValue(row.averageFirstContactSeconds),
       };
@@ -458,6 +473,7 @@ export async function getLeadQualityReport(
       hotWarmConverted: numberValue(row.hotWarmConverted),
       assigned: numberValue(row.assigned),
       assignedInShift: numberValue(row.assignedInShift),
+      assignedAfterShift: numberValue(row.assignedAfterShift),
       metaAttributed: numberValue(row.metaAttributed),
       averageFirstContactSeconds: row.averageFirstContactSeconds == null ? null : numberValue(row.averageFirstContactSeconds),
     };
@@ -472,7 +488,7 @@ export async function getLeadQualityReport(
 
   const resolvedSummary = summary ?? {
     total: 0, hot: 0, warm: 0, cold: 0, unclassified: 0, classified: 0, converted: 0,
-    hotWarmConverted: 0, assigned: 0, assignedInShift: 0, assignedInShiftRate: 0, metaAttributed: 0, averageFirstContactSeconds: null,
+    hotWarmConverted: 0, assigned: 0, assignedInShift: 0, assignedInShiftRate: 0, assignedAfterShift: 0, metaAttributed: 0, averageFirstContactSeconds: null,
     classificationCoverage: 0, hotWarmShare: 0, hotWarmConversionRate: 0, conversionRate: 0,
     assignedRate: 0, metaAdAttributionCoverage: 0, temperatureDistribution: { hot: 0, warm: 0, cold: 0, unclassified: 0 },
   };
@@ -501,7 +517,7 @@ export async function getLeadQualityReport(
           isNull(schema.leads.archivedAt),
           leadQualityCohortWhere(window, filters),
           scope.leadScope,
-          focusWhere(focus),
+          focusWhere(focus, window),
         ))
         .orderBy(desc(schema.leads.createdAt))
         .limit(MAX_FOCUSED_LEADS + 1);

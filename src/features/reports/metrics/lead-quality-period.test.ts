@@ -62,3 +62,32 @@ describe("intervalo de datas (de x até y)", () => {
     expect(leadQualityPeriodLabel("2026-10-13_2026-10-13")).toBe("Dia 13/10");
   });
 });
+
+describe("intervalo com horário e turnos do intervalo", () => {
+  it("accepts times on de/até and rejects de after até", () => {
+    expect(parseLeadQualityPeriod("2026-10-10T08:00_2026-10-13T18:00")).toBe("2026-10-10T08:00_2026-10-13T18:00");
+    expect(parseLeadQualityPeriod("2026-10-13T18:00_2026-10-13T08:00")).toBe(30);
+    expect(parseLeadQualityPeriod("2026-10-13T25:00_2026-10-14")).toBe(30);
+  });
+
+  it("Turno 1 runs from de to 13:30 of the last day; Turno 2 from there to até", () => {
+    const window = leadQualityWindow("2026-10-10T08:00_2026-10-13T18:00", new Date("2026-10-14T12:00:00Z"));
+    expect(window.since.toISOString()).toBe("2026-10-10T11:00:00.000Z");
+    expect(window.until?.toISOString()).toBe("2026-10-13T21:00:00.000Z");
+    expect(window.shiftSplit?.toISOString()).toBe("2026-10-13T16:30:00.000Z");
+  });
+
+  it("labels the times", () => {
+    expect(leadQualityPeriodLabel("2026-10-10T08:00_2026-10-13T18:00")).toBe("De 10/10 08:00 a 13/10 18:00");
+  });
+});
+
+describe("um dia só com horário", () => {
+  it("08:00 to 18:00 keeps Turno 1 (08:00-13:30) and Turno 2 (13:30-18:00)", () => {
+    const window = leadQualityWindow("2026-10-13T08:00_2026-10-13T18:00", new Date("2026-10-14T12:00:00Z"));
+    expect(window.since.toISOString()).toBe("2026-10-13T11:00:00.000Z");
+    expect(window.shiftSplit?.toISOString()).toBe("2026-10-13T16:30:00.000Z");
+    expect(window.since < window.shiftSplit!).toBe(true);
+    expect(window.until?.toISOString()).toBe("2026-10-13T21:00:00.000Z");
+  });
+});

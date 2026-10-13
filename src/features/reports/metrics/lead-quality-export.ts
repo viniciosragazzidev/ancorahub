@@ -66,7 +66,7 @@ export async function getLeadQualityExport(context: TenantContext, period: LeadQ
     id: schema.leads.id,
     name: schema.leads.nome,
     origin: leadOriginExpression(),
-    shift: leadShiftExpression(),
+    shift: leadShiftExpression(window),
     createdAt: schema.leads.createdAt,
     queueName: schema.leadQueues.name,
     brokerName: schema.user.name,

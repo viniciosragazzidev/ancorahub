@@ -232,6 +232,31 @@ function ShiftBlock({ input }: { input: LeadQualityPdfInput }) {
   const byOriginShift = new Map(segments.origin_shift.map((segment) => [segment.key, segment]));
   const origins = LEAD_ORIGINS.filter((origin) => origin.key !== "other" || segments.origin.some((segment) => segment.key === "other"));
   const max = Math.max(1, ...segments.origin_shift.map((segment) => segment.total));
+  // What Turno 1 left for Turno 2: arrived in Turno 1, not handed out before it ended.
+  const first = shiftTotals.get(1);
+  const leftover = first ? first.total - first.assignedInShift : 0;
+  const leftoverTakenLater = first?.assignedAfterShift ?? 0;
+  const flow = (shiftKey: number): Array<[string, string]> => {
+    const total = shiftTotals.get(shiftKey);
+    const arrived = total?.total ?? 0;
+    const inShift = total?.assignedInShift ?? 0;
+    if (shiftKey === 1) {
+      return [
+        ["Entraram no turno", numberLabel(arrived)],
+        ["Distribuídos no turno", `${numberLabel(inShift)} (${percentLabel(arrived ? (inShift / arrived) * 100 : 0)})`],
+        ["Sobraram para o Turno 2", `${numberLabel(leftover)}`],
+      ];
+    }
+    const toHandle = arrived + leftover;
+    const handled = inShift + leftoverTakenLater;
+    return [
+      ["Entraram no turno", numberLabel(arrived)],
+      ["+ Sobras do Turno 1", numberLabel(leftover)],
+      ["Total para distribuir", numberLabel(toHandle)],
+      ["Distribuídos", `${numberLabel(handled)} (${numberLabel(inShift)} do turno + ${numberLabel(leftoverTakenLater)} das sobras)`],
+      ["Não distribuídos no turno", numberLabel(Math.max(0, toHandle - handled))],
+    ];
+  };
 
   const rows: LeadQualitySegment[] = [];
   for (const shift of LEAD_SHIFTS) {
@@ -259,10 +284,14 @@ function ShiftBlock({ input }: { input: LeadQualityPdfInput }) {
                   </View>
                   <Span style={{ fontSize: 18, fontWeight: 600, color: C.accent }}>{numberLabel(total?.total ?? 0)}</Span>
                 </Row>
-                <Row style={{ justifyContent: "space-between" }}>
-                  <Span style={{ fontSize: 8, color: C.mutedForeground }}>{`Entraram ${numberLabel(total?.total ?? 0)} · atribuídos até o fim do turno`}</Span>
-                  <Span style={{ fontSize: 8, fontWeight: 600, color: C.foreground }}>{`${numberLabel(total?.assignedInShift ?? 0)} (${percentLabel(total && total.total ? (total.assignedInShift / total.total) * 100 : 0)})`}</Span>
-                </Row>
+                <View style={{ gap: 2, paddingVertical: 4, borderTopWidth: 1, borderBottomWidth: 1, borderColor: C.border }}>
+                  {flow(shift.key).map(([label, value]) => (
+                    <Row key={label} style={{ justifyContent: "space-between" }}>
+                      <Span style={{ fontSize: 8, color: C.mutedForeground }}>{label}</Span>
+                      <Span style={{ fontSize: 8, fontWeight: 600, color: C.foreground }}>{value}</Span>
+                    </Row>
+                  ))}
+                </View>
                 {origins.map((origin) => {
                   const segment = byOriginShift.get(`${origin.key}:${shift.key}`);
                   const count = segment?.total ?? 0;

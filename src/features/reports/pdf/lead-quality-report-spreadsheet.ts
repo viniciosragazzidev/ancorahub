@@ -13,12 +13,12 @@ function safeCell(value: unknown) {
   return /^[=+\-@]/.test(text) ? `'${text}` : text;
 }
 
-const SEGMENT_HEADER = ["Leads", "Quentes", "Mornos", "Frios", "Sem classificação", "Quentes + mornos (%)", "Distribuídos", "Distribuídos no turno", "Convertidos", "Conversão (%)", "1º contato médio (min)"];
+const SEGMENT_HEADER = ["Leads", "Quentes", "Mornos", "Frios", "Sem classificação", "Quentes + mornos (%)", "Distribuídos", "Distribuídos no turno", "Sobraram e foram distribuídos depois", "Convertidos", "Conversão (%)", "1º contato médio (min)"];
 
 function segmentValues(segment: LeadQualitySegment) {
   return [
     segment.total, segment.hot, segment.warm, segment.cold, segment.unclassified,
-    Number(segment.hotWarmShare.toFixed(1)), segment.assigned, segment.assignedInShift, segment.converted, Number(segment.conversionRate.toFixed(1)),
+    Number(segment.hotWarmShare.toFixed(1)), segment.assigned, segment.assignedInShift, segment.assignedAfterShift, segment.converted, Number(segment.conversionRate.toFixed(1)),
     segment.averageFirstContactSeconds == null ? "" : Math.round(segment.averageFirstContactSeconds / 60),
   ];
 }

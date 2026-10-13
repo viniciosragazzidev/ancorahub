@@ -8,13 +8,15 @@ import { PERIOD_OPTIONS, DEFAULT_PERIOD, periodStart, type PeriodValue } from "@
 export type LeadQualityPeriod = PeriodValue | 3 | "today" | LeadQualityRange;
 
 /**
- * A chosen range, "2026-10-01_2026-10-13", in operation days: each day starts
- * with its first shift at 19:00 of the day before and ends at 19:00 (like
- * "Hoje"). So 01/10 to 13/10 = 30/09 19:00 to 13/10 19:00.
+ * A chosen range: "2026-10-01_2026-10-13", optionally with times,
+ * "2026-10-01T08:00_2026-10-13T18:00". Without a time, "de" starts at 19:00 of
+ * the day before (the first shift of that day) and "até" ends at 19:00.
+ * Turno 1 runs from "de" to 13:30 of the last day, however many days that is;
+ * Turno 2 from 13:30 of the last day to "até" (Vinicios, 13/10).
  */
 export type LeadQualityRange = `${string}_${string}`;
 
-const RANGE = /^(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})$/;
+const RANGE = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?_(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?$/;
 const MAX_RANGE_DAYS = 366;
 
 export function isLeadQualityRange(period: LeadQualityPeriod): period is LeadQualityRange {
@@ -26,16 +28,21 @@ function validDay(value: string) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-/** The range "de" to "até", or null when a day is invalid, reversed or the range is over a year. */
-export function leadQualityRange(from: string, to: string): LeadQualityRange | null {
-  if (!validDay(from) || !validDay(to) || from > to) return null;
-  const days = (Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86_400_000 + 1;
-  return days <= MAX_RANGE_DAYS ? `${from}_${to}` : null;
+const validTime = (value: string | null | undefined) => !value || /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+
+/** "de"/"até" (day + optional time) of a range. */
+export function rangeDays(period: LeadQualityRange) {
+  const [, from = "", fromTime = "", to = "", toTime = ""] = period.match(RANGE) ?? [];
+  return { from, fromTime: fromTime || null, to, toTime: toTime || null };
 }
 
-export function rangeDays(period: LeadQualityRange) {
-  const [, from = "", to = ""] = period.match(RANGE) ?? [];
-  return { from, to };
+/** The range, or null when a day/time is invalid, "de" is not before "até" or it spans over a year. */
+export function leadQualityRange(from: string, to: string, fromTime?: string | null, toTime?: string | null): LeadQualityRange | null {
+  if (!validDay(from) || !validDay(to) || !validTime(fromTime) || !validTime(toTime)) return null;
+  const value = `${from}${fromTime ? `T${fromTime}` : ""}_${to}${toTime ? `T${toTime}` : ""}` as LeadQualityRange;
+  const { since, until } = rangeBounds(value);
+  if (since >= until) return null;
+  return (until.getTime() - since.getTime()) / 86_400_000 <= MAX_RANGE_DAYS ? value : null;
 }
 
 export const LEAD_QUALITY_TIMEZONE = "America/Sao_Paulo";
@@ -53,7 +60,7 @@ export function parseLeadQualityPeriod(raw: unknown): LeadQualityPeriod {
   if (raw === "today" || raw === "hoje") return "today";
   if (typeof raw !== "string") return DEFAULT_PERIOD;
   const range = raw.match(RANGE);
-  if (range) return leadQualityRange(range[1]!, range[2]!) ?? DEFAULT_PERIOD;
+  if (range) return leadQualityRange(range[1]!, range[3]!, range[2], range[4]) ?? DEFAULT_PERIOD;
   const days = Number.parseInt(raw, 10);
   if (raw === "3") return 3;
   return (PERIOD_OPTIONS as readonly number[]).includes(days) ? (days as PeriodValue) : DEFAULT_PERIOD;
@@ -75,19 +82,32 @@ function wallClockToUtc(year: number, month: number, day: number, clock: string,
   return new Date(guess - offset);
 }
 
-/** Leads created in [since, until). `until` null = still open. */
-export type LeadQualityWindow = { since: Date; until: Date | null };
+/**
+ * Leads created in [since, until). `until` null = still open. A range also
+ * carries where Turno 1 ends (13:30 of its last day) and where it ends.
+ */
+export type LeadQualityWindow = { since: Date; until: Date | null; shiftSplit?: Date; end?: Date };
+
+const dayParts = (day: string) => day.split("-").map(Number) as [number, number, number];
+
+function rangeBounds(period: LeadQualityRange) {
+  const { from, fromTime, to, toTime } = rangeDays(period);
+  const [fy, fm, fd] = dayParts(from);
+  const [ty, tm, td] = dayParts(to);
+  // No time on "de": 19:00 of the day before (Date.UTC rolls the day over).
+  const dayBefore = new Date(Date.UTC(fy, fm - 1, fd - 1));
+  const since = fromTime
+    ? wallClockToUtc(fy, fm, fd, fromTime, LEAD_QUALITY_TIMEZONE)
+    : wallClockToUtc(dayBefore.getUTCFullYear(), dayBefore.getUTCMonth() + 1, dayBefore.getUTCDate(), OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
+  const until = wallClockToUtc(ty, tm, td, toTime ?? OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
+  const shiftSplit = wallClockToUtc(ty, tm, td, SHIFT_SPLIT_AT, LEAD_QUALITY_TIMEZONE);
+  return { since, until, shiftSplit };
+}
 
 export function leadQualityWindow(period: LeadQualityPeriod, now = new Date()): LeadQualityWindow {
   if (isLeadQualityRange(period)) {
-    const { from, to } = rangeDays(period);
-    const [fy, fm, fd] = from.split("-").map(Number) as [number, number, number];
-    const [ty, tm, td] = to.split("-").map(Number) as [number, number, number];
-    // From 19:00 of the day before the first day to 19:00 of the last one (Date.UTC rolls the day over).
-    const dayBefore = new Date(Date.UTC(fy, fm - 1, fd - 1));
-    const since = wallClockToUtc(dayBefore.getUTCFullYear(), dayBefore.getUTCMonth() + 1, dayBefore.getUTCDate(), OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
-    const until = wallClockToUtc(ty, tm, td, OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
-    return { since, until: until > now ? null : until };
+    const { since, until, shiftSplit } = rangeBounds(period);
+    return { since, until: until > now ? null : until, shiftSplit, end: until };
   }
   if (period !== "today") {
     if (period === 3) {
@@ -124,8 +144,9 @@ const dayMonth = (day: string) => `${day.slice(8, 10)}/${day.slice(5, 7)}`;
 
 export function leadQualityPeriodLabel(period: LeadQualityPeriod) {
   if (isLeadQualityRange(period)) {
-    const { from, to } = rangeDays(period);
-    return from === to ? `Dia ${dayMonth(from)}` : `De ${dayMonth(from)} a ${dayMonth(to)}`;
+    const { from, fromTime, to, toTime } = rangeDays(period);
+    const at = (day: string, time: string | null) => `${dayMonth(day)}${time ? ` ${time}` : ""}`;
+    return from === to && !fromTime && !toTime ? `Dia ${dayMonth(from)}` : `De ${at(from, fromTime)} a ${at(to, toTime)}`;
   }
   return period === "today" ? "Hoje (19h de ontem às 19h)" : `Últimos ${period} dias`;
 }

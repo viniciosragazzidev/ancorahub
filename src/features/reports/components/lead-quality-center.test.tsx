@@ -22,12 +22,12 @@ const dimensionKeys: LeadQualityDimension[] = ["source", "campaign", "adset", "a
 const segments = Object.fromEntries(dimensionKeys.map((dimension) => [dimension, []])) as unknown as Record<LeadQualityDimension, LeadQualitySegment[]>;
 segments.ad = [{
   dimension: "ad", key: "ad-1", label: "Anúncio PME", total: 8, hot: 2, warm: 3, cold: 1,
-  unclassified: 2, converted: 1, hotWarmConverted: 1, assigned: 6, assignedInShift: 6, metaAttributed: 8,
+  unclassified: 2, converted: 1, hotWarmConverted: 1, assigned: 6, assignedInShift: 6, assignedAfterShift: 0, metaAttributed: 8,
   averageFirstContactSeconds: 420, hotWarmShare: 71.4, conversionRate: 12.5,
 }];
 segments.queue = [{
   dimension: "queue", key: "queue-1", label: "Fila Centro", total: 8, hot: 2, warm: 3, cold: 1,
-  unclassified: 2, converted: 1, hotWarmConverted: 1, assigned: 6, assignedInShift: 6, metaAttributed: 8,
+  unclassified: 2, converted: 1, hotWarmConverted: 1, assigned: 6, assignedInShift: 6, assignedAfterShift: 0, metaAttributed: 8,
   averageFirstContactSeconds: 420, hotWarmShare: 71.4, conversionRate: 12.5,
 }];
 
@@ -39,7 +39,7 @@ const report: LeadQualityReport = {
   generatedAt: "2026-10-01T12:00:00.000Z",
   summary: {
     total: 8, hot: 2, warm: 3, cold: 1, unclassified: 2, classified: 6,
-    converted: 1, hotWarmConverted: 1, assigned: 6, assignedInShift: 6, metaAttributed: 8,
+    converted: 1, hotWarmConverted: 1, assigned: 6, assignedInShift: 6, assignedAfterShift: 0, metaAttributed: 8,
     averageFirstContactSeconds: 420, classificationCoverage: 75, hotWarmShare: 83.3,
     hotWarmConversionRate: 20, conversionRate: 12.5, assignedRate: 75, assignedInShiftRate: 50,
     metaAdAttributionCoverage: 100,

@@ -495,8 +495,9 @@ export function LeadQualityCenter({ report, showQualityTab = true, queues = [] }
               <div className="px-1">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Entrada</p>
                 <h2 id="origin-heading" className="mt-1 text-lg font-semibold tracking-tight">Formulário × WhatsApp, por turno</h2>
-                <p className="mt-1 text-xs text-muted-foreground">Turno 1: das 19h do dia anterior às 13h30 · Turno 2: das 13h30 às 19h.</p>
+                <p className="mt-1 text-xs text-muted-foreground">Turno 1: das 19h do dia anterior às 13h30 · Turno 2: das 13h30 às 19h. Num intervalo, o Turno 1 vai do início até 13h30 do último dia.</p>
               </div>
+              <ShiftFlow report={report} />
               <div className="grid gap-4 xl:grid-cols-2">
                 <SegmentTable title="Origem do lead" description="Formulário Meta, WhatsApp e demais origens." dimension="origin" rows={report.segments.origin} period={period} icon={ContactRound} />
                 <SegmentTable title="Origem por turno" description="Cada origem em cada turno do dia." dimension="origin_shift" rows={originShiftRows} period={period} icon={Clock3} />
@@ -577,5 +578,45 @@ function Intro({ period, windowLabel }: { period: LeadQualityPeriod; windowLabel
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Turno 1 → Turno 2: what arrived in each shift, what was handed out in it,
+ * and what Turno 1 left for Turno 2 (counted in Turno 2's total).
+ */
+function ShiftFlow({ report }: { report: LeadQualityReport }) {
+  const first = report.segments.shift.find((segment) => segment.key === "1");
+  const second = report.segments.shift.find((segment) => segment.key === "2");
+  const arrived1 = first?.total ?? 0;
+  const inShift1 = first?.assignedInShift ?? 0;
+  const leftover = arrived1 - inShift1;
+  const leftoverTaken = first?.assignedAfterShift ?? 0;
+  const arrived2 = second?.total ?? 0;
+  const inShift2 = second?.assignedInShift ?? 0;
+  const toHandle = arrived2 + leftover;
+  const handled = inShift2 + leftoverTaken;
+  const cards = [
+    { title: "Turno 1", rows: [["Entraram", numberLabel(arrived1)], ["Distribuídos no turno", numberLabel(inShift1)], ["Sobraram para o Turno 2", numberLabel(leftover)]] },
+    { title: "Turno 2", rows: [["Entraram", numberLabel(arrived2)], ["+ Sobras do Turno 1", numberLabel(leftover)], ["Total para distribuir", numberLabel(toHandle)], ["Distribuídos", `${numberLabel(handled)} (${numberLabel(inShift2)} do turno + ${numberLabel(leftoverTaken)} das sobras)`], ["Não distribuídos no turno", numberLabel(Math.max(0, toHandle - handled))]] },
+  ];
+  return (
+    <div className="grid gap-4 md:grid-cols-2" aria-label="Entrada e distribuição por turno">
+      {cards.map((card) => (
+        <Card key={card.title} className="border-border/70 shadow-none">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">{card.title}</CardTitle></CardHeader>
+          <CardContent>
+            <dl className="grid gap-1.5 text-sm">
+              {card.rows.map(([label, value]) => (
+                <div key={label} className="flex items-baseline justify-between gap-3">
+                  <dt className="text-muted-foreground">{label}</dt>
+                  <dd className="font-medium tabular-nums">{value}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }
