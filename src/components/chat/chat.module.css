@@ -350,12 +350,17 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 @media (prefers-reduced-motion: reduce) { .presenceClock { animation: none; } }
 
 /* Camera inside the app (2026-10-12): avoids Android closing the browser when the camera app opens. */
-.camera { position: fixed; inset: 0; z-index: 1000; display: grid; grid-template-rows: 1fr auto; background: #000; color: #fff; }
-.cameraVideo { grid-area: 1 / 1; width: 100%; height: 100%; object-fit: cover; }
+/* minmax(0, 1fr): on iPhone the portrait camera stream is taller than the
+   screen and a plain 1fr row grew to fit it, pushing the shutter bar below the
+   browser toolbar (13/10, nothing to tap). The row now shrinks to what is left,
+   and the height follows the visible viewport (dvh), not the layout one. */
+.camera { position: fixed; inset: 0; height: 100vh; height: 100dvh; z-index: 1000; display: grid; grid-template-rows: minmax(0, 1fr) auto; overflow: hidden; background: #000; color: #fff; }
+/* Absolutely placed in its grid area: the stream never sizes the rows, so the bar always stays on screen. */
+.cameraVideo { grid-area: 1 / 1; position: absolute; inset: 0; width: 100%; height: 100%; min-width: 0; min-height: 0; object-fit: cover; }
 .cameraVideo[data-hidden="true"] { visibility: hidden; }
-.cameraHint { grid-area: 1 / 1; align-self: start; justify-self: center; margin: calc(env(safe-area-inset-top) + 16px) 0 0; padding: 6px 14px; border-radius: 999px; font-size: 14px; background: rgb(0 0 0 / 0.5); }
-.cameraFailed { grid-area: 1 / 1; align-self: center; justify-self: center; display: grid; gap: 14px; max-width: 300px; padding: 20px; text-align: center; font-size: 15px; line-height: 1.45; }
-.cameraBar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 18px 20px calc(env(safe-area-inset-bottom) + 22px); background: #000; }
+.cameraHint { grid-area: 1 / 1; position: relative; z-index: 1; align-self: start; justify-self: center; margin: calc(env(safe-area-inset-top) + 16px) 0 0; padding: 6px 14px; border-radius: 999px; font-size: 14px; background: rgb(0 0 0 / 0.5); }
+.cameraFailed { grid-area: 1 / 1; position: relative; z-index: 1; align-self: center; justify-self: center; display: grid; gap: 14px; max-width: 300px; padding: 20px; text-align: center; font-size: 15px; line-height: 1.45; }
+.cameraBar { grid-row: 2; position: relative; z-index: 1; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; padding: 18px 20px calc(env(safe-area-inset-bottom) + 22px); background: #000; }
 .cameraShutter { width: 72px; height: 72px; border-radius: 50%; border: 4px solid #fff; background: #fff; box-shadow: inset 0 0 0 4px #000; cursor: pointer; }
 .cameraShutter:disabled { opacity: 0.4; }
 .cameraPrimary { min-height: 48px; padding: 0 22px; border: 0; border-radius: 999px; font: inherit; font-size: 15px; font-weight: 500; color: #fff; background: oklch(62% 0.18 28); cursor: pointer; }
