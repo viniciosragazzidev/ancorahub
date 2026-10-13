@@ -220,10 +220,36 @@ export function daysBackForLeadWindow(weekday: number) {
   return weekday === 1 ? 3 : 1;
 }
 
+/**
+ * National holidays with no plantão (only national ones; state/city holidays are not here). 2026-10-13: Monday 12/10 was a holiday,
+ * so Tuesday's plantões take the leads from Friday 19:00). Add new ones here.
+ */
+export const NO_DUTY_HOLIDAYS: ReadonlySet<string> = new Set([
+  "2026-01-01", "2026-04-03", "2026-04-21", "2026-05-01", "2026-09-07", "2026-10-12", "2026-11-02", "2026-11-20", "2026-12-25",
+  "2027-01-01", "2027-03-26", "2027-04-21", "2027-05-01", "2027-09-07", "2027-10-12", "2027-11-02", "2027-11-15", "2027-11-20", "2027-12-25",
+]);
+
+/**
+ * Days back to the previous working day (its 19:00 opens this day's lead
+ * window), skipping weekends and holidays: Monday → Friday (3), the day after a
+ * Monday holiday → Friday (4), any other day → 1.
+ */
+export function daysBackForLeadWindowOn(dutyDate: string) {
+  for (let back = 1; back <= 10; back += 1) {
+    const day = addCalendarDays(dutyDate, -back);
+    const [year, month, date] = day.split("-").map(Number);
+    const weekday = new Date(Date.UTC(year!, month! - 1, date!)).getUTCDay();
+    if (weekday === 0 || weekday === 6 || NO_DUTY_HOLIDAYS.has(day)) continue;
+    return back;
+  }
+  return 1;
+}
+
 function previousEveningOf(occurrence: DutyWindow, timezone: string) {
   const day = zonedParts(occurrence.startsAt, timezone);
+  const key = dateKey(day.year, day.month, day.day);
   return localTimeToUtc(
-    addCalendarDays(dateKey(day.year, day.month, day.day), -daysBackForLeadWindow(day.weekday)),
+    addCalendarDays(key, -daysBackForLeadWindowOn(key)),
     DUTY_LEADS_FROM_PREVIOUS_DAY_AT,
     timezone,
   );

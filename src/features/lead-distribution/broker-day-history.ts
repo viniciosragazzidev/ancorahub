@@ -4,7 +4,7 @@ import { and, desc, eq, gte, isNull, lt } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
-import { DUTY_LEADS_FROM_PREVIOUS_DAY_AT, daysBackForLeadWindow } from "./duty-presence-domain";
+import { DUTY_LEADS_FROM_PREVIOUS_DAY_AT, daysBackForLeadWindowOn } from "./duty-presence-domain";
 
 export type BrokerDayHistoryLead = {
   id: string;
@@ -51,8 +51,8 @@ export function operationDayStart(now: Date) {
   // São Paulo has no DST: UTC-3 all year.
   const todayCut = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day), cutHour + 3, cutMinute));
   if (todayCut <= now) return todayCut;
-  const weekday = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day))).getUTCDay();
-  return new Date(todayCut.getTime() - daysBackForLeadWindow(weekday) * DAY_MS);
+  // Weekends and holidays (e.g. a Monday holiday) belong to the next working day.
+  return new Date(todayCut.getTime() - daysBackForLeadWindowOn(`${parts.year}-${parts.month}-${parts.day}`) * DAY_MS);
 }
 
 /** The operation's day of a past plantão date ("YYYY-MM-DD"): 19:00 of the day before (Friday, for a Monday) to 19:00 of that day. */
@@ -60,8 +60,7 @@ export function operationDayOf(dutyDate: string) {
   const [year, month, day] = dutyDate.split("-").map(Number);
   const [cutHour, cutMinute] = DUTY_LEADS_FROM_PREVIOUS_DAY_AT.split(":").map(Number);
   const until = new Date(Date.UTC(year, month - 1, day, cutHour + 3, cutMinute));
-  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay();
-  return { since: new Date(until.getTime() - daysBackForLeadWindow(weekday) * DAY_MS), until };
+  return { since: new Date(until.getTime() - daysBackForLeadWindowOn(dutyDate) * DAY_MS), until };
 }
 
 /**

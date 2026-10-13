@@ -184,3 +184,13 @@ describe("findRunningDutySchedule", () => {
     expect(findRunningDutySchedule([{ ...monday, id: "weekly", validFrom: new Date("2026-01-01T03:00:00Z"), validUntil: null }], now)?.schedule.id).toBe("weekly");
   });
 });
+
+describe("lead window after weekends and holidays", () => {
+  it("goes back to the previous working day", async () => {
+    const { daysBackForLeadWindowOn } = await import("./duty-presence-domain");
+    expect(daysBackForLeadWindowOn("2026-10-14")).toBe(1); // Wednesday → Tuesday
+    expect(daysBackForLeadWindowOn("2026-10-09")).toBe(1); // Friday → Thursday
+    expect(daysBackForLeadWindowOn("2026-10-19")).toBe(3); // Monday → Friday
+    expect(daysBackForLeadWindowOn("2026-10-13")).toBe(4); // Tuesday after the Monday holiday → Friday
+  });
+});
