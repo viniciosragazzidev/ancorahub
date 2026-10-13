@@ -126,8 +126,8 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
 
   if (!waiting.length) {
     blocks.push({ type: "assistant", id: "i-clear", text: "Ninguém esperando sua resposta agora." });
-    const recent = insights.slice(0, OTHERS_SHOWN).map((item) => ({ id: item.id, lead: item.name, primary: item.name, secondary: item.latestMessage ? clip(item.latestMessage.body, 70) : item.status, trailing: item.latestMessage ? time(item.latestMessage.sentAt) : undefined, href: detailHref(item) }));
-    if (recent.length) blocks.push({ type: "list", id: "i-recent", title: "Conversas recentes", items: recent });
+    const recent = insights.slice(0, OTHERS_SHOWN).map((item) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 70)), trailing: item.latestMessage ? time(item.latestMessage.sentAt) : undefined, href: detailHref(item) }));
+    if (recent.length) blocks.push({ type: "list", id: "i-recent", title: "Conversas recentes", subtitle: "Toque para ver o diagnóstico", items: recent });
     blocks.push({ type: "question", id: "i-clear-choice", prompt: "Quer ver mais?", choices: [all] });
     return { blocks, status: { label: "Em dia", tone: "idle" } };
   }
@@ -153,6 +153,9 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
   ];
   blocks.push({ type: "question", id: "i-choice", prompt: "Como quer seguir?", choices });
 
+  // Everyone else stays one tap away: their own analysis (the list used to show only those waiting).
+  const waitingIds = new Set(waiting.map(({ item }) => item.id));
+  const others = insights.filter((item) => !waitingIds.has(item.id)).slice(0, OTHERS_SHOWN);
   if (rest.length) {
     blocks.push({
       type: "list",
@@ -160,6 +163,15 @@ export function buildInsightsScript(input: { insights: BrokerConversationInsight
       title: "Depois",
       subtitle: "Também esperando você",
       items: rest.slice(0, OTHERS_SHOWN).map(({ item, since: at }) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 80)), trailing: waited(at, now), href: detailHref(item) })),
+    });
+  }
+  if (others.length) {
+    blocks.push({
+      type: "list",
+      id: "i-recent",
+      title: "Outros clientes",
+      subtitle: "Toque para ver o diagnóstico",
+      items: others.map((item) => ({ id: item.id, lead: item.name, primary: item.name, secondary: nextStepText(item.intelligence?.nextBestAction) ?? (item.intelligence?.summary ? clip(item.intelligence.summary, 80) : clip(quickTip(item, now), 80)), trailing: item.latestMessage ? time(item.latestMessage.sentAt) : undefined, href: detailHref(item) })),
     });
   }
 
@@ -190,7 +202,7 @@ export function buildLeadInsightScript(input: { item: BrokerConversationInsight;
   const actions: ChatChoice[] = [
     ...(whatsapp ? [{ id: "reply", label: `Responder ${name} no WhatsApp`, action: { kind: "href" as const, href: whatsapp } }] : []),
     { id: "lead", label: item.kind === "client" ? "Abrir o cliente" : "Abrir o lead", action: { kind: "href", href: item.href } },
-    { id: "all", label: "Ver outros clientes", action: { kind: "href", href: "/conversas/broker?todas=1" } },
+    { id: "all", label: "Ver outros clientes", hint: "A lista com o diagnóstico de cada um", action: { kind: "href", href: "/conversas/broker" } },
   ];
 
   if (!ai || (!ai.summary && !ai.nextBestAction)) {

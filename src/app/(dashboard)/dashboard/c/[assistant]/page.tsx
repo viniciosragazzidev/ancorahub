@@ -55,14 +55,14 @@ export default async function AssistantConversationPage({ params }: { params: Pr
     const hasUnread = notifications.some((item) => !item.readAt);
     return (
       <>
-        <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} canWrite={audience === "broker"} />
+        <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} canWrite={audience === "broker"} />
         {hasUnread ? <MarkSeenOnView kind="ancora" /> : null}
       </>
     );
   }
   if (audience === "supervisor") {
     const data = await getCachedSupervisorWorkspaceData();
-    return <AssistantChat identity={identity} script={buildSupervisorScript(assistant as SupervisorScriptId, data, new Date())} />;
+    return <AssistantChat key={assistant} identity={identity} script={buildSupervisorScript(assistant as SupervisorScriptId, data, new Date())} />;
   }
   if (assistant === "jornada") {
     if (await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false") !== "true") redirect("/dashboard");
@@ -73,7 +73,7 @@ export default async function AssistantConversationPage({ params }: { params: Pr
     const unseen = journey?.celebrations.map((item) => item.id) ?? [];
     return (
       <>
-        <AssistantChat identity={identity} script={buildJourneyScript({ journey, dailySummaries, now: new Date() })} />
+        <AssistantChat key="jornada" identity={identity} script={buildJourneyScript({ journey, dailySummaries, now: new Date() })} />
         {unseen.length ? <MarkSeenOnView kind="jornada" ids={unseen} /> : null}
       </>
     );
@@ -91,5 +91,5 @@ export default async function AssistantConversationPage({ params }: { params: Pr
       </Link>
     )
     : undefined;
-  return <AssistantChat identity={identity} script={script} headerAction={headerAction} agentId={assistant as Scripted} />;
+  return <AssistantChat key={assistant} identity={identity} script={script} headerAction={headerAction} agentId={assistant as Scripted} />;
 }
