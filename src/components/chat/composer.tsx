@@ -22,7 +22,7 @@ export type Mention = {
 
 /** The @ commands of the broker chat; each opens a card with that data. */
 export const BROKER_MENTIONS: Mention[] = [
-  { handle: "leads", label: "@leads", note: "Seus leads e o que espera você" },
+  { handle: "leads", label: "@meusleads", note: "Meus Leads: seus leads e o que espera você" },
   { handle: "plantao", label: "@plantao", note: "Plantão agora e próximos" },
   { handle: "agenda", label: "@agenda", note: "Retornos e tarefas de hoje" },
   { handle: "cotacao", label: "@cotacao", note: "Cotação (em pausa)" },

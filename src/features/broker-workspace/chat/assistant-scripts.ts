@@ -25,7 +25,7 @@ type AssistantDefinition = {
 
 export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
   ancora: { name: "Âncora", shape: "logo", hue: null, verified: true, href: "/dashboard/c/ancora" },
-  leads: { name: "Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
+  leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
   plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
   agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
   cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },

@@ -14,7 +14,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 
 import { runChatServerAction } from "./chat-actions";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
-import { whatsappButton } from "./lead-script";
+import { WHATSAPP_LOCAL_PREFIX, whatsappButton } from "./lead-script";
 
 /**
  * A lead as a conversation: the script plays, replies run the broker's lead
@@ -24,12 +24,12 @@ export function LeadConversation({
   leadId,
   name,
   initials,
-  canWrite,
   script,
 }: {
   leadId: string;
   name: string;
   initials: string;
+  /** Kept for the callers; the composer is off on the lead page since 2026-10-12. */
   canWrite: boolean;
   script: ChatScript;
 }) {
@@ -44,7 +44,9 @@ export function LeadConversation({
         backHref="/dashboard"
         script={script}
         tourTargets={{ conversation: "micro-conv-messages", composer: "micro-conv-composer" }}
-        composerDisabled={!canWrite}
+        // The lead page works by the replies above (Vinicios, 2026-10-12): no free text here.
+        composerDisabled
+        placeholder="Escolha uma das opções acima"
         onButtonOpen={(block, event) => {
           if (block.tone !== "whatsapp") return;
           void recordWhatsAppOpenedAction(leadId);
@@ -59,6 +61,17 @@ export function LeadConversation({
             <svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="2.5" width="10" height="11" rx="2" fill="none" stroke="currentColor" strokeWidth="1.4" /><path d="M5.5 6h5M5.5 8.5h5M5.5 11h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" /></svg>
           </Link>
         }
+        onLocalChoice={(_choice, value): ChatBlock[] => {
+          if (!value.startsWith(WHATSAPP_LOCAL_PREFIX)) return [];
+          // Same tap as the reply: the phone opens WhatsApp (never a blocked popup); the computer opens the dialog.
+          void recordWhatsAppOpenedAction(leadId);
+          if (desktop) {
+            setFirstMessageOpen(true);
+            return [{ type: "assistant", id: `wa-open-${Date.now()}`, text: "Abrindo a mensagem…" }];
+          }
+          window.open(value.slice(WHATSAPP_LOCAL_PREFIX.length), "_blank", "noopener");
+          return [{ type: "assistant", id: `wa-open-${Date.now()}`, text: "Abrindo o WhatsApp…" }];
+        }}
         runAction={async (action) => {
           const result = await runChatServerAction(action.name, action.payload);
           if (result.ok && action.name === "lead.decline") router.push("/minha-fila");

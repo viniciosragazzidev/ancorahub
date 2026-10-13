@@ -167,11 +167,12 @@ function fichaChoice(lead: LeadConversationLead, label = "Ver a ficha completa",
   return { id: `ficha${hash}`, label, action: { kind: "href", href: `/leads/${lead.id}?ficha=1${hash}` } };
 }
 
-const WHATSAPP_BUTTON_ID = "b-whatsapp";
+/** Value of the "Chamar no WhatsApp" reply: the screen opens WhatsApp in the same tap (computer: the first-message dialog). */
+export const WHATSAPP_LOCAL_PREFIX = "whatsapp:";
 
-/** "Chamar no WhatsApp" answers with a button right below (a real link the phone never blocks). */
+/** "Chamar no WhatsApp" opens WhatsApp right away, no extra button (2026-10-12). */
 function whatsappChoice(whatsappUrl: string | null): ChatChoice[] {
-  return whatsappUrl ? [{ id: "whatsapp", label: "Chamar no WhatsApp", reply: "Vou chamar no WhatsApp", action: { kind: "next", questionId: WHATSAPP_BUTTON_ID } }] : [];
+  return whatsappUrl ? [{ id: "whatsapp", label: "Chamar no WhatsApp", reply: "Vou chamar no WhatsApp", action: { kind: "local", value: `${WHATSAPP_LOCAL_PREFIX}${whatsappUrl}` } }] : [];
 }
 
 export function whatsappButton(id: string, href: string, text?: string): ChatBlock {
@@ -315,8 +316,6 @@ export function buildLeadConversationScript({
   }
 
   blocks.push(...nextStep(lead, now, whatsappUrl, advice));
-  const offersWhatsApp = blocks.some((block) => block.type === "question" && block.choices.some((choice) => choice.action.kind === "next" && choice.action.questionId === WHATSAPP_BUTTON_ID));
-  if (offersWhatsApp && whatsappUrl) blocks.push(whatsappButton(WHATSAPP_BUTTON_ID, whatsappUrl, "A mensagem de apresentação já vai pronta. É só tocar:"));
 
   const waiting = lead.isCurrentBroker && (lead.status === "distributed" || lead.status === "new" || IN_SERVICE.has(lead.status));
   return {

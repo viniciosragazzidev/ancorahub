@@ -1,5 +1,6 @@
 "use client";
 
+import { CHAT_RAIL_REFRESH_EVENT } from "@/components/chat/chat-events";
 import { Suspense, useEffect, useState, type ReactNode, type RefObject } from "react";
 
 import "@/components/arc/venancor-scope.css";
@@ -179,11 +180,14 @@ function useDesktopChatRail() {
     load();
     media.addEventListener("change", load);
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+    // Something was just seen (Âncora, Jornada): the blue dot leaves the list right away.
+    window.addEventListener(CHAT_RAIL_REFRESH_EVENT, load);
     return () => {
       alive = false;
       window.clearTimeout(timer);
       media.removeEventListener("change", load);
       window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
+      window.removeEventListener(CHAT_RAIL_REFRESH_EVENT, load);
     };
   }, []);
   return rail;

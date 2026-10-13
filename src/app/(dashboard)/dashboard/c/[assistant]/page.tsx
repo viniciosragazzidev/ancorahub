@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import type { AssistantId } from "@/components/chat/types";
+import { MarkSeenOnView } from "@/components/chat/mark-seen-on-view";
 import { ASSISTANTS, SUPERVISOR_ASSISTANTS, buildAncoraScript, buildAssistantScript, buildJourneyScript } from "@/features/broker-workspace/chat/assistant-scripts";
 import { getCachedSupervisorWorkspaceData, getCachedBrokerJourneyData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { buildSupervisorScript, type SupervisorScriptId } from "@/features/supervisor-workspace/chat";
@@ -51,7 +52,13 @@ export default async function AssistantConversationPage({ params }: { params: Pr
       .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId)))
       .orderBy(desc(schema.notifications.createdAt))
       .limit(ANCORA_HISTORY);
-    return <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} />;
+    const hasUnread = notifications.some((item) => !item.readAt);
+    return (
+      <>
+        <AssistantChat identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} />
+        {hasUnread ? <MarkSeenOnView kind="ancora" /> : null}
+      </>
+    );
   }
   if (audience === "supervisor") {
     const data = await getCachedSupervisorWorkspaceData();
@@ -63,7 +70,13 @@ export default async function AssistantConversationPage({ params }: { params: Pr
       getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null),
       getJourneyDailySummaries(context.tenantId, context.userId),
     ]);
-    return <AssistantChat identity={identity} script={buildJourneyScript({ journey, dailySummaries, now: new Date() })} />;
+    const unseen = journey?.celebrations.map((item) => item.id) ?? [];
+    return (
+      <>
+        <AssistantChat identity={identity} script={buildJourneyScript({ journey, dailySummaries, now: new Date() })} />
+        {unseen.length ? <MarkSeenOnView kind="jornada" ids={unseen} /> : null}
+      </>
+    );
   }
   // Cotação and Insights have their own screens.
   if (!SCRIPTED.includes(assistant as Scripted)) redirect(definition.href);
