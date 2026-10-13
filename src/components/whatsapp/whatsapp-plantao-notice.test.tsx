@@ -4,9 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WhatsAppPlantaoNotice } from "./whatsapp-plantao-notice";
 
-const { recordNoticeAction, getConnection } = vi.hoisted(() => ({
+const { recordNoticeAction, getConnection, pathname } = vi.hoisted(() => ({
   recordNoticeAction: vi.fn().mockResolvedValue(undefined),
   getConnection: vi.fn(),
+  pathname: { current: "/dashboard" },
+}));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => pathname.current,
 }));
 
 vi.mock("@/features/whatsapp-plantao-notice/actions", () => ({
@@ -54,6 +59,7 @@ describe("WhatsAppPlantaoNotice", () => {
     localStorage.clear();
     recordNoticeAction.mockClear();
     getConnection.mockImplementation(async () => initialConnection);
+    pathname.current = "/dashboard";
     mockDesktop(true);
   });
 
@@ -103,5 +109,14 @@ describe("WhatsAppPlantaoNotice", () => {
 
     expect(await screen.findByText(/A partir de 20\/10, conecte seu WhatsApp/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Fechar aviso" })).toBeNull();
+  });
+
+  it("omite o aviso diário na conversa com Jack, que tem o aviso fixo", async () => {
+    pathname.current = "/dashboard/c/ancora";
+    render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
+
+    await waitFor(() => expect(screen.queryByText(/A partir de 20\/10, conecte seu WhatsApp/)).toBeNull());
+    expect(screen.queryByRole("button", { name: "Conectar WhatsApp" })).toBeNull();
+    pathname.current = "/dashboard";
   });
 });

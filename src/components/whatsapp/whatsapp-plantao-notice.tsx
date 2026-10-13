@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
 import { X } from "@/components/huge-icons";
@@ -34,6 +35,7 @@ export function WhatsAppPlantaoNotice({
   userId: string;
   mode: NoticeMode;
 }) {
+  const pathname = usePathname();
   const [visible, setVisible] = useState(mode === "sticky");
   const [mobileHelp, setMobileHelp] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -58,7 +60,7 @@ export function WhatsAppPlantaoNotice({
     return () => { isMounted = false; };
   }, [mode, userId]);
 
-  if (!visible || connected) return null;
+  if (!visible || connected || (mode === "daily" && pathname === "/dashboard/c/ancora")) return null;
 
   function closeForToday() {
     try {
