@@ -1690,3 +1690,17 @@ componentes vêm do Arc UI (bottom-sheet, segmented-control, skeleton, avatar, b
 com os tokens do Arc escopados na classe `.arc-venancor` (`arc/venancor-scope.css`) e
 mapeados para o Venancor, para não alterar o resto do CRM. Sem gradiente, sem sombra
 empilhada, pesos 400 a 700, sentence case, alvos de 44px.
+
+## DEC-140 — Reter leads frios na fila durante o plantão
+
+**Estado:** Aceita pelo Vinicios em 2026-10-13
+
+Cada fila pode ligar `holdColdLeads` na política JSONB existente. Ligada, a
+distribuição automática daquela fila não oferta leads cujo
+`qualification_status` seja exatamente `cold`; eles continuam sem proprietário
+na fila para atribuição manual pela gestão. Leads `warm`, `hot`, sem temperatura
+ou em outros estados mantêm o fluxo atual. O bloqueio é tratado como retenção
+recuperável pelo worker e a contingência não pode tirar o lead frio da fila de
+origem. A atribuição manual direta permanece permitida. A opção começa desligada,
+é editada por fila e auditada no evento `queue.updated`. Sem migration e sem flag
+global adicional; esta entrega não muda o comportamento das demais filas.

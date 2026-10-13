@@ -14,6 +14,7 @@ import { resolveReportDataScope } from "./metric-scope";
 import { LEAD_ORIGINS, LEAD_QUALITY_DIMENSIONS, type LeadOrigin, type LeadQualityDimension, type LeadQualityFilters, type LeadQualityFocus } from "./lead-quality-contract";
 import { leadQualityRates, percentage } from "./metrics-math";
 import { buildSimpleQualityReport, type SimpleLeadClass } from "./lead-quality-simple";
+import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 
 export { LEAD_QUALITY_DIMENSIONS } from "./lead-quality-contract";
 export { parseLeadQualityFocus } from "./lead-quality-contract";
@@ -580,12 +581,14 @@ export async function getSimpleLeadQualityReport(context: TenantContext, period:
   if (!(await canAccessLeadQualityCenter(context))) throw new Error("Você não tem permissão para acessar esta análise.");
   const window = leadQualityWindow(period, now);
   const scope = await resolveReportDataScope(context);
-  const rows = await getDatabase()
+  const db = getDatabase();
+  const [rows, queuePolicyRows] = await Promise.all([db
     .select({
       createdAt: schema.leads.createdAt,
       readyAt: schema.leads.qualificationCompletedAt,
       assignedAt: schema.leads.assignedAt,
       quality: simpleLeadQualityExpression(),
+      queueId: schema.leadQueues.id,
       queueName: schema.leadQueues.name,
       brokerId: schema.leads.corretorId,
       converted: sql<boolean>`${schema.leads.status} = 'converted'`,
@@ -601,8 +604,15 @@ export async function getSimpleLeadQualityReport(context: TenantContext, period:
     ))
     // The most recent ones when a very long period passes the limit (flagged as truncated).
     .orderBy(desc(schema.leads.createdAt))
-    .limit(SIMPLE_REPORT_MAX_ROWS);
-  const report = buildSimpleQualityReport(rows.map((row) => ({ ...row, quality: (["good", "cold", "no_reply"].includes(row.quality) ? row.quality : "other") as SimpleLeadClass, converted: Boolean(row.converted) })), window, now);
+    .limit(SIMPLE_REPORT_MAX_ROWS),
+    db.select({ queueId: schema.leadDistributionPolicies.queueId, policy: schema.leadDistributionPolicies.policy })
+      .from(schema.leadDistributionPolicies)
+      .where(and(eq(schema.leadDistributionPolicies.tenantId, context.tenantId), isNull(schema.leadDistributionPolicies.profileKey))),
+  ]);
+  const holdColdByQueue = new Map(queuePolicyRows
+    .filter((row): row is typeof row & { queueId: string } => Boolean(row.queueId))
+    .map((row) => [row.queueId, readDistributionPolicy(row.policy).holdColdLeads]));
+  const report = buildSimpleQualityReport(rows.map((row) => ({ ...row, holdColdLeads: row.queueId ? holdColdByQueue.get(row.queueId) ?? false : false, quality: (["good", "cold", "no_reply"].includes(row.quality) ? row.quality : "other") as SimpleLeadClass, converted: Boolean(row.converted) })), window, now);
   return { period, window: { since: window.since.toISOString(), until: window.until?.toISOString() ?? null }, filters, truncated: rows.length >= SIMPLE_REPORT_MAX_ROWS, ...report };
 }
 

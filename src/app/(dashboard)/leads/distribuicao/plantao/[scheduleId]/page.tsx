@@ -511,7 +511,12 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                                   WhatsApp
                                 </span>
                               ) : null}</div></TableCell>
-                              <TableCell><LeadTemperature status={lead.qualificationStatus} /></TableCell>
+                              <TableCell>
+                                <LeadTemperature status={lead.qualificationStatus} />
+                                {lead.qualificationStatus === "cold" && !lead.corretorId && linkedQueues.find((queue) => queue.id === lead.queueId)?.holdColdLeads
+                                  ? <span className="mt-1 block text-xs font-medium text-warning">Frio, retido pela fila</span>
+                                  : null}
+                              </TableCell>
                               <TableCell className="text-muted-foreground">{lead.queueName ?? "—"}</TableCell>
                               <TableCell className="text-muted-foreground">{returnedUnaccepted.has(lead.id) ? <span className="flex items-center gap-1.5 font-medium text-warning" title="Já passou por um corretor que não aceitou/atendeu a tempo; aguardando novo corretor"><span className="size-2 shrink-0 animate-pulse rounded-full bg-warning motion-reduce:animate-none" aria-hidden="true" />Devolvido — não aceito</span> : (lead.brokerName ?? "Sem corretor")}</TableCell>
                               <TableCell><Badge variant={distribution.tone}>{distribution.label}</Badge></TableCell>

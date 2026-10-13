@@ -257,3 +257,12 @@ Refinamento pontual em `/primeiro-acesso` (2026-09-26): papel membro convidado; 
 - KPIs de Visão geral, Comercial e Financeiro, além de Funil e Atenção, adotam
   a composição sem alterar métricas, escopo, permissões, URL ou consultas.
 - A experiência do Corretor Lite permanece fora do piloto conforme DEC-015.
+## 2026-10-13: T121, retenção de leads frios por fila
+
+Papel: Diretor/Gestor na configuração da fila e no plantão; objetivo: manter
+leads frios sem proprietário para decisão manual. Ação principal: ligar ou
+desligar a retenção por fila. Estados: ligado/desligado, lead frio retido,
+simulação com retenção e atribuição manual permitida. Reutiliza Checkbox, Badge,
+simulador e relatório existentes; sem token, primitive ou movimento novo. A
+leitura e a gravação da política permanecem escopadas pelo tenant. Registro:
+`docs/implementations/completed/2026-10-13-cold-leads-per-queue.md`.

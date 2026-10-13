@@ -122,6 +122,7 @@ export function QueueDetailSheet({
                   <Detail label="Intervalo entre ofertas">{queue.offerIntervalMinutes ?? 5} min</Detail>
                   <Detail label="Ofertas pendentes">{queue.maxPendingOffersPerBroker ?? 1} por corretor</Detail>
                   <Detail label="Qualificação por IA">{queue.aiQualificationEnabled === false ? "Pausada" : "Ativa"}</Detail>
+                  <Detail label="Não distribuir leads frios no plantão">{queue.holdColdLeads ? "Ligado" : "Desligado"}</Detail>
                   <Detail label="Plantões">{duties.length ? duties.join(", ") : "Nenhum"}</Detail>
                   <Detail label="Fontes">{sources.length ? sources.join(", ") : "Todas as fontes válidas"}</Detail>
                   <Detail label="Corretores">{specificBrokers.length ? specificBrokers.join(", ") : "Todos os elegíveis das unidades"}</Detail>

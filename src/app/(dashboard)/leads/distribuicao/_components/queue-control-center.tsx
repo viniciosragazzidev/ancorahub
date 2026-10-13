@@ -96,6 +96,7 @@ const emptyQueue = {
   offerIntervalMinutes: "5",
   maxPendingOffersPerBroker: "1",
   aiQualificationEnabled: true,
+  holdColdLeads: false,
   attendanceFlowId: null as string | null,
   status: "active",
   colorHue: null as number | null,
@@ -329,6 +330,7 @@ export function QueueControlCenter({
       offerIntervalMinutes: String(queue.offerIntervalMinutes ?? 5),
       maxPendingOffersPerBroker: String(queue.maxPendingOffersPerBroker ?? 1),
       aiQualificationEnabled: queue.aiQualificationEnabled ?? true,
+      holdColdLeads: queue.holdColdLeads ?? false,
       attendanceFlowId: queue.attendanceFlowId ?? null,
       status: queue.status,
       colorHue: queue.colorHue ?? pickDistinctHue(usedHuesExcept(queue.id)),
@@ -424,6 +426,7 @@ export function QueueControlCenter({
       offerIntervalMinutes: Math.max(0, Math.trunc(Number(form.offerIntervalMinutes) || 0)),
       maxPendingOffersPerBroker: Math.max(0, Math.trunc(Number(form.maxPendingOffersPerBroker) || 0)),
       aiQualificationEnabled: form.aiQualificationEnabled,
+      holdColdLeads: form.holdColdLeads,
       ...(attendanceFlows ? { attendanceFlowId: form.attendanceFlowId } : {}),
       status: form.status,
       colorHue: form.colorHue,
@@ -951,6 +954,19 @@ export function QueueControlCenter({
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   Quando ativada, o Bot de IA do WhatsApp qualifica automaticamente os leads
                   direcionados a esta fila.
+                </p>
+              </div>
+
+              <div className="rounded-[var(--radius-card)] border border-border/70 p-4 space-y-1.5">
+                <label className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-foreground">
+                  <span>Não distribuir leads frios no plantão</span>
+                  <Checkbox
+                    checked={form.holdColdLeads}
+                    onCheckedChange={(checked) => setForm({ ...form, holdColdLeads: checked === true })}
+                  />
+                </label>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">
+                  Ligado: o plantão desta fila só recebe leads quentes e mornos. Os frios ficam na fila, sem corretor, para você distribuir manualmente.
                 </p>
               </div>
 

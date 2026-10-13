@@ -104,9 +104,15 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       maxPendingOffersPerBroker: schema.leadQueues.maxPendingOffersPerBroker,
       exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId,
       exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds,
+      holdColdLeads: sql<boolean>`${schema.leadDistributionPolicies.policy} ->> 'holdColdLeads' = 'true'`,
     })
     .from(schema.leadQueues)
     .leftJoin(schema.branches, eq(schema.leadQueues.branchId, schema.branches.id))
+    .leftJoin(schema.leadDistributionPolicies, and(
+      eq(schema.leadDistributionPolicies.tenantId, context.tenantId),
+      eq(schema.leadDistributionPolicies.queueId, schema.leadQueues.id),
+      isNull(schema.leadDistributionPolicies.profileKey),
+    ))
     .where(and(
       eq(schema.leadQueues.tenantId, context.tenantId),
       isNull(schema.leadQueues.deletedAt),

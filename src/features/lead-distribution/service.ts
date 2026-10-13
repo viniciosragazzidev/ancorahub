@@ -6,7 +6,7 @@ import { operationDayStart } from "./broker-day-history";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { calculateBrokerRankingScore, canRotateProvisionalLeadOwner, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, type IntelligentDistributionPolicy } from "./domain";
+import { calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { createLeadOffersForBrokers, loadBrokerPacingOffers } from "./offers";
@@ -189,6 +189,7 @@ function readDistributionPolicy(value: unknown): IntelligentDistributionPolicy {
     allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
+    holdColdLeads: raw.holdColdLeads === true,
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }
@@ -702,6 +703,10 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // Regra de DDD (Matriz de Roteamento): each situation — valid DDD, invalid
   // DDD, no identifiable DDD — may send the lead to a configured queue before
   // any offer. Idempotent: once in that queue the lead is not moved again.
+  const sourceQueueId = lead.queueId;
+  if (sourceQueueId && shouldHoldColdLead(lead.qualificationStatus, (await loadDistributionPolicy(context.tenantId, sourceQueueId, null)).value.holdColdLeads)) {
+    return { status: "queued", leadId, reason: COLD_HELD_BY_QUEUE_REASON };
+  }
   const dddDecision = decideDddRouting(await getDddRoutingSettings(context.tenantId), lead.telefone);
   if (dddDecision?.queueId && dddDecision.queueId !== lead.queueId) {
     const [dddQueue] = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues)
@@ -724,6 +729,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       });
       if (moved) lead.queueId = dddQueue.id;
     }
+  }
+  if (lead.queueId && lead.queueId !== sourceQueueId && shouldHoldColdLead(lead.qualificationStatus, (await loadDistributionPolicy(context.tenantId, lead.queueId, null)).value.holdColdLeads)) {
+    return { status: "queued", leadId, reason: COLD_HELD_BY_QUEUE_REASON };
   }
   const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy, dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
   if (lead.queueId && !queue) {

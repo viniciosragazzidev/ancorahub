@@ -15,6 +15,7 @@ export type Queue = {
   offerIntervalMinutes?: number;
   maxPendingOffersPerBroker?: number;
   aiQualificationEnabled?: boolean;
+  holdColdLeads?: boolean;
   attendanceFlowId?: string | null;
   colorHue?: number | null;
   waiting: number;

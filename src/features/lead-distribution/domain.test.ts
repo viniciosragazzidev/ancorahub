@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shouldReleaseUnacceptedProvisionalOwner, shuffle } from "./domain";
+import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isHeldDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, readDistributionPolicy, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shouldHoldColdLead, shouldReleaseUnacceptedProvisionalOwner, shuffle } from "./domain";
 
 describe("provisional assignment rotation guard", () => {
   it("does not rotate a lead after the broker has started or contacted the customer", () => {
@@ -45,6 +45,22 @@ describe("provisional assignment rotation guard", () => {
       firstContactAt: null,
       serviceStartedAt: null,
     })).toBe(false);
+  });
+});
+
+describe("retenção de leads frios por fila", () => {
+  it("usa false por padrão e retém somente qualification_status cold", () => {
+    expect(defaultIntelligentDistributionPolicy.holdColdLeads).toBe(false);
+    expect(readDistributionPolicy({ holdColdLeads: true }).holdColdLeads).toBe(true);
+    expect(shouldHoldColdLead("cold", true)).toBe(true);
+    for (const status of ["warm", "hot", "pending", "qualified", "ia_disabled", "qualifying", null]) {
+      expect(shouldHoldColdLead(status, true)).toBe(false);
+    }
+    expect(shouldHoldColdLead("cold", false)).toBe(false);
+  });
+
+  it("marca o motivo de retenção como recuperável para o worker", () => {
+    expect(isHeldDistributionReason(COLD_HELD_BY_QUEUE_REASON)).toBe(true);
   });
 });
 
