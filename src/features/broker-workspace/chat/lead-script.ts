@@ -107,7 +107,23 @@ function eventBlock(event: LeadConversationEvent, viewerId: string): ChatBlock {
   if (event.tipo === "note" && event.userId === viewerId) return { type: "user", id: `ev-${event.id}`, text: event.conteudo, at };
   if (event.tipo === "note") return { type: "system", id: `ev-${event.id}`, strong: event.userName ?? "Equipe", text: `anotou: ${event.conteudo}` };
   if (event.tipo === "whatsapp_msg") return { type: "assistant", id: `ev-${event.id}`, text: event.conteudo, at };
+  if (isAiFeedback(event)) return { type: "system", id: `ev-${event.id}`, strong: "Sugestão da IA", text: `${aiNextAction(event.conteudo)} · ${at}` };
   return { type: "system", id: `ev-${event.id}`, text: `${event.conteudo} · ${at}` };
+}
+
+const isAiFeedback = (event: LeadConversationEvent) => event.conteudo.startsWith("[IA Feedback]");
+
+/** Only the next action of an AI feedback, short: the full analysis filled the screen. */
+function aiNextAction(conteudo: string) {
+  const next = conteudo.split("Próxima Ação:")[1]?.trim() || conteudo.replace("[IA Feedback]", "").trim();
+  const firstSentence = next.split(/(?<=\.)\s/)[0] ?? next;
+  return firstSentence.length > 180 ? `${firstSentence.slice(0, 177).trimEnd()}...` : firstSentence;
+}
+
+/** A new analysis comes with each client message: only the latest one is shown. */
+function withLatestAiFeedback(events: LeadConversationEvent[]) {
+  const latest = events.filter(isAiFeedback).reduce<LeadConversationEvent | null>((last, event) => (!last || event.createdAt > last.createdAt ? event : last), null);
+  return events.filter((event) => !isAiFeedback(event) || event === latest);
 }
 
 function declineQuestion(lead: LeadConversationLead): ChatBlock {
@@ -285,7 +301,7 @@ export function buildLeadConversationScript({
   // History and WhatsApp in one timeline: the latest of each, in time order.
   type Entry = { at: Date; block: ChatBlock; id: string };
   const history: Entry[] = [
-    ...[...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT).map((event) => ({ at: event.createdAt, id: event.id, block: eventBlock(event, viewerId) })),
+    ...withLatestAiFeedback([...events]).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT).map((event) => ({ at: event.createdAt, id: event.id, block: eventBlock(event, viewerId) })),
     ...[...messages].sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-MESSAGES_LIMIT).map((message) => ({
       at: message.sentAt,
       id: `wa-${message.id}`,

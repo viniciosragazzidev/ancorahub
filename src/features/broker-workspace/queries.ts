@@ -458,8 +458,17 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
   ].slice(0, 8);
 
   const leadNameById = new Map(leads.map((lead) => [lead.id, lead.name]));
+  // Leads that reached the broker today come first, newest first: older leads
+  // with a pending reply were taking the top and brokers lost today's arrivals.
+  const arrivalOf = (lead: (typeof leads)[number]) => (lead.assignedAt ?? lead.createdAt).getTime();
+  const arrivedToday = (lead: (typeof leads)[number]) => arrivalOf(lead) >= todayStart.getTime();
+  const todayLeadIds = new Set(leads.filter(arrivedToday).map((lead) => lead.id));
   const queue = [...leads]
     .sort((left, right) => {
+      const todayLeft = arrivedToday(left);
+      const todayRight = arrivedToday(right);
+      if (todayLeft !== todayRight) return todayLeft ? -1 : 1;
+      if (todayLeft) return arrivalOf(right) - arrivalOf(left);
       const normalizedLeft = priorityRankByLead.get(left.id) ?? Number.MAX_SAFE_INTEGER;
       const normalizedRight = priorityRankByLead.get(right.id) ?? Number.MAX_SAFE_INTEGER;
       return normalizedLeft !== normalizedRight ? normalizedLeft - normalizedRight : right.createdAt.getTime() - left.createdAt.getTime();
@@ -475,7 +484,7 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
       branchName: profile[0]?.branchName ?? "Unidade não identificada",
       availabilityStatus: profile[0]?.availabilityStatus ?? "available",
     },
-    nextAction: priorities[0] ?? null,
+    nextAction: (queue.find((lead) => todayLeadIds.has(lead.id) && lead.nextAction)?.nextAction) ?? priorities[0] ?? null,
     today: {
       awaitingResponse: new Set(priorities.filter((priority) => priority.kind === "awaiting_response").map((priority) => priority.leadId)).size,
       overdueTasks: priorities.filter((priority) => priority.kind === "task_overdue").length,

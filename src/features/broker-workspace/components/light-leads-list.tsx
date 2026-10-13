@@ -235,7 +235,8 @@ export function LightLeadsList({
       );
   }, [leads, filter, searchQuery]);
 
-  const urgent = filter === "closed" ? [] : visible.filter(needsYouNow);
+  // Newest arrival first (today's leads on top), not the order the leads were created.
+  const urgent = filter === "closed" ? [] : visible.filter(needsYouNow).sort((a, b) => (arrival(b)?.getTime() ?? 0) - (arrival(a)?.getTime() ?? 0));
   const rest = filter === "closed" ? visible : visible.filter((lead) => !needsYouNow(lead));
   const searching = searchQuery.trim().length > 0;
 

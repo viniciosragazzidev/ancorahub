@@ -95,6 +95,27 @@ describe("buildLeadConversationScript", () => {
     expect(blocks.some((block) => block.type === "date" && block.id === "d-e2")).toBe(true);
   });
 
+  it("shows only the latest AI feedback, as its short next action", () => {
+    const { blocks } = build({ status: "in_contact" }, [
+      { id: "a1", tipo: "system_alert", conteudo: "[IA Feedback] Resumo antigo.\n\nPróxima Ação: Ligar amanhã.", userId: "me", userName: "Eu", createdAt: new Date("2026-10-13T14:57:00.000Z") },
+      { id: "a2", tipo: "system_alert", conteudo: "[IA Feedback] Resumo longo da conversa.\n\nPróxima Ação: Enviar a cotação prometida. Depois confirmar o recebimento.", userId: "me", userName: "Eu", createdAt: new Date("2026-10-13T14:59:00.000Z") },
+    ]);
+    expect(blocks.some((block) => block.id === "ev-a1")).toBe(false);
+    const latest = blocks.find((block) => block.id === "ev-a2");
+    expect(latest).toMatchObject({ type: "system", strong: "Sugestão da IA" });
+    expect(latest && "text" in latest ? latest.text : "").toMatch(/^Enviar a cotação prometida\. ·/);
+  });
+
+  it("falls back to the AI text, cut short, when the next action marker is missing", () => {
+    const { blocks } = build({ status: "in_contact" }, [
+      { id: "a3", tipo: "system_alert", conteudo: `[IA Feedback] ${"Texto sem marcador ".repeat(20)}`, userId: "me", userName: "Eu", createdAt: new Date("2026-10-13T14:59:00.000Z") },
+    ]);
+    const block = blocks.find((item) => item.id === "ev-a3");
+    const text = block && "text" in block ? block.text : "";
+    expect(text.startsWith("Texto sem marcador")).toBe(true);
+    expect(text.split(" · ")[0]?.length).toBeLessThanOrEqual(180);
+  });
+
   it("is read only for a lead of another broker", () => {
     const script = build({ isCurrentBroker: false, status: "in_contact" });
     expect(question(script.blocks, "q-main").choices.map((choice) => choice.id)).toEqual(["ficha"]);
