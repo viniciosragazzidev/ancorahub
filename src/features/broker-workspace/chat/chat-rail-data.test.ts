@@ -43,7 +43,7 @@ describe("manager desktop chat rail", () => {
     const rail = await getChatRailData();
 
     expect(rail?.viewerName).toBe("Ana Gestora");
-    expect(rail?.assistants).toHaveLength(4);
+    expect(rail?.assistants).toHaveLength(5);
     expect(rail?.assistants[0]).toMatchObject({
       name: "Leads da unidade",
       preview: "2 leads aguardando distribuição manual.",
@@ -63,7 +63,8 @@ describe("manager desktop chat rail", () => {
     expect(rail?.assistants.some((thread) => thread.name === "Desempenho da unidade")).toBe(false);
     // Desktop has no "Mais" sheet, so Clientes is reachable from the rail.
     expect(rail?.assistants[2]).toMatchObject({ name: "Clientes da unidade", href: "/clientes" });
-    expect(rail?.assistants[3]).toMatchObject({ name: "Notificações", href: "/notificacoes", shape: "jack" });
+    expect(rail?.assistants[3]).toMatchObject({ name: "Mensagens da unidade", href: "/mensagens" });
+    expect(rail?.assistants[4]).toMatchObject({ name: "Notificações", href: "/notificacoes", shape: "jack" });
     expect(rail?.leadsBadgeCount).toBe(2);
     expect(rail?.managerUnitSummary).toMatchObject({ leads: 3, unassigned: 2, activeBrokers: 2, brokersWithoutWhatsApp: 1, late: 1 });
     expect(rail?.assistants.every((thread) => thread.at !== null)).toBe(true);
