@@ -12,6 +12,11 @@ ficam ocultos como no Lite do corretor; onboarding geral de tenant e wizard exis
 permanecem. Registro: DEC-141 e
 `docs/implementations/active/2026-10-14-manager-lite-leads.md`.
 
+Adendo desktop T125: a coluna lateral do gestor usa os cinco destinos persistentes
+Início, Leads, Equipe, Notificações e Configurações; abaixo de 1024px ela segue
+oculta, preservando a navegação mobile existente. Reutiliza a coluna e os tokens
+compartilhados do Lite, sem nova primitive, token ou regra de domínio.
+
 ## 2026-10-14: T122, refinamento visual do aviso de WhatsApp
 
 Papel: corretor sem WhatsApp conectado; ação principal: iniciar a conexão no
