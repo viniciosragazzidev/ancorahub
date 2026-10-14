@@ -53,8 +53,10 @@ export default async function CustomersPage({
       email: schema.clients.email,
       convertedAt: schema.clients.convertedAt,
       brokerName: schema.user.name,
+      status: schema.activeCustomers.status,
     }).from(schema.clients)
       .leftJoin(schema.user, eq(schema.clients.corretorId, schema.user.id))
+      .leftJoin(schema.activeCustomers, and(eq(schema.activeCustomers.clientId, schema.clients.id), eq(schema.activeCustomers.tenantId, schema.clients.tenantId)))
       .where(buildClientScopeWhere(context))
       .orderBy(desc(schema.clients.convertedAt));
     return <LightClientsList clients={clients} management />;

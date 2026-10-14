@@ -91,8 +91,6 @@ export function LightClientDetail({ data }: { data: LightClientDetailData }) {
 
   return (
     <LitePageEnter className={`arc-venancor ${styles.page}`}>
-      <Link href="/clientes" className={styles.back}>← Clientes</Link>
-
       <header className={styles.header}>
         <h1>{client.name}</h1>
         <p>Convertido em {dateFormat.format(new Date(client.convertedAt))}{client.branchName ? ` · ${client.branchName}` : ""}</p>

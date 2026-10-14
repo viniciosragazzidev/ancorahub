@@ -4,8 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { Avatar } from "@/components/arc/avatar/avatar";
+import { AnimatedCounter } from "@/components/arc/animated-counter/animated-counter";
 import { Button } from "@/components/arc/button/button";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { LitePageEnter, LiteList, LiteListItem } from "@/components/light/light-motion";
@@ -18,7 +20,17 @@ export type LightClientItem = {
   email: string | null;
   convertedAt: Date | string;
   brokerName?: string | null;
+  /** The contract status (active or cancelled) when the client has one; the gestor list filters on it. */
+  status?: string | null;
 };
+
+type StatusFilter = "all" | "active" | "cancelled";
+
+/** Pill on the row, the same small rounded tag the broker's lead list uses. */
+const statusPill = {
+  active: { label: "Cliente ativo", className: "bg-(--surface-muted) text-(--chat-action-text)" },
+  cancelled: { label: "Cancelado", className: "bg-(--surface-muted) text-(--text-secondary)" },
+} as const;
 
 const secondaryAction =
   "inline-flex h-11 items-center justify-center rounded-full bg-(--surface-muted) px-4 text-sm font-semibold text-(--foreground)";
@@ -38,12 +50,17 @@ function monthLabel(value: Date | string) {
  */
 export function LightClientsList({ clients, management = false }: { clients: LightClientItem[]; management?: boolean }) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<StatusFilter>("all");
 
   const filteredClients = useMemo(() => {
-    if (!searchQuery.trim()) return clients;
+    const byStatus = management && filter !== "all" ? clients.filter((c) => c.status === filter) : clients;
+    if (!searchQuery.trim()) return byStatus;
     const q = searchQuery.toLowerCase().trim();
-    return clients.filter((c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
-  }, [clients, searchQuery]);
+    return byStatus.filter((c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
+  }, [clients, searchQuery, filter, management]);
+
+  const activeCount = clients.filter((c) => c.status === "active").length;
+  const cancelledCount = clients.filter((c) => c.status === "cancelled").length;
 
   /** Management groups keep the list order (most recent first) and open a header per month. */
   const groups = useMemo(() => {
@@ -73,7 +90,14 @@ export function LightClientsList({ clients, management = false }: { clients: Lig
         <div className="flex min-w-0 items-center gap-3">
           <Avatar name={client.name} size="lg" className="light-avatar" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-base font-semibold text-(--foreground)">{client.name}</p>
+            <div className="flex min-w-0 items-center gap-2">
+              <p className="truncate text-base font-semibold text-(--foreground)">{client.name}</p>
+              {management && client.status && client.status in statusPill ? (
+                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusPill[client.status as keyof typeof statusPill].className}`}>
+                  {statusPill[client.status as keyof typeof statusPill].label}
+                </span>
+              ) : null}
+            </div>
             <p className="text-sm tabular-nums text-(--text-secondary)">Venda concluída em {convertedDate}</p>
             {client.brokerName ? <p className="text-sm text-(--text-secondary)">Com {client.brokerName}</p> : null}
             {client.phone ? <p className="text-sm tabular-nums text-(--text-secondary)">{client.phone}</p> : null}
@@ -115,17 +139,30 @@ export function LightClientsList({ clients, management = false }: { clients: Lig
         {management ? (
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-2xl bg-(--surface-muted) p-4">
-              <p className="text-2xl font-semibold tabular-nums text-(--foreground)">{clients.length}</p>
+              <p className="text-2xl font-semibold tabular-nums text-(--foreground)"><AnimatedCounter value={clients.length} locale="pt-BR" /></p>
               <p className="text-xs text-(--text-secondary)">Clientes</p>
             </div>
             <div className="rounded-2xl bg-(--surface-muted) p-4">
-              <p className="text-2xl font-semibold tabular-nums text-(--foreground)">{new Set(clients.map((client) => client.brokerName ?? "")).size}</p>
+              <p className="text-2xl font-semibold tabular-nums text-(--foreground)"><AnimatedCounter value={new Set(clients.map((client) => client.brokerName ?? "")).size} locale="pt-BR" /></p>
               <p className="text-xs text-(--text-secondary)">Corretores com clientes</p>
             </div>
           </div>
         ) : null}
 
         <SearchField label="Buscar cliente" placeholder="Nome ou telefone" value={searchQuery} onValueChange={setSearchQuery} />
+
+        {management ? (
+          <SegmentedControl
+            label="Filtrar clientes por situação"
+            options={[
+              { value: "all", label: `Todos ${clients.length}` },
+              { value: "active", label: `Ativos ${activeCount}` },
+              { value: "cancelled", label: `Cancelados ${cancelledCount}` },
+            ]}
+            value={filter}
+            onValueChange={(value) => setFilter(value as StatusFilter)}
+          />
+        ) : null}
 
         {filteredClients.length > 0 ? (
           management ? (

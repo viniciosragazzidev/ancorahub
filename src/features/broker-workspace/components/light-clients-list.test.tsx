@@ -21,6 +21,8 @@ vi.mock("@/components/arc/search-field/search-field", () => ({
   ),
 }));
 
+vi.mock("@/components/arc/animated-counter/animated-counter", () => ({ AnimatedCounter: ({ value }: { value: number }) => <span>{value}</span> }));
+
 import { LightClientsList, type LightClientItem } from "./light-clients-list";
 
 const clients: LightClientItem[] = [
@@ -67,5 +69,19 @@ describe("LightClientsList", () => {
     render(<LightClientsList clients={clients} management />);
     expect(screen.getByRole("heading", { level: 1, name: "Clientes" }).className).not.toContain("sr-only");
     expect(screen.getByText("Corretores com clientes")).toBeTruthy();
+  });
+
+  it("filters the management list by contract status and shows the status pill", () => {
+    const withStatus: LightClientItem[] = [
+      { ...clients[0], status: "active" },
+      { ...clients[1], status: "cancelled" },
+    ];
+    render(<LightClientsList clients={withStatus} management />);
+
+    expect(screen.getAllByText("Cliente ativo").length).toBe(1);
+    fireEvent.click(screen.getByRole("button", { name: /Cancelados/ }));
+    expect(screen.queryByText("Marina Alves")).toBeNull();
+    expect(screen.getByText("Paulo Dias")).toBeTruthy();
+    expect(screen.getAllByRole("link", { name: "Abrir cliente" })).toHaveLength(1);
   });
 });

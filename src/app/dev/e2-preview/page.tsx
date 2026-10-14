@@ -3,21 +3,26 @@ import "@/components/arc/venancor-scope.css";
 import { notFound } from "next/navigation";
 
 import { LightChrome } from "@/components/light/light-chrome";
+import { RouteAs } from "./route-as";
 import { LightClientsList } from "@/features/broker-workspace/components/light-clients-list";
 import { LightClientDetail } from "@/features/broker-workspace/components/light-client-detail";
 
 /** Dev-only print of the E2 screens (gestor/supervisor Clientes in Lite) with sample data. /dev/e2-preview?view=list|detail */
 const clients = [
-  { id: "c1", name: "Marina Alves", phone: "11999998888", email: "marina@example.com", convertedAt: "2026-09-20T12:00:00Z", brokerName: "Paulo Dias" },
-  { id: "c2", name: "Carlos Mendes", phone: "11977776666", email: null, convertedAt: "2026-09-22T12:00:00Z", brokerName: "Ana Souza" },
-  { id: "c3", name: "Juliana Prado", phone: null, email: null, convertedAt: "2026-10-02T12:00:00Z", brokerName: "Paulo Dias" },
+  { id: "c1", name: "Marina Alves", phone: "11999998888", email: "marina@example.com", convertedAt: "2026-09-20T12:00:00Z", brokerName: "Paulo Dias", status: "active" },
+  { id: "c2", name: "Carlos Mendes", phone: "11977776666", email: null, convertedAt: "2026-09-22T12:00:00Z", brokerName: "Ana Souza", status: "cancelled" },
+  { id: "c3", name: "Juliana Prado", phone: null, email: null, convertedAt: "2026-10-02T12:00:00Z", brokerName: "Paulo Dias", status: "active" },
 ];
 
 /** Sample conversation list for the rail (the real one comes from getChatRailData). */
 const rail = {
   viewerName: "Vinicios",
   assistants: [{ id: "ancora", kind: "assistant" as const, name: "Âncora", preview: "Sem avisos novos.", at: null, unread: false, waitingYou: false, href: "/dashboard/c/ancora", shape: "logo" as const, hue: null }],
-  leads: [{ id: "l1", kind: "lead" as const, name: "Marina Alves", preview: "Cliente ativo", at: null, unread: false, waitingYou: false, href: "/clientes", shape: "mochi" as const, hue: 212 }],
+  leads: [
+    { id: "unidade", kind: "lead" as const, name: "Leads da unidade", preview: "12 leads esperando atendimento", at: null, unread: true, waitingYou: true, href: "/leads", shape: "mochi" as const, hue: 212 },
+    { id: "minha-unidade", kind: "lead" as const, name: "Minha unidade", preview: "3 corretores ativos", at: null, unread: false, waitingYou: false, href: "/unidades", shape: "cubo" as const, hue: 150 },
+    { id: "notificacoes", kind: "lead" as const, name: "Notificações", preview: "2 avisos novos", at: null, unread: false, waitingYou: false, href: "/notificacoes", shape: "nuvem" as const, hue: 330 },
+  ],
   nowIso: "2026-10-14T15:00:00.000Z",
   canQuote: false,
   leadsBadgeCount: 0,
@@ -36,9 +41,11 @@ export default async function E2PreviewPage({ searchParams }: { searchParams: Pr
   if (process.env.NODE_ENV !== "development") notFound();
   const { view } = await searchParams;
 
-  // The real Lite shell (rail on desktop, bottom bar on mobile) as the gestor sees it.
+  // The real Lite shell (rail on desktop, bottom bar on mobile) as the gestor sees it, at the real route.
+  const path = view === "detail" ? "/clientes/c1" : "/clientes";
   return (
     <LightChrome audience="manager" initialChatRail={rail}>
+      <RouteAs path={path} />
       {view === "detail" ? <LightClientDetail data={detail} /> : <LightClientsList clients={clients} management />}
     </LightChrome>
   );
