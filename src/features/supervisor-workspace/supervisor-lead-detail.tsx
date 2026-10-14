@@ -6,6 +6,7 @@ import { Badge } from "@/components/arc/badge/badge";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { ManagerLeadTransferForm, type TransferBroker } from "@/features/manager-workspace/manager-lead-transfer-form";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
+import { ManagerLeadStatusSheet } from "@/features/manager-workspace/manager-lead-status-sheet";
 
 import styles from "./supervisor-lead-detail.module.css";
 
@@ -46,6 +47,7 @@ export function SupervisorLeadDetail({ lead, timeline, now, managerBrokers, task
       <div><span>Com o corretor</span><strong>{lead.ownerName ?? "Sem corretor"}</strong><small>{since}</small></div>
       {lead.ownerId && !managerBrokers ? <Link href={`/equipe/${encodeURIComponent(lead.ownerId)}`}>Ver corretor</Link> : null}
     </section>
+    {managerBrokers ? <div className={styles.actions}><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} /></div> : null}
     {managerBrokers ? <section className={styles.timeline} aria-label="Repassar lead"><h2>Repassar lead</h2><ManagerLeadTransferForm leadId={lead.id} leadName={lead.name} brokers={managerBrokers} /></section> : <div className={styles.actions}>
       <Button variant="outline" render={<Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} />}>Repassar</Button>
       {lead.ownerId ? <Button render={<Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} />}>Cobrar corretor</Button> : null}

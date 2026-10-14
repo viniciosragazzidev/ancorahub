@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/features/manager-workspace/manager-lead-transfer-form", () => ({ ManagerLeadTransferForm: () => <div>Formulário de repasse</div> }));
+vi.mock("@/features/manager-workspace/manager-lead-status-sheet", () => ({ ManagerLeadStatusSheet: () => <button type="button">Alterar etapa</button> }));
 vi.mock("@/components/arc/avatar/avatar", () => ({ Avatar: ({ name }: { name: string }) => <span role="img" aria-label={name} /> }));
 vi.mock("@/components/arc/badge/badge", () => ({ Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
 vi.mock("@/components/arc/empty-state/empty-state", () => ({ EmptyState: ({ title }: { title: string }) => <p>{title}</p> }));
