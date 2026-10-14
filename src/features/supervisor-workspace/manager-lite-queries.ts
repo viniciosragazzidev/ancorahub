@@ -23,7 +23,7 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
 
   const now = new Date();
   const db = getDatabase();
-  const [[viewer], [tenant], members, rows, counts] = await Promise.all([
+  const [[viewer], [tenant], members, rows, [awaitingFirstContact], counts] = await Promise.all([
     db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
     db.select({ sla: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, scope.tenantId)).limit(1),
     db.select({ id: schema.tenantMemberships.userId, name: schema.user.name, image: schema.user.image, availability: schema.tenantMemberships.availabilityStatus })
@@ -33,6 +33,9 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
       .from(schema.leads).leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId)).leftJoin(schema.carrierPlans, eq(schema.carrierPlans.id, schema.leads.planId))
       .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, [...ACTIVE_STATUSES]), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
       .orderBy(desc(schema.leads.assignedAt), desc(schema.leads.createdAt)).limit(500),
+    // Counted in the database, not from the 500 rows above: the funnel must not undercount a large unit.
+    db.select({ total: count() }).from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.firstContactAt), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))),
     db.select({ status: schema.leads.status, total: count() }).from(schema.leads)
       .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, [...ACTIVE_STATUSES]), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).groupBy(schema.leads.status),
   ]);
@@ -69,7 +72,7 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
     leads,
     funnel: {
       new: Number(funnelCounts.get("new") ?? 0) + Number(funnelCounts.get("distributed") ?? 0),
-      firstContact: leads.filter((lead) => (lead.status === "new" || lead.status === "distributed") && !lead.firstContactAt).length,
+      firstContact: Number(awaitingFirstContact?.total ?? 0),
       service: Number(funnelCounts.get("in_contact") ?? 0), quote: Number(funnelCounts.get("quote_sent") ?? 0),
       closing: Number(funnelCounts.get("negotiation") ?? 0) + Number(funnelCounts.get("documentation_pending") ?? 0) + Number(funnelCounts.get("under_analysis") ?? 0),
     },
