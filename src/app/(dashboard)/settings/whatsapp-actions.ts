@@ -560,3 +560,67 @@ export async function recoverWhatsAppFailedSessionAction() {
     };
   }
 }
+
+// ── Pairing code (no QR) ──────────────────────────────────────────────
+
+/** WhatsApp blocks a number that asks for codes too often: one per 30s per user. */
+const PAIRING_CODE_COOLDOWN_MS = 30_000;
+const lastPairingCodeAt = new Map<string, number>();
+
+/** Brazilian mobile with country code: 55 + DDD + 8 or 9 digits. */
+function pairingPhoneDigits(value: string | null | undefined) {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  const withCountry = digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+  return /^55\d{10,11}$/.test(withCountry) ? withCountry : null;
+}
+
+/** The number the code is generated for: the broker's own phone from their profile. */
+export async function getWhatsAppPairingPhone() {
+  const context = await getRequiredTenantContext();
+  const [profile] = await getDatabase()
+    .select({ phone: schema.brokerProfiles.phone })
+    .from(schema.brokerProfiles)
+    .where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.userId, context.userId)))
+    .limit(1);
+  return { phone: pairingPhoneDigits(profile?.phone) };
+}
+
+/**
+ * Code the broker types in WhatsApp (Linked devices → Link with phone number)
+ * instead of scanning the QR. `code: null` + `retryInMs` while the session is
+ * still starting: the dialog asks again on its own.
+ */
+export async function requestWhatsAppPairingCode(input: { phone: string }) {
+  const { context, db, connection } = await getOwnConnection();
+  if (!connection?.sessionName) return { success: false as const, code: "NO_SESSION", error: "Sessão não iniciada." };
+  const phone = pairingPhoneDigits(input.phone);
+  if (!phone) return { success: false as const, code: "INVALID_PHONE", error: "Confira o número: DDD + celular." };
+
+  const key = `${context.tenantId}:${context.userId}`;
+  const waitMs = (lastPairingCodeAt.get(key) ?? 0) + PAIRING_CODE_COOLDOWN_MS - Date.now();
+  if (waitMs > 0) return { success: false as const, code: "PAIRING_COOLDOWN", error: "Aguarde para gerar outro código.", retryInMs: waitMs };
+
+  try {
+    const result = await vpsRequest<WahaConnectionResponse & { code?: string | null }>(
+      `/internal/waha/connections/${encodeURIComponent(connection.sessionName)}/pairing-code`,
+      { method: "POST", body: { phoneNumber: phone }, timeoutMs: 20_000 },
+    );
+    if (!result.code) return { success: true as const, pairingCode: null, retryInMs: 1_500 };
+    lastPairingCodeAt.set(key, Date.now());
+    await db.insert(schema.auditLogs).values({
+      id: randomUUID(),
+      userId: context.userId,
+      entidade: "whatsapp_connection",
+      entidadeId: connection.id,
+      acao: "whatsapp.pairing_code.requested",
+    });
+    return { success: true as const, pairingCode: result.code, retryInMs: null };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Não foi possível gerar o código.";
+    const code = /INVALID_PHONE/.test(message) ? "INVALID_PHONE"
+      : /ALREADY_CONNECTED/.test(message) ? "ALREADY_CONNECTED"
+        : /\b404\b|não foi encontrada/i.test(message) ? "PAIRING_CODE_UNSUPPORTED"
+          : wahaActionErrorCode(message);
+    return { success: false as const, code, error: message };
+  }
+}

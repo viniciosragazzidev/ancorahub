@@ -1,12 +1,19 @@
 "use client";
 
 import * as React from "react";
-import { ArrowsClockwise, CheckCircle, LockKey, Phone, WarningCircle } from "@/components/huge-icons";
+import { AnimatePresence, motion } from "motion/react";
+import { ArrowsClockwise, CheckCircle, Copy, LockKey, Phone, WarningCircle, WhatsappLogo } from "@/components/huge-icons";
+import { CopyCheckIcon } from "@/components/motion/copy-check-icon";
+import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/utils/core/cn";
 import type { PairingPhase } from "@/features/waha-cadence/pairing-phase";
 import {
+  PAIRING_CODE_CAPTIONS,
   PAIRING_COPY,
   PAIRING_QR_CAPTIONS,
+  type PairingMethod,
   resolvePairingCopyBody,
   type PairingCopyKey,
   type PairingIcon,
@@ -25,7 +32,10 @@ import {
 
 // ── Stepper ───────────────────────────────────────────────────────────
 
-const STEPS = ["Preparar", "Escanear", "Conectar"] as const;
+const STEPS: Record<PairingMethod, readonly string[]> = {
+  qr: ["Preparar", "Escanear", "Conectar"],
+  code: ["Preparar", "Digitar código", "Conectar"],
+};
 
 function stepIndexFor(phase: PairingPhase): { active: number; done: number } {
   switch (phase) {
@@ -37,11 +47,12 @@ function stepIndexFor(phase: PairingPhase): { active: number; done: number } {
   }
 }
 
-export function PairingStepper({ phase }: { phase: PairingPhase }) {
+export function PairingStepper({ phase, method = "qr" }: { phase: PairingPhase; method?: PairingMethod }) {
   const { active, done } = stepIndexFor(phase);
+  const steps = STEPS[method];
   return (
-    <ol className="flex items-center gap-ds-8" aria-label="Progresso da conexão">
-      {STEPS.map((label, index) => {
+    <ol className="flex flex-wrap items-center gap-ds-8" aria-label="Progresso da conexão">
+      {steps.map((label, index) => {
         const isDone = index < done;
         const isActive = index === active;
         return (
@@ -65,7 +76,7 @@ export function PairingStepper({ phase }: { phase: PairingPhase }) {
             >
               {label}
             </span>
-            {index < STEPS.length - 1 && (
+            {index < steps.length - 1 && (
               <span
                 aria-hidden
                 className={cn("h-px w-ds-16 transition-colors duration-300", index < done ? "bg-ds-electric-blue" : "bg-ds-ash")}
@@ -139,6 +150,10 @@ export type PairingGuideProps = {
   connectivity?: "unreachable" | "unauthorized" | null;
   /** Renovação automática em andamento (QR expirou sem leitura). */
   renewing?: boolean;
+  /** Pareamento por QR (padrão) ou por código digitado no WhatsApp. */
+  method?: PairingMethod;
+  /** Um código de pareamento está na tela. */
+  hasCode?: boolean;
 };
 
 const ICONS: Record<PairingIcon, (props: { className?: string }) => React.ReactNode> = {
@@ -149,7 +164,11 @@ const ICONS: Record<PairingIcon, (props: { className?: string }) => React.ReactN
   warning: (p) => <WarningCircle aria-hidden {...p} />,
 };
 
-function guideKeyFor({ phase, stalled, renewing }: Pick<PairingGuideProps, "phase" | "stalled" | "renewing">): PairingCopyKey {
+function guideKeyFor({ phase, stalled, renewing, method, hasCode }: Pick<PairingGuideProps, "phase" | "stalled" | "renewing" | "method" | "hasCode">): PairingCopyKey {
+  if (method === "code") {
+    if (phase === "error") return "codeError";
+    if (phase === "idle" || phase === "starting" || phase === "qr") return hasCode ? "code" : "codeIntro";
+  }
   if (phase === "starting" && renewing) return "renewing";
   if (phase === "pairing" && stalled) return "stalled";
   return phase;
@@ -173,10 +192,13 @@ export function PairingCopyCallout({ copyKey, phoneSuffix, className }: { copyKe
   );
 }
 
-export function PairingGuide({ phase, phoneSuffix, stalled, connectivity, renewing }: PairingGuideProps) {
+export function PairingGuide({ phase, phoneSuffix, stalled, connectivity, renewing, method = "qr", hasCode = false }: PairingGuideProps) {
+  const copyKey = guideKeyFor({ phase, stalled, renewing, method, hasCode });
   return (
     <div className="space-y-ds-8">
-      <PairingCopyCallout copyKey={guideKeyFor({ phase, stalled, renewing })} phoneSuffix={phoneSuffix} />
+      <FadeSwap swapKey={copyKey}>
+        <PairingCopyCallout copyKey={copyKey} phoneSuffix={phoneSuffix} />
+      </FadeSwap>
       {connectivity && phase !== "ready" && <PairingCopyCallout copyKey={connectivity} />}
     </div>
   );
@@ -278,6 +300,237 @@ export function PairingQrPanel({ phase, qrCode, secondsLeft, lifetime, qrKey }: 
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Transições ────────────────────────────────────────────────────────
+
+const EASE_OUT = [0.25, 1, 0.5, 1] as const;
+
+/**
+ * Troca animada de conteúdo (fade + leve deslocamento + desfoque). Sem
+ * animação quando o usuário desligou o movimento da interface.
+ */
+export function FadeSwap({ swapKey, children, className }: { swapKey: string; children: React.ReactNode; className?: string }) {
+  const enabled = useInterfaceMotionEnabled();
+  return (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.div
+        key={swapKey}
+        className={className}
+        initial={enabled ? { opacity: 0, y: 8, filter: "blur(4px)" } : false}
+        animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+        exit={enabled ? { opacity: 0, y: -6, filter: "blur(4px)" } : { opacity: 0 }}
+        transition={{ duration: enabled ? 0.22 : 0, ease: EASE_OUT }}
+      >
+        {children}
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ── Painel do código de pareamento ────────────────────────────────────
+
+/** "21999998888" → "(21) 99999-8888". */
+export function formatPairingPhone(national: string) {
+  const digits = national.replace(/\D/g, "");
+  if (digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  if (digits.length === 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return digits;
+}
+
+export type PairingCodePanelProps = {
+  phase: PairingPhase;
+  /** DDD + número (sem o 55). Vazio quando o cadastro não tem telefone. */
+  phone: string;
+  onPhoneChange: (phone: string) => void;
+  /** Código atual ("ABCD-1234"), ou null antes de gerar. */
+  code: string | null;
+  generating: boolean;
+  /** Segundos até poder pedir outro código (limite do WhatsApp). */
+  cooldownSeconds: number;
+  /** O código anterior morreu (sessão renovada): pedir outro. */
+  expired: boolean;
+  onGenerate: () => void;
+  onOpenWhatsApp: () => void;
+};
+
+export function PairingCodePanel({
+  phase,
+  phone,
+  onPhoneChange,
+  code,
+  generating,
+  cooldownSeconds,
+  expired,
+  onGenerate,
+  onOpenWhatsApp,
+}: PairingCodePanelProps) {
+  const [editing, setEditing] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const phoneValid = /^\d{10,11}$/.test(phone);
+  const showEditor = editing || !phoneValid;
+  const stage = code ? "code" : generating ? "generating" : "phone";
+
+  React.useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1_500);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  async function copy() {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code.replace(/[^A-Z0-9]/gi, ""));
+      setCopied(true);
+    } catch {
+      // Sem permissão de área de transferência: o código continua visível para digitar.
+    }
+  }
+
+  return (
+    <div
+      className="flex min-h-64 flex-col justify-center rounded-ds-cards border border-ds-ash bg-ds-canvas-white p-ds-16"
+      data-phase={phase}
+      data-stage={stage}
+    >
+      <FadeSwap swapKey={stage} className="space-y-ds-16">
+        {stage === "code" && code ? (
+          <>
+            <div className="space-y-ds-8 text-center">
+              <p className="text-ds-caption font-medium text-ds-fog">Seu código</p>
+              <PairingCodeDigits code={code} />
+              <p className="text-ds-caption text-ds-fog">
+                para <span className="font-medium tabular-nums text-ds-charcoal">+55 {formatPairingPhone(phone)}</span>
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-ds-8">
+              <Button variant="outline" size="sm" onClick={copy} aria-label={copied ? PAIRING_CODE_CAPTIONS.copied : PAIRING_CODE_CAPTIONS.copy}>
+                <CopyCheckIcon copied={copied}><Copy className="size-4" aria-hidden /></CopyCheckIcon>
+                {copied ? "Copiado" : "Copiar"}
+              </Button>
+              <Button variant="outline" size="sm" onClick={onOpenWhatsApp}>
+                <WhatsappLogo className="size-4" aria-hidden /> {PAIRING_CODE_CAPTIONS.openWhatsApp}
+              </Button>
+            </div>
+            <button
+              type="button"
+              onClick={onGenerate}
+              disabled={cooldownSeconds > 0 || generating}
+              className="mx-auto flex items-center gap-ds-4 text-ds-caption font-medium text-ds-electric-blue underline-offset-4 hover:underline disabled:cursor-not-allowed disabled:text-ds-fog disabled:no-underline"
+            >
+              <ArrowsClockwise className="size-3" aria-hidden />
+              <span className="tabular-nums">{cooldownSeconds > 0 ? `${PAIRING_CODE_CAPTIONS.regenerate} em ${cooldownSeconds}s` : PAIRING_CODE_CAPTIONS.regenerate}</span>
+            </button>
+          </>
+        ) : stage === "generating" ? (
+          <div className="space-y-ds-12 text-center">
+            <PairingCodeSkeleton />
+            <p className="text-ds-body font-medium">
+              <span className="ct-shimmer-text" data-text={PAIRING_CODE_CAPTIONS.generating}>{PAIRING_CODE_CAPTIONS.generating}</span>
+            </p>
+          </div>
+        ) : (
+          <>
+            {expired && (
+              <p className="rounded-ds-inputs border border-ds-amber-ink bg-ds-amber-wash px-ds-12 py-ds-8 text-ds-caption text-ds-charcoal" role="status">
+                {PAIRING_CODE_CAPTIONS.expired}
+              </p>
+            )}
+            <div className="space-y-ds-8">
+              <div className="flex items-center justify-between gap-ds-8">
+                <label htmlFor="pairing-phone" className="text-ds-caption font-medium text-ds-fog">{PAIRING_CODE_CAPTIONS.phoneLabel}</label>
+                {phoneValid && !editing && (
+                  <button type="button" onClick={() => setEditing(true)} className="text-ds-caption font-medium text-ds-electric-blue underline-offset-4 hover:underline">
+                    {PAIRING_CODE_CAPTIONS.change}
+                  </button>
+                )}
+              </div>
+              <FadeSwap swapKey={showEditor ? "edit" : "view"}>
+                {showEditor ? (
+                  <div className="flex items-center gap-ds-8">
+                    <span className="shrink-0 text-ds-body font-medium tabular-nums text-ds-charcoal">+55</span>
+                    <Input
+                      id="pairing-phone"
+                      name="pairing-phone"
+                      format="none"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel-national"
+                      autoFocus={editing}
+                      placeholder="(21) 99999-8888"
+                      value={formatPairingPhone(phone)}
+                      onChange={(event) => onPhoneChange(event.target.value.replace(/\D/g, "").slice(0, 11))}
+                      aria-invalid={phone.length > 0 && !phoneValid ? true : undefined}
+                      className="h-10 rounded-ds-inputs border-black bg-ds-canvas-white px-ds-12 text-ds-body tabular-nums dark:border-border"
+                      onBlur={() => { if (phoneValid) setEditing(false); }}
+                    />
+                  </div>
+                ) : (
+                  <p className="rounded-ds-inputs border border-ds-ash bg-ds-paper-mist px-ds-12 py-ds-8 text-ds-body font-medium tabular-nums text-ds-charcoal">
+                    +55 {formatPairingPhone(phone)}
+                  </p>
+                )}
+              </FadeSwap>
+              {!phoneValid && <p className="text-ds-caption text-ds-fog">{PAIRING_CODE_CAPTIONS.phoneMissing}</p>}
+            </div>
+            <Button className="w-full" disabled={!phoneValid || cooldownSeconds > 0} onClick={() => { setEditing(false); onGenerate(); }}>
+              <span className="tabular-nums">{cooldownSeconds > 0 ? `${PAIRING_CODE_CAPTIONS.generate} em ${cooldownSeconds}s` : PAIRING_CODE_CAPTIONS.generate}</span>
+            </Button>
+          </>
+        )}
+      </FadeSwap>
+    </div>
+  );
+}
+
+/** Os 8 caracteres em dois blocos de 4, entrando um a um. */
+function PairingCodeDigits({ code }: { code: string }) {
+  const enabled = useInterfaceMotionEnabled();
+  const chars = code.replace(/[^A-Z0-9]/gi, "").toUpperCase().split("");
+  const groups = [chars.slice(0, 4), chars.slice(4)];
+  return (
+    <div className="flex items-center justify-center gap-ds-8" role="img" aria-label={`Código ${chars.join(" ")}`}>
+      {groups.map((group, groupIndex) => (
+        <React.Fragment key={groupIndex}>
+          {groupIndex > 0 && <span aria-hidden className="h-0.5 w-2 rounded-full bg-ds-silver" />}
+          <div className="flex gap-ds-4">
+            {group.map((char, index) => {
+              const order = groupIndex * 4 + index;
+              return (
+                <motion.span
+                  key={`${code}-${order}`}
+                  aria-hidden
+                  className="flex h-11 w-7 items-center justify-center rounded-ds-inputs border border-ds-ash bg-ds-paper-mist font-ds-mono text-lg font-semibold text-ds-charcoal"
+                  initial={enabled ? { opacity: 0, y: 10, scale: 0.9, filter: "blur(3px)" } : false}
+                  animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+                  transition={{ duration: enabled ? 0.28 : 0, delay: enabled ? order * 0.045 : 0, ease: EASE_OUT }}
+                >
+                  {char}
+                </motion.span>
+              );
+            })}
+          </div>
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function PairingCodeSkeleton() {
+  return (
+    <div className="flex items-center justify-center gap-ds-8" aria-hidden>
+      {[0, 1].map((group) => (
+        <React.Fragment key={group}>
+          {group > 0 && <span className="h-0.5 w-2 rounded-full bg-ds-ash" />}
+          <div className="flex gap-ds-4">
+            {[0, 1, 2, 3].map((index) => (
+              <span key={index} className="h-11 w-7 animate-pulse rounded-ds-inputs bg-ds-paper-mist motion-reduce:animate-none" />
+            ))}
+          </div>
+        </React.Fragment>
+      ))}
     </div>
   );
 }

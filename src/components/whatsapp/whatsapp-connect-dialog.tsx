@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Monitor, WhatsappLogo } from "@/components/huge-icons";
+import { WhatsappLogo } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
+import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { DsStatusBadge, type DsStatusBadgeStatus } from "@/components/ui/ds-status-badge";
 import { Dialog, DialogDescription, DialogPopup, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { wahaActionCodeFromMessage, wahaActionErrorMessage } from "@/lib/waha-error-codes";
@@ -18,13 +19,15 @@ import {
 import {
   forceDisconnectWhatsAppSession,
   getWhatsAppConnection,
+  getWhatsAppPairingPhone,
   pollWhatsAppConnection,
+  requestWhatsAppPairingCode,
   resetWhatsAppSessionAction,
   startWhatsAppConnection,
   toggleWhatsAppChatAction,
 } from "@/app/(dashboard)/settings/whatsapp-actions";
-import { PAIRING_BADGE_LABELS, PAIRING_TOASTS } from "@/features/waha-cadence/pairing-copy";
-import { PairingCallout, PairingGuide, PairingQrPanel, PairingStepper } from "./whatsapp-pairing-panel";
+import { PAIRING_BADGE_LABELS, PAIRING_TOASTS, type PairingMethod } from "@/features/waha-cadence/pairing-copy";
+import { FadeSwap, PairingCodePanel, PairingGuide, PairingQrPanel, PairingStepper } from "./whatsapp-pairing-panel";
 
 type Connection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
 type PollSnapshot = Extract<Awaited<ReturnType<typeof pollWhatsAppConnection>>, { success: true }>;
@@ -51,6 +54,24 @@ const MAX_AUTO_RESTARTS = 2;
 
 /** Leitura de relógio para handlers de eventos (fora do render). */
 const clock = () => Date.now();
+
+/** Pedidos seguidos enquanto a sessão ainda sobe (cada um espera ~1,5 s). */
+const MAX_CODE_ATTEMPTS = 15;
+const PAIRING_METHOD_OPTIONS = [
+  { value: "qr", label: "QR Code" },
+  { value: "code", label: "Código" },
+] as const;
+
+/**
+ * Celular ou tablet: o QR apareceria no mesmo aparelho que teria de lê-lo,
+ * então o código de pareamento é o padrão (tela estreita ou toque como
+ * ponteiro principal).
+ */
+function prefersPairingCode() {
+  return window.matchMedia("(max-width: 767px), (pointer: coarse)").matches;
+}
+
+const sleep = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms));
 
 function errorMessage(code?: string | null): string {
   return wahaActionErrorMessage(code);
@@ -101,6 +122,13 @@ export function WhatsAppConnectDialog({
   const [renewing, setRenewing] = useState(false);
   // Pareamento pendente com o dialog fechado: a verificação continua em segundo plano.
   const [watching, setWatching] = useState(false);
+  // ── Código de pareamento (alternativa ao QR; padrão no celular) ──────
+  const [method, setMethod] = useState<PairingMethod>("qr");
+  const [pairingPhone, setPairingPhone] = useState("");
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [codeExpired, setCodeExpired] = useState(false);
+  const [codeCooldownUntil, setCodeCooldownUntil] = useState(0);
   const [now, setNow] = useState(() => Date.now());
 
   // Refs espelham o que o loop de polling (fechado em um efeito) precisa ler
@@ -119,6 +147,10 @@ export function WhatsAppConnectDialog({
   const wake = useRef<(() => void) | null>(null);
   const intervalMs = useRef(1_000);
   const openRef = useRef(false);
+  const methodChosen = useRef(false);
+  const phoneLoaded = useRef(false);
+  const pairingCodeRef = useRef<string | null>(null);
+  const generatingRef = useRef(false);
 
   const ready = connection.status === "ready";
   const secondsLeft = qrShownAt ? Math.min(qrLifetime, Math.ceil(qrLifetime - (now - qrShownAt) / 1_000)) : qrLifetime;
@@ -126,18 +158,26 @@ export function WhatsAppConnectDialog({
   // estimada; depois disso a interface volta a "gerando" em vez de mostrar um
   // código morto.
   const hasQr = Boolean(connection.qrCode) && secondsLeft > -QR_GRACE_SECONDS;
+  // No código, "pronto para ler" é a sessão aguardando autenticação (o QR em
+  // si nunca aparece) ou um código já na tela.
+  const awaitingAuth = method === "code" ? providerStatus === "SCAN_QR_CODE" || Boolean(pairingCode) : hasQr;
   const phase: PairingPhase = ready
     ? "ready"
-    : derivePairingPhase({ status: connection.status, providerStatus, hasQr, sawQr });
+    : derivePairingPhase({ status: connection.status, providerStatus, hasQr: awaitingAuth, sawQr });
   const stalled = phase === "pairing" && pairingSince !== null && now - pairingSince > PAIRING_STALL_SECONDS * 1_000;
-  const badge = { status: PHASE_BADGE_STATUS[phase], label: PAIRING_BADGE_LABELS[phase] };
+  const badge = {
+    status: PHASE_BADGE_STATUS[phase],
+    label: method === "code" && phase === "qr" ? PAIRING_BADGE_LABELS.code : PAIRING_BADGE_LABELS[phase],
+  };
+  const codeCooldownSeconds = Math.max(0, Math.ceil((codeCooldownUntil - now) / 1_000));
 
   // Fase visível → ticker de 250 ms só enquanto há contagem/estagnação a exibir.
+  const ticking = phase === "qr" || phase === "pairing" || codeCooldownUntil > now;
   useEffect(() => {
-    if (!open || (phase !== "qr" && phase !== "pairing")) return;
+    if (!open || !ticking) return;
     const timer = window.setInterval(() => setNow(Date.now()), 250);
     return () => window.clearInterval(timer);
-  }, [open, phase]);
+  }, [open, ticking]);
 
   // O servidor é a autoridade inicial, mas nunca sobrescreve o estado vivo
   // enquanto o dialog está aberto (o polling do badge lê o banco, que pode
@@ -371,12 +411,6 @@ export function WhatsAppConnectDialog({
 
   // ── Ações ───────────────────────────────────────────────────────────
 
-  function shouldBlockQrOnMobile(notify = true) {
-    if (!window.matchMedia("(max-width: 767px)").matches) return false;
-    if (notify) toast.info("Conecte o WhatsApp em um computador para gerar e ler o QR Code.");
-    return true;
-  }
-
   function openWhatsAppExternal() {
     const isMobile = window.matchMedia("(max-width: 767px)").matches;
     if (isMobile) {
@@ -395,9 +429,14 @@ export function WhatsAppConnectDialog({
    *   por ação explícita do corretor ou por expiração confirmada.
    */
   function runStart({ forceNew, auto = false }: { forceNew: boolean; auto?: boolean }) {
-    if (shouldBlockQrOnMobile(!auto)) return;
     if (!auto) autoRestarts.current = 0;
     resetAttempt();
+    // Uma sessão nova invalida o código já mostrado: o corretor precisa de outro.
+    if (pairingCodeRef.current) {
+      if (auto) setCodeExpired(true);
+      pairingCodeRef.current = null;
+      setPairingCode(null);
+    }
     // Renovação automática: recomeça o ciclo do zero (senão o "já houve QR"
     // faria a tela parecer pós-scan), mas sinaliza que é uma renovação.
     if (auto) setRenewing(true);
@@ -441,17 +480,90 @@ export function WhatsAppConnectDialog({
     });
   }
 
+  function loadPairingPhone() {
+    if (phoneLoaded.current) return;
+    phoneLoaded.current = true;
+    void getWhatsAppPairingPhone()
+      .then((result) => {
+        // O campo guarda DDD + número; o 55 é fixo na tela.
+        if (result.phone) setPairingPhone((current) => current || result.phone!.slice(2));
+      })
+      .catch(() => { phoneLoaded.current = false; });
+  }
+
+  function chooseMethod(next: PairingMethod) {
+    methodChosen.current = true;
+    setMethod(next);
+    if (next === "code") loadPairingPhone();
+  }
+
+  /**
+   * Pede o código ao WhatsApp. Enquanto a sessão ainda sobe, o servidor
+   * responde sem código e o pedido se repete sozinho por alguns segundos.
+   */
+  async function generatePairingCode() {
+    if (generatingRef.current) return;
+    generatingRef.current = true;
+    setGeneratingCode(true);
+    setCodeExpired(false);
+    try {
+      if (!connection.sessionId && !connectingRef.current) runStart({ forceNew: false });
+      for (let attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt += 1) {
+        const result = await requestWhatsAppPairingCode({ phone: `55${pairingPhone}` });
+        if (result.success && result.pairingCode) {
+          pairingCodeRef.current = result.pairingCode;
+          setPairingCode(result.pairingCode);
+          connectingRef.current = true;
+          // Sair de SCAN_QR_CODE depois disto = o celular aceitou o código.
+          sawQrRef.current = true;
+          setSawQr(true);
+          setCodeCooldownUntil(clock() + 30_000);
+          setNow(clock());
+          return;
+        }
+        if (result.success || result.code === "NO_SESSION") {
+          await sleep(result.success ? (result.retryInMs ?? 1_500) : 1_500);
+          continue;
+        }
+        if (result.code === "PAIRING_COOLDOWN") {
+          setCodeCooldownUntil(clock() + ("retryInMs" in result && result.retryInMs ? result.retryInMs : 30_000));
+          setNow(clock());
+          return;
+        }
+        if (result.code === "ALREADY_CONNECTED") {
+          wake.current?.();
+          return;
+        }
+        toast.error(
+          result.code === "INVALID_PHONE"
+            ? "Confira o número: DDD + celular."
+            : result.code === "PAIRING_CODE_UNSUPPORTED"
+              ? "O servidor do WhatsApp ainda não aceita código. Use o QR Code por enquanto."
+              : errorMessage(result.code),
+          { duration: 8_000 },
+        );
+        return;
+      }
+      toast.error("O WhatsApp demorou para liberar o código. Tente de novo.");
+    } catch (error) {
+      showUnexpectedActionError(error);
+    } finally {
+      generatingRef.current = false;
+      setGeneratingCode(false);
+    }
+  }
+
   function handleOpenChange(nextOpen: boolean) {
     updateOpen(nextOpen);
 
     if (nextOpen) {
       setWatching(false);
+      if (!methodChosen.current) setMethod(prefersPairingCode() ? "code" : "qr");
+      if (!ready && (methodChosen.current ? method === "code" : prefersPairingCode())) loadPairingPhone();
       // Abrir NÃO recria a sessão: o start idempotente reutiliza a sessão viva.
       // (Recriar aqui desvinculava o aparelho de quem abria o dialog com o
       // WAHA já conectado e o CRM ainda desatualizado.)
-      if (ready || shouldBlockQrOnMobile(false)) {
-        // Mobile can reconcile a session connected elsewhere without starting
-        // pairing or displaying a desktop-only toast over an already ready session.
+      if (ready) {
         if (connection.sessionId) void pollOnce();
       } else {
         runStart({ forceNew: false });
@@ -490,6 +602,8 @@ export function WhatsAppConnectDialog({
 
   function clearLocalSession() {
     resetAttempt();
+    pairingCodeRef.current = null;
+    setPairingCode(null);
     connectingRef.current = false;
     setPhoneSuffix(null);
     setConnection((current) => ({
@@ -549,6 +663,8 @@ export function WhatsAppConnectDialog({
   // ── Render ──────────────────────────────────────────────────────────
 
   const canGenerateNewQr = phase === "qr" || phase === "pairing" || phase === "starting";
+  // Fases finais (finalizando, conectado) são as mesmas nos dois métodos.
+  const cardKey = method === "code" && phase !== "pairing" && phase !== "ready" ? "code" : `qr-${phase === "pairing" || phase === "ready" ? "end" : "scan"}`;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -563,13 +679,23 @@ export function WhatsAppConnectDialog({
               Vincule o WhatsApp do seu celular para atender seus leads por aqui.
             </DialogDescription>
             <div className="mt-ds-12">
-              <PairingStepper phase={phase} />
+              <PairingStepper phase={phase} method={method} />
             </div>
           </div>
           <DsStatusBadge status={badge.status} label={badge.label} className="shrink-0" />
         </div>
 
-        <div className="grid gap-ds-16 md:grid-cols-[minmax(0,1fr)_16rem]">
+        {!ready && phase !== "pairing" && (
+          <DsSegmentedControl
+            aria-label="Como conectar"
+            className="w-full md:w-auto [&>button]:flex-1 [&>button]:justify-center md:[&>button]:flex-none"
+            options={PAIRING_METHOD_OPTIONS}
+            value={method}
+            onValueChange={(next) => chooseMethod(next as PairingMethod)}
+          />
+        )}
+
+        <div className="grid gap-ds-16 md:grid-cols-[minmax(0,1fr)_19rem]">
           <div className="space-y-ds-12">
             <PairingGuide
               phase={phase}
@@ -577,16 +703,11 @@ export function WhatsAppConnectDialog({
               stalled={stalled}
               connectivity={connectivity}
               renewing={renewing}
+              method={method}
+              hasCode={Boolean(pairingCode)}
             />
 
-            {/* A restrição é do pareamento por QR, não do uso da sessão conectada. */}
-            {!ready && (
-              <PairingCallout tone="info" title="Conexão somente pelo computador" icon={<Monitor className="size-4" aria-hidden />} className="md:hidden">
-                <p>Para gerar e ler o QR Code, abra esta integração em um computador. Depois de conectar, você pode usar o WhatsApp pelo app no celular.</p>
-              </PairingCallout>
-            )}
-
-            <div className="hidden flex-wrap gap-ds-8 md:flex">
+            <div className={method === "qr" ? "flex flex-wrap gap-ds-8" : "hidden"}>
               {phase === "idle" && (
                 <Button disabled={pending} onClick={() => runStart({ forceNew: false })}>Conectar WhatsApp</Button>
               )}
@@ -610,20 +731,37 @@ export function WhatsAppConnectDialog({
               </div>
             )}
 
-            <Button className="w-full md:w-auto" onClick={openWhatsAppExternal} size="sm" variant="outline">
-              <WhatsappLogo className="size-4" /> Abrir WhatsApp Web ou app
-            </Button>
+            {!(method === "code" && pairingCode && !ready) && (
+              <Button className="w-full md:w-auto" onClick={openWhatsAppExternal} size="sm" variant="outline">
+                <WhatsappLogo className="size-4" /> Abrir WhatsApp Web ou app
+              </Button>
+            )}
           </div>
 
-          <div className="hidden md:block">
-            <PairingQrPanel
-              phase={phase}
-              qrCode={hasQr ? connection.qrCode : null}
-              secondsLeft={secondsLeft}
-              lifetime={qrLifetime}
-              qrKey={qrKey}
-            />
-          </div>
+          {/* No celular o cartão vem primeiro: é nele que a conexão acontece. */}
+          <FadeSwap swapKey={cardKey} className="order-first md:order-none">
+            {cardKey === "code" ? (
+              <PairingCodePanel
+                phase={phase}
+                phone={pairingPhone}
+                onPhoneChange={setPairingPhone}
+                code={pairingCode}
+                generating={generatingCode}
+                cooldownSeconds={codeCooldownSeconds}
+                expired={codeExpired}
+                onGenerate={() => void generatePairingCode()}
+                onOpenWhatsApp={openWhatsAppExternal}
+              />
+            ) : (
+              <PairingQrPanel
+                phase={phase}
+                qrCode={hasQr ? connection.qrCode : null}
+                secondsLeft={secondsLeft}
+                lifetime={qrLifetime}
+                qrKey={qrKey}
+              />
+            )}
+          </FadeSwap>
         </div>
       </DialogPopup>
     </Dialog>
