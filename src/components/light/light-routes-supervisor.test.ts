@@ -19,7 +19,10 @@ describe("supervisor Lite routes", () => {
   });
 
   it("gives the supervisor their own Mais menu", () => {
-    expect(getLightMoreDestinations({ relationshipCenter: true }, "supervisor").map((item) => item.href)).toEqual(["/equipe/minha", "/equipe/transferencia", "/relacionamento", "/clientes", "/notificacoes", "/settings"]);
+    expect(getLightMoreDestinations({ relationshipCenter: true }, "supervisor").map((item) => item.href)).toEqual(["/equipe/minha", "/equipe/transferencia", "/relacionamento", "/clientes", "/mensagens", "/notificacoes", "/settings"]);
+    expect(isLightRouteAllowed("/mensagens", "supervisor")).toBe(true);
+    expect(isLightRouteAllowed("/mensagens/lead-1", "supervisor")).toBe(true);
+    expect(resolveLightRoute("/mensagens/lead-1")).toMatchObject({ title: "Conversa", parentHref: "/mensagens" });
     expect(getLightMoreDestinations({ relationshipCenter: true, teamRanking: true }, "supervisor").map((item) => item.href)).toContain("/equipe/desempenho");
     expect(getLightMoreDestinations({ relationshipCenter: true, teamRanking: false }, "supervisor").map((item) => item.href)).not.toContain("/equipe/desempenho");
   });

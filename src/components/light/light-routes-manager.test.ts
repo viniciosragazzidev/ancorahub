@@ -9,11 +9,14 @@ describe("manager Lite routes", () => {
     for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/leads/distribuicao", "/leads/a/b", "/leads/distribuicao/plantao", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/clientes/a/b", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(false);
     }
-    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(10);
+    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(12);
+    expect(isLightRouteAllowed("/mensagens", "manager")).toBe(true);
+    expect(isLightRouteAllowed("/mensagens/lead-1", "manager")).toBe(true);
+    expect(isLightRouteAllowed("/mensagens/a/b", "manager")).toBe(false);
   });
 
   it("shows unit leads, team, clients, notifications and settings in Mais", () => {
     expect(getLightMoreDestinations({ quoteSimulator: true, dutyCalendar: true, relationshipCenter: true }, "manager").map((item) => item.href))
-      .toEqual(["/leads", "/equipe", "/clientes", "/notificacoes", "/settings"]);
+      .toEqual(["/leads", "/equipe", "/clientes", "/mensagens", "/notificacoes", "/settings"]);
   });
 });
