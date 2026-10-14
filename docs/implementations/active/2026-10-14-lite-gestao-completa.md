@@ -75,6 +75,7 @@ Correções antes de qualquer tela nova:
 7. `empresas/page.tsx:30-33` e `features/noc/queries.ts:132-135`: escopo de supervisor.
 8. `light-routes.ts`: a regex `/leads/<id>` aceita `dashboard` e `arquivados`; excluir.
 9. Rotas inalcançáveis por redirect em `next.config.ts:29-33` (`/propostas`, `/configuracoes/comissoes`, `/minha-fila`): decidir destino (ver E7). **Recomendação E0:** manter os redirects globais como aliases compatíveis, pois valem para todos os papéis. Em E7/E6, tornar os destinos `/vendas?tab=propostas` e `/settings?tab=comissoes` cientes do papel e validar as superfícies Lite permitidas. Manter `/minha-fila` como alias da fila do corretor em `/leads?tab=minha-fila`; não torná-la uma rota de gestor/supervisor. Reavaliar os aliases somente depois de os destinos estarem portados e testados para cada papel.
+**Adendo E0:** `updateCustomerRenewalStatusAction` deriva tenant e escopo pelos dados de propriedade do cliente no servidor; gestor fica na unidade, supervisor na equipe e diretor preserva o tenant. A leitura e a atualização revalidam o mesmo escopo.
 **Pronto quando:** cada ponto com teste (outro tenant, outra unidade, fora da equipe = recusa/vazio).
 
 ### E1. Leads e atendimento
