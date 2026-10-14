@@ -8,6 +8,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { SalesWorkspace } from "./sales-workspace";
 import { RelatedActions } from "@/components/related-actions";
+import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
+import { buildSalesPageScope } from "@/features/sales/sales-page-scope";
 
 export default async function SalesPage({
   searchParams,
@@ -21,28 +23,22 @@ export default async function SalesPage({
   const branchParam = resolvedSearchParams.branch;
 
   const canFilterBranch = context.role === "director" || context.role === "manager";
+  const effectiveBranchId = context.role === "director"
+    ? branchParam
+    : context.role === "manager"
+      ? context.branchId ?? undefined
+      : undefined;
+  const reportScope = await resolveReportDataScope(context);
+  const scope = buildSalesPageScope(context, reportScope, effectiveBranchId);
 
   const branchesPromise = canFilterBranch
     ? db
         .select({ id: schema.branches.id, name: schema.branches.name })
         .from(schema.branches)
-        .where(eq(schema.branches.tenantId, context.tenantId))
+        .where(scope.branchesWhere!)
     : Promise.resolve([] as { id: string; name: string }[]);
 
   // Build conditions with scope filtering
-  const conditions = [
-    eq(schema.sales.tenantId, context.tenantId),
-    gte(schema.sales.saleDate, periodStart(period)),
-  ];
-
-  if (context.role === "broker") {
-    conditions.push(eq(schema.sales.brokerId, context.userId));
-  } else if (branchParam) {
-    conditions.push(eq(schema.leads.branchId, branchParam));
-  } else if (context.role === "manager" && context.branchId) {
-    conditions.push(eq(schema.leads.branchId, context.branchId));
-  }
-
   const salesPromise = db
     .select({
       id: schema.sales.id,
@@ -60,13 +56,13 @@ export default async function SalesPage({
       createdAt: schema.sales.createdAt,
     })
     .from(schema.sales)
-    .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.sales.leadId, schema.leads.id), eq(schema.sales.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.clients, eq(schema.sales.clientId, schema.clients.id))
     .innerJoin(schema.user, eq(schema.sales.brokerId, schema.user.id))
     .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
     .leftJoin(schema.carrierPlans, eq(schema.sales.carrierPlanId, schema.carrierPlans.id))
     .leftJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
-    .where(and(...conditions))
+    .where(and(scope.salesWhere, gte(schema.sales.saleDate, periodStart(period))))
     .orderBy(desc(schema.sales.createdAt));
 
   const [branches, sales] = await Promise.all([branchesPromise, salesPromise]);
@@ -79,7 +75,7 @@ export default async function SalesPage({
         title="Vendas & Fechamentos"
         rightSlot={
           <div className="flex items-center gap-2">
-            <BranchSelect branches={branches} value={branchParam} />
+            {canFilterBranch ? <BranchSelect branches={branches} value={effectiveBranchId} /> : null}
             <PeriodSelect value={period} />
           </div>
         }

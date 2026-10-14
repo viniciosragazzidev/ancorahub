@@ -10,6 +10,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import type { ProposalStatus } from "@/shared/db/schema";
+import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
+import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
 
 async function assertFeatureEnabled() {
   const enabled = await getSystemSetting("feature_proposals_enabled");
@@ -65,6 +67,7 @@ export async function createProposalAction(
     const documentIds = JSON.parse(documentIdsJson) as string[];
 
     const db = getDatabase();
+    const leadScope = buildStrictRoleLeadScope(context, await resolveReportDataScope(context));
 
     // Verify lead exists and belongs to tenant
     const [lead] = await db
@@ -74,7 +77,7 @@ export async function createProposalAction(
         telefone: schema.leads.telefone,
       })
       .from(schema.leads)
-      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
+      .where(and(eq(schema.leads.id, leadId), leadScope))
       .limit(1);
 
     if (!lead) return { error: "Lead nao encontrado." };
@@ -89,9 +92,10 @@ export async function createProposalAction(
           beneficiaryCount: schema.quotes.beneficiaryCount,
         })
         .from(schema.quotes)
-        .where(and(eq(schema.quotes.id, quoteId), eq(schema.quotes.tenantId, context.tenantId)))
+        .where(and(eq(schema.quotes.id, quoteId), eq(schema.quotes.tenantId, context.tenantId), eq(schema.quotes.leadId, leadId)))
         .limit(1);
 
+      if (!quote) return { error: "Cotação não encontrada para este lead." };
       if (quote) {
         totalMonthly = quote.totalMonthly ? Number(quote.totalMonthly).toFixed(2) : "0.00";
         beneficiaryCount = quote.beneficiaryCount ?? 0;
@@ -157,6 +161,14 @@ export async function updateProposalStatusAction(
       .limit(1);
 
     if (!proposal) return { success: false, error: "Proposta nao encontrada." };
+
+    const leadScope = buildStrictRoleLeadScope(context, await resolveReportDataScope(context));
+    const [lead] = await db
+      .select({ id: schema.leads.id })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, proposal.leadId), leadScope))
+      .limit(1);
+    if (!lead) return { success: false, error: "Acesso negado para esta proposta." };
 
     // Role restrictions (brokers can only modify their own proposals)
     if (context.role === "broker" && proposal.createdBy !== context.userId) {
@@ -239,6 +251,24 @@ export async function convertProposalToSaleAction(
 
     if (!proposal) return { success: false, error: "Proposta nao encontrada." };
 
+    const leadScope = buildStrictRoleLeadScope(context, await resolveReportDataScope(context));
+    const [lead] = await db
+      .select({
+        id: schema.leads.id,
+        tenantId: schema.leads.tenantId,
+        branchId: schema.leads.branchId,
+        corretorId: schema.leads.corretorId,
+        planId: schema.leads.planId,
+        nome: schema.leads.nome,
+        telefone: schema.leads.telefone,
+        email: schema.leads.email,
+        status: schema.leads.status,
+      })
+      .from(schema.leads)
+      .where(and(eq(schema.leads.id, proposal.leadId), leadScope))
+      .limit(1);
+    if (!lead) return { success: false, error: "Proposta nao encontrada." };
+
     // Role restrictions
     if (context.role === "broker" && proposal.createdBy !== context.userId) {
       return { success: false, error: "Acesso negado para esta proposta." };
@@ -259,25 +289,7 @@ export async function convertProposalToSaleAction(
       return { success: false, error: "Esta proposta expirou e nao pode ser convertida em venda." };
     }
 
-    // 4. Resolve Lead and Plan details
-    const [lead] = await db
-      .select({
-        id: schema.leads.id,
-        tenantId: schema.leads.tenantId,
-        branchId: schema.leads.branchId,
-        corretorId: schema.leads.corretorId,
-        planId: schema.leads.planId,
-        nome: schema.leads.nome,
-        telefone: schema.leads.telefone,
-        email: schema.leads.email,
-        status: schema.leads.status,
-      })
-      .from(schema.leads)
-      .where(and(eq(schema.leads.id, proposal.leadId), eq(schema.leads.tenantId, context.tenantId)))
-      .limit(1);
-
-    if (!lead) return { success: false, error: "Lead associado nao encontrado." };
-
+    // 4. Resolve the plan details after the lead has passed the role scope check.
     let resolvedPlanId = input.carrierPlanId || lead.planId || null;
 
     // If still no planId and quoteId exists, resolve first plan from quote items
@@ -477,7 +489,7 @@ export async function getQuotesForLeadAction(leadId: string) {
     const quotes = await getQuotesForProposalCreation(leadId);
     const docs = await getDocumentsForProposalCreation(leadId);
     return { success: true, quotes, docs };
-  } catch (error) {
+  } catch {
     return { success: false, error: "Erro ao carregar dados do lead." };
   }
 }

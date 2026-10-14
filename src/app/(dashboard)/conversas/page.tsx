@@ -22,6 +22,7 @@ import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
 import { isMediaKindSupported } from "@/features/conversations/media-kinds";
+import { buildConversationLeadScope } from "@/features/conversations/lead-scope";
 import { shouldCreateSyntheticCustomerConversation } from "@/features/communication-channels/conversation-classification";
 import { resolveTemplateTextBody } from "@/features/communication-channels/outbound-service";
 import { renderTemplatePreview } from "@/features/communication-channels/template-preview";
@@ -93,12 +94,7 @@ export default async function ConversationsPage({
   const coexLabel = coexChannels.length
     ? `WhatsApp coex · ${coexChannels.map((channel) => String(channel.displayPhoneNumber ?? "").replace(/\D/g, "").slice(-4)).filter(Boolean).join(", ")}`
     : null;
-  const scope =
-    context.role === "manager" && context.branchId
-      ? eq(schema.leads.branchId, context.branchId)
-      : context.role === "broker"
-        ? eq(schema.leads.corretorId, context.userId)
-        : undefined;
+  const scope = buildConversationLeadScope(context);
 
   let finalConversations: ConversationItem[] = [];
   let branches: { id: string; name: string }[] = [];

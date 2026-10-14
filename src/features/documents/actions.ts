@@ -9,6 +9,8 @@ import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
+import { buildDocumentLeadScope } from "./document-scope";
 
 // ─── Requirements Actions ──────────────────────────────────────────────────
 
@@ -115,6 +117,7 @@ export async function getDocumentRequirements() {
 export async function getLeadDocuments(leadId: string) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = buildDocumentLeadScope(context, await resolveReportDataScope(context));
 
   return db
     .select({
@@ -135,18 +138,14 @@ export async function getLeadDocuments(leadId: string) {
       createdAt: schema.leadDocuments.createdAt,
     })
     .from(schema.leadDocuments)
-    .innerJoin(schema.leads, eq(schema.leadDocuments.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.leadDocuments.leadId, schema.leads.id), eq(schema.leadDocuments.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.documentRequirements, eq(schema.leadDocuments.requirementId, schema.documentRequirements.id))
     .where(
       and(
         eq(schema.leadDocuments.leadId, leadId),
         eq(schema.leadDocuments.tenantId, context.tenantId),
         isNull(schema.leadDocuments.deletedAt),
-        context.role === "broker"
-          ? eq(schema.leads.corretorId, context.userId)
-          : context.role === "manager" && context.branchId
-            ? eq(schema.leads.branchId, context.branchId)
-            : undefined,
+        leadScope,
       )
     )
     .orderBy(schema.leadDocuments.createdAt);
@@ -185,6 +184,7 @@ export async function confirmDocumentUploadAction({
 }): Promise<DocumentActionState> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = buildDocumentLeadScope(context, await resolveReportDataScope(context));
 
   try {
     const parsedCategory = documentCategory.safeParse(category ?? "outros");
@@ -201,7 +201,7 @@ export async function confirmDocumentUploadAction({
     const [lead] = await db
       .select({ id: schema.leads.id, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId, nome: schema.leads.nome })
       .from(schema.leads)
-      .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, context.tenantId)))
+      .where(and(eq(schema.leads.id, leadId), leadScope))
       .limit(1);
     if (!lead) return { error: "Lead não encontrado." };
     if (context.role === "broker" && lead.corretorId !== context.userId) {
@@ -341,7 +341,7 @@ export async function reviewDocumentAction({
       .where(and(
         eq(schema.leads.id, leadId),
         eq(schema.leads.tenantId, context.tenantId),
-        context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+        buildDocumentLeadScope(context, await resolveReportDataScope(context)),
       ))
       .limit(1);
     if (!lead) return { error: "Este lead não pertence ao escopo da sua unidade." };
@@ -424,8 +424,8 @@ export async function deleteDocumentAction(documentId: string): Promise<Document
     const [document] = await db
       .select({ id: schema.leadDocuments.id, leadId: schema.leadDocuments.leadId, filename: schema.leadDocuments.filename, requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId, corretorId: schema.leads.corretorId, branchId: schema.leads.branchId })
       .from(schema.leadDocuments)
-      .innerJoin(schema.leads, eq(schema.leadDocuments.leadId, schema.leads.id))
-      .where(and(eq(schema.leadDocuments.id, documentId), eq(schema.leadDocuments.tenantId, context.tenantId), isNull(schema.leadDocuments.deletedAt)))
+      .innerJoin(schema.leads, and(eq(schema.leadDocuments.leadId, schema.leads.id), eq(schema.leadDocuments.tenantId, schema.leads.tenantId)))
+      .where(and(eq(schema.leadDocuments.id, documentId), eq(schema.leadDocuments.tenantId, context.tenantId), buildDocumentLeadScope(context, await resolveReportDataScope(context)), isNull(schema.leadDocuments.deletedAt)))
       .limit(1);
     if (!document) return { error: "Documento não encontrado." };
     const allowed = context.role === "director" || (context.role === "manager" && context.branchId === document.branchId) || (context.role === "broker" && context.userId === document.corretorId);
@@ -454,6 +454,7 @@ export async function deleteDocumentAction(documentId: string): Promise<Document
 
 export async function getPendingDocuments() {
   const context = await getRequiredTenantContext();
+  const leadScope = buildDocumentLeadScope(context, await resolveReportDataScope(context));
 
   const db = getDatabase();
 
@@ -472,29 +473,20 @@ export async function getPendingDocuments() {
       branchName: schema.branches.name,
     })
     .from(schema.leadDocuments)
-    .innerJoin(schema.leads, eq(schema.leadDocuments.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.leadDocuments.leadId, schema.leads.id), eq(schema.leadDocuments.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.leads.corretorId, schema.user.id))
     .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
     .leftJoin(schema.documentRequirements, eq(schema.leadDocuments.requirementId, schema.documentRequirements.id))
     .where(
       and(
-        context.role === "broker"
-          ? eq(schema.leads.corretorId, context.userId)
-          : undefined,
+        leadScope,
         isNull(schema.leadDocuments.deletedAt),
         eq(schema.leadDocuments.tenantId, context.tenantId)
       )
     )
     .orderBy(desc(schema.leadDocuments.createdAt));
 
-  const rows = await query;
-
-  // Filter based on branch scope for manager
-  if (context.role === "manager" && context.branchId) {
-    return rows.filter((r) => r.branchId === context.branchId);
-  }
-
-  return rows;
+  return query;
 }
 
 export async function bulkReviewDocumentsAction(
@@ -507,6 +499,7 @@ export async function bulkReviewDocumentsAction(
   if (documentIds.length === 0) return { success: true };
 
   const db = getDatabase();
+  const leadScope = buildDocumentLeadScope(context, await resolveReportDataScope(context));
   try {
     let allowedDocsToNotify: Array<{ id: string; leadId: string; filename: string }> = [];
 
@@ -515,18 +508,16 @@ export async function bulkReviewDocumentsAction(
       const docs = await tx
         .select({ id: schema.leadDocuments.id, leadId: schema.leadDocuments.leadId, filename: schema.leadDocuments.filename, requirementId: schema.leadDocuments.requirementId, beneficiaryId: schema.leadDocuments.beneficiaryId, branchId: schema.leads.branchId })
         .from(schema.leadDocuments)
-        .innerJoin(schema.leads, eq(schema.leadDocuments.leadId, schema.leads.id))
+        .innerJoin(schema.leads, and(eq(schema.leadDocuments.leadId, schema.leads.id), eq(schema.leadDocuments.tenantId, schema.leads.tenantId)))
         .where(
           and(
             inArray(schema.leadDocuments.id, documentIds),
-            eq(schema.leadDocuments.tenantId, context.tenantId)
+            eq(schema.leadDocuments.tenantId, context.tenantId),
+            leadScope,
           )
         );
 
-      // Filter by branch if manager
-      const allowedDocs = context.role === "manager" && context.branchId
-        ? docs.filter((doc) => doc.branchId === context.branchId)
-        : docs;
+      const allowedDocs = docs;
 
       if (allowedDocs.length === 0) return;
 
@@ -540,7 +531,7 @@ export async function bulkReviewDocumentsAction(
           reviewedBy: context.userId,
           reviewedAt: new Date(),
         })
-        .where(inArray(schema.leadDocuments.id, allowedIds));
+        .where(and(inArray(schema.leadDocuments.id, allowedIds), eq(schema.leadDocuments.tenantId, context.tenantId)));
 
       for (const doc of allowedDocs) {
         if (!doc.requirementId) continue;
@@ -599,6 +590,7 @@ export async function bulkReviewDocumentsAction(
 export async function getRequirementsForLead(leadId: string) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = buildDocumentLeadScope(context, await resolveReportDataScope(context));
 
   const [lead] = await db
     .select({
@@ -610,11 +602,7 @@ export async function getRequirementsForLead(leadId: string) {
     .where(and(
       eq(schema.leads.id, leadId),
       eq(schema.leads.tenantId, context.tenantId),
-      context.role === "broker"
-        ? eq(schema.leads.corretorId, context.userId)
-        : context.role === "manager" && context.branchId
-          ? eq(schema.leads.branchId, context.branchId)
-          : undefined,
+      leadScope,
     ))
     .limit(1);
 
@@ -644,6 +632,7 @@ export async function getRequirementsForLead(leadId: string) {
 export async function getLeadDocumentChecklist(leadId: string) {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = buildDocumentLeadScope(context, await resolveReportDataScope(context));
   const requirements = await getRequirementsForLead(leadId);
   if (requirements.length === 0) return [];
 
@@ -715,6 +704,6 @@ export async function getLeadDocumentChecklist(leadId: string) {
     .where(and(
       eq(schema.leadDocumentChecklist.tenantId, context.tenantId),
       eq(schema.leadDocumentChecklist.leadId, leadId),
-      context.role === "broker" ? eq(schema.leads.corretorId, context.userId) : context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+      leadScope,
     ));
 }

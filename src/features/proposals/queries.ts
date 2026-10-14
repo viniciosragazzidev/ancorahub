@@ -5,6 +5,13 @@ import { and, desc, eq, lte, gte, or, sql } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import type { ProposalStatus } from "@/shared/db/schema";
+import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
+import { buildStrictRoleLeadScope, leadIdInStrictRoleScope } from "@/features/leads/strict-role-scope";
+import type { TenantContext } from "@/shared/auth/types";
+
+async function getProposalLeadScope(context: TenantContext) {
+  return buildStrictRoleLeadScope(context, await resolveReportDataScope(context));
+}
 
 export type ProposalRecord = {
   id: string;
@@ -32,8 +39,9 @@ export type ProposalRecord = {
 export async function getProposals(): Promise<ProposalRecord[]> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = await getProposalLeadScope(context);
 
-  const conditions = [eq(schema.proposals.tenantId, context.tenantId)];
+  const conditions = [eq(schema.proposals.tenantId, context.tenantId), eq(schema.leads.tenantId, context.tenantId), leadScope];
 
   if (context.role === "broker") {
     conditions.push(eq(schema.proposals.createdBy, context.userId));
@@ -65,7 +73,7 @@ export async function getProposals(): Promise<ProposalRecord[]> {
       updatedAt: schema.proposals.updatedAt,
     })
     .from(schema.proposals)
-    .innerJoin(schema.leads, eq(schema.proposals.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.proposals.leadId, schema.leads.id), eq(schema.proposals.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.proposals.createdBy, schema.user.id))
     .where(and(...conditions))
     .orderBy(desc(schema.proposals.createdAt));
@@ -79,10 +87,13 @@ export async function getProposals(): Promise<ProposalRecord[]> {
 export async function getProposalById(id: string): Promise<ProposalRecord | null> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = await getProposalLeadScope(context);
 
   const conditions = [
     eq(schema.proposals.id, id),
     eq(schema.proposals.tenantId, context.tenantId),
+    eq(schema.leads.tenantId, context.tenantId),
+    leadScope,
   ];
 
   if (context.role === "broker") {
@@ -115,7 +126,7 @@ export async function getProposalById(id: string): Promise<ProposalRecord | null
       updatedAt: schema.proposals.updatedAt,
     })
     .from(schema.proposals)
-    .innerJoin(schema.leads, eq(schema.proposals.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.proposals.leadId, schema.leads.id), eq(schema.proposals.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.proposals.createdBy, schema.user.id))
     .where(and(...conditions))
     .limit(1);
@@ -131,10 +142,13 @@ export async function getProposalById(id: string): Promise<ProposalRecord | null
 export async function getProposalsByLead(leadId: string): Promise<ProposalRecord[]> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = await getProposalLeadScope(context);
 
   const conditions = [
     eq(schema.proposals.leadId, leadId),
     eq(schema.proposals.tenantId, context.tenantId),
+    eq(schema.leads.tenantId, context.tenantId),
+    leadScope,
   ];
 
   if (context.role === "broker") {
@@ -167,7 +181,7 @@ export async function getProposalsByLead(leadId: string): Promise<ProposalRecord
       updatedAt: schema.proposals.updatedAt,
     })
     .from(schema.proposals)
-    .innerJoin(schema.leads, eq(schema.proposals.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.proposals.leadId, schema.leads.id), eq(schema.proposals.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.proposals.createdBy, schema.user.id))
     .where(and(...conditions))
     .orderBy(desc(schema.proposals.createdAt));
@@ -181,12 +195,15 @@ export async function getProposalsByLead(leadId: string): Promise<ProposalRecord
 export async function getExpiringProposals(): Promise<ProposalRecord[]> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = await getProposalLeadScope(context);
 
   const now = new Date();
   const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   const conditions = [
     eq(schema.proposals.tenantId, context.tenantId),
+    eq(schema.leads.tenantId, context.tenantId),
+    leadScope,
     gte(schema.proposals.validUntil, now),
     lte(schema.proposals.validUntil, sevenDaysFromNow),
     or(
@@ -228,7 +245,7 @@ export async function getExpiringProposals(): Promise<ProposalRecord[]> {
       updatedAt: schema.proposals.updatedAt,
     })
     .from(schema.proposals)
-    .innerJoin(schema.leads, eq(schema.proposals.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.proposals.leadId, schema.leads.id), eq(schema.proposals.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.user, eq(schema.proposals.createdBy, schema.user.id))
     .where(and(...conditions))
     .orderBy(desc(schema.proposals.validUntil));
@@ -242,16 +259,9 @@ export async function getExpiringProposals(): Promise<ProposalRecord[]> {
 export async function getLeadsForProposals(): Promise<Array<{ id: string; name: string }>> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const leadScope = await getProposalLeadScope(context);
 
-  const conditions = [
-    eq(schema.leads.tenantId, context.tenantId),
-  ];
-
-  if (context.role === "broker") {
-    conditions.push(eq(schema.leads.corretorId, context.userId));
-  } else if (context.role === "manager" && context.branchId) {
-    conditions.push(eq(schema.leads.branchId, context.branchId));
-  }
+  const conditions = [leadScope];
 
   conditions.push(
     sql`${schema.leads.status} NOT IN ('converted', 'lost')`
@@ -281,7 +291,8 @@ export async function getQuotesForProposalCreation(leadId: string): Promise<Arra
     .where(
       and(
         eq(schema.quotes.leadId, leadId),
-        eq(schema.quotes.tenantId, context.tenantId)
+        eq(schema.quotes.tenantId, context.tenantId),
+        leadIdInStrictRoleScope(schema.quotes.leadId, await getProposalLeadScope(context)),
       )
     )
     .orderBy(desc(schema.quotes.createdAt));
@@ -307,7 +318,8 @@ export async function getDocumentsForProposalCreation(leadId: string): Promise<A
     .where(
       and(
         eq(schema.leadDocuments.leadId, leadId),
-        eq(schema.leadDocuments.tenantId, context.tenantId)
+        eq(schema.leadDocuments.tenantId, context.tenantId),
+        leadIdInStrictRoleScope(schema.leadDocuments.leadId, await getProposalLeadScope(context)),
       )
     )
     .orderBy(schema.leadDocuments.filename);

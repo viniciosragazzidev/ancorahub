@@ -1,5 +1,6 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import {
@@ -18,6 +19,11 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { Sparkline } from "@/components/dashboard/sparkline";
 import { brazilDayKey } from "@/shared/trends";
+import {
+  buildIntegrityAuditScope,
+  buildIntegrityLeadScope,
+  canViewIntegrityPanel,
+} from "@/features/integrity/integrity-scope";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +39,11 @@ const activeLeadStatuses = [
 
 export default async function IntegrityPage() {
   const context = await getRequiredTenantContext();
+  if (!(await canViewIntegrityPanel(context))) notFound();
+
   const db = getDatabase();
+  const leadScope = await buildIntegrityLeadScope(context);
+  const auditScope = buildIntegrityAuditScope(context);
 
   const now = new Date();
 
@@ -49,6 +59,7 @@ export default async function IntegrityPage() {
     })
     .from(schema.auditLogs)
     .innerJoin(schema.user, eq(schema.auditLogs.userId, schema.user.id))
+    .where(auditScope)
     .orderBy(desc(schema.auditLogs.createdAt))
     .limit(30);
 
@@ -57,13 +68,13 @@ export default async function IntegrityPage() {
     db
       .select({ count: count() })
       .from(schema.leads)
-      .where(eq(schema.leads.tenantId, context.tenantId)),
+      .where(leadScope),
     db
       .select({ count: count() })
       .from(schema.leads)
       .where(
         and(
-          eq(schema.leads.tenantId, context.tenantId),
+          leadScope,
           inArray(schema.leads.status, activeLeadStatuses),
           sql`${schema.leads.stageEnteredAt} < ${new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString()}`,
         ),
@@ -73,7 +84,7 @@ export default async function IntegrityPage() {
       .from(schema.leads)
       .where(
         and(
-          eq(schema.leads.tenantId, context.tenantId),
+          leadScope,
           eq(schema.leads.status, "distributed"),
           sql`${schema.leads.assignedAt} < ${new Date(now.getTime() - 15 * 60 * 1000).toISOString()}`,
         ),
@@ -90,7 +101,7 @@ export default async function IntegrityPage() {
         total: count(),
       })
       .from(schema.leads)
-      .where(and(eq(schema.leads.tenantId, context.tenantId), sql`${schema.leads.createdAt} >= ${sevenDaysAgo.toISOString()}`))
+      .where(and(leadScope, sql`${schema.leads.createdAt} >= ${sevenDaysAgo.toISOString()}`))
       .groupBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`),
     db
       .select({
@@ -98,7 +109,7 @@ export default async function IntegrityPage() {
         total: count(),
       })
       .from(schema.auditLogs)
-      .where(sql`${schema.auditLogs.createdAt} >= ${sevenDaysAgo.toISOString()}`)
+      .where(and(auditScope, sql`${schema.auditLogs.createdAt} >= ${sevenDaysAgo.toISOString()}`))
       .groupBy(sql`date_trunc('day', ${schema.auditLogs.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`),
   ]);
 

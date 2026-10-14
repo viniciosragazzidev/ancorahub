@@ -30,7 +30,7 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/dashboard$/,
   new RegExp(`^/dashboard/c/${ID}$`),
   /^\/leads$/,
-  new RegExp(`^/leads/(?!distribuicao$|distribuicao/)${ID}$`),
+  new RegExp(`^/leads/(?!dashboard$|arquivados$|distribuicao(?:/|$))${ID}$`),
   /^\/clientes$/,
   new RegExp(`^/clientes/${ID}$`),
   /^\/equipe$/,
@@ -49,7 +49,7 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
 export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/dashboard$/,
   /^\/leads$/,
-  new RegExp(`^/leads/(?!distribuicao$)${ID}$`),
+  new RegExp(`^/leads/(?!dashboard$|arquivados$|distribuicao$)${ID}$`),
   /^\/notificacoes$/,
   /^\/settings$/,
   /^\/primeiro-acesso$/,

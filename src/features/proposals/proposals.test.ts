@@ -22,6 +22,14 @@ vi.mock("@/shared/db", () => ({
     leads: {
       id: "leads.id",
       tenantId: "leads.tenant_id",
+      corretorId: "leads.corretor_id",
+    },
+    quotes: {
+      id: "quotes.id",
+      tenantId: "quotes.tenant_id",
+      leadId: "quotes.lead_id",
+      totalMonthly: "quotes.total_monthly",
+      beneficiaryCount: "quotes.beneficiary_count",
     },
     sales: {
       id: "sales.id",
@@ -40,6 +48,10 @@ const mockContext = {
 
 vi.mock("@/shared/auth/tenant-context", () => ({
   getRequiredTenantContext: () => Promise.resolve(mockContext),
+}));
+
+vi.mock("@/features/reports/metrics/metric-scope", () => ({
+  resolveReportDataScope: () => Promise.resolve({ leadScope: undefined, salesBrokerScope: undefined }),
 }));
 
 vi.mock("@/features/system-settings/queries", () => ({
