@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
 import { ChatHomeContent } from "@/features/broker-workspace/components/chat-home-content";
 import { SupervisorHomeContent } from "@/features/supervisor-workspace/supervisor-home-content";
+import { ManagerHomeContent } from "@/features/manager-workspace/manager-home-content";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getCommandCenterData } from "@/features/dashboard/today";
 import { CommandCenter } from "@/features/dashboard/components/command-center";
@@ -53,6 +54,13 @@ export default async function DashboardPage({
       return (
         <Suspense fallback={<LightPageSkeleton variant="dashboard" />}>
           <SupervisorHomeContent />
+        </Suspense>
+      );
+    }
+    if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
+      return (
+        <Suspense fallback={<LightPageSkeleton variant="dashboard" />}>
+          <ManagerHomeContent />
         </Suspense>
       );
     }

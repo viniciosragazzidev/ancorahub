@@ -45,7 +45,21 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/primeiro-acesso(\/.*)?$/,
 ];
 
-export function isLightRouteAllowed(pathname: string, audience: "broker" | "supervisor" = "broker") {
+/** The manager Lite starts with the unit dashboard and lead work only. */
+export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
+  /^\/dashboard$/,
+  /^\/leads$/,
+  new RegExp(`^/leads/(?!distribuicao$)${ID}$`),
+  /^\/notificacoes$/,
+  /^\/settings$/,
+  /^\/primeiro-acesso$/,
+];
+
+export function isLightRouteAllowed(pathname: string, audience: "broker" | "supervisor" | "manager" = "broker") {
+  if (audience === "manager") {
+    const path = pathname.split("?")[0] ?? pathname;
+    return LIGHT_MANAGER_ALLOWED_ROUTES.some((route) => route.test(path));
+  }
   if (audience === "supervisor") {
     const path = pathname.split("?")[0] ?? pathname;
     return LIGHT_SUPERVISOR_ALLOWED_ROUTES.some((route) => route.test(path));
@@ -60,6 +74,12 @@ export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/equipe/transferencia", label: "Pedir corretor de outra equipe" },
   { href: "/relacionamento", label: "Central de relacionamento", requires: "relationshipCenter" },
   { href: "/clientes", label: "Clientes da equipe" },
+  { href: "/notificacoes", label: "Notificações" },
+  { href: "/settings", label: "Configurações" },
+];
+
+export const LIGHT_MANAGER_DESTINATIONS: readonly LightMoreDestination[] = [
+  { href: "/leads", label: "Leads da unidade" },
   { href: "/notificacoes", label: "Notificações" },
   { href: "/settings", label: "Configurações" },
 ];
@@ -92,8 +112,8 @@ export const LIGHT_MORE_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/settings", label: "Configurações" },
 ];
 
-export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean }, audience: "broker" | "supervisor" = "broker") {
-  const list = audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : LIGHT_MORE_DESTINATIONS;
+export function getLightMoreDestinations(capabilities: { quoteSimulator?: boolean; dutyCalendar?: boolean; relationshipCenter?: boolean; journey?: boolean; teamRanking?: boolean }, audience: "broker" | "supervisor" | "manager" = "broker") {
+  const list = audience === "manager" ? LIGHT_MANAGER_DESTINATIONS : audience === "supervisor" ? LIGHT_SUPERVISOR_DESTINATIONS : LIGHT_MORE_DESTINATIONS;
   return list.filter((item) => !item.requires || capabilities[item.requires]);
 }
 

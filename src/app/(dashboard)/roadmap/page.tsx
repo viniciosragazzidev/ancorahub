@@ -31,6 +31,7 @@ const priorityClass = {
   P0: "border-destructive/40 text-destructive",
   P1: "border-amber-500/40 text-amber-500",
   P2: "border-muted-foreground/30 text-muted-foreground",
+  P3: "border-muted-foreground/20 text-muted-foreground",
   "Risco externo": "border-sky-500/40 text-sky-500",
 } as const;
 

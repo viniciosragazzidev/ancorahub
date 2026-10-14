@@ -56,7 +56,7 @@ export function LightChrome({
   welcomeVideoEnabled?: boolean;
   teamRankingEnabled?: boolean;
   viewAs?: ViewAsState;
-  audience?: "broker" | "supervisor";
+  audience?: "broker" | "supervisor" | "manager";
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
 }) {
@@ -134,7 +134,7 @@ export function LightChrome({
           availability={availability}
           availabilityPending={isPending}
           onToggleAvailability={() => setStatus(availability === "available" ? "paused" : "available")}
-          hideAvailability={audience === "supervisor"}
+          hideAvailability={audience !== "broker"}
           actions={audience === "broker" ? <AssistHelpButton /> : undefined}
           onOpenMore={() => setMoreOpen(true)}
         />

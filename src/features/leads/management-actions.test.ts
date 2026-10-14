@@ -71,7 +71,7 @@ const state = vi.hoisted(() => {
     controls,
     inserts,
     lead,
-    mockTenantContext: { tenantId: "tenant-test", userId: "director-test", role: "director" as const },
+    mockTenantContext: { tenantId: "tenant-test", userId: "director-test", role: "director" as "director" | "manager" | "supervisor", branchId: null as string | null },
     schema,
     updates,
   };
@@ -80,7 +80,7 @@ const state = vi.hoisted(() => {
 vi.mock("@/shared/db", () => ({ getDatabase: () => state.db, schema: state.schema }));
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: () => Promise.resolve(state.mockTenantContext) }));
 vi.mock("@/shared/auth/errors", () => ({ AuthorizationError: class AuthorizationError extends Error {} }));
-vi.mock("@/shared/auth/authorization-service", () => ({ AuthorizationService: { can: () => true } }));
+vi.mock("@/shared/auth/authorization-service", () => ({ AuthorizationService: { can: (context: { role?: string; branchId?: string | null }, _capability: string, resource: { branchId?: string | null }) => context.role === "manager" ? context.branchId === resource.branchId : true } }));
 vi.mock("@/features/leads/lead-authorization", () => ({ buildLeadResourceScope: (lead: unknown) => lead, toEffectiveLeadAccessContext: (context: unknown) => context }));
 vi.mock("@/shared/auth/shadow-mode", () => ({ evaluateShadowAuthorization: vi.fn(async () => undefined) }));
 vi.mock("@/features/notifications/send-push-helper", () => ({ notifyLeadReassigned: vi.fn(async () => undefined) }));
@@ -237,6 +237,35 @@ describe("manual service reassignment", () => {
   });
 });
 
+describe("manager reassignment stays within the authenticated unit", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.updates.length = 0;
+    state.inserts.length = 0;
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false });
+    Object.assign(state.lead, { branchId: "branch-test", corretorId: "00000000-0000-4000-8000-000000000002", status: "distributed", distributionStatus: "assigned", firstContactAt: null, serviceStartedAt: null, archivedAt: null, deletedAt: null });
+    Object.assign(state.mockTenantContext, { userId: "manager-test", role: "manager", branchId: "branch-test" });
+  });
+
+  it("reassigns through the existing audited flow inside the manager's unit", async () => {
+    const data = formData();
+    data.set("brokerId", "00000000-0000-4000-8000-000000000003");
+    const result = await reassignLeadAction({}, data);
+    expect(result).toMatchObject({ success: true, entity: { branchId: "branch-test", corretorId: "00000000-0000-4000-8000-000000000003" } });
+    expect(state.inserts.some((item) => item.table === state.schema.auditLogs && item.values.acao === "reatribuiu_lead")).toBe(true);
+    expect(state.inserts.some((item) => item.table === state.schema.leadDistributionEvents && item.values.source === "manual_manager")).toBe(true);
+  });
+
+  it("rejects a lead outside the manager's unit before writing history", async () => {
+    state.lead.branchId = "another-branch";
+    const data = formData();
+    data.set("brokerId", "00000000-0000-4000-8000-000000000003");
+    expect(await reassignLeadAction({}, data)).toMatchObject({ error: expect.any(String) });
+    expect(state.inserts).toHaveLength(0);
+    expect(state.updates).toHaveLength(0);
+  });
+});
+
 describe("supervisor hand-off within the team (supervisor Lite P4)", () => {
   const owner = "00000000-0000-4000-8000-000000000002";
   const target = "00000000-0000-4000-8000-000000000003";
@@ -249,7 +278,7 @@ describe("supervisor hand-off within the team (supervisor Lite P4)", () => {
     Object.assign(state.mockTenantContext, { userId: "supervisor-test", role: "supervisor", supervisorTeamScope: true });
   });
   afterAll(() => {
-    Object.assign(state.mockTenantContext, { userId: "director-test", role: "director", supervisorTeamScope: undefined });
+    Object.assign(state.mockTenantContext, { userId: "director-test", role: "director", branchId: null, supervisorTeamScope: undefined });
   });
   function handoff(extra: Record<string, string> = {}) {
     const data = formData();

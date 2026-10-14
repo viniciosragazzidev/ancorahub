@@ -84,7 +84,8 @@ function SlaRing({ percent, bucket }: { percent: number; bucket: Bucket }) {
   );
 }
 
-export function SupervisorLeadsRadar({ data, now, search = "" }: { data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string }) {
+export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor" }: { data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager" }) {
+  const isManager = audience === "manager";
   const reduce = useReducedMotionConfig();
   const [query, setQuery] = useState(search);
   const [brokerId, setBrokerId] = useState<string | null>(null);
@@ -111,7 +112,7 @@ export function SupervisorLeadsRadar({ data, now, search = "" }: { data: { team:
     <div className={`arc-venancor ${styles.page}`}>
       <div className={styles.inner}>
         <header className={styles.header}>
-          <h1>Leads da equipe</h1>
+          <h1>{isManager ? "Leads da unidade" : "Leads da equipe"}</h1>
           <p>{lateTotal ? <><strong className={styles.alert}>{lateTotal === 1 ? "1 lead atrasado" : `${lateTotal} leads atrasados`}</strong> precisando de você agora.</> : "Tudo em dia. Acompanhe onde cada lead está."}</p>
         </header>
 
@@ -182,14 +183,14 @@ export function SupervisorLeadsRadar({ data, now, search = "" }: { data: { team:
                           <span>{[lead.productName, statusName[lead.status] ?? "Em andamento"].filter(Boolean).join(" · ")}</span>
                         </span>
                         <span className={styles.cardMeta}>
-                          <span className={styles.owner}><Avatar name={lead.ownerName} src={lead.ownerImage ?? undefined} size="sm" />{firstName(lead.ownerName)}</span>
+                          {lead.ownerId ? <span className={styles.owner}><Avatar name={lead.ownerName} src={lead.ownerImage ?? undefined} size="sm" />{firstName(lead.ownerName)}</span> : <span className={styles.owner}>Sem corretor</span>}
                           <span className={styles.elapsed} data-late={bucket === "late"}>{elapsed(bucket === "stalled" ? lead.stageEnteredAt : lead.assignedAt, currentTime)}</span>
                         </span>
                       </Link>
-                      <div className={styles.cardActions}>
+                      {isManager ? null : <div className={styles.cardActions}>
                         <Button variant="outline" size="sm" render={<Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} />}>Repassar</Button>
                         <Button size="sm" render={<Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} />}>Cobrar {firstName(lead.ownerName)}</Button>
-                      </div>
+                      </div>}
                     </motion.li>
                   );
                 })}

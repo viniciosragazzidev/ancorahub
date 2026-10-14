@@ -39,6 +39,15 @@ export async function GET(request: NextRequest) {
     );
   }).slice(0, 6);
 
+  // A manager without an authenticated unit has no operational search scope.
+  if (context.role === "manager" && !context.branchId) {
+    return Response.json({ enabled: true, groups: matchingFeatures.length ? [{
+      type: "features", label: "Funcionalidades & Módulos", items: matchingFeatures.map((feature) => ({
+        id: feature.id, title: feature.title, subtitle: `${feature.domain} · ${feature.description}`, href: feature.url,
+      })),
+    }] : [] });
+  }
+
   const pattern = `%${query.replace(/[%_]/g, "\\$&")}%`.trim();
   const teamScoped = isSupervisorTeamScoped(context);
   const scope = leadScope(context.tenantId, context.role, context.branchId, context.userId, teamScoped);

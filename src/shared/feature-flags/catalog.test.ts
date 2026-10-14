@@ -12,3 +12,14 @@ describe("cold lead reactivation feature flag", () => {
     });
   });
 });
+
+describe("manager Lite feature flag", () => {
+  it("is globally controlled and disabled by default", () => {
+    expect(FEATURE_FLAGS.MANAGER_LITE).toMatchObject({
+      key: "feature_manager_lite_enabled",
+      scope: "global",
+      defaultValue: "false",
+      allowedValues: ["true", "false"],
+    });
+  });
+});

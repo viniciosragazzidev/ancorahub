@@ -39,6 +39,7 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { readLeadIntelligence } from "@/features/broker-workspace/chat/intelligence";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { SupervisorLeadDetail } from "@/features/supervisor-workspace/supervisor-lead-detail";
+import { ManagerLiteLeadDetailPage } from "@/features/manager-workspace/manager-lite-leads";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
 import { LeadDocumentsSection } from "@/features/documents/components/lead-documents-section";
@@ -65,6 +66,9 @@ function getCurrentTimestamp() {
 export default async function LeadDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ ficha?: string }> }) {
   const [{ id }, { ficha }] = await Promise.all([params, searchParams]);
   const context = await getRequiredTenantContext();
+  if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
+    return <ManagerLiteLeadDetailPage leadId={id} />;
+  }
   // The Light app streams its own skeleton while the lead loads; the Full screen is unchanged.
   if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
     return (

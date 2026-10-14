@@ -178,6 +178,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Modo Lite do supervisor (S2): Início em conversas com Equipe, Leads da equipe e Desempenho da equipe. Só vale com o escopo da equipe ligado.",
   },
+  MANAGER_LITE: {
+    key: "feature_manager_lite_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Força o Gestor a usar a experiência Lite, começando por Leads.",
+  },
 
   SUPERVISOR_TEAM_SCOPE: {
     key: "feature_supervisor_team_scope_enabled",

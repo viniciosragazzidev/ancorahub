@@ -109,6 +109,7 @@ export function ChatHome({
   const reduce = useReducedMotion();
   const shell = useLightAvailabilityContext();
   const isSupervisor = shell?.audience === "supervisor";
+  const isManager = shell?.audience === "manager";
   const pathname = usePathname() ?? "";
   const [tab, setTab] = useState<Tab>("assistentes");
   const [searching, setSearching] = useState(false);
@@ -152,7 +153,7 @@ export function ChatHome({
       {!visible.length ? (
         <div className={home.emptyAction}>
           {query ? <button type="button" className={styles.headerPill} onClick={() => setQuery("")}>Limpar busca</button>
-            : tab === "leads" ? <Link href="/plantoes" className={styles.headerPill}>Ver plantões</Link>
+            : tab === "leads" ? <Link href={isManager ? "/leads" : "/plantoes"} className={styles.headerPill}>{isManager ? "Ver leads da unidade" : "Ver plantões"}</Link>
             : <Link href="/notificacoes" className={styles.headerPill}>Ver avisos da Âncora</Link>}
         </div>
       ) : null}
@@ -165,7 +166,7 @@ export function ChatHome({
         <button type="button" className={home.me} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</button>
         <Link href="/dashboard" className={home.helloLink}><h1 className={home.hello}>Olá, {firstName}</h1></Link>
         <div className={home.headerTools} data-tour="home-tools">
-          {isSupervisor ? null : <WhatsAppStatusButton />}
+          {isSupervisor || isManager ? null : <WhatsAppStatusButton />}
           <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>
@@ -185,7 +186,7 @@ export function ChatHome({
         {isSupervisor ? <li><Link href="/relacionamento" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Mandar recado para a equipe</strong><span>Aviso, reconhecimento ou pedido de ciente</span></Link></li> : null}
         {canQuote ? <li><Link href="/cotacao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Fazer uma cotação</strong><span>Simular planos para um cliente</span></Link></li> : null}
         <li><button type="button" className={home.newItem} onClick={() => { setNewOpen(false); setTab("leads"); setSearching(true); }}><strong>Buscar um lead</strong><span>Pelo nome ou telefone</span></button></li>
-        {isSupervisor ? null : <li><Link href="/dashboard/c/plantao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver meu plantão</strong><span>Agora e próximos</span></Link></li>}
+        {isManager ? <li><Link href="/leads" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Leads da unidade</strong><span>Acompanhar e repassar leads</span></Link></li> : isSupervisor ? null : <li><Link href="/dashboard/c/plantao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver meu plantão</strong><span>Agora e próximos</span></Link></li>}
       </ul>
     </BottomSheet>
   );
@@ -290,8 +291,8 @@ export function ChatHome({
       </div>
 
       {/* Welcome and tour of the audience: broker or supervisor (each with its own steps). */}
-      <LiteWelcome variant={isSupervisor ? "supervisor" : "broker"} />
-      <LiteTour variant={isSupervisor ? "supervisor" : "broker"} />
+      {isManager ? null : <LiteWelcome variant={isSupervisor ? "supervisor" : "broker"} />}
+      {isManager ? null : <LiteTour variant={isSupervisor ? "supervisor" : "broker"} />}
       {sheet}
     </div>
   );
