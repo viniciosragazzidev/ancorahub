@@ -61,6 +61,7 @@ export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   new RegExp(`^/clientes/${ID}$`),
   /^\/mensagens$/,
   new RegExp(`^/mensagens/${ID}$`),
+  /^\/empresas$/,
 ];
 
 export function isLightRouteAllowed(pathname: string, audience: "broker" | "supervisor" | "manager" = "broker") {
@@ -92,6 +93,7 @@ export const LIGHT_MANAGER_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/equipe", label: "Equipe" },
   { href: "/clientes", label: "Clientes" },
   { href: "/mensagens", label: "Mensagens" },
+  { href: "/empresas", label: "Empresas" },
   { href: "/notificacoes", label: "Notificações" },
   { href: "/settings", label: "Configurações" },
 ];
@@ -226,6 +228,7 @@ const RULES: readonly RouteRule[] = [
   { test: under("/mensagens"), route: { title: "Conversa", tab: "mais", isRoot: false, parentHref: "/mensagens", backToParent: true } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
+  { test: exact("/empresas"), route: { title: "Empresas", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   // Settings is a list of sections; ?tab opens one and back returns to the list.
   {
     test: exact("/settings"),

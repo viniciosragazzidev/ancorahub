@@ -23,7 +23,7 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
 
   const now = new Date();
   const db = getDatabase();
-  const [[viewer], [tenant], members, rows, counts] = await Promise.all([
+  const [[viewer], [tenant], members, rows, [awaitingFirstContact], counts] = await Promise.all([
     db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
     db.select({ sla: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, scope.tenantId)).limit(1),
     db.select({ id: schema.tenantMemberships.userId, name: schema.user.name, image: schema.user.image, availability: schema.tenantMemberships.availabilityStatus })
@@ -33,6 +33,9 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
       .from(schema.leads).leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId)).leftJoin(schema.carrierPlans, eq(schema.carrierPlans.id, schema.leads.planId))
       .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, [...ACTIVE_STATUSES]), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt)))
       .orderBy(desc(schema.leads.assignedAt), desc(schema.leads.createdAt)).limit(500),
+    // Counted in the database, not from the 500 rows above: the funnel must not undercount a large unit.
+    db.select({ total: count() }).from(schema.leads)
+      .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, ["new", "distributed"]), isNull(schema.leads.firstContactAt), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))),
     db.select({ status: schema.leads.status, total: count() }).from(schema.leads)
       .where(and(eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), inArray(schema.leads.status, [...ACTIVE_STATUSES]), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).groupBy(schema.leads.status),
   ]);
@@ -69,7 +72,7 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
     leads,
     funnel: {
       new: Number(funnelCounts.get("new") ?? 0) + Number(funnelCounts.get("distributed") ?? 0),
-      firstContact: leads.filter((lead) => (lead.status === "new" || lead.status === "distributed") && !lead.firstContactAt).length,
+      firstContact: Number(awaitingFirstContact?.total ?? 0),
       service: Number(funnelCounts.get("in_contact") ?? 0), quote: Number(funnelCounts.get("quote_sent") ?? 0),
       closing: Number(funnelCounts.get("negotiation") ?? 0) + Number(funnelCounts.get("documentation_pending") ?? 0) + Number(funnelCounts.get("under_analysis") ?? 0),
     },
@@ -87,14 +90,28 @@ export async function getManagerLiteLeadDetail(context: TenantContext, leadId: s
     db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, ownerId: schema.leads.corretorId, ownerName: schema.user.name, ownerImage: schema.user.image, productName: schema.carrierPlans.name, assignedAt: schema.leads.assignedAt, branchName: schema.branches.name })
       .from(schema.leads).leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId)).leftJoin(schema.carrierPlans, eq(schema.carrierPlans.id, schema.leads.planId)).leftJoin(schema.branches, and(eq(schema.branches.id, schema.leads.branchId), eq(schema.branches.tenantId, schema.leads.tenantId)))
       .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1),
-    db.select({ id: schema.user.id, name: schema.user.name }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+    db.select({ id: schema.user.id, name: schema.user.name, image: schema.user.image, availability: schema.tenantMemberships.availabilityStatus }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
       .where(and(eq(schema.tenantMemberships.tenantId, scope.tenantId), eq(schema.tenantMemberships.branchId, scope.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(schema.user.name),
   ]);
   if (!lead) return null;
-  const timeline = await getLeadTimeline(leadId);
+  // The lead is already inside the manager's unit (checked above), so its tasks and documents are read by lead id.
+  const [timeline, tasks, documents] = await Promise.all([
+    getLeadTimeline(leadId),
+    db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, dueAt: schema.leadTasks.dueAt, completedAt: schema.leadTasks.completedAt, priority: schema.leadTasks.priority })
+      .from(schema.leadTasks)
+      .where(and(eq(schema.leadTasks.tenantId, scope.tenantId), eq(schema.leadTasks.leadId, leadId)))
+      .orderBy(schema.leadTasks.completedAt, schema.leadTasks.dueAt),
+    db.select({ id: schema.leadDocuments.id, filename: schema.leadDocuments.filename, status: schema.leadDocuments.status, requirementName: schema.documentRequirements.name })
+      .from(schema.leadDocuments)
+      .leftJoin(schema.documentRequirements, eq(schema.leadDocuments.requirementId, schema.documentRequirements.id))
+      .where(and(eq(schema.leadDocuments.tenantId, scope.tenantId), eq(schema.leadDocuments.leadId, leadId), isNull(schema.leadDocuments.deletedAt)))
+      .orderBy(desc(schema.leadDocuments.createdAt)),
+  ]);
   return {
     lead: { id: lead.id, name: lead.name ?? "Lead", status: lead.status, ownerId: lead.ownerId, ownerName: lead.ownerName, ownerImage: lead.ownerImage, productName: lead.productName, assignedAt: lead.assignedAt, branchName: lead.branchName },
     timeline: timeline ?? [],
-    brokers: brokers.map((broker) => ({ id: broker.id, name: broker.name ?? "Corretor" })),
+    tasks,
+    documents,
+    brokers: brokers.map((broker) => ({ id: broker.id, name: broker.name ?? "Corretor", image: broker.image ?? null, availability: broker.availability ?? "offline" })),
   };
 }

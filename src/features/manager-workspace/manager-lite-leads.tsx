@@ -20,5 +20,5 @@ export async function ManagerLiteLeadDetailPage({ leadId }: { leadId: string }) 
   if (!(await hasEffectiveCapability({ tenantId: context.tenantId, role: context.role, jobTitle: context.jobTitle, customRoleId: context.customRoleId ?? null, permission: "acessar_leads" }))) notFound();
   const data = await getManagerLiteLeadDetail(context, leadId);
   if (!data) notFound();
-  return <SupervisorLeadDetail lead={data.lead} timeline={data.timeline} now={new Date().toISOString()} managerBrokers={data.brokers.filter((broker) => broker.id !== data.lead.ownerId)} />;
+  return <SupervisorLeadDetail lead={data.lead} timeline={data.timeline} now={new Date().toISOString()} managerBrokers={data.brokers.filter((broker) => broker.id !== data.lead.ownerId)} tasks={data.tasks} documents={data.documents} />;
 }
