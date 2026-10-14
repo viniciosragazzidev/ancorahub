@@ -148,6 +148,57 @@ function QueuesToday({ queues, received }: { queues: CommandCenterData["today"][
   );
 }
 
+/** Brokers with WhatsApp connected x not connected (it is required for plantão leads from 20/10). */
+function BrokersWhatsApp({ whatsapp }: { whatsapp: CommandCenterData["whatsapp"] }) {
+  const missing = whatsapp.total - whatsapp.connected;
+  const percent = whatsapp.total ? Math.round((whatsapp.connected / whatsapp.total) * 100) : 0;
+  return (
+    <Card variant="overview">
+      <SectionCardHeader
+        title="WhatsApp dos corretores"
+        description={whatsapp.total ? `Obrigatório para receber leads do plantão a partir de 20/10.` : "Nenhum corretor ativo."}
+      />
+      {whatsapp.total ? (
+        <div className="grid gap-3 px-5 pb-5 pt-1">
+          <div className="grid grid-cols-2 gap-3">
+            <span className="grid gap-0.5">
+              <span className="font-mono text-2xl font-medium tabular-nums">{whatsapp.connected}</span>
+              <span className="text-xs text-muted-foreground">Conectaram</span>
+            </span>
+            <span className="grid gap-0.5">
+              <span className={cn("font-mono text-2xl font-medium tabular-nums", missing ? "text-ds-amber-ink" : "text-foreground")}>{missing}</span>
+              <span className="text-xs text-muted-foreground">Não conectaram</span>
+            </span>
+          </div>
+          <span
+            className="h-1.5 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-label="Corretores com WhatsApp conectado"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+          >
+            <span className="block h-full rounded-full bg-ds-electric-blue" style={{ width: `${percent}%` }} />
+          </span>
+          <span className="text-xs text-muted-foreground">{percent}% de {whatsapp.total} {whatsapp.total === 1 ? "corretor ativo" : "corretores ativos"}</span>
+          {whatsapp.notConnected.length ? (
+            <ul className="grid gap-1 border-t border-border pt-3" aria-label="Corretores sem WhatsApp conectado">
+              {whatsapp.notConnected.map((broker) => (
+                <li key={broker.id}>
+                  <Link href={`/equipe/${broker.id}`} className="block truncate text-sm hover:text-ds-electric-blue focus-visible:outline-none" title={broker.name}>{broker.name}</Link>
+                </li>
+              ))}
+              {missing > whatsapp.notConnected.length ? (
+                <li className="text-xs text-muted-foreground">e mais {missing - whatsapp.notConnected.length}</li>
+              ) : null}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
 function DutiesNow({ welcome }: { welcome: CommandCenterData["welcome"] }) {
   const running = welcome.runningDuties ?? [];
   const list = running.length ? running : welcome.nextDuty ? [welcome.nextDuty] : [];
@@ -232,6 +283,7 @@ export function CommandCenter({ data, showQualityTab = false, canManage = true }
           </div>
           <aside className="grid min-w-0 content-start gap-6" aria-label="Plantões e pendências">
             <DutiesNow welcome={data.welcome} />
+            <BrokersWhatsApp whatsapp={data.whatsapp} />
             {data.attention.length ? <AttentionGrid items={data.attention} /> : (
               <Card variant="overview" className="px-5 py-4">
                 <p className="text-sm font-medium">Precisa de atenção</p>
