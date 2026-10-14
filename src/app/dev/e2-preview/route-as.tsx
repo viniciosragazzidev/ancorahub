@@ -9,7 +9,11 @@ import { useLayoutEffect } from "react";
  */
 export function RouteAs({ path }: { path: string }) {
   useLayoutEffect(() => {
-    if (window.location.pathname !== path) window.history.replaceState(window.history.state, "", path);
+    // After hydration: Next patches history.replaceState only once the app router is running.
+    const timer = window.setTimeout(() => {
+      if (window.location.pathname !== path) window.history.replaceState(window.history.state, "", path);
+    }, 50);
+    return () => window.clearTimeout(timer);
   }, [path]);
   return null;
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
@@ -125,8 +125,7 @@ export function LightClientDetail({ data }: { data: LightClientDetailData }) {
         onValueChange={(value) => setSection(value as Section)}
       />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div key={section} className={styles.panels} {...panelMotion} transition={{ duration: 0.18 }}>
+      <motion.div key={section} className={styles.panels} {...panelMotion} transition={{ duration: 0.18 }}>
           {section === "dados" ? (
             <>
               <section className={styles.panel} aria-labelledby="client-contact-title">
@@ -243,8 +242,7 @@ export function LightClientDetail({ data }: { data: LightClientDetailData }) {
               )}
             </section>
           ) : null}
-        </motion.div>
-      </AnimatePresence>
+      </motion.div>
     </LitePageEnter>
   );
 }
