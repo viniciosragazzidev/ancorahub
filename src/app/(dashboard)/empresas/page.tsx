@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
+import { buildCompanyLeadCountScope, buildCompanyReadScope } from "@/features/companies/read-scope";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -27,10 +28,7 @@ export default async function EmpresasPage() {
   if (!enabled) redirect("/leads");
 
   const db = getDatabase();
-  const branchScope = context.role === "manager"
-    ? eq(schema.companies.branchId, context.branchId ?? "")
-    : undefined;
-  const leadScope = context.role === "broker" ? eq(schema.leads.corretorId, context.userId) : undefined;
+  const leadScope = buildCompanyLeadCountScope(context);
   const companies = await db
     .select({
       id: schema.companies.id,
@@ -41,12 +39,12 @@ export default async function EmpresasPage() {
       leadCount: count(schema.leads.id),
     })
     .from(schema.companies)
-    .leftJoin(schema.branches, eq(schema.companies.branchId, schema.branches.id))
+    .leftJoin(schema.branches, and(eq(schema.companies.branchId, schema.branches.id), eq(schema.branches.tenantId, context.tenantId)))
     .leftJoin(schema.leads, and(eq(schema.leads.companyId, schema.companies.id), eq(schema.leads.tenantId, context.tenantId), ...(leadScope ? [leadScope] : [])))
-    .where(and(eq(schema.companies.tenantId, context.tenantId), ...(branchScope ? [branchScope] : [])))
+    .where(buildCompanyReadScope(context))
     .groupBy(schema.companies.id, schema.branches.name)
     .orderBy(desc(schema.companies.createdAt));
-  const visibleCompanies = context.role === "broker" ? companies.filter((company) => company.leadCount > 0) : companies;
+  const visibleCompanies = companies;
 
   return (
     <>
