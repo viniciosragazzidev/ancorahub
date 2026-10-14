@@ -13,6 +13,7 @@
 - Repasse chama `reassignLeadAction`, preservando validação de unidade, fila, eventos e auditoria existentes.
 - Supervisores e corretores mantêm os respectivos caminhos atuais. Distribuição, escala e Meta seguem fora da experiência Lite do Gestor.
 - Adendo T125: no desktop, a coluna lateral do gestor traz Início, Leads, Equipe, Notificações e Configurações; no mobile a navegação existente permanece igual.
+- T125b: filtros por unidade do perfil, métricas e plantão aplicam-se só ao gestor; o supervisor mantém o escopo por `supervisorId`, inclusive sem unidade própria.
 
 ## Arquivos e fluxos
 

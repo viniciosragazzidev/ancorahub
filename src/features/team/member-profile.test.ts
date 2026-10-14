@@ -11,9 +11,27 @@ describe("team member profile visibility", () => {
     expect(canViewTeamMemberProfile({ role: "manager", branchId: "branch-a" }, "branch-b")).toBe(false);
   });
 
+  it("lets a supervisor without a branch inspect a broker in their team", () => {
+    expect(canViewTeamMemberProfile(
+      { role: "supervisor", branchId: null, userId: "supervisor-a", supervisorTeamScope: true },
+      "branch-a",
+      "supervisor-a",
+    )).toBe(true);
+  });
+
+  it("keeps a supervisor's team scope across branches, based on supervisorId", () => {
+    const viewer = { role: "supervisor" as const, branchId: "branch-a", userId: "supervisor-a", supervisorTeamScope: true };
+    expect(canViewTeamMemberProfile(viewer, "branch-b", "supervisor-a")).toBe(true);
+    expect(canViewTeamMemberProfile(viewer, "branch-a", "supervisor-b")).toBe(false);
+  });
+
   it("never grants the profile to a broker or to a manager without branch scope", () => {
     expect(canViewTeamMemberProfile({ role: "broker", branchId: "branch-a" }, "branch-a")).toBe(false);
     expect(canViewTeamMemberProfile({ role: "manager", branchId: null }, "branch-a")).toBe(false);
+  });
+
+  it("requires supervisor team scope before granting visibility", () => {
+    expect(canViewTeamMemberProfile({ role: "supervisor", branchId: null, userId: "supervisor-a", supervisorTeamScope: false }, "branch-a", "supervisor-a")).toBe(false);
   });
 });
 
