@@ -57,10 +57,10 @@ export async function addSupervisorNoteAction(input: unknown): Promise<AddSuperv
   if (!parsed.success) return { ok: false, message: "Escreva um feedback de até 1.000 caracteres." };
 
   const context = await getRequiredTenantContext();
-  if (context.role !== "supervisor" || !context.supervisorTeamScope) {
-    return { ok: false, message: "Somente o supervisor pode registrar feedback." };
-  }
-  if ((await getLiteAudience(context)) !== "supervisor") {
+  const audience = await getLiteAudience(context);
+  const canCreateAsSupervisor = context.role === "supervisor" && context.supervisorTeamScope && audience === "supervisor";
+  const canCreateAsManager = context.role === "manager" && audience === "manager";
+  if (!canCreateAsSupervisor && !canCreateAsManager) {
     return { ok: false, message: "O feedback não está disponível agora." };
   }
   if (!(await canReadBrokerNotes(context, parsed.data.brokerId, "create"))) {

@@ -31,7 +31,6 @@ const state = vi.hoisted(() => {
 
   // ── Helper: builds a flexible chain of query methods ────────────────
   function queryChain({ rows, useLimit = true }: { rows: unknown[]; useLimit?: boolean }) {
-    const resolve = vi.fn(async () => rows);
     // If the chain ends without .limit(), make .where() return a thenable
     const whereResult = useLimit
       ? { limit: vi.fn(async () => rows) }
@@ -98,7 +97,7 @@ const state = vi.hoisted(() => {
     mockTenantContext: {
       tenantId: "tenant-test",
       userId: "director-test",
-      role: "director" as const,
+      role: "director" as "director" | "manager" | "supervisor",
       branchId: "branch-test",
       jobTitle: "director",
     },
@@ -118,6 +117,12 @@ vi.mock("@/shared/auth/tenant-context", () => ({
 }));
 
 vi.mock("@/shared/auth/team-permissions", () => ({
+  canManageMember: (context: { userId: string; role: string; branchId: string | null }, target: { userId: string; role: string; branchId: string | null }) => {
+    if (context.role === "director") return context.userId !== target.userId;
+    if (context.userId === target.userId || target.branchId !== context.branchId) return false;
+    if (context.role === "manager") return target.role === "broker" || target.role === "supervisor";
+    return context.role === "supervisor" && target.role === "broker";
+  },
   requireCanManageMember: vi.fn(),
   requireCanCreateRole: vi.fn(),
   requireCanUpdateMemberAuthority: vi.fn(),
@@ -140,9 +145,10 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => args),
   eq: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),
   ne: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),
+  or: vi.fn((...args: unknown[]) => args),
 }));
 
-import { deleteTeamMemberAction, updateTeamMemberAction } from "./actions";
+import { deleteTeamMemberAction, revokeInviteAction, updateTeamMemberAction } from "./actions";
 
 // ── Helpers ────────────────────────────────────────────────────────────
 function inserted(table: symbol) {
@@ -268,6 +274,30 @@ describe("updateTeamMemberAction", () => {
       professionalName: "Corretora Atualizada",
       invitedEmail: "corretora.atualizada@example.com",
     }));
+  });
+});
+
+describe("revokeInviteAction scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    state.inserts.length = 0; state.updates.length = 0; state.deletes.length = 0;
+    Object.assign(state.mockTenantContext, { tenantId: "tenant-test", userId: "manager-test", role: "manager", branchId: "branch-test" });
+  });
+
+  it("rejects a pending invite outside the manager unit", async () => {
+    state.db.select.mockImplementation(() => state.queryChain({ rows: [{ id: "invite-1", status: "PENDING", userId: null, role: "broker", branchId: "branch-other", supervisorId: null, membershipRole: null }], useLimit: true }));
+    const form = new FormData(); form.set("invitationId", "invite-1");
+    const result = await revokeInviteAction({}, form);
+    expect(result.success).toBe(false);
+    expect(updated(state.schema.brokerInvitations)).toHaveLength(0);
+  });
+
+  it("revokes a pending invite in the manager unit", async () => {
+    state.db.select.mockImplementation(() => state.queryChain({ rows: [{ id: "invite-1", status: "PENDING", userId: null, role: "broker", branchId: "branch-test", supervisorId: null, membershipRole: null }], useLimit: true }));
+    const form = new FormData(); form.set("invitationId", "invite-1");
+    const result = await revokeInviteAction({}, form);
+    expect(result).toEqual({ success: true });
+    expect(updated(state.schema.brokerInvitations)).toContainEqual(expect.objectContaining({ status: "REVOKED" }));
   });
 });
 

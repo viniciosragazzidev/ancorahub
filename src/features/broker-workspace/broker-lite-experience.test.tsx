@@ -89,6 +89,21 @@ describe("Corretor Lite experience contract", () => {
     expect(screen.queryByRole("link", { name: /Fila, 3 pendentes/ })).toBeNull();
   });
 
+  it("shows the manager's persistent desktop destinations and marks the current route", () => {
+    navigation.pathname = "/equipe/corretor-1";
+    renderChrome({ audience: "manager" });
+    const liteCss = readFileSync(join(process.cwd(), "src/components/arc/venancor-scope.css"), "utf8");
+
+    const nav = screen.getByRole("navigation", { name: "Navegação principal" });
+    for (const [href, label] of [["/dashboard", "Início"], ["/leads", "Leads"], ["/equipe", "Equipe"], ["/notificacoes", "Notificações"], ["/settings", "Configurações"]]) {
+      expect(within(nav).getByRole("link", { name: label })).toHaveAttribute("href", href);
+    }
+    expect(within(nav).getByRole("link", { name: "Equipe" })).toHaveAttribute("aria-current", "page");
+    expect(nav).toHaveClass("lite-rail");
+    expect(liteCss).toContain(".lite-rail { display: none; }");
+    expect(liteCss).toContain("@media (min-width: 1024px)");
+  });
+
   it("opens the Mais sheet (from the chat home avatar) with the destinations, availability and sign out", () => {
     renderChrome({ showQuoteSimulator: true, showDutyCalendar: true }, <MoreOpener />);
 

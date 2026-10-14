@@ -186,7 +186,7 @@ export function ChatHome({
         {isSupervisor ? <li><Link href="/relacionamento" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Mandar recado para a equipe</strong><span>Aviso, reconhecimento ou pedido de ciente</span></Link></li> : null}
         {canQuote ? <li><Link href="/cotacao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Fazer uma cotação</strong><span>Simular planos para um cliente</span></Link></li> : null}
         <li><button type="button" className={home.newItem} onClick={() => { setNewOpen(false); setTab("leads"); setSearching(true); }}><strong>Buscar um lead</strong><span>Pelo nome ou telefone</span></button></li>
-        {isManager ? <li><Link href="/leads" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Leads da unidade</strong><span>Acompanhar e repassar leads</span></Link></li> : isSupervisor ? null : <li><Link href="/dashboard/c/plantao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver meu plantão</strong><span>Agora e próximos</span></Link></li>}
+        {isManager ? <><li><Link href="/leads" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Leads da unidade</strong><span>Acompanhar e repassar leads</span></Link></li><li><Link href="/equipe" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Minha unidade</strong><span>Ver corretores e operação</span></Link></li></> : isSupervisor ? null : <li><Link href="/dashboard/c/plantao" className={home.newItem} onClick={() => setNewOpen(false)}><strong>Ver meu plantão</strong><span>Agora e próximos</span></Link></li>}
       </ul>
     </BottomSheet>
   );

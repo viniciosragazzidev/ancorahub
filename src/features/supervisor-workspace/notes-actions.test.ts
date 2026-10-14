@@ -119,6 +119,15 @@ describe("supervisor notes actions", () => {
     });
   });
 
+  it("allows the Lite manager to leave feedback only for a broker in the manager unit", async () => {
+    mockGetLiteAudience.mockResolvedValue("manager");
+    mockGetContext.mockResolvedValue({ ...supervisorContext, userId: "manager-1", role: "manager", supervisorTeamScope: undefined });
+    mockState.selectRows = [[activeTeamBroker]];
+    const result = await addSupervisorNoteAction({ brokerId: activeTeamBroker.userId, kind: "elogio", body: "Bom acompanhamento." });
+    expect(result.ok).toBe(true);
+    expect(mockState.inserts[0]).toMatchObject({ payload: { tenantId: "tenant-1", supervisorId: "manager-1", brokerId: activeTeamBroker.userId } });
+  });
+
   it("does not create a note for a broker outside the supervisor's active team", async () => {
     mockState.selectRows = [[]];
 

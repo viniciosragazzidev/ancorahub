@@ -3,6 +3,8 @@
 import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 
 import { getTeamOfferStats, statsWindow } from "@/features/engagement/broker-stats";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-scope";
 import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/queries";
 import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
 import type { TenantContext } from "@/shared/auth/types";
@@ -125,17 +127,19 @@ export async function getSupervisorLiteMemberPulse(input: {
   now?: Date;
 }) {
   const { context, memberId, slaMinutes, now = new Date() } = input;
-  if (!isSupervisorTeamScoped(context) || !context.branchId) throw new Error("A equipe não está disponível neste escopo.");
+  const isSupervisor = context.role === "supervisor" && isSupervisorTeamScoped(context) && context.supervisorTeamScope;
+  const managerScope = getManagerUnitScope(context);
+  if ((!isSupervisor && !managerScope) || !context.branchId || (await getLiteAudience(context)) !== (isSupervisor ? "supervisor" : "manager")) throw new Error("A equipe não está disponível neste escopo.");
   const db = getDatabase();
   const [membership] = await db.select({ id: schema.tenantMemberships.userId })
     .from(schema.tenantMemberships)
     .where(and(
       eq(schema.tenantMemberships.tenantId, context.tenantId),
       eq(schema.tenantMemberships.userId, memberId),
-      eq(schema.tenantMemberships.supervisorId, context.userId),
       eq(schema.tenantMemberships.branchId, context.branchId),
       eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.status, "active"),
+      isSupervisor ? eq(schema.tenantMemberships.supervisorId, context.userId) : undefined,
     )).limit(1);
   if (!membership) throw new Error("Corretor fora da equipe.");
 
@@ -147,10 +151,17 @@ export async function getSupervisorLiteMemberPulse(input: {
   const leadScope = and(
     eq(schema.leads.tenantId, context.tenantId),
     eq(schema.leads.corretorId, memberId),
-    inSupervisorTeam(schema.leads.corretorId, context.tenantId, context.userId),
+    isSupervisor ? inSupervisorTeam(schema.leads.corretorId, context.tenantId, context.userId) : eq(schema.leads.branchId, context.branchId),
     isNull(schema.leads.deletedAt),
     isNull(schema.leads.archivedAt),
   );
+  const teamIds = (await db.select({ id: schema.tenantMemberships.userId }).from(schema.tenantMemberships).where(and(
+    eq(schema.tenantMemberships.tenantId, context.tenantId),
+    eq(schema.tenantMemberships.branchId, context.branchId),
+    eq(schema.tenantMemberships.role, "broker"),
+    eq(schema.tenantMemberships.status, "active"),
+    isSupervisor ? eq(schema.tenantMemberships.supervisorId, context.userId) : undefined,
+  ))).map((row) => row.id);
   const [todayRows, acceptedRows, funnelRows, attentionRows, teamStats] = await Promise.all([
     db.select({
       received: sql<number>`count(*) filter (where ${schema.leads.assignedAt} >= ${todayStart.toISOString()}::timestamptz and ${schema.leads.assignedAt} < ${tomorrowStart.toISOString()}::timestamptz)::int`,
@@ -160,13 +171,14 @@ export async function getSupervisorLiteMemberPulse(input: {
       onTimeTotal: sql<number>`count(*) filter (where ${schema.leads.firstContactAt} >= ${chartStart.toISOString()}::timestamptz and ${schema.leads.firstContactAt} < ${tomorrowStart.toISOString()}::timestamptz)::int`,
       onTime: sql<number>`count(*) filter (where ${schema.leads.firstContactAt} >= ${chartStart.toISOString()}::timestamptz and ${schema.leads.firstContactAt} < ${tomorrowStart.toISOString()}::timestamptz and ${schema.leads.assignedAt} is not null and ${schema.leads.firstContactAt} <= ${schema.leads.assignedAt} + (${slaMinutes} * interval '1 minute'))::int`,
     }).from(schema.leads).where(leadScope),
-    db.select({ day: acceptedDay, total: count() }).from(schema.leadOffers)
+    db.select({ day: acceptedDay, total: count() }).from(schema.leadOffers).innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, context.tenantId)))
       .where(and(
         eq(schema.leadOffers.tenantId, context.tenantId),
         eq(schema.leadOffers.brokerId, memberId),
         eq(schema.leadOffers.status, "ACCEPTED"),
         gte(schema.leadOffers.acceptedAt, chartStart),
         lt(schema.leadOffers.acceptedAt, tomorrowStart),
+        eq(schema.leads.branchId, context.branchId),
       )).groupBy(acceptedDay),
     db.select({ status: schema.leads.status, total: count() }).from(schema.leads).where(leadScope).groupBy(schema.leads.status),
     db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, assignedAt: schema.leads.assignedAt, stageEnteredAt: schema.leads.stageEnteredAt, firstContactAt: schema.leads.firstContactAt })
@@ -177,17 +189,10 @@ export async function getSupervisorLiteMemberPulse(input: {
           and(inArray(schema.leads.status, ["in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]), lt(schema.leads.stageEnteredAt, new Date(now.getTime() - 3 * 86_400_000))),
         ),
       )).orderBy(asc(schema.leads.assignedAt)).limit(10),
-    getTeamOfferStats(context.tenantId, statsWindow(now)),
+    getTeamOfferStats(context.tenantId, statsWindow(now), teamIds),
   ]);
   const acceptedByDay = new Map(acceptedRows.map((row) => [row.day, Number(row.total)]));
   const funnelByStatus = new Map(funnelRows.map((row) => [row.status, Number(row.total)]));
-  const teamIds = (await db.select({ id: schema.tenantMemberships.userId }).from(schema.tenantMemberships).where(and(
-    eq(schema.tenantMemberships.tenantId, context.tenantId),
-    eq(schema.tenantMemberships.supervisorId, context.userId),
-    eq(schema.tenantMemberships.branchId, context.branchId),
-    eq(schema.tenantMemberships.role, "broker"),
-    eq(schema.tenantMemberships.status, "active"),
-  ))).map((row) => row.id);
   const teamMedians = teamStats.filter((row) => teamIds.includes(row.brokerId) && row.medianAcceptSeconds !== null).map((row) => row.medianAcceptSeconds!);
   const memberMedian = teamStats.find((row) => row.brokerId === memberId)?.medianAcceptSeconds ?? null;
   const teamMedianAverage = teamMedians.length ? teamMedians.reduce((sum, value) => sum + value, 0) / teamMedians.length : null;

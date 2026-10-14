@@ -6,6 +6,7 @@ import { and, eq, or } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { canGenerateMemberPasswordReset } from "./password-recovery-scope";
 import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
 import {
   buildCredentialAccount,
@@ -297,67 +298,21 @@ export async function generatePasswordResetLinkForMember(targetIdentifier: strin
 
   const db = getDatabase();
 
-  // 1. Tentar encontrar usuário por ID direto em user
-  let [user] = await db
-    .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
-    .from(schema.user)
-    .where(eq(schema.user.id, targetIdentifier))
+  const [target] = await db
+    .select({ tenantId: schema.tenantMemberships.tenantId, userId: schema.user.id, email: schema.user.email, role: schema.tenantMemberships.role, branchId: schema.tenantMemberships.branchId })
+    .from(schema.tenantMemberships)
+    .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+    .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, context.tenantId)))
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      or(eq(schema.user.id, targetIdentifier), eq(schema.tenantMemberships.id, targetIdentifier), eq(schema.brokerProfiles.id, targetIdentifier)),
+    ))
     .limit(1);
 
-  let targetUserId = user?.id;
-
-  // 2. Se não encontrou por user.id, tentar por brokerProfiles.id ou brokerProfiles.userId
-  if (!targetUserId) {
-    const [broker] = await db
-      .select({ userId: schema.brokerProfiles.userId, invitedEmail: schema.brokerProfiles.invitedEmail })
-      .from(schema.brokerProfiles)
-      .where(
-        and(
-          eq(schema.brokerProfiles.tenantId, context.tenantId),
-          or(
-            eq(schema.brokerProfiles.id, targetIdentifier),
-            eq(schema.brokerProfiles.userId, targetIdentifier),
-          ),
-        ),
-      )
-      .limit(1);
-
-    if (broker?.userId) {
-      targetUserId = broker.userId;
-      [user] = await db
-        .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
-        .from(schema.user)
-        .where(eq(schema.user.id, targetUserId))
-        .limit(1);
-    }
-  }
-
-  // 3. Se ainda não encontrou, tentar por tenantMemberships.id
-  if (!targetUserId) {
-    const [membership] = await db
-      .select({ userId: schema.tenantMemberships.userId })
-      .from(schema.tenantMemberships)
-      .where(
-        and(
-          eq(schema.tenantMemberships.tenantId, context.tenantId),
-          eq(schema.tenantMemberships.id, targetIdentifier),
-        ),
-      )
-      .limit(1);
-
-    if (membership?.userId) {
-      targetUserId = membership.userId;
-      [user] = await db
-        .select({ id: schema.user.id, email: schema.user.email, name: schema.user.name })
-        .from(schema.user)
-        .where(eq(schema.user.id, targetUserId))
-        .limit(1);
-    }
-  }
-
-  if (!user || !targetUserId) {
-    throw new Error("Este membro ainda não possui uma conta de usuário cadastrada no sistema.");
-  }
+  if (!target) throw new Error("Este membro ainda não possui uma conta cadastrada neste tenant.");
+  if (!canGenerateMemberPasswordReset(context, target)) throw new Error("Este membro está fora do seu escopo de gestão.");
+  const user = { id: target.userId, email: target.email };
+  const targetUserId = target.userId;
 
   const id = randomUUID();
   const token = randomBytes(32).toString("hex");

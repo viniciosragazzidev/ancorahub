@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useTransition } from "react";
+import type { ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "@/components/arc/lib/motion-tokens";
 
@@ -30,6 +31,10 @@ export type SupervisorBrokerProfileProps = {
     image: string | null;
     branchName: string | null;
     availabilityStatus: string;
+    email?: string;
+    phone?: string | null;
+    brokerCode?: string | null;
+    statusLabel?: string;
   };
   metrics: {
     portfolio: number;
@@ -37,6 +42,8 @@ export type SupervisorBrokerProfileProps = {
     withoutFirstContact: number;
     sales: number;
     overdueTasks: number;
+    qualified?: number;
+    lost?: number;
   };
   recentLeads: Array<{
     id: string;
@@ -62,6 +69,16 @@ export type SupervisorBrokerProfileProps = {
     funnel: Array<{ status: string; label: string; total: number }>;
     attention: Array<{ id: string; name: string; status: string; assignedAt: string | null; stageEnteredAt: string | null; firstContactAt: string | null }>;
   };
+  managerProfile?: {
+    temperature: { hot: number; warm: number; cold: number; unknown: number };
+    quotes: { total: number; sent: number };
+    sales: { total: number; cancelled: number };
+    interactions: number;
+    tasks: { completed: number; total: number };
+    dutyDays: Array<{ date: string; scheduleName: string; startsAt: string; endsAt: string; state: string }>;
+  };
+  managementActions?: ReactNode;
+  showSupervisorActions?: boolean;
 };
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
@@ -118,6 +135,9 @@ export function SupervisorBrokerProfile({
   notes: initialNotes,
   joinedAt,
   pulse,
+  managerProfile,
+  managementActions,
+  showSupervisorActions = true,
 }: SupervisorBrokerProfileProps) {
   const reduce = useReducedMotion();
   const [notes, setNotes] = useState(initialNotes);
@@ -159,8 +179,11 @@ export function SupervisorBrokerProfile({
           <Avatar name={member.name} src={member.image ?? undefined} size="xl" status={member.availabilityStatus === "available" || member.availabilityStatus === "on_duty" ? "online" : "offline"} className={styles.avatar} />
           <div className={styles.identity}>
             <h1 id="broker-profile-title" className={styles.name}>{member.name}</h1>
-            <p className={styles.branch}>{member.branchName ?? "Unidade não informada"}</p>
+            <p className={styles.branch}>{member.branchName ?? "Unidade não informada"}{member.brokerCode ? ` · Código ${member.brokerCode}` : ""}</p>
+            {member.email ? <p className={styles.branch}>{member.email}</p> : null}
+            {member.phone ? <p className={styles.branch}>{member.phone}</p> : null}
             <Badge tone={member.availabilityStatus === "available" || member.availabilityStatus === "on_duty" ? "success" : "neutral"}>{AVAILABILITY_LABELS[member.availabilityStatus] ?? "Disponibilidade não informada"}</Badge>
+            {member.statusLabel ? <Badge tone={member.statusLabel === "Ativo" ? "success" : "neutral"}>{member.statusLabel}</Badge> : null}
           </div>
           <div className={styles.actions}>
             {whatsappHref ? (
@@ -175,12 +198,18 @@ export function SupervisorBrokerProfile({
         </motion.section>
 
         <section className={styles.stats} aria-label="Resumo do corretor">
-          {metrics.portfolio > 0 ? <MetricCard label="Carteira" value={metrics.portfolio} context="leads no total" /> : null}
+          <MetricCard label="Carteira" value={metrics.portfolio} context="leads no total" />
           {metrics.inService > 0 ? <MetricCard label="Em atendimento" value={metrics.inService} context="leads em andamento" /> : null}
           <div className={styles.compactMetrics}>{[
-            ["Sem primeiro contato", metrics.withoutFirstContact], ["Vendas", metrics.sales], ["Tarefas vencidas", metrics.overdueTasks],
+            ["Qualificados", metrics.qualified ?? 0], ["Sem primeiro contato", metrics.withoutFirstContact], ["Perdidos", metrics.lost ?? 0], ["Vendas", metrics.sales], ["Tarefas vencidas", metrics.overdueTasks],
           ].map(([label, value]) => <p key={label}><span>{label}</span><strong data-alert={label === "Tarefas vencidas" && Number(value) > 0}>{Number(value) > 0 ? numberFormat.format(Number(value)) : "·"}</strong></p>)}</div>
         </section>
+
+        {managerProfile ? <>
+          <section className={styles.pulseSection} aria-labelledby="broker-temperatures-title"><div className={styles.sectionHeading}><h2 id="broker-temperatures-title">Temperatura dos leads</h2></div><div className={styles.todayGrid}>{[["Quentes", managerProfile.temperature.hot], ["Mornos", managerProfile.temperature.warm], ["Frios", managerProfile.temperature.cold], ["Sem classificação", managerProfile.temperature.unknown]].map(([label, value]) => <div className={styles.todayMetric} key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></section>
+          <section className={styles.pulseSection} aria-labelledby="broker-commercial-result-title"><div className={styles.sectionHeading}><h2 id="broker-commercial-result-title">Resultado comercial</h2></div><div className={styles.weekFacts}><p><span>Cotações criadas</span><strong>{managerProfile.quotes.total} ({managerProfile.quotes.sent} enviadas)</strong></p><p><span>Vendas registradas</span><strong>{managerProfile.sales.total} ({managerProfile.sales.cancelled} canceladas)</strong></p><p><span>Tarefas concluídas</span><strong>{managerProfile.tasks.completed} de {managerProfile.tasks.total}</strong></p><p><span>Interações</span><strong>{managerProfile.interactions}</strong></p></div></section>
+          <section className={styles.pulseSection} aria-labelledby="broker-duty-days-title"><div className={styles.sectionHeading}><h2 id="broker-duty-days-title">Dias de plantão</h2><span>Somente leitura</span></div>{managerProfile.dutyDays.length ? <ul className={styles.attentionList}>{managerProfile.dutyDays.map((day) => <li key={`${day.date}-${day.scheduleName}`}><span><strong>{day.scheduleName}</strong><span>{day.date} · {day.startsAt} às {day.endsAt}</span></span></li>)}</ul> : <EmptyState title="Sem plantões no período" description="Os dias de plantão futuros e recentes aparecem aqui." />}</section>
+        </> : null}
 
         {joinedAt ? <p className={styles.teamTenure}>Na equipe desde {new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeZone: "America/Sao_Paulo" }).format(new Date(joinedAt))}</p> : null}
         {ranking ? (
@@ -267,10 +296,10 @@ export function SupervisorBrokerProfile({
           <SupervisorNoteHistory notes={notes} />
         </section>
 
-        <BottomSheet className="arc-venancor" trigger={<Button variant="outline">Mais ações</Button>} title={`Ações para ${member.name}`} description="Escolha como quer apoiar este corretor." closeLabel="Fechar" detents={[0.4, 0.72]}>
+        {showSupervisorActions ? <BottomSheet className="arc-venancor" trigger={<Button variant="outline">Mais ações</Button>} title={`Ações para ${member.name}`} description="Escolha como quer apoiar este corretor." closeLabel="Fechar" detents={[0.4, 0.72]}>
           <div className={styles.memberActions}><Link className={styles.secondaryAction} href={relationshipHref}>Mandar recado</Link><button type="button" className={styles.secondaryAction} onClick={() => setRecognizeOpen(true)}>Reconhecer com pontos</button><Button variant="destructive" disabled={removing} loading={removing} onClick={removeFromTeam}>Remover da equipe</Button></div>
           <RecognizeSheet brokerId={member.userId} brokerName={member.name} open={recognizeOpen} onOpenChange={setRecognizeOpen} onRecognize={recognizeBrokerAction} />
-        </BottomSheet>
+        </BottomSheet> : managementActions ?? null}
       </div>
     </div>
   );
