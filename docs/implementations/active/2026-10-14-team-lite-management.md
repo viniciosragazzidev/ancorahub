@@ -34,3 +34,12 @@ checagens foi registrada em `reports/agent/verification/2026-10-14-team-lite-man
 Parte 0 foi entregue em commit próprio `848b9cc9`. A lista e o perfil continuam
 atrás de `MANAGER_LITE`; o supervisor permanece limitado à equipe. O roadmap N107
 continua parcial porque outras áreas de gestão ainda não foram migradas.
+
+
+## T126: Manager Lite chat rail
+
+The manager desktop reuses the existing ChatHome rail used by brokers and supervisors. Its two conversations open Leads da unidade and Minha unidade, with summaries derived from the authenticated unit scope. getManagerLiteLeads uses React cache per request so layout and page can share the query. Mobile, broker, supervisor, and the disabled MANAGER_LITE flag retain their prior behavior. Evidence: reports/agent/verification/2026-10-14-manager-lite-rail.md.
+
+### T126b: rail and home visual parity
+
+The manager desktop keeps the broker Lite's shared rail header and row components, adds the unit waiting-lead badge and unit-only summaries for Leads da unidade, Minha unidade, Desempenho da unidade, and Notificações. The home uses the same cached rail data and existing four-stat tile layout, including active brokers without a ready WhatsApp connection. Supervisor and manager mobile headers retain their prior WhatsApp button behavior. The WhatsApp count is scoped to the manager's active brokers in the same tenant and branch. No new visual primitive or token was introduced. Validation: `reports/agent/verification/2026-10-14-manager-lite-rail-visual.md`.

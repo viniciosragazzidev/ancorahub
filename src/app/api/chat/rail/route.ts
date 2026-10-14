@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { isSupervisorLiteAvailable } from "@/features/broker-workspace/lite-audience";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
@@ -14,8 +14,9 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const context = await getRequiredTenantContext().catch(() => null);
   if (!context) return NextResponse.json({ rail: null }, { status: 401 });
-  // Broker or supervisor with the supervisor Lite (the rail lists the team threads).
-  if (context.role !== "broker" && !(await isSupervisorLiteAvailable(context))) return NextResponse.json({ rail: null });
+  // The existing desktop chat rail supports brokers, supervisors and enabled Manager Lite users.
+  const audience = context.role === "broker" ? "broker" : await getLiteAudience(context);
+  if (audience !== "broker" && audience !== "supervisor" && audience !== "manager") return NextResponse.json({ rail: null });
   const rail = await getChatRailData();
   return NextResponse.json({ rail }, { headers: { "Cache-Control": "no-store" } });
 }

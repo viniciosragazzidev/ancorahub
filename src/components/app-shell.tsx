@@ -9,6 +9,7 @@ import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-side
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { LightChrome } from "@/components/light/light-chrome";
+import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { ViewAsBanner, type ViewAsState } from "@/features/super-admin/components/view-as";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
@@ -48,6 +49,7 @@ export function AppShell({
   teamRankingEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
   liteAudience = "broker",
+  initialChatRail = null,
   showQuoteSimulator = false,
   initialAvailability = "available",
   cleanUiEnabled = false,
@@ -67,6 +69,7 @@ export function AppShell({
   viewAs?: ViewAsState;
   /** Who uses the Lite chrome (supervisor Lite, 2026-10-10). */
   liteAudience?: "broker" | "supervisor" | "manager";
+  initialChatRail?: ChatRailData | null;
   showQuoteSimulator?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
   cleanUiEnabled?: boolean;
@@ -167,6 +170,7 @@ export function AppShell({
           welcomeVideoEnabled={welcomeVideoEnabled}
           teamRankingEnabled={teamRankingEnabled}
           audience={liteAudience}
+          initialChatRail={initialChatRail}
           showQuoteSimulator={showQuoteSimulator}
           initialAvailability={initialAvailability}
           queueBadgeCount={queueBadgeCount}

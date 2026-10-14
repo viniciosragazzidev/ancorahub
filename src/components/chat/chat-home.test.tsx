@@ -29,6 +29,14 @@ describe("ChatHome", () => {
     expect(screen.queryByText("Recebidos hoje")).toBeNull();
   });
 
+  it("shows the manager's waiting unit lead count on the Leads tab", () => {
+    render(<ChatHome mode="rail" viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote={false} leadsBadgeCount={6} />);
+    const leadsTab = screen.getByRole("button", { name: /Leads/ });
+    expect(leadsTab.textContent).toContain("6");
+    fireEvent.click(leadsTab);
+    expect(leadsTab.getAttribute("aria-pressed")).toBe("true");
+  });
+
   it("page: the center shows the day at a glance and who is waiting", () => {
     navigation.pathname = "/dashboard";
     render(

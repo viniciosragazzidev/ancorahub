@@ -3,8 +3,6 @@
 import { CHAT_RAIL_REFRESH_EVENT } from "@/components/chat/chat-events";
 import { TipHost } from "@/components/chat/tip-host";
 import { Suspense, useEffect, useState, type ReactNode, type RefObject } from "react";
-import Link from "next/link";
-import { Bell, House, Settings, Users, UsersRound } from "lucide-react";
 
 import "@/components/arc/venancor-scope.css";
 import { useLightAvailability, type LightAvailability } from "@/components/light-top-nav";
@@ -24,15 +22,6 @@ import { LightAvailabilityProvider } from "./light-availability-context";
 import { useLightNavigationTracker } from "./light-navigation";
 import { LightMoreSheet } from "./light-more-sheet";
 import { useLightRoute } from "./use-light-route";
-import { cn } from "@/lib/utils";
-
-const MANAGER_NAV_ITEMS = [
-  { href: "/dashboard", label: "Início", Icon: House },
-  { href: "/leads", label: "Leads", Icon: Users },
-  { href: "/equipe", label: "Equipe", Icon: UsersRound },
-  { href: "/notificacoes", label: "Notificações", Icon: Bell },
-  { href: "/settings", label: "Configurações", Icon: Settings },
-] as const;
 
 /**
  * Broker app shell: the chat screens draw everything themselves; the other
@@ -54,6 +43,7 @@ export function LightChrome({
   teamRankingEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
   audience = "broker",
+  initialChatRail = null,
   initialAvailability = "available",
 }: {
   children: ReactNode;
@@ -68,6 +58,7 @@ export function LightChrome({
   teamRankingEnabled?: boolean;
   viewAs?: ViewAsState;
   audience?: "broker" | "supervisor" | "manager";
+  initialChatRail?: ChatRailData | null;
   initialAvailability?: LightAvailability;
   queueBadgeCount?: number;
 }) {
@@ -97,7 +88,7 @@ export function LightChrome({
     />
   );
 
-  const chatRail = useDesktopChatRail(audience !== "manager");
+  const chatRail = useDesktopChatRail(true, initialChatRail);
   // Broker assistance ("Onde fica?" and the "?" of each screen) over the whole Lite.
   const withAssist = (content: ReactNode) => <A11yPrefsProvider>{audience === "broker"
     ? <AssistLayer pathname={pathname} capabilities={{ journey: journeyEnabled, quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship }}>{content}</AssistLayer>
@@ -107,44 +98,16 @@ export function LightChrome({
   // (CSS .lite-split, venancor-scope.css); phones keep one screen at a time.
   const withRail = (content: ReactNode) => withAssist(
     <LightAvailabilityProvider value={shell}>
-      <div className={cn("lite-split", audience === "manager" && "lite-manager-split")}>
-        {audience === "manager" ? (
-          <nav className="lite-rail lite-manager-nav arc-venancor" aria-label="Navegação principal">
-            <p className="px-3 pb-3 pt-2 text-xs font-semibold uppercase tracking-wide text-(--text-muted)">Gestão</p>
-            <ul className="flex flex-col gap-1">
-              {MANAGER_NAV_ITEMS.map(({ href, label, Icon }) => {
-                const isActive = href === "/dashboard"
-                  ? pathname === href
-                  : pathname === href || pathname.startsWith(`${href}/`);
-                return (
-                  <li key={href}>
-                    <Link
-                      href={href}
-                      aria-current={isActive ? "page" : undefined}
-                      className={cn(
-                        "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors duration-(--duration-fast) motion-reduce:transition-none",
-                        isActive ? "bg-(--foreground) text-(--surface)" : "text-(--text-secondary) hover:bg-(--surface) hover:text-(--foreground)",
-                      )}
-                    >
-                      <Icon className="size-4 shrink-0" aria-hidden="true" />
-                      <span>{label}</span>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
-        ) : (
-          <aside className="lite-rail arc-venancor" aria-label="Conversas" aria-busy={!chatRail}>
-            {chatRail ? (
-              <ChatHome mode="rail" viewerName={chatRail.viewerName} assistants={chatRail.assistants} leads={chatRail.leads} nowIso={chatRail.nowIso} canQuote={chatRail.canQuote} />
-            ) : (
-              <div className="lite-rail-skeleton" aria-hidden="true">
-                {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
-              </div>
-            )}
-          </aside>
-        )}
+      <div className="lite-split">
+        <aside className="lite-rail arc-venancor" aria-label="Conversas" aria-busy={!chatRail}>
+          {chatRail ? (
+            <ChatHome mode="rail" viewerName={chatRail.viewerName} assistants={chatRail.assistants} leads={chatRail.leads} nowIso={chatRail.nowIso} canQuote={chatRail.canQuote} leadsBadgeCount={chatRail.leadsBadgeCount} />
+          ) : (
+            <div className="lite-rail-skeleton" aria-hidden="true">
+              {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
+            </div>
+          )}
+        </aside>
         <div className="lite-main">{content}</div>
       </div>
       {/* Points, missions and achievements of the broker show up here, never over a lead offer. */}
@@ -197,8 +160,13 @@ const RAIL_REFRESH_MS = 3000;
  * The rail's list, loaded in the browser and only on computers (phones never
  * show it). Refreshed when realtime says something changed, at most every 3s.
  */
-function useDesktopChatRail(enabled: boolean) {
-  const [rail, setRail] = useState<ChatRailData | null>(null);
+function useDesktopChatRail(enabled: boolean, initialData: ChatRailData | null) {
+  const [rail, setRail] = useState<ChatRailData | null>(initialData);
+  const [previousInitialData, setPreviousInitialData] = useState(initialData);
+  if (initialData !== previousInitialData) {
+    setPreviousInitialData(initialData);
+    setRail(initialData);
+  }
   useEffect(() => {
     if (!enabled || typeof window === "undefined" || !window.matchMedia) return;
     const media = window.matchMedia(DESKTOP_QUERY);
@@ -211,14 +179,14 @@ function useDesktopChatRail(enabled: boolean) {
       // A GET route, not a server action: "Ver como" refuses POSTs and the rail stayed a skeleton.
       void fetch("/api/chat/rail", { cache: "no-store" })
         .then((response) => (response.ok ? (response.json() as Promise<{ rail: ChatRailData | null }>) : null))
-        .then((body) => { if (alive && body?.rail) setRail(body.rail); })
+        .then((body) => { if (alive && body) setRail(body.rail ?? null); })
         .catch(() => undefined);
     };
     const onRealtime = () => {
       window.clearTimeout(timer);
       timer = window.setTimeout(load, Math.max(0, RAIL_REFRESH_MS - (Date.now() - lastLoad)));
     };
-    load();
+    if (!initialData) load();
     media.addEventListener("change", load);
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
     // Something was just seen (Âncora, Jornada): the blue dot leaves the list right away.
@@ -230,6 +198,6 @@ function useDesktopChatRail(enabled: boolean) {
       window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onRealtime);
       window.removeEventListener(CHAT_RAIL_REFRESH_EVENT, load);
     };
-  }, [enabled]);
+  }, [enabled, initialData]);
   return rail;
 }

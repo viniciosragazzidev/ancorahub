@@ -5,6 +5,7 @@ import { AuthorizationError, AuthenticationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AppShell } from "@/components/app-shell";
 import { isLightRouteAllowed } from "@/components/light/light-routes";
+import { getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { getDatabase, schema } from "@/shared/db";
 import { TenantOnboardingDialogLoader } from "@/features/onboarding/components/tenant-onboarding-dialog-loader";
 import { DirectorWizardLoader } from "@/features/onboarding/components/director-wizard-loader";
@@ -143,6 +144,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const isLightSupervisor = supervisorLiteAvailable && experienceMode === "LIGHT";
   const isLightManager = managerLiteAvailable && experienceMode === "LIGHT";
   const liteAudience = isLightManager ? "manager" as const : isLightSupervisor ? "supervisor" as const : "broker" as const;
+  const initialChatRail = isLightManager ? await getChatRailData() : null;
 
   const pathname = headersList.get("x-pathname") || "";
 
@@ -215,6 +217,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         cleanUiEnabled={cleanUiEnabled}
         isLightBroker={isLightBroker || isLightSupervisor || isLightManager}
         liteAudience={liteAudience}
+        initialChatRail={initialChatRail}
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
         journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
