@@ -24,6 +24,7 @@ import { ensureDefaultQueue } from "@/features/lead-distribution/service";
 import { findPostSaleExemptionQueueName, postSaleTransferAuditAction } from "@/features/lead-distribution/post-sale-transfer";
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { getSystemSetting } from "@/features/system-settings/queries";
+import { canRevokeTeamInvitation } from "@/features/team/invitation-scope";
 
 import { invalidateTenantContextCache } from "@/shared/auth/tenant-context";
 import { clearSupervisedBrokers, detachFromSupervision, supervisedBrokersField, syncSupervisedBrokers } from "@/features/team/supervised-brokers";
@@ -872,17 +873,34 @@ export async function revokeInviteAction(_prev: TeamActionState, formData: FormD
     const db = getDatabase();
 
     const [invitation] = await db
-      .select({ id: schema.brokerInvitations.id, status: schema.brokerInvitations.status })
+      .select({
+        id: schema.brokerInvitations.id,
+        status: schema.brokerInvitations.status,
+        userId: schema.brokerProfiles.userId,
+        role: schema.brokerInvitations.role,
+        branchId: schema.brokerInvitations.branchId,
+        supervisorId: schema.tenantMemberships.supervisorId,
+        membershipRole: schema.tenantMemberships.role,
+      })
       .from(schema.brokerInvitations)
+      .innerJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId), eq(schema.brokerProfiles.tenantId, context.tenantId)))
+      .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId), eq(schema.tenantMemberships.tenantId, context.tenantId)))
       .where(and(or(eq(schema.brokerInvitations.id, invitationId), eq(schema.brokerInvitations.brokerProfileId, invitationId)), eq(schema.brokerInvitations.tenantId, context.tenantId)))
       .limit(1);
 
     if (!invitation) throw new Error("Convite não encontrado.");
+    if (invitation.status !== "PENDING") throw new Error("Este convite não está mais pendente.");
+    if (!canRevokeTeamInvitation(context, {
+      userId: invitation.userId,
+      role: invitation.membershipRole ?? invitation.role,
+      branchId: invitation.branchId,
+      supervisorId: invitation.supervisorId,
+    })) throw new Error("Este convite está fora do seu escopo de gestão.");
 
     await db
       .update(schema.brokerInvitations)
       .set({ status: "REVOKED", revokedAt: new Date() })
-      .where(eq(schema.brokerInvitations.id, invitation.id));
+      .where(and(eq(schema.brokerInvitations.id, invitation.id), eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.status, "PENDING")));
 
     await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_invitation", entidadeId: invitation.id, acao: "revogou_convite" });
     invalidateTenantContextCache(); // role/unit/status changes apply at once
