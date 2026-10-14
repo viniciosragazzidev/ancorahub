@@ -91,10 +91,24 @@ export async function getManagerLiteLeadDetail(context: TenantContext, leadId: s
       .where(and(eq(schema.tenantMemberships.tenantId, scope.tenantId), eq(schema.tenantMemberships.branchId, scope.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(schema.user.name),
   ]);
   if (!lead) return null;
-  const timeline = await getLeadTimeline(leadId);
+  // The lead is already inside the manager's unit (checked above), so its tasks and documents are read by lead id.
+  const [timeline, tasks, documents] = await Promise.all([
+    getLeadTimeline(leadId),
+    db.select({ id: schema.leadTasks.id, title: schema.leadTasks.title, dueAt: schema.leadTasks.dueAt, completedAt: schema.leadTasks.completedAt, priority: schema.leadTasks.priority })
+      .from(schema.leadTasks)
+      .where(and(eq(schema.leadTasks.tenantId, scope.tenantId), eq(schema.leadTasks.leadId, leadId)))
+      .orderBy(schema.leadTasks.completedAt, schema.leadTasks.dueAt),
+    db.select({ id: schema.leadDocuments.id, filename: schema.leadDocuments.filename, status: schema.leadDocuments.status, requirementName: schema.documentRequirements.name })
+      .from(schema.leadDocuments)
+      .leftJoin(schema.documentRequirements, eq(schema.leadDocuments.requirementId, schema.documentRequirements.id))
+      .where(and(eq(schema.leadDocuments.tenantId, scope.tenantId), eq(schema.leadDocuments.leadId, leadId), isNull(schema.leadDocuments.deletedAt)))
+      .orderBy(desc(schema.leadDocuments.createdAt)),
+  ]);
   return {
     lead: { id: lead.id, name: lead.name ?? "Lead", status: lead.status, ownerId: lead.ownerId, ownerName: lead.ownerName, ownerImage: lead.ownerImage, productName: lead.productName, assignedAt: lead.assignedAt, branchName: lead.branchName },
     timeline: timeline ?? [],
+    tasks,
+    documents,
     brokers: brokers.map((broker) => ({ id: broker.id, name: broker.name ?? "Corretor" })),
   };
 }
