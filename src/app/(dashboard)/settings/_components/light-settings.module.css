@@ -1,0 +1,16 @@
+/* Lite settings entrance: CSS (not JS), so the content is visible even before hydration. */
+@keyframes liteRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes liteFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.enter {
+  animation: liteRise 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: calc(var(--enter-index, 0) * 35ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .enter { animation: liteFade 150ms ease both; animation-delay: 0ms; }
+}

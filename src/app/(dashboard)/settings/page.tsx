@@ -118,8 +118,8 @@ export default async function SettingsPage() {
             { id: "extensao", title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension },
             { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, menos animação e alto contraste", node: <AccessibilityPreferences /> },
           ]}
+          footer={<ManagerLiteSettingsFooter />}
         />
-        <ManagerLiteSettingsFooter />
       </>
     );
   }

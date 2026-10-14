@@ -92,7 +92,7 @@ export function ManagerLiteUnitSection({ unit }: { unit: ManagerLiteUnit | null 
 /** Tour and sign out, at the end of the manager's settings list (same as the supervisor's). */
 export function ManagerLiteSettingsFooter() {
   return (
-    <div className="mx-auto grid w-full max-w-4xl gap-3 px-4 pb-8 sm:px-6">
+    <div className="grid gap-3 pt-1">
       <Button variant="outline" size="lg" onClick={() => { if (window.location.pathname === "/dashboard") startLiteTour(); else window.location.assign("/dashboard?tour=1"); }}><Play className="size-4" /> Ver o tour do app</Button>
       <Button variant="secondary" size="lg" onClick={() => void signOut()}><LogOut className="size-4" /> Sair da conta</Button>
     </div>
