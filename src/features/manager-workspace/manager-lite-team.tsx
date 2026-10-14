@@ -32,12 +32,12 @@ export function ManagerLiteTeam({ initialData }: { initialData: ManagerLiteTeamD
   return <div className={`arc-venancor ${styles.page}`}>
     <div className={styles.inner}>
       <header className={styles.pageHeader}><div><h1>Minha unidade</h1><p className={styles.muted}>{initialData.unitName ?? "Unidade não configurada"}</p></div></header>
-      <section className={styles.teamHero} aria-label="Resumo dos corretores">
+      <section className={`${styles.teamHero} ${styles.unitHero}`} aria-label="Resumo dos corretores">
         <div className={styles.heroText}><h2>Corretores da unidade</h2><p>Consulte a operação e abra o perfil de cada corretor.</p></div>
         <div className={styles.overview}>
           <span><strong>{initialData.counts.brokers}</strong> corretores</span>
           <span><strong>{initialData.counts.inService}</strong> em atendimento</span>
-          <span data-alert={initialData.counts.late > 0}><strong>{initialData.counts.late || "·"}</strong> atrasados</span>
+          <span data-alert={initialData.counts.late > 0}><strong>{initialData.counts.late}</strong> atrasados</span>
         </div>
       </section>
       <Input aria-label="Buscar corretor por nome" placeholder="Buscar corretor" value={query} onChange={(event) => setQuery(event.target.value)} />
@@ -47,7 +47,7 @@ export function ManagerLiteTeam({ initialData }: { initialData: ManagerLiteTeamD
           <Avatar name={member.name} src={member.image ?? undefined} size="lg" status={member.availability === "available" || member.availability === "on_duty" ? "online" : "offline"} className={styles.avatar} />
           <span>{member.name}<small><Badge tone={member.status === "disabled" ? "danger" : member.availability === "available" || member.availability === "on_duty" ? "success" : "neutral"} size="sm">{member.status === "disabled" ? "Desativado" : member.availability === "available" ? "Disponível" : member.availability === "on_duty" ? "Em plantão" : member.availability === "paused" ? "Pausado" : "Fora do ar"}</Badge></small></span>
         </Link>}
-        <div className={styles.memberNumbers}><span><strong>{member.inService || "·"}</strong> em atendimento</span>{member.late > 0 ? <Badge tone="danger" size="sm">Atrasado · {member.late}</Badge> : null}</div>
+        <div className={styles.memberNumbers}><span><strong>{member.inService}</strong> em atendimento</span>{member.late > 0 ? <Badge tone="danger" size="sm">Atrasado · {member.late}</Badge> : null}</div>
         <BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este corretor." closeLabel="Fechar" detents={[0.38, 0.7]}>
           <nav className={styles.sheetList} aria-label="Ações do corretor">
             {member.status !== "pending" ? <Link href={`/equipe/${encodeURIComponent(member.userId ?? member.id)}`} className={styles.sheetRow}><span>Ver perfil</span><small>Informações e operação</small></Link> : null}

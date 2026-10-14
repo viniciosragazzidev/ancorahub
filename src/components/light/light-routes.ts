@@ -211,7 +211,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/equipe/minha"), route: { title: "Minha equipe", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/equipe/minha/configurar"), route: { title: "Configuração da equipe", tab: "mais", isRoot: false, parentHref: "/equipe/minha" } },
   { test: exact("/equipe/desempenho"), route: { title: "Placar da equipe", tab: "mais", isRoot: false, parentHref: "/equipe/minha" } },
-  { test: exact("/equipe"), route: { title: "Minha equipe", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: exact("/equipe"), route: { title: "Minha unidade", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/equipe"), route: { title: "Corretor", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },

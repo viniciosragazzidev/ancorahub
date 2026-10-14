@@ -55,3 +55,8 @@
 .sheetDanger p { margin: 0; font-size: var(--text-sm); }
 .sheetDangerActions { display: flex; justify-content: flex-end; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .sheetRow { transition: none; } }
+
+/* Manager unit summary: text on top, the numbers as a row of blocks (no team photo column). */
+.unitHero { grid-template-columns: minmax(0,1fr); }
+.unitHero .overview { grid-column: 1; grid-row: auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr)); }
+@media (min-width: 640px) { .unitHero { grid-template-columns: minmax(0,1fr); } .unitHero .overview { grid-column: 1; grid-row: auto; } }
