@@ -7,6 +7,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { brazilDayKey } from "@/shared/trends";
 import { DEFAULT_PERIOD, periodStart, type PeriodValue } from "@/shared/period";
 import { resolveCohortConversion } from "@/features/reports/metrics/metrics-service";
+import { buildNocBranchScope, buildNocLeadScope, buildNocMembershipScope, canViewNocBranchHealth } from "./role-scope";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,8 +132,8 @@ function periodBounds(days: PeriodValue, now: Date = new Date()) {
 
 function tenantScope(context: TenantContext) {
   return context.role === "manager" && context.branchId
-    ? { tenantId: context.tenantId, branchId: context.branchId }
-    : { tenantId: context.tenantId, branchId: null };
+    ? { tenantId: context.tenantId, branchId: context.branchId, leadScope: buildNocLeadScope(context), membershipScope: buildNocMembershipScope(context), branchScope: buildNocBranchScope(context) }
+    : { tenantId: context.tenantId, branchId: null, leadScope: buildNocLeadScope(context), membershipScope: buildNocMembershipScope(context), branchScope: buildNocBranchScope(context) };
 }
 
 // ─── KPIs ─────────────────────────────────────────────────────────────────────
@@ -156,9 +157,7 @@ async function getNocKpis(
       gte(schema.leads.createdAt, start),
       lt(schema.leads.createdAt, end),
     );
-    return scope.branchId
-      ? and(base, eq(schema.leads.branchId, scope.branchId))
-      : base;
+    return and(base, scope.leadScope);
   }
 
   const activeStatuses = [
@@ -197,7 +196,7 @@ async function getNocKpis(
           isNull(schema.leads.deletedAt),
           isNull(schema.leads.archivedAt),
           inArray(schema.leads.status, activeStatuses),
-          ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+          scope.leadScope,
         ),
       ),
 
@@ -240,7 +239,7 @@ async function getNocKpis(
           gte(schema.sales.saleDate, start),
           lt(schema.sales.saleDate, end),
           eq(schema.sales.status, "active"),
-          ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+          scope.leadScope,
         ),
       ),
 
@@ -257,7 +256,7 @@ async function getNocKpis(
           gte(schema.sales.saleDate, prevStart),
           lt(schema.sales.saleDate, start),
           eq(schema.sales.status, "active"),
-          ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+          scope.leadScope,
         ),
       ),
   ]);
@@ -296,7 +295,7 @@ async function getLeadFlow(context: TenantContext, period: PeriodValue): Promise
     isNull(schema.leads.deletedAt),
     isNull(schema.leads.archivedAt),
     gte(schema.leads.createdAt, start),
-    ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+    scope.leadScope,
   );
 
   const rows = await db
@@ -348,7 +347,7 @@ async function getStatusDistribution(context: TenantContext, period: PeriodValue
         isNull(schema.leads.deletedAt),
         isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, start),
-        ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+        scope.leadScope,
       ),
     )
     .groupBy(schema.leads.status);
@@ -386,7 +385,7 @@ async function getFirstContactTrend(context: TenantContext, period: PeriodValue)
         isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, start),
         isNotNull(schema.leads.firstContactAt),
-        ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+        scope.leadScope,
       ),
     )
     .groupBy(sql`date_trunc('day', ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::date`)
@@ -424,7 +423,7 @@ async function getTicketTrend(context: TenantContext, period: PeriodValue): Prom
         isNull(schema.leads.archivedAt),
         gte(schema.sales.saleDate, start),
         eq(schema.sales.status, "active"),
-        ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+        scope.leadScope,
       ),
     )
     .groupBy(sql`date_trunc('day', ${schema.sales.saleDate} AT TIME ZONE 'America/Sao_Paulo')::date`)
@@ -459,7 +458,7 @@ async function getHourlyActivity(context: TenantContext): Promise<HourlyBucket[]
         isNull(schema.leads.archivedAt),
         gte(schema.leads.createdAt, today.start),
         lt(schema.leads.createdAt, today.end),
-        ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+        scope.leadScope,
       ),
     )
     .groupBy(sql`extract(hour from ${schema.leads.createdAt} AT TIME ZONE 'America/Sao_Paulo')::int`)
@@ -509,9 +508,7 @@ async function getTeamPerformance(context: TenantContext): Promise<TeamMemberPer
         eq(schema.tenantMemberships.tenantId, scope.tenantId),
         eq(schema.tenantMemberships.role, "broker"),
         eq(schema.tenantMemberships.status, "active"),
-        ...(scope.branchId
-          ? [eq(schema.tenantMemberships.branchId, scope.branchId)]
-          : []),
+        scope.membershipScope,
       ),
     )
     .groupBy(schema.user.id, schema.user.name)
@@ -561,7 +558,7 @@ async function getRecentActivity(context: TenantContext, period: PeriodValue): P
         isNull(schema.leads.archivedAt),
         sql`${schema.leadInteractions.tipo} = ANY(ARRAY['status_change','quote_generated','service_started']::lead_interaction_type[])`,
         gte(schema.leadInteractions.createdAt, start),
-        ...(scope.branchId ? [eq(schema.leads.branchId, scope.branchId)] : []),
+        scope.leadScope,
       ),
     )
     .orderBy(sql`${schema.leadInteractions.createdAt} desc`)
@@ -614,13 +611,14 @@ function safeSlaMinutes(value: string | null | undefined) {
 }
 
 async function getBranchHealth(context: TenantContext): Promise<BranchHealth[]> {
+  if (!canViewNocBranchHealth(context)) return [];
   const db = getDatabase();
   const scope = tenantScope(context);
   const today = todayBounds();
 
   const [tenant, branches] = await Promise.all([
     db.select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, scope.tenantId)).limit(1),
-    db.select({ id: schema.branches.id, name: schema.branches.name, acceptingLeads: schema.branches.acceptingLeads }).from(schema.branches).where(and(eq(schema.branches.tenantId, scope.tenantId), eq(schema.branches.status, "active"), ...(scope.branchId ? [eq(schema.branches.id, scope.branchId)] : []))).orderBy(schema.branches.name),
+    db.select({ id: schema.branches.id, name: schema.branches.name, acceptingLeads: schema.branches.acceptingLeads }).from(schema.branches).where(scope.branchScope).orderBy(schema.branches.name),
   ]);
 
   if (!branches.length) return [];
