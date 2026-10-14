@@ -99,7 +99,7 @@ describe("WhatsAppPlantaoNotice", () => {
     render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
     expect(await screen.findByRole("button", { name: "Conectar WhatsApp" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
-    expect(await screen.findByText("Você está no celular. Para conectar, abra o CRM no computador.")).toBeTruthy();
+    expect(await screen.findByText("Para conectar, abra o CRM no computador.")).toBeTruthy();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(getConnection).not.toHaveBeenCalled();
   });

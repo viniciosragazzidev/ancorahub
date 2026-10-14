@@ -1,0 +1,251 @@
+.frame {
+  width: 100%;
+  min-width: 0;
+}
+
+.dailyFrame {
+  margin-bottom: 16px;
+}
+
+.stickyFrame {
+  margin-inline: auto;
+}
+
+.card {
+  min-width: 0;
+  border: 1px solid rgb(16 16 40 / 10%);
+  color: #0b0b12;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.dailyCard {
+  gap: 10px;
+  padding: 20px 22px 18px;
+}
+
+.stickyCard {
+  gap: 8px;
+  padding: 13px 18px;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px oklch(0% 0 0 / .13), 0 2px 6px oklch(0% 0 0 / .08);
+}
+
+.heading {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.brandIcon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  place-items: center;
+  border-radius: 14px;
+  background: #f1f1f5;
+  color: #128c4a;
+}
+
+.brandIcon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.title {
+  min-width: 0;
+  flex: 1;
+  margin-top: 1px;
+  padding-right: 28px;
+  font-size: 20px;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+}
+
+.dismiss {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  color: #4b4b59;
+}
+
+.body {
+  max-width: 72ch;
+  padding-left: 54px;
+}
+
+.computerLine {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  max-width: none;
+  margin-top: 1px;
+  padding: 11px 13px;
+  border: 1px solid rgb(16 16 40 / 8%);
+  border-radius: 14px;
+  background: #f7f7fa;
+  color: #30303d;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.computerLine svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+  margin-top: 1px;
+  color: #4b4b59;
+}
+
+.actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  padding-left: 54px;
+}
+
+.connectButton {
+  min-height: 46px;
+  height: 46px;
+  padding-inline: 20px;
+  font-size: 15px;
+}
+
+.status,
+.error {
+  padding-left: 54px;
+  font-weight: 500;
+}
+
+.error {
+  color: #b42318;
+}
+
+.stickyCard .title {
+  font-size: 17px;
+}
+
+.stickyCard .brandIcon {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-radius: 12px;
+}
+
+.stickyCard .brandIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.stickyCard .body {
+  font-size: 14px;
+}
+
+:global(.dark) .card {
+  border-color: rgb(255 255 255 / 12%);
+  color: #fafafa;
+}
+
+:global(.dark) .computerLine {
+  border-color: rgb(255 255 255 / 10%);
+  background: #222228;
+  color: #e4e4e7;
+}
+
+:global(.dark) .computerLine svg,
+:global(.dark) .dismiss {
+  color: #d4d4d8;
+}
+
+@media (max-width: 640px) {
+  .dailyCard {
+    gap: 10px;
+    padding: 16px 14px 14px;
+    border-radius: 20px;
+  }
+
+  .stickyCard {
+    gap: 7px;
+    padding: 10px 12px;
+    border-radius: 16px;
+  }
+
+  .heading {
+    gap: 9px;
+  }
+
+  .brandIcon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    border-radius: 12px;
+  }
+
+  .brandIcon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .title {
+    padding-right: 24px;
+    font-size: 17px;
+    line-height: 1.3;
+  }
+
+  .body,
+  .computerLine,
+  .actions,
+  .status,
+  .error {
+    padding-left: 0;
+  }
+
+  .body {
+    font-size: 14px;
+  }
+
+  .computerLine {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+
+  .connectButton {
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .stickyCard .body,
+  .stickyCard .computerLine {
+    display: none;
+  }
+
+  .stickyCard .actions {
+    padding-left: 45px;
+  }
+
+  .stickyCard .connectButton {
+    min-height: 40px;
+    height: 40px;
+    padding-inline: 15px;
+    font-size: 14px;
+  }
+
+  .stickyCard .status {
+    padding-left: 45px;
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .connectButton {
+    scroll-behavior: auto;
+  }
+}
