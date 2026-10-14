@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { LightClientDetail, type LightClientDetailData } from "./light-client-detail";
@@ -32,18 +32,34 @@ const base: LightClientDetailData = {
 
 afterEach(() => cleanup());
 
+function openSection(name: RegExp) {
+  fireEvent.click(screen.getByRole("button", { name }));
+}
+
 describe("LightClientDetail", () => {
-  it("shows the client sections with the WhatsApp action and the link back to the lead", () => {
+  it("opens on Dados with the contact, renewal and beneficiaries, and the WhatsApp action", () => {
     render(<LightClientDetail data={base} />);
 
     expect(screen.getByRole("heading", { level: 1, name: "Marina Alves" })).toBeTruthy();
     expect(screen.getByText("Cliente ativo")).toBeTruthy();
     expect(screen.getByRole("link", { name: "WhatsApp" }).getAttribute("href")).toContain("wa.me/");
-    expect(screen.getByRole("link", { name: "Ver lead original" }).getAttribute("href")).toBe("/leads/lead-1");
+    expect(screen.getByRole("group", { name: "Seções do cliente" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Renovação" })).toBeTruthy();
     expect(screen.getByText("Acompanhar no prazo")).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Beneficiários (1)" })).toBeTruthy();
+  });
+
+  it("switches sections with the segmented control", () => {
+    render(<LightClientDetail data={base} />);
+
+    openSection(/Vendas \(1\)/);
+    expect(screen.getByRole("heading", { name: "Vendas (1)" })).toBeTruthy();
+    expect(screen.getByText(/Total em vendas/)).toBeTruthy();
+
+    openSection(/Documentos \(1\)/);
     expect(screen.getByRole("heading", { name: "Documentos (1)" })).toBeTruthy();
+
+    openSection(/Histórico/);
     expect(screen.getByRole("heading", { name: "Linha do tempo" })).toBeTruthy();
   });
 
@@ -67,9 +83,13 @@ describe("LightClientDetail", () => {
 
     expect(screen.queryByRole("link", { name: "WhatsApp" })).toBeNull();
     expect(screen.getByText("Sem contrato ativo registrado para este cliente.")).toBeTruthy();
-    expect(screen.getByText("Nenhuma venda registrada.")).toBeTruthy();
     expect(screen.getByText("Nenhum beneficiário cadastrado.")).toBeTruthy();
+
+    openSection(/Vendas/);
+    expect(screen.getByText("Nenhuma venda registrada.")).toBeTruthy();
+    openSection(/Documentos/);
     expect(screen.getByText("Nenhum documento enviado.")).toBeTruthy();
+    openSection(/Histórico/);
     expect(screen.getByText("Nenhum registro na linha do tempo.")).toBeTruthy();
   });
 });

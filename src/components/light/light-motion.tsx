@@ -47,10 +47,11 @@ export function LiteList({ children, className, label }: { children: ReactNode; 
   );
 }
 
+/** A list row: staggered entry and a press feedback (slight scale, none with reduced motion). */
 export function LiteListItem({ children, className }: { children: ReactNode; className?: string }) {
   const reduce = useReducedMotion();
   return (
-    <motion.li className={className} variants={itemVariants(reduce)}>
+    <motion.li className={className} variants={itemVariants(reduce)} whileTap={reduce ? undefined : { scale: 0.99 }}>
       {children}
     </motion.li>
   );

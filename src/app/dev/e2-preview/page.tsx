@@ -2,6 +2,7 @@ import "@/components/arc/venancor-scope.css";
 
 import { notFound } from "next/navigation";
 
+import { LightChrome } from "@/components/light/light-chrome";
 import { LightClientsList } from "@/features/broker-workspace/components/light-clients-list";
 import { LightClientDetail } from "@/features/broker-workspace/components/light-client-detail";
 
@@ -25,9 +26,10 @@ export default async function E2PreviewPage({ searchParams }: { searchParams: Pr
   if (process.env.NODE_ENV !== "development") notFound();
   const { view } = await searchParams;
 
+  // The real Lite shell (rail on desktop, bottom bar on mobile) as the gestor sees it.
   return (
-    <main className="min-h-screen bg-(--canvas,#f7f7f9)">
+    <LightChrome audience="manager">
       {view === "detail" ? <LightClientDetail data={detail} /> : <LightClientsList clients={clients} management />}
-    </main>
+    </LightChrome>
   );
 }
