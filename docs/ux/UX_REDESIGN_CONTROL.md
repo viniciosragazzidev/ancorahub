@@ -1,12 +1,13 @@
 ## 2026-10-14: T122, refinamento visual do aviso de WhatsApp
 
 Papel: corretor sem WhatsApp conectado; ação principal: iniciar a conexão no
-computador. O cartão diário fica no topo do conteúdo; o aviso de Jack permanece
-compacto e sticky no fluxo da conversa, sem cobrir mensagens. Reutiliza o card,
+computador. O cartão diário usa um tile à esquerda e uma coluna de conteúdo à
+direita, com a linha do computador e o CTA alinhados na mesma linha. O aviso de
+Jack permanece em uma linha sticky de 60px no fluxo da conversa. Reutiliza o card,
 tipografia, botão, tokens e entrada animada do tour Lite; ícone do WhatsApp verde,
-foco visível e reduced motion respeitado. No celular, o cartão sticky mostra título,
-ação e orientação após o toque. Não altera elegibilidade, flag, auditoria,
-armazenamento ou diálogo de conexão. Registro:
+foco visível e reduced motion respeitado. No celular, ambos ocultam o CTA e mostram
+a orientação de computador; o daily mantém texto completo e X. Não altera
+elegibilidade, flag, auditoria, armazenamento ou diálogo de conexão. Registro:
 `docs/implementations/completed/2026-10-14-whatsapp-plantao-notice-lite-redesign.md`.
 
 ## 2026-10-13: T120, aviso de conexão do WhatsApp para o plantão
@@ -17,7 +18,8 @@ aviso diário, aviso fechado até amanhã, orientação no celular, QR aberto e 
 O lembrete fixo fica no topo da conversa com Jack e não tem fechamento. O aviso diário
 fica no topo do conteúdo do dashboard. A flag global do Super-admin controla ambos;
 desativá-la não muda a distribuição. O refinamento visual T122 reutiliza card e
-tipografia do tour Lite, `Button` e o diálogo de conexão existentes. Gap: o token Deep Sapphire `#1e40af` descrito em
+tipografia do tour Lite, `Button` e o diálogo de conexão existentes. Gap: o token
+Deep Sapphire `#1e40af` descrito em
 `docs/design-system.md` ainda não estava ligado à primitiva `Button`. Decisão: expor o
 token documentado por uma variante compartilhada `deep-sapphire` e usá-la neste único
 CTA. Registro:
