@@ -70,10 +70,10 @@ describe("WhatsAppPlantaoNotice", () => {
 
   it("fecha só até o próximo dia local e registra a ação", async () => {
     const { unmount } = render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
-    expect(await screen.findByText(/A partir de 20\/10, conecte seu WhatsApp/)).toBeTruthy();
+    expect(await screen.findByText(/Conecte seu WhatsApp até 20\/10 para continuar recebendo/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Fechar aviso" }));
-    await waitFor(() => expect(screen.queryByText(/A partir de 20\/10, conecte seu WhatsApp/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Conecte seu WhatsApp até 20\/10 para continuar recebendo/)).toBeNull());
     const key = Object.keys(localStorage).find((item) => item.startsWith("whatsapp-plantao-notice:user-1:"));
     expect(key).toBeTruthy();
     expect(localStorage.getItem(key!)).toBe("closed");
@@ -81,22 +81,28 @@ describe("WhatsAppPlantaoNotice", () => {
 
     unmount();
     render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
-    await waitFor(() => expect(screen.queryByText(/A partir de 20\/10, conecte seu WhatsApp/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Conecte seu WhatsApp até 20\/10 para continuar recebendo/)).toBeNull());
   });
 
   it("abre o QR no computador e mostra a orientação no celular", async () => {
     const desktop = render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
     expect(await screen.findByRole("button", { name: "Conectar WhatsApp" })).toBeTruthy();
+    expect(screen.queryByText(/Para continuar recebendo os leads do plantão/)).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Por quê?" }));
+    expect(screen.getByText(/Para continuar recebendo os leads do plantão/)).toBeTruthy();
+    expect(screen.getByText(/A conexão precisa ser feita pelo computador/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
     expect(await screen.findByRole("dialog")).toBeTruthy();
     expect(recordNoticeAction).toHaveBeenCalledWith("connect_clicked");
     fireEvent.click(screen.getByRole("button", { name: "Simular conexão" }));
-    await waitFor(() => expect(screen.queryByText(/A partir de 20\/10, conecte seu WhatsApp/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Conecte seu WhatsApp até 20\/10 para continuar recebendo/)).toBeNull());
 
     desktop.unmount();
     mockDesktop(false);
     getConnection.mockClear();
     const mobileDaily = render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
+    expect(screen.queryByText("Para conectar, abra o CRM no computador.")).toBeNull();
+    fireEvent.click(await screen.findByRole("button", { name: "Por quê?" }));
     expect(await screen.findByText("Para conectar, abra o CRM no computador.")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Conectar WhatsApp" })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -119,7 +125,7 @@ describe("WhatsAppPlantaoNotice", () => {
     pathname.current = "/dashboard/c/ancora";
     render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
 
-    await waitFor(() => expect(screen.queryByText(/A partir de 20\/10, conecte seu WhatsApp/)).toBeNull());
+    await waitFor(() => expect(screen.queryByText(/Conecte seu WhatsApp até 20\/10 para continuar recebendo/)).toBeNull());
     expect(screen.queryByRole("button", { name: "Conectar WhatsApp" })).toBeNull();
     pathname.current = "/dashboard";
   });

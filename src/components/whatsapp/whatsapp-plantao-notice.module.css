@@ -20,13 +20,108 @@
 }
 
 .dailyCard {
-  padding: 20px 22px;
+  display: block;
+  min-height: 64px;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 2px 8px oklch(0% 0 0 / .08), 0 1px 2px oklch(0% 0 0 / .04);
 }
 
 .stickyCard {
   padding: 8px 14px;
   border-radius: 20px;
   box-shadow: 0 8px 24px oklch(0% 0 0 / .13), 0 2px 6px oklch(0% 0 0 / .08);
+}
+
+.dailyLayout {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 32px minmax(0, 1fr) auto 32px;
+  align-items: center;
+  gap: 10px;
+}
+
+.dailyBrandIcon {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
+  background: #f1f1f5;
+  color: #128c4a;
+}
+
+.dailyBrandIcon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.dailySummary {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.dailyTitle {
+  min-width: 0;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -.02em;
+  line-height: 1.35;
+}
+
+.whyButton {
+  min-height: 32px;
+  flex: 0 0 auto;
+  padding-inline: 2px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.dailyConnectButton {
+  min-height: 40px;
+  height: 40px;
+  padding-inline: 14px;
+  border-radius: 999px;
+  box-shadow: none;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.dailyDismiss {
+  color: #4b4b59;
+}
+
+.dailyDetails {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 8px;
+  min-width: 0;
+  margin: 10px 2px 0 42px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(16 16 40 / 8%);
+}
+
+.dailyDetails .body {
+  max-width: none;
+  padding: 0;
+}
+
+.dailyDetails .computerLine,
+.dailyDetails .mobileComputerLine {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.dailyError {
+  margin: 8px 0 0 42px;
+  color: #b42318;
 }
 
 .layout {
@@ -201,6 +296,19 @@
   color: #fafafa;
 }
 
+:global(.dark) .dailyCard {
+  background: #18181b;
+  box-shadow: 0 2px 8px oklch(0% 0 0 / .28), 0 1px 2px oklch(0% 0 0 / .16);
+}
+
+:global(.dark) .dailyDetails {
+  border-top-color: rgb(255 255 255 / 12%);
+}
+
+:global(.dark) .dailyDismiss {
+  color: #d4d4d8;
+}
+
 :global(.dark) .computerLine,
 :global(.dark) .mobileComputerLine {
   border-color: rgb(255 255 255 / 10%);
@@ -216,8 +324,41 @@
 
 @media (max-width: 1023px), (pointer: coarse) {
   .dailyCard {
-    padding: 16px 14px;
-    border-radius: 20px;
+    padding: 10px;
+  }
+
+  .dailyLayout {
+    grid-template-columns: 32px minmax(0, 1fr) 32px;
+    gap: 8px;
+  }
+
+  .dailySummary {
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+
+  .dailyTitle {
+    flex: 1 1 100%;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .dailyConnectButton {
+    display: none;
+  }
+
+  .dailyDismiss {
+    grid-column: 3;
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .dailyDetails {
+    margin: 10px 0 0 40px;
+  }
+
+  .dailyError {
+    margin-left: 40px;
   }
 
   .stickyCard {
