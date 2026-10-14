@@ -46,8 +46,8 @@ Toda tela nova tem que ficar **tão bonita quanto o Lite do corretor**, com anim
   - skeleton com brilho enquanto carrega (nada de tela branca);
   - estados vazios ilustrados (mascote) e mensagens de sucesso animadas.
 - **Respeitar `prefers-reduced-motion`:** sem movimento, só opacidade.
-- **Portão de design (bloqueante):** nenhuma etapa entra na `feat/diretor-visual-lite` sem prints desktop 1440 e celular 390 (claro e escuro) de **todas** as telas novas, comparados lado a lado com a tela equivalente do corretor. O revisor reprova se: alguma tela tiver visual do modo normal, faltar animação de entrada ou de sheet, faltar skeleton ou estado vazio, desalinhamento, texto cortado, scroll horizontal no celular, contraste ruim. O Maestro confere os prints antes do merge.
-- Se a prévia do app não subir, montar a tela numa rota `/dev/<etapa>-preview` com dados de exemplo só para o print (não vai para o menu).
+- **Portão de design (bloqueante):** nenhuma etapa entra na `feat/diretor-visual-lite` sem prints desktop 1440 e celular 390 (tema claro: o Lite não tem tema escuro, `venancor-scope.css` não define `.dark`) de **todas** as telas novas, comparados lado a lado com a tela equivalente do corretor. O revisor reprova se: alguma tela tiver visual do modo normal, faltar animação de entrada ou de sheet, faltar skeleton ou estado vazio, desalinhamento, texto cortado, scroll horizontal no celular, contraste ruim. O Maestro confere os prints antes do merge.
+- Se a prévia do app não subir, montar a tela numa rota `/dev/<etapa>-preview` com dados de exemplo só para o print (não vai para o menu). Em worktree com `node_modules` por junction, subir com `npx next dev --webpack` (o Turbopack falha).
 
 ### 2.3 Rotas e chaves
 - Cada rota nova entra com regex exata em `LIGHT_MANAGER_ALLOWED_ROUTES` / `LIGHT_SUPERVISOR_ALLOWED_ROUTES` e nos `*_DESTINATIONS` (`src/components/light/light-routes.ts`), com teste.
