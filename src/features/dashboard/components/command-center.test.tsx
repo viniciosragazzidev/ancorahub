@@ -26,6 +26,7 @@ const data: CommandCenterData = {
     runningDuties: [{ scheduleId: "s1", name: "PME 09/10", dutyDate: "2026-10-09", startsAt: "09:00", endsAt: "18:00", running: true, queueName: "FILA PME - RENAN", brokerCount: 4, minimumBrokers: 5 }],
     pulse: { activeQueues: 3, runningDuties: 1, brokersOnDutyNow: 4 },
   },
+  whatsapp: { total: 10, connected: 7, notConnected: [{ id: "b1", name: "Ana Souza" }, { id: "b2", name: "Bruno Lima" }] },
   attention: [],
   recentLeads: [],
   generatedAt: "2026-10-09T15:00:00.000Z",
@@ -55,6 +56,16 @@ describe("CommandCenter", () => {
     render(<CommandCenter data={data} canManage={false} />);
     expect(screen.queryByRole("link", { name: /Escala do mês/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /Convidar corretor/ })).toBeNull();
+  });
+
+  it("shows how many brokers connected WhatsApp and who is still missing", () => {
+    render(<CommandCenter data={data} />);
+    expect(screen.getByText("WhatsApp dos corretores")).toBeTruthy();
+    expect(screen.getByText("Conectaram").previousElementSibling?.textContent).toBe("7");
+    expect(screen.getByText("Não conectaram").previousElementSibling?.textContent).toBe("3");
+    expect(screen.getByText("70% de 10 corretores ativos")).toBeTruthy();
+    expect(screen.getByText("Ana Souza").closest("a")?.getAttribute("href")).toBe("/equipe/b1");
+    expect(screen.getByText("e mais 1")).toBeTruthy();
   });
 
   it("searches a lead from the dashboard", () => {

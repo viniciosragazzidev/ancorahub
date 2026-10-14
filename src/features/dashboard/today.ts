@@ -74,6 +74,51 @@ export async function getDashboardToday(context: TenantContext, now = new Date()
   };
 }
 
+export type BrokerWhatsAppStatus = {
+  total: number;
+  connected: number;
+  /** First brokers still without WhatsApp, by name, to chase before the 20/10 rule. */
+  notConnected: Array<{ id: string; name: string }>;
+};
+
+/**
+ * Active brokers in the viewer's scope (Diretor: tenant, Gestor: unit,
+ * Supervisor: team) and how many have their WhatsApp connected ("ready").
+ */
+export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awaited<ReturnType<typeof resolveReportDataScope>>): Promise<BrokerWhatsAppStatus> {
+  const empty = { total: 0, connected: 0, notConnected: [] };
+  const brokerScope = context.role === "director"
+    ? undefined
+    : context.role === "manager"
+      ? (context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : null)
+      : context.role === "supervisor"
+        ? (scope.supervisedBrokerIds?.length ? inArray(schema.tenantMemberships.userId, scope.supervisedBrokerIds) : null)
+        : null;
+  if (brokerScope === null) return empty;
+
+  const rows = await getDatabase()
+    .select({
+      id: schema.tenantMemberships.userId,
+      name: schema.user.name,
+      connected: sql<boolean>`exists (select 1 from ${schema.whatsappConnections} where ${schema.whatsappConnections.tenantId} = ${context.tenantId} and ${schema.whatsappConnections.userId} = ${schema.tenantMemberships.userId} and ${schema.whatsappConnections.status} = 'ready')`,
+    })
+    .from(schema.tenantMemberships)
+    .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      eq(schema.tenantMemberships.role, "broker"),
+      eq(schema.tenantMemberships.status, "active"),
+      brokerScope,
+    ));
+
+  const notConnected = rows.filter((row) => !row.connected).map((row) => ({ id: row.id, name: row.name }));
+  return {
+    total: rows.length,
+    connected: rows.length - notConnected.length,
+    notConnected: notConnected.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).slice(0, 6),
+  };
+}
+
 export type CommandCenterData = Awaited<ReturnType<typeof getCommandCenterData>>;
 
 /**
@@ -84,7 +129,7 @@ export type CommandCenterData = Awaited<ReturnType<typeof getCommandCenterData>>
 export async function getCommandCenterData(context: TenantContext) {
   const db = getDatabase();
   const scope = await resolveReportDataScope(context);
-  const [today, welcome, attention, recentLeads] = await Promise.all([
+  const [today, welcome, attention, recentLeads, whatsapp] = await Promise.all([
     getDashboardToday(context, new Date(), scope),
     getDashboardWelcome(context),
     getAttentionSnapshot(context, 7),
@@ -94,10 +139,12 @@ export async function getCommandCenterData(context: TenantContext) {
       .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), scope.leadScope))
       .orderBy(sql`${schema.leads.createdAt} desc`)
       .limit(6),
+    getBrokerWhatsAppStatus(context, scope),
   ]);
   return {
     today,
     welcome,
+    whatsapp,
     attention: attention.items.filter((item) => item.count > 0).map((item) => ({ ...item, tone: item.count > 5 ? "danger" as const : "warning" as const })),
     recentLeads: recentLeads.map((row) => ({ id: row.id, name: row.name, status: row.status, branchName: row.branchName, createdAt: row.createdAt.toISOString() })),
     generatedAt: new Date().toISOString(),
