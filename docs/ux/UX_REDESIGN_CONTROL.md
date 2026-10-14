@@ -323,3 +323,14 @@ confirmação/sucesso/erro. Disclosure por menu do card e por seções do perfil
 de plantão ficam somente para leitura. Reutiliza as peças Arc/Lite e o perfil atual;
 sem novo token, primitive ou animação. Decisão de produto: DEC-142. A revisão não
 avança a etapa global UX-M1.10.
+
+## 2026-10-14: T127, aviso diário de WhatsApp em modal
+
+Papel: corretor; objetivo: conectar o WhatsApp para receber leads do plantão.
+O aviso diário usa o `Dialog` compartilhado, com foco e fechamento por Escape;
+o CTA “Agora não” mantém o fechamento diário e a auditoria existentes. Desktop:
+texto e ilustração em duas colunas. Celular: ilustração acima, orientação de
+conexão e “Entendi”. O aviso compacto do Jack, a audiência, a flag, a conexão e
+o armazenamento local permanecem iguais. Nenhum token, componente-base,
+variante ou movimento novo; sem avanço da etapa global UX-M1.10. Registro:
+`docs/implementations/completed/2026-10-14-whatsapp-plantao-notice-modal.md`.
