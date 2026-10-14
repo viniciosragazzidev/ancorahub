@@ -61,6 +61,7 @@ export function WhatsAppConnectDialog({
   returnTo,
   triggerLabel = "Conectar WhatsApp",
   connectedLabel = "WhatsApp conectado",
+  open: controlledOpen,
   onConnectionChanged,
   onOpenChange,
   trigger,
@@ -71,14 +72,22 @@ export function WhatsAppConnectDialog({
   returnTo?: string;
   triggerLabel?: string;
   connectedLabel?: string;
+  /** Allows another CTA to open this dialog without an additional visible trigger. */
+  open?: boolean;
   onConnectionChanged?: (connection?: Connection) => void;
   /** Permite ao pai manter o dialog montado enquanto ele estiver aberto. */
   onOpenChange?: (open: boolean) => void;
 }) {
   const router = useRouter();
   const [connection, setConnection] = useState(initial);
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen ?? internalOpen;
   const [pending, startTransition] = useTransition();
+
+  function updateOpen(nextOpen: boolean) {
+    if (controlledOpen === undefined) setInternalOpen(nextOpen);
+    onOpenChange?.(nextOpen);
+  }
 
   // ── Estado do pareamento ────────────────────────────────────────────
   const [providerStatus, setProviderStatus] = useState<string | null>(null);
@@ -225,8 +234,7 @@ export function WhatsAppConnectDialog({
     // depois: ele pode trocar de árvore ao ver "conectado" e desmontar este
     // dialog no meio da animação.
     successTimer.current = window.setTimeout(() => {
-      setOpen(false);
-      onOpenChange?.(false);
+      updateOpen(false);
       onConnectionChanged?.();
       if (returnTo) router.replace(returnTo);
     }, SUCCESS_HOLD_MS);
@@ -434,8 +442,7 @@ export function WhatsAppConnectDialog({
   }
 
   function handleOpenChange(nextOpen: boolean) {
-    setOpen(nextOpen);
-    onOpenChange?.(nextOpen);
+    updateOpen(nextOpen);
 
     if (nextOpen) {
       setWatching(false);
@@ -545,7 +552,9 @@ export function WhatsAppConnectDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={trigger ?? <Button variant={ready ? "outline" : "default"}><WhatsappLogo /> {ready ? connectedLabel : triggerLabel}</Button>} />
+      {trigger || controlledOpen === undefined ? (
+        <DialogTrigger render={trigger ?? <Button variant={ready ? "outline" : "default"}><WhatsappLogo /> {ready ? connectedLabel : triggerLabel}</Button>} />
+      ) : null}
       <DialogPopup className="max-w-2xl">
         <div className="flex items-start justify-between gap-ds-16">
           <div className="min-w-0 flex-1">

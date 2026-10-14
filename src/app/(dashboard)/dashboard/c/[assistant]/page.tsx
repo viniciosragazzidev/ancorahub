@@ -15,6 +15,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { getJourneyDailySummaries } from "@/features/engagement/journey-queries";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
+import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
+import { WhatsAppPlantaoNotice } from "@/components/whatsapp/whatsapp-plantao-notice";
 import chatStyles from "@/components/chat/chat.module.css";
 
 export const dynamic = "force-dynamic";
@@ -38,24 +40,34 @@ export default async function AssistantConversationPage({ params }: { params: Pr
   const definition = ASSISTANTS[assistant as AssistantId];
   const identity = { name: definition.name, shape: definition.shape, hue: definition.hue };
   if (assistant === "ancora") {
-    const notifications = await getDatabase()
-      .select({
-        id: schema.notifications.id,
-        title: schema.notifications.title,
-        message: schema.notifications.message,
-        type: schema.notifications.type,
-        readAt: schema.notifications.readAt,
-        createdAt: schema.notifications.createdAt,
-        leadId: schema.notifications.leadId,
-      })
-      .from(schema.notifications)
-      .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId)))
-      .orderBy(desc(schema.notifications.createdAt))
-      .limit(ANCORA_HISTORY);
+    const [notifications, noticeFlag, whatsappConnection] = await Promise.all([
+      getDatabase()
+        .select({
+          id: schema.notifications.id,
+          title: schema.notifications.title,
+          message: schema.notifications.message,
+          type: schema.notifications.type,
+          readAt: schema.notifications.readAt,
+          createdAt: schema.notifications.createdAt,
+          leadId: schema.notifications.leadId,
+        })
+        .from(schema.notifications)
+        .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId)))
+        .orderBy(desc(schema.notifications.createdAt))
+        .limit(ANCORA_HISTORY),
+      audience === "broker" ? getFeatureFlag(FEATURE_FLAGS.WHATSAPP_PLANTAO_NOTICE).catch(() => "false") : Promise.resolve("false"),
+      audience === "broker" ? getWhatsAppConnection().catch(() => null) : Promise.resolve(null),
+    ]);
     const hasUnread = notifications.some((item) => !item.readAt);
+    const topNotice = audience === "broker"
+      && noticeFlag === "true"
+      && whatsappConnection
+      && whatsappConnection.status !== "ready"
+      ? <WhatsAppPlantaoNotice userId={context.userId} mode="sticky" />
+      : undefined;
     return (
       <>
-        <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} canWrite={audience === "broker"} />
+        <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} canWrite={audience === "broker"} topNotice={topNotice} />
         {hasUnread ? <MarkSeenOnView kind="ancora" /> : null}
       </>
     );

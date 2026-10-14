@@ -50,6 +50,7 @@ export function ChatScreen({
   onFreeText,
   onMention,
   headerAction,
+  topNotice,
   composerDisabled = false,
   onLocalChoice,
   progress: progressOverride,
@@ -67,6 +68,8 @@ export function ChatScreen({
   onFreeText?: (text: string) => Promise<ChatBlock[]>;
   onMention?: (mention: Mention) => Promise<ChatBlock[]> | ChatBlock[];
   headerAction?: ReactNode;
+  /** Fixed context notice displayed between the conversation header and thread. */
+  topNotice?: ReactNode;
   composerDisabled?: boolean;
   /** Replies with a "local" action: returns the blocks that answer it (next question, result...). */
   onLocalChoice?: (choice: ChatChoice, value: string) => Promise<ChatBlock[]> | ChatBlock[];
@@ -321,6 +324,7 @@ export function ChatScreen({
       </header>
 
       <div ref={scrollRef} className={styles.scroll} aria-live="polite" aria-relevant="additions">
+        {topNotice ? <div className={styles.topNotice}>{topNotice}</div> : null}
         <div data-tour={tourTargets?.conversation} className={styles.thread_}>
           {shown.map((block) => (
             <BlockRow key={block.id} block={block} chosenId={block.type === "question" ? answers[block.id] ?? null : null} working={working} handlers={rowHandlers} />

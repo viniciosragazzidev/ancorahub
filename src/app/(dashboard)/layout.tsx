@@ -24,6 +24,8 @@ import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { isSupervisorLiteAvailable } from "@/features/broker-workspace/lite-audience";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
+import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
+import { WhatsAppPlantaoNotice } from "@/components/whatsapp/whatsapp-plantao-notice";
 import { hasPermission } from "@/shared/auth/permissions";
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRouteDefinition } from "@/features/custom-roles/routes";
@@ -55,6 +57,12 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const welcomeVideoFlagPromise = context.role === "broker"
     ? getFeatureFlag(FEATURE_FLAGS.WELCOME_VIDEO).catch(() => "false")
     : Promise.resolve("false");
+  const whatsappPlantaoNoticeFlagPromise = context.role === "broker"
+    ? getFeatureFlag(FEATURE_FLAGS.WHATSAPP_PLANTAO_NOTICE).catch(() => "false")
+    : Promise.resolve("false");
+  const whatsappConnectionPromise = context.role === "broker"
+    ? getWhatsAppConnection().catch(() => null)
+    : Promise.resolve(null);
   const teamRankingFlagPromise = context.role === "supervisor"
     ? getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false")
     : Promise.resolve("false");
@@ -108,6 +116,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     teamRankingFlag,
     supervisorLiteAvailable,
     welcomeVideoFlag,
+    whatsappPlantaoNoticeFlag,
+    whatsappConnection,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -121,6 +131,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     teamRankingFlagPromise,
     supervisorLitePromise,
     welcomeVideoFlagPromise,
+    whatsappPlantaoNoticeFlagPromise,
+    whatsappConnectionPromise,
   ]);
 
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
@@ -235,6 +247,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           <NotificationCountProvider userId={context.userId}>
             <FeedbackToastHandler userId={context.userId} />
             <PasskeyToastHandler userId={context.userId} />
+            {context.role === "broker" && whatsappPlantaoNoticeFlag === "true" && whatsappConnection && whatsappConnection.status !== "ready" ? (
+              <WhatsAppPlantaoNotice userId={context.userId} mode="daily" />
+            ) : null}
             <CommandPalette />
             {!isLightBroker && <SystemFeedbackDrawer />}
             {!isLightBroker && <AgentDrawer />}
