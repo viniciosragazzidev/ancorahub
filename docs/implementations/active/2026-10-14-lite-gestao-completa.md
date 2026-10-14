@@ -75,8 +75,13 @@ Correções antes de qualquer tela nova:
 - Supervisor: conversas da equipe, só leitura.
 
 ### E4. Equipe e unidade
-- Gestor: convidar corretor (sheet), aprovar pedidos de transferência (`TransferRequestsPanel`), notas de feedback, "Minha unidade" (`/unidades/<branchId>`: métricas, membros, top corretores) no Lite.
+- Gestor: aprovar pedidos de transferência (`TransferRequestsPanel`), notas de feedback, "Minha unidade" (`/unidades/<branchId>`: métricas, membros, top corretores) no Lite.
 - Supervisor: já tem `/equipe/minha`, configurar, transferência, repassar, perfil. Conferir paridade visual.
+- **Adicionar pessoas (pedido do Vinicios, 2026-10-14):**
+  - **Gestor** adiciona na unidade dele um **corretor** ou um **supervisor**: criar o acesso (convite) já com a unidade dele travada, e escolher o papel entre corretor e supervisor (nunca gestor ou diretor). Para supervisor, escolher já os corretores da unidade que ele vai supervisionar (opcional).
+  - **Supervisor** tem duas opções na equipe dele: **criar um corretor novo** (convite) que já entra na unidade dele e na equipe dele; ou **adicionar à equipe um corretor já cadastrado na unidade** (lista dos corretores ativos da unidade sem supervisor; corretor de outra equipe vai pelo pedido de transferência que já existe).
+  - Escopo no servidor: unidade sempre a do ator (`context.branchId`), papel permitido por `canCreateRole` (gestor: supervisor e corretor; supervisor: corretor), e-mail já usado em outro tenant recusado como hoje, tudo auditado.
+  - Reuso: `createTeamUserAction`, `TeamInviteSection`, `addBrokerToMyTeamAction` (`features/supervisor-workspace/actions.ts:15`), `my-team-actions.ts` (convidar), fluxo de transferência (`transfer-actions.ts`). Visual: sheet do Lite, um passo por vez (dados, papel, unidade travada, confirmação).
 
 ### E5. Desempenho e relatórios (depende de E0.2)
 - Painel do dia (números, filas, plantões, WhatsApp dos corretores) em cards Lite; relatório de qualidade dos leads simples; drill-downs (`/dashboard/drill/<id>`); ranking da unidade (`unitLeaderboard`) em `/equipe/desempenho` para o gestor; NOC da unidade (E0.7); integridade da unidade (E0.1).
