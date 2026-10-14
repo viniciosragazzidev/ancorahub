@@ -8,6 +8,8 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { hasPermission } from "@/shared/auth/permissions";
 import { AuthorizationError } from "@/shared/auth/errors";
+import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
+import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
 
 export type SaleActionState = { success?: boolean; error?: string };
 export type BulkExportState = { csvData?: string; count?: number; error?: string };
@@ -27,18 +29,16 @@ export async function bulkExportSalesAction(
     if (saleIds.length === 0) return { error: "Nenhuma venda selecionada." };
 
     const db = getDatabase();
+    const reportScope = await resolveReportDataScope(context);
+    const leadScope = buildStrictRoleLeadScope(context, reportScope);
 
-    // Fetch selected sales with scope filtering
     const conditions = [
       inArray(schema.sales.id, saleIds),
       eq(schema.sales.tenantId, context.tenantId),
+      eq(schema.sales.tenantId, schema.leads.tenantId),
+      leadScope,
+      reportScope.salesBrokerScope,
     ];
-
-    if (context.role === "broker") {
-      conditions.push(eq(schema.sales.brokerId, context.userId));
-    } else if (context.role === "manager" && context.branchId) {
-      conditions.push(eq(schema.leads.branchId, context.branchId));
-    }
 
     const rows = await db
       .select({
@@ -53,7 +53,7 @@ export async function bulkExportSalesAction(
         status: schema.sales.status,
       })
       .from(schema.sales)
-      .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+      .innerJoin(schema.leads, and(eq(schema.sales.leadId, schema.leads.id), eq(schema.sales.tenantId, schema.leads.tenantId)))
       .leftJoin(schema.clients, eq(schema.sales.clientId, schema.clients.id))
       .innerJoin(schema.user, eq(schema.sales.brokerId, schema.user.id))
       .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))

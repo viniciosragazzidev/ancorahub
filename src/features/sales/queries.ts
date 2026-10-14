@@ -4,6 +4,8 @@ import { and, desc, eq, sql } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
+import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
 
 export type SaleRecord = {
   id: string;
@@ -32,15 +34,8 @@ export type SaleRecord = {
 export async function getSales(): Promise<SaleRecord[]> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-
-  const conditions = [eq(schema.sales.tenantId, context.tenantId)];
-
-  // Apply scope filtering based on role
-  if (context.role === "broker") {
-    conditions.push(eq(schema.sales.brokerId, context.userId));
-  } else if (context.role === "manager" && context.branchId) {
-    conditions.push(eq(schema.leads.branchId, context.branchId));
-  }
+  const reportScope = await resolveReportDataScope(context);
+  const leadScope = buildStrictRoleLeadScope(context, reportScope);
 
   return db
     .select({
@@ -67,32 +62,30 @@ export async function getSales(): Promise<SaleRecord[]> {
       updatedAt: schema.sales.updatedAt,
     })
     .from(schema.sales)
-    .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.sales.leadId, schema.leads.id), eq(schema.sales.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.clients, eq(schema.sales.clientId, schema.clients.id))
     .innerJoin(schema.user, eq(schema.sales.brokerId, schema.user.id))
     .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
     .leftJoin(schema.carrierPlans, eq(schema.sales.carrierPlanId, schema.carrierPlans.id))
     .leftJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
     .leftJoin(schema.commissionRules, eq(schema.sales.commissionRuleId, schema.commissionRules.id))
-    .where(and(...conditions))
+    .where(and(eq(schema.sales.tenantId, context.tenantId), leadScope, reportScope.salesBrokerScope))
     .orderBy(desc(schema.sales.createdAt));
 }
 
 export async function getSaleById(saleId: string): Promise<SaleRecord | null> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const reportScope = await resolveReportDataScope(context);
+  const leadScope = buildStrictRoleLeadScope(context, reportScope);
 
   const conditions = [
     eq(schema.sales.id, saleId),
     eq(schema.sales.tenantId, context.tenantId),
+    eq(schema.sales.tenantId, schema.leads.tenantId),
+    leadScope,
+    reportScope.salesBrokerScope,
   ];
-
-  // Apply scope
-  if (context.role === "broker") {
-    conditions.push(eq(schema.sales.brokerId, context.userId));
-  } else if (context.role === "manager" && context.branchId) {
-    conditions.push(eq(schema.leads.branchId, context.branchId));
-  }
 
   const [row] = await db
     .select({
@@ -119,7 +112,7 @@ export async function getSaleById(saleId: string): Promise<SaleRecord | null> {
       updatedAt: schema.sales.updatedAt,
     })
     .from(schema.sales)
-    .innerJoin(schema.leads, eq(schema.sales.leadId, schema.leads.id))
+    .innerJoin(schema.leads, and(eq(schema.sales.leadId, schema.leads.id), eq(schema.sales.tenantId, schema.leads.tenantId)))
     .leftJoin(schema.clients, eq(schema.sales.clientId, schema.clients.id))
     .innerJoin(schema.user, eq(schema.sales.brokerId, schema.user.id))
     .leftJoin(schema.branches, eq(schema.leads.branchId, schema.branches.id))
@@ -150,6 +143,8 @@ export type CommissionScheduleItem = {
 export async function getCommissionSchedule(saleId: string): Promise<CommissionScheduleItem[]> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const reportScope = await resolveReportDataScope(context);
+  const leadScope = buildStrictRoleLeadScope(context, reportScope);
 
   return db
     .select({
@@ -168,11 +163,14 @@ export async function getCommissionSchedule(saleId: string): Promise<CommissionS
     })
     .from(schema.commissionSchedule)
     .leftJoin(schema.user, eq(schema.commissionSchedule.paidBy, schema.user.id))
-    .innerJoin(schema.sales, eq(schema.commissionSchedule.saleId, schema.sales.id))
+    .innerJoin(schema.sales, and(eq(schema.commissionSchedule.saleId, schema.sales.id), eq(schema.commissionSchedule.tenantId, schema.sales.tenantId)))
+    .innerJoin(schema.leads, and(eq(schema.sales.leadId, schema.leads.id), eq(schema.sales.tenantId, schema.leads.tenantId)))
     .where(
       and(
         eq(schema.commissionSchedule.saleId, saleId),
         eq(schema.sales.tenantId, context.tenantId),
+        leadScope,
+        reportScope.salesBrokerScope,
       ),
     )
     .orderBy(schema.commissionSchedule.monthNumber);
@@ -189,14 +187,9 @@ export type SaleSummary = {
 export async function getSaleSummary(): Promise<SaleSummary> {
   const context = await getRequiredTenantContext();
   const db = getDatabase();
-
-  const salesConditions = [eq(schema.sales.tenantId, context.tenantId)];
-
-  if (context.role === "broker") {
-    salesConditions.push(eq(schema.sales.brokerId, context.userId));
-  } else if (context.role === "manager" && context.branchId) {
-    salesConditions.push(eq(schema.sales.brokerId, context.userId));
-  }
+  const reportScope = await resolveReportDataScope(context);
+  const leadScope = buildStrictRoleLeadScope(context, reportScope);
+  const salesConditions = [eq(schema.sales.tenantId, context.tenantId), leadScope, reportScope.salesBrokerScope];
 
   const [salesSummary] = await db
     .select({
@@ -204,41 +197,26 @@ export async function getSaleSummary(): Promise<SaleSummary> {
       salesCount: sql<number>`COUNT(*)`,
     })
     .from(schema.sales)
+    .innerJoin(schema.leads, and(eq(schema.sales.leadId, schema.leads.id), eq(schema.sales.tenantId, schema.leads.tenantId)))
     .where(and(...salesConditions));
 
-  const [totalComm] = await db
-    .select({
-      total: sql<string>`COALESCE(SUM(${schema.commissionSchedule.amount}), 0)`,
-    })
+  const commissionScope = [
+    eq(schema.commissionSchedule.tenantId, context.tenantId),
+    eq(schema.sales.tenantId, context.tenantId),
+    leadScope,
+    reportScope.salesBrokerScope,
+  ];
+  const commissionTotal = (status?: "pending" | "paid") => db
+    .select({ total: sql<string>`COALESCE(SUM(${schema.commissionSchedule.amount}), 0)` })
     .from(schema.commissionSchedule)
-    .innerJoin(schema.sales, eq(schema.commissionSchedule.saleId, schema.sales.id))
-    .where(eq(schema.sales.tenantId, context.tenantId));
-
-  const [pendingComm] = await db
-    .select({
-      total: sql<string>`COALESCE(SUM(${schema.commissionSchedule.amount}), 0)`,
-    })
-    .from(schema.commissionSchedule)
-    .innerJoin(schema.sales, eq(schema.commissionSchedule.saleId, schema.sales.id))
-    .where(
-      and(
-        eq(schema.sales.tenantId, context.tenantId),
-        eq(schema.commissionSchedule.status, "pending"),
-      ),
-    );
-
-  const [paidComm] = await db
-    .select({
-      total: sql<string>`COALESCE(SUM(${schema.commissionSchedule.amount}), 0)`,
-    })
-    .from(schema.commissionSchedule)
-    .innerJoin(schema.sales, eq(schema.commissionSchedule.saleId, schema.sales.id))
-    .where(
-      and(
-        eq(schema.sales.tenantId, context.tenantId),
-        eq(schema.commissionSchedule.status, "paid"),
-      ),
-    );
+    .innerJoin(schema.sales, and(eq(schema.commissionSchedule.saleId, schema.sales.id), eq(schema.commissionSchedule.tenantId, schema.sales.tenantId)))
+    .innerJoin(schema.leads, and(eq(schema.sales.leadId, schema.leads.id), eq(schema.sales.tenantId, schema.leads.tenantId)))
+    .where(and(...commissionScope, status ? eq(schema.commissionSchedule.status, status) : undefined));
+  const [[totalComm], [pendingComm], [paidComm]] = await Promise.all([
+    commissionTotal(),
+    commissionTotal("pending"),
+    commissionTotal("paid"),
+  ]);
 
   return {
     totalRevenue: salesSummary?.totalRevenue ?? "0",
