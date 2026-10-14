@@ -12,7 +12,7 @@ import { MemberDutyCalendar } from "./_components/member-duty-calendar";
 import { MemberLeadsTabs } from "./_components/member-leads-tabs";
 import { MemberOffersPanel, MemberTemperaturePanel } from "./_components/member-temperature";
 import { MemberRankingPanel } from "./_components/member-ranking";
-import { getMemberOfferRanking } from "@/features/engagement/broker-stats";
+import { getMemberOfferRanking, getScopedMemberOfferRanking } from "@/features/engagement/broker-stats";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getCachedSupervisorWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { rankHeadline, type RankPosition } from "@/features/engagement/ranking";
@@ -20,6 +20,8 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { listBrokerNotes } from "@/features/supervisor-workspace/notes-actions";
 import { SupervisorBrokerProfile, SupervisorNoteHistory } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
 import { getSupervisorLiteMemberPulse } from "@/features/supervisor-workspace/lite-queries";
+import { getManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team-queries";
+import { LiteBrokerProfileActions } from "@/features/manager-workspace/manager-lite-profile-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -44,13 +46,39 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
   const profile = await getTeamMemberProfile(id);
   if (!profile) redirect("/access-denied");
 
-  const supervisorLite = context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor";
-  if (supervisorLite) {
+  const audience = await getLiteAudience(context);
+  const managerLite = context.role === "manager" && audience === "manager";
+  if (managerLite && profile.member.role !== "broker") redirect("/not-found");
+  if (managerLite) {
     const notes = await listBrokerNotes(profile.member.userId).catch(() => []);
-    const ranking = profile.member.role === "broker"
-      ? await getMemberOfferRanking(context.tenantId, profile.member.userId).catch(() => null)
-      : null;
+    const teamData = await getManagerLiteTeam(context);
+    const brokerIds = teamData.members.filter((member) => member.status === "active" && member.userId).map((member) => member.userId!);
+    const ranking = await getScopedMemberOfferRanking(context.tenantId, brokerIds, profile.member.userId).catch(() => null);
+    const pulse = await getSupervisorLiteMemberPulse({ context, memberId: profile.member.userId, slaMinutes: teamData.slaMinutes }).catch(() => null);
+    const activeStatuses = new Set(["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+    const active = profile.member.membershipStatus === "active" && profile.member.userStatus === "active";
+    return <SupervisorBrokerProfile
+      member={{ userId: profile.member.userId, name: profile.member.name, image: profile.member.image, branchName: profile.member.branchName, availabilityStatus: profile.member.availabilityStatus, email: profile.member.email, phone: profile.member.brokerPhone, brokerCode: profile.member.brokerCode, statusLabel: active ? "Ativo" : "Desativado" }}
+      metrics={{ portfolio: profile.metrics.leads.total, inService: profile.metrics.leads.active, withoutFirstContact: profile.metrics.leads.withoutFirstContact, sales: profile.metrics.sales.total, overdueTasks: profile.metrics.tasks.overdue, qualified: profile.metrics.leads.qualified, lost: profile.metrics.leads.lost }}
+      recentLeads={profile.recentLeads.filter((lead) => activeStatuses.has(lead.status)).slice(0, 8).map((lead) => ({ id: lead.id, name: lead.name, status: lead.status, queueName: lead.queueName, assignedAt: lead.assignedAt?.toISOString() ?? null, createdAt: lead.createdAt.toISOString() }))}
+      whatsappHref={buildWhatsAppUrl(profile.member.brokerPhone)}
+      relationshipHref={`/relacionamento?brokerId=${encodeURIComponent(profile.member.userId)}`}
+      ranking={ranking ? { medianAcceptSeconds: ranking.stats?.medianAcceptSeconds ?? null, positions: ranking.ranks.map((rank) => rankHeadline(rank)), periodDays: ranking.periodDays } : null}
+      notes={notes} joinedAt={profile.member.joinedAt.toISOString()} pulse={pulse ?? undefined}
+      managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
+      managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={active} canResetPassword />}
+      showSupervisorActions={false}
+    />;
+  }
+  const supervisorLite = context.role === "supervisor" && audience === "supervisor";
+  if (supervisorLite) {
+    if (profile.member.role !== "broker") redirect("/not-found");
+    const notes = await listBrokerNotes(profile.member.userId).catch(() => []);
     const teamData = profile.member.role === "broker" ? await getCachedSupervisorWorkspaceData().catch(() => null) : null;
+    const brokerIds = teamData?.team.map((broker) => broker.userId) ?? [];
+    const ranking = profile.member.role === "broker"
+      ? await getScopedMemberOfferRanking(context.tenantId, brokerIds, profile.member.userId).catch(() => null)
+      : null;
     const teamRanks: RankPosition[] = ranking ? teamData?.team.find((broker) => broker.userId === profile.member.userId)?.ranks ?? [] : [];
     const pulse = profile.member.role === "broker" && teamData
       ? await getSupervisorLiteMemberPulse({ context, memberId: profile.member.userId, slaMinutes: teamData.slaMinutes }).catch(() => null)
@@ -66,6 +94,10 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
           image: profile.member.image,
           branchName: profile.member.branchName,
           availabilityStatus: liveAvailability,
+          email: profile.member.email,
+          phone: profile.member.brokerPhone,
+          brokerCode: profile.member.brokerCode,
+          statusLabel: profile.member.membershipStatus === "active" && profile.member.userStatus === "active" ? "Ativo" : "Desativado",
         }}
         metrics={{
           portfolio: profile.metrics.leads.total,
@@ -73,6 +105,8 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
           withoutFirstContact: profile.metrics.leads.withoutFirstContact,
           sales: profile.metrics.sales.active,
           overdueTasks: profile.metrics.tasks.overdue,
+          qualified: profile.metrics.leads.qualified,
+          lost: profile.metrics.leads.lost,
         }}
         recentLeads={profile.recentLeads
           .filter((lead) => activeStatuses.has(lead.status))
@@ -95,6 +129,9 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
         notes={notes}
         joinedAt={profile.member.joinedAt.toISOString()}
         pulse={pulse ?? undefined}
+        managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
+        managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={profile.member.membershipStatus === "active" && profile.member.userStatus === "active"} canResetPassword={false} />}
+        showSupervisorActions
       />
     );
   }

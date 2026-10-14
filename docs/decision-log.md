@@ -1723,3 +1723,20 @@ e auditoria atual. Sem unidade autenticada, a área de Leads fica vazia e não
 consulta o tenant. Notificações, Configurações e Primeiro acesso permanecem
 permitidos; Distribuição, Escala, Meta e demais telas de gestão ficam fora da
 allowlist até serem portadas. Desligar a flag restaura a experiência anterior.
+
+## DEC-142 - Equipe Lite com escopos distintos para gestor e supervisor
+
+**Aceita pelo Vinicios em 2026-10-14.**
+
+O gestor no Lite pode consultar e executar ações de gestão apenas sobre corretores
+cuja membership ativa pertence à unidade autenticada. O supervisor pode consultar
+e agir somente sobre corretores cuja membership ativa aponta `supervisorId` para
+ele, mesmo quando outros corretores pertencem à mesma unidade. Convites pendentes
+do gestor seguem a unidade gravada no convite; o perfil do corretor não concede
+escopo sozinho. A lista, perfil, busca e todas as Server Actions repetem a
+autorização no tenant atual. O perfil Lite expõe operação e dados comerciais em
+leitura, com dias de plantão sem edição; pausa de leads, escala, autoridade,
+exclusão, lote e transferência de carteira continuam exclusivos do diretor geral.
+O Lite do gestor continua atrás de `MANAGER_LITE`; com a flag desligada, `/equipe`
+preserva a tela atual. Registro de implementação:
+`docs/implementations/active/2026-10-14-team-lite-management.md`.

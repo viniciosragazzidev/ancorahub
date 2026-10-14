@@ -23,7 +23,8 @@ export function statsWindow(now = new Date()) {
  * Services started (offers and direct assignments) and the median time from assignment to start, per broker.
  * A reassigned lead counts for its current broker (corretorId), even if the previous one started it.
  */
-async function getTeamServiceStats(tenantId: string, window: { since: Date; until: Date }) {
+async function getTeamServiceStats(tenantId: string, window: { since: Date; until: Date }, brokerIds?: readonly string[]) {
+  if (brokerIds && !brokerIds.length) return new Map();
   const leads = schema.leads;
   const rows = await getDatabase().select({
     brokerId: leads.corretorId,
@@ -39,6 +40,7 @@ async function getTeamServiceStats(tenantId: string, window: { since: Date; unti
       lt(leads.serviceStartedAt, window.until),
       eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.status, "active"),
+      brokerIds ? inArray(leads.corretorId, [...brokerIds]) : undefined,
     ))
     .groupBy(leads.corretorId);
   return new Map(rows.filter((row) => row.brokerId).map((row) => [row.brokerId!, { started: Number(row.started), medianStartSeconds: row.medianStartSeconds === null ? null : Number(row.medianStartSeconds) }]));
@@ -48,7 +50,8 @@ async function getTeamServiceStats(tenantId: string, window: { since: Date; unti
 const teamStatsCache = new TtlCache<BrokerOfferStats[]>(60_000, 200);
 
 /** Offers and services of every active broker: offers only cover the plantão; services also count direct assignments. */
-export async function getTeamOfferStats(tenantId: string, window = statsWindow()): Promise<BrokerOfferStats[]> {
+export async function getTeamOfferStats(tenantId: string, window = statsWindow(), brokerIds?: readonly string[]): Promise<BrokerOfferStats[]> {
+  if (brokerIds) return loadTeamStats(tenantId, window, brokerIds);
   const cached = teamStatsCache.get(tenantId);
   if (cached) return cached;
   const stats = await loadTeamStats(tenantId, window);
@@ -56,8 +59,9 @@ export async function getTeamOfferStats(tenantId: string, window = statsWindow()
   return stats;
 }
 
-async function loadTeamStats(tenantId: string, window: { since: Date; until: Date }): Promise<BrokerOfferStats[]> {
-  const [offerStats, serviceStats] = await Promise.all([getTeamOnlyOfferStats(tenantId, window), getTeamServiceStats(tenantId, window)]);
+async function loadTeamStats(tenantId: string, window: { since: Date; until: Date }, brokerIds?: readonly string[]): Promise<BrokerOfferStats[]> {
+  if (brokerIds && !brokerIds.length) return [];
+  const [offerStats, serviceStats] = await Promise.all([getTeamOnlyOfferStats(tenantId, window, brokerIds), getTeamServiceStats(tenantId, window, brokerIds)]);
   const byBroker = new Map(offerStats.map((row) => [row.brokerId, row]));
   for (const [brokerId, service] of serviceStats) {
     const current = byBroker.get(brokerId) ?? { brokerId, offered: 0, accepted: 0, medianAcceptSeconds: null };
@@ -67,7 +71,7 @@ async function loadTeamStats(tenantId: string, window: { since: Date; until: Dat
 }
 
 /** Offers received, accepted and the median time to accept of every active broker (one grouped query). */
-async function getTeamOnlyOfferStats(tenantId: string, window: { since: Date; until: Date }): Promise<BrokerOfferStats[]> {
+async function getTeamOnlyOfferStats(tenantId: string, window: { since: Date; until: Date }, brokerIds?: readonly string[]): Promise<BrokerOfferStats[]> {
   const offers = schema.leadOffers;
   const rows = await getDatabase().select({
     brokerId: offers.brokerId,
@@ -83,6 +87,7 @@ async function getTeamOnlyOfferStats(tenantId: string, window: { since: Date; un
       notInArray(offers.status, NOT_COUNTED),
       eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.status, "active"),
+      brokerIds ? inArray(offers.brokerId, [...brokerIds]) : undefined,
     ))
     .groupBy(offers.brokerId);
   return rows.map((row) => ({
@@ -140,5 +145,15 @@ export async function getBrokerHighlights(tenantId: string, brokerId: string, no
 export async function getMemberOfferRanking(tenantId: string, brokerId: string, now = new Date()) {
   if (!(await journeyEnabled())) return null;
   const [team, withoutStep] = await Promise.all([getTeamOfferStats(tenantId, statsWindow(now)), getLeadsWithoutStep(tenantId, brokerId, now)]);
+  return { stats: team.find((row) => row.brokerId === brokerId) ?? null, ranks: rankBroker(team, brokerId), periodDays: STATS_PERIOD_DAYS, withoutStep: withoutStep.total };
+}
+
+/** A team ranking whose SQL input is restricted to broker IDs resolved in the viewer's authorized scope. */
+export async function getScopedMemberOfferRanking(tenantId: string, brokerIds: readonly string[], brokerId: string, now = new Date()) {
+  if (!brokerIds.includes(brokerId) || !(await journeyEnabled())) return null;
+  const [team, withoutStep] = await Promise.all([
+    getTeamOfferStats(tenantId, statsWindow(now), brokerIds),
+    getLeadsWithoutStep(tenantId, brokerId, now),
+  ]);
   return { stats: team.find((row) => row.brokerId === brokerId) ?? null, ranks: rankBroker(team, brokerId), periodDays: STATS_PERIOD_DAYS, withoutStep: withoutStep.total };
 }

@@ -307,3 +307,14 @@ simulação com retenção e atribuição manual permitida. Reutiliza Checkbox, 
 simulador e relatório existentes; sem token, primitive ou movimento novo. A
 leitura e a gravação da política permanecem escopadas pelo tenant. Registro:
 `docs/implementations/completed/2026-10-13-cold-leads-per-queue.md`.
+## 2026-10-14: T125, Lista e perfil Lite de equipe
+
+Papel e rotas: gestor em `/equipe` e `/equipe/<id>`, limitado aos corretores da
+unidade; supervisor permanece em `/equipe/minha` e no perfil dos corretores com
+`supervisorId` próprio. Ações principais: abrir perfil, enviar recado e executar
+operações básicas explicitamente autorizadas. Estados: lista com busca/contadores,
+sem unidade, sem resultados, convite pendente, perfil fora do escopo e ação com
+confirmação/sucesso/erro. Disclosure por menu do card e por seções do perfil; os dias
+de plantão ficam somente para leitura. Reutiliza as peças Arc/Lite e o perfil atual;
+sem novo token, primitive ou animação. Decisão de produto: DEC-142. A revisão não
+avança a etapa global UX-M1.10.

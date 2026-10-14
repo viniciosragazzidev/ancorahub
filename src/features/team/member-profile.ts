@@ -75,6 +75,9 @@ export async function getTeamMemberProfile(memberUserId: string) {
   const managerScope = context.role === "manager"
     ? context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : sql`false`
     : undefined;
+  const brokerLeadUnitScope = context.role === "manager" || context.role === "supervisor"
+    ? context.branchId ? eq(schema.leads.branchId, context.branchId) : sql`false`
+    : undefined;
   const [member] = await db.select({
     userId: schema.user.id,
     name: schema.user.name,
@@ -112,40 +115,40 @@ export async function getTeamMemberProfile(memberUserId: string) {
   const leadScope = and(
     eq(schema.leads.tenantId, context.tenantId),
     eq(schema.leads.corretorId, member.userId),
-    context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+    brokerLeadUnitScope,
   );
   const salesScope = and(
     eq(schema.sales.tenantId, context.tenantId),
     eq(schema.sales.brokerId, member.userId),
-    context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+    brokerLeadUnitScope,
   );
   const taskScope = and(
     eq(schema.leadTasks.tenantId, context.tenantId),
     eq(schema.leadTasks.assignedTo, member.userId),
-    context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+    brokerLeadUnitScope,
   );
   const quoteScope = and(
     eq(schema.quotes.tenantId, context.tenantId),
     eq(schema.quotes.createdBy, member.userId),
-    context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+    brokerLeadUnitScope,
   );
   const interactionScope = and(
     eq(schema.leads.tenantId, context.tenantId),
     eq(schema.leadInteractions.userId, member.userId),
-    context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+    brokerLeadUnitScope,
   );
   const redistributionScope = and(
     eq(schema.leadDistributionEvents.tenantId, context.tenantId),
     eq(schema.leadDistributionEvents.previousOwnerId, member.userId),
     or(ne(schema.leadDistributionEvents.newOwnerId, member.userId), isNull(schema.leadDistributionEvents.newOwnerId)),
-    context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+    brokerLeadUnitScope,
   );
   const offerScope = and(
     eq(schema.leadOffers.tenantId, context.tenantId),
     eq(schema.leadOffers.brokerId, member.userId),
     isNotNull(schema.leadOffers.outboundMessageId),
     inArray(schema.whatsappOutboundMessages.status, ["sent", "delivered", "read"]),
-    context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined,
+    brokerLeadUnitScope,
   );
 
   const dutyDateWindow = getMemberDutyDateWindow(new Date());
@@ -226,7 +229,7 @@ export async function getTeamMemberProfile(memberUserId: string) {
     }).from(schema.dutyRosterAssignments)
       .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId), eq(schema.unitDutySchedules.tenantId, context.tenantId)))
       .leftJoin(schema.dutyScheduleTypes, and(eq(schema.dutyScheduleTypes.id, schema.unitDutySchedules.typeId), eq(schema.dutyScheduleTypes.tenantId, context.tenantId)))
-      .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.brokerId, member.userId), eq(schema.dutyRosterAssignments.status, "active"), ne(schema.unitDutySchedules.status, "archived"), or(isNull(schema.dutyRosterAssignments.dutyDate), and(gte(schema.dutyRosterAssignments.dutyDate, dutyDateWindow.fromDateKey), lte(schema.dutyRosterAssignments.dutyDate, dutyDateWindow.throughDateKey))))) : Promise.resolve([]),
+      .where(and(eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.brokerId, member.userId), eq(schema.dutyRosterAssignments.status, "active"), ne(schema.unitDutySchedules.status, "archived"), context.role === "manager" || context.role === "supervisor" ? context.branchId ? eq(schema.unitDutySchedules.branchId, context.branchId) : sql`false` : undefined, or(isNull(schema.dutyRosterAssignments.dutyDate), and(gte(schema.dutyRosterAssignments.dutyDate, dutyDateWindow.fromDateKey), lte(schema.dutyRosterAssignments.dutyDate, dutyDateWindow.throughDateKey))))) : Promise.resolve([]),
   ]);
 
   let dutyDays: ReturnType<typeof buildMemberDutyDays> = [];
@@ -242,11 +245,11 @@ export async function getTeamMemberProfile(memberUserId: string) {
     if (scheduleIds.length) {
       [leadDutyCounts, offerDutyCounts, presenceCounts] = await Promise.all([
         db.select({ scheduleId: schema.leads.dutyScheduleId, date: assignedDate, total: sql<number>`count(*)::int` }).from(schema.leads)
-          .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, member.userId), gte(schema.leads.assignedAt, dutyFromAt), lt(schema.leads.assignedAt, dutyThroughAt), or(inArray(schema.leads.dutyScheduleId, scheduleIds), isNull(schema.leads.dutyScheduleId)), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
+          .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, member.userId), gte(schema.leads.assignedAt, dutyFromAt), lt(schema.leads.assignedAt, dutyThroughAt), or(inArray(schema.leads.dutyScheduleId, scheduleIds), isNull(schema.leads.dutyScheduleId)), brokerLeadUnitScope))
           .groupBy(schema.leads.dutyScheduleId, assignedDate),
         db.select({ scheduleId: schema.leadOffers.dutyScheduleId, date: offeredDate, sent: sql<number>`count(*)::int`, accepted: sql<number>`count(*) filter (where ${schema.leadOffers.status} = 'ACCEPTED')::int` })
           .from(schema.leadOffers).innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, context.tenantId)))
-          .where(and(eq(schema.leadOffers.tenantId, context.tenantId), eq(schema.leadOffers.brokerId, member.userId), inArray(schema.leadOffers.dutyScheduleId, scheduleIds), ne(schema.leadOffers.status, "CANCELLED"), gte(schema.leadOffers.offeredAt, dutyFromAt), lt(schema.leadOffers.offeredAt, dutyThroughAt), context.role === "manager" && context.branchId ? eq(schema.leads.branchId, context.branchId) : undefined))
+          .where(and(eq(schema.leadOffers.tenantId, context.tenantId), eq(schema.leadOffers.brokerId, member.userId), inArray(schema.leadOffers.dutyScheduleId, scheduleIds), ne(schema.leadOffers.status, "CANCELLED"), gte(schema.leadOffers.offeredAt, dutyFromAt), lt(schema.leadOffers.offeredAt, dutyThroughAt), brokerLeadUnitScope))
           .groupBy(schema.leadOffers.dutyScheduleId, offeredDate),
         db.select({ scheduleId: schema.dutyPresenceConfirmations.scheduleId, date: sql<string>`${schema.dutyPresenceConfirmations.dutyDate}::text`, status: schema.dutyPresenceConfirmations.status, total: sql<number>`count(*)::int` })
           .from(schema.dutyPresenceConfirmations)

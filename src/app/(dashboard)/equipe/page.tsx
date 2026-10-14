@@ -19,11 +19,16 @@ import { UnitsView } from "./units-view";
 import { getPendingBrokerTransferRequestsAction } from "@/features/supervisor-workspace/transfer-actions";
 import { TransferRequestsPanel } from "@/features/supervisor-workspace/transfer-requests-panel";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { ManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team";
+import { getManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team-queries";
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
   const context = await getRequiredTenantContext();
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") redirect("/equipe/minha");
   if (context.role === "broker") redirect("/access-denied");
+  if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
+    return <ManagerLiteTeam initialData={await getManagerLiteTeam(context)} />;
+  }
   const params = await searchParams;
   if (params.visao === "unidades") {
     if (context.role !== "director" && !(context.role === "manager" && context.branchId)) redirect("/access-denied");

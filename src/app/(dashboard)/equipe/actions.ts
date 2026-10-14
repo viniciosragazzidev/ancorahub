@@ -25,6 +25,8 @@ import { findPostSaleExemptionQueueName, postSaleTransferAuditAction } from "@/f
 import { publishLeadInvalidation } from "@/features/leads/publish-lead-invalidation";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { canRevokeTeamInvitation } from "@/features/team/invitation-scope";
+import { canManageLiteBroker } from "@/features/team/lite-team-scope";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 
 import { invalidateTenantContextCache } from "@/shared/auth/tenant-context";
 import { clearSupervisedBrokers, detachFromSupervision, supervisedBrokersField, syncSupervisedBrokers } from "@/features/team/supervised-brokers";
@@ -32,6 +34,27 @@ export type TeamActionState = { success?: boolean; error?: string; message?: str
 
 const memberRole = z.enum(["director", "manager", "supervisor", "broker"]);
 const memberJobTitle = z.enum(schema.teamJobTitleValues);
+const liteBrokerIdInput = z.string().trim().min(1).max(80);
+const liteContactInput = z.object({
+  userId: liteBrokerIdInput,
+  name: z.string().trim().min(2).max(120),
+  email: z.string().trim().email().max(254).transform((value) => value.toLowerCase()),
+  phone: z.string().trim().min(8).max(30),
+});
+
+async function getLiteManagedBroker(userId: string, context: Awaited<ReturnType<typeof getRequiredTenantContext>>) {
+  const [target] = await getDatabase().select({
+    membershipId: schema.tenantMemberships.id,
+    userId: schema.tenantMemberships.userId,
+    role: schema.tenantMemberships.role,
+    branchId: schema.tenantMemberships.branchId,
+    supervisorId: schema.tenantMemberships.supervisorId,
+    status: schema.tenantMemberships.status,
+  }).from(schema.tenantMemberships)
+    .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, userId)))
+    .limit(1);
+  return target && canManageLiteBroker(context, target) ? target : null;
+}
 
 const updateMemberInput = z.object({
   memberId: z.string().uuid(),
@@ -514,6 +537,7 @@ export async function toggleTeamMemberStatusAction(
         userId: schema.user.id,
         role: schema.tenantMemberships.role,
         branchId: schema.tenantMemberships.branchId,
+        supervisorId: schema.tenantMemberships.supervisorId,
         status: schema.user.status,
       })
       .from(schema.tenantMemberships)
@@ -535,6 +559,7 @@ export async function toggleTeamMemberStatusAction(
       branchId: member.branchId,
       userId: member.userId,
     });
+    if (context.role === "supervisor" && member.supervisorId !== context.userId) throw new Error("Este corretor não pertence à sua equipe.");
 
     const nextActive = member.status !== "active";
 
@@ -563,6 +588,60 @@ export async function toggleTeamMemberStatusAction(
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro desconhecido ao atualizar o status.";
     return { success: false, error: message };
+  }
+}
+
+export async function toggleLiteBrokerStatusAction(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
+  try {
+    const userId = liteBrokerIdInput.parse(formData.get("userId"));
+    const context = await getRequiredTenantContext();
+    const audience = await getLiteAudience(context);
+    if ((context.role !== "manager" || audience !== "manager") && (context.role !== "supervisor" || audience !== "supervisor")) throw new Error("Esta ação não está disponível.");
+    const target = await getLiteManagedBroker(userId, context);
+    if (!target) throw new Error("Corretor fora do seu escopo de gestão.");
+    const scopedForm = new FormData();
+    scopedForm.set("memberId", target.membershipId);
+    return toggleTeamMemberStatusAction({}, scopedForm);
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar o status." };
+  }
+}
+
+export async function updateLiteBrokerContactAction(input: unknown): Promise<TeamActionState> {
+  try {
+    const data = liteContactInput.parse(input);
+    const context = await getRequiredTenantContext();
+    const audience = await getLiteAudience(context);
+    if ((context.role !== "manager" || audience !== "manager") && (context.role !== "supervisor" || audience !== "supervisor")) throw new Error("Esta ação não está disponível.");
+    const target = await getLiteManagedBroker(data.userId, context);
+    if (!target || target.status !== "active") throw new Error("Corretor fora do seu escopo de gestão.");
+    const db = getDatabase();
+    const [otherTenantMembership] = await db.select({ id: schema.tenantMemberships.id }).from(schema.tenantMemberships)
+      .where(and(eq(schema.tenantMemberships.userId, target.userId), ne(schema.tenantMemberships.tenantId, context.tenantId))).limit(1);
+    if (otherTenantMembership) throw new Error("O e-mail deste acesso é compartilhado com outro tenant e não pode ser alterado por esta tela.");
+    await db.transaction(async (tx) => {
+      await tx.update(schema.user).set({ name: data.name, email: data.email, updatedAt: new Date() }).where(eq(schema.user.id, target.userId));
+      await tx.update(schema.brokerProfiles).set({ professionalName: data.name, invitedEmail: data.email, phone: data.phone, updatedAt: new Date() })
+        .where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.userId, target.userId)));
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "broker_profile", entidadeId: target.userId, acao: "team.broker_contact_updated" });
+    });
+    return { success: true, message: "Dados do corretor atualizados." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível atualizar os dados." };
+  }
+}
+
+export async function generateLiteBrokerPasswordResetAction(_prev: TeamActionState & { resetUrl?: string }, formData: FormData): Promise<TeamActionState & { resetUrl?: string }> {
+  try {
+    const userId = liteBrokerIdInput.parse(formData.get("userId"));
+    const context = await getRequiredTenantContext();
+    if (context.role !== "manager" || (await getLiteAudience(context)) !== "manager") throw new Error("Apenas o gestor Lite pode gerar este link.");
+    const target = await getLiteManagedBroker(userId, context);
+    if (!target) throw new Error("Corretor fora da sua unidade.");
+    const result = await generatePasswordResetLinkForMember(target.userId);
+    return { success: true, resetUrl: result.resetUrl };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "Não foi possível gerar o link." };
   }
 }
 
@@ -858,7 +937,21 @@ export async function getPendingInvitesAction() {
 
 export async function resendInviteAction(_prev: TeamActionState, formData: FormData): Promise<TeamActionState> {
   try {
-    const result = await resendTeamInvitation(formData.get("memberId") ?? formData.get("invitationId"));
+    const identifier = String(formData.get("memberId") ?? formData.get("invitationId") ?? "").trim();
+    const context = await getRequiredTenantContext();
+    const [invitation] = await getDatabase().select({
+      id: schema.brokerInvitations.id, userId: schema.brokerProfiles.userId,
+      role: schema.brokerInvitations.role, branchId: schema.brokerInvitations.branchId,
+      supervisorId: schema.tenantMemberships.supervisorId, membershipRole: schema.tenantMemberships.role, memberBranchId: schema.tenantMemberships.branchId,
+    }).from(schema.brokerInvitations)
+      .innerJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId), eq(schema.brokerProfiles.tenantId, context.tenantId)))
+      .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId), eq(schema.tenantMemberships.tenantId, context.tenantId)))
+      .where(and(or(eq(schema.brokerInvitations.id, identifier), eq(schema.brokerInvitations.brokerProfileId, identifier)), eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.status, "PENDING")))
+      .limit(1);
+    if (!invitation || !canRevokeTeamInvitation(context, { userId: invitation.userId, role: invitation.membershipRole ?? invitation.role, branchId: invitation.memberBranchId ?? invitation.branchId, supervisorId: invitation.supervisorId })) {
+      throw new Error("Este convite está fora do seu escopo de gestão.");
+    }
+    const result = await resendTeamInvitation(identifier);
     invalidateTenantContextCache(); // role/unit/status changes apply at once
     return { success: true, ...result };
   } catch (error) {
@@ -881,6 +974,7 @@ export async function revokeInviteAction(_prev: TeamActionState, formData: FormD
         branchId: schema.brokerInvitations.branchId,
         supervisorId: schema.tenantMemberships.supervisorId,
         membershipRole: schema.tenantMemberships.role,
+        memberBranchId: schema.tenantMemberships.branchId,
       })
       .from(schema.brokerInvitations)
       .innerJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId), eq(schema.brokerProfiles.tenantId, context.tenantId)))
@@ -893,7 +987,7 @@ export async function revokeInviteAction(_prev: TeamActionState, formData: FormD
     if (!canRevokeTeamInvitation(context, {
       userId: invitation.userId,
       role: invitation.membershipRole ?? invitation.role,
-      branchId: invitation.branchId,
+      branchId: invitation.memberBranchId ?? invitation.branchId,
       supervisorId: invitation.supervisorId,
     })) throw new Error("Este convite está fora do seu escopo de gestão.");
 
