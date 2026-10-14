@@ -55,6 +55,8 @@ export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/primeiro-acesso$/,
   /^\/equipe$/,
   new RegExp(`^/equipe/(?!cargos(?:/|$)|convidar(?:/|$)|dashboard(?:/|$)|recuperacoes(?:/|$)|minha(?:/|$)|repassar(?:/|$)|transferencia(?:/|$))${ID}$`),
+  /^\/clientes$/,
+  new RegExp(`^/clientes/${ID}$`),
 ];
 
 export function isLightRouteAllowed(pathname: string, audience: "broker" | "supervisor" | "manager" = "broker") {
@@ -83,6 +85,7 @@ export const LIGHT_SUPERVISOR_DESTINATIONS: readonly LightMoreDestination[] = [
 export const LIGHT_MANAGER_DESTINATIONS: readonly LightMoreDestination[] = [
   { href: "/leads", label: "Leads da unidade" },
   { href: "/equipe", label: "Equipe" },
+  { href: "/clientes", label: "Clientes" },
   { href: "/notificacoes", label: "Notificações" },
   { href: "/settings", label: "Configurações" },
 ];

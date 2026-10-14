@@ -1,0 +1,75 @@
+// @vitest-environment jsdom
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
+
+import { LightClientDetail, type LightClientDetailData } from "./light-client-detail";
+
+const base: LightClientDetailData = {
+  client: {
+    id: "c1",
+    leadId: "lead-1",
+    name: "Marina Alves",
+    phone: "11999998888",
+    email: "marina@example.com",
+    convertedAt: "2026-09-20T12:00:00Z",
+    branchName: "Unidade Centro",
+    brokerName: "Paulo Dias",
+  },
+  activeCustomer: {
+    status: "active",
+    coverageStartDate: "2026-09-20",
+    contractAnniversary: "2026-12-01",
+    expirationDate: null,
+    renewalStatus: "pending_window",
+    cancellationDate: null,
+    cancellationReason: null,
+  },
+  sales: [{ id: "s1", planName: "Plano Essencial", carrierName: "Operadora X", saleValue: "350.5", policyNumber: "APL-9", status: "approved", saleDate: "2026-09-20", brokerName: "Paulo Dias" }],
+  beneficiaries: [{ id: "b1", name: "Marina Alves", relationship: null, isHolder: true }],
+  documents: [{ id: "d1", filename: "rg.pdf", status: "approved", requirementName: "RG" }],
+  timeline: [{ id: "t1", tipo: "status_change", conteudo: "Venda concluída", userName: "Paulo Dias", createdAt: "2026-09-20T12:00:00Z" }],
+};
+
+afterEach(() => cleanup());
+
+describe("LightClientDetail", () => {
+  it("shows the client sections with the WhatsApp action and the link back to the lead", () => {
+    render(<LightClientDetail data={base} />);
+
+    expect(screen.getByRole("heading", { level: 1, name: "Marina Alves" })).toBeTruthy();
+    expect(screen.getByText("Cliente ativo")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "WhatsApp" }).getAttribute("href")).toContain("wa.me/");
+    expect(screen.getByRole("link", { name: "Ver lead original" }).getAttribute("href")).toBe("/leads/lead-1");
+    expect(screen.getByRole("heading", { name: "Renovação" })).toBeTruthy();
+    expect(screen.getByText("Acompanhar no prazo")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Beneficiários (1)" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Documentos (1)" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Linha do tempo" })).toBeTruthy();
+  });
+
+  it("marks a cancelled client and shows the cancellation reason", () => {
+    render(
+      <LightClientDetail
+        data={{
+          ...base,
+          activeCustomer: { ...base.activeCustomer!, status: "cancelled", cancellationDate: "2026-10-01", cancellationReason: "Inadimplência" },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Cliente cancelado")).toBeTruthy();
+    expect(screen.getByText(/Inadimplência/)).toBeTruthy();
+    expect(screen.queryByText(/Renovação em \d+ dias/)).toBeNull();
+  });
+
+  it("explains empty sections instead of leaving them blank", () => {
+    render(<LightClientDetail data={{ ...base, client: { ...base.client, phone: null }, activeCustomer: null, sales: [], beneficiaries: [], documents: [], timeline: [] }} />);
+
+    expect(screen.queryByRole("link", { name: "WhatsApp" })).toBeNull();
+    expect(screen.getByText("Sem contrato ativo registrado para este cliente.")).toBeTruthy();
+    expect(screen.getByText("Nenhuma venda registrada.")).toBeTruthy();
+    expect(screen.getByText("Nenhum beneficiário cadastrado.")).toBeTruthy();
+    expect(screen.getByText("Nenhum documento enviado.")).toBeTruthy();
+    expect(screen.getByText("Nenhum registro na linha do tempo.")).toBeTruthy();
+  });
+});

@@ -43,7 +43,9 @@ export default async function CustomersPage({
 
   const experienceMode = await getExperienceMode(context);
 
-  if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
+  // Gestor and supervisor Lite share the list; buildClientScopeWhere limits each to his unit or team.
+  const liteAudience = await getLiteAudience(context);
+  if (liteAudience === "supervisor" || liteAudience === "manager") {
     const clients = await db.select({
       id: schema.clients.id,
       name: schema.clients.nome,
@@ -55,7 +57,7 @@ export default async function CustomersPage({
       .leftJoin(schema.user, eq(schema.clients.corretorId, schema.user.id))
       .where(buildClientScopeWhere(context))
       .orderBy(desc(schema.clients.convertedAt));
-    return <LightClientsList clients={clients} />;
+    return <LightClientsList clients={clients} management />;
   }
 
   if (experienceMode === "LIGHT" && context.role === "broker") {

@@ -58,4 +58,14 @@ describe("LightClientsList", () => {
     render(<LightClientsList clients={[]} />);
     expect(screen.getByRole("heading", { name: "Nenhum cliente ainda" })).toBeTruthy();
   });
+
+  it("shows the big title and the count blocks only on the management screen", () => {
+    const { unmount } = render(<LightClientsList clients={clients} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Clientes" }).className).toContain("sr-only");
+    unmount();
+
+    render(<LightClientsList clients={clients} management />);
+    expect(screen.getByRole("heading", { level: 1, name: "Clientes" }).className).not.toContain("sr-only");
+    expect(screen.getByText("Corretores com clientes")).toBeTruthy();
+  });
 });

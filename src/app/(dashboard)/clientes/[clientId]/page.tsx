@@ -21,6 +21,8 @@ import { CustomerRenewalStatus } from "@/features/post-sale/components/customer-
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
 
 import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { LightClientDetail } from "@/features/broker-workspace/components/light-client-detail";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,60 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
     .limit(1);
 
   if (!client) notFound();
+
+  // Gestor and supervisor Lite: the Lite ficha, read through the same scoped client lookup above.
+  const liteAudience = await getLiteAudience(context);
+  if (liteAudience === "supervisor" || liteAudience === "manager") {
+    const [liteSales, liteActiveCustomer, timeline, documents, beneficiaries] = await Promise.all([
+      db
+        .select({
+          id: schema.sales.id,
+          planName: schema.carrierPlans.name,
+          carrierName: schema.carriers.name,
+          saleValue: schema.sales.saleValue,
+          policyNumber: schema.sales.policyNumber,
+          saleDate: schema.sales.saleDate,
+          status: schema.sales.status,
+          brokerName: schema.user.name,
+        })
+        .from(schema.sales)
+        .leftJoin(schema.carrierPlans, eq(schema.sales.carrierPlanId, schema.carrierPlans.id))
+        .leftJoin(schema.carriers, eq(schema.carrierPlans.carrierId, schema.carriers.id))
+        .leftJoin(schema.user, eq(schema.sales.brokerId, schema.user.id))
+        .where(and(eq(schema.sales.tenantId, context.tenantId), eq(schema.sales.clientId, client.id)))
+        .orderBy(desc(schema.sales.createdAt)),
+      db
+        .select({
+          status: schema.activeCustomers.status,
+          coverageStartDate: schema.activeCustomers.coverageStartDate,
+          contractAnniversary: schema.activeCustomers.contractAnniversary,
+          expirationDate: schema.activeCustomers.expirationDate,
+          renewalStatus: schema.activeCustomers.renewalStatus,
+          cancellationDate: schema.activeCustomers.cancellationDate,
+          cancellationReason: schema.activeCustomers.cancellationReason,
+        })
+        .from(schema.activeCustomers)
+        .where(and(eq(schema.activeCustomers.tenantId, context.tenantId), eq(schema.activeCustomers.clientId, client.id)))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
+      getLeadTimeline(client.leadId),
+      getLeadDocuments(client.leadId),
+      getLeadBeneficiaries(client.leadId),
+    ]);
+
+    return (
+      <LightClientDetail
+        data={{
+          client,
+          activeCustomer: liteActiveCustomer,
+          sales: liteSales,
+          beneficiaries,
+          documents: documents.map((document) => ({ id: document.id, filename: document.filename, status: document.status, requirementName: document.requirementName })),
+          timeline: timeline ?? [],
+        }}
+      />
+    );
+  }
 
   // Fetch related data in parallel
   const [lead, sales, activeCustomer, interactions, requirements, leadDocs, checklist, beneficiaries] = await Promise.all([
