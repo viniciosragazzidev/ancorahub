@@ -86,6 +86,7 @@ export function ChatHome({
   leads,
   nowIso,
   canQuote,
+  leadsBadgeCount,
   mode = "page",
   summary = null,
   highlights = null,
@@ -97,6 +98,7 @@ export function ChatHome({
   leads: ThreadSummary[];
   nowIso: string;
   canQuote: boolean;
+  leadsBadgeCount?: number;
   mode?: "page" | "rail";
   summary?: HomeSummary | null;
   highlights?: HomeHighlights | null;
@@ -116,7 +118,7 @@ export function ChatHome({
   const [query, setQuery] = useState("");
   const [newOpen, setNewOpen] = useState(false);
   const firstName = viewerName.split(/\s+/)[0] || viewerName;
-  const waitingLeads = leads.filter((lead) => lead.waitingYou).length;
+  const waitingLeads = leadsBadgeCount ?? leads.filter((lead) => lead.waitingYou).length;
   const visible = (tab === "assistentes" ? assistants : leads).filter((thread) => matches(thread, query));
   const nextLead = leads.find((lead) => lead.waitingYou) ?? null;
   const next = summary?.next ?? null;
@@ -166,7 +168,7 @@ export function ChatHome({
         <button type="button" className={home.me} data-tour="home-me" aria-label="Abrir menu e disponibilidade" onClick={() => shell?.openMore?.()}>{initialsOf(viewerName)}</button>
         <Link href="/dashboard" className={home.helloLink}><h1 className={home.hello}>Olá, {firstName}</h1></Link>
         <div className={home.headerTools} data-tour="home-tools">
-          {isSupervisor || isManager ? null : <WhatsAppStatusButton />}
+          {isSupervisor || (isManager && mode !== "rail") ? null : <WhatsAppStatusButton />}
           <button type="button" className={styles.iconButton} aria-label={searching ? "Fechar busca" : "Buscar"} aria-pressed={searching} onClick={() => { setSearching((value) => !value); setQuery(""); }}><SearchIcon /></button>
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>

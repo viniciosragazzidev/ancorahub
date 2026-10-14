@@ -10,10 +10,10 @@ import { getLeadTimeline } from "@/features/leads/queries";
 
 const ACTIVE_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
-export type ManagerLiteLeadData = { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number; viewerName: string };
+export type ManagerLiteLeadData = { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number; viewerName: string; brokersWithoutWhatsApp: number };
 
 const emptyData = (viewerName = "Gestor"): ManagerLiteLeadData => ({
-  team: [], leads: [], funnel: { new: 0, firstContact: 0, service: 0, quote: 0, closing: 0 }, slaMinutes: 15, viewerName,
+  team: [], leads: [], funnel: { new: 0, firstContact: 0, service: 0, quote: 0, closing: 0 }, slaMinutes: 15, viewerName, brokersWithoutWhatsApp: 0,
 });
 
 export const getManagerLiteLeads = cache(async function getManagerLiteLeads(context: TenantContext): Promise<ManagerLiteLeadData> {
@@ -50,6 +50,14 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
     id: member.id, name: member.name ?? "Corretor", image: member.image ?? null, availability: member.availability ?? "offline",
     openCount: ownerCounts.get(member.id)?.openCount ?? 0, late: ownerCounts.get(member.id)?.late ?? 0,
   }));
+  const readyConnections = team.length
+    ? await db.select({ userId: schema.whatsappConnections.userId }).from(schema.whatsappConnections)
+      .where(and(
+        eq(schema.whatsappConnections.tenantId, scope.tenantId),
+        eq(schema.whatsappConnections.status, "ready"),
+        inArray(schema.whatsappConnections.userId, team.map((member) => member.id)),
+      ))
+    : [];
   const funnelCounts = new Map(counts.map((row) => [row.status, Number(row.total)]));
   const leads: RadarLead[] = rows.map((lead) => ({
     id: lead.id, name: lead.name ?? "Lead", phone: lead.phone ?? null, status: lead.status, ownerId: lead.ownerId ?? "", ownerName: lead.ownerName ?? "Sem corretor", ownerImage: lead.ownerImage ?? null,
@@ -67,6 +75,7 @@ export const getManagerLiteLeads = cache(async function getManagerLiteLeads(cont
     },
     slaMinutes,
     viewerName: viewer?.name ?? "Gestor",
+    brokersWithoutWhatsApp: Math.max(0, team.length - new Set(readyConnections.map((connection) => connection.userId)).size),
   };
 });
 

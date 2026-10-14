@@ -101,7 +101,7 @@ export function LightChrome({
       <div className="lite-split">
         <aside className="lite-rail arc-venancor" aria-label="Conversas" aria-busy={!chatRail}>
           {chatRail ? (
-            <ChatHome mode="rail" viewerName={chatRail.viewerName} assistants={chatRail.assistants} leads={chatRail.leads} nowIso={chatRail.nowIso} canQuote={chatRail.canQuote} />
+            <ChatHome mode="rail" viewerName={chatRail.viewerName} assistants={chatRail.assistants} leads={chatRail.leads} nowIso={chatRail.nowIso} canQuote={chatRail.canQuote} leadsBadgeCount={chatRail.leadsBadgeCount} />
           ) : (
             <div className="lite-rail-skeleton" aria-hidden="true">
               {Array.from({ length: 7 }, (_, index) => <span key={index} />)}

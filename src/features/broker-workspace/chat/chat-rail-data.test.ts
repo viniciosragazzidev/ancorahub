@@ -32,9 +32,10 @@ describe("manager desktop chat rail", () => {
         { id: "lead-3", ownerId: null },
       ],
       team: [
-        { id: "broker-1", openCount: 2 },
-        { id: "broker-2", openCount: 0 },
+        { id: "broker-1", openCount: 2, late: 0 },
+        { id: "broker-2", openCount: 0, late: 1 },
       ],
+      brokersWithoutWhatsApp: 1,
     });
   });
 
@@ -42,7 +43,7 @@ describe("manager desktop chat rail", () => {
     const rail = await getChatRailData();
 
     expect(rail?.viewerName).toBe("Ana Gestora");
-    expect(rail?.assistants).toHaveLength(2);
+    expect(rail?.assistants).toHaveLength(4);
     expect(rail?.assistants[0]).toMatchObject({
       name: "Leads da unidade",
       preview: "2 leads aguardando distribuição manual.",
@@ -55,8 +56,13 @@ describe("manager desktop chat rail", () => {
       name: "Minha unidade",
       preview: "1 corretor em atendimento na unidade.",
       href: "/equipe",
-      shape: "nuvem",
+      shape: "mochi",
+      waitingYou: true,
     });
+    expect(rail?.assistants[2]).toMatchObject({ name: "Desempenho da unidade", href: "/equipe", shape: "nuvem" });
+    expect(rail?.assistants[3]).toMatchObject({ name: "Notificações", href: "/notificacoes", shape: "jack" });
+    expect(rail?.leadsBadgeCount).toBe(2);
+    expect(rail?.managerUnitSummary).toMatchObject({ leads: 3, unassigned: 2, activeBrokers: 2, brokersWithoutWhatsApp: 1, late: 1 });
     expect(rail?.assistants.every((thread) => thread.at !== null)).toBe(true);
     expect(mocks.getManagerLiteLeads).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-1", branchId: "branch-1" }));
   });

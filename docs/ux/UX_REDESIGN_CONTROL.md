@@ -328,3 +328,7 @@ avança a etapa global UX-M1.10.
 ## 2026-10-14: T126 Manager Lite chat rail
 
 Desktop manager home uses the shared conversation rail on the left and the unit summary at center. Primary actions open Leads da unidade and Minha unidade. Mobile navigation stays as before. Reuses ChatHome styles, tokens, and components without adding a primitive, token, or animation.
+
+### T126b: desktop parity with broker Lite
+
+The manager desktop now uses the broker's existing header controls, Assistentes/Leads tabs, count badge, and conversation row components. The list and four home metrics use only the authenticated manager's tenant and unit scope. Mobile behavior is unchanged. No new token or primitive.
