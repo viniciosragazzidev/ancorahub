@@ -82,6 +82,22 @@
   --foreground: #0b0b12;
   --text-secondary: #4b4b59;
   --text-muted: #666674;
+  /* Keep shared CRM primitives aligned with the Arc light palette in this scope. */
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--foreground);
+  --primary: #3b2dff;
+  --primary-foreground: #ffffff;
+  --secondary: var(--surface-muted);
+  --secondary-foreground: var(--foreground);
+  --muted: var(--surface-muted);
+  --muted-foreground: var(--text-muted);
+  --input: var(--border-strong);
+  --ring: var(--accent-strong);
+  --destructive: var(--danger);
+  --destructive-foreground: #ffffff;
+  --success-foreground: #ffffff;
   --border: rgb(16 16 40 / 0.08);
   --border-subtle: rgb(16 16 40 / 0.05);
   --border-strong: rgb(16 16 40 / 0.18);

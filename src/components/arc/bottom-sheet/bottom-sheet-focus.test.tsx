@@ -34,3 +34,13 @@ describe("BottomSheet without a trigger", () => {
     expect(document.activeElement).toBe(opener);
   });
 });
+
+describe("BottomSheet with a trigger", () => {
+  it("uses the supplied button as the trigger without nesting buttons", async () => {
+    render(<BottomSheet trigger={<button type="button">Abrir painel</button>} title="Painel" closeLabel="Fechar"><p>Conteúdo do painel</p></BottomSheet>);
+    const trigger = screen.getByRole("button", { name: "Abrir painel" });
+    expect(trigger.querySelector("button")).toBeNull();
+    fireEvent.click(trigger);
+    expect(await screen.findByText("Conteúdo do painel")).toBeTruthy();
+  });
+});

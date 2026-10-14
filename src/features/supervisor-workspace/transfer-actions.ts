@@ -35,6 +35,7 @@ export type TransferActionResult = { ok: true } | { ok: false; reason: string };
 async function canManageBranch(context: Awaited<ReturnType<typeof getRequiredTenantContext>>, branchId: string) {
   if (context.role === "director") return true;
   if (context.role !== "manager") return false;
+  if ((await getLiteAudience(context)) === "manager") return Boolean(context.branchId && context.branchId === branchId);
   if (context.branchId === branchId) return true;
   const [scope] = await getDatabase().select({ id: schema.tenantManagerBranches.id })
     .from(schema.tenantManagerBranches)
@@ -208,6 +209,10 @@ export async function getPendingBrokerTransferRequestsAction(): Promise<PendingT
   const requestedTo = alias(schema.user, "transfer_to_supervisor");
   const conditions = [eq(schema.supervisorTransferRequests.tenantId, context.tenantId), eq(schema.supervisorTransferRequests.status, "pending")];
   if (context.role === "manager") {
+    if ((await getLiteAudience(context)) === "manager") {
+      if (!context.branchId) return [];
+      conditions.push(eq(schema.supervisorTransferRequests.branchId, context.branchId));
+    } else {
     const scopes = await getDatabase().select({ branchId: schema.tenantManagerBranches.branchId })
       .from(schema.tenantManagerBranches)
       .where(and(eq(schema.tenantManagerBranches.tenantId, context.tenantId), eq(schema.tenantManagerBranches.userId, context.userId)));
@@ -215,6 +220,7 @@ export async function getPendingBrokerTransferRequestsAction(): Promise<PendingT
     if (context.branchId) branchIds.add(context.branchId);
     if (!branchIds.size) return [];
     conditions.push(inArray(schema.supervisorTransferRequests.branchId, [...branchIds]));
+    }
   }
   const rows = await getDatabase().select({
     id: schema.supervisorTransferRequests.id,

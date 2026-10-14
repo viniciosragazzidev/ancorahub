@@ -55,6 +55,7 @@ export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/primeiro-acesso$/,
   /^\/equipe$/,
   new RegExp(`^/equipe/(?!cargos(?:/|$)|convidar(?:/|$)|dashboard(?:/|$)|recuperacoes(?:/|$)|minha(?:/|$)|repassar(?:/|$)|transferencia(?:/|$))${ID}$`),
+  new RegExp(`^/unidades/${ID}$`),
 ];
 
 export function isLightRouteAllowed(pathname: string, audience: "broker" | "supervisor" | "manager" = "broker") {
@@ -213,6 +214,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/equipe/desempenho"), route: { title: "Placar da equipe", tab: "mais", isRoot: false, parentHref: "/equipe/minha" } },
   { test: exact("/equipe"), route: { title: "Minha unidade", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/equipe"), route: { title: "Corretor", tab: "mais", isRoot: false, parentHref: "/equipe" } },
+  { test: under("/unidades"), route: { title: "Minha unidade", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
   // Settings is a list of sections; ?tab opens one and back returns to the list.

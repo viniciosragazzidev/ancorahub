@@ -1,12 +1,14 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCanCreateRole } from "@/shared/auth/team-permissions";
 import { getDatabase, schema } from "@/shared/db";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { supervisedBrokersField } from "./supervised-brokers";
 import { generateNextInternalCode, createBrokerInvitation } from "./onboarding-helpers";
 import { enqueueBrokerInvitation } from "./broker-invitation-delivery";
 import { classifyExistingTeamIdentity } from "./identity-reuse-policy";
@@ -39,8 +41,26 @@ export const createUserInput = z.object({
 export async function createTeamUser(rawInput: unknown) {
   const input = createUserInput.parse(rawInput);
   const context = requireCanCreateRole(await getRequiredTenantContext(), input.role);
-  if (context.role === "manager" && input.branchId !== context.branchId) {
+  const liteAudience = context.role === "manager" || context.role === "supervisor"
+    ? await getLiteAudience(context)
+    : null;
+  if (context.role === "manager" && liteAudience === "manager" && input.branchId !== context.branchId) {
     throw new Error("Gestores só podem criar acessos na própria unidade.");
+  }
+  if (context.role === "supervisor" && (
+    input.role !== "broker" || !context.supervisorTeamScope || !context.branchId || input.branchId !== context.branchId || liteAudience !== "supervisor"
+  )) {
+    throw new Error("Supervisores só podem convidar corretores para a própria equipe.");
+  }
+  const rawIds = rawInput && typeof rawInput === "object" ? (rawInput as Record<string, unknown>).supervisedBrokerIds : undefined;
+  const parsedSupervisedBrokerIds = supervisedBrokersField.safeParse(rawIds);
+  if (!parsedSupervisedBrokerIds.success) throw new Error(parsedSupervisedBrokerIds.error.issues[0]?.message ?? "Confira os corretores escolhidos.");
+  const selectedBrokerIds = [...new Set(parsedSupervisedBrokerIds.data ?? [])];
+  if (selectedBrokerIds.length !== (parsedSupervisedBrokerIds.data ?? []).length) {
+    throw new Error("Não repita corretores na equipe do supervisor.");
+  }
+  if (selectedBrokerIds.length && (context.role !== "manager" || liteAudience !== "manager" || input.role !== "supervisor")) {
+    throw new Error("A seleção de corretores está disponível somente ao gestor ao convidar um supervisor.");
   }
 
   const db = getDatabase();
@@ -129,6 +149,24 @@ export async function createTeamUser(rawInput: unknown) {
   let invitationId = "";
 
   await db.transaction(async (tx) => {
+    if (selectedBrokerIds.length) {
+      const eligible = await tx.select({ userId: schema.tenantMemberships.userId })
+        .from(schema.tenantMemberships)
+        .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+        .where(and(
+          eq(schema.tenantMemberships.tenantId, context.tenantId),
+          eq(schema.tenantMemberships.branchId, input.branchId),
+          eq(schema.tenantMemberships.role, "broker"),
+          eq(schema.tenantMemberships.status, "active"),
+          eq(schema.user.status, "active"),
+          eq(schema.user.active, true),
+          sql`${schema.tenantMemberships.supervisorId} is null`,
+          inArray(schema.tenantMemberships.userId, selectedBrokerIds),
+        )).for("update");
+      if (eligible.length !== selectedBrokerIds.length) {
+        throw new Error("Escolha apenas corretores ativos e livres da sua unidade.");
+      }
+    }
     let internalCode = input.brokerCode ?? null;
     if (internalCode) {
       const [existingCode] = await tx
@@ -164,7 +202,20 @@ export async function createTeamUser(rawInput: unknown) {
       updatedAt: new Date(),
     });
 
-    const invitation = await createBrokerInvitation(tx, context.tenantId, input.branchId, brokerProfileId, input.email, input.role, input.jobTitle, input.customRoleId ?? null);
+    const invitation = await createBrokerInvitation(
+      tx,
+      context.tenantId,
+      input.branchId,
+      brokerProfileId,
+      input.email,
+      input.role,
+      input.jobTitle,
+      input.customRoleId ?? null,
+      {
+        supervisorId: context.role === "supervisor" && input.role === "broker" ? context.userId : null,
+        supervisedBrokerIds: selectedBrokerIds,
+      },
+    );
     const { token } = invitation;
     inviteToken = token;
     invitationId = invitation.id;
@@ -176,6 +227,15 @@ export async function createTeamUser(rawInput: unknown) {
       entidadeId: brokerProfileId,
       acao: reusableUserId ? "recriou_corretor_onboarding" : "criou_corretor_onboarding",
     });
+    if (selectedBrokerIds.length) {
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(),
+        userId: context.userId,
+        entidade: "broker_invitation",
+        entidadeId: invitation.id,
+        acao: `supervisor_team.invitation_members_selected:${selectedBrokerIds.length}`,
+      });
+    }
     if (reusableUserId) {
       await tx.insert(schema.auditLogs).values({
         id: randomUUID(),

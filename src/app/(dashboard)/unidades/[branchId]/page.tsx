@@ -8,6 +8,10 @@ import { UnitMetricsCards } from "@/features/branches/components/unit-metrics-ca
 import { UnitMembersTable } from "@/features/branches/components/unit-members-table";
 import { UnitTopBrokers } from "@/features/branches/components/unit-top-brokers";
 import { getBranchProfileData } from "@/features/branches/queries";
+import { ManagerLiteUnitProfile } from "@/features/branches/components/manager-lite-unit-profile";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { canAccessManagerUnit } from "@/features/broker-workspace/manager-unit-scope";
+import { isLightRouteAllowed } from "@/components/light/light-routes";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { parsePeriod } from "@/shared/period";
 
@@ -24,6 +28,21 @@ export default async function UnitProfilePage({
   const period = parsePeriod((await searchParams).period);
 
   const { branchId } = await params;
+
+  if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
+    if (!isLightRouteAllowed(`/unidades/${branchId}`, "manager") || !canAccessManagerUnit(context, branchId)) {
+      notFound();
+    }
+
+    let managerUnitData: Awaited<ReturnType<typeof getBranchProfileData>>;
+    try {
+      managerUnitData = await getBranchProfileData(branchId, period);
+    } catch (err) {
+      if (err instanceof Error && err.message === "BRANCH_NOT_FOUND") notFound();
+      redirect("/access-denied");
+    }
+    return <ManagerLiteUnitProfile data={managerUnitData} period={period} />;
+  }
 
   // Authorization: director sees all; manager and broker only their branch.
   if (context.role !== "director") {

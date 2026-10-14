@@ -3,13 +3,13 @@ import { getLightMoreDestinations, isLightRouteAllowed, LIGHT_MANAGER_ALLOWED_RO
 
 describe("manager Lite routes", () => {
   it("allows only the manager's first Lite destinations and a single lead detail segment", () => {
-    for (const path of ["/dashboard", "/leads", "/leads/abc", "/notificacoes", "/settings", "/primeiro-acesso", "/equipe", "/equipe/member-1"]) {
+    for (const path of ["/dashboard", "/leads", "/leads/abc", "/notificacoes", "/settings", "/primeiro-acesso", "/equipe", "/equipe/member-1", "/unidades/branch-1"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(true);
     }
-    for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/leads/distribuicao", "/leads/a/b", "/leads/distribuicao/plantao", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
+    for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/leads/distribuicao", "/leads/a/b", "/leads/distribuicao/plantao", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/unidades", "/unidades/branch-1/subpage", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(false);
     }
-    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(8);
+    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(9);
   });
 
   it("shows unit leads, team, notifications and settings in Mais", () => {

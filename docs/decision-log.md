@@ -1740,3 +1740,18 @@ exclusão, lote e transferência de carteira continuam exclusivos do diretor ger
 O Lite do gestor continua atrás de `MANAGER_LITE`; com a flag desligada, `/equipe`
 preserva a tela atual. Registro de implementação:
 `docs/implementations/active/2026-10-14-team-lite-management.md`.
+
+## DEC-143 - Equipe e unidade do gestor no Lite
+
+**Aceita pelo Vinicios em 2026-10-14 no plano Lite de gestão completa.**
+Com `MANAGER_LITE` ligada, o Gestor consulta e age somente na unidade de seu
+contexto: convida corretores e supervisores, aprova pedidos de transferência,
+registra feedback e consulta métricas, membros e ranking em `/unidades/<branchId>`.
+O Supervisor permanece restrito aos corretores cujo `supervisorId` aponta para
+ele. Um corretor convidado por um supervisor entra na equipe dele ao aceitar;
+quando o gestor convida um supervisor, os corretores livres escolhidos são
+vinculados quando o convite é aceito e somente se ainda estiverem ativos e sem
+supervisor. Membros que entraram em outra equipe não são movidos por esse fluxo.
+As ações e leituras repetem o escopo no servidor e mantêm auditoria. A tela da
+unidade é somente leitura para distribuição e disponibilidade. O comportamento
+do Diretor e o modo normal com a flag desligada permanecem iguais.

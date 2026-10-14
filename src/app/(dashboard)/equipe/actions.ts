@@ -942,7 +942,7 @@ export async function resendInviteAction(_prev: TeamActionState, formData: FormD
     const [invitation] = await getDatabase().select({
       id: schema.brokerInvitations.id, userId: schema.brokerProfiles.userId,
       role: schema.brokerInvitations.role, branchId: schema.brokerInvitations.branchId,
-      supervisorId: schema.tenantMemberships.supervisorId, membershipRole: schema.tenantMemberships.role, memberBranchId: schema.tenantMemberships.branchId,
+      supervisorId: sql<string | null>`coalesce(${schema.tenantMemberships.supervisorId}, ${schema.brokerInvitations.supervisorId})`, membershipRole: schema.tenantMemberships.role, memberBranchId: schema.tenantMemberships.branchId,
     }).from(schema.brokerInvitations)
       .innerJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId), eq(schema.brokerProfiles.tenantId, context.tenantId)))
       .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId), eq(schema.tenantMemberships.tenantId, context.tenantId)))
@@ -972,7 +972,7 @@ export async function revokeInviteAction(_prev: TeamActionState, formData: FormD
         userId: schema.brokerProfiles.userId,
         role: schema.brokerInvitations.role,
         branchId: schema.brokerInvitations.branchId,
-        supervisorId: schema.tenantMemberships.supervisorId,
+        supervisorId: sql<string | null>`coalesce(${schema.tenantMemberships.supervisorId}, ${schema.brokerInvitations.supervisorId})`,
         membershipRole: schema.tenantMemberships.role,
         memberBranchId: schema.tenantMemberships.branchId,
       })

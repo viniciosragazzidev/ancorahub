@@ -15,6 +15,7 @@ import type { TenantRole } from "@/shared/db/schema";
 const ROLE_LABELS: Record<string, string> = {
   director: "Diretor",
   manager: "Gestor",
+  supervisor: "Supervisor",
   broker: "Corretor",
 };
 
