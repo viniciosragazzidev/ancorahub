@@ -28,6 +28,8 @@ vi.mock("@/components/arc/switch/switch", () => ({
 import { LightAvailabilityProvider } from "@/components/light/light-availability-context";
 import { LightAvailabilitySection } from "@/features/broker-availability/components/light-availability-section";
 
+import { ManagerLiteUnitSection } from "@/features/manager-workspace/manager-lite-settings-parts";
+
 import { LightSettings, type LightSettingsSection } from "./light-settings";
 
 const sections: LightSettingsSection[] = [
@@ -60,6 +62,33 @@ describe("LightSettings", () => {
     search.value = "tab=passkey";
     render(<LightSettings sections={sections} />);
     expect(screen.getByText("conteúdo da segurança")).toBeTruthy();
+  });
+});
+
+describe("LightSettings for the manager", () => {
+  it("shows the profile header and the manager's intro above the sections", () => {
+    render(<LightSettings sections={sections} intro="Sua conta, sua unidade e a segurança do acesso." header={<header>Ana Gestora</header>} />);
+    expect(screen.getByText("Ana Gestora")).toBeTruthy();
+    expect(screen.getByText("Sua conta, sua unidade e a segurança do acesso.")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Minha conta/ })).toBeTruthy();
+  });
+});
+
+describe("ManagerLiteUnitSection", () => {
+  it("shows the unit, its people and that rules stay with the director", () => {
+    render(<ManagerLiteUnitSection unit={{ name: "Central", active: true, acceptingLeads: true, autoDistribute: false, brokers: 12, supervisors: 2 }} />);
+    expect(screen.getByRole("heading", { name: "Central" })).toBeTruthy();
+    expect(screen.getByText("Unidade ativa")).toBeTruthy();
+    expect(screen.getByText("Recebendo leads")).toBeTruthy();
+    expect(screen.getByText("12")).toBeTruthy();
+    expect(screen.getByText(/definidos pela diretoria/)).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Equipe da unidade/ }).getAttribute("href")).toBe("/equipe");
+  });
+
+  it("explains an empty state when the manager has no unit", () => {
+    render(<ManagerLiteUnitSection unit={null} />);
+    expect(screen.getByText("Você ainda não está em uma unidade")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: /Equipe da unidade/ })).toBeNull();
   });
 });
 

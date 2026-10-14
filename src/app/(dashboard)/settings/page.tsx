@@ -1,5 +1,8 @@
 import { AccessibilityPreferences } from "@/features/assist/components/accessibility-preferences";
-import { and, eq } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
+import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-scope";
+import { ManagerLiteSettingsFooter, ManagerLiteSettingsHeader, ManagerLiteUnitSection } from "@/features/manager-workspace/manager-lite-settings-parts";
+import { PushNotificationManager } from "@/features/notifications/components/push-notification-manager";
 
 import { DashboardHeader } from "@/components/dashboard-header";
 import { Button } from "@/components/ui/button";
@@ -80,6 +83,46 @@ export default async function SettingsPage() {
   const account = <MinhaContaTab name={user[0]?.name ?? "Usuário"} email={user[0]?.email ?? ""} role={context.role} />;
   const company = <EmpresaTab canEdit tenant={{ name: tenant[0]?.name ?? "", legalName: tenant[0]?.legalName ?? null, cnpj: tenant[0]?.cnpj ?? null, logoUrl: tenant[0]?.logoUrl ?? null, brandColor: tenant[0]?.brandColor ?? null }} />;
   const extension = <ExtensionTab />;
+
+  // Manager Lite: personal settings plus their own unit, read only (rules and queues stay with the director).
+  if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
+    const unitScope = await getManagerUnitScope(context);
+    const [[whatsappConnection], [profile], unitCounts] = await Promise.all([
+      db.select({ status: schema.whatsappConnections.status }).from(schema.whatsappConnections)
+        .where(and(eq(schema.whatsappConnections.tenantId, context.tenantId), eq(schema.whatsappConnections.userId, context.userId))).limit(1),
+      db.select({ image: schema.user.image }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
+      unitScope
+        ? db.select({ role: schema.tenantMemberships.role, value: count() }).from(schema.tenantMemberships)
+          .where(and(eq(schema.tenantMemberships.tenantId, unitScope.tenantId), eq(schema.tenantMemberships.branchId, unitScope.branchId), eq(schema.tenantMemberships.status, "active"), inArray(schema.tenantMemberships.role, ["broker", "supervisor"])))
+          .groupBy(schema.tenantMemberships.role)
+        : Promise.resolve([]),
+    ]);
+    const branch = unitScope ? membership[0] : undefined;
+    const countOf = (role: "broker" | "supervisor") => Number(unitCounts.find((row) => row.role === role)?.value ?? 0);
+    return (
+      <>
+        <LightSettings
+          intro="Sua conta, sua unidade e a segurança do acesso."
+          header={<ManagerLiteSettingsHeader user={{ name: user[0]?.name ?? "Gestor", image: profile?.image ?? null }} branchName={branch?.name ?? null} />}
+          sections={[
+            { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: account },
+            {
+              id: "unidade",
+              title: "Minha unidade",
+              description: branch ? branch.name : "Você ainda não está em uma unidade",
+              node: <ManagerLiteUnitSection unit={branch ? { name: branch.name, active: branch.status === "active", acceptingLeads: branch.acceptingLeads, autoDistribute: branch.autoDistribute, brokers: countOf("broker"), supervisors: countOf("supervisor") } : null} />,
+            },
+            { id: "whatsapp", title: "WhatsApp pessoal", description: "O número que você usa no atendimento", node: <LightWhatsappSection connected={whatsappConnection?.status === "ready"} status={whatsappConnection?.status ?? "disconnected"} /> },
+            { id: "notificacoes", title: "Notificações", description: "Avisos no celular e no navegador", node: <div className="rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)"><PushNotificationManager variant="compact" /></div> },
+            { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityTab enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
+            { id: "extensao", title: "Extensão para o WhatsApp Web", description: "Atendimento contextual no navegador", node: extension },
+            { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, menos animação e alto contraste", node: <AccessibilityPreferences /> },
+          ]}
+          footer={<ManagerLiteSettingsFooter />}
+        />
+      </>
+    );
+  }
 
   // Broker app (Light): sections as cards; managers and directors keep the desktop tabs below.
   if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
