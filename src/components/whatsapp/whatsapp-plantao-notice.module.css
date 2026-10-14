@@ -543,7 +543,7 @@
 
   .modalIllustration {
     grid-area: art;
-    min-height: 176px;
+    min-height: 208px;
     background:
       radial-gradient(ellipse at 50% 67%, rgb(30 64 175 / 12%), transparent 58%),
       linear-gradient(145deg, transparent 12%, rgb(30 64 175 / 4%) 100%);
@@ -558,7 +558,7 @@
   }
 
   .phone {
-    top: 4px;
+    top: 14px;
     width: 92px;
     height: 162px;
     transform: translateX(-50%) perspective(700px) rotateY(-12deg) rotateZ(-5deg);

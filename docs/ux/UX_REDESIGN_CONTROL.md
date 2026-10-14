@@ -19,6 +19,10 @@ compartilhados do Lite, sem nova primitive, token ou regra de domínio.
 
 ## 2026-10-14: T122, refinamento visual do aviso de WhatsApp
 
+### T127 mobile follow-up
+
+The daily WhatsApp modal gives the tilted phone illustration additional vertical space and a top inset, keeping the full device visible inside the existing art panel. No new token or component.
+
 Papel: corretor sem WhatsApp conectado; ação principal: iniciar a conexão no
 computador. O cartão diário usa um tile à esquerda e uma coluna de conteúdo à
 direita, com a linha do computador e o CTA alinhados na mesma linha. O aviso de

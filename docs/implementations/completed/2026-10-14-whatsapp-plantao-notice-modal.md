@@ -13,6 +13,10 @@ conexão não mudaram. Não foram criados tokens, variantes ou dependências.
 
 ## Validação
 
+### Mobile illustration follow-up
+
+The rotated phone is inset farther from the top edge and the art panel has more height, so the whole device stays visible on small screens. Validation: `reports/agent/verification/2026-10-14-t127-mobile-illustration.md`.
+
 - `npx vitest run src/components/whatsapp/whatsapp-plantao-notice.test.tsx`: 5 testes aprovados.
 - `npm run type-check`: aprovado.
 - `npx eslint` nos arquivos TSX alterados: aprovado.
