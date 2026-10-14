@@ -19,6 +19,10 @@ compartilhados do Lite, sem nova primitive, token ou regra de domínio.
 
 ## 2026-10-14: T122, refinamento visual do aviso de WhatsApp
 
+### T127 mobile follow-up
+
+The daily WhatsApp modal gives the tilted phone illustration additional vertical space and a top inset, keeping the full device visible inside the existing art panel. No new token or component.
+
 Papel: corretor sem WhatsApp conectado; ação principal: iniciar a conexão no
 computador. O cartão diário usa um tile à esquerda e uma coluna de conteúdo à
 direita, com a linha do computador e o CTA alinhados na mesma linha. O aviso de
@@ -332,3 +336,14 @@ Desktop manager home uses the shared conversation rail on the left and the unit 
 ### T126b: desktop parity with broker Lite
 
 The manager desktop now uses the broker's existing header controls, Assistentes/Leads tabs, count badge, and conversation row components. The list and four home metrics use only the authenticated manager's tenant and unit scope. Mobile behavior is unchanged. No new token or primitive.
+
+## 2026-10-14: T127, aviso diário de WhatsApp em modal
+
+Papel: corretor; objetivo: conectar o WhatsApp para receber leads do plantão.
+O aviso diário usa o `Dialog` compartilhado, com foco e fechamento por Escape;
+o CTA “Agora não” mantém o fechamento diário e a auditoria existentes. Desktop:
+texto e ilustração em duas colunas. Celular: ilustração acima, orientação de
+conexão e “Entendi”. O aviso compacto do Jack, a audiência, a flag, a conexão e
+o armazenamento local permanecem iguais. Nenhum token, componente-base,
+variante ou movimento novo; sem avanço da etapa global UX-M1.10. Registro:
+`docs/implementations/completed/2026-10-14-whatsapp-plantao-notice-modal.md`.
