@@ -4,7 +4,6 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import { and, eq, gte, isNull, lt, or } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -12,6 +11,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { buildCustomerRenewalStatusScope } from "./customer-renewal-scope";
 
 const registerSaleInput = z.object({
   leadId: z.string().min(1),
@@ -323,6 +323,7 @@ export async function updateCustomerRenewalStatusAction(rawInput: {
 
   const context = await getRequiredTenantContext();
   const db = getDatabase();
+  const customerScope = buildCustomerRenewalStatusScope(context);
 
   const [customer] = await db
     .select({
@@ -338,11 +339,7 @@ export async function updateCustomerRenewalStatusAction(rawInput: {
       and(
         eq(schema.activeCustomers.id, input.activeCustomerId),
         eq(schema.activeCustomers.tenantId, context.tenantId),
-        context.role === "broker"
-          ? eq(schema.activeCustomers.brokerId, context.userId)
-          : context.role === "manager"
-          ? eq(schema.activeCustomers.branchId, context.branchId ?? "")
-          : undefined,
+        customerScope,
       ),
     )
     .limit(1);
@@ -353,7 +350,7 @@ export async function updateCustomerRenewalStatusAction(rawInput: {
   if (customer.status === "cancelled") return { error: "Não é possível atualizar a renovação de um cliente cancelado." };
 
   const now = new Date();
-  await db
+  const [updated] = await db
     .update(schema.activeCustomers)
     .set({
       renewalStatus: input.renewalStatus,
@@ -361,7 +358,10 @@ export async function updateCustomerRenewalStatusAction(rawInput: {
       renewalNotes: input.renewalNotes ?? null,
       updatedAt: now,
     })
-    .where(eq(schema.activeCustomers.id, customer.id));
+    .where(and(eq(schema.activeCustomers.id, customer.id), customerScope))
+    .returning({ id: schema.activeCustomers.id });
+
+  if (!updated) return { error: "Cliente não encontrado ou fora do seu escopo." };
 
   await db.insert(schema.auditLogs).values({
     id: randomUUID(),
