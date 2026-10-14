@@ -11,6 +11,8 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { redirect } from "next/navigation";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { LightCompaniesList } from "@/features/broker-workspace/components/light-companies-list";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +46,8 @@ export default async function EmpresasPage() {
     .where(buildCompanyReadScope(context))
     .groupBy(schema.companies.id, schema.branches.name)
     .orderBy(desc(schema.companies.createdAt));
+  // Gestor Lite: the unit's PJ portfolio in the Lite shell (same scoped query above).
+  if ((await getLiteAudience(context)) === "manager") return <LightCompaniesList companies={companies} />;
   const visibleCompanies = companies;
 
   return (
