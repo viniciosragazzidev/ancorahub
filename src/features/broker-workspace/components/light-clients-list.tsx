@@ -23,8 +23,19 @@ export type LightClientItem = {
 const secondaryAction =
   "inline-flex h-11 items-center justify-center rounded-full bg-(--surface-muted) px-4 text-sm font-semibold text-(--foreground)";
 
-/** Clientes of the broker: search, then one white card per client with WhatsApp and Abrir. */
-/** `management`: the gestor and supervisor screen (big title and count blocks); the broker keeps the compact header. */
+const monthFormat = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
+
+/** "setembro de 2026" -> "Setembro 2026", the same header style as the broker's lead list. */
+function monthLabel(value: Date | string) {
+  const label = monthFormat.format(new Date(value)).replace(" de ", " ");
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+/**
+ * Clientes of the broker: search, then one white card per client with WhatsApp and Abrir.
+ * `management`: the gestor and supervisor screen (big title, count blocks and months as groups);
+ * the broker keeps the compact header and the flat list.
+ */
 export function LightClientsList({ clients, management = false }: { clients: LightClientItem[]; management?: boolean }) {
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -34,7 +45,53 @@ export function LightClientsList({ clients, management = false }: { clients: Lig
     return clients.filter((c) => c.name.toLowerCase().includes(q) || (c.phone && c.phone.includes(q)));
   }, [clients, searchQuery]);
 
+  /** Management groups keep the list order (most recent first) and open a header per month. */
+  const groups = useMemo(() => {
+    const byMonth = new Map<string, { label: string; items: LightClientItem[] }>();
+    for (const client of filteredClients) {
+      const label = monthLabel(client.convertedAt);
+      const group = byMonth.get(label) ?? { label, items: [] };
+      group.items.push(client);
+      byMonth.set(label, group);
+    }
+    return [...byMonth.values()];
+  }, [filteredClients]);
+
   const searching = searchQuery.trim().length > 0;
+
+  function renderClient(client: LightClientItem) {
+    const convertedDate = new Date(client.convertedAt).toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      timeZone: "America/Sao_Paulo",
+    });
+    const waUrl = buildWhatsAppUrl(client.phone);
+
+    return (
+      <LiteListItem key={client.id} className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+        <div className="flex min-w-0 items-center gap-3">
+          <Avatar name={client.name} size="lg" className="light-avatar" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base font-semibold text-(--foreground)">{client.name}</p>
+            <p className="text-sm tabular-nums text-(--text-secondary)">Venda concluída em {convertedDate}</p>
+            {client.brokerName ? <p className="text-sm text-(--text-secondary)">Com {client.brokerName}</p> : null}
+            {client.phone ? <p className="text-sm tabular-nums text-(--text-secondary)">{client.phone}</p> : null}
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {waUrl ? (
+            <a href={waUrl} target="_blank" rel="noopener noreferrer" className={`${secondaryAction} sm:flex-1`}>
+              WhatsApp
+            </a>
+          ) : null}
+          <Link href={`/clientes/${client.id}`} className={`${secondaryAction} sm:flex-1`}>
+            Abrir cliente
+          </Link>
+        </div>
+      </LiteListItem>
+    );
+  }
 
   return (
     <LitePageEnter className="flex min-h-full flex-col text-foreground">
@@ -71,41 +128,25 @@ export function LightClientsList({ clients, management = false }: { clients: Lig
         <SearchField label="Buscar cliente" placeholder="Nome ou telefone" value={searchQuery} onValueChange={setSearchQuery} />
 
         {filteredClients.length > 0 ? (
-          <LiteList className="flex flex-col gap-3" label="Clientes">
-            {filteredClients.map((client) => {
-              const convertedDate = new Date(client.convertedAt).toLocaleDateString("pt-BR", {
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-                timeZone: "America/Sao_Paulo",
-              });
-              const waUrl = buildWhatsAppUrl(client.phone);
-
-              return (
-                <LiteListItem key={client.id} className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <Avatar name={client.name} size="lg" className="light-avatar" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-base font-semibold text-(--foreground)">{client.name}</p>
-                      <p className="text-sm tabular-nums text-(--text-secondary)">Venda concluída em {convertedDate}</p>
-                      {client.brokerName ? <p className="text-sm text-(--text-secondary)">Com {client.brokerName}</p> : null}
-                      {client.phone ? <p className="text-sm tabular-nums text-(--text-secondary)">{client.phone}</p> : null}
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    {waUrl ? (
-                      <a href={waUrl} target="_blank" rel="noopener noreferrer" className={`${secondaryAction} sm:flex-1`}>
-                        WhatsApp
-                      </a>
-                    ) : null}
-                    <Link href={`/clientes/${client.id}`} className={`${secondaryAction} sm:flex-1`}>
-                      Abrir cliente
-                    </Link>
-                  </div>
-                </LiteListItem>
-              );
-            })}
-          </LiteList>
+          management ? (
+            <div className="flex flex-col gap-4">
+              {groups.map((group) => (
+                <section key={group.label} aria-label={group.label} className="flex flex-col gap-3">
+                  <p className="flex items-center gap-2 text-sm font-medium text-(--text-secondary)">
+                    {group.label}
+                    <span className="rounded-full bg-(--surface-muted) px-2 py-0.5 text-xs tabular-nums text-(--foreground)">{group.items.length}</span>
+                  </p>
+                  <LiteList className="flex flex-col gap-3" label={`Clientes de ${group.label}`}>
+                    {group.items.map(renderClient)}
+                  </LiteList>
+                </section>
+              ))}
+            </div>
+          ) : (
+            <LiteList className="flex flex-col gap-3" label="Clientes">
+              {filteredClients.map(renderClient)}
+            </LiteList>
+          )
         ) : (
           <EmptyState
             label="Lista de clientes vazia"

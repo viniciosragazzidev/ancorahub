@@ -13,6 +13,16 @@ const clients = [
   { id: "c3", name: "Juliana Prado", phone: null, email: null, convertedAt: "2026-10-02T12:00:00Z", brokerName: "Paulo Dias" },
 ];
 
+/** Sample conversation list for the rail (the real one comes from getChatRailData). */
+const rail = {
+  viewerName: "Vinicios",
+  assistants: [{ id: "ancora", kind: "assistant" as const, name: "Âncora", preview: "Sem avisos novos.", at: null, unread: false, waitingYou: false, href: "/dashboard/c/ancora", shape: "logo" as const, hue: null }],
+  leads: [{ id: "l1", kind: "lead" as const, name: "Marina Alves", preview: "Cliente ativo", at: null, unread: false, waitingYou: false, href: "/clientes", shape: "mochi" as const, hue: 212 }],
+  nowIso: "2026-10-14T15:00:00.000Z",
+  canQuote: false,
+  leadsBadgeCount: 0,
+};
+
 const detail = {
   client: { id: "c1", leadId: "lead-1", name: "Marina Alves", phone: "11999998888", email: "marina@example.com", convertedAt: "2026-09-20T12:00:00Z", branchName: "Unidade Centro", brokerName: "Paulo Dias" },
   activeCustomer: { status: "active", coverageStartDate: "2026-09-20", contractAnniversary: "2026-12-01", expirationDate: null, renewalStatus: "pending_window", cancellationDate: null, cancellationReason: null },
@@ -28,7 +38,7 @@ export default async function E2PreviewPage({ searchParams }: { searchParams: Pr
 
   // The real Lite shell (rail on desktop, bottom bar on mobile) as the gestor sees it.
   return (
-    <LightChrome audience="manager">
+    <LightChrome audience="manager" initialChatRail={rail}>
       {view === "detail" ? <LightClientDetail data={detail} /> : <LightClientsList clients={clients} management />}
     </LightChrome>
   );
