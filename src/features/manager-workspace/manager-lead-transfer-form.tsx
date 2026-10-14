@@ -35,7 +35,7 @@ export function ManagerLeadTransferForm({ leadId, leadName, brokers }: { leadId:
   return <>
     <Button variant="primary" className="w-full" disabled={brokers.length === 0} onClick={() => setOpen(true)}>Repassar lead</Button>
     {!brokers.length ? <p className="text-sm text-(--text-secondary)">Não há corretores ativos nesta unidade.</p> : null}
-    <BottomSheet title={`Repassar ${leadName}`} description="Escolha o corretor da unidade que vai atender este lead." open={open} onOpenChange={setOpen} closeLabel="Fechar" detents={[0.72]}>
+    <BottomSheet className="arc-venancor" title={`Repassar ${leadName}`} description="Escolha o corretor da unidade que vai atender este lead." open={open} onOpenChange={setOpen} closeLabel="Fechar" detents={[0.72]}>
       <form action={action} aria-label={`Repassar ${leadName}`} className="grid gap-4 px-5 pb-6">
         <input type="hidden" name="leadId" value={leadId} />
         <input type="hidden" name="brokerId" value={brokerId ?? ""} />

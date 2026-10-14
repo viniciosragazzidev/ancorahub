@@ -20,7 +20,7 @@ export function ManagerLeadStatusSheet({ leadId, leadName, currentStatus }: { le
 
   return <>
     <Button variant="secondary" onClick={() => setOpen(true)}>Alterar etapa</Button>
-    <BottomSheet title="Alterar etapa" description={`${leadName} · etapa atual: ${LEAD_STATUS_LABELS[currentStatus] ?? currentStatus}`} open={open} onOpenChange={setOpen} closeLabel="Fechar" detents={[0.72]}>
+    <BottomSheet className="arc-venancor" title="Alterar etapa" description={`${leadName} · etapa atual: ${LEAD_STATUS_LABELS[currentStatus] ?? currentStatus}`} open={open} onOpenChange={setOpen} closeLabel="Fechar" detents={[0.72]}>
       {state.success ? (
         <div className="grid gap-3 px-5 pb-6" aria-live="polite">
           <p className="text-base font-semibold text-(--foreground)">Etapa alterada para {LEAD_STATUS_LABELS[state.newStatus ?? ""] ?? state.newStatus}.</p>
