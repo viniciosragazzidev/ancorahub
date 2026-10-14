@@ -1,5 +1,6 @@
-import { RouteLoading } from "@/components/route-loading";
+import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
 
+/** Lite list skeleton (with the shimmer of the Arc Skeleton) while Clientes loads. */
 export default function Loading() {
-  return <RouteLoading />;
+  return <LightPageSkeleton variant="list" label="Carregando clientes" />;
 }

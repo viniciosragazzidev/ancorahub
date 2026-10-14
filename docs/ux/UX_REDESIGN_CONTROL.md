@@ -347,3 +347,14 @@ conexão e “Entendi”. O aviso compacto do Jack, a audiência, a flag, a cone
 o armazenamento local permanecem iguais. Nenhum token, componente-base,
 variante ou movimento novo; sem avanço da etapa global UX-M1.10. Registro:
 `docs/implementations/completed/2026-10-14-whatsapp-plantao-notice-modal.md`.
+
+## 2026-10-14: E2, Clientes no Lite do gestor e supervisor
+
+Papel: gestor e supervisor; objetivo: ver clientes da unidade ou da equipe no Lite.
+Lista com título grande, dois blocos de contagem e entrada escalonada; ficha do
+cliente com contato, renovação (leitura), vendas, beneficiários, documentos e linha
+do tempo. Gestor pela flag `MANAGER_LITE`; supervisor pela `SUPERVISOR_LITE`.
+Corretor sem mudança de layout: a lista compacta continua e só ganha a entrada
+animada. Pendências: skeleton Lite no carregamento da rota (`loading.tsx` ainda é o
+genérico), prints lado a lado com a tela do corretor e ação de renovação com escopo
+de equipe (E0). Registro: DEC-143.
