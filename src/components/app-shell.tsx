@@ -66,7 +66,7 @@ export function AppShell({
   /** Super admin "Ver como" (button and the strip while viewing as someone). */
   viewAs?: ViewAsState;
   /** Who uses the Lite chrome (supervisor Lite, 2026-10-10). */
-  liteAudience?: "broker" | "supervisor";
+  liteAudience?: "broker" | "supervisor" | "manager";
   showQuoteSimulator?: boolean;
   initialAvailability?: "available" | "paused" | "offline";
   cleanUiEnabled?: boolean;

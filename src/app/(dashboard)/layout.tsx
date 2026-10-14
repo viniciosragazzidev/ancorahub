@@ -21,7 +21,7 @@ import { AgentDrawer } from "@/components/agent-drawer/agent-drawer";
 import { getRealtimeSyncTopic, isRealtimeSyncEnabled } from "@/features/notifications/realtime-sync";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
-import { isSupervisorLiteAvailable } from "@/features/broker-workspace/lite-audience";
+import { isManagerLiteAvailable, isSupervisorLiteAvailable } from "@/features/broker-workspace/lite-audience";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
@@ -67,6 +67,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     ? getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false")
     : Promise.resolve("false");
   const supervisorLitePromise = isSupervisorLiteAvailable(context);
+  const managerLitePromise = isManagerLiteAvailable(context);
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   const headersPromise = headers();
   const tenantPromise = getDatabase()
@@ -115,6 +116,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     relationshipFlag,
     teamRankingFlag,
     supervisorLiteAvailable,
+    managerLiteAvailable,
     welcomeVideoFlag,
     whatsappPlantaoNoticeFlag,
     whatsappConnection,
@@ -130,6 +132,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     relationshipFlagPromise,
     teamRankingFlagPromise,
     supervisorLitePromise,
+    managerLitePromise,
     welcomeVideoFlagPromise,
     whatsappPlantaoNoticeFlagPromise,
     whatsappConnectionPromise,
@@ -138,12 +141,13 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
   // Supervisor Lite (S2): same chrome, team screens only.
   const isLightSupervisor = supervisorLiteAvailable && experienceMode === "LIGHT";
-  const liteAudience = isLightSupervisor ? "supervisor" as const : "broker" as const;
+  const isLightManager = managerLiteAvailable && experienceMode === "LIGHT";
+  const liteAudience = isLightManager ? "manager" as const : isLightSupervisor ? "supervisor" as const : "broker" as const;
 
   const pathname = headersList.get("x-pathname") || "";
 
   if (isLightBroker && brokerJourneyFlag !== "true" && (pathname === "/jornada" || pathname === "/dashboard/c/jornada")) redirect("/dashboard");
-  if (isLightBroker || isLightSupervisor) {
+  if (isLightBroker || isLightSupervisor || isLightManager) {
     if (!isLightRouteAllowed(pathname, liteAudience) && pathname !== "") {
       redirect("/dashboard");
     }
@@ -209,7 +213,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       <AppShell
         viewAs={viewAsState}
         cleanUiEnabled={cleanUiEnabled}
-        isLightBroker={isLightBroker || isLightSupervisor}
+        isLightBroker={isLightBroker || isLightSupervisor || isLightManager}
         liteAudience={liteAudience}
         queueBadgeCount={queueBadgeCount}
         showQuoteSimulator={isLightBroker}
@@ -233,9 +237,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       >
         <TenantOnboardingDialogLoader />
         <DirectorWizardLoader />
-        {/* Lite (broker or supervisor) has its own guided tour: the old step-by-step dialogs would show on top of it. */}
-        {isLightBroker || isLightSupervisor ? null : <RouteOnboardingLoader />}
-        {isLightBroker || isLightSupervisor ? null : <BrokerAvailabilityOnboardingLoader />}
+        {/* Lite audiences skip route and availability onboarding dialogs. */}
+        {isLightBroker || isLightSupervisor || isLightManager ? null : <RouteOnboardingLoader />}
+        {isLightBroker || isLightSupervisor || isLightManager ? null : <BrokerAvailabilityOnboardingLoader />}
         <RealtimeSyncProvider
           tenantId={context.tenantId}
           userId={context.userId}
@@ -250,9 +254,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
             {context.role === "broker" && whatsappPlantaoNoticeFlag === "true" && whatsappConnection && whatsappConnection.status !== "ready" ? (
               <WhatsAppPlantaoNotice userId={context.userId} mode="daily" />
             ) : null}
-            <CommandPalette />
-            {!isLightBroker && <SystemFeedbackDrawer />}
-            {!isLightBroker && <AgentDrawer />}
+            {!isLightManager && <CommandPalette />}
+            {!isLightBroker && !isLightManager && <SystemFeedbackDrawer />}
+            {!isLightBroker && !isLightManager && <AgentDrawer />}
             {children}
           </NotificationCountProvider>
         </RealtimeSyncProvider>

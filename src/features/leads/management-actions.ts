@@ -428,6 +428,9 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       const isDutyReassignment = Boolean(dutyScheduleId);
       const targetBranchId = isDutyReassignment ? lead.branchId : input.branchId ?? lead.branchId;
       if (!targetBranchId) throw new Error("Selecione uma unidade para reatribuir o lead.");
+      if (context.role === "manager" && (!context.branchId || targetBranchId !== context.branchId)) {
+        throw new AuthorizationError("Gestores só podem repassar leads dentro da própria unidade.");
+      }
       const accessContext = toEffectiveLeadAccessContext(context);
       const targetResourceScope = buildLeadResourceScope({ tenantId: context.tenantId, branchId: targetBranchId });
       const targetScopeAllowed = context.role === "director" || accessContext.canAccessAllUnits || (bySupervisor && targetBranchId === lead.branchId) ||
@@ -451,6 +454,9 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       const [broker] = await db.select({ id: schema.user.id, branchId: schema.tenantMemberships.branchId }).from(schema.tenantMemberships)
         .innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
         .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, input.brokerId), isDutyReassignment || isPostSale ? undefined : eq(schema.tenantMemberships.branchId, targetBranchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).limit(1);
+      if (context.role === "manager" && broker?.branchId !== context.branchId) {
+        throw new AuthorizationError("Gestores só podem repassar leads a corretores da própria unidade.");
+      }
       if (!broker || (selectedDutyBroker && broker.branchId !== selectedDutyBroker.branchId)) throw new Error(isPostSale ? "O corretor selecionado não está ativo neste tenant." : isDutyReassignment ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor selecionado não está ativo nesta unidade.");
       // Pós Venda na mesma unidade continua na fila Pós Venda; mudando de unidade, vai para a fila padrão do destino.
       const targetQueueId = isDutyReassignment || (isPostSale && targetBranchId === lead.branchId) ? lead.queueId : await ensureDefaultQueue(context.tenantId, targetBranchId, context.userId);

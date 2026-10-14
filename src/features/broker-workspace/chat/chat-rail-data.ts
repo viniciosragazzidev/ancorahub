@@ -9,6 +9,8 @@ import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/querie
 import { buildSupervisorLeadThreads, buildSupervisorThreads } from "@/features/supervisor-workspace/chat";
 import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { getManagerLiteLeads } from "@/features/supervisor-workspace/manager-lite-queries";
 
 import { buildAssistantThreads, buildLeadThreads } from "./assistant-scripts";
 
@@ -44,6 +46,16 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
         leads: buildSupervisorLeadThreads(data, now),
         nowIso: now.toISOString(),
         canQuote: false,
+      };
+    }
+    if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
+      const data = await getManagerLiteLeads(context);
+      const now = new Date();
+      const waiting = data.leads.filter((lead) => !lead.ownerId).length;
+      return {
+        viewerName: data.viewerName,
+        assistants: [{ id: "assistant:equipe-leads", kind: "assistant", assistant: "equipe-leads", name: "Leads da unidade", verified: true, preview: `${data.leads.length} leads na unidade. Acompanhe e repasse por aqui.`, at: null, unread: false, waitingYou: waiting > 0, href: "/leads", shape: "logo", hue: null }],
+        leads: [], nowIso: now.toISOString(), canQuote: false,
       };
     }
     const data = await getCachedBrokerWorkspaceData();

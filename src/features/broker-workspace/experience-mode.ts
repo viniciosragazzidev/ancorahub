@@ -19,24 +19,30 @@ const COOKIE_NAME = "ancora_experience_mode";
  * 3. Default: "LIGHT" for brokers, "NORMAL" for non-brokers
  */
 export async function getExperienceMode(customContext?: TenantContext): Promise<ExperienceMode> {
+  let context = customContext;
+  // Read the cookie first so a context failure cannot change prior behavior when the manager flag is off.
+  let cookieVal: string | undefined;
   try {
     const cookieStore = await cookies();
-    const cookieVal = cookieStore.get(COOKIE_NAME)?.value;
-    if (cookieVal === "LIGHT" || cookieVal === "NORMAL") {
-      return cookieVal;
-    }
+    cookieVal = cookieStore.get(COOKIE_NAME)?.value;
   } catch {
     // If reading cookies fails outside request context, proceed to context check
   }
 
-  let context = customContext;
   if (!context) {
     try {
       context = await getRequiredTenantContext();
     } catch {
-      return "LIGHT";
+      return cookieVal === "LIGHT" || cookieVal === "NORMAL" ? cookieVal : "LIGHT";
     }
   }
+
+  if (context?.role === "manager") {
+    const { FEATURE_FLAGS, getFeatureFlag } = await import("@/features/system-settings/queries");
+    if ((await getFeatureFlag(FEATURE_FLAGS.MANAGER_LITE).catch(() => "false")) === "true") return "LIGHT";
+  }
+
+  if (cookieVal === "LIGHT" || cookieVal === "NORMAL") return cookieVal;
 
   if (!context) return "LIGHT";
 
@@ -75,6 +81,13 @@ export async function setExperienceModeAction(newMode: ExperienceMode): Promise<
   try {
     const context = await getRequiredTenantContext();
     const mode: ExperienceMode = newMode === "NORMAL" ? "NORMAL" : "LIGHT";
+
+    if (context.role === "manager" && mode === "NORMAL") {
+      const { FEATURE_FLAGS, getFeatureFlag } = await import("@/features/system-settings/queries");
+      if ((await getFeatureFlag(FEATURE_FLAGS.MANAGER_LITE).catch(() => "false")) === "true") {
+        return { success: false, mode: "LIGHT", error: "O modo Lite é obrigatório para gestores neste momento." };
+      }
+    }
 
     try {
       const db = getDatabase();

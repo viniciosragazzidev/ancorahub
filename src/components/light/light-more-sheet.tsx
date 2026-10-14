@@ -43,7 +43,7 @@ export function LightMoreSheet({
   journeyEnabled?: boolean;
   viewAs?: ViewAsState;
   teamRankingEnabled?: boolean;
-  audience?: "broker" | "supervisor";
+  audience?: "broker" | "supervisor" | "manager";
   availability: LightAvailability;
   availabilityPending: boolean;
   onChangeAvailability: (next: "available" | "paused") => void;
@@ -51,6 +51,7 @@ export function LightMoreSheet({
   const destinations = getLightMoreDestinations({ quoteSimulator: showQuoteSimulator, dutyCalendar: showDutyCalendar, relationshipCenter: showRelationship, journey: journeyEnabled, teamRanking: teamRankingEnabled }, audience);
   // The supervisor does not receive leads: no availability, and the tour is the broker's.
   const isSupervisor = audience === "supervisor";
+  const isManager = audience === "manager";
 
   return (
     <BottomSheet
@@ -88,7 +89,7 @@ export function LightMoreSheet({
         </nav>
 
         {/* The tour of the audience (broker or supervisor steps) runs on the Início. */}
-        <button
+        {isManager ? null : <button
           type="button"
           onClick={() => {
             onOpenChange(false);
@@ -103,9 +104,9 @@ export function LightMoreSheet({
             <span className="block text-xs font-normal text-(--text-muted)">{isSupervisor ? "uns 2 minutos, passo a passo" : "uns 3 minutos, passo a passo"}</span>
           </span>
           <ChevronRight className="size-4 text-(--text-muted)" aria-hidden="true" />
-        </button>
+        </button>}
 
-        {isSupervisor ? null : <div className="flex flex-col gap-2">
+        {isSupervisor || isManager ? null : <div className="flex flex-col gap-2">
           <p className="text-sm font-medium text-(--foreground)">Disponibilidade</p>
           <div aria-busy={availabilityPending}>
             <SegmentedControl

@@ -24,6 +24,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
+import { ManagerLiteLeadsPage } from "@/features/manager-workspace/manager-lite-leads";
 import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
@@ -115,6 +116,10 @@ async function LeadsPageContent({
     !(await capabilityPromise)
   )
     redirect("/access-denied");
+
+  if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
+    return <ManagerLiteLeadsPage />;
+  }
 
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
     const params = await searchParams;

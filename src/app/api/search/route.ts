@@ -1,9 +1,9 @@
-import { and, eq, ilike, inArray, isNull, or } from "drizzle-orm";
+import { and, eq, ilike, isNull, or } from "drizzle-orm";
 import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/supervisor-scope";
 import { NextRequest } from "next/server";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
-import { getSystemSetting } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS, getFeatureFlag, getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
 import type { TenantRole } from "@/shared/db/schema";
@@ -38,6 +38,16 @@ export async function GET(request: NextRequest) {
       feat.keywords.some((k) => k.toLowerCase().includes(qLower))
     );
   }).slice(0, 6);
+
+  // A manager without an authenticated unit has no operational search scope.
+  const managerLiteEnabled = context.role === "manager" && (await getFeatureFlag(FEATURE_FLAGS.MANAGER_LITE).catch(() => "false")) === "true";
+  if (managerLiteEnabled && !context.branchId) {
+    return Response.json({ enabled: true, groups: matchingFeatures.length ? [{
+      type: "features", label: "Funcionalidades & Módulos", items: matchingFeatures.map((feature) => ({
+        id: feature.id, title: feature.title, subtitle: `${feature.domain} · ${feature.description}`, href: feature.url,
+      })),
+    }] : [] });
+  }
 
   const pattern = `%${query.replace(/[%_]/g, "\\$&")}%`.trim();
   const teamScoped = isSupervisorTeamScoped(context);

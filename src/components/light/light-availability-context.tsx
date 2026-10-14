@@ -11,7 +11,7 @@ export type LightAvailabilityValue = {
   /** Opens the "Mais" sheet (chat screens have no tab bar of their own). */
   openMore?: () => void;
   /** Who uses the Lite: the broker (default) or the supervisor (team, no availability). */
-  audience?: "broker" | "supervisor";
+  audience?: "broker" | "supervisor" | "manager";
   /** The welcome video plays first on the broker's first access (Super-admin flag). */
   welcomeVideo?: boolean;
 };

@@ -1,3 +1,17 @@
+## 2026-10-14: T124, Gestor Lite com Leads como primeira etapa
+
+Papel: Gestor (`manager`); objetivo: acompanhar e repassar leads da própria unidade.
+Ação principal: abrir um lead e repassá-lo pelo fluxo existente para um corretor
+ativo da unidade. Estados: unidade vinculada, unidade ausente com vazio explícito,
+lead atribuído/sem corretor, sucesso e erro do repasse. Início apresenta uma conversa
+"Leads da unidade"; Leads reutiliza o radar e o detalhe Lite do supervisor com
+variante de gestão. A allowlist limita a experiência a Dashboard, Leads,
+Notificações, Configurações e Primeiro acesso. Sem token ou primitive nova; nenhuma
+transição nova. Drawers de feedback/agente e loaders de onboarding por rota/agenda
+ficam ocultos como no Lite do corretor; onboarding geral de tenant e wizard existentes
+permanecem. Registro: DEC-141 e
+`docs/implementations/active/2026-10-14-manager-lite-leads.md`.
+
 ## 2026-10-14: T122, refinamento visual do aviso de WhatsApp
 
 Papel: corretor sem WhatsApp conectado; ação principal: iniciar a conexão no

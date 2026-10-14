@@ -1711,3 +1711,15 @@ recuperável pelo worker e a contingência não pode tirar o lead frio da fila d
 origem. A atribuição manual direta permanece permitida. A opção começa desligada,
 é editada por fila e auditada no evento `queue.updated`. Sem migration e sem flag
 global adicional; esta entrega não muda o comportamento das demais filas.
+
+## DEC-141 - Gestor obrigatoriamente no Lite, com Leads como primeira etapa
+
+**Aceita pelo Vinicios em 2026-10-14.** Com a flag global reversível
+`feature_manager_lite_enabled` ligada, o Gestor usa sempre o visual Lite,
+independente de cookie ou preferência salva, e não pode voltar ao modo normal.
+A migração das funcionalidades de gestão acontece por etapas; esta primeira
+entrega cobre Início e Leads da própria unidade, com repasse pelo fluxo existente
+e auditoria atual. Sem unidade autenticada, a área de Leads fica vazia e não
+consulta o tenant. Notificações, Configurações e Primeiro acesso permanecem
+permitidos; Distribuição, Escala, Meta e demais telas de gestão ficam fora da
+allowlist até serem portadas. Desligar a flag restaura a experiência anterior.

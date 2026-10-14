@@ -1,0 +1,19 @@
+import { describe, expect, it } from "vitest";
+import { getLightMoreDestinations, isLightRouteAllowed, LIGHT_MANAGER_ALLOWED_ROUTES } from "./light-routes";
+
+describe("manager Lite routes", () => {
+  it("allows only the manager's first Lite destinations and a single lead detail segment", () => {
+    for (const path of ["/dashboard", "/leads", "/leads/abc", "/notificacoes", "/settings", "/primeiro-acesso"]) {
+      expect(isLightRouteAllowed(path, "manager"), path).toBe(true);
+    }
+    for (const path of ["/dashboard/c/ancora", "/leads/distribuicao", "/leads/a/b", "/leads/distribuicao/plantao", "/equipe", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
+      expect(isLightRouteAllowed(path, "manager"), path).toBe(false);
+    }
+    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(6);
+  });
+
+  it("shows only unit leads, notifications and settings in Mais", () => {
+    expect(getLightMoreDestinations({ quoteSimulator: true, dutyCalendar: true, relationshipCenter: true }, "manager").map((item) => item.href))
+      .toEqual(["/leads", "/notificacoes", "/settings"]);
+  });
+});
