@@ -18,6 +18,8 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/arc/bottom-sheet/bottom-sheet", () => ({
   BottomSheet: ({ open, title, children }: { open?: boolean; title: string; children: React.ReactNode }) =>
     open ? <div role="dialog" aria-label={title}>{children}</div> : null,
+  default: ({ open, title, children }: { open?: boolean; title: string; children: React.ReactNode }) =>
+    open ? <div role="dialog" aria-label={title}>{children}</div> : null,
 }));
 vi.mock("@/components/arc/segmented-control/segmented-control", () => ({
   default: ({ label, options, value, onValueChange }: { label?: string; options: { value: string; label: string }[]; value: string; onValueChange: (value: string) => void }) => (
@@ -89,19 +91,24 @@ describe("Corretor Lite experience contract", () => {
     expect(screen.queryByRole("link", { name: /Fila, 3 pendentes/ })).toBeNull();
   });
 
-  it("shows the manager's persistent desktop destinations and marks the current route", () => {
-    navigation.pathname = "/equipe/corretor-1";
-    renderChrome({ audience: "manager" });
-    const liteCss = readFileSync(join(process.cwd(), "src/components/arc/venancor-scope.css"), "utf8");
+  it("renders the shared Lite conversation rail for the manager", () => {
+    navigation.pathname = "/dashboard";
+    renderChrome({ audience: "manager", initialChatRail: {
+      viewerName: "Ana Gestora",
+      assistants: [
+        { id: "assistant:equipe-leads", kind: "assistant", assistant: "equipe-leads", name: "Leads da unidade", preview: "2 leads aguardando distribuição manual.", at: "2026-10-14T14:35:00.000Z", unread: false, waitingYou: true, pinned: true, href: "/leads", shape: "favo", hue: 252 },
+        { id: "assistant:equipe", kind: "assistant", assistant: "equipe", name: "Minha unidade", preview: "1 corretor em atendimento na unidade.", at: "2026-10-14T14:35:00.000Z", unread: false, waitingYou: false, href: "/equipe", shape: "nuvem", hue: 170 },
+      ],
+      leads: [], nowIso: "2026-10-14T14:35:00.000Z", canQuote: false,
+    } });
 
-    const nav = screen.getByRole("navigation", { name: "Navegação principal" });
-    for (const [href, label] of [["/dashboard", "Início"], ["/leads", "Leads"], ["/equipe", "Equipe"], ["/notificacoes", "Notificações"], ["/settings", "Configurações"]]) {
-      expect(within(nav).getByRole("link", { name: label })).toHaveAttribute("href", href);
-    }
-    expect(within(nav).getByRole("link", { name: "Equipe" })).toHaveAttribute("aria-current", "page");
-    expect(nav).toHaveClass("lite-rail");
-    expect(liteCss).toContain(".lite-rail { display: none; }");
-    expect(liteCss).toContain("@media (min-width: 1024px)");
+    expect(screen.getByRole("link", { name: /Ana/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Buscar" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Novo" })).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Conversas" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Leads da unidade: 2 leads aguardando/ })).toHaveAttribute("href", "/leads");
+    expect(screen.getByRole("link", { name: /Minha unidade: 1 corretor em atendimento/ })).toHaveAttribute("href", "/equipe");
+    expect(screen.getByRole("img", { name: "Fixado" })).toBeTruthy();
   });
 
   it("opens the Mais sheet (from the chat home avatar) with the destinations, availability and sign out", () => {

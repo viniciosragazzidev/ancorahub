@@ -52,9 +52,13 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
       const data = await getManagerLiteLeads(context);
       const now = new Date();
       const waiting = data.leads.filter((lead) => !lead.ownerId).length;
+      const inService = data.team.filter((member) => member.openCount > 0).length;
       return {
         viewerName: data.viewerName,
-        assistants: [{ id: "assistant:equipe-leads", kind: "assistant", assistant: "equipe-leads", name: "Leads da unidade", verified: true, preview: `${data.leads.length} leads na unidade. Acompanhe e repasse por aqui.`, at: null, unread: false, waitingYou: waiting > 0, href: "/leads", shape: "logo", hue: null }],
+        assistants: [
+          { id: "assistant:equipe-leads", kind: "assistant", assistant: "equipe-leads", name: "Leads da unidade", verified: true, pinned: true, preview: waiting ? `${waiting} ${waiting === 1 ? "lead aguardando" : "leads aguardando"} distribuição manual.` : "Nenhum lead aguardando distribuição manual.", at: now.toISOString(), unread: false, waitingYou: waiting > 0, href: "/leads", shape: "favo", hue: 252 },
+          { id: "assistant:equipe", kind: "assistant", assistant: "equipe", name: "Minha unidade", verified: true, preview: `${inService} ${inService === 1 ? "corretor" : "corretores"} em atendimento na unidade.`, at: now.toISOString(), unread: false, waitingYou: false, href: "/equipe", shape: "nuvem", hue: 170 },
+        ],
         leads: [], nowIso: now.toISOString(), canQuote: false,
       };
     }

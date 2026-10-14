@@ -323,3 +323,8 @@ confirmação/sucesso/erro. Disclosure por menu do card e por seções do perfil
 de plantão ficam somente para leitura. Reutiliza as peças Arc/Lite e o perfil atual;
 sem novo token, primitive ou animação. Decisão de produto: DEC-142. A revisão não
 avança a etapa global UX-M1.10.
+
+
+## 2026-10-14: T126 Manager Lite chat rail
+
+Desktop manager home uses the shared conversation rail on the left and the unit summary at center. Primary actions open Leads da unidade and Minha unidade. Mobile navigation stays as before. Reuses ChatHome styles, tokens, and components without adding a primitive, token, or animation.

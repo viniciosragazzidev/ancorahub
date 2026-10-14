@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { and, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -15,11 +16,12 @@ const emptyData = (viewerName = "Gestor"): ManagerLiteLeadData => ({
   team: [], leads: [], funnel: { new: 0, firstContact: 0, service: 0, quote: 0, closing: 0 }, slaMinutes: 15, viewerName,
 });
 
-export async function getManagerLiteLeads(context: TenantContext, now = new Date()): Promise<ManagerLiteLeadData> {
+export const getManagerLiteLeads = cache(async function getManagerLiteLeads(context: TenantContext): Promise<ManagerLiteLeadData> {
   if (context.role !== "manager") throw new Error("Esta área está disponível apenas para gestores.");
   const scope = getManagerUnitScope(context);
   if (!scope) return emptyData();
 
+  const now = new Date();
   const db = getDatabase();
   const [[viewer], [tenant], members, rows, counts] = await Promise.all([
     db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
@@ -66,7 +68,7 @@ export async function getManagerLiteLeads(context: TenantContext, now = new Date
     slaMinutes,
     viewerName: viewer?.name ?? "Gestor",
   };
-}
+});
 
 export async function getManagerLiteLeadDetail(context: TenantContext, leadId: string) {
   const scope = getManagerUnitScope(context);

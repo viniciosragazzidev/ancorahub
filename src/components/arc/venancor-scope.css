@@ -135,9 +135,7 @@
 .lite-split, .lite-main { display: contents; }
 @media (min-width: 1024px) {
   .lite-split { display: grid; grid-template-columns: 360px minmax(0, 1fr); height: var(--app-dvh, 100dvh); overflow: hidden; }
-  .lite-split.lite-manager-split { grid-template-columns: 232px minmax(0, 1fr); }
   .lite-rail { display: block; height: var(--app-dvh, 100dvh); overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--border, rgb(16 16 40 / 0.08)); background: var(--surface-muted, #f1f1f5); }
-  .lite-manager-nav { padding: 20px 12px; }
   .lite-main { display: block; min-width: 0; height: var(--app-dvh, 100dvh); overflow: hidden; }
 }
 .lite-rail-skeleton { display: grid; gap: 14px; padding: 88px 20px 20px; }
