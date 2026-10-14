@@ -18,10 +18,10 @@ vi.mock("@/components/arc/badge/badge", () => ({ Badge: ({ children }: { childre
 vi.mock("@/components/arc/metric-card/metric-card", () => ({ MetricCard: ({ label, value }: { label: string; value: number }) => <div><span>{label}</span><strong>{value}</strong></div> }));
 vi.mock("@/components/arc/bottom-sheet/bottom-sheet", async () => {
   const React = await import("react");
-  return { BottomSheet: ({ trigger, title, children, open, defaultOpen = false, onOpenChange }: { trigger: React.ReactElement<{ onClick?: () => void }>; title: string; children: React.ReactNode; open?: boolean; defaultOpen?: boolean; onOpenChange?: (value: boolean) => void }) => {
+  return { BottomSheet: ({ trigger, title, children, open, defaultOpen = false, onOpenChange }: { trigger?: React.ReactElement<{ onClick?: () => void }>; title: string; children: React.ReactNode; open?: boolean; defaultOpen?: boolean; onOpenChange?: (value: boolean) => void }) => {
     const [internalOpen, setInternalOpen] = React.useState(defaultOpen);
     const isOpen = open ?? internalOpen;
-    const nextTrigger = React.cloneElement(trigger, { onClick: () => { setInternalOpen(true); onOpenChange?.(true); } });
+    const nextTrigger = trigger ? React.cloneElement(trigger, { onClick: () => { setInternalOpen(true); onOpenChange?.(true); } }) : null;
     return <div>{nextTrigger}{isOpen ? <><h3>{title}</h3>{children}</> : null}</div>;
   } };
 });
@@ -74,6 +74,25 @@ afterEach(() => cleanup());
 beforeEach(() => mockAddSupervisorNote.mockReset());
 
 describe("SupervisorBrokerProfile", () => {
+  it("shows only supervisor actions when both action sets are provided", () => {
+    render(<SupervisorBrokerProfile {...profile} managementActions={<button type="button">Desativar corretor</button>} showSupervisorActions />);
+
+    expect(screen.getByRole("button", { name: "Mais ações" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Desativar corretor" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Mais ações" }));
+    const supervisorActions = within(screen.getByRole("heading", { name: "Ações para Ana Souza" }).parentElement!);
+    expect(supervisorActions.getByRole("link", { name: "Mandar recado" })).toBeTruthy();
+    expect(supervisorActions.getByRole("button", { name: "Reconhecer com pontos" })).toBeTruthy();
+    expect(supervisorActions.getByRole("button", { name: "Remover da equipe" })).toBeTruthy();
+  });
+
+  it("shows only manager actions when supervisor actions are disabled", () => {
+    render(<SupervisorBrokerProfile {...profile} managementActions={<button type="button">Desativar corretor</button>} showSupervisorActions={false} />);
+
+    expect(screen.getByRole("button", { name: "Desativar corretor" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Mais ações" })).toBeNull();
+  });
+
   it("shows the team's broker profile, operational numbers, team ranking and actions", () => {
     render(<SupervisorBrokerProfile {...profile} />);
 

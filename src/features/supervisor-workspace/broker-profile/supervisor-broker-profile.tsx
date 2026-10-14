@@ -296,11 +296,10 @@ export function SupervisorBrokerProfile({
           <SupervisorNoteHistory notes={notes} />
         </section>
 
-        {managementActions ? managementActions : null}
         {showSupervisorActions ? <BottomSheet className="arc-venancor" trigger={<Button variant="outline">Mais ações</Button>} title={`Ações para ${member.name}`} description="Escolha como quer apoiar este corretor." closeLabel="Fechar" detents={[0.4, 0.72]}>
           <div className={styles.memberActions}><Link className={styles.secondaryAction} href={relationshipHref}>Mandar recado</Link><button type="button" className={styles.secondaryAction} onClick={() => setRecognizeOpen(true)}>Reconhecer com pontos</button><Button variant="destructive" disabled={removing} loading={removing} onClick={removeFromTeam}>Remover da equipe</Button></div>
           <RecognizeSheet brokerId={member.userId} brokerName={member.name} open={recognizeOpen} onOpenChange={setRecognizeOpen} onRecognize={recognizeBrokerAction} />
-        </BottomSheet> : null}
+        </BottomSheet> : managementActions ?? null}
       </div>
     </div>
   );
