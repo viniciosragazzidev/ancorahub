@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge } from "@/components/arc/badge/badge";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import { ManagerLeadTransferForm } from "@/features/manager-workspace/manager-lead-transfer-form";
+import { ManagerLeadTransferForm, type TransferBroker } from "@/features/manager-workspace/manager-lead-transfer-form";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 
 import styles from "./supervisor-lead-detail.module.css";
@@ -32,7 +32,7 @@ export function SupervisorLeadDetail({ lead, timeline, now, managerBrokers, task
   lead: { id: string; name: string; status: string; ownerId: string | null; ownerName: string | null; ownerImage: string | null; productName: string | null; assignedAt: Date | null; branchName: string | null };
   timeline: TimelineItem[];
   now: string;
-  managerBrokers?: { id: string; name: string }[];
+  managerBrokers?: TransferBroker[];
   /** Gestor Lite only: the lead's tasks and documents (the supervisor view leaves them out). */
   tasks?: TaskItem[];
   documents?: DocumentItem[];

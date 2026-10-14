@@ -87,7 +87,7 @@ export async function getManagerLiteLeadDetail(context: TenantContext, leadId: s
     db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, ownerId: schema.leads.corretorId, ownerName: schema.user.name, ownerImage: schema.user.image, productName: schema.carrierPlans.name, assignedAt: schema.leads.assignedAt, branchName: schema.branches.name })
       .from(schema.leads).leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId)).leftJoin(schema.carrierPlans, eq(schema.carrierPlans.id, schema.leads.planId)).leftJoin(schema.branches, and(eq(schema.branches.id, schema.leads.branchId), eq(schema.branches.tenantId, schema.leads.tenantId)))
       .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1),
-    db.select({ id: schema.user.id, name: schema.user.name }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+    db.select({ id: schema.user.id, name: schema.user.name, image: schema.user.image, availability: schema.tenantMemberships.availabilityStatus }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
       .where(and(eq(schema.tenantMemberships.tenantId, scope.tenantId), eq(schema.tenantMemberships.branchId, scope.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(schema.user.name),
   ]);
   if (!lead) return null;
@@ -109,6 +109,6 @@ export async function getManagerLiteLeadDetail(context: TenantContext, leadId: s
     timeline: timeline ?? [],
     tasks,
     documents,
-    brokers: brokers.map((broker) => ({ id: broker.id, name: broker.name ?? "Corretor" })),
+    brokers: brokers.map((broker) => ({ id: broker.id, name: broker.name ?? "Corretor", image: broker.image ?? null, availability: broker.availability ?? "offline" })),
   };
 }
