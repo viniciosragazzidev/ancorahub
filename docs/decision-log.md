@@ -1740,3 +1740,15 @@ exclusão, lote e transferência de carteira continuam exclusivos do diretor ger
 O Lite do gestor continua atrás de `MANAGER_LITE`; com a flag desligada, `/equipe`
 preserva a tela atual. Registro de implementação:
 `docs/implementations/active/2026-10-14-team-lite-management.md`.
+
+## DEC-143 - Clientes Lite para gestor e supervisor (E2 do plano Lite de gestão)
+
+O gestor no Lite ganha `/clientes` e `/clientes/<id>`, com a mesma lista e ficha
+do supervisor no visual Lite. O escopo continua no `buildClientScopeWhere`: gestor
+vê só a unidade (sem unidade, lista vazia), supervisor só a equipe. A ficha usa
+o cliente lido pelo escopo; a rota `/clientes/<id>` fora do escopo responde não
+encontrado. O supervisor deixa de cair na tela normal dentro do chrome Lite. A
+renovação aparece só em leitura: a ação de atualizar a renovação não confere
+escopo de equipe no servidor e fica para a etapa E0. Movimento: entrada da
+página e listas escalonadas com `motion/react`, reduzido a opacidade com
+`prefers-reduced-motion`. Prévia de print: `/dev/e2-preview` (só em desenvolvimento).
