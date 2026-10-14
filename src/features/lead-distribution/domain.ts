@@ -62,6 +62,7 @@ export type IntelligentDistributionPolicy = {
   allowedBrokerIds?: string[];
   allowedBranchIds?: string[];
   allowedSourceIds?: string[];
+  holdColdLeads: boolean;
   ranking: { enabled: boolean; conversionWeight: number; slaWeight: number; manualPriorityWeight: number };
 };
 
@@ -83,7 +84,7 @@ export type RankedBroker = EligibleBroker & {
 };
 
 export const defaultIntelligentDistributionPolicy: IntelligentDistributionPolicy = {
-  excludedBrokerIds: [], excludedBranchIds: [], allowedBrokerIds: [], allowedBranchIds: [], allowedSourceIds: [],
+  excludedBrokerIds: [], excludedBranchIds: [], allowedBrokerIds: [], allowedBranchIds: [], allowedSourceIds: [], holdColdLeads: false,
   ranking: { enabled: true, conversionWeight: 45, slaWeight: 35, manualPriorityWeight: 20 },
 };
 
@@ -96,8 +97,16 @@ export function readDistributionPolicy(value: unknown): IntelligentDistributionP
     allowedBrokerIds: Array.isArray(raw.allowedBrokerIds) ? raw.allowedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
+    holdColdLeads: raw.holdColdLeads === true,
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
+}
+
+export const COLD_HELD_BY_QUEUE_REASON_PREFIX = "cold_held_by_queue";
+export const COLD_HELD_BY_QUEUE_REASON = `${COLD_HELD_BY_QUEUE_REASON_PREFIX}: Lead frio retido na fila para atribuição manual.`;
+
+export function shouldHoldColdLead(qualificationStatus: string | null | undefined, holdColdLeads: boolean) {
+  return holdColdLeads && qualificationStatus === "cold";
 }
 
 const BROKER_COOLDOWN_MS = 5 * 60 * 1000;
@@ -424,6 +433,7 @@ export function resolveDutyFallbackDecision(input: {
  */
 export const HELD_DISTRIBUTION_RETRY_MS = 15 * 60_000;
 const HELD_DISTRIBUTION_REASON_PREFIXES = [
+  COLD_HELD_BY_QUEUE_REASON_PREFIX,
   "Lead chegou antes do início deste plantão",
   "A fila está em modo manual",
   "A fila configurada pertence a outra unidade",

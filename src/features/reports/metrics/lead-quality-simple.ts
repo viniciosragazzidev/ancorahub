@@ -15,7 +15,9 @@ export type SimpleLeadRow = {
   readyAt?: Date | null;
   assignedAt: Date | null;
   quality: SimpleLeadClass;
+  queueId?: string | null;
   queueName: string | null;
+  holdColdLeads?: boolean;
   brokerId: string | null;
   converted: boolean;
 };
@@ -55,7 +57,7 @@ export type SimpleQualityReport = {
   brokers: number;
   converted: { good: number; weak: number };
   byQueue: Array<{
-    queue: string; arrived: number; good: number; weak: number; distributed: number; distributedWeak: number;
+    queueId: string | null; queue: string; holdColdLeads: boolean; arrived: number; good: number; weak: number; distributed: number; distributedWeak: number;
     /** When this queue had no qualified good lead left while weak ones went out (timeline only). */
     goodRanOut: string | null;
     /** Weak leads handed out while a qualified good lead of the same queue was waiting. */
@@ -90,11 +92,13 @@ export function buildSimpleQualityReport(rows: SimpleLeadRow[], window: { since:
   const distributed = emptySplit();
   const brokers = new Set<string>();
   const converted = { good: 0, weak: 0 };
-  const queues = new Map<string, { arrived: number; good: number; weak: number; distributed: number; distributedWeak: number }>();
+  const queues = new Map<string, { queueId: string | null; queue: string; holdColdLeads: boolean; arrived: number; good: number; weak: number; distributed: number; distributedWeak: number }>();
 
   for (const row of rows) {
     add(arrived, row.quality);
-    const queue = queues.get(row.queueName ?? "Sem fila") ?? { arrived: 0, good: 0, weak: 0, distributed: 0, distributedWeak: 0 };
+    const queueKey = row.queueId ?? `name:${row.queueName ?? "Sem fila"}`;
+    const queue = queues.get(queueKey) ?? { queueId: row.queueId ?? null, queue: row.queueName ?? "Sem fila", holdColdLeads: false, arrived: 0, good: 0, weak: 0, distributed: 0, distributedWeak: 0 };
+    queue.holdColdLeads ||= row.holdColdLeads === true;
     queue.arrived += 1;
     if (row.quality === "good") queue.good += 1;
     if (row.quality === "cold" || row.quality === "no_reply") queue.weak += 1;
@@ -104,7 +108,7 @@ export function buildSimpleQualityReport(rows: SimpleLeadRow[], window: { since:
       if (row.quality === "cold" || row.quality === "no_reply") queue.distributedWeak += 1;
       if (row.brokerId) brokers.add(row.brokerId);
     }
-    queues.set(row.queueName ?? "Sem fila", queue);
+    queues.set(queueKey, queue);
     if (row.converted) {
       if (row.quality === "good") converted.good += 1;
       else if (row.quality === "cold" || row.quality === "no_reply") converted.weak += 1;
@@ -167,9 +171,11 @@ export function buildSimpleQualityReport(rows: SimpleLeadRow[], window: { since:
     distributed: { ...distributed, total: distributedTotal },
     brokers: brokers.size,
     converted,
-    byQueue: [...queues.entries()].map(([queue, values]) => {
-      const queueRows = rows.filter((row) => (row.queueName ?? "Sem fila") === queue);
-      return { queue, ...values, goodRanOut: timeline ? firstRunOut(queueRows, window.since, end) : null, weakWhileGoodWaiting: weakSentWhileGoodWaiting(queueRows, end) };
+    byQueue: [...queues.values()].map((values) => {
+      const queueRows = rows.filter((row) => values.queueId
+        ? row.queueId === values.queueId
+        : !row.queueId && (row.queueName ?? "Sem fila") === values.queue);
+      return { ...values, goodRanOut: timeline ? firstRunOut(queueRows, window.since, end) : null, weakWhileGoodWaiting: weakSentWhileGoodWaiting(queueRows, end) };
     }).sort((a, b) => b.arrived - a.arrived),
     hours,
     hourly: timeline ? "timeline" : "hour_of_day",

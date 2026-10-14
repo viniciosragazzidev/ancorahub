@@ -12,7 +12,7 @@ import { getLocalDutyParts } from "@/features/leads/assignment";
 
 import { processQueuedLead } from "./service";
 import { expireOutdatedLeadOffers } from "./offers";
-import { HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
+import { COLD_HELD_BY_QUEUE_REASON_PREFIX, HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
 import { dutyScheduleBranchCondition, isDutyScheduleBranchCompatible } from "./duty-job-schedule-scope";
 
@@ -391,7 +391,8 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
     // Leads held by a rule go last: they can't be handed out anyway, and being
     // hot/warm they used to take every batch ahead of the cold leads that can.
     .orderBy(
-      sql`case when ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%'
+      sql`case when ${schema.leadDistributionJobs.lastErrorMessage} like '${sql.raw(COLD_HELD_BY_QUEUE_REASON_PREFIX)}%'
+        or ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila está em modo manual%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila configurada pertence a outra unidade%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A origem %'

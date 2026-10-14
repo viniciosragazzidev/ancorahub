@@ -407,7 +407,7 @@ export default async function LeadDistributionPage({
       .where(
         and(
           eq(schema.leadDistributionPolicies.tenantId, context.tenantId),
-          eq(schema.leadDistributionPolicies.enabled, true),
+          isNull(schema.leadDistributionPolicies.profileKey),
         ),
       ),
     db
@@ -593,6 +593,7 @@ export default async function LeadDistributionPage({
       allowedBranchIds: queuePolicy?.allowedBranchIds ?? [],
       allowedBrokerIds: queuePolicy?.allowedBrokerIds ?? [],
       allowedSourceIds: queuePolicy?.allowedSourceIds ?? [],
+      holdColdLeads: queuePolicy?.holdColdLeads ?? false,
       waiting: queueWaiting.get(queue.id) ?? 0,
       members: queue.branchId ? (countsByBranch.get(queue.branchId) ?? 0) : totalBrokers,
       activeLeads: queue.branchId ? (leadsByBranch.get(queue.branchId) ?? 0) : totalNewLeads,

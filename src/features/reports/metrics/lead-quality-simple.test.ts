@@ -58,4 +58,16 @@ describe("relatório simples de qualidade", () => {
     expect(report.withoutWeak).toEqual({ distributed: 2, removed: 2, removedShare: 50, perBrokerNow: 2, perBrokerWithout: 1 });
     expect(report.shifts.map((shift) => [shift.distributedGood, shift.distributedWeak])).toEqual([[1, 1], [1, 1]]);
   });
+
+  it("shows cold retention by queue without merging queues that share a name", () => {
+    const report = buildSimpleQualityReport([
+      lead({ queueId: "queue-1", queueName: "PF", holdColdLeads: true }),
+      lead({ queueId: "queue-2", queueName: "PF", holdColdLeads: false }),
+    ], window, at("19:00"));
+
+    expect(report.byQueue).toEqual(expect.arrayContaining([
+      expect.objectContaining({ queueId: "queue-1", queue: "PF", holdColdLeads: true, arrived: 1 }),
+      expect.objectContaining({ queueId: "queue-2", queue: "PF", holdColdLeads: false, arrived: 1 }),
+    ]));
+  });
 });

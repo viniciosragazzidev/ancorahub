@@ -53,6 +53,7 @@ export function LeadQualitySimple({ report, queueName }: { report: SimpleLeadQua
               <TableHeader>
                 <TableRow>
                   <TableHead>Fila</TableHead>
+                  <TableHead>Reter frios</TableHead>
                   <TableHead className="text-right">Entraram</TableHead>
                   <TableHead className="text-right">Bons</TableHead>
                   <TableHead className="text-right">Frios</TableHead>
@@ -65,6 +66,7 @@ export function LeadQualitySimple({ report, queueName }: { report: SimpleLeadQua
                 {report.byQueue.map((queue) => (
                   <TableRow key={queue.queue}>
                     <TableCell className="font-medium">{queue.queue}</TableCell>
+                    <TableCell>{queue.holdColdLeads ? "Ligada" : "Desligada"}</TableCell>
                     <TableCell className="text-right tabular-nums">{n(queue.arrived)}</TableCell>
                     <TableCell className="text-right tabular-nums">{n(queue.good)} <span className="text-muted-foreground">({pct(queue.good, queue.arrived)})</span></TableCell>
                     <TableCell className="text-right tabular-nums">{n(queue.weak)}</TableCell>
