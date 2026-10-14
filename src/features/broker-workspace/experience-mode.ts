@@ -20,11 +20,20 @@ const COOKIE_NAME = "ancora_experience_mode";
  */
 export async function getExperienceMode(customContext?: TenantContext): Promise<ExperienceMode> {
   let context = customContext;
+  // Read the cookie first so a context failure cannot change prior behavior when the manager flag is off.
+  let cookieVal: string | undefined;
+  try {
+    const cookieStore = await cookies();
+    cookieVal = cookieStore.get(COOKIE_NAME)?.value;
+  } catch {
+    // If reading cookies fails outside request context, proceed to context check
+  }
+
   if (!context) {
     try {
       context = await getRequiredTenantContext();
     } catch {
-      return "LIGHT";
+      return cookieVal === "LIGHT" || cookieVal === "NORMAL" ? cookieVal : "LIGHT";
     }
   }
 
@@ -33,15 +42,7 @@ export async function getExperienceMode(customContext?: TenantContext): Promise<
     if ((await getFeatureFlag(FEATURE_FLAGS.MANAGER_LITE).catch(() => "false")) === "true") return "LIGHT";
   }
 
-  try {
-    const cookieStore = await cookies();
-    const cookieVal = cookieStore.get(COOKIE_NAME)?.value;
-    if (cookieVal === "LIGHT" || cookieVal === "NORMAL") {
-      return cookieVal;
-    }
-  } catch {
-    // If reading cookies fails outside request context, proceed to context check
-  }
+  if (cookieVal === "LIGHT" || cookieVal === "NORMAL") return cookieVal;
 
   if (!context) return "LIGHT";
 

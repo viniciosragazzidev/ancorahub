@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { TenantContext } from "@/shared/auth/types";
 
-const state = vi.hoisted(() => ({ cookieMode: "LIGHT", managerFlag: "false", setCookie: vi.fn() }));
+const state = vi.hoisted(() => ({ cookieMode: "LIGHT", managerFlag: "false", contextFailure: false, setCookie: vi.fn() }));
 
 // Mock next/headers
 vi.mock("next/headers", () => ({
@@ -14,7 +14,10 @@ vi.mock("@/features/system-settings/queries", () => ({
   FEATURE_FLAGS: { MANAGER_LITE: "manager-lite" },
   getFeatureFlag: vi.fn(async () => state.managerFlag),
 }));
-vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: vi.fn(async () => ({ userId: "manager-1", tenantId: "tenant-1", role: "manager", jobTitle: "manager", branchId: "branch-1" })) }));
+vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: vi.fn(async () => {
+  if (state.contextFailure) throw new Error("No tenant context");
+  return { userId: "manager-1", tenantId: "tenant-1", role: "manager", jobTitle: "manager", branchId: "branch-1" };
+}) }));
 vi.mock("@/shared/db", () => ({ getDatabase: vi.fn(), schema: {} }));
 
 // Mock next/cache
@@ -49,6 +52,21 @@ describe("getExperienceMode", () => {
     state.cookieMode = "NORMAL";
     const context: TenantContext = { userId: "manager-1", tenantId: "tenant-1", role: "manager", jobTitle: "manager", branchId: "branch-1" };
     expect(await getExperienceMode(context)).toBe("NORMAL");
+  });
+
+  it("returns a valid cookie when tenant context fails and the manager flag is off", async () => {
+    state.managerFlag = "false";
+    state.contextFailure = true;
+    state.cookieMode = "NORMAL";
+    expect(await getExperienceMode()).toBe("NORMAL");
+    state.contextFailure = false;
+  });
+
+  it("still forces a flagged manager to LIGHT when a NORMAL cookie is present", async () => {
+    state.managerFlag = "true";
+    state.contextFailure = false;
+    state.cookieMode = "NORMAL";
+    expect(await getExperienceMode()).toBe("LIGHT");
   });
 
   it("rejects a manager request for NORMAL while the flag is on", async () => {

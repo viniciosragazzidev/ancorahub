@@ -31,11 +31,11 @@ const state = vi.hoisted(() => {
     archivedAt: null as Date | null,
     deletedAt: null as Date | null,
   };
-  const controls = { enabled: true, conflict: false, postSale: false, dutyRoster: false, teamMembers: [] as string[] };
+  const controls = { enabled: true, conflict: false, postSale: false, dutyRoster: false, brokerBranchId: "00000000-0000-4000-8000-000000000004", teamMembers: [] as string[] };
   const db = {
     select: vi.fn(() => ({
       from: vi.fn((table: unknown) => ({
-        innerJoin: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000003", branchId: "00000000-0000-4000-8000-000000000004" }]) })) })),
+        innerJoin: vi.fn(() => ({ where: vi.fn(() => ({ limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000003", branchId: controls.brokerBranchId }]) })) })),
         where: vi.fn((condition?: unknown) => table === schema.leads
           ? { limit: vi.fn(async () => [{ ...lead }]) }
           : table === schema.branches ? { limit: vi.fn(async () => [{ id: "00000000-0000-4000-8000-000000000004", status: "active", acceptingLeads: true, isDistributionHub: false }]) }
@@ -166,7 +166,7 @@ describe("manual service reassignment", () => {
     vi.clearAllMocks();
     state.updates.length = 0;
     state.inserts.length = 0;
-    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false });
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, brokerBranchId: "00000000-0000-4000-8000-000000000004" });
     Object.assign(state.lead, { corretorId: "00000000-0000-4000-8000-000000000002", status: "in_contact", distributionStatus: "assigned", firstContactAt: new Date("2026-09-25T10:00:00Z"), serviceStartedAt: new Date("2026-09-25T10:00:00Z"), archivedAt: null, deletedAt: null });
   });
   function reassignmentForm() {
@@ -242,7 +242,7 @@ describe("manager reassignment stays within the authenticated unit", () => {
     vi.clearAllMocks();
     state.updates.length = 0;
     state.inserts.length = 0;
-    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false });
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, brokerBranchId: "branch-test" });
     Object.assign(state.lead, { branchId: "branch-test", corretorId: "00000000-0000-4000-8000-000000000002", status: "distributed", distributionStatus: "assigned", firstContactAt: null, serviceStartedAt: null, archivedAt: null, deletedAt: null });
     Object.assign(state.mockTenantContext, { userId: "manager-test", role: "manager", branchId: "branch-test" });
   });
@@ -258,6 +258,44 @@ describe("manager reassignment stays within the authenticated unit", () => {
 
   it("rejects a lead outside the manager's unit before writing history", async () => {
     state.lead.branchId = "another-branch";
+    const data = formData();
+    data.set("brokerId", "00000000-0000-4000-8000-000000000003");
+    expect(await reassignLeadAction({}, data)).toMatchObject({ error: expect.any(String) });
+    expect(state.inserts).toHaveLength(0);
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it("rejects a forged destination branch even when authorization context allows broad scope", async () => {
+    const data = formData();
+    data.set("branchId", "another-branch");
+    data.set("brokerId", "00000000-0000-4000-8000-000000000003");
+    expect(await reassignLeadAction({}, data)).toMatchObject({ error: expect.any(String) });
+    expect(state.inserts).toHaveLength(0);
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it("rejects a manager destination outside their unit for a PÃ³s Venda lead", async () => {
+    state.controls.postSale = true;
+    const data = formData();
+    data.set("branchId", "another-branch");
+    data.set("brokerId", "00000000-0000-4000-8000-000000000003");
+    expect(await reassignLeadAction({}, data)).toMatchObject({ error: expect.any(String) });
+    expect(state.inserts).toHaveLength(0);
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it("rejects PÃ³s Venda reassignment to a broker from another unit", async () => {
+    state.controls.postSale = true;
+    state.controls.brokerBranchId = "another-branch";
+    const data = formData();
+    data.set("brokerId", "00000000-0000-4000-8000-000000000003");
+    expect(await reassignLeadAction({}, data)).toMatchObject({ error: expect.any(String) });
+    expect(state.inserts).toHaveLength(0);
+    expect(state.updates).toHaveLength(0);
+  });
+
+  it("does not allow a manager without a unit to reassign a lead", async () => {
+    state.mockTenantContext.branchId = null;
     const data = formData();
     data.set("brokerId", "00000000-0000-4000-8000-000000000003");
     expect(await reassignLeadAction({}, data)).toMatchObject({ error: expect.any(String) });
