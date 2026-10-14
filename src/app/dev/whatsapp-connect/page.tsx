@@ -5,9 +5,10 @@ import { notFound } from "next/navigation";
 
 import { WhatsappLogo } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
+import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { DsStatusBadge, type DsStatusBadgeStatus } from "@/components/ui/ds-status-badge";
-import { PairingGuide, PairingQrPanel, PairingStepper } from "@/components/whatsapp/whatsapp-pairing-panel";
-import { PAIRING_BADGE_LABELS } from "@/features/waha-cadence/pairing-copy";
+import { FadeSwap, PairingCodePanel, PairingGuide, PairingQrPanel, PairingStepper } from "@/components/whatsapp/whatsapp-pairing-panel";
+import { PAIRING_BADGE_LABELS, type PairingMethod } from "@/features/waha-cadence/pairing-copy";
 import {
   FIRST_QR_LIFETIME_SECONDS,
   ROTATED_QR_LIFETIME_SECONDS,
@@ -157,6 +158,103 @@ function useSimulation() {
   return { running, phase, seed, secondsLeft, lifetime, start };
 }
 
+/** Pareamento por código, simulado: gerar → código → digitado → conectado (ou QR, trocando o método). */
+function CodeFlowCard() {
+  const [method, setMethod] = useState<PairingMethod>("code");
+  const [phase, setPhase] = useState<PairingPhase>("qr");
+  const [phone, setPhone] = useState("21999998888");
+  const [code, setCode] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
+  useEffect(() => {
+    if (cooldownUntil <= now) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [cooldownUntil, now]);
+
+  const at = (ms: number, fn: () => void) => timers.current.push(window.setTimeout(fn, ms));
+  function generate() {
+    setGenerating(true);
+    setCode(null);
+    at(1_200, () => {
+      setGenerating(false);
+      setCode(Math.random() > 0.5 ? "K7QD-M2XP" : "ABCD-1234");
+      setCooldownUntil(Date.now() + 30_000);
+      setNow(Date.now());
+    });
+  }
+  function typed() {
+    setPhase("pairing");
+    at(2_500, () => setPhase("ready"));
+  }
+  function reset() {
+    timers.current.forEach((t) => window.clearTimeout(t));
+    setPhase("qr");
+    setCode(null);
+    setGenerating(false);
+    setCooldownUntil(0);
+  }
+
+  const cardKey = method === "code" && phase !== "pairing" && phase !== "ready" ? "code" : `qr-${phase === "pairing" || phase === "ready" ? "end" : "scan"}`;
+  const qr = useMemo(() => fakeQr(5), []);
+  return (
+    <div className="space-y-ds-12">
+      <div className="flex flex-wrap gap-ds-8">
+        <Button size="sm" variant="outline" onClick={typed} disabled={!code || phase !== "qr"}>Simular código digitado</Button>
+        <Button size="sm" variant="outline" onClick={reset}>Recomeçar</Button>
+      </div>
+      <div className="max-w-2xl rounded-ds-large-cards border border-ds-ash bg-ds-canvas-white p-ds-24 shadow-[var(--shadow-lg)]">
+        <div className="flex items-start justify-between gap-ds-16">
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-2 text-ds-body-lg font-semibold text-ds-charcoal">
+              <WhatsappLogo className="text-success" /> WhatsApp
+            </p>
+            <p className="mt-2 text-ds-body text-ds-steel">Vincule o WhatsApp do seu celular para atender seus leads por aqui.</p>
+            <div className="mt-ds-12"><PairingStepper phase={phase} method={method} /></div>
+          </div>
+          <DsStatusBadge
+            status={BADGE_STATUS[phase]}
+            label={method === "code" && phase === "qr" ? PAIRING_BADGE_LABELS.code : PAIRING_BADGE_LABELS[phase]}
+            className="shrink-0"
+          />
+        </div>
+        {phase !== "pairing" && phase !== "ready" && (
+          <DsSegmentedControl
+            aria-label="Como conectar"
+            className="mt-ds-16 w-full md:w-auto [&>button]:flex-1 [&>button]:justify-center md:[&>button]:flex-none"
+            options={[{ value: "qr", label: "QR Code" }, { value: "code", label: "Código" }]}
+            value={method}
+            onValueChange={(next) => setMethod(next as PairingMethod)}
+          />
+        )}
+        <div className="mt-ds-16 grid gap-ds-16 md:grid-cols-[minmax(0,1fr)_19rem]">
+          <PairingGuide phase={phase} phoneSuffix="8888" method={method} hasCode={Boolean(code)} />
+          <FadeSwap swapKey={cardKey} className="order-first md:order-none">
+            {cardKey === "code" ? (
+              <PairingCodePanel
+                phase={phase}
+                phone={phone}
+                onPhoneChange={setPhone}
+                code={code}
+                generating={generating}
+                cooldownSeconds={Math.max(0, Math.ceil((cooldownUntil - now) / 1_000))}
+                expired={false}
+                onGenerate={generate}
+                onOpenWhatsApp={() => undefined}
+              />
+            ) : (
+              <PairingQrPanel phase={phase} qrCode={phase === "qr" ? qr : null} secondsLeft={14} lifetime={ROTATED_QR_LIFETIME_SECONDS} qrKey={5} />
+            )}
+          </FadeSwap>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function WhatsappConnectPreviewPage() {
   if (process.env.NODE_ENV !== "development") {
     notFound();
@@ -181,6 +279,11 @@ export default function WhatsappConnectPreviewPage() {
           </Button>
         </div>
         <PhaseCard phase={sim.phase} secondsLeft={sim.secondsLeft} lifetime={sim.lifetime} qrSeed={sim.seed} />
+      </section>
+
+      <section className="space-y-ds-12">
+        <h2 className="text-ds-body-lg font-semibold">Código de pareamento (padrão no celular)</h2>
+        <CodeFlowCard />
       </section>
 
       <section className="space-y-ds-12">

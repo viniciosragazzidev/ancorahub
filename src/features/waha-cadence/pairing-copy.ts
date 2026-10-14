@@ -12,7 +12,13 @@
 export type PairingTone = "neutral" | "info" | "success" | "warning" | "destructive";
 export type PairingIcon = "lock" | "spinner" | "phone" | "check" | "warning";
 
+/** How the broker links the phone: scanning a QR or typing a pairing code in WhatsApp. */
+export type PairingMethod = "qr" | "code";
+
 export type PairingCopyKey =
+  | "codeIntro"
+  | "code"
+  | "codeError"
   | "idle"
   | "starting"
   | "renewing"
@@ -34,6 +40,29 @@ export type PairingCopy = {
 };
 
 export const PAIRING_COPY: Record<PairingCopyKey, PairingCopy> = {
+  codeIntro: {
+    tone: "neutral",
+    icon: "phone",
+    title: "Conecte com um código",
+    body: "Confirme seu número e gere o código. Você digita ele no próprio WhatsApp, sem precisar ler QR Code.",
+  },
+  code: {
+    tone: "info",
+    icon: "phone",
+    title: "Digite o código no WhatsApp",
+    steps: [
+      "Abra o WhatsApp do número informado.",
+      "Toque em Dispositivos conectados e depois em Conectar dispositivo.",
+      "Toque em Conectar com número de telefone e digite o código.",
+    ],
+    hint: "O código vale por cerca de 2 minutos. Se expirar, gere outro.",
+  },
+  codeError: {
+    tone: "destructive",
+    icon: "warning",
+    title: "Não foi possível conectar",
+    body: "O código expirou ou o WhatsApp recusou o vínculo. Gere um novo código e tente de novo.",
+  },
   idle: {
     tone: "neutral",
     icon: "lock",
@@ -111,11 +140,26 @@ export const PAIRING_QR_CAPTIONS = {
   qrRefreshing: "Atualizando código…",
 } as const;
 
+/** Textos do painel do código de pareamento. */
+export const PAIRING_CODE_CAPTIONS = {
+  phoneLabel: "Número do WhatsApp",
+  phoneMissing: "Informe o número do WhatsApp que você vai conectar.",
+  change: "Alterar",
+  generate: "Gerar código",
+  generating: "Gerando código…",
+  regenerate: "Gerar novo código",
+  copy: "Copiar código",
+  copied: "Código copiado",
+  openWhatsApp: "Abrir WhatsApp",
+  expired: "O código expirou. Gere um novo para continuar.",
+} as const;
+
 /** Rótulos do selo de status por fase. */
 export const PAIRING_BADGE_LABELS = {
   idle: "Desconectado",
   starting: "Preparando",
   qr: "Aguardando leitura",
+  code: "Aguardando código",
   pairing: "Finalizando",
   ready: "Conectado",
   error: "Falha",
