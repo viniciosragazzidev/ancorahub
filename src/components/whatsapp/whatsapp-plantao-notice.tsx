@@ -2,20 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { motion, useReducedMotion } from "motion/react";
 
 import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
-import { X } from "@/components/huge-icons";
+import { Monitor, WhatsappLogo, X } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
-import { DsCallout } from "@/components/ui/ds-callout";
 import { WhatsAppConnectDialog } from "@/components/whatsapp/whatsapp-connect-dialog";
 import { recordWhatsAppPlantaoNoticeAction } from "@/features/whatsapp-plantao-notice/actions";
+import tourStyles from "@/components/chat/tour/lite-tour.module.css";
+import styles from "./whatsapp-plantao-notice.module.css";
 
 type WhatsAppConnection = Awaited<ReturnType<typeof getWhatsAppConnection>>;
 type NoticeMode = "daily" | "sticky";
 
 const NOTICE_TITLE = "A partir de 20/10, conecte seu WhatsApp para receber os leads do plantão";
+const STICKY_TITLE = "Conecte seu WhatsApp até 20/10 para receber os leads do plantão";
 const NOTICE_BODY = "Para continuar recebendo os leads do plantão em que você está escalado, seu WhatsApp precisa estar conectado ao CRM. Com as informações dos seus atendimentos, conseguimos melhorar a qualidade dos leads que chegam até você.";
 const NOTICE_HIGHLIGHT = "A conexão precisa ser feita pelo computador: o CRM mostra um QR code e você lê com o WhatsApp do seu celular.";
+const MOBILE_CONNECT_COPY = "Para conectar, abra o CRM no computador.";
 
 function localDateKey() {
   const now = new Date();
@@ -36,6 +40,7 @@ export function WhatsAppPlantaoNotice({
   mode: NoticeMode;
 }) {
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
   const [visible, setVisible] = useState(mode === "sticky");
   const [mobileHelp, setMobileHelp] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -43,6 +48,15 @@ export function WhatsAppPlantaoNotice({
   const [loadingConnection, setLoadingConnection] = useState(false);
   const [connectionError, setConnectionError] = useState(false);
   const [connected, setConnected] = useState(false);
+  const [desktopConnectAvailable, setDesktopConnectAvailable] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia("(min-width: 1024px) and (pointer: fine)");
+    const update = () => setDesktopConnectAvailable(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
   useEffect(() => {
     if (mode === "sticky") return;
@@ -97,34 +111,58 @@ export function WhatsAppPlantaoNotice({
   }
 
   return (
-    <div className={`w-full min-w-0 ${mode === "daily" ? "mb-4" : ""}`}>
-      <DsCallout
-        tone="info"
-        title={<span className={`block break-words ${mode === "daily" ? "pr-7" : ""}`}>{NOTICE_TITLE}</span>}
-        className="relative w-full min-w-0"
+    <div className={`${styles.frame} ${mode === "daily" ? styles.dailyFrame : styles.stickyFrame}`}>
+      <motion.section
+        aria-labelledby="whatsapp-plantao-notice-title"
+        className={`${tourStyles.card} ${styles.card} ${mode === "daily" ? styles.dailyCard : styles.stickyCard}`}
+        style={{ position: "relative", inset: "auto", zIndex: 1, width: "100%" }}
+        initial={reduceMotion ? false : { opacity: 0, y: 14, scale: 0.97, filter: "blur(4px)" }}
+        animate={{ opacity: 1, y: 0, scale: 1, filter: "blur(0px)" }}
+        transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
       >
-        {mode === "daily" ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-xs"
-            onClick={closeForToday}
-            aria-label="Fechar aviso"
-            className="absolute right-2 top-2"
-          >
-            <X aria-hidden="true" />
-          </Button>
-        ) : null}
-        <p className="max-w-full break-words pr-7 text-sm leading-5">{NOTICE_BODY}</p>
-        <p className="max-w-full break-words text-sm font-medium leading-5">{NOTICE_HIGHLIGHT}</p>
-        {mobileHelp ? <p role="status" className="text-sm font-medium">Você está no celular. Para conectar, abra o CRM no computador.</p> : null}
-        {connectionError ? <p role="alert" className="text-sm text-destructive">Não foi possível abrir a conexão agora. Tente novamente.</p> : null}
-        <div className="flex min-w-0 flex-wrap items-center gap-2 pt-2">
-          <Button type="button" variant="deep-sapphire" size="sm" onClick={() => void connect()} loading={loadingConnection} disabled={loadingConnection}>
-            Conectar WhatsApp
-          </Button>
+        <div className={styles.layout}>
+          <div className={styles.brandIcon} aria-hidden="true"><WhatsappLogo size={25} /></div>
+          <div className={styles.content}>
+            <div className={styles.heading}>
+              <h2 id="whatsapp-plantao-notice-title" className={`${tourStyles.title} ${styles.title}`}>
+                {mode === "daily" ? NOTICE_TITLE : STICKY_TITLE}
+              </h2>
+              {mode === "daily" ? (
+                <Button type="button" variant="ghost" size="icon-sm" onClick={closeForToday} aria-label="Fechar aviso" className={styles.dismiss}>
+                  <X aria-hidden="true" />
+                </Button>
+              ) : null}
+            </div>
+            {mode === "daily" ? <p className={`${tourStyles.body} ${styles.body}`}>{NOTICE_BODY}</p> : null}
+            {connectionError ? <p role="alert" className={`${tourStyles.body} ${styles.error}`}>Não foi possível abrir a conexão agora. Tente novamente.</p> : null}
+            <div className={styles.actions}>
+              {mode === "daily" ? (
+                <p className={`${tourStyles.body} ${styles.computerLine}`}>
+                  <Monitor size={19} aria-hidden="true" />
+                  <span>{NOTICE_HIGHLIGHT}</span>
+                </p>
+              ) : null}
+              <p role={mobileHelp ? "status" : undefined} className={`${tourStyles.body} ${styles.mobileComputerLine}`}>
+                <Monitor size={18} aria-hidden="true" />
+                <span>{MOBILE_CONNECT_COPY}</span>
+              </p>
+              {desktopConnectAvailable ? (
+                <Button
+                  type="button"
+                  variant="deep-sapphire"
+                  size="lg"
+                  onClick={() => void connect()}
+                  loading={loadingConnection}
+                  disabled={loadingConnection}
+                  className={`${tourStyles.primary} ${styles.connectButton}`}
+                >
+                  {mode === "daily" ? "Conectar WhatsApp" : "Conectar"}
+                </Button>
+              ) : null}
+            </div>
+          </div>
         </div>
-      </DsCallout>
+      </motion.section>
       {dialogInitial ? (
         <WhatsAppConnectDialog
           initial={dialogInitial}

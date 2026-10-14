@@ -96,18 +96,22 @@ describe("WhatsAppPlantaoNotice", () => {
     desktop.unmount();
     mockDesktop(false);
     getConnection.mockClear();
-    render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
-    expect(await screen.findByRole("button", { name: "Conectar WhatsApp" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
-    expect(await screen.findByText("Você está no celular. Para conectar, abra o CRM no computador.")).toBeTruthy();
+    const mobileDaily = render(<WhatsAppPlantaoNotice userId="user-1" mode="daily" />);
+    expect(await screen.findByText("Para conectar, abra o CRM no computador.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Conectar WhatsApp" })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(getConnection).not.toHaveBeenCalled();
+
+    mobileDaily.unmount();
+    render(<WhatsAppPlantaoNotice userId="user-1" mode="sticky" />);
+    expect(screen.getByText("Para conectar, abra o CRM no computador.")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Conectar" })).toBeNull();
   });
 
   it("mantém o aviso fixo sem opção para fechar", async () => {
     render(<WhatsAppPlantaoNotice userId="user-1" mode="sticky" />);
 
-    expect(await screen.findByText(/A partir de 20\/10, conecte seu WhatsApp/)).toBeTruthy();
+    expect(await screen.findByText(/Conecte seu WhatsApp até 20\/10/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Fechar aviso" })).toBeNull();
   });
 

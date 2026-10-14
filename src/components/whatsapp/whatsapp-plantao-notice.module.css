@@ -1,0 +1,318 @@
+.frame {
+  width: 100%;
+  min-width: 0;
+}
+
+.dailyFrame {
+  margin-bottom: 16px;
+}
+
+.stickyFrame {
+  margin-inline: auto;
+}
+
+.card {
+  min-width: 0;
+  border: 1px solid rgb(16 16 40 / 10%);
+  color: #0b0b12;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+.dailyCard {
+  padding: 20px 22px;
+}
+
+.stickyCard {
+  padding: 8px 14px;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px oklch(0% 0 0 / .13), 0 2px 6px oklch(0% 0 0 / .08);
+}
+
+.layout {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 44px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+}
+
+.content {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.brandIcon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  place-items: center;
+  border-radius: 14px;
+  background: #f1f1f5;
+  color: #128c4a;
+}
+
+.brandIcon svg {
+  width: 25px;
+  height: 25px;
+}
+
+.title {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+  padding-right: 40px;
+  font-size: 20px;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+}
+
+.dismiss {
+  position: absolute;
+  top: 18px;
+  right: 22px;
+  color: #4b4b59;
+}
+
+.body {
+  max-width: none;
+  padding: 0;
+}
+
+.computerLine,
+.mobileComputerLine {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  border: 1px solid rgb(16 16 40 / 8%);
+  border-radius: 14px;
+  background: #f7f7fa;
+  color: #30303d;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.computerLine {
+  flex: 1 1 auto;
+  padding: 11px 13px;
+}
+
+.mobileComputerLine {
+  display: none;
+  padding: 9px 11px;
+}
+
+.computerLine svg,
+.mobileComputerLine svg {
+  width: 19px;
+  height: 19px;
+  flex: 0 0 19px;
+  color: #4b4b59;
+}
+
+.actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+}
+
+.connectButton {
+  min-height: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  padding-inline: 20px;
+  font-size: 15px;
+}
+
+.error {
+  margin: 0;
+  color: #b42318;
+}
+
+.stickyCard .layout {
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.stickyCard .brandIcon {
+  width: 36px;
+  height: 36px;
+  flex-basis: 36px;
+  border-radius: 12px;
+}
+
+.stickyCard .brandIcon svg {
+  width: 22px;
+  height: 22px;
+}
+
+.stickyCard .content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.stickyCard .heading {
+  flex: 1 1 auto;
+}
+
+.stickyCard .title {
+  padding: 0;
+  font-size: 15px;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.stickyCard .body,
+.stickyCard .computerLine {
+  display: none;
+}
+
+.stickyCard .actions {
+  flex: 0 0 auto;
+}
+
+.stickyCard .connectButton {
+  min-height: 42px;
+  height: 42px;
+  padding-inline: 18px;
+  font-size: 14px;
+}
+
+.stickyCard .mobileComputerLine {
+  display: none;
+}
+
+:global(.dark) .card {
+  border-color: rgb(255 255 255 / 12%);
+  color: #fafafa;
+}
+
+:global(.dark) .computerLine,
+:global(.dark) .mobileComputerLine {
+  border-color: rgb(255 255 255 / 10%);
+  background: #222228;
+  color: #e4e4e7;
+}
+
+:global(.dark) .computerLine svg,
+:global(.dark) .mobileComputerLine svg,
+:global(.dark) .dismiss {
+  color: #d4d4d8;
+}
+
+@media (max-width: 1023px), (pointer: coarse) {
+  .dailyCard {
+    padding: 16px 14px;
+    border-radius: 20px;
+  }
+
+  .stickyCard {
+    padding: 10px 12px;
+    border-radius: 16px;
+  }
+
+  .layout {
+    grid-template-columns: 36px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .brandIcon {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    border-radius: 12px;
+  }
+
+  .brandIcon svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .content {
+    gap: 9px;
+  }
+
+  .title {
+    padding-right: 34px;
+    font-size: 17px;
+    line-height: 1.3;
+  }
+
+  .dismiss {
+    top: 12px;
+    right: 12px;
+  }
+
+  .body {
+    font-size: 14px;
+  }
+
+  .computerLine {
+    display: none;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+
+  .mobileComputerLine {
+    display: flex;
+    font-size: 13px;
+  }
+
+  .connectButton {
+    display: none;
+  }
+
+  .stickyCard .layout {
+    align-items: start;
+    gap: 9px;
+  }
+
+  .stickyCard .content {
+    display: grid;
+    min-width: 0;
+    gap: 5px;
+  }
+
+  .stickyCard .heading {
+    width: 100%;
+  }
+
+  .stickyCard .title {
+    white-space: normal;
+    font-size: 15px;
+  }
+
+  .stickyCard .actions {
+    width: 100%;
+  }
+
+  .stickyCard .mobileComputerLine {
+    display: flex;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    font-size: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connectButton {
+    transition: none;
+  }
+}
