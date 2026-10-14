@@ -33,6 +33,22 @@ O que for construído aqui será reaproveitado quando o diretor geral migrar par
 - Avisos/banners: modal 2 colunas com ilustração (padrão do aviso do WhatsApp, T127).
 - Copy pt-BR, sem travessão.
 
+### 2.2.1 Padrão de qualidade visual e animação (exigência do Vinicios, 2026-10-14)
+Toda tela nova tem que ficar **tão bonita quanto o Lite do corretor**, com animação. Não basta funcionar.
+- **Referência obrigatória:** o Lite do corretor (Início, rail, lista de leads, ficha do lead, tour). Antes de desenhar, abrir a tela equivalente do corretor e copiar a linguagem: espaçamentos generosos, cantos bem arredondados, blocos cinza nos números, mascotes nas conversas, tipografia grande nos títulos, uma ação principal em pílula azul.
+- **Animações (usar o que o Lite já usa):** `motion/react` com `useReducedMotion` (como `chat-blocks.tsx` e `assistant-avatar.tsx`) e a skill `.agents/skills/transitions-dev`. Mínimo em cada tela:
+  - entrada da página (fade + leve subida, 150 a 250 ms);
+  - listas e cards com entrada escalonada (stagger curto);
+  - sheets e modais abrindo e fechando com mola suave;
+  - troca de abas/segmentos com indicador deslizando;
+  - feedback de toque em botões e cards (leve escala/realce);
+  - números que mudam com transição;
+  - skeleton com brilho enquanto carrega (nada de tela branca);
+  - estados vazios ilustrados (mascote) e mensagens de sucesso animadas.
+- **Respeitar `prefers-reduced-motion`:** sem movimento, só opacidade.
+- **Portão de design (bloqueante):** nenhuma etapa entra na `feat/diretor-visual-lite` sem prints desktop 1440 e celular 390 (claro e escuro) de **todas** as telas novas, comparados lado a lado com a tela equivalente do corretor. O revisor reprova se: alguma tela tiver visual do modo normal, faltar animação de entrada ou de sheet, faltar skeleton ou estado vazio, desalinhamento, texto cortado, scroll horizontal no celular, contraste ruim. O Maestro confere os prints antes do merge.
+- Se a prévia do app não subir, montar a tela numa rota `/dev/<etapa>-preview` com dados de exemplo só para o print (não vai para o menu).
+
 ### 2.3 Rotas e chaves
 - Cada rota nova entra com regex exata em `LIGHT_MANAGER_ALLOWED_ROUTES` / `LIGHT_SUPERVISOR_ALLOWED_ROUTES` e nos `*_DESTINATIONS` (`src/components/light/light-routes.ts`), com teste.
 - Tudo atrás de `feature_manager_lite_enabled` (gestor) e `feature_supervisor_lite_enabled` (supervisor). Flag desligada = nada muda para ninguém.
