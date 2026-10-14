@@ -10,9 +10,10 @@ describe("supervisor Lite routes", () => {
   });
 
   it("never lets normal management screens or the broker's own work in", () => {
-    for (const path of ["/leads/distribuicao", "/leads/distribuicao/plantao/x", "/dashboard/relatorios", "/equipe/cargos", "/equipe/dashboard", "/minha-fila", "/cotacao", "/plantoes", "/conversas/broker"]) {
+    for (const path of ["/leads/dashboard", "/leads/arquivados", "/leads/distribuicao", "/leads/distribuicao/plantao/x", "/dashboard/relatorios", "/equipe/cargos", "/equipe/dashboard", "/minha-fila", "/cotacao", "/plantoes", "/conversas/broker"]) {
       expect(isLightRouteAllowed(path, "supervisor")).toBe(false);
     }
+    expect(isLightRouteAllowed("/leads/dashboard")).toBe(true);
     // The broker keeps its own list.
     expect(isLightRouteAllowed("/minha-fila")).toBe(true);
   });
