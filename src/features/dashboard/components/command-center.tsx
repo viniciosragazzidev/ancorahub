@@ -58,18 +58,18 @@ function LeadSearch() {
 }
 
 /**
- * Today's four numbers. The two that ask for work carry their action, so a
+ * The four numbers of today's operation day (since 19:00, like Qualidade dos leads). The two that ask for work carry their action, so a
  * number and its shortcut are the same click.
  */
 function TodayNumbers({ today }: { today: CommandCenterData["today"] }) {
   const items = [
-    { label: "Chegaram hoje", value: today.received, href: "/leads", action: "Ver leads" },
-    { label: "Distribuídos hoje", value: today.distributed, href: "/leads/distribuicao", action: "Ver distribuição" },
+    { label: "Chegaram desde as 19h", value: today.received, href: "/leads", action: "Ver leads" },
+    { label: "Distribuídos desde as 19h", value: today.distributed, href: "/leads/distribuicao", action: "Ver distribuição" },
     { label: "Aguardando corretor", value: today.waiting, href: "/leads/distribuicao", action: "Distribuir", warn: today.waiting > 0 },
     { label: "Sem 1º contato", value: today.withoutFirstContact, href: "/leads?attention=unworked", action: "Cobrar atendimento", warn: today.withoutFirstContact > 0 },
   ];
   return (
-    <section aria-label="Hoje" className="grid gap-px overflow-hidden rounded-[var(--radius-card)] border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
+    <section aria-label="Turno de hoje, desde 19h" className="grid gap-px overflow-hidden rounded-[var(--radius-card)] border border-border bg-border sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => (
         <Link
           key={item.label}
@@ -112,7 +112,7 @@ function QueuesToday({ queues, received }: { queues: CommandCenterData["today"][
   const max = Math.max(1, ...queues.map((queue) => queue.today));
   return (
     <Card variant="overview">
-      <SectionCardHeader title="Leads de hoje por fila" description={queues.length ? `${received} chegaram hoje em ${queues.length} ${queues.length === 1 ? "fila" : "filas"}.` : "Nenhum lead chegou hoje ainda."} />
+      <SectionCardHeader title="Leads do turno por fila" description={queues.length ? `${received} chegaram desde as 19h em ${queues.length} ${queues.length === 1 ? "fila" : "filas"}.` : "Nenhum lead chegou desde as 19h."} />
       {queues.length ? (
         <ul className="divide-y divide-border">
           {queues.map((queue) => (
@@ -133,7 +133,7 @@ function QueuesToday({ queues, received }: { queues: CommandCenterData["today"][
                 </span>
                 <span className="text-right">
                   <span className="block font-mono text-xl font-medium tabular-nums">{queue.today}</span>
-                  <span className="block text-[11px] text-muted-foreground">hoje</span>
+                  <span className="block text-[11px] text-muted-foreground">no turno</span>
                 </span>
               </Link>
             </li>
