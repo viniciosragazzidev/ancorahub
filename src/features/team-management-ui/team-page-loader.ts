@@ -2,6 +2,7 @@ import "server-only";
 
 import { and, desc, eq, gte, lt } from "drizzle-orm";
 
+import { getTeamAlertContext } from "@/features/team-management/alert-context";
 import { getTeamMetrics } from "@/features/team-management/metrics";
 import { resolveTeamMetricsScope } from "@/features/team-management/scope";
 import type { TenantContext } from "@/shared/auth/types";
@@ -82,6 +83,15 @@ export async function loadTeamPage(input: {
 
   const goal = await getTeamGoal(context.tenantId, requestedSupervisorId, now);
   const viewer: TeamPageViewer = isManager ? "gestor" : "supervisor";
-  const view = buildTeamPageView({ team, unitCurrent: metrics.unit?.current ?? null, now, viewer, goal });
+  const alertContext = await getTeamAlertContext(context, team.brokers.map((broker) => broker.id), now);
+  const view = buildTeamPageView({
+    team,
+    unitConversionRate: metrics.unitConversionRate,
+    now,
+    viewer,
+    goal,
+    onDuty: alertContext.onDuty,
+    criticalLeads: alertContext.criticalLeads,
+  });
   return { access: "render", view };
 }

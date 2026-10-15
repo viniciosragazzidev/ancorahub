@@ -1,12 +1,15 @@
 import { brokerTeamAlerts, DEFAULT_ALERT_THRESHOLDS, teamAlerts, type OnDutyBroker, type TeamAlert } from "@/features/team-management/alerts";
-import { teamHealthScore, type TeamHealthInput } from "@/features/team-management/health";
-import type { TeamMetricBroker, TeamMetricTeam, TeamMetricWindow } from "@/features/team-management/metrics";
+import type { CriticalLead } from "@/features/team-management/alert-context";
+import { teamHealthScore } from "@/features/team-management/health";
+import { isInactiveForTwoBusinessDays, teamHealthInputFor } from "@/features/team-management/health-input";
+import type { TeamMetricBroker, TeamMetricTeam } from "@/features/team-management/metrics";
 import { compareTrend, type TrendDirection } from "@/features/team-management/trend";
 
-/** Visão da equipe (G2). Puro: recebe o que a camada do G0 entregou e monta a tela. Nenhuma métrica é recalculada aqui. */
+/** Visão da equipe (G2). Puro: monta a tela a partir do que o G0 entregou. Nenhuma métrica é recalculada aqui. */
 
 export type TeamPageViewer = "gestor" | "supervisor";
 export type HealthTone = "excelente" | "saudavel" | "atencao" | "critico";
+export type AlertSeverity = TeamAlert["severity"];
 
 export type TeamGoalView = { name: string; percentage: number; currentValue: string; targetValue: string };
 
@@ -14,17 +17,19 @@ export type TeamKpi = {
   key: string;
   label: string;
   value: string;
-  /** Movimento favorável (vindo do G0 via compareTrend): up = melhorou, down = piorou. */
+  /** Movimento favorável (compareTrend do G0): up = melhorou, down = piorou. */
   trend: TrendDirection | null;
 };
 
-export type AttentionCard = {
-  id: string;
-  severity: TeamAlert["severity"];
+/** Um card por corretor: o alerta mais grave em frase, os outros como etiqueta, e o lead mais crítico. */
+export type BrokerAttention = {
+  brokerId: string;
+  name: string;
+  image: string | null;
+  severity: AlertSeverity;
   message: string;
-  subjectType: TeamAlert["subjectType"];
-  subjectId: string;
-  links: Array<{ label: string; href: string }>;
+  badges: Array<{ id: string; label: string }>;
+  lead: CriticalLead | null;
 };
 
 export type LoadBar = { id: string; name: string; activeLeads: number; overThreshold: boolean };
@@ -43,8 +48,10 @@ export type TeamPageView = {
   supervisorName: string;
   brokersCount: number;
   health: { score: number; band: HealthTone; strongPoints: string[]; attentionPoints: string[] };
+  /** Uma linha só, no cabeçalho: o alerta de equipe mais grave que não repete um card de corretor. */
+  teamSummary: string | null;
   kpis: TeamKpi[];
-  attention: AttentionCard[];
+  attention: BrokerAttention[];
   load: { average: number; brokers: LoadBar[] };
   goal: TeamGoalView | null;
   managerBlock: ManagerBlock | null;
@@ -52,12 +59,13 @@ export type TeamPageView = {
 
 export type TeamPageInput = {
   team: TeamMetricTeam;
-  /** Janela da unidade (só existe para o gestor). null quando o viewer é supervisor. */
-  unitCurrent: TeamMetricWindow | null;
+  /** Conversão agregada da unidade (G0). */
+  unitConversionRate: number | null;
   now: Date;
   viewer: TeamPageViewer;
   goal: TeamGoalView | null;
   onDuty?: readonly OnDutyBroker[];
+  criticalLeads?: ReadonlyMap<string, CriticalLead>;
 };
 
 const BAND_MAP: Record<"Excelente" | "Saudável" | "Atenção" | "Crítico", HealthTone> = {
@@ -67,40 +75,27 @@ const BAND_MAP: Record<"Excelente" | "Saudável" | "Atenção" | "Crítico", Hea
   Crítico: "critico",
 };
 
-const SEVERITY_RANK: Record<TeamAlert["severity"], number> = { critical: 0, warning: 1, info: 2 };
+const SEVERITY_RANK: Record<AlertSeverity, number> = { critical: 0, warning: 1, info: 2 };
 
-/** Dias úteis (seg a sex, em UTC) depois do último movimento até agora. Dois ou mais = sem atividade recente. */
-export function isInactiveForTwoBusinessDays(lastActivityAt: Date | null, now: Date): boolean {
-  if (!lastActivityAt) return true;
-  const lastDay = Date.UTC(lastActivityAt.getUTCFullYear(), lastActivityAt.getUTCMonth(), lastActivityAt.getUTCDate());
-  const nowDay = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  let businessDays = 0;
-  for (let day = lastDay + 86_400_000; day <= nowDay; day += 86_400_000) {
-    const weekday = new Date(day).getUTCDay();
-    if (weekday !== 0 && weekday !== 6) businessDays += 1;
-  }
-  return businessDays >= 2;
-}
+/** Rótulos curtos das etiquetas de corretor. */
+const BADGE_LABEL: Record<TeamAlert["id"], string> = {
+  no_accept_in_duty: "Sem aceite no plantão",
+  redistributions_rising: "Redistribuições em alta",
+  many_without_next_action: "Sem próxima ação",
+  conversion_falling: "Conversão caiu",
+  overloaded: "Carga alta",
+  few_leads: "Poucos leads",
+  team_sla_worsening: "SLA caiu",
+  critical_pending: "Retornos urgentes",
+};
 
-/** Entrada da função de saúde do G0, montada a partir das janelas já calculadas pela camada de métricas. */
-export function teamHealthInputFor(team: TeamMetricTeam, unitCurrent: TeamMetricWindow | null, now: Date): TeamHealthInput {
-  const current = team.current;
-  const brokers = team.brokers;
-  return {
-    slaRate: current.slaRate,
-    acceptanceRate: current.acceptanceRate,
-    overdueReturns: current.overdueReturns ?? 0,
-    leadsWithoutNextAction: current.leadsWithoutNextAction ?? 0,
-    activeLeads: current.activeLeads ?? 0,
-    conversionRate: current.conversion.rate,
-    // O supervisor não recebe a janela da unidade: a própria conversão serve de referência neutra.
-    unitAverageConversionRate: unitCurrent ? unitCurrent.conversion.rate : current.conversion.rate,
-    redistributions: current.redistributions,
-    offersReceived: current.received,
-    activeBrokers: brokers.length,
-    brokersActiveWithinTwoBusinessDays: brokers.filter((broker) => !isInactiveForTwoBusinessDays(broker.current.lastActivityAt, now)).length,
-    brokerActiveLeads: brokers.map((broker) => broker.current.activeLeads ?? 0),
-  };
+/** Alertas de equipe que apenas repetem os individuais: não viram linha de resumo. */
+const TEAM_DUPLICATES_OF_BROKER_CARDS: ReadonlySet<TeamAlert["id"]> = new Set(["overloaded", "few_leads"]);
+
+/** Tira o prefixo "Destaque:" / "Ponto de atenção:" das frases da saúde: o título da seção já diz o tipo. */
+export function plainHealthPoint(text: string): string {
+  const stripped = text.replace(/^(Destaque|Ponto de atenção|Ponto de atencao):\s*/i, "");
+  return stripped.charAt(0).toUpperCase() + stripped.slice(1);
 }
 
 /** Alertas em ordem de severidade: crítico, depois atenção, depois informação. Empate mantém a ordem do G0. */
@@ -111,14 +106,34 @@ export function sortAttentionAlerts(alerts: readonly TeamAlert[]): TeamAlert[] {
     .map((entry) => entry.alert);
 }
 
-function linksFor(alert: TeamAlert): AttentionCard["links"] {
-  if (alert.subjectType === "broker") {
-    return [
-      { label: "Abrir corretor", href: `/equipe/${encodeURIComponent(alert.subjectId)}` },
-      { label: "Cobrar", href: `/relacionamento?brokerId=${encodeURIComponent(alert.subjectId)}` },
-    ];
+/** Um card por corretor, na ordem do alerta mais grave de cada um. */
+export function groupAttentionByBroker(alerts: readonly TeamAlert[], brokers: readonly TeamMetricBroker[], criticalLeads: ReadonlyMap<string, CriticalLead>): BrokerAttention[] {
+  const sorted = sortAttentionAlerts(alerts.filter((alert) => alert.subjectType === "broker"));
+  const byBroker = new Map<string, TeamAlert[]>();
+  for (const alert of sorted) {
+    const list = byBroker.get(alert.subjectId) ?? [];
+    list.push(alert);
+    byBroker.set(alert.subjectId, list);
   }
-  return [{ label: "Mural da gestão", href: "/relacionamento" }];
+  return [...byBroker.entries()].map(([brokerId, list]) => {
+    const broker = brokers.find((item) => item.id === brokerId);
+    const [top, ...others] = list;
+    return {
+      brokerId,
+      name: broker?.name ?? "Corretor",
+      image: broker?.image ?? null,
+      severity: top!.severity,
+      message: top!.message,
+      badges: others.map((alert) => ({ id: alert.id, label: BADGE_LABEL[alert.id] })),
+      lead: criticalLeads.get(brokerId) ?? null,
+    };
+  });
+}
+
+/** O alerta de equipe mais grave que não repete um card de corretor. */
+export function pickTeamSummary(alerts: readonly TeamAlert[]): string | null {
+  const teamOnly = sortAttentionAlerts(alerts.filter((alert) => alert.subjectType === "team" && !TEAM_DUPLICATES_OF_BROKER_CARDS.has(alert.id)));
+  return teamOnly[0]?.message ?? null;
 }
 
 function average(values: readonly number[]) {
@@ -130,12 +145,13 @@ function percentText(value: number | null | undefined) {
 }
 
 export function buildTeamPageView(input: TeamPageInput): TeamPageView {
-  const { team, unitCurrent, now, viewer, goal } = input;
+  const { team, now, viewer, goal } = input;
   const onDuty = input.onDuty ?? [];
+  const criticalLeads = input.criticalLeads ?? new Map<string, CriticalLead>();
   const brokers = team.brokers;
   const activeLeadsAverage = average(brokers.map((broker) => broker.current.activeLeads ?? 0));
 
-  const health = teamHealthScore(teamHealthInputFor(team, unitCurrent, now));
+  const health = teamHealthScore(teamHealthInputFor(team, input.unitConversionRate, now));
 
   const brokerAlerts = brokers.flatMap((broker) => brokerTeamAlerts({
     broker,
@@ -144,10 +160,7 @@ export function buildTeamPageView(input: TeamPageInput): TeamPageView {
     onDuty: onDuty.find((duty) => duty.id === broker.id) ?? null,
     teamAverageActiveLeads: activeLeadsAverage,
   }));
-  const attention = sortAttentionAlerts([
-    ...teamAlerts({ team, now, windowDays: 7, onDutyBrokers: onDuty }),
-    ...brokerAlerts,
-  ]).map((alert) => ({ id: `${alert.id}:${alert.subjectId}`, severity: alert.severity, message: alert.message, subjectType: alert.subjectType, subjectId: alert.subjectId, links: linksFor(alert) }));
+  const allAlerts = [...teamAlerts({ team, now, windowDays: 7, onDutyBrokers: onDuty }), ...brokerAlerts];
 
   const current = team.current;
   const previous = team.previous;
@@ -170,8 +183,6 @@ export function buildTeamPageView(input: TeamPageInput): TeamPageView {
     };
   });
 
-  const managerBlock = viewer === "gestor" ? buildManagerBlock(brokers, now) : null;
-
   return {
     viewer,
     teamName: team.name,
@@ -180,14 +191,15 @@ export function buildTeamPageView(input: TeamPageInput): TeamPageView {
     health: {
       score: health.score,
       band: BAND_MAP[health.band],
-      strongPoints: [...health.strongPoints],
-      attentionPoints: [...health.attentionPoints],
+      strongPoints: health.strongPoints.map(plainHealthPoint),
+      attentionPoints: health.attentionPoints.map(plainHealthPoint),
     },
+    teamSummary: pickTeamSummary(allAlerts),
     kpis,
-    attention,
+    attention: groupAttentionByBroker(allAlerts, brokers, criticalLeads),
     load: { average: activeLeadsAverage, brokers: loadBars },
     goal,
-    managerBlock,
+    managerBlock: viewer === "gestor" ? buildManagerBlock(brokers, now) : null,
   };
 }
 
@@ -210,7 +222,7 @@ export function buildManagerBlock(brokers: readonly TeamMetricBroker[], now: Dat
   };
 }
 
-/** Estado vazio da tela: nada de alerta e nenhum corretor com pendência crítica. */
+/** Estado vazio da tela: nenhum card de corretor e nenhum alerta de equipe para mostrar. */
 export function nobodyNeedsYou(view: TeamPageView): boolean {
-  return view.attention.length === 0;
+  return view.attention.length === 0 && view.teamSummary === null;
 }

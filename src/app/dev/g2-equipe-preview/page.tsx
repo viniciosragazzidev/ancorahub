@@ -48,7 +48,15 @@ const goal: TeamGoalView = { name: "Vendas da equipe em outubro", percentage: 62
 
 function Showcase() {
   const view = useSearchParams().get("view") === "supervisor" ? "supervisor" : "gestor";
-  const page = buildTeamPageView({ team, unitCurrent: view === "gestor" ? windowOf({ conversion: { received: 100, converted: 12, rate: 12 } }) : null, now: NOW, viewer: view === "gestor" ? "gestor" : "supervisor", goal });
+  // Mesma referência da unidade nas duas telas: o score é o mesmo para gestor e supervisor.
+  const page = buildTeamPageView({
+    team,
+    unitConversionRate: 12,
+    now: NOW,
+    viewer: view === "gestor" ? "gestor" : "supervisor",
+    goal,
+    criticalLeads: new Map([["b-carla", { leadId: "lead-carla-1", leadName: "Mariana Costa" }], ["b-diego", { leadId: "lead-diego-3", leadName: "Roberto Dias" }]]),
+  });
   return <TeamPageViewComponent key={view} view={page} />;
 }
 

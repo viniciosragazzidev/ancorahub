@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import type { TeamAlert } from "@/features/team-management/alerts";
 import type { TeamMetricBroker, TeamMetricTeam, TeamMetricWindow } from "@/features/team-management/metrics";
 
-import { buildManagerBlock, buildTeamPageView, isInactiveForTwoBusinessDays, nobodyNeedsYou, sortAttentionAlerts, teamHealthInputFor } from "./team-page";
-import type { TeamAlert } from "@/features/team-management/alerts";
+import { buildManagerBlock, buildTeamPageView, groupAttentionByBroker, nobodyNeedsYou, pickTeamSummary, plainHealthPoint, sortAttentionAlerts } from "./team-page";
 import { resolveTeamPageAccess } from "./team-page-access";
 
 // Quarta-feira, 15/10/2026 ao meio-dia UTC.
@@ -34,16 +34,56 @@ function team(brokers: TeamMetricBroker[], overrides: Partial<TeamMetricTeam> = 
   };
 }
 
+function alert(overrides: Partial<TeamAlert> & Pick<TeamAlert, "id" | "severity" | "message" | "subjectId" | "subjectType">): TeamAlert {
+  return overrides as TeamAlert;
+}
+
 describe("ordenação dos alertas por severidade", () => {
   it("puts critical first, then warning, then info, keeping the G0 order inside each severity", () => {
-    const alerts: TeamAlert[] = [
-      { id: "few_leads", severity: "info", message: "a", subjectId: "1", subjectType: "broker" },
-      { id: "overloaded", severity: "warning", message: "b", subjectId: "2", subjectType: "broker" },
-      { id: "critical_pending", severity: "critical", message: "c", subjectId: "t", subjectType: "team" },
-      { id: "conversion_falling", severity: "warning", message: "d", subjectId: "3", subjectType: "broker" },
+    const alerts = [
+      alert({ id: "few_leads", severity: "info", message: "a", subjectId: "1", subjectType: "broker" }),
+      alert({ id: "overloaded", severity: "warning", message: "b", subjectId: "2", subjectType: "broker" }),
+      alert({ id: "critical_pending", severity: "critical", message: "c", subjectId: "t", subjectType: "team" }),
+      alert({ id: "conversion_falling", severity: "warning", message: "d", subjectId: "3", subjectType: "broker" }),
     ];
 
-    expect(sortAttentionAlerts(alerts).map((alert) => alert.message)).toEqual(["c", "b", "d", "a"]);
+    expect(sortAttentionAlerts(alerts).map((item) => item.message)).toEqual(["c", "b", "d", "a"]);
+  });
+});
+
+describe("um card por corretor", () => {
+  it("groups a broker's alerts into one card: the most severe phrase, the others as badges, and the critical lead", () => {
+    const alerts = [
+      alert({ id: "overloaded", severity: "warning", message: "Carla está com 11 leads ativos.", subjectId: "carla", subjectType: "broker" }),
+      alert({ id: "many_without_next_action", severity: "warning", message: "Carla tem 4 leads sem próxima ação.", subjectId: "carla", subjectType: "broker" }),
+      alert({ id: "few_leads", severity: "info", message: "Fábio está com poucos leads.", subjectId: "fabio", subjectType: "broker" }),
+    ];
+    const cards = groupAttentionByBroker(alerts, [broker("carla"), broker("fabio")], new Map([["carla", { leadId: "lead-9", leadName: "Mariana" }]]));
+
+    expect(cards.map((card) => card.brokerId)).toEqual(["carla", "fabio"]);
+    expect(cards[0]?.message).toBe("Carla está com 11 leads ativos.");
+    expect(cards[0]?.badges.map((badge) => badge.label)).toEqual(["Sem próxima ação"]);
+    expect(cards[0]?.lead).toEqual({ leadId: "lead-9", leadName: "Mariana" });
+    expect(cards[1]?.lead).toBeNull();
+  });
+});
+
+describe("linha de resumo da equipe", () => {
+  it("shows the most severe team alert, but not the ones that only repeat a broker card", () => {
+    const alerts = [
+      alert({ id: "overloaded", severity: "warning", message: "1 corretor está com mais de 50% acima da média.", subjectId: "t", subjectType: "team" }),
+      alert({ id: "critical_pending", severity: "critical", message: "A equipe acumula 3 retornos urgentes vencidos.", subjectId: "t", subjectType: "team" }),
+    ];
+
+    expect(pickTeamSummary(alerts)).toBe("A equipe acumula 3 retornos urgentes vencidos.");
+    expect(pickTeamSummary([alerts[0]!])).toBeNull();
+  });
+});
+
+describe("frases da saúde sem prefixo", () => {
+  it("drops the 'Destaque:' and 'Ponto de atenção:' prefixes", () => {
+    expect(plainHealthPoint("Destaque: SLA de primeiro contato em 88%.")).toBe("SLA de primeiro contato em 88%.");
+    expect(plainHealthPoint("Ponto de atenção: conversão de 8% (média da unidade: 12%).")).toBe("Conversão de 8% (média da unidade: 12%).");
   });
 });
 
@@ -55,7 +95,7 @@ describe("carga da equipe e aviso de quem passa de 50% acima da média", () => {
         broker("b", { current: { activeLeads: 4 } }),
         broker("c", { current: { activeLeads: 9 } }),
       ]),
-      unitCurrent: null, now: NOW, viewer: "supervisor", goal: null,
+      unitConversionRate: null, now: NOW, viewer: "supervisor", goal: null,
     });
 
     expect(view.load.average).toBeCloseTo(5.67, 1);
@@ -65,30 +105,21 @@ describe("carga da equipe e aviso de quem passa de 50% acima da média", () => {
 
 describe("estado vazio 'Ninguém precisa de você agora'", () => {
   it("is shown when the team has no alert at all", () => {
-    const view = buildTeamPageView({ team: team([broker("a"), broker("b")]), unitCurrent: null, now: NOW, viewer: "supervisor", goal: null });
+    const view = buildTeamPageView({ team: team([broker("a"), broker("b")]), unitConversionRate: null, now: NOW, viewer: "supervisor", goal: null });
 
     expect(view.attention).toEqual([]);
+    expect(view.teamSummary).toBeNull();
     expect(nobodyNeedsYou(view)).toBe(true);
   });
 
   it("is not shown when a broker needs attention", () => {
     const view = buildTeamPageView({
       team: team([broker("a", { current: { leadsWithoutNextAction: 5 } }), broker("b")]),
-      unitCurrent: null, now: NOW, viewer: "supervisor", goal: null,
+      unitConversionRate: null, now: NOW, viewer: "supervisor", goal: null,
     });
 
     expect(nobodyNeedsYou(view)).toBe(false);
-    expect(view.attention[0]?.links.map((link) => link.href)).toEqual(["/equipe/a", "/relacionamento?brokerId=a"]);
-  });
-});
-
-describe("dias úteis sem atividade", () => {
-  it("counts two business days, skipping the weekend", () => {
-    // Sexta 09/10 até terça 13/10 tem dois dias úteis (segunda e terça): sem atividade.
-    expect(isInactiveForTwoBusinessDays(new Date("2026-10-09T15:00:00.000Z"), new Date("2026-10-13T12:00:00.000Z"))).toBe(true);
-    // Quarta 14/10 até quinta 15/10 tem só um dia útil: ainda dentro da janela.
-    expect(isInactiveForTwoBusinessDays(new Date("2026-10-14T15:00:00.000Z"), NOW)).toBe(false);
-    expect(isInactiveForTwoBusinessDays(null, NOW)).toBe(true);
+    expect(view.attention[0]?.brokerId).toBe("a");
   });
 });
 
@@ -108,28 +139,18 @@ describe("gestão do supervisor (bloco extra do gestor)", () => {
   });
 
   it("is present only for the gestor view", () => {
-    const input = { team: team([broker("a")]), unitCurrent: null, now: NOW, goal: null };
+    const input = { team: team([broker("a")]), unitConversionRate: null, now: NOW, goal: null };
 
     expect(buildTeamPageView({ ...input, viewer: "gestor" }).managerBlock).not.toBeNull();
     expect(buildTeamPageView({ ...input, viewer: "supervisor" }).managerBlock).toBeNull();
   });
 });
 
-describe("saúde e entrada do G0", () => {
-  it("uses the G0 score and maps the unit average only for the gestor", () => {
-    const t = team([broker("a")]);
-    const gestorInput = teamHealthInputFor(t, window({ conversion: { received: 10, converted: 2, rate: 20 } }), NOW);
-    const supervisorInput = teamHealthInputFor(t, null, NOW);
-
-    expect(gestorInput.unitAverageConversionRate).toBe(20);
-    expect(supervisorInput.unitAverageConversionRate).toBe(10);
-    expect(gestorInput.brokersActiveWithinTwoBusinessDays).toBe(1);
-  });
-
-  it("shows the trend of the KPIs as the favorable direction", () => {
+describe("tendência dos números", () => {
+  it("shows the trend as the favorable direction", () => {
     const view = buildTeamPageView({
       team: team([broker("a")], { current: window({ slaRate: 95 }), previous: window({ slaRate: 80 }) }),
-      unitCurrent: null, now: NOW, viewer: "supervisor", goal: null,
+      unitConversionRate: null, now: NOW, viewer: "supervisor", goal: null,
     });
 
     expect(view.kpis.find((kpi) => kpi.key === "sla")?.trend).toBe("up");
