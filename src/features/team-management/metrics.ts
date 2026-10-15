@@ -9,7 +9,7 @@ import { resolveCanonicalTeamMetrics, type CanonicalTeamMetricRow } from "@/feat
 import { TtlCache } from "@/shared/cache/ttl-cache";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
-import { isTeamMetricRowVisibleInScope, resolveTeamMetricsScope } from "./scope";
+import { isTeamMetricRowVisibleInScope, resolveTeamMetricsScope, type TeamMetricsScope } from "./scope";
 
 export type TeamMetricWindow = {
   received: number;
@@ -61,6 +61,8 @@ export type TeamMetricsResult = {
   generatedAt: Date;
   slaFirstContactMinutes: number;
   unit: { id: string; name: string | null; current: TeamMetricWindow; previous: TeamMetricWindow } | null;
+  /** Conversão agregada da unidade: referência da saúde para gestor e supervisor (nenhuma linha de outra equipe). */
+  unitConversionRate: number | null;
   teams: TeamMetricTeam[];
   brokers: TeamMetricBroker[];
 };
@@ -175,9 +177,18 @@ function buildResult(snapshot: Awaited<ReturnType<typeof resolveCanonicalTeamMet
     generatedAt: snapshot.now,
     slaFirstContactMinutes: snapshot.slaFirstContactMinutes,
     unit,
+    unitConversionRate: unit ? unit.current.conversion.rate : null,
     teams,
     brokers: [...allBrokers.values()],
   };
+}
+
+/** Referência de conversão da unidade para o supervisor: só a média agregada da unidade. */
+async function unitConversionReference(context: TenantContext, scope: TeamMetricsScope, input: { window: 7 | 30; now: Date }): Promise<number | null> {
+  if (!context.branchId) return null;
+  const snapshot = await resolveCanonicalTeamMetrics(context, { kind: "unit", tenantId: scope.tenantId, branchId: context.branchId }, input);
+  const row = snapshot.rows.find((item) => item.scopeType === "unit" && item.windowKey === "current");
+  return row ? value(row, "commercial.conversion_rate") : null;
 }
 
 /** Scoped, audited, 60-second cached team metrics. */
@@ -197,7 +208,9 @@ export async function getTeamMetrics(
     if (snapshot.rows.some((row) => !isTeamMetricRowVisibleInScope(scope, { ...row, tenantId: snapshot.tenantId }))) {
       throw new Error("A consulta agregada retornou uma métrica fora do escopo autorizado.");
     }
-    return buildResult(snapshot);
+    const built = buildResult(snapshot);
+    if (scope.kind === "team") built.unitConversionRate = await unitConversionReference(context, scope, input);
+    return built;
   });
 
   await getDatabase().insert(schema.auditLogs).values({

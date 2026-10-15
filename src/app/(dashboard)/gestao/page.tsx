@@ -5,6 +5,8 @@ import { getManagerUnitIdentity } from "@/features/manager-workspace/gestao-over
 import { resolveGestaoAccess } from "@/features/team-management-ui/access";
 import { buildUnitOverview } from "@/features/team-management-ui/build-overview";
 import { isTeamManagementEnabled } from "@/features/team-management-ui/flag";
+import { loadTeamPage } from "@/features/team-management-ui/team-page-loader";
+import { TeamPageViewComponent } from "@/features/team-management-ui/team-page-view";
 import { UnitOverviewView } from "@/features/team-management-ui/unit-overview";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
@@ -15,7 +17,12 @@ export default async function GestaoPage() {
   const audience = await getLiteAudience(context);
   const decision = resolveGestaoAccess({ flagOn: await isTeamManagementEnabled(), role: context.role, audience });
   if (decision === "off") notFound();
-  if (decision === "supervisor") redirect("/equipe/minha");
+  if (decision === "supervisor") {
+    // Supervisor Lite: a própria equipe, a mesma tela do perfil da equipe (G2).
+    const page = await loadTeamPage({ context, audience, flagOn: true, requestedSupervisorId: context.userId });
+    if (page.access !== "render") redirect("/equipe/minha");
+    return <TeamPageViewComponent view={page.view} />;
+  }
   if (decision === "denied") redirect("/access-denied");
 
   const identity = await getManagerUnitIdentity(context);
