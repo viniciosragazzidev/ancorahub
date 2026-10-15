@@ -2,11 +2,13 @@ import type { TeamMetricBroker, TeamMetricTeam, TeamMetricWindow } from "./metri
 
 export type TeamAlertSeverity = "info" | "warning" | "critical";
 export type TeamAlert = {
-  id: "no_accept_in_duty" | "redistributions_rising" | "many_without_next_action" | "conversion_falling" | "overloaded" | "few_leads" | "team_sla_worsening" | "critical_pending";
+  id: "no_accept_in_duty" | "redistributions_rising" | "many_without_next_action" | "conversion_falling" | "overloaded" | "few_leads" | "team_sla_worsening" | "critical_pending" | "broker_critical_pending";
   severity: TeamAlertSeverity;
   message: string;
   subjectId: string;
   subjectType: "broker" | "team";
+  /** Lead mais crítico do corretor (atalho "Abrir lead"), quando o alerta é de corretor e há um lead. */
+  leadId?: string | null;
 };
 
 export type AlertThresholds = {
@@ -45,6 +47,8 @@ export type BrokerAlertInput = {
   onDuty: OnDutyBroker | null;
   teamAverageActiveLeads: number;
   thresholds?: Partial<AlertThresholds>;
+  /** Lead mais crítico do corretor, vindo do alert-context. */
+  criticalLead?: { leadId: string; leadName: string } | null;
 };
 
 export type TeamAlertInput = {
@@ -104,6 +108,16 @@ export function brokerTeamAlerts(input: BrokerAlertInput): TeamAlert[] {
   }
   if (teamAverage > 0 && activeLeads > teamAverage * (1 + threshold.loadDifference)) {
     alerts.push({ id: "overloaded", severity: "warning", message: `${broker.name} está com ${activeLeads} leads ativos, mais de ${Math.round(threshold.loadDifference * 100)}% acima da média da equipe (${teamAverage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}).`, ...unit });
+  }
+  const criticalOverdue = broker.current.criticalOverdueReturns ?? 0;
+  if (criticalOverdue > 0) {
+    alerts.push({
+      id: "broker_critical_pending",
+      severity: "critical",
+      message: `${broker.name} tem ${criticalOverdue} ${criticalOverdue === 1 ? "retorno urgente vencido" : "retornos urgentes vencidos"}.`,
+      leadId: input.criticalLead?.leadId ?? null,
+      ...unit,
+    });
   }
   if (teamAverage > 0 && activeLeads < teamAverage * threshold.lowLeadShare) {
     alerts.push({ id: "few_leads", severity: "info", message: `${broker.name} está com menos da metade da média de leads ativos da equipe (${activeLeads} contra ${teamAverage.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}).`, ...unit });

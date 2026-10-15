@@ -87,6 +87,7 @@ const BADGE_LABEL: Record<TeamAlert["id"], string> = {
   few_leads: "Poucos leads",
   team_sla_worsening: "SLA caiu",
   critical_pending: "Retornos urgentes",
+  broker_critical_pending: "Retornos urgentes",
 };
 
 /** Alertas de equipe que apenas repetem os individuais: não viram linha de resumo. */
@@ -159,6 +160,7 @@ export function buildTeamPageView(input: TeamPageInput): TeamPageView {
     windowDays: 7,
     onDuty: onDuty.find((duty) => duty.id === broker.id) ?? null,
     teamAverageActiveLeads: activeLeadsAverage,
+    criticalLead: criticalLeads.get(broker.id) ?? null,
   }));
   const allAlerts = [...teamAlerts({ team, now, windowDays: 7, onDutyBrokers: onDuty }), ...brokerAlerts];
 

@@ -12,7 +12,7 @@ export type GoalRecord = {
   scopeId: string | null;
   scopeName: string | null;
   name: string;
-  targetType: "sales_count" | "revenue" | "conversion_rate" | "leads_contacted";
+  targetType: "sales_count" | "revenue" | "conversion_rate" | "leads_contacted" | "quotes_count" | "sla_rate" | "response_minutes";
   targetValue: string;
   period: string;
   startDate: Date;

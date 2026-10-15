@@ -11,7 +11,7 @@ export const goalInputSchema = z
       message: "Selecione o escopo da meta.",
     }),
     scopeId: z.string().trim().optional().nullable(),
-    targetType: z.enum(["sales_count", "revenue", "conversion_rate", "leads_contacted"], {
+    targetType: z.enum(["sales_count", "revenue", "conversion_rate", "leads_contacted", "quotes_count", "sla_rate", "response_minutes"], {
       message: "Selecione o tipo de meta.",
     }),
     targetValue: z

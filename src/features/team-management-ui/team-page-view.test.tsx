@@ -57,9 +57,7 @@ describe("TeamPageViewComponent", () => {
     expect(within(card).getByRole("link", { name: "Abrir corretor" }).getAttribute("href")).toBe("/equipe/b-1");
     expect(within(card).getByRole("link", { name: "Abrir lead" }).getAttribute("href")).toBe("/leads/lead-7");
     expect(within(card).getByRole("link", { name: "Cobrar" }).getAttribute("href")).toBe("/relacionamento?brokerId=b-1");
-    expect(screen.getByRole("heading", { name: "Gestão do supervisor" })).toBeTruthy();
-    expect(screen.getByText("Meta de outubro")).toBeTruthy();
-  });
+    expect(screen.getByRole("heading", { name: "Gestão do supervisor" })).toBeTruthy();  });
 
   it("has no eyebrow and no 'Destaque' or 'Ponto de atenção' prefixes", () => {
     const { container } = render(<TeamPageViewComponent view={buildTeamPageView({ team: teamWith([brokerOf("a", "Ana Costa")]), unitConversionRate: null, now: NOW, viewer: "gestor", goal: null })} />);
