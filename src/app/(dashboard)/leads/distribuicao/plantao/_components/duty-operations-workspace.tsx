@@ -1,6 +1,5 @@
 "use client";
 
-import { ScheduleEscalarButton } from "./schedule-escalar-button";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -892,16 +891,6 @@ function DutyInspector({
           {schedule && (
             <>
               <SheetBody contentClassName="grid gap-4">
-                {/* Also here (the same option exists inside the plantão page): put someone on a day of the published escala. */}
-                <SheetSection>
-                  <SheetSectionHeader>
-                    <div>
-                      <p className="text-sm font-semibold">Escalar num dia</p>
-                      <p className="text-xs text-muted-foreground">Coloque um corretor neste plantão num dia da escala publicada.</p>
-                    </div>
-                  </SheetSectionHeader>
-                  <ScheduleEscalarButton scheduleId={schedule.id} scheduleName={schedule.name} defaultDate={new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())} brokers={snapshot.brokers} />
-                </SheetSection>
                 <SheetSection>
                   <SheetSectionHeader>
                     <div>
