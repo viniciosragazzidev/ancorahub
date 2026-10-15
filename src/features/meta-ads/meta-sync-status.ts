@@ -51,6 +51,9 @@ export function isMetaRateLimitMessage(errorDetails: string | null | undefined):
     && /user request limit reached|request limit reached|rate.?limit/i.test(errorDetails);
 }
 
+/** Mesmo limite do lock do serviço de sincronização: além disso, o run foi cortado no meio. */
+const META_SYNC_STALE_AFTER_MS = 15 * 60 * 1000;
+
 type RateLimitLog = { status: string; errorDetails?: string | null; startedAt: Date | string; completedAt?: Date | string | null };
 
 /**
@@ -115,8 +118,15 @@ export function summarizeLastSync(
       }
       return { tone: "destructive", label: "Falhou", detail: when, at: at.toISOString() };
     }
-    case "in_progress":
+    case "in_progress": {
+      // Passou do limite do lock, o servidor reiniciou no meio e o registro nunca
+      // fechou: mostra interrupção em vez de "Em andamento" para sempre.
+      const startedAt = toDate(latest.startedAt)!;
+      if (now.getTime() - startedAt.getTime() > META_SYNC_STALE_AFTER_MS) {
+        return { tone: "warning", label: "Interrompida", detail: `${when} · clique em Sincronizar`, at: at.toISOString() };
+      }
       return { tone: "info", label: "Em andamento", detail: `iniciada ${when}`, at: at.toISOString() };
+    }
     default:
       return { tone: "secondary", label: latest.status, detail: when, at: at.toISOString() };
   }
