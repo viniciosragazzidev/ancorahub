@@ -65,10 +65,9 @@ describe("supervisor Lite chat", () => {
     expect(choice && choice.type === "question" ? choice.choices.map((item) => [item.label, item.action]) : []).toContainEqual(["Ver o placar", { kind: "href", href: "/equipe/desempenho" }]);
   });
 
-  it("offers to add a free broker of the unit and to hand off a late lead", () => {
+  it("does not offer to add brokers in the chat (that lives in Minha equipe) and hands off a late lead", () => {
     const team = buildSupervisorScript("equipe", data(), now);
-    const add = team.blocks.find((block) => block.id === "equipe-free-choice");
-    expect(add && add.type === "question" ? add.choices[0]!.action : null).toEqual({ kind: "server", name: "team.addBroker", payload: { brokerId: "b9" } });
+    expect(team.blocks.some((block) => block.id === "equipe-free-choice")).toBe(false);
     const leads = buildSupervisorScript("equipe-leads", data(), now);
     const handoff = leads.blocks.find((block) => block.id === "equipe-leads-handoff");
     expect(handoff && handoff.type === "question" ? handoff.choices[0]!.action : null).toEqual({ kind: "href", href: "/equipe/repassar?lead=l1" });

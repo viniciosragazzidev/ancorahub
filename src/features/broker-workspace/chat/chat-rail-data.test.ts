@@ -13,7 +13,8 @@ vi.mock("@/features/supervisor-workspace/manager-lite-queries", () => ({ getMana
 vi.mock("@/features/broker-workspace/queries", () => ({ getBrokerWorkspaceData: vi.fn() }));
 vi.mock("@/features/engagement/journey-queries", () => ({ getBrokerJourneyData: vi.fn() }));
 vi.mock("@/features/system-settings/queries", () => ({ FEATURE_FLAGS: {}, getFeatureFlag: vi.fn() }));
-vi.mock("@/features/supervisor-workspace/chat", () => ({ buildSupervisorLeadThreads: vi.fn(), buildSupervisorThreads: vi.fn() }));
+vi.mock("@/features/supervisor-workspace/chat", () => ({ buildSupervisorLeadThreads: vi.fn(), buildSupervisorThreads: vi.fn(), buildTeamLeadThreads: (leads: Array<{ id: string }>) => leads.map((lead) => ({ id: `lead:${lead.id}` })) }));
+vi.mock("@/features/supervisor-workspace/lite-queries", () => ({ getSupervisorLiteRadar: vi.fn() }));
 vi.mock("@/features/supervisor-workspace/queries", () => ({ getSupervisorWorkspaceData: vi.fn() }));
 vi.mock("./assistant-scripts", () => ({ buildAssistantThreads: vi.fn(), buildLeadThreads: vi.fn() }));
 
@@ -66,6 +67,7 @@ describe("manager desktop chat rail", () => {
     expect(rail?.assistants[3]).toMatchObject({ name: "Mensagens da unidade", href: "/mensagens" });
     expect(rail?.assistants[4]).toMatchObject({ name: "Notificações", href: "/notificacoes", shape: "jack" });
     expect(rail?.leadsBadgeCount).toBe(2);
+    expect(rail?.leads).toHaveLength(3);
     expect(rail?.managerUnitSummary).toMatchObject({ leads: 3, unassigned: 2, activeBrokers: 2, brokersWithoutWhatsApp: 1, late: 1 });
     expect(rail?.assistants.every((thread) => thread.at !== null)).toBe(true);
     expect(mocks.getManagerLiteLeads).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-1", branchId: "branch-1" }));
