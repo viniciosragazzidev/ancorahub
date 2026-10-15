@@ -47,6 +47,7 @@ export function AppShell({
   journeyEnabled = false,
   welcomeVideoEnabled = false,
   teamRankingEnabled = false,
+  teamManagementEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
   liteAudience = "broker",
   initialChatRail = null,
@@ -65,6 +66,7 @@ export function AppShell({
   /** Welcome video on the broker's first access (Super-admin flag). */
   welcomeVideoEnabled?: boolean;
   teamRankingEnabled?: boolean;
+  teamManagementEnabled?: boolean;
   /** Super admin "Ver como" (button and the strip while viewing as someone). */
   viewAs?: ViewAsState;
   /** Who uses the Lite chrome (supervisor Lite, 2026-10-10). */
@@ -169,6 +171,7 @@ export function AppShell({
           journeyEnabled={journeyEnabled}
           welcomeVideoEnabled={welcomeVideoEnabled}
           teamRankingEnabled={teamRankingEnabled}
+          teamManagementEnabled={teamManagementEnabled}
           audience={liteAudience}
           initialChatRail={initialChatRail}
           showQuoteSimulator={showQuoteSimulator}

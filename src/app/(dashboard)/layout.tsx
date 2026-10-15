@@ -23,6 +23,7 @@ import { getRealtimeSyncTopic, isRealtimeSyncEnabled } from "@/features/notifica
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { isManagerLiteAvailable, isSupervisorLiteAvailable } from "@/features/broker-workspace/lite-audience";
+import { isTeamManagementEnabled } from "@/features/team-management-ui/flag";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
@@ -139,6 +140,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     whatsappConnectionPromise,
   ]);
 
+  // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
+  const teamManagementFlag = context.role === "manager" ? await isTeamManagementEnabled() : false;
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
   // Supervisor Lite (S2): same chrome, team screens only.
   const isLightSupervisor = supervisorLiteAvailable && experienceMode === "LIGHT";
@@ -223,6 +226,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
         journeyEnabled={isLightBroker && brokerJourneyFlag === "true"}
         welcomeVideoEnabled={isLightBroker && welcomeVideoFlag === "true" && (process.env.WELCOME_VIDEO_TENANT_ID ?? "").split(",").map((id) => id.trim()).filter(Boolean).includes(context.tenantId)}
         teamRankingEnabled={isLightSupervisor && teamRankingFlag === "true"}
+        teamManagementEnabled={isLightManager && teamManagementFlag}
         showDutyCalendar={isLightBroker && brokerDutyCalendarFlag === "true"}
         showRelationship={(isLightBroker || isLightSupervisor) && relationshipFlag === "true"}
         branding={{

@@ -1,0 +1,93 @@
+.page {
+  min-height: 100%;
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.inner {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 20px 16px 40px;
+  display: grid;
+  gap: 20px;
+}
+
+.heading { display: grid; gap: 6px; }
+.heading h1 { margin: 0; font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); }
+.exception { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+.exception[data-attention="true"] { color: var(--danger); font-weight: 500; }
+
+/* Cards Lite (mesmo padrão do perfil do corretor): rounded-3xl, shadow-resting, entrada só por transform. */
+.card {
+  min-width: 0;
+  border-radius: 1.5rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-resting);
+  animation: overview-card-enter var(--duration-standard) var(--ease-enter) both;
+}
+
+@keyframes overview-card-enter {
+  from { transform: translateY(8px); }
+}
+
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 14px; }
+.kpi { min-width: 0; display: grid; gap: 4px; padding: 12px; border-radius: 1rem; background: var(--surface-muted); }
+.kpiLabel { color: var(--text-muted); font-size: var(--text-xs); }
+.kpiValue { font-size: var(--text-xl); font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-display); }
+.kpiSoon { color: var(--text-muted); font-size: var(--text-sm); font-weight: 500; }
+.trendGood { color: var(--success); font-size: var(--text-sm); }
+.trendBad { color: var(--danger); font-size: var(--text-sm); }
+.trendFlat { color: var(--text-muted); font-size: var(--text-sm); }
+
+.section { display: grid; gap: 12px; }
+.section h2 { margin: 0; padding: 0 4px; font-size: var(--text-base); font-weight: 500; }
+.teamGrid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+
+.team { display: grid; gap: 14px; padding: 18px; align-content: start; }
+.teamHead { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.teamIdentity { min-width: 0; display: grid; gap: 2px; }
+.teamIdentity h3 { margin: 0; overflow: hidden; font-size: var(--text-base); font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.teamIdentity p { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+
+.scoreRow { display: flex; align-items: baseline; gap: 10px; }
+.score { font-size: 2.5rem; font-weight: 500; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-display); }
+/* Uma cor por faixa, nunca duas no mesmo componente. */
+.band { padding: 4px 10px; border-radius: 999px; font-size: var(--text-xs); font-weight: 500; background: var(--surface-muted); color: var(--text-secondary); }
+.band[data-band="critico"] { color: var(--danger); }
+.band[data-band="atencao"] { color: var(--warning); }
+.band[data-band="excelente"] { color: var(--success); }
+.soon { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+
+.notes { display: grid; gap: 10px; }
+.notes > div { display: grid; gap: 4px; }
+.notes span { color: var(--text-muted); font-size: var(--text-xs); }
+.notes ul { margin: 0; padding-left: 16px; font-size: var(--text-sm); }
+
+.openLink { justify-self: start; color: var(--chat-action-text); font-size: var(--text-sm); font-weight: 500; text-decoration: none; }
+.unassignedList { margin: 0; padding-left: 16px; font-size: var(--text-sm); }
+
+.compare { padding: 6px 4px; }
+.compareTable { display: none; width: 100%; border-collapse: collapse; font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.compareTable th, .compareTable td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border-subtle); }
+.compareTable thead th { color: var(--text-muted); font-size: var(--text-xs); font-weight: 500; }
+.compareTable tbody th { font-weight: 500; }
+.compareList { display: grid; gap: 8px; margin: 0; padding: 8px; list-style: none; }
+.compareItem { display: grid; gap: 4px; padding: 12px; border-radius: 1rem; background: var(--surface-muted); font-size: var(--text-sm); }
+.compareItem span { color: var(--text-muted); font-size: var(--text-xs); }
+
+@media (min-width: 640px) {
+  .inner { padding: 24px 24px 48px; }
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 900px) {
+  .kpis { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .teamGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .compareTable { display: table; }
+  .compareList { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}
