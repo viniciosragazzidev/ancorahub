@@ -8,9 +8,9 @@ describe("/gestao no Lite", () => {
     expect(isLightRouteAllowed("/gestao", "supervisor")).toBe(true);
   });
 
-  it("stays closed for the broker and does not open the team detail before the G2", () => {
+  it("stays closed for the broker and keeps the team detail to the managers and supervisors (G2)", () => {
     expect(isLightRouteAllowed("/gestao", "broker")).toBe(false);
-    expect(isLightRouteAllowed("/gestao/equipes/sup-ana", "manager")).toBe(false);
+    expect(isLightRouteAllowed("/gestao/equipes/sup-ana", "broker")).toBe(false);
   });
 
   it("shows the Gestão item in the manager's Mais only when the flag is on", () => {

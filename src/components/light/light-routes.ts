@@ -39,6 +39,7 @@ export const LIGHT_SUPERVISOR_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/equipe\/desempenho$/,
   /^\/equipe\/transferencia$/,
   /^\/gestao$/,
+  /^\/gestao\/equipes\/[^/]+$/,
   new RegExp(`^/equipe/(?!cargos$|convidar$|dashboard$|recuperacoes$)${ID}$`),
   /^\/relacionamento$/,
   /^\/notificacoes$/,
@@ -64,6 +65,8 @@ export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   new RegExp(`^/mensagens/${ID}$`),
   /^\/empresas$/,
   /^\/gestao$/,
+  /^\/relacionamento$/,
+  /^\/gestao\/equipes\/[^/]+$/,
   new RegExp(`^/unidades/${ID}$`),
 ];
 
@@ -222,6 +225,7 @@ const RULES: readonly RouteRule[] = [
   { test: exact("/plantoes"), route: { title: "Plantões", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/relacionamento"), route: { title: "Mural da gestão", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: exact("/gestao"), route: { title: "Gestão", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
+  { test: under("/gestao"), route: { title: "Equipe", tab: "mais", isRoot: false, parentHref: "/gestao" } },
   { test: exact("/equipe/repassar"), route: { title: "Repassar lead", tab: "inicio", isRoot: false, parentHref: "/dashboard/c/equipe-leads" } },
   { test: exact("/equipe/transferencia"), route: { title: "Pedir transferência", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/equipe/minha"), route: { title: "Minha equipe", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
