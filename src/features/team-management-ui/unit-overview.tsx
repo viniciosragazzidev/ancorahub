@@ -4,13 +4,15 @@ import { Avatar } from "@/components/arc/avatar/avatar";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 
 import { BAND_LABELS, exceptionPhrase, sortSupervisorsForComparison, sortTeamsByHealth } from "./health-order";
+import { plainHealthPoint } from "./team-page";
 import styles from "./unit-overview.module.css";
 import type { HealthBand, KpiTrend, SupervisorRow, TeamHealthCard, UnitKpi, UnitOverview } from "./types";
 
 const TREND_LABEL: Record<Exclude<KpiTrend, null>, string> = { up: "Subiu", flat: "Estável", down: "Caiu" };
 
 function TrendMark({ trend, better }: { trend: KpiTrend; better: "up" | "down" }) {
-  if (!trend) return <span className={styles.trendFlat} aria-label="Sem comparação anterior" title="Sem histórico anterior">s/h</span>;
+  // Counts (brokers, teams) have no previous window: nothing to show next to them.
+  if (!trend) return null;
   if (trend === "flat") return <span className={styles.trendFlat} aria-label={TREND_LABEL.flat}>→</span>;
   const improved = trend === better;
   return (
@@ -54,8 +56,8 @@ function TeamCard({ team }: { team: TeamHealthCard }) {
       )}
       {hasScore && (team.strengths.length || team.concerns.length) ? (
         <div className={styles.notes}>
-          {team.strengths.length ? <div><span>Pontos fortes</span><ul>{team.strengths.slice(0, 2).map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
-          {team.concerns.length ? <div><span>Pontos de atenção</span><ul>{team.concerns.slice(0, 2).map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
+          {team.strengths.length ? <div><span>Pontos fortes</span><ul>{team.strengths.slice(0, 2).map((item) => <li key={item}>{plainHealthPoint(item)}</li>)}</ul></div> : null}
+          {team.concerns.length ? <div><span>Pontos de atenção</span><ul>{team.concerns.slice(0, 2).map((item) => <li key={item}>{plainHealthPoint(item)}</li>)}</ul></div> : null}
         </div>
       ) : null}
       {team.isUnassigned && team.brokerNames.length ? <ul className={styles.unassignedList}>{team.brokerNames.slice(0, 6).map((name) => <li key={name}>{name}</li>)}</ul> : null}
@@ -123,7 +125,7 @@ export function UnitOverviewView({ overview }: { overview: UnitOverview }) {
           </p>
         </header>
 
-        <section className={`${styles.card} ${styles.kpis}`} aria-label="Resumo da unidade">
+        <section className={styles.kpis} aria-label="Resumo da unidade">
           {overview.kpis.map((kpi) => <KpiTile key={kpi.key} kpi={kpi} />)}
         </section>
 
