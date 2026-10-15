@@ -147,13 +147,41 @@ describe("supervisor notes actions", () => {
     expect(mockState.inserts).toHaveLength(0);
   });
 
+  it("stores the new feedback types and the 'Revisar em' day as the start of that day in São Paulo", async () => {
+    mockState.selectRows = [[activeTeamBroker]];
+
+    const result = await addSupervisorNoteAction({
+      brokerId: activeTeamBroker.userId,
+      kind: "acompanhamento",
+      body: "Ver a conversão da semana.",
+      followUpDay: "2026-10-22",
+    });
+
+    expect(result).toMatchObject({ ok: true, note: { kind: "acompanhamento", followUpAt: "2026-10-22T03:00:00.000Z" } });
+    expect(mockState.inserts[0]).toMatchObject({ payload: { kind: "acompanhamento", followUpAt: new Date("2026-10-22T03:00:00.000Z") } });
+  });
+
+  it("keeps the review day empty when the supervisor leaves it out", async () => {
+    mockState.selectRows = [[activeTeamBroker]];
+
+    const result = await addSupervisorNoteAction({ brokerId: activeTeamBroker.userId, kind: "melhoria", body: "Usar o roteiro." });
+
+    expect(result).toMatchObject({ ok: true, note: { kind: "melhoria", followUpAt: null } });
+  });
+
+  it("rejects an unknown feedback type and a malformed review day before touching the database", async () => {
+    await expect(addSupervisorNoteAction({ brokerId: activeTeamBroker.userId, kind: "bronca", body: "Teste" })).resolves.toEqual({ ok: false, message: "Escreva um feedback de até 1.000 caracteres." });
+    await expect(addSupervisorNoteAction({ brokerId: activeTeamBroker.userId, kind: "alerta", body: "Teste", followUpDay: "22/10/2026" })).resolves.toEqual({ ok: false, message: "Escreva um feedback de até 1.000 caracteres." });
+    expect(mockState.inserts).toHaveLength(0);
+  });
+
   it("lists tenant notes for a manager within their own unit", async () => {
     mockGetContext.mockResolvedValue({ ...supervisorContext, userId: "manager-1", role: "manager", supervisorTeamScope: undefined });
     const createdAt = new Date("2026-10-10T12:00:00.000Z");
-    mockState.selectRows = [[activeTeamBroker], [{ id: "note-1", kind: "elogio", body: "Boa escuta.", createdAt }]];
+    mockState.selectRows = [[activeTeamBroker], [{ id: "note-1", kind: "elogio", body: "Boa escuta.", createdAt, followUpAt: null }]];
 
     await expect(listBrokerNotes(activeTeamBroker.userId)).resolves.toEqual([
-      { id: "note-1", kind: "elogio", body: "Boa escuta.", createdAt: "2026-10-10T12:00:00.000Z" },
+      { id: "note-1", kind: "elogio", body: "Boa escuta.", createdAt: "2026-10-10T12:00:00.000Z", followUpAt: null },
     ]);
   });
 });

@@ -1030,6 +1030,13 @@
                         "when":  1791662000000,
                         "tag":  "0199_team_invitation_supervisor_scope",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  147,
+                        "version":  "7",
+                        "when":  1791662001000,
+                        "tag":  "0200_supervisor_notes_followup",
+                        "breakpoints":  true
                     }
                 ]
 }

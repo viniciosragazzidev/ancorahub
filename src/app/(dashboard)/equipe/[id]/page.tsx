@@ -15,11 +15,11 @@ import { MemberRankingPanel } from "./_components/member-ranking";
 import { getMemberOfferRanking, getScopedMemberOfferRanking } from "@/features/engagement/broker-stats";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getCachedSupervisorWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
-import { rankHeadline, type RankPosition } from "@/features/engagement/ranking";
+import { formatDuration, rankHeadline, type RankPosition } from "@/features/engagement/ranking";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { listBrokerNotes } from "@/features/supervisor-workspace/notes-actions";
-import { SupervisorBrokerProfile, SupervisorNoteHistory } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
-import { getSupervisorLiteMemberPulse } from "@/features/supervisor-workspace/lite-queries";
+import { SupervisorBrokerProfile, SupervisorNoteHistory, type BrokerPerformanceView } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
+import { getSupervisorLiteMemberPulse, getSupervisorLiteNextTask, getSupervisorLiteRecognitions, getSupervisorLiteWhatsAppStatus } from "@/features/supervisor-workspace/lite-queries";
 import { getManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team-queries";
 import { LiteBrokerProfileActions } from "@/features/manager-workspace/manager-lite-profile-actions";
 
@@ -27,6 +27,31 @@ export const dynamic = "force-dynamic";
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const date = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeZone: "America/Sao_Paulo" });
+
+// Situação e reconhecimentos do topo do perfil Lite. Escopo checado em cada query (gestor = unidade, supervisor = equipe).
+// The gestor sees the whole unit, not one duty roster, so the "Plantão de hoje" row stays hidden there (dutyToday undefined).
+async function getBrokerProfileExtras(context: Parameters<typeof getSupervisorLiteNextTask>[0]["context"], memberId: string) {
+  const [nextTask, recognitions, whatsapp] = await Promise.all([
+    getSupervisorLiteNextTask({ context, memberId }).catch(() => null),
+    getSupervisorLiteRecognitions({ context, memberId }).catch(() => []),
+    getSupervisorLiteWhatsAppStatus({ context, memberId }).catch(() => null),
+  ]);
+  return { nextTask, recognitions, whatsapp };
+}
+
+// TODO(G0): trocar pela camada de métricas do Cinzel (src/features/team-management/) e incluir a janela de 30 dias.
+// Por enquanto a seção Desempenho usa só o que o pulso já dá (7 dias).
+function brokerPerformanceFromPulse(pulse: { week: Array<{ accepted: number }>; medianAcceptSeconds: number | null; onTimeContactRate: number | null }): BrokerPerformanceView {
+  const accepted = pulse.week.reduce((total, day) => total + day.accepted, 0);
+  return {
+    window: 7,
+    items: [
+      { key: "accepted", label: "Aceites", value: new Intl.NumberFormat("pt-BR").format(accepted), trend: null, better: "up" },
+      { key: "accept-time", label: "Tempo mediano para aceitar", value: formatDuration(pulse.medianAcceptSeconds), trend: null, better: "down" },
+      { key: "on-time", label: "Primeiro contato no prazo", value: pulse.onTimeContactRate === null ? "Sem contatos" : `${pulse.onTimeContactRate}%`, trend: null, better: "up" },
+    ],
+  };
+}
 
 
 function Metric({ label, value, detail, icon: Icon, tone = "default" }: { label: string; value: string | number; detail: string; icon: typeof ChartBar; tone?: "default" | "success" | "warning" | "danger" }) {
@@ -55,6 +80,7 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
     const brokerIds = teamData.members.filter((member) => member.status === "active" && member.userId).map((member) => member.userId!);
     const ranking = await getScopedMemberOfferRanking(context.tenantId, brokerIds, profile.member.userId).catch(() => null);
     const pulse = await getSupervisorLiteMemberPulse({ context, memberId: profile.member.userId, slaMinutes: teamData.slaMinutes }).catch(() => null);
+    const extras = await getBrokerProfileExtras(context, profile.member.userId);
     const activeStatuses = new Set(["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
     const active = profile.member.membershipStatus === "active" && profile.member.userStatus === "active";
     return <SupervisorBrokerProfile
@@ -65,6 +91,9 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
       relationshipHref={`/relacionamento?brokerId=${encodeURIComponent(profile.member.userId)}`}
       ranking={ranking ? { medianAcceptSeconds: ranking.stats?.medianAcceptSeconds ?? null, positions: ranking.ranks.map((rank) => rankHeadline(rank)), periodDays: ranking.periodDays } : null}
       notes={notes} joinedAt={profile.member.joinedAt.toISOString()} pulse={pulse ?? undefined}
+      situation={{ dutyToday: undefined, newLeads: pulse?.funnel.find((step) => step.status === "distributed")?.total ?? 0, nextTask: extras.nextTask, whatsapp: extras.whatsapp }}
+      performance={pulse ? brokerPerformanceFromPulse(pulse) : null}
+      recognitions={extras.recognitions}
       managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
       managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={active} canResetPassword />}
       showSupervisorActions={false}
@@ -84,6 +113,7 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
       ? await getSupervisorLiteMemberPulse({ context, memberId: profile.member.userId, slaMinutes: teamData.slaMinutes }).catch(() => null)
       : null;
     const duty = teamData?.duty.find((item) => item.brokerId === profile.member.userId);
+    const extras = await getBrokerProfileExtras(context, profile.member.userId);
     const liveAvailability = duty ? duty.paused ? "paused" : duty.presence === "confirmed" ? "on_duty" : "offline" : profile.member.availabilityStatus;
     const activeStatuses = new Set(["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
     return (
@@ -129,6 +159,14 @@ export default async function TeamMemberProfilePage({ params }: { params: Promis
         notes={notes}
         joinedAt={profile.member.joinedAt.toISOString()}
         pulse={pulse ?? undefined}
+        situation={{
+          dutyToday: teamData ? (duty ? { scheduleName: duty.scheduleName, startsAt: duty.startsAt, endsAt: duty.endsAt, paused: duty.paused, presence: duty.presence } : null) : undefined,
+          newLeads: pulse?.funnel.find((step) => step.status === "distributed")?.total ?? 0,
+          nextTask: extras.nextTask,
+          whatsapp: extras.whatsapp,
+        }}
+        performance={pulse ? brokerPerformanceFromPulse(pulse) : null}
+        recognitions={extras.recognitions}
         managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
         managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={profile.member.membershipStatus === "active" && profile.member.userStatus === "active"} canResetPassword={false} />}
         showSupervisorActions

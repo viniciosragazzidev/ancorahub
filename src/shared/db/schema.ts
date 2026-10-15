@@ -2881,9 +2881,10 @@ export const supervisorNotes = pgTable(
     kind: text("kind").notNull(),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    followUpAt: timestamp("follow_up_at", { withTimezone: true }),
   },
   (table) => [
-    check("supervisor_notes_kind_check", sql`${table.kind} in ('orientacao', 'elogio', 'alerta')`),
+    check("supervisor_notes_kind_check", sql`${table.kind} in ('orientacao', 'elogio', 'alerta', 'melhoria', 'acompanhamento')`),
     check("supervisor_notes_body_length_check", sql`char_length(${table.body}) between 1 and 1000`),
     index("supervisor_notes_tenant_broker_created_idx").on(table.tenantId, table.brokerId, table.createdAt.desc()),
   ],
