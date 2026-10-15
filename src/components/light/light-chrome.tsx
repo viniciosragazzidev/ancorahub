@@ -41,6 +41,7 @@ export function LightChrome({
   journeyEnabled = false,
   welcomeVideoEnabled = false,
   teamRankingEnabled = false,
+  teamManagementEnabled = false,
   viewAs = { canViewAs: false, viewingAs: null },
   audience = "broker",
   initialChatRail = null,
@@ -56,6 +57,7 @@ export function LightChrome({
   journeyEnabled?: boolean;
   welcomeVideoEnabled?: boolean;
   teamRankingEnabled?: boolean;
+  teamManagementEnabled?: boolean;
   viewAs?: ViewAsState;
   audience?: "broker" | "supervisor" | "manager";
   initialChatRail?: ChatRailData | null;
@@ -81,6 +83,7 @@ export function LightChrome({
       journeyEnabled={journeyEnabled}
       viewAs={viewAs}
       teamRankingEnabled={teamRankingEnabled}
+      teamManagementEnabled={teamManagementEnabled}
       audience={audience}
       availability={availability}
       availabilityPending={isPending}
