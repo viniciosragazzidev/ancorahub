@@ -67,7 +67,8 @@ const profile: SupervisorBrokerProfileProps = {
   whatsappHref: "https://wa.me/5511999999999",
   relationshipHref: "/relacionamento",
   ranking: { medianAcceptSeconds: 80, positions: ["1º nos que mais aceitam"], periodDays: 7 },
-  notes: [{ id: "note-1", kind: "orientacao", body: "Retornar o primeiro contato até o fim do dia.", createdAt: "2026-10-10T12:00:00.000Z" }],
+  notes: [{ id: "note-1", kind: "orientacao", body: "Retornar o primeiro contato até o fim do dia.", createdAt: "2026-10-10T12:00:00.000Z", followUpAt: null }],
+  situation: { dutyToday: null, newLeads: 5, nextTask: null },
 };
 
 afterEach(() => cleanup());
@@ -100,10 +101,10 @@ describe("SupervisorBrokerProfile", () => {
     expect(screen.getByText("Centro")).toBeTruthy();
     expect(screen.getByText("Disponível")).toBeTruthy();
     expect(screen.getByText("Carteira").parentElement?.textContent).toContain("12");
-    expect(screen.getByText("Em atendimento").parentElement?.textContent).toContain("4");
+    expect(screen.getByText("Leads ativos").parentElement?.textContent).toContain("4");
+    expect(screen.getByText("Novos").parentElement?.textContent).toContain("5");
     expect(screen.getByText("Sem primeiro contato").parentElement?.textContent).toContain("2");
-    expect(screen.getByText("Vendas").parentElement?.textContent).toContain("3");
-    expect(screen.getByText("Tarefas vencidas").parentElement?.textContent).toContain("1");
+    expect(screen.getByText("Pendências").parentElement?.textContent).toContain("1");
     expect(screen.getByText("1 min 20 s")).toBeTruthy();
     expect(screen.getByText("1º nos que mais aceitam")).toBeTruthy();
 
@@ -130,7 +131,7 @@ describe("SupervisorBrokerProfile", () => {
   it("saves a chosen feedback type and adds the confirmed note to the history", async () => {
     mockAddSupervisorNote.mockResolvedValue({
       ok: true,
-      note: { id: "note-2", kind: "elogio", body: "Boa condução com a cliente.", createdAt: "2026-10-10T13:00:00.000Z" },
+      note: { id: "note-2", kind: "elogio", body: "Boa condução com a cliente.", createdAt: "2026-10-10T13:00:00.000Z", followUpAt: null },
     });
     render(<SupervisorBrokerProfile {...profile} />);
 

@@ -230,3 +230,103 @@ export async function getSupervisorLiteMemberPulse(input: {
     })),
   };
 }
+
+/** G3: the broker must be an active member of the viewer's scope (supervisor = own team, manager = own unit). */
+async function isBrokerInLiteScope(context: TenantContext, memberId: string) {
+  const isSupervisor = context.role === "supervisor" && isSupervisorTeamScoped(context) && context.supervisorTeamScope;
+  const managerScope = getManagerUnitScope(context);
+  if ((!isSupervisor && !managerScope) || !context.branchId || (await getLiteAudience(context)) !== (isSupervisor ? "supervisor" : "manager")) return false;
+  const [membership] = await getDatabase().select({ id: schema.tenantMemberships.userId })
+    .from(schema.tenantMemberships)
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, context.tenantId),
+      eq(schema.tenantMemberships.userId, memberId),
+      eq(schema.tenantMemberships.branchId, context.branchId),
+      eq(schema.tenantMemberships.role, "broker"),
+      eq(schema.tenantMemberships.status, "active"),
+      isSupervisor ? eq(schema.tenantMemberships.supervisorId, context.userId) : undefined,
+    )).limit(1);
+  return Boolean(membership);
+}
+
+/** G3 "Próxima ação": the earliest open task of the broker on an active lead of the viewer's scope. */
+export async function getSupervisorLiteNextTask(input: { context: TenantContext; memberId: string }) {
+  const { context, memberId } = input;
+  if (!(await isBrokerInLiteScope(context, memberId))) return null;
+  const [task] = await getDatabase().select({
+    taskId: schema.leadTasks.id,
+    title: schema.leadTasks.title,
+    dueAt: schema.leadTasks.dueAt,
+    leadId: schema.leads.id,
+    leadName: schema.leads.nome,
+  })
+    .from(schema.leadTasks)
+    .innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadTasks.leadId), eq(schema.leads.tenantId, context.tenantId)))
+    .where(and(
+      eq(schema.leadTasks.tenantId, context.tenantId),
+      eq(schema.leadTasks.assignedTo, memberId),
+      isNull(schema.leadTasks.completedAt),
+      eq(schema.leads.branchId, context.branchId!),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+    ))
+    .orderBy(sql`${schema.leadTasks.dueAt} asc nulls last`, asc(schema.leadTasks.createdAt))
+    .limit(1);
+  if (!task) return null;
+  return {
+    taskId: task.taskId,
+    title: task.title,
+    dueAt: task.dueAt?.toISOString() ?? null,
+    leadId: task.leadId,
+    leadName: task.leadName,
+  };
+}
+
+export type SupervisorLiteRecognition = { id: string; points: number; reason: string; occurredAt: string; senderRole: string | null };
+
+/** G3 "Reconhecimentos recebidos": the 5 latest recognition bonuses still standing (reversed ones are hidden). */
+export async function getSupervisorLiteRecognitions(input: { context: TenantContext; memberId: string }): Promise<SupervisorLiteRecognition[]> {
+  const { context, memberId } = input;
+  if (!(await isBrokerInLiteScope(context, memberId))) return [];
+  const rows = await getDatabase().select({
+    id: schema.engagementPointEvents.id,
+    points: schema.engagementPointEvents.points,
+    occurredAt: schema.engagementPointEvents.occurredAt,
+    metadata: schema.engagementPointEvents.metadata,
+  })
+    .from(schema.engagementPointEvents)
+    .where(and(
+      eq(schema.engagementPointEvents.tenantId, context.tenantId),
+      eq(schema.engagementPointEvents.brokerId, memberId),
+      eq(schema.engagementPointEvents.ruleKey, "recognition.bonus"),
+      isNull(schema.engagementPointEvents.reversedAt),
+    ))
+    .orderBy(desc(schema.engagementPointEvents.occurredAt))
+    .limit(5);
+  return rows.map((row) => {
+    const metadata = row.metadata as { reason?: unknown; senderRole?: unknown };
+    return {
+      id: row.id,
+      points: row.points,
+      reason: typeof metadata.reason === "string" ? metadata.reason : "Reconhecimento",
+      occurredAt: row.occurredAt.toISOString(),
+      senderRole: typeof metadata.senderRole === "string" ? metadata.senderRole : null,
+    };
+  });
+}
+
+/** G3 "WhatsApp": connected = a 'ready' connection of the broker in this tenant (same rule as readyConnections in manager-lite-queries). */
+export async function getSupervisorLiteWhatsAppStatus(input: { context: TenantContext; memberId: string }): Promise<{ connected: boolean; connectedAt: string | null } | null> {
+  const { context, memberId } = input;
+  if (!(await isBrokerInLiteScope(context, memberId))) return null;
+  const [connection] = await getDatabase().select({ connectedAt: schema.whatsappConnections.connectedAt })
+    .from(schema.whatsappConnections)
+    .where(and(
+      eq(schema.whatsappConnections.tenantId, context.tenantId),
+      eq(schema.whatsappConnections.userId, memberId),
+      eq(schema.whatsappConnections.status, "ready"),
+    ))
+    .orderBy(desc(schema.whatsappConnections.connectedAt))
+    .limit(1);
+  return { connected: Boolean(connection), connectedAt: connection?.connectedAt?.toISOString() ?? null };
+}

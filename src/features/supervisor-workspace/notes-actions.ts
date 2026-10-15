@@ -11,10 +11,13 @@ import { SUPERVISOR_NOTE_KINDS, type SupervisorNote, type SupervisorNoteKind } f
 
 // user.id is text (not always a UUID): same rule as the rest of the team actions.
 const brokerIdSchema = z.string().trim().min(1).max(80);
+// "Revisar em" arrives as a calendar day (YYYY-MM-DD, São Paulo). It is stored as the start of that day.
+const followUpDaySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00-03:00`)), "Data inválida.");
 const addNoteSchema = z.object({
   brokerId: brokerIdSchema,
   kind: z.enum(SUPERVISOR_NOTE_KINDS),
   body: z.string().trim().min(1).max(1000),
+  followUpDay: followUpDaySchema.optional(),
 });
 
 type TenantAccessContext = Awaited<ReturnType<typeof getRequiredTenantContext>>;
@@ -22,6 +25,10 @@ type TenantAccessContext = Awaited<ReturnType<typeof getRequiredTenantContext>>;
 export type AddSupervisorNoteResult =
   | { ok: true; note: SupervisorNote }
   | { ok: false; message: string };
+
+function followUpDayToDate(day: string | undefined) {
+  return day ? new Date(`${day}T00:00:00-03:00`) : null;
+}
 
 async function canReadBrokerNotes(context: TenantAccessContext, brokerId: string, mode: "read" | "create") {
   if (context.role === "supervisor" && !context.supervisorTeamScope) return false;
@@ -77,11 +84,13 @@ export async function addSupervisorNoteAction(input: unknown): Promise<AddSuperv
         brokerId: parsed.data.brokerId,
         kind: parsed.data.kind,
         body: parsed.data.body,
+        followUpAt: followUpDayToDate(parsed.data.followUpDay),
       }).returning({
         id: schema.supervisorNotes.id,
         kind: schema.supervisorNotes.kind,
         body: schema.supervisorNotes.body,
         createdAt: schema.supervisorNotes.createdAt,
+        followUpAt: schema.supervisorNotes.followUpAt,
       });
 
       if (!created) throw new Error("O feedback não foi salvo.");
@@ -103,6 +112,7 @@ export async function addSupervisorNoteAction(input: unknown): Promise<AddSuperv
         kind: note.kind as SupervisorNoteKind,
         body: note.body,
         createdAt: note.createdAt.toISOString(),
+        followUpAt: note.followUpAt?.toISOString() ?? null,
       },
     };
   } catch {
@@ -120,6 +130,7 @@ export async function listBrokerNotes(brokerId: string): Promise<SupervisorNote[
     kind: schema.supervisorNotes.kind,
     body: schema.supervisorNotes.body,
     createdAt: schema.supervisorNotes.createdAt,
+    followUpAt: schema.supervisorNotes.followUpAt,
   })
     .from(schema.supervisorNotes)
     .where(and(
@@ -135,5 +146,6 @@ export async function listBrokerNotes(brokerId: string): Promise<SupervisorNote[
     kind: row.kind as SupervisorNoteKind,
     body: row.body,
     createdAt: row.createdAt.toISOString(),
+    followUpAt: row.followUpAt?.toISOString() ?? null,
   }));
 }
