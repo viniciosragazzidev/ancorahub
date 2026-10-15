@@ -14,6 +14,11 @@ export function percentage(numerator: number, denominator: number): number {
   return safeRate(numerator, denominator) * 100;
 }
 
+/** Canonical DEC-090 `commercial.conversion_rate` for a single entry cohort. */
+export function cohortConversionRate(converted: number, received: number): number {
+  return percentage(converted, received);
+}
+
 export type LeadQualityCounts = {
   total: number;
   hot: number;

@@ -1,12 +1,6 @@
 import { sql, type AnyColumn, type SQL } from "drizzle-orm";
 
-import type { TenantContext } from "@/shared/auth/types";
-import { tenantMemberships } from "@/shared/db/schema";
-
-/** Supervisor limited to their team (flag SUPERVISOR_TEAM_SCOPE, resolved in the tenant context). */
-export function isSupervisorTeamScoped(context: Pick<TenantContext, "role" | "supervisorTeamScope">) {
-  return context.role === "supervisor" && Boolean(context.supervisorTeamScope);
-}
+export { isSupervisorTeamScoped } from "./supervisor-scope-policy";
 
 /**
  * `column` belongs to a broker of the supervisor's team. Resolved in the
@@ -14,6 +8,10 @@ export function isSupervisorTeamScoped(context: Pick<TenantContext, "role" | "su
  * never the whole unit.
  */
 export function inSupervisorTeam(column: AnyColumn | SQL, tenantId: string, supervisorUserId: string): SQL {
-  const memberships = tenantMemberships;
-  return sql`${column} in (select ${memberships.userId} from ${memberships} where ${memberships.tenantId} = ${tenantId} and ${memberships.supervisorId} = ${supervisorUserId} and ${memberships.status} = 'active')`;
+  return sql`${column} in (
+    select "tenant_memberships"."user_id" from "tenant_memberships"
+    where "tenant_memberships"."tenant_id" = ${tenantId}
+      and "tenant_memberships"."supervisor_id" = ${supervisorUserId}
+      and "tenant_memberships"."status" = 'active'
+  )`;
 }

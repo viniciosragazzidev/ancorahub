@@ -7,10 +7,11 @@
  * decision-log.
  */
 
-export type MetricFormat = "count" | "percentage" | "currency" | "seconds" | "days";
+export type MetricFormat = "count" | "percentage" | "currency" | "seconds" | "days" | "datetime";
 
 export type MetricDimension =
   | "unit"
+  | "team"
   | "broker"
   | "source"
   | "period"
@@ -56,7 +57,16 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     format: "percentage",
     explanation:
       "Leads recebidos no período que alcançaram o estágio `converted` ÷ leads recebidos no mesmo período. Numerador e denominador pertencem à mesma população.",
-    allowedDimensions: ["unit", "broker", "source", "period"],
+    allowedDimensions: ["unit", "team", "broker", "source", "period"],
+    version: 1,
+  },
+  {
+    id: "commercial.leads_converted",
+    label: "Leads convertidos",
+    description: "Leads recebidos na janela que alcançaram o estágio converted.",
+    format: "count",
+    explanation: "Numerador da métrica commercial.conversion_rate: leads da coorte de entrada com status converted.",
+    allowedDimensions: ["unit", "team", "broker", "source", "period"],
     version: 1,
   },
   {
@@ -169,6 +179,132 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     explanation:
       "Corretores cujo número de leads ativos excede a capacidade configurada na fila responsável.",
     allowedDimensions: ["unit", "period"],
+    version: 1,
+  },
+  {
+    id: "team.offers_received",
+    label: "Ofertas recebidas",
+    description: "Ofertas de lead recebidas na janela, sem cancelamentos ou leads perdidos.",
+    format: "count",
+    explanation: "Contagem de lead_offers por offered_at na janela; status CANCELLED e LOST são excluídos.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.offers_accepted",
+    label: "Ofertas aceitas",
+    description: "Ofertas recebidas na janela com aceite registrado.",
+    format: "count",
+    explanation: "Contagem de ofertas da coorte de recebimento com accepted_at preenchido.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.acceptance_rate",
+    label: "Taxa de aceite",
+    description: "Ofertas aceitas ÷ ofertas recebidas na mesma janela.",
+    format: "percentage",
+    explanation: "Ofertas da janela com aceite registrado ÷ ofertas da janela, excluídos CANCELLED e LOST.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.median_acceptance_time",
+    label: "Mediana do tempo de aceite",
+    description: "Mediana do tempo entre o recebimento da oferta e o aceite.",
+    format: "seconds",
+    explanation: "Mediana de accepted_at − offered_at para ofertas aceitas recebidas na janela.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.redistributions",
+    label: "Redistribuições",
+    description: "Ofertas expiradas, recusadas ou substituídas na janela.",
+    format: "count",
+    explanation: "Contagem de ofertas recebidas na janela com status EXPIRED, DECLINED ou REPLACED; CANCELLED e LOST ficam fora.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.first_contact_sla_rate",
+    label: "SLA de primeiro contato da equipe",
+    description: "Leads atribuídos na janela com primeiro contato dentro do prazo do tenant ÷ leads atribuídos na janela.",
+    format: "percentage",
+    explanation: "Contatos feitos até assigned_at + sla_first_contact_minutes ÷ leads não apagados atribuídos na janela; leads sem contato permanecem no denominador.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.active_leads",
+    label: "Leads ativos",
+    description: "Carteira atual de leads em estágios não terminais.",
+    format: "count",
+    explanation: "Leads atribuídos ao corretor em estágio ativo, não apagados nem arquivados, no momento da consulta.",
+    allowedDimensions: ["unit", "team", "broker"],
+    version: 1,
+  },
+  {
+    id: "team.overdue_returns",
+    label: "Retornos vencidos",
+    description: "Tarefas abertas com prazo anterior ao momento da consulta.",
+    format: "count",
+    explanation: "Tarefas sem completed_at, vinculadas a lead ativo, com due_at anterior ao momento da consulta.",
+    allowedDimensions: ["unit", "team", "broker"],
+    version: 1,
+  },
+  {
+    id: "team.critical_overdue_returns",
+    label: "Retornos críticos vencidos",
+    description: "Tarefas urgentes abertas e vencidas em leads ativos.",
+    format: "count",
+    explanation: "Tarefas abertas com prioridade urgent e due_at anterior ao momento da consulta, vinculadas a lead ativo.",
+    allowedDimensions: ["unit", "team", "broker"],
+    version: 1,
+  },
+  {
+    id: "team.leads_without_next_action",
+    label: "Leads sem próxima ação",
+    description: "Leads em atendimento sem tarefa aberta.",
+    format: "count",
+    explanation: "Leads em estágio de atendimento sem nenhuma lead_task aberta, não apagados nem arquivados.",
+    allowedDimensions: ["unit", "team", "broker"],
+    version: 1,
+  },
+  {
+    id: "team.quotes",
+    label: "Cotações",
+    description: "Cotações criadas na janela para leads da carteira do corretor.",
+    format: "count",
+    explanation: "Contagem de quotes por created_at, associadas a lead não apagado nem arquivado dentro do escopo.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.sales",
+    label: "Vendas",
+    description: "Vendas ativas fechadas na janela por corretor responsável pela venda.",
+    format: "count",
+    explanation: "Contagem de sales ativas por sale_date, associadas a lead não apagado nem arquivado dentro do escopo.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.losses",
+    label: "Perdas",
+    description: "Leads da coorte recebida na janela que estão com status perdido.",
+    format: "count",
+    explanation: "Contagem de leads da coorte de criação da janela cujo status atual é lost.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
+    id: "team.last_activity_at",
+    label: "Última atividade",
+    description: "Data mais recente de atualização de lead, oferta, tarefa, cotação ou venda do corretor.",
+    format: "datetime",
+    explanation: "Máximo updated_at (ou sale_date para vendas) dos registros operacionais dentro do escopo.",
+    allowedDimensions: ["unit", "team", "broker"],
     version: 1,
   },
   {

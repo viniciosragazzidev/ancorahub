@@ -20,6 +20,12 @@
       "documents": ["docs/product/corretor-resume-dashboard-plan.md", "docs/business-rules.md", "docs/decision-log.md", "docs/ux/UX_REDESIGN_CONTRACT.md", "docs/ux/UX_REDESIGN_CONTROL.md"]
     },
     {
+      "id": "team-management",
+      "keywords": ["gestão de equipes", "gestao de equipes", "team management", "team metrics", "team metric", "métricas da equipe", "metricas da equipe", "métricas de equipe", "metricas de equipe", "supervisor lite"],
+      "paths": ["src/features/team-management", "src/features/reports/metrics/team-metrics-service.ts"],
+      "documents": ["docs/implementations/active/2026-10-15-gestao-de-equipes.md", "docs/business-rules.md", "docs/decision-log.md"]
+    },
+    {
       "id": "ai-agent",
       "keywords": ["ia", "ai", "whatsapp", "quick reply", "qualificação", "qualificacao", "handoff"],
       "paths": ["src/features/ai-agent", "src/features/ai-qualification"],

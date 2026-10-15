@@ -910,6 +910,7 @@ const BROKER_NEWS_FLAGS = [
   { field: "brokerAiAssistantsEnabled", flag: FEATURE_FLAGS.BROKER_AI_ASSISTANTS },
   { field: "supervisorTeamScopeEnabled", flag: FEATURE_FLAGS.SUPERVISOR_TEAM_SCOPE },
   { field: "supervisorLiteEnabled", flag: FEATURE_FLAGS.SUPERVISOR_LITE },
+  { field: "teamManagementEnabled", flag: FEATURE_FLAGS.TEAM_MANAGEMENT },
   { field: "brokerJourneyEnabled", flag: FEATURE_FLAGS.BROKER_JOURNEY },
   { field: "teamRankingEnabled", flag: FEATURE_FLAGS.TEAM_RANKING },
   { field: "engagementCampaignsEnabled", flag: FEATURE_FLAGS.ENGAGEMENT_CAMPAIGNS },

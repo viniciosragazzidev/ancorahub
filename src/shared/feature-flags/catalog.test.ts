@@ -23,3 +23,14 @@ describe("manager Lite feature flag", () => {
     });
   });
 });
+
+describe("team management feature flag", () => {
+  it("is globally controlled and disabled by default", () => {
+    expect(FEATURE_FLAGS.TEAM_MANAGEMENT).toMatchObject({
+      key: "feature_team_management_enabled",
+      scope: "global",
+      defaultValue: "false",
+      allowedValues: ["true", "false"],
+    });
+  });
+});
