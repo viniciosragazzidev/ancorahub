@@ -40,13 +40,22 @@ describe("supervisor Lite chat", () => {
     expect(lead!.preview).toContain("Ana · contato atrasado");
   });
 
-  it("an empty team says to ask the manager, never shows other brokers", () => {
+  it("a team that was not created points to Minha equipe, never shows other brokers", () => {
     const empty = data({ team: [], attention: [], today: { receivedToday: 0, inService: 0, waiting: 0, late: 0 } });
-    expect(buildSupervisorThreads(empty, now)[1]!.preview).toContain("Peça ao gestor");
+    expect(buildSupervisorThreads(empty, now)[1]!.preview).toContain("Monte em Minha equipe");
     for (const id of ["equipe", "equipe-leads", "equipe-plantao", "equipe-desempenho"] as const) {
       const script = buildSupervisorScript(id, empty, now);
       expect(script.status?.label).toBe("Sem equipe");
     }
+  });
+
+  it("a created team with no broker yet is named and points to adding brokers", () => {
+    const created = data({ teamIdentity: { name: "Equipe Horizonte", description: null }, team: [], attention: [], today: { receivedToday: 0, inService: 0, waiting: 0, late: 0 } });
+    expect(buildSupervisorThreads(created, now)[1]!.preview).toBe("Equipe Horizonte: ainda sem corretores. Adicione em Minha equipe.");
+    const script = buildSupervisorScript("equipe", created, now);
+    expect(script.status?.label).toBe("Equipe Horizonte · sem corretores");
+    const choice = script.blocks.find((block) => block.type === "question");
+    expect(choice && choice.type === "question" ? choice.choices[0]!.label : null).toBe("Adicionar corretores");
   });
 
   it("team script opens each broker's profile and offers a message to the team", () => {

@@ -43,7 +43,9 @@ export function buildSupervisorThreads(data: SupervisorWorkspaceData, now: Date)
     }),
     thread("equipe", {
       preview: !data.team.length
-        ? "Sua equipe ainda não foi montada. Peça ao gestor."
+        ? data.teamIdentity
+          ? `${data.teamIdentity.name}: ainda sem corretores. Adicione em Minha equipe.`
+          : "Sua equipe ainda não foi montada. Monte em Minha equipe."
         : needing.length
           ? `${firstName(needing[0]!.name)} precisa de você: ${needing[0]!.late ? `${needing[0]!.late} lead(s) atrasado(s)` : `${needing[0]!.waiting} esperando contato`}.`
           : `${online} de ${data.team.length} disponíveis. Tudo em dia.`,
@@ -144,11 +146,25 @@ export function buildTeamLeadThreads(leads: TeamLeadForThread[], slaMinutes: num
 const date = (id: string, now: Date): ChatBlock => ({ type: "date", id, label: `Hoje, ${hhmm(now)}` });
 const say = (id: string, text: string): ChatBlock => ({ type: "assistant", id, text });
 
-function emptyTeam(now: Date, prefix: string): ChatScript {
+function emptyTeam(now: Date, prefix: string, identity?: SupervisorWorkspaceData["teamIdentity"]): ChatScript {
+  // Team created in Minha equipe but no broker yet: name it, the next step is adding people.
+  if (identity) {
+    return {
+      blocks: [
+        date(`${prefix}-date`, now),
+        say(`${prefix}-empty`, `A equipe ${identity.name} já está criada${identity.description ? ` (${identity.description})` : ""}, mas ainda não tem corretores. Adicione corretores da sua unidade ou envie convites.`),
+        { type: "question", id: `${prefix}-empty-choice`, prompt: "Vamos completar a equipe?", choices: [
+          { id: "add-brokers", label: "Adicionar corretores", hint: "Da sua unidade, em Minha equipe", action: { kind: "href", href: "/equipe/minha" } },
+          { id: "team-settings", label: "Editar a equipe", hint: "Nome, descrição e foto", action: { kind: "href", href: "/equipe/minha/configurar" } },
+        ] },
+      ],
+      status: { label: `${identity.name} · sem corretores`, tone: "idle" },
+    };
+  }
   return {
     blocks: [
       date(`${prefix}-date`, now),
-      say(`${prefix}-empty`, "Sua equipe ainda está vazia. Monte em Minha equipe: dê nome e foto, adicione ou convide corretores da sua unidade."),
+      say(`${prefix}-empty`, "Sua equipe ainda não foi criada. Monte em Minha equipe: dê nome e foto, adicione ou convide corretores da sua unidade."),
       { type: "question", id: `${prefix}-empty-choice`, prompt: "Vamos montar?", choices: [{ id: "my-team", label: "Montar minha equipe", action: { kind: "href", href: "/equipe/minha" } }] },
     ],
     status: { label: "Sem equipe", tone: "idle" },
@@ -157,19 +173,16 @@ function emptyTeam(now: Date, prefix: string): ChatScript {
 
 /** Equipe: who is available, who needs the supervisor, a card per broker. */
 function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
-  if (!data.team.length) {
-    const empty = emptyTeam(now, "equipe");
-    return empty;
-  }
+  if (!data.team.length) return emptyTeam(now, "equipe", data.teamIdentity);
   const needing = brokersNeedingAttention(data.team);
   const online = data.team.filter((broker) => broker.availability === "available").length;
   const blocks: ChatBlock[] = [
     date("equipe-date", now),
-    say("equipe-hello", `${greeting(now)}, ${firstName(data.viewer.name)}. Sua equipe tem ${data.team.length} corretores, ${online} disponíveis agora.`),
+    say("equipe-hello", `${greeting(now)}, ${firstName(data.viewer.name)}. ${data.teamIdentity ? `A equipe ${data.teamIdentity.name}` : "Sua equipe"} tem ${data.team.length === 1 ? "1 corretor" : `${data.team.length} corretores`}, ${online} ${online === 1 ? "disponível" : "disponíveis"} agora.`),
     {
       type: "list",
       id: "equipe-list",
-      title: "Sua equipe",
+      title: data.teamIdentity?.name ?? "Sua equipe",
       items: data.team.map((broker) => ({
         id: broker.userId,
         primary: broker.name,
@@ -194,12 +207,15 @@ function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
       { id: "team-page", label: "Minha equipe", hint: "Perfil, membros e convites", action: { kind: "href", href: "/equipe/minha" } },
     ],
   });
-  return { blocks, status: needing.some((broker) => broker.late) ? { label: "Precisa de você", tone: "waiting" } : { label: "Equipe em dia", tone: "idle" } };
+  const teamLabel = data.teamIdentity?.name;
+  return { blocks, status: needing.some((broker) => broker.late)
+    ? { label: teamLabel ? `${teamLabel} · precisa de você` : "Precisa de você", tone: "waiting" }
+    : { label: teamLabel ? `${teamLabel} · em dia` : "Equipe em dia", tone: "idle" } };
 }
 
 /** Leads da equipe: the stuck ones first, each opening the lead. */
 function teamLeadsScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
-  if (!data.team.length) return emptyTeam(now, "equipe-leads");
+  if (!data.team.length) return emptyTeam(now, "equipe-leads", data.teamIdentity);
   const blocks: ChatBlock[] = [
     date("equipe-leads-date", now),
     say("equipe-leads-summary", data.today.late
@@ -240,7 +256,7 @@ function teamLeadsScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
 
 /** Desempenho da equipe: the week of each broker, ranked inside the team only. */
 function teamPerformanceScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
-  if (!data.team.length) return emptyTeam(now, "equipe-desempenho");
+  if (!data.team.length) return emptyTeam(now, "equipe-desempenho", data.teamIdentity);
   const ranked = [...data.team].sort((a, b) => (b.stats?.accepted ?? 0) - (a.stats?.accepted ?? 0) || (b.stats?.started ?? 0) - (a.stats?.started ?? 0));
   const blocks: ChatBlock[] = [
     date("equipe-desempenho-date", now),
@@ -281,7 +297,7 @@ const PRESENCE: Record<string, string> = { confirmed: "presença confirmada", pe
 
 /** Plantão da equipe (P5): who of the team is on duty today, read only (the roster is the manager's). */
 function teamDutyScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
-  if (!data.team.length) return emptyTeam(now, "equipe-plantao");
+  if (!data.team.length) return emptyTeam(now, "equipe-plantao", data.teamIdentity);
   const blocks: ChatBlock[] = [date("equipe-plantao-date", now)];
   if (!data.duty.length) {
     blocks.push(say("equipe-plantao-empty", "Ninguém da sua equipe está escalado hoje."));

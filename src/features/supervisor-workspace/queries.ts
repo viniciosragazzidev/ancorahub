@@ -44,6 +44,8 @@ export type AttentionLead = { leadId: string; name: string; brokerName: string; 
 
 export type SupervisorWorkspaceData = {
   viewer: { userId: string; tenantId: string; name: string; branchName: string | null };
+  /** The team the supervisor created in Minha equipe (name, description), even before it has brokers. */
+  teamIdentity?: { name: string; description: string | null } | null;
   team: TeamBroker[];
   /** Active brokers of the supervisor's unit with no supervisor (P2: "add to my team"). */
   freeBrokers: { userId: string; name: string }[];
@@ -193,8 +195,14 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
   });
   const sum = (key: "receivedToday" | "inService" | "waiting" | "late") => team.reduce((total, broker) => total + broker[key], 0);
 
+  const [teamIdentity] = await db.select({ name: schema.supervisorTeams.name, description: schema.supervisorTeams.description })
+    .from(schema.supervisorTeams)
+    .where(and(eq(schema.supervisorTeams.tenantId, context.tenantId), eq(schema.supervisorTeams.supervisorId, context.userId)))
+    .limit(1);
+
   return {
     viewer: { userId: context.userId, tenantId: context.tenantId, name: viewerRows[0]?.name ?? "Supervisor", branchName: viewerRows[0]?.branchName ?? null },
+    teamIdentity: teamIdentity ?? null,
     team,
     freeBrokers: freeRows,
     duty: dutyRows.map((row) => {
