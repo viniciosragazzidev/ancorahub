@@ -194,7 +194,7 @@ async function unitConversionReference(context: TenantContext, scope: TeamMetric
 /** Scoped, audited, 60-second cached team metrics. */
 export async function getTeamMetrics(
   context: TenantContext,
-  input: { window: 7 | 30; now: Date },
+  input: { window: 7 | 30; now: Date; includeUnitConversionRate?: boolean },
 ): Promise<TeamMetricsResult> {
   const scope = resolveTeamMetricsScope(context);
   const enabled = await getFeatureFlag(FEATURE_FLAGS.TEAM_MANAGEMENT);
@@ -202,14 +202,15 @@ export async function getTeamMetrics(
 
   const minuteBucket = Math.floor(input.now.getTime() / 60_000);
   const scopeKey = scope.kind === "unit" ? `unit:${scope.branchId}` : `team:${scope.supervisorId}`;
-  const cacheKey = `${scope.tenantId}:${scope.kind}:${scopeKey}:${input.window}:${minuteBucket}`;
+  const includeUnitConversionRate = input.includeUnitConversionRate !== false;
+  const cacheKey = `${scope.tenantId}:${scope.kind}:${scopeKey}:${input.window}:${minuteBucket}:unit-conversion-${includeUnitConversionRate}`;
   const result = await metricsCache.getOrLoad(cacheKey, async () => {
     const snapshot = await resolveCanonicalTeamMetrics(context, scope, input);
     if (snapshot.rows.some((row) => !isTeamMetricRowVisibleInScope(scope, { ...row, tenantId: snapshot.tenantId }))) {
       throw new Error("A consulta agregada retornou uma métrica fora do escopo autorizado.");
     }
     const built = buildResult(snapshot);
-    if (scope.kind === "team") built.unitConversionRate = await unitConversionReference(context, scope, input);
+    if (scope.kind === "team" && includeUnitConversionRate) built.unitConversionRate = await unitConversionReference(context, scope, input);
     return built;
   });
 

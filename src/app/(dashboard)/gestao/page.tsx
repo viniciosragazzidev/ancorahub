@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getManagerUnitIdentity } from "@/features/manager-workspace/gestao-overview-queries";
+import { getTeamMetrics } from "@/features/team-management/metrics";
 import { resolveGestaoAccess } from "@/features/team-management-ui/access";
 import { buildUnitOverview } from "@/features/team-management-ui/build-overview";
 import { isTeamManagementEnabled } from "@/features/team-management-ui/flag";
@@ -25,10 +26,23 @@ export default async function GestaoPage() {
   }
   if (decision === "denied") redirect("/access-denied");
 
-  const identity = await getManagerUnitIdentity(context);
-  // TODO(G0): trocar `metrics: null` pela camada de métricas do Cinzel (src/features/team-management/metrics.ts),
-  // com janela atual e anterior por supervisor. Até lá a tela mostra estrutura e "Indicadores em breve".
-  const overview = buildUnitOverview({ ...identity, metrics: null });
+  const now = new Date();
+  const [identity, teamMetrics] = await Promise.all([
+    getManagerUnitIdentity(context),
+    getTeamMetrics(context, { window: 7, now }),
+  ]);
+  const overview = buildUnitOverview({
+    ...identity,
+    now,
+    metrics: {
+      unit: teamMetrics.unit,
+      unitConversionRate: teamMetrics.unitConversionRate,
+      teamsBySupervisorId: new Map(teamMetrics.teams
+        .filter((team) => team.supervisorId !== null)
+        .map((team) => [team.supervisorId!, team])),
+      unassignedTeam: teamMetrics.teams.find((team) => team.supervisorId === null) ?? null,
+    },
+  });
 
   return <UnitOverviewView overview={overview} />;
 }

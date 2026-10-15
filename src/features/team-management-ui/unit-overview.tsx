@@ -10,7 +10,7 @@ import type { HealthBand, KpiTrend, SupervisorRow, TeamHealthCard, UnitKpi, Unit
 const TREND_LABEL: Record<Exclude<KpiTrend, null>, string> = { up: "Subiu", flat: "Estável", down: "Caiu" };
 
 function TrendMark({ trend, better }: { trend: KpiTrend; better: "up" | "down" }) {
-  if (!trend) return null;
+  if (!trend) return <span className={styles.trendFlat} aria-label="Sem comparação anterior" title="Sem histórico anterior">s/h</span>;
   if (trend === "flat") return <span className={styles.trendFlat} aria-label={TREND_LABEL.flat}>→</span>;
   const improved = trend === better;
   return (
@@ -25,7 +25,7 @@ function KpiTile({ kpi }: { kpi: UnitKpi }) {
     <div className={styles.kpi}>
       <span className={styles.kpiLabel}>{kpi.label}</span>
       {kpi.value === null ? (
-        <strong className={styles.kpiSoon}>Em breve</strong>
+        <strong className={styles.kpiSoon}>Sem dados</strong>
       ) : (
         <strong className={styles.kpiValue}>{kpi.value} <TrendMark trend={kpi.trend} better={kpi.better} /></strong>
       )}
@@ -36,12 +36,12 @@ function KpiTile({ kpi }: { kpi: UnitKpi }) {
 function TeamCard({ team }: { team: TeamHealthCard }) {
   const hasScore = team.score !== null && team.band !== null;
   return (
-    <article className={`${styles.card} ${styles.team}`} aria-labelledby={`team-${team.supervisorId}`}>
+    <article className={`${styles.card} ${styles.team}`} aria-labelledby={`team-${team.id}`}>
       <header className={styles.teamHead}>
-        <Avatar name={team.supervisorName} src={team.image ?? undefined} size="md" />
+        {!team.isUnassigned ? <Avatar name={team.supervisorName} src={team.image ?? undefined} size="md" /> : null}
         <div className={styles.teamIdentity}>
-          <h3 id={`team-${team.supervisorId}`}>{team.teamName}</h3>
-          <p>{team.supervisorName} · {team.brokers} {team.brokers === 1 ? "corretor" : "corretores"}</p>
+          <h3 id={`team-${team.id}`}>{team.teamName}</h3>
+          <p>{team.isUnassigned ? "Sem supervisor" : team.supervisorName} · {team.brokers} {team.brokers === 1 ? "corretor" : "corretores"}</p>
         </div>
       </header>
       {hasScore ? (
@@ -58,7 +58,8 @@ function TeamCard({ team }: { team: TeamHealthCard }) {
           {team.concerns.length ? <div><span>Pontos de atenção</span><ul>{team.concerns.slice(0, 2).map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
         </div>
       ) : null}
-      <Link className={styles.openLink} href={`/gestao/equipes/${encodeURIComponent(team.supervisorId)}`}>Abrir equipe</Link>
+      {team.isUnassigned && team.brokerNames.length ? <ul className={styles.unassignedList}>{team.brokerNames.slice(0, 6).map((name) => <li key={name}>{name}</li>)}</ul> : null}
+      {!team.isUnassigned ? <Link className={styles.openLink} href={`/gestao/equipes/${encodeURIComponent(team.supervisorId)}`}>Abrir equipe</Link> : null}
     </article>
   );
 }
@@ -106,13 +107,19 @@ function SupervisorTable({ rows }: { rows: SupervisorRow[] }) {
 
 export function UnitOverviewView({ overview }: { overview: UnitOverview }) {
   const teams = sortTeamsByHealth(overview.teams);
+  const baseException = exceptionPhrase(overview.teamsNeedingAttention, overview.metricsAvailable);
+  const exception = overview.metricsAvailable && overview.unassignedNeedsAttention
+    ? overview.teamsNeedingAttention > 0
+      ? `${baseException}. O grupo Sem equipe também precisa de atenção.`
+      : "O grupo Sem equipe precisa de atenção."
+    : baseException;
   return (
     <div className={`arc-venancor ${styles.page}`}>
       <div className={styles.inner}>
         <header className={styles.heading}>
           <h1>Gestão da unidade</h1>
-          <p className={styles.exception} data-attention={overview.teamsNeedingAttention > 0}>
-            {exceptionPhrase(overview.teamsNeedingAttention, overview.metricsAvailable)}
+          <p className={styles.exception} data-attention={overview.teamsNeedingAttention > 0 || overview.unassignedNeedsAttention}>
+            {exception}
           </p>
         </header>
 
@@ -124,18 +131,7 @@ export function UnitOverviewView({ overview }: { overview: UnitOverview }) {
           <h2 id="teams-health-title">Saúde das equipes</h2>
           {teams.length ? (
             <div className={styles.teamGrid}>
-              {teams.map((team) => <TeamCard key={team.supervisorId} team={team} />)}
-              {overview.unassigned.brokers > 0 ? (
-                <article className={`${styles.card} ${styles.team}`} aria-labelledby="unassigned-title">
-                  <header className={styles.teamHead}>
-                    <div className={styles.teamIdentity}>
-                      <h3 id="unassigned-title">Sem equipe</h3>
-                      <p>{overview.unassigned.brokers} {overview.unassigned.brokers === 1 ? "corretor" : "corretores"} sem supervisor</p>
-                    </div>
-                  </header>
-                  <ul className={styles.unassignedList}>{overview.unassigned.names.slice(0, 6).map((name) => <li key={name}>{name}</li>)}</ul>
-                </article>
-              ) : null}
+              {teams.map((team) => <TeamCard key={team.id} team={team} />)}
             </div>
           ) : <EmptyState title="Nenhuma equipe ainda" description="Crie a equipe de um supervisor para ver a saúde aqui." />}
         </section>
