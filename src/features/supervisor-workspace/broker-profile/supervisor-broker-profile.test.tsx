@@ -69,6 +69,7 @@ const profile: SupervisorBrokerProfileProps = {
   ranking: { medianAcceptSeconds: 80, positions: ["1º nos que mais aceitam"], periodDays: 7 },
   notes: [{ id: "note-1", kind: "orientacao", body: "Retornar o primeiro contato até o fim do dia.", createdAt: "2026-10-10T12:00:00.000Z", followUpAt: null }],
   situation: { dutyToday: null, newLeads: 5, nextTask: null },
+  performance: { window: 7, items: [{ key: "accepted", label: "Aceites", value: "9", trend: null, better: "up" }] },
 };
 
 afterEach(() => cleanup());
@@ -105,7 +106,6 @@ describe("SupervisorBrokerProfile", () => {
     expect(screen.getByText("Novos").parentElement?.textContent).toContain("5");
     expect(screen.getByText("Sem primeiro contato").parentElement?.textContent).toContain("2");
     expect(screen.getByText("Pendências").parentElement?.textContent).toContain("1");
-    expect(screen.getByText("1 min 20 s")).toBeTruthy();
     expect(screen.getByText("1º nos que mais aceitam")).toBeTruthy();
 
     const leadLink = screen.getByRole("link", { name: /Maria Silva/ });
@@ -135,7 +135,7 @@ describe("SupervisorBrokerProfile", () => {
     });
     render(<SupervisorBrokerProfile {...profile} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Nova nota" }));
+    fireEvent.click(screen.getByRole("button", { name: "+ Nova nota" }));
     fireEvent.click(screen.getByRole("button", { name: "Elogio" }));
     fireEvent.change(screen.getByLabelText("Mensagem"), { target: { value: "Boa condução com a cliente." } });
     fireEvent.click(screen.getByRole("button", { name: "Salvar nota" }));

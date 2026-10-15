@@ -147,12 +147,14 @@
 .memberActions { display: flex; flex-wrap: wrap; gap: 8px; }
 
 /* Feedbacks */
-.feedback { display: grid; gap: 12px; }
+.feedback { display: grid; gap: 12px; padding: 16px; }
+.headingTools { display: flex; align-items: center; gap: 10px; }
+.pillButton { min-height: 32px; padding: 0 12px; border-radius: var(--radius-pill); font-size: var(--text-xs); }
 .noteComposer { display:grid; gap:16px; padding:8px 4px 24px; }
 .noteCount { justify-self:end; color:var(--text-muted); font-size:var(--text-xs); }
 .noteFeedback { min-height: 1em; margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
 .noteList { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
-.noteItem { display: grid; width:min(100%,38rem); gap: 6px; margin-left:auto; padding: 14px 16px; border-radius: 1.5rem 1.5rem 0.375rem 1.5rem; background: var(--surface); box-shadow: var(--shadow-resting); }
+.noteItem { display: grid; gap: 6px; padding: 14px 16px; border-radius: 1rem; background: var(--surface-muted); }
 .noteMeta { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px; font-size: var(--text-xs); }
 .noteMeta strong { font-weight: 500; }
 .noteMeta time { color: var(--text-muted); }
@@ -169,7 +171,16 @@
 .recognitionList time { color: var(--text-muted); font-size: var(--text-xs); }
 
 /* Situação e Desempenho lado a lado no desktop */
-.pair { display: grid; gap: 16px; }
+/* Duas colunas no desktop: esquerda Situação e Feedbacks; direita Desempenho, Reconhecimentos e Atenção. */
+.columns { display: grid; gap: 16px; align-items: start; }
+.column { display: grid; gap: 16px; min-width: 0; align-content: start; }
+.performanceChart { display: flex; height: 124px; align-items: end; justify-content: space-around; gap: 8px; padding: 8px 4px; border-radius: 1rem; background: var(--surface-muted); }
+.performanceFoot { display: grid; gap: 10px; padding-top: 4px; }
+.performanceFoot p { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; }
+.performanceFoot span { color: var(--text-muted); font-size: var(--text-xs); }
+.performanceFoot strong { font-size: var(--text-sm); font-weight: 500; text-align: right; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chips li { padding: 5px 9px; border-radius: 999px; background: var(--surface-muted); font-size: var(--text-xs); }
 
 @media (min-width: 640px) {
   .inner { padding: 24px 24px 48px; }
@@ -181,7 +192,7 @@
 }
 
 @media (min-width: 1024px) {
-  .pair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  .columns { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {
