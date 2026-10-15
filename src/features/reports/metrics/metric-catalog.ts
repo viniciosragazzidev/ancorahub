@@ -236,6 +236,15 @@ export const METRIC_CATALOG: readonly MetricDefinition[] = [
     version: 1,
   },
   {
+    id: "team.first_contact_sla_leads",
+    label: "Leads no SLA de primeiro contato",
+    description: "Leads atribuídos na janela usados como denominador da taxa de SLA.",
+    format: "count",
+    explanation: "Contagem de leads não apagados atribuídos na janela, incluindo leads sem primeiro contato.",
+    allowedDimensions: ["unit", "team", "broker", "period"],
+    version: 1,
+  },
+  {
     id: "team.active_leads",
     label: "Leads ativos",
     description: "Carteira atual de leads em estágios não terminais.",

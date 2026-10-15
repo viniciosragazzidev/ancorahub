@@ -182,6 +182,37 @@ export async function publishNotification(input: {
   return true;
 }
 
+/** Persist a notification in the in-app inbox without sending a Web Push. */
+export async function publishInAppNotification(input: {
+  capability: NotificationCapabilityId;
+  tenantId: string;
+  recipientUserId: string;
+  type: string;
+  title: string;
+  message: string;
+  idempotencyKey: string;
+}) {
+  if (!(await isNotificationCapabilityEnabled(input.capability))) return false;
+  const inserted = await getDatabase().insert(schema.notifications).values({
+    id: randomUUID(),
+    tenantId: input.tenantId,
+    recipientUserId: input.recipientUserId,
+    type: input.type,
+    title: input.title,
+    message: input.message,
+    idempotencyKey: input.idempotencyKey,
+    createdAt: new Date(),
+  }).onConflictDoNothing().returning({ id: schema.notifications.id });
+  const notificationId = inserted[0]?.id;
+  if (notificationId) {
+    await publishRealtimeSync(
+      { tenantId: input.tenantId, userId: input.recipientUserId },
+      { version: 1, kind: "notification.created", notificationId, occurredAt: new Date().toISOString() },
+    ).catch(() => undefined);
+  }
+  return Boolean(notificationId);
+}
+
 export async function notifyNewLead(
   leadId: string,
   tenantId: string,

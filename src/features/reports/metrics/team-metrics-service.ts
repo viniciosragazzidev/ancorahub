@@ -21,6 +21,7 @@ export type CanonicalTeamMetricId =
   | "team.median_acceptance_time"
   | "team.redistributions"
   | "team.first_contact_sla_rate"
+  | "team.first_contact_sla_leads"
   | "team.active_leads"
   | "team.overdue_returns"
   | "team.critical_overdue_returns"
@@ -69,6 +70,7 @@ const CATALOG_METRIC_IDS: readonly CanonicalTeamMetricId[] = [
   "team.median_acceptance_time",
   "team.redistributions",
   "team.first_contact_sla_rate",
+  "team.first_contact_sla_leads",
   "team.active_leads",
   "team.overdue_returns",
   "team.critical_overdue_returns",
@@ -518,6 +520,7 @@ export async function resolveCanonicalTeamMetrics(
       "team.median_acceptance_time": row.median_acceptance_seconds == null ? null : numberValue(row.median_acceptance_seconds),
       "team.redistributions": numberValue(row.redistributions),
       "team.first_contact_sla_rate": percentage(slaWithin, slaAssigned),
+      "team.first_contact_sla_leads": slaAssigned,
       "team.active_leads": snapshot ? numberValue(row.active_leads) : null,
       "team.overdue_returns": snapshot ? numberValue(row.overdue_returns) : null,
       "team.critical_overdue_returns": snapshot ? numberValue(row.critical_overdue_returns) : null,

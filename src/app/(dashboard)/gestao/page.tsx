@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getManagerUnitIdentity } from "@/features/manager-workspace/gestao-overview-queries";
 import { getTeamMetrics } from "@/features/team-management/metrics";
+import { getWeeklyTeamSummary } from "@/features/team-management/weekly-highlights-data";
 import { resolveGestaoAccess } from "@/features/team-management-ui/access";
 import { buildUnitOverview } from "@/features/team-management-ui/build-overview";
 import { isTeamManagementEnabled } from "@/features/team-management-ui/flag";
@@ -40,6 +41,9 @@ export default async function GestaoPage() {
   const overview = buildUnitOverview({
     ...identity,
     now,
+    weeklySummary: teamMetrics.unit
+      ? (await getWeeklyTeamSummary({ context, window: teamMetrics.unit.current, brokers: teamMetrics.brokers, now })).summary
+      : null,
     metrics: {
       unit: teamMetrics.unit,
       unitConversionRate: teamMetrics.unitConversionRate,

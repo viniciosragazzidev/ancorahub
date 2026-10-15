@@ -4,6 +4,8 @@ import { teamHealthScore } from "@/features/team-management/health";
 import { isInactiveForTwoBusinessDays, teamHealthInputFor } from "@/features/team-management/health-input";
 import type { TeamMetricBroker, TeamMetricTeam } from "@/features/team-management/metrics";
 import { compareTrend, type TrendDirection } from "@/features/team-management/trend";
+import type { WeeklySummaryValues } from "@/features/team-management/g6-pure";
+import type { WeeklyHighlightBrokerOption } from "@/features/team-management/weekly-highlights-data";
 
 /** Visão da equipe (G2). Puro: monta a tela a partir do que o G0 entregou. Nenhuma métrica é recalculada aqui. */
 
@@ -55,6 +57,8 @@ export type TeamPageView = {
   load: { average: number; brokers: LoadBar[] };
   goal: TeamGoalView | null;
   managerBlock: ManagerBlock | null;
+  weeklySummary: WeeklySummaryValues | null;
+  manualRecognitionBrokers: WeeklyHighlightBrokerOption[];
 };
 
 export type TeamPageInput = {
@@ -66,6 +70,8 @@ export type TeamPageInput = {
   goal: TeamGoalView | null;
   onDuty?: readonly OnDutyBroker[];
   criticalLeads?: ReadonlyMap<string, CriticalLead>;
+  weeklySummary?: WeeklySummaryValues | null;
+  manualRecognitionBrokers?: WeeklyHighlightBrokerOption[];
 };
 
 const BAND_MAP: Record<"Excelente" | "Saudável" | "Atenção" | "Crítico", HealthTone> = {
@@ -202,6 +208,8 @@ export function buildTeamPageView(input: TeamPageInput): TeamPageView {
     load: { average: activeLeadsAverage, brokers: loadBars },
     goal,
     managerBlock: viewer === "gestor" ? buildManagerBlock(brokers, now) : null,
+    weeklySummary: input.weeklySummary ?? null,
+    manualRecognitionBrokers: viewer === "supervisor" ? input.manualRecognitionBrokers ?? [] : [],
   };
 }
 

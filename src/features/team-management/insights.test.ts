@@ -9,7 +9,7 @@ const NOW = new Date("2026-10-15T12:00:00.000Z");
 function window(overrides: Partial<TeamMetricWindow> = {}): TeamMetricWindow {
   return {
     received: 10, accepted: 8, acceptanceRate: 80, medianAcceptanceSeconds: 100, redistributions: 0, slaRate: 90,
-    activeLeads: 4, overdueReturns: 0, criticalOverdueReturns: 0, leadsWithoutNextAction: 0,
+    slaLeads: 0,activeLeads: 4, overdueReturns: 0, criticalOverdueReturns: 0, leadsWithoutNextAction: 0,
     quotes: 2, sales: 1, losses: 1, conversion: { received: 10, converted: 1, rate: 10 }, lastActivityAt: NOW,
     ...overrides,
   };

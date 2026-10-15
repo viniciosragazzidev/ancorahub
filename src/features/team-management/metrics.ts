@@ -18,6 +18,7 @@ export type TeamMetricWindow = {
   medianAcceptanceSeconds: number | null;
   redistributions: number;
   slaRate: number;
+  slaLeads: number;
   activeLeads: number | null;
   overdueReturns: number | null;
   criticalOverdueReturns: number | null;
@@ -92,6 +93,7 @@ function windowValue(row: CanonicalTeamMetricRow): TeamMetricWindow {
     medianAcceptanceSeconds: value(row, "team.median_acceptance_time"),
     redistributions: value(row, "team.redistributions") ?? 0,
     slaRate: value(row, "team.first_contact_sla_rate") ?? 0,
+    slaLeads: value(row, "team.first_contact_sla_leads") ?? 0,
     activeLeads: value(row, "team.active_leads"),
     overdueReturns: value(row, "team.overdue_returns"),
     criticalOverdueReturns: value(row, "team.critical_overdue_returns"),

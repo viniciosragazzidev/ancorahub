@@ -7,6 +7,7 @@ import { BAND_LABELS, exceptionPhrase, sortSupervisorsForComparison, sortTeamsBy
 import { plainHealthPoint } from "./team-page";
 import styles from "./unit-overview.module.css";
 import type { HealthBand, KpiTrend, SupervisorRow, TeamHealthCard, UnitKpi, UnitOverview } from "./types";
+import { WeeklySummaryCard } from "./weekly-summary-card";
 
 const TREND_LABEL: Record<Exclude<KpiTrend, null>, string> = { up: "Subiu", flat: "Estável", down: "Caiu" };
 
@@ -128,6 +129,8 @@ export function UnitOverviewView({ overview }: { overview: UnitOverview }) {
         <section className={styles.kpis} aria-label="Resumo da unidade">
           {overview.kpis.map((kpi) => <KpiTile key={kpi.key} kpi={kpi} />)}
         </section>
+
+        {overview.weeklySummary ? <WeeklySummaryCard summary={overview.weeklySummary} /> : null}
 
         <section aria-labelledby="teams-health-title" className={styles.section}>
           <h2 id="teams-health-title">Saúde das equipes</h2>

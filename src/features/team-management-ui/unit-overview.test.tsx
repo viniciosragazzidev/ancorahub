@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => <a href={href} {...props}>{children}</a>,
 }));
+vi.mock("./weekly-summary-card", () => ({ WeeklySummaryCard: () => null }));
 vi.mock("@/components/arc/avatar/avatar", () => ({ Avatar: ({ name }: { name: string }) => <div role="img" aria-label={name} /> }));
 vi.mock("@/components/arc/empty-state/empty-state", () => ({ EmptyState: ({ title }: { title: string }) => <section><strong>{title}</strong></section> }));
 
@@ -32,7 +33,7 @@ function metricWindow(overrides: Partial<TeamMetricWindow> = {}): TeamMetricWind
     medianAcceptanceSeconds: null,
     redistributions: 0,
     slaRate: 0,
-    activeLeads: null,
+    slaLeads: 0,activeLeads: null,
     overdueReturns: null,
     criticalOverdueReturns: null,
     leadsWithoutNextAction: null,
@@ -78,21 +79,21 @@ function teamMetric(input: { current: Partial<TeamMetricWindow>; previous?: Part
 }
 
 const healthyTeam = teamMetric({
-  current: { received: 40, accepted: 40, acceptanceRate: 100, slaRate: 100, activeLeads: 20, conversion: { received: 10, converted: 4, rate: 40 } },
-  previous: { received: 30, accepted: 24, acceptanceRate: 80, slaRate: 75, conversion: { received: 10, converted: 2, rate: 20 } },
+  current: { received: 40, accepted: 40, acceptanceRate: 100, slaRate: 100, slaLeads: 0,activeLeads: 20, conversion: { received: 10, converted: 4, rate: 40 } },
+  previous: { received: 30, accepted: 24, acceptanceRate: 80, slaRate: 75, slaLeads: 0,conversion: { received: 10, converted: 2, rate: 20 } },
   brokers: Array.from({ length: 5 }, (_, index) => makeBroker(`ana-${index}`, 4, now)),
 });
 const criticalTeam = teamMetric({
-  current: { received: 40, accepted: 8, acceptanceRate: 20, slaRate: 20, activeLeads: 4, overdueReturns: 5, leadsWithoutNextAction: 3, redistributions: 40, conversion: { received: 10, converted: 0, rate: 0 } },
-  previous: { received: 30, accepted: 20, acceptanceRate: 67, slaRate: 70, conversion: { received: 10, converted: 3, rate: 30 } },
+  current: { received: 40, accepted: 8, acceptanceRate: 20, slaRate: 20, slaLeads: 0,activeLeads: 4, overdueReturns: 5, leadsWithoutNextAction: 3, redistributions: 40, conversion: { received: 10, converted: 0, rate: 0 } },
+  previous: { received: 30, accepted: 20, acceptanceRate: 67, slaRate: 70, slaLeads: 0,conversion: { received: 10, converted: 3, rate: 30 } },
   brokers: Array.from({ length: 4 }, (_, index) => makeBroker(`bruno-${index}`, 1, null)),
 });
 const metrics: TeamMetricsOverviewInput = {
   unit: {
     id: "unit-1",
     name: "Central",
-    current: metricWindow({ received: 94, slaRate: 87, acceptanceRate: 84, conversion: { received: 80, converted: 24, rate: 30 } }),
-    previous: metricWindow({ received: 79, slaRate: 78, acceptanceRate: 80, conversion: { received: 70, converted: 14, rate: 20 } }),
+    current: metricWindow({ received: 94, slaRate: 87, slaLeads: 0,acceptanceRate: 84, conversion: { received: 80, converted: 24, rate: 30 } }),
+    previous: metricWindow({ received: 79, slaRate: 78, slaLeads: 0,acceptanceRate: 80, conversion: { received: 70, converted: 14, rate: 20 } }),
   },
   unitConversionRate: 30,
   teamsBySupervisorId: new Map([["sup-ana", healthyTeam], ["sup-bruno", criticalTeam]]),
