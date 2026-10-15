@@ -5,6 +5,7 @@ import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-sc
 import { getManagerLiteLeadDetail, getManagerLiteLeads } from "@/features/supervisor-workspace/manager-lite-queries";
 import { hasEffectiveCapability } from "@/features/custom-roles/service";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
+import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals";
 import { SupervisorLeadDetail } from "@/features/supervisor-workspace/supervisor-lead-detail";
 
 export async function ManagerLiteLeadsPage() {
@@ -12,7 +13,8 @@ export async function ManagerLiteLeadsPage() {
   const scope = getManagerUnitScope(context);
   if (!scope) return <div className="arc-venancor p-6"><EmptyState title="Sua unidade ainda não está configurada" description="Peça ao administrador para vincular seu acesso a uma unidade. Seus leads aparecerão aqui quando o vínculo estiver ativo." /></div>;
   const data = await getManagerLiteLeads(context);
-  return <SupervisorLeadsRadar data={data} now={new Date().toISOString()} audience="manager" />;
+  const leads = await withRadarSignals(scope.tenantId, data.leads);
+  return <SupervisorLeadsRadar data={{ ...data, leads }} now={new Date().toISOString()} audience="manager" />;
 }
 
 export async function ManagerLiteLeadDetailPage({ leadId }: { leadId: string }) {

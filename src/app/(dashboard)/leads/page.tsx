@@ -27,6 +27,7 @@ import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { ManagerLiteLeadsPage } from "@/features/manager-workspace/manager-lite-leads";
 import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
 import { SupervisorLeadsRadar } from "@/features/supervisor-workspace/supervisor-leads-radar";
+import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals";
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import type { TenantContext } from "@/shared/auth/types";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
@@ -62,10 +63,8 @@ export default async function LeadsPage(props: Parameters<typeof LeadsPageConten
 
 async function SupervisorRadarContent({ context, search }: { context: TenantContext; search: string }) {
   const radar = await getSupervisorLiteRadar(context);
-  return <SupervisorLeadsRadar data={{
-    ...radar,
-    leads: radar.leads.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null, stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null })),
-  }} now={new Date().toISOString()} search={search} />;
+  const leads = await withRadarSignals(context.tenantId, radar.leads.map((lead) => ({ ...lead, assignedAt: lead.assignedAt?.toISOString() ?? null, firstContactAt: lead.firstContactAt?.toISOString() ?? null, stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null })));
+  return <SupervisorLeadsRadar data={{ ...radar, leads }} now={new Date().toISOString()} search={search} />;
 }
 
 function SupervisorRadarLoading() {
