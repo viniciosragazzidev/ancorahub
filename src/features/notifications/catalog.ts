@@ -21,6 +21,7 @@ export const notificationCapabilities = [
   { id: "duty_absence", label: "Falta no plantão", description: "Avisa o corretor quando a gestão marca ou desfaz uma falta dele em um plantão.", channels: "Toast + push" },
   { id: "duty_presence_photo", label: "Foto do plantão presencial", description: "Avisa o diretor e o gerente do plantão quando o corretor envia a foto do local, para validar e liberar.", channels: "Toast + push" },
   { id: "supervisor_digest", label: "Resumo do dia para o supervisor", description: "Às 19h, o dia da equipe do supervisor em poucas linhas (leads, atrasos, destaque e meta).", channels: "Toast + push" },
+  { id: "team_weekly_summary", label: "Resumo semanal da equipe", description: "Na segunda de manha, resume leads, SLA, aceite e conversao da unidade ou equipe no Lite.", channels: "In-app" },
   { id: "journey_near_completion", label: "Missão da equipe quase concluída", description: "Avisa o supervisor uma vez por corretor ao faltar um contato para concluir a missão do dia.", channels: "Toast/in-app" },
   { id: "supervisor_transfer", label: "Pedido de transferência entre equipes", description: "Avisa os gestores sobre pedidos de transferência de corretores entre equipes de supervisão.", channels: "Toast + push" },
   { id: "supervisor_team_invite", label: "Convite para equipe do supervisor", description: "Avisa o corretor quando um supervisor da unidade convida para a equipe e informa o resultado ao supervisor.", channels: "Toast + push" },

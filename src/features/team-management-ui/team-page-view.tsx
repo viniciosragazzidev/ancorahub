@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 
 import type { AlertSeverity, BrokerAttention, HealthTone, ManagerBlock, TeamKpi, TeamPageView } from "./team-page";
 import { nobodyNeedsYou } from "./team-page";
+import { WeeklySummaryCard } from "./weekly-summary-card";
 import styles from "./team-page-view.module.css";
 
 const BAND_LABELS: Record<HealthTone, string> = { excelente: "Excelente", saudavel: "Saudável", atencao: "Atenção", critico: "Crítico" };
@@ -89,6 +90,8 @@ export function TeamPageViewComponent({ view }: { view: TeamPageView }) {
             {view.health.attentionPoints.length ? <div><span>Pontos de atenção</span><ul>{view.health.attentionPoints.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}
           </div>
         </section>
+
+        {view.weeklySummary ? <WeeklySummaryCard summary={view.weeklySummary} manualRecognitionBrokers={view.manualRecognitionBrokers} canRecognize={view.viewer === "supervisor"} /> : null}
 
         <section className={styles.kpis} aria-label="Números da equipe, últimos 7 dias">
           {view.kpis.map((kpi) => (

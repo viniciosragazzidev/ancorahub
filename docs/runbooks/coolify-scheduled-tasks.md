@@ -50,3 +50,7 @@ para o mesmo job geram trabalho em dobro.
 
 Desative a tarefa no Coolify. Os jobs são idempotentes: reativar retoma a fila
 sem perder itens.
+
+### G6 e cron de engajamento
+
+O mesmo `/api/internal/jobs/engagement` executa, sob locks transacionais independentes, o resumo semanal G6 segunda-feira as 08h de Sao Paulo e os snapshots diarios as 02h. Nao criar uma tarefa nova no Coolify. A migration `drizzle/0202_broker_metric_daily.sql` precisa ser aplicada separadamente antes da timeline e dos snapshots aparecerem; enquanto a tabela estiver ausente, o restante do cron continua.

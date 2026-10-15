@@ -11,7 +11,7 @@ function window(overrides: Partial<TeamMetricWindow> = {}): TeamMetricWindow {
     medianAcceptanceSeconds: 60,
     redistributions: 2,
     slaRate: 80,
-    activeLeads: 10,
+    slaLeads: 0,activeLeads: 10,
     overdueReturns: 0,
     criticalOverdueReturns: 0,
     leadsWithoutNextAction: 0,
@@ -80,8 +80,8 @@ describe("teamAlerts", () => {
     ];
     const team: TeamMetricTeam = {
       id: "s1", name: "Equipe Azul", supervisorId: "s1", supervisorName: "João", branchId: "u1",
-      current: window({ slaRate: 60, criticalOverdueReturns: 3, leadsWithoutNextAction: 3, conversion: { received: 10, converted: 1, rate: 7 } }),
-      previous: window({ slaRate: 70, conversion: { received: 10, converted: 2, rate: 10 } }),
+      current: window({ slaRate: 60, slaLeads: 0,criticalOverdueReturns: 3, leadsWithoutNextAction: 3, conversion: { received: 10, converted: 1, rate: 7 } }),
+      previous: window({ slaRate: 70, slaLeads: 0,conversion: { received: 10, converted: 2, rate: 10 } }),
       recent3DaysRedistributions: 14, previous3DaysRedistributions: 10, brokers: members,
     };
     const result = teamAlerts({ team, now, windowDays: 7, onDutyBrokers: [duty] });

@@ -2,6 +2,7 @@ import { teamHealthScore, type TeamHealthBand } from "@/features/team-management
 import { teamHealthInputFor } from "@/features/team-management/health-input";
 import type { TeamMetricTeam, TeamMetricsResult } from "@/features/team-management/metrics";
 import { compareTrend } from "@/features/team-management/trend";
+import type { WeeklySummaryValues } from "@/features/team-management/g6-pure";
 
 import { countTeamsNeedingAttention } from "./health-order";
 import type { HealthBand, KpiTrend, SupervisorRow, TeamHealthCard, UnitKpi, UnitOverview } from "./types";
@@ -22,6 +23,7 @@ export type OverviewInput = {
   supervisors: OverviewSupervisor[];
   unassigned: Array<{ userId: string; name: string }>;
   metrics: TeamMetricsOverviewInput | null;
+  weeklySummary?: WeeklySummaryValues | null;
   now: Date;
 };
 
@@ -169,5 +171,6 @@ export function buildUnitOverview(input: OverviewInput): UnitOverview {
     teams,
     supervisors,
     unassigned: { brokers: input.unassigned.length, names: input.unassigned.map((broker) => broker.name) },
+    weeklySummary: input.weeklySummary ?? null,
   };
 }

@@ -3706,6 +3706,27 @@ export const engagementPointEvents = pgTable(
   ],
 );
 
+/** Daily canonical team-metric snapshots, rebuilt from events for the 90-day history. */
+export const brokerMetricDaily = pgTable(
+  "broker_metric_daily",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    brokerId: text("broker_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    branchId: text("branch_id").references(() => branches.id, { onDelete: "set null" }),
+    supervisorId: text("supervisor_id").references(() => user.id, { onDelete: "set null" }),
+    snapshotDay: date("snapshot_day", { mode: "string" }).notNull(),
+    windowStart: date("window_start", { mode: "string" }).notNull(),
+    windowEnd: date("window_end", { mode: "string" }).notNull(),
+    metrics: jsonb("metrics").$type<Record<string, number | null>>().notNull(),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("broker_metric_daily_tenant_broker_day_unique").on(table.tenantId, table.brokerId, table.snapshotDay),
+    index("broker_metric_daily_tenant_day_idx").on(table.tenantId, table.snapshotDay),
+  ],
+);
+
 export const engagementWatermarks = pgTable(
   "engagement_watermarks",
   {

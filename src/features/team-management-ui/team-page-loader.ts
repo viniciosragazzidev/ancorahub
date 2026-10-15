@@ -4,6 +4,7 @@ import { and, desc, eq, gte, lt } from "drizzle-orm";
 
 import { getTeamAlertContext } from "@/features/team-management/alert-context";
 import { getTeamMetrics } from "@/features/team-management/metrics";
+import { getWeeklyTeamSummary } from "@/features/team-management/weekly-highlights-data";
 import { resolveTeamMetricsScope } from "@/features/team-management/scope";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -82,6 +83,7 @@ export async function loadTeamPage(input: {
   if (access !== "render" || !team) return { access: access === "render" ? "notFound" : access, view: null };
 
   const goal = await getTeamGoal(context.tenantId, requestedSupervisorId, now);
+  const weekly = await getWeeklyTeamSummary({ context, window: team.current, brokers: team.brokers, now });
   const viewer: TeamPageViewer = isManager ? "gestor" : "supervisor";
   const alertContext = await getTeamAlertContext(context, team.brokers.map((broker) => broker.id), now);
   const view = buildTeamPageView({
@@ -92,6 +94,8 @@ export async function loadTeamPage(input: {
     goal,
     onDuty: alertContext.onDuty,
     criticalLeads: alertContext.criticalLeads,
+    weeklySummary: weekly.summary,
+    manualRecognitionBrokers: weekly.manualRecognitionBrokers,
   });
   return { access: "render", view };
 }

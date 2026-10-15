@@ -20,6 +20,7 @@ import { SUPERVISOR_NOTE_KIND_LABELS, SUPERVISOR_NOTE_KINDS, type SupervisorNote
 import { removeBrokerFromMyTeamAction } from "@/features/supervisor-workspace/my-team-actions";
 import { recognizeBrokerAction } from "@/features/journey/recognition-actions";
 import { RecognizeSheet } from "@/features/journey/components/recognize-sheet";
+import type { MonthlyBrokerMetricPoint } from "@/features/team-management/g6-pure";
 
 import styles from "./supervisor-broker-profile.module.css";
 
@@ -86,6 +87,7 @@ export type SupervisorBrokerProfileProps = {
   joinedAt?: string;
   situation?: BrokerSituation;
   performance?: BrokerPerformanceView | null;
+  metricTimeline?: MonthlyBrokerMetricPoint[] | null;
   recognitions?: BrokerRecognitionView[];
   weeklyAcceptances?: Array<{ date: string; label: string; accepted: number }>;
   managerProfile?: {
@@ -168,6 +170,7 @@ export function SupervisorBrokerProfile({
   joinedAt,
   situation,
   performance,
+  metricTimeline,
   recognitions = [],
   weeklyAcceptances = [],
   managerProfile,
@@ -323,6 +326,8 @@ export function SupervisorBrokerProfile({
               positions={ranking?.positions ?? []}
             />
 
+            {metricTimeline !== undefined && metricTimeline !== null ? <BrokerMetricTimeline points={metricTimeline} /> : null}
+
             <section className={`${styles.card} ${styles.recognitions}`} aria-labelledby="broker-recognitions-title">
               <div className={styles.sectionHeading}><h2 id="broker-recognitions-title">Reconhecimentos recebidos</h2><span>{recognitions.length || "·"}</span></div>
               {recognitions.length ? (
@@ -401,6 +406,38 @@ function TrendMark({ trend, better }: { trend: BrokerPerformanceTrend; better: "
  * Desempenho do corretor. Componente puro: recebe a janela, os itens, o gráfico e a posição prontos.
  * O seletor 7/30 só troca a janela quando o pai passa `onWindowChange`; sem ele, a outra janela fica desabilitada.
  */
+const timelineMonthFormat = new Intl.DateTimeFormat("pt-BR", { month: "short", year: "numeric", timeZone: "America/Sao_Paulo" });
+const timelinePercentFormat = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 1 });
+
+function BrokerMetricTimeline({ points }: { points: MonthlyBrokerMetricPoint[] }) {
+  const measured = points.filter((point) => point.conversionRate !== null);
+  const coordinates = measured.map((point, index) => ({
+    month: point.month,
+    x: measured.length < 2 ? 150 : 12 + index * (276 / (measured.length - 1)),
+    y: 72 - Math.max(0, Math.min(100, point.conversionRate ?? 0)) * 0.6,
+  }));
+  const line = coordinates.map((point) => `${point.x},${point.y}`).join(" ");
+  return (
+    <section className={`${styles.card} ${styles.metricTimeline}`} aria-labelledby="broker-metric-timeline-title">
+      <div className={styles.sectionHeading}><h2 id="broker-metric-timeline-title">Evolução mês a mês</h2><span>Conversão canônica</span></div>
+      {points.length ? <>
+        {coordinates.length > 1 ? <svg className={styles.metricTimelineChart} viewBox="0 0 300 84" role="img" aria-label="Evolução mensal da taxa canônica de conversão">
+          <line x1="8" y1="72" x2="292" y2="72" stroke="currentColor" opacity="0.16" />
+          <polyline points={line} fill="none" stroke="var(--chat-action)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          {coordinates.map((point) => <circle key={point.month} cx={point.x} cy={point.y} r="4" fill="var(--chat-action)" />)}
+        </svg> : null}
+        <ol className={styles.metricTimelineList}>
+          {points.map((point) => <li key={point.month}>
+            <strong>{timelineMonthFormat.format(new Date(`${point.month}-01T12:00:00-03:00`))}</strong>
+            <span>{point.conversionRate === null ? "Sem dado" : `${timelinePercentFormat.format(point.conversionRate)}%`}</span>
+            <small>{point.leadsConverted ?? 0} de {point.leadsReceived ?? 0} leads</small>
+          </li>)}
+        </ol>
+      </> : <EmptyState title="Histórico em formação" description="Os pontos mensais aparecem depois que os snapshots diários forem gerados." />}
+    </section>
+  );
+}
+
 export function BrokerPerformanceSection({
   performance,
   onWindowChange,

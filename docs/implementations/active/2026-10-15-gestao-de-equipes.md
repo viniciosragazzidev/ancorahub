@@ -132,3 +132,5 @@ Migrations do MVP: só `supervisor_notes` (tipos + `follow_up_at`) em G3 e `goal
 2. Score: pesos e faixas da seção 3, como propostos.
 3. Conversão: **métrica canônica `commercial.conversion_rate` da DEC-090**, por coorte de entrada. Este registro substitui a hipótese inicial de vendas ÷ leads atribuídos.
 4. Destaques e "maior evolução": **só gestor e supervisor no MVP** (o corretor vê depois).
+
+Registro da entrega G6: `docs/implementations/active/2026-10-15-gestao-g6.md`.

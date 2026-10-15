@@ -387,3 +387,7 @@ e ações individuais; abas usam `SegmentedControl` compartilhado. Reutiliza Arc
 `motion/react`, `useReducedMotion` e tokens existentes, sem nova primitive ou token.
 O visual Lite continua claro, sem tema escuro. Prints sintéticos desktop e celular
 ficam em `tmp/e4/`; a etapa não avança a UX-M1.10.
+
+## 2026-10-15: G6, destaques e evolucao da equipe
+
+Papeis e rotas: gestor em `/gestao` (unidade) e supervisor em `/gestao` (equipe propria); linha do tempo no perfil Lite `/equipe/[id]`. Acoes: consultar resumo dos ultimos sete dias, abrir o perfil destacado e, somente para supervisor, reconhecer corretor com motivo. Estados: sem historico, sem destaques, timeline indisponivel antes da migration, envio/sucesso/erro no reconhecimento existente. Disclosure no card semanal e tabela mensal. Reutiliza Card, Select, Button, Avatar e RecognizeSheet existentes, sem novo token, primitive ou animacao. Escopos continuam derivados no servidor e ranking_opt_out remove o corretor dos destaques automaticos.

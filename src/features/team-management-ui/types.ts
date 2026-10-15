@@ -1,5 +1,7 @@
 /** Tipos locais da visão do gestor (G1). Espelham o plano; os números vêm da camada de métricas (G0) quando existir. */
 
+import type { WeeklySummaryValues } from "@/features/team-management/g6-pure";
+
 export type HealthBand = "excelente" | "saudavel" | "atencao" | "critico";
 
 export type KpiTrend = "up" | "flat" | "down" | null;
@@ -53,4 +55,5 @@ export type UnitOverview = {
   teams: TeamHealthCard[];
   supervisors: SupervisorRow[];
   unassigned: UnassignedGroup;
+  weeklySummary: WeeklySummaryValues | null;
 };

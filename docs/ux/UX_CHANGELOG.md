@@ -787,3 +787,7 @@ de métricas entre tenants.
 ## 2026-10-10 - Minha equipe no Lite do supervisor
 
 Papel: supervisor no Lite. Objetivo: montar a equipe, editar seu perfil e enviar convites a corretores livres da unidade. Acoes: salvar perfil, convidar, cancelar convite e remover membro; corretor decide em notificacoes. Estados de equipe vazia, carregamento, sucesso, erro e tabela indisponivel tratados. Reutiliza Button, Input, Textarea e tokens Lite existentes, sem nova primitive, token ou movimento. Registro: docs/implementations/active/2026-10-10-lite-supervisor.md, secao 9.
+
+## 2026-10-15: G6, destaques e evolucao da equipe
+
+`/gestao` mostra o resumo dos ultimos sete dias e destaques automaticos no escopo da unidade ou equipe. O supervisor pode abrir o reconhecimento manual existente, com pontos e motivo. O perfil Lite do corretor recebe a evolucao mensal da metrica canonica de conversao; a secao fica oculta ate a tabela de snapshots existir. Reutiliza Card, Select, Button, Avatar e RecognizeSheet, sem token ou primitive nova.

@@ -3,7 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 import { getDatabase, schema } from "@/shared/db";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
-import { buildTeamInternal, buildTeamLeaderboard, buildUnitLeaderboard, type BrokerStanding, type TeamProfile } from "./leaderboard";
+import { buildTeamInternal, buildTeamLeaderboard, buildUnitLeaderboard, rankBrokers, type BrokerStanding, type TeamProfile } from "./leaderboard";
 import { journeyWeek, shiftJourneyDay } from "./journey-periods";
 import { journeyUserIdSchema } from "./journey-validation";
 import type { BrokerWeekSummary } from "./journey-types";
@@ -60,4 +60,14 @@ export async function teamInternal(tenantId: string, supervisorId: string, now =
   const week = journeyWeek(now);
   const rows = await getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false") === "true" ? await standings(tenantId, week.startsAt, week.endsAt) : [];
   return buildTeamInternal(week, rows, supervisorId, viewerId);
+}
+
+/** Journey ranking movement restricted to broker IDs already resolved by a server-side team/unit query. */
+export async function journeyPositionChangesForBrokers(tenantId: string, brokerIds: readonly string[], now = new Date()) {
+  const allowedIds = new Set(brokerIds);
+  if (!allowedIds.size || await getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false") !== "true") return [];
+  const week = journeyWeek(now);
+  const visible = (await standings(tenantId, week.startsAt, week.endsAt))
+    .filter((row) => allowedIds.has(row.brokerId) && !row.optedOut);
+  return rankBrokers(visible).map((row) => ({ brokerId: row.brokerId, positionChange: row.positionChange }));
 }

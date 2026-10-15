@@ -16,7 +16,7 @@ const NOW = new Date("2026-10-15T15:00:00.000Z");
 function windowOf(overrides: Partial<TeamMetricWindow>): TeamMetricWindow {
   return {
     received: 24, accepted: 19, acceptanceRate: 79, medianAcceptanceSeconds: 70, redistributions: 3, slaRate: 88,
-    activeLeads: 6, overdueReturns: 2, criticalOverdueReturns: 0, leadsWithoutNextAction: 1,
+    slaLeads: 0,activeLeads: 6, overdueReturns: 2, criticalOverdueReturns: 0, leadsWithoutNextAction: 1,
     quotes: 5, sales: 2, losses: 2, conversion: { received: 24, converted: 2, rate: 8.3 }, lastActivityAt: NOW,
     ...overrides,
   };
@@ -39,7 +39,7 @@ const brokers: TeamMetricBroker[] = [
 const team: TeamMetricTeam = {
   id: "team-centro", name: "Equipe Centro", supervisorId: "sup-ana", supervisorName: "Ana Ribeiro", branchId: "branch-1",
   current: windowOf({ activeLeads: 21, overdueReturns: 4, criticalOverdueReturns: 3, leadsWithoutNextAction: 5 }),
-  previous: windowOf({ slaRate: 80, acceptanceRate: 70, conversion: { received: 24, converted: 1, rate: 4 }, overdueReturns: 1 }),
+  previous: windowOf({ slaRate: 80, slaLeads: 0,acceptanceRate: 70, conversion: { received: 24, converted: 1, rate: 4 }, overdueReturns: 1 }),
   recent3DaysRedistributions: 4, previous3DaysRedistributions: 1,
   brokers,
 };
