@@ -95,7 +95,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                 past
                   ? "bg-[color-mix(in_oklab,var(--card)_65%,var(--muted))]"
                   : hasItems
-                    ? "bg-[color-mix(in_oklab,var(--primary)_8%,var(--card))] dark:bg-[color-mix(in_oklab,var(--primary)_14%,var(--card))]"
+                    ? "bg-[color-mix(in_oklab,var(--primary)_16%,var(--card))] shadow-[inset_3px_0_0_var(--primary)] dark:bg-[color-mix(in_oklab,var(--primary)_26%,var(--card))]"
                     : "bg-card",
                 isToday && "ring-2 ring-inset ring-primary/60",
               )}
