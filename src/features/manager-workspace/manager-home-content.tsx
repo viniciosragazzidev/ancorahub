@@ -3,11 +3,13 @@ import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-scope";
 import { LightDashboardUnavailable } from "@/features/broker-workspace/components/light-dashboard";
+import { loadNeedsYouIfEnabled } from "@/features/team-management-extras/needs-you-summary";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 export async function ManagerHomeContent() {
   const context = await getRequiredTenantContext();
   if (!getManagerUnitScope(context)) return <div className="arc-venancor p-6"><EmptyState title="Sua unidade ainda não está configurada" description="Peça ao administrador para vincular seu acesso a uma unidade. Os leads aparecerão aqui quando o vínculo estiver ativo." /></div>;
+  const needs = await loadNeedsYouIfEnabled(context);
   const rail = await getChatRailData();
   const data = rail?.managerUnitSummary;
   if (!rail || !data) return <LightDashboardUnavailable />;
@@ -25,7 +27,7 @@ export async function ManagerHomeContent() {
       { label: "Corretores ativos", value: data.activeBrokers },
       { label: "Corretores sem WhatsApp", value: data.brokersWithoutWhatsApp },
     ],
-    next: {
+    next: needs ? { label: needs.phrase, detail: "Abrir a gestão da unidade e ver as equipes.", href: needs.href, urgent: needs.urgent } : {
       label: "Ver leads da unidade",
       detail: data.unassigned ? `${data.unassigned} aguardando atribuição manual.` : "Acompanhe o andamento do time.",
       href: "/leads",

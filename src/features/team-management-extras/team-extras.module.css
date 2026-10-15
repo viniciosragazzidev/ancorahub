@@ -1,0 +1,56 @@
+/* Seções extras da equipe (G4 destaques e G5 metas). Mesmo padrão Lite: cards rounded-3xl, shadow-resting, entrada por transform. */
+.extras {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 16px 40px;
+  display: grid;
+  gap: 16px;
+}
+
+.card {
+  min-width: 0;
+  border-radius: 1.5rem;
+  background: var(--surface);
+  box-shadow: var(--shadow-resting);
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  animation: extras-card-enter var(--duration-standard) var(--ease-enter) both;
+}
+
+@keyframes extras-card-enter {
+  from { transform: translateY(8px); }
+}
+
+.card h2 { margin: 0; font-size: var(--text-base); font-weight: 500; }
+.sectionHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sectionHeading span { color: var(--text-muted); font-size: var(--text-xs); }
+.muted { margin: 0; color: var(--text-muted); font-size: var(--text-sm); }
+
+.insights { gap: 10px; }
+.insightList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.insightList li { display: grid; justify-items: start; gap: 6px; padding: 12px; border-radius: 1rem; background: var(--surface-muted); }
+.insightList p { margin: 0; font-size: var(--text-sm); }
+
+.goals { gap: 16px; }
+.goalBlock { display: grid; gap: 8px; }
+.goalKind { margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+.goalList { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.goalRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; border-radius: 1rem; background: var(--surface-muted); }
+.goalRow > div { min-width: 0; display: grid; gap: 6px; flex: 1; }
+.goalRow strong { font-size: var(--text-sm); font-weight: 500; }
+.goalRow span { color: var(--text-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.track { display: block; height: 8px; overflow: hidden; border-radius: 999px; background: var(--surface); }
+.track i { display: block; height: 100%; border-radius: inherit; background: var(--text-secondary); }
+
+.sheetForm { display: grid; gap: 14px; padding: 8px 4px 24px; }
+.feedback { min-height: 1em; margin: 0; color: var(--text-muted); font-size: var(--text-xs); }
+
+@media (min-width: 640px) {
+  .extras { padding: 0 24px 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card { animation: none; }
+}

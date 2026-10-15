@@ -1,6 +1,8 @@
 import { ChatHome, type HomeSummary } from "@/components/chat/chat-home";
 import { LightDashboardUnavailable } from "@/features/broker-workspace/components/light-dashboard";
 import { getCachedSupervisorWorkspaceData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
+import { loadNeedsYouIfEnabled, type NeedsYouSummary } from "@/features/team-management-extras/needs-you-summary";
+import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 import type { SupervisorWorkspaceData } from "./queries";
 
@@ -22,9 +24,16 @@ function summaryOf(data: SupervisorWorkspaceData): HomeSummary {
   };
 }
 
+/** Com a gestão de equipes ligada, a pílula de próxima ação vira "Precisa de você" (G4). */
+function withNeeds(summary: HomeSummary, needs: NeedsYouSummary | null): HomeSummary {
+  if (!needs) return summary;
+  return { ...summary, next: { label: needs.phrase, detail: "Abrir a equipe e ver quem precisa de você.", href: needs.href, urgent: needs.urgent } };
+}
+
 /** Supervisor Lite home (S2): the team assistants as conversations, the team's day at the center. */
 export async function SupervisorHomeContent() {
-  const [rail, data] = await Promise.all([getChatRailData(), getCachedSupervisorWorkspaceData().catch(() => null)]);
+  const context = await getRequiredTenantContext();
+  const [rail, data, needs] = await Promise.all([getChatRailData(), getCachedSupervisorWorkspaceData().catch(() => null), loadNeedsYouIfEnabled(context)]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
     <ChatHome
@@ -33,7 +42,7 @@ export async function SupervisorHomeContent() {
       leads={rail.leads}
       nowIso={rail.nowIso}
       canQuote={false}
-      summary={summaryOf(data)}
+      summary={withNeeds(summaryOf(data), needs)}
     />
   );
 }

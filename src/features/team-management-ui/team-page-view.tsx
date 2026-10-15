@@ -131,16 +131,7 @@ export function TeamPageViewComponent({ view }: { view: TeamPageView }) {
           ) : <EmptyState title="Sem corretores na equipe" description="Os corretores da equipe aparecem aqui." />}
         </section>
 
-        <section className={`${styles.card} ${styles.goal}`} aria-labelledby="goal-title">
-          <h2 id="goal-title">Meta da equipe</h2>
-          {view.goal ? (
-            <>
-              <p>{view.goal.name}</p>
-              <span className={styles.track}><i style={{ width: `${Math.min(100, view.goal.percentage)}%` }} /></span>
-              <small>{view.goal.currentValue} de {view.goal.targetValue} · {view.goal.percentage}%</small>
-            </>
-          ) : <p className={styles.muted}>Nenhuma meta ativa para esta equipe.</p>}
-        </section>
+
 
         {view.managerBlock ? <ManagerBlockView block={view.managerBlock} /> : null}
       </div>

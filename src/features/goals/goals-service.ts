@@ -5,8 +5,15 @@ import { and, eq, gte, isNull, lte, sql } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { inSupervisorTeam } from "@/features/team/supervisor-scope";
+import type { TenantContext } from "@/shared/auth/types";
+import { getTeamMetrics } from "@/features/team-management/metrics";
+import { isMetricGoalType, metricGoalProgress, windowForGoal } from "./metric-goals";
 
-export async function calculateGoalProgress(goalId: string): Promise<void> {
+/**
+ * Recalcula o progresso de uma meta. As metas de cotações, SLA e tempo de resposta vêm da camada do G0,
+ * no escopo do viewer (context). Sem context elas não são recalculadas (o progresso guardado fica como está).
+ */
+export async function calculateGoalProgress(goalId: string, context?: TenantContext): Promise<void> {
   const db = getDatabase();
 
   // Fetch the goal
@@ -27,9 +34,23 @@ export async function calculateGoalProgress(goalId: string): Promise<void> {
 
   if (!goal) return;
 
-  const currentValue = await computeCurrentValue(goal);
-  const targetVal = parseFloat(String(goal.targetValue)) || 1;
-  const percentage = targetVal > 0 ? Math.round((currentValue / targetVal) * 100 * 100) / 100 : 0;
+  let currentValue: number;
+  let percentage: number;
+  if (isMetricGoalType(goal.targetType)) {
+    if (!context) return;
+    const metrics = await getTeamMetrics(context, { window: 30, now: new Date() });
+    const progress = metricGoalProgress({
+      targetType: goal.targetType,
+      targetValue: parseFloat(String(goal.targetValue)),
+      window: windowForGoal(goal, metrics),
+    });
+    currentValue = progress.current;
+    percentage = progress.percentage;
+  } else {
+    currentValue = await computeCurrentValue(goal);
+    const targetVal = parseFloat(String(goal.targetValue)) || 1;
+    percentage = targetVal > 0 ? Math.round((currentValue / targetVal) * 100 * 100) / 100 : 0;
+  }
 
   // Upsert into goal_progress
   const existing = await db
