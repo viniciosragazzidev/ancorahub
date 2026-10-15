@@ -71,6 +71,13 @@ export function TeamInviteLiteSheet(props: {
         <label className="grid gap-1.5 text-sm font-medium">Nome<Input name="name" required minLength={2} maxLength={120} disabled={pending} autoComplete="name" /></label>
         <label className="grid gap-1.5 text-sm font-medium">E-mail <span className="font-normal text-muted-foreground">(opcional)</span><Input name="email" type="email" maxLength={254} disabled={pending} autoComplete="email" /></label>
         <label className="grid gap-1.5 text-sm font-medium">Telefone<Input name="phone" type="tel" required minLength={8} maxLength={30} disabled={pending} autoComplete="tel" placeholder="(21) 99999-9999" /></label>
+        {inviteRole === "broker" ? (
+          <label className="grid gap-1.5 text-sm font-medium">
+            <span>Código do corretor <span className="font-normal text-muted-foreground">(opcional)</span></span>
+            <Input name="brokerCode" maxLength={40} pattern="[A-Za-z0-9._\-]+" title="Use apenas letras, números, ponto, hífen ou sublinhado." disabled={pending} inputMode="numeric" placeholder="Ex.: 4994" />
+            <span className="text-xs font-normal text-muted-foreground">O código interno da corretora. Em branco, o sistema gera um automaticamente.</span>
+          </label>
+        ) : null}
         <div className="rounded-2xl bg-muted/70 px-3 py-2 text-sm text-muted-foreground">
           Unidade: <strong className="font-medium text-foreground">{props.branchName ?? "Unidade da sua conta"}</strong>
         </div>
