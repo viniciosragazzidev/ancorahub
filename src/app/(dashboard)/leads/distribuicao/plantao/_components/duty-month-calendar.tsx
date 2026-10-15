@@ -43,7 +43,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
   /** Weekly rules (more than one date): shown with ↻. */
   repeatingScheduleIds: ReadonlySet<string>;
   canCreate: boolean;
-  onOpen: (schedule: T, date: string) => void;
+  onOpen: (schedule: T) => void;
   onCreateOnDate: (date: string) => void;
 }) {
   const today = todayKey();
@@ -115,7 +115,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                   <button
                     key={schedule.id}
                     type="button"
-                    onClick={() => onOpen(schedule, date)}
+                    onClick={() => onOpen(schedule)}
                     title={`${schedule.typeName ? `${schedule.typeName} · ` : ""}${schedule.name} · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}${repeatingScheduleIds.has(schedule.id) ? " · repete toda semana" : ""}${done ? " · encerrado" : ""}`}
                     style={schedule.typeName ? typeStripe(schedule.typeHue) : undefined}
                     className={cn(

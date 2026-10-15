@@ -38,6 +38,7 @@ import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger
 import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigger";
 import { BrokerOccurrenceCard } from "../_components/broker-occurrence-card";
 import { PendingRoster } from "../_components/pending-roster";
+import { ScheduleEscalarButton } from "../_components/schedule-escalar-button";
 import { listInvitedBrokers, listPendingRosterEntries } from "@/features/lead-distribution/duty-roster-pending";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { dutyShifts, worksInShift } from "@/features/lead-distribution/duty-shifts";
@@ -547,6 +548,15 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
               : presenceEnabled ? "Acompanhe quem confirmou presença neste turno." : "Quem está na escala ativa deste plantão agora."}
           />
           <CardContent className="space-y-3" role={presenceEnabled ? "group" : undefined} aria-label={presenceEnabled ? "Status de confirmação dos corretores escalados" : undefined}>
+            {/* Escalar alguém neste plantão sem sair da página (mesma regra da Escala publicada). */}
+            {context.role === "director" ? (
+              <ScheduleEscalarButton
+                scheduleId={schedule.id}
+                scheduleName={schedule.name}
+                defaultDate={liveWindow?.dutyDate ?? dayKey.format(now)}
+                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name, internalCode: null, branchId: broker.branchId ?? null }))}
+              />
+            ) : null}
             {roster.length && roster.every((entry) => entry.blockedReason) ? (
               <div role="alert" className="rounded-[var(--radius-card)] border border-warning/30 bg-warning/10 px-3 py-2.5 text-xs text-foreground">
                 <strong className="font-semibold">Nenhum escalado está elegível para receber leads.</strong> Há pendências de cadastro ou confirmação — os leads permanecem aguardando.

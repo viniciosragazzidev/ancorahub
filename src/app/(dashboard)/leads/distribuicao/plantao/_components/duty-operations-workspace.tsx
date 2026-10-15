@@ -1,5 +1,6 @@
 "use client";
 
+import { ScheduleEscalarButton } from "./schedule-escalar-button";
 import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -63,8 +64,6 @@ import { getDutyCoverage } from "@/features/lead-distribution/domain";
 import { monthCoverage, monthShiftProgress, summarizeDutyDays } from "@/features/lead-distribution/monthly-duty-plan";
 import { DutyMonthCalendar } from "./duty-month-calendar";
 import { MonthlyDutyPlanner, monthLabel, useMonthlyDutyPlans } from "./monthly-duty-planner";
-import { findPublishedOccurrence } from "./plantao-occurrence";
-import { PlantaoOccurrenceSheet } from "./plantao-occurrence-sheet";
 import { DutyTypeDialog, DutyTypesSheet, DutyTypeTag, MODALITY_LABEL, typeUnitsLabel } from "./duty-type-ui";
 import { getOperationalMonthKey } from "./duty-schedule-month-groups";
 
@@ -893,6 +892,16 @@ function DutyInspector({
           {schedule && (
             <>
               <SheetBody contentClassName="grid gap-4">
+                {/* Also here (the same option exists inside the plantão page): put someone on a day of the published escala. */}
+                <SheetSection>
+                  <SheetSectionHeader>
+                    <div>
+                      <p className="text-sm font-semibold">Escalar num dia</p>
+                      <p className="text-xs text-muted-foreground">Coloque um corretor neste plantão num dia da escala publicada.</p>
+                    </div>
+                  </SheetSectionHeader>
+                  <ScheduleEscalarButton scheduleId={schedule.id} scheduleName={schedule.name} defaultDate={new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())} brokers={snapshot.brokers} />
+                </SheetSection>
                 <SheetSection>
                   <SheetSectionHeader>
                     <div>
@@ -1291,13 +1300,6 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
   const [createDate, setCreateDate] = useState<string | null>(null);
   const plansState = useMonthlyDutyPlans(monthlySchedulingEnabled);
   const { load: loadPlan } = plansState;
-  // A plantão of the published escala opens its own sheet (escalar/tirar pessoas); the other plantões keep the weekly drawer.
-  const [occurrenceOpen, setOccurrenceOpen] = useState<{ scheduleId: string; scheduleName: string; date: string } | null>(null);
-  const occurrenceFound = occurrenceOpen ? findPublishedOccurrence(plansState.plans, occurrenceOpen.scheduleId, occurrenceOpen.date) : null;
-  function openFromCalendar(schedule: Schedule, date: string) {
-    if (findPublishedOccurrence(plansState.plans, schedule.id, date)) setOccurrenceOpen({ scheduleId: schedule.id, scheduleName: schedule.name, date });
-    else setSelectedSchedule(schedule);
-  }
 
   useEffect(() => {
     // The previous month's escala may run into this month (a period that crosses it).
@@ -1516,7 +1518,7 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
               gapScheduleIds={gapScheduleIds}
               repeatingScheduleIds={repeatingScheduleIds}
               canCreate
-              onOpen={openFromCalendar}
+              onOpen={setSelectedSchedule}
               onCreateOnDate={(date) => openCreate(date)}
             />
           ) : (
@@ -1581,16 +1583,6 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
         />
       ) : null}
       {typesOpen ? <DutyTypesSheet open onOpenChange={setTypesOpen} types={snapshot.types} branches={snapshot.branches} /> : null}
-      {occurrenceOpen && occurrenceFound ? (
-        <PlantaoOccurrenceSheet
-          open
-          onOpenChange={(open) => { if (!open) setOccurrenceOpen(null); }}
-          occurrence={occurrenceFound.occurrence}
-          scheduleName={occurrenceOpen.scheduleName}
-          brokers={snapshot.brokers}
-          onChanged={(view) => plansState.setPlan(view)}
-        />
-      ) : null}
       <DutyInspector
         key={`${selectedSchedule?.id ?? "closed"}-${selectedSchedule ? "open" : "closed"}`}
         schedule={selectedSchedule}
