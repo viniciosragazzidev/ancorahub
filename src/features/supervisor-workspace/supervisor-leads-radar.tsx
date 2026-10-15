@@ -1,16 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
+import { ChipGroup } from "@/components/arc/chip-group/chip-group";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { SearchField } from "@/components/arc/search-field/search-field";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
-
-import styles from "./supervisor-leads-radar.module.css";
 
 export type RadarTag = { id: string; name: string; colorHue: number | null };
 export type RadarLead = {
@@ -69,7 +68,6 @@ const EMPTY_COPY: Record<Tab, { title: string; description: string }> = {
 const SEVERITY: Record<Alert["kind"], number> = { late: 0, client: 1, task: 2, stalled: 3 };
 
 const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? name;
-const tagStyle = (tag: RadarTag) => ({ "--hue": tag.colorHue ?? 220 }) as CSSProperties;
 
 const TIME_ZONE = "America/Sao_Paulo";
 const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
@@ -84,29 +82,99 @@ function dayLabel(date: Date, now: Date) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-function Tags({ tags, max = 2 }: { tags?: RadarTag[]; max?: number }) {
+// Same action pills as the broker's queue.
+const actionPrimary = "inline-flex h-11 flex-1 items-center justify-center rounded-full bg-(--accent) px-5 text-sm font-medium text-(--accent-foreground) sm:flex-none";
+const actionSecondary = "inline-flex h-11 flex-1 items-center justify-center rounded-full bg-(--surface-muted) px-5 text-sm font-medium text-(--foreground) sm:flex-none";
+
+function LeadTags({ tags, max }: { tags?: RadarTag[]; max: number }) {
   if (!tags?.length) return null;
   const rest = tags.length - max;
   return (
-    <span className={styles.tags}>
-      {tags.slice(0, max).map((tag) => <span key={tag.id} className={styles.tag} style={tagStyle(tag)}>{tag.name}</span>)}
-      {rest > 0 ? <span className={styles.tagMore} aria-label={`mais ${rest} tags`}>+{rest}</span> : null}
-    </span>
+    <>
+      {tags.slice(0, max).map((tag) => <Badge key={tag.id} tone="neutral" size="sm">{tag.name}</Badge>)}
+      {rest > 0 ? <Badge tone="neutral" size="sm">+{rest}</Badge> : null}
+    </>
   );
 }
 
 type Item = { lead: RadarLead; bucket: Bucket; alerts: Alert[] };
 
+function AttentionCard({ item, isManager }: { item: Item; isManager: boolean }) {
+  const { lead, alerts } = item;
+  const [main, ...others] = alerts;
+  const owner = lead.ownerId ? firstName(lead.ownerName) : "Sem corretor";
+  return (
+    <li className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+      <Link href={`/leads/${encodeURIComponent(lead.id)}`} className="flex items-start gap-3">
+        <Avatar name={lead.name} size="lg" className="light-avatar" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-base font-medium text-(--foreground)">{lead.name}</span>
+          <span className="mt-0.5 block text-sm text-(--text-secondary)">{main!.text}</span>
+          <span className="mt-0.5 block truncate text-xs text-(--text-muted)">{[owner, statusName[lead.status] ?? "Em andamento", lead.productName].filter(Boolean).join(" · ")}</span>
+        </span>
+        <Badge tone={main!.tone}>{main!.chip}</Badge>
+      </Link>
+      {others.length || lead.tags?.length ? (
+        <div className="flex flex-wrap gap-1.5 pl-[60px]">
+          {others.map((alert) => <Badge key={alert.kind} tone={alert.tone} size="sm">{alert.chip}</Badge>)}
+          <LeadTags tags={lead.tags} max={3} />
+        </div>
+      ) : null}
+      {isManager ? (
+        lead.clientWaitingSince ? (
+          <div className="flex gap-2 sm:justify-end">
+            <Link href={`/mensagens/${encodeURIComponent(lead.id)}`} className={actionSecondary}>Ver conversa</Link>
+          </div>
+        ) : null
+      ) : (
+        <div className="flex gap-2 sm:justify-end">
+          <Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} className={actionSecondary}>Repassar</Link>
+          {lead.ownerId ? <Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} className={actionPrimary}>Cobrar {owner}</Link> : null}
+        </div>
+      )}
+    </li>
+  );
+}
+
+function CompactRow({ item, slaMinutes, now }: { item: Item; slaMinutes: number; now: Date }) {
+  const { lead, bucket, alerts } = item;
+  const remaining = bucket === "waiting" && lead.assignedAt
+    ? Math.max(1, Math.ceil((new Date(lead.assignedAt).getTime() + slaMinutes * 60_000 - now.getTime()) / 60_000))
+    : null;
+  const chip = alerts[0] ?? (bucket === "waiting"
+    ? { tone: "info" as BadgeTone, chip: "Novo" }
+    : { tone: "neutral" as BadgeTone, chip: statusName[lead.status] ?? "Em andamento" });
+  const owner = lead.ownerId ? firstName(lead.ownerName) : "Sem corretor";
+  return (
+    <li className="border-b border-(--border) last:border-b-0">
+      <Link href={`/leads/${encodeURIComponent(lead.id)}`} className="flex min-h-16 items-center gap-3 px-4 py-3 active:bg-(--surface-muted)">
+        <Avatar name={lead.name} size="md" className="light-avatar" />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium text-(--foreground)">{lead.name}</span>
+          <span className="block truncate text-sm text-(--text-secondary)">{[owner, remaining ? `${remaining} min para o 1º contato` : lead.productName].filter(Boolean).join(" · ")}</span>
+          {lead.tags?.length ? <span className="mt-1 flex flex-wrap gap-1"><LeadTags tags={lead.tags} max={2} /></span> : null}
+        </span>
+        <span className="flex shrink-0 flex-col items-end gap-1">
+          {lead.assignedAt ? <time dateTime={lead.assignedAt} className="text-xs tabular-nums text-(--text-muted)" suppressHydrationWarning>{timeFormat.format(new Date(lead.assignedAt))}</time> : null}
+          <Badge tone={chip.tone} size="sm">{chip.chip}</Badge>
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 /**
- * The manager's (unit) or supervisor's (team) lead list, in the same shape as the broker's queue:
- * a tab with what needs attention now as cards, and the rest grouped by the day it arrived.
+ * The manager's (unit) or supervisor's (team) lead list, built from the same Arc pieces as the
+ * broker's queue: what needs attention now as cards, and the rest grouped by the day it arrived.
  */
 export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager" }) {
   const isManager = audience === "manager";
   const currentTime = useMemo(() => new Date(now), [now]);
   const [query, setQuery] = useState(search);
-  const [brokerId, setBrokerId] = useState<string | null>(null);
-  const [tagId, setTagId] = useState<string | null>(null);
+  const [brokerIds, setBrokerIds] = useState<string[]>([]);
+  const [tagIds, setTagIds] = useState<string[]>([]);
+  const brokerId = brokerIds[0] ?? null;
+  const tagId = tagIds[0] ?? null;
 
   const items = useMemo<Item[]>(() => data.leads.map((lead) => {
     const bucket = classifyRadarLead(lead, currentTime, data.slaMinutes);
@@ -133,15 +201,22 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
   const [tab, setTab] = useState<Tab>(() => initialTab ?? (attentionTotal > 0 ? "attention" : "all"));
   const visible = byTab[tab];
 
-  const tags = useMemo(() => {
-    const seen = new Map<string, RadarTag & { total: number }>();
-    for (const { lead } of items) for (const tag of lead.tags ?? []) seen.set(tag.id, { ...tag, total: (seen.get(tag.id)?.total ?? 0) + 1 });
-    return [...seen.values()].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name, "pt-BR"));
+  const tagOptions = useMemo(() => {
+    const seen = new Map<string, { value: string; label: string; total: number }>();
+    for (const { lead } of items) for (const tag of lead.tags ?? []) {
+      const current = seen.get(tag.id);
+      seen.set(tag.id, { value: tag.id, label: tag.name, total: (current?.total ?? 0) + 1 });
+    }
+    return [...seen.values()].sort((a, b) => b.total - a.total || a.label.localeCompare(b.label, "pt-BR")).map(({ value, label }) => ({ value, label }));
   }, [items]);
 
-  const team = useMemo(() => [...data.team].sort((a, b) => b.late - a.late || b.openCount - a.openCount || a.name.localeCompare(b.name, "pt-BR")), [data.team]);
+  // Brokers with late leads first; the count in the chip is what the manager acts on.
+  const brokerOptions = useMemo(() => [...data.team]
+    .sort((a, b) => b.late - a.late || b.openCount - a.openCount || a.name.localeCompare(b.name, "pt-BR"))
+    .map((member) => ({ value: member.id, label: member.late ? `${firstName(member.name)} · ${member.late} atrasado${member.late === 1 ? "" : "s"}` : `${firstName(member.name)} · ${member.openCount}` })), [data.team]);
+
   const filtering = Boolean(query.trim() || brokerId || tagId);
-  const clear = () => { setQuery(""); setBrokerId(null); setTagId(null); };
+  const clear = () => { setQuery(""); setBrokerIds([]); setTagIds([]); };
 
   const groups = useMemo(() => {
     const sorted = [...visible].sort((a, b) => new Date(b.lead.assignedAt ?? 0).getTime() - new Date(a.lead.assignedAt ?? 0).getTime());
@@ -159,66 +234,30 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
   const options = (["attention", "new", "service", "all"] as const).map((value) => ({
     value,
     label: TAB_LABEL[value],
-    accessory: byTab[value].length ? <span className={styles.tabCount} data-alert={value === "attention"}>{byTab[value].length}</span> : undefined,
+    accessory: byTab[value].length ? <span className="tabular-nums">{byTab[value].length}</span> : undefined,
   }));
 
-  // Staggered entrance in CSS (nothing stays hidden before hydration).
-  let order = 3;
-  const enter = () => ({ "--i": Math.min(order++, 12) }) as CSSProperties;
-
   return (
-    <div className={`arc-venancor ${styles.page}`}>
-      <div className={styles.inner}>
-        <header className={`${styles.header} ${styles.enter}`}>
-          <h1>{isManager ? "Leads da unidade" : "Leads da equipe"}</h1>
-          <p>
+    <div className="flex min-h-full flex-col text-foreground">
+      <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-6 pt-2 sm:px-6">
+        <header>
+          <h1 className="text-2xl font-medium text-(--foreground)">{isManager ? "Leads da unidade" : "Leads da equipe"}</h1>
+          <p className="mt-1 text-sm text-(--text-secondary)">
             {attentionTotal
-              ? <><strong className={styles.alert}>{attentionTotal === 1 ? "1 lead precisa" : `${attentionTotal} leads precisam`} de você</strong> · {data.leads.length} em aberto</>
-              : <>Tudo em dia · {data.leads.length === 1 ? "1 lead em aberto" : `${data.leads.length} leads em aberto`}</>}
+              ? <><span className="font-medium text-(--danger)">{attentionTotal === 1 ? "1 lead precisa" : `${attentionTotal} leads precisam`} de você</span> · {data.leads.length} em aberto</>
+              : `Tudo em dia · ${data.leads.length === 1 ? "1 lead em aberto" : `${data.leads.length} leads em aberto`}`}
           </p>
         </header>
 
-        {team.length ? (
-          <div className={`${styles.brokers} ${styles.enter}`} style={{ "--i": 1 } as CSSProperties} role="group" aria-label="Filtrar por corretor">
-            <button type="button" className={styles.broker} aria-pressed={!brokerId} onClick={() => setBrokerId(null)}>
-              <span className={styles.allIcon} aria-hidden="true">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="8" r="3.2" /><path d="M3.5 19a5.5 5.5 0 0 1 11 0" /><circle cx="17" cy="9" r="2.6" /><path d="M15.5 14.2A4.6 4.6 0 0 1 21 18.5" /></svg>
-              </span>
-              Todos
-            </button>
-            {team.map((member) => (
-              <button
-                type="button"
-                key={member.id}
-                className={styles.broker}
-                aria-pressed={brokerId === member.id}
-                onClick={() => setBrokerId((current) => (current === member.id ? null : member.id))}
-                aria-label={`${member.name}: ${member.openCount === 1 ? "1 lead aberto" : `${member.openCount} leads abertos`}${member.late ? `, ${member.late} atrasado${member.late === 1 ? "" : "s"}` : ""}`}
-              >
-                <Avatar name={member.name} src={member.image ?? undefined} size="sm" status={member.availability === "available" ? "online" : "offline"} />
-                <span aria-hidden="true">{firstName(member.name)}</span>
-                {member.openCount ? <span className={styles.brokerCount} data-late={member.late > 0} aria-hidden="true">{member.late || member.openCount}</span> : null}
-              </button>
-            ))}
-          </div>
-        ) : null}
+        <SearchField label="Buscar lead" placeholder="Nome, telefone, corretor ou produto" value={query} onValueChange={setQuery} />
 
-        <div className={`${styles.controls} ${styles.enter}`} style={{ "--i": 2 } as CSSProperties}>
-          <SearchField label="Buscar lead ou corretor" placeholder="Nome, telefone, corretor ou produto" value={query} onValueChange={setQuery} />
-          {tags.length ? (
-            <div className={styles.tagFilter} role="group" aria-label="Filtrar por tag">
-              {tags.map((tag) => (
-                <button key={tag.id} type="button" className={styles.tagChip} style={tagStyle(tag)} aria-pressed={tagId === tag.id} onClick={() => setTagId((current) => (current === tag.id ? null : tag.id))}>
-                  <i aria-hidden="true" />{tag.name}<span>{tag.total}</span>
-                </button>
-              ))}
-            </div>
-          ) : null}
-          <SegmentedControl className={styles.segment} label="Situação dos leads" options={options} value={tab} onValueChange={(value) => setTab(value as Tab)} />
-        </div>
+        {brokerOptions.length ? <ChipGroup label="Corretor" options={brokerOptions} value={brokerIds} onValueChange={setBrokerIds} maxVisible={6} /> : null}
+        {tagOptions.length ? <ChipGroup label="Tags" options={tagOptions} value={tagIds} onValueChange={setTagIds} maxVisible={5} /> : null}
+
+        <SegmentedControl label="Situação dos leads" options={options} value={tab} onValueChange={(value) => setTab(value as Tab)} />
 
         {filtering ? (
-          <div className={styles.filterBar}>
+          <div className="flex items-center justify-between gap-2 text-sm text-(--text-secondary)">
             <span>{visible.length === 1 ? "1 lead" : `${visible.length} leads`} com esses filtros</span>
             <Button variant="ghost" size="sm" onClick={clear}>Limpar filtros</Button>
           </div>
@@ -230,72 +269,29 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
             description={filtering ? "Troque o corretor, a tag ou a busca." : EMPTY_COPY[tab].description}
           />
         ) : tab === "attention" ? (
-          <ul className={styles.cards} aria-label="Leads que precisam de você">
-            {visible.map(({ lead, alerts }) => {
-              const [main, ...others] = alerts;
-              return (
-                <li key={lead.id} className={`${styles.card} ${styles.enter}`} data-tone={main!.tone} style={enter()}>
-                  <Link href={`/leads/${encodeURIComponent(lead.id)}`} className={styles.cardMain}>
-                    <Avatar name={lead.name} size="lg" className="light-avatar" />
-                    <span className={styles.cardText}>
-                      <strong>{lead.name}</strong>
-                      <span className={styles.alertText}>{main!.text}</span>
-                      <span className={styles.muted}>{[lead.ownerId ? firstName(lead.ownerName) : "Sem corretor", statusName[lead.status] ?? "Em andamento", lead.productName].filter(Boolean).join(" · ")}</span>
-                    </span>
-                    <Badge tone={main!.tone}>{main!.chip}</Badge>
-                  </Link>
-                  {others.length || lead.tags?.length ? (
-                    <div className={styles.cardExtra}>
-                      {others.map((alert) => <Badge key={alert.kind} tone={alert.tone} size="sm">{alert.chip}</Badge>)}
-                      <Tags tags={lead.tags} max={3} />
-                    </div>
-                  ) : null}
-                  {isManager ? (
-                    lead.clientWaitingSince ? <div className={styles.cardActions}><Link className={styles.secondary} href={`/mensagens/${encodeURIComponent(lead.id)}`}>Ver conversa</Link></div> : null
-                  ) : (
-                    <div className={styles.cardActions}>
-                      <Link className={styles.secondary} href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`}>Repassar</Link>
-                      {lead.ownerId ? <Link className={styles.primary} href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`}>Cobrar {firstName(lead.ownerName)}</Link> : null}
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <section aria-labelledby="radar-attention" className="flex flex-col gap-3">
+            <h2 id="radar-attention" className="text-base font-medium text-(--foreground)">
+              Precisa de você agora
+              <span className="ml-2 tabular-nums text-(--text-secondary)">{visible.length}</span>
+            </h2>
+            <ul className="flex flex-col gap-3" aria-label="Leads que precisam de você">
+              {visible.map((item) => <AttentionCard key={item.lead.id} item={item} isManager={isManager} />)}
+            </ul>
+          </section>
         ) : (
-          groups.map((group) => (
-            <section key={group.key} className={styles.day} aria-label={group.label}>
-              <h2 className={`${styles.dayTitle} ${styles.enter}`} style={enter()} suppressHydrationWarning>{group.label}<span>{group.items.length}</span></h2>
-              <ul className={`${styles.rows} ${styles.enter}`} style={enter()}>
-                {group.items.map(({ lead, bucket, alerts }) => {
-                  const remaining = bucket === "waiting" && lead.assignedAt
-                    ? Math.max(1, Math.ceil((new Date(lead.assignedAt).getTime() + data.slaMinutes * 60_000 - currentTime.getTime()) / 60_000))
-                    : null;
-                  const chip = alerts[0] ?? (bucket === "waiting"
-                    ? { tone: "info" as BadgeTone, chip: "Novo" }
-                    : { tone: "neutral" as BadgeTone, chip: statusName[lead.status] ?? "Em andamento" });
-                  return (
-                    <li key={lead.id}>
-                      <Link href={`/leads/${encodeURIComponent(lead.id)}`} className={styles.row} data-tone={alerts[0]?.tone}>
-                        <Avatar name={lead.name} size="md" className="light-avatar" />
-                        <span className={styles.rowText}>
-                          <span className={styles.rowName}>{lead.name}</span>
-                          <span className={styles.rowLine}>
-                            <span className={styles.muted}>{[lead.ownerId ? firstName(lead.ownerName) : "Sem corretor", remaining ? `${remaining} min para o 1º contato` : lead.productName].filter(Boolean).join(" · ")}</span>
-                            <Tags tags={lead.tags} />
-                          </span>
-                        </span>
-                        <span className={styles.rowMeta}>
-                          {lead.assignedAt ? <time dateTime={lead.assignedAt} suppressHydrationWarning>{timeFormat.format(new Date(lead.assignedAt))}</time> : null}
-                          <Badge tone={chip.tone} size="sm">{chip.chip}</Badge>
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))
+          <section aria-label="Leads" className="flex flex-col gap-3">
+            {groups.map((group) => (
+              <div key={group.key} className="flex flex-col gap-2">
+                <h3 className="px-1 text-sm font-medium text-(--text-secondary)" suppressHydrationWarning>
+                  {group.label}
+                  <span className="ml-2 tabular-nums text-(--text-muted)">{group.items.length}</span>
+                </h3>
+                <ul className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
+                  {group.items.map((item) => <CompactRow key={item.lead.id} item={item} slaMinutes={data.slaMinutes} now={currentTime} />)}
+                </ul>
+              </div>
+            ))}
+          </section>
         )}
       </div>
     </div>

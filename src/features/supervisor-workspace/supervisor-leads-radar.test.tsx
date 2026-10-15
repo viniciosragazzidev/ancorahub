@@ -6,6 +6,7 @@ vi.mock("next/link", () => ({ default: ({ href, children, ...props }: React.Anch
 vi.mock("@/components/arc/button/button", () => ({ Button: ({ children, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => <button {...props}>{children}</button> }));
 vi.mock("@/components/arc/search-field/search-field", () => ({ SearchField: ({ value, onValueChange, label }: { value: string; onValueChange: (value: string) => void; label: string }) => <label>{label}<input value={value} onChange={(event) => onValueChange(event.target.value)} /></label> }));
 vi.mock("@/components/arc/segmented-control/segmented-control", () => ({ default: ({ label, options, value, onValueChange }: { label: string; options: Array<{ value: string; label: string }>; value: string; onValueChange: (value: string) => void }) => <div role="group" aria-label={label}>{options.map((option) => <button type="button" key={option.value} aria-pressed={value === option.value} onClick={() => onValueChange(option.value)}>{option.label}</button>)}</div> }));
+vi.mock("@/components/arc/chip-group/chip-group", () => ({ ChipGroup: ({ label, options, value, onValueChange }: { label: string; options: Array<{ value: string; label: string }>; value: string[]; onValueChange: (value: string[]) => void }) => <div role="group" aria-label={label}>{options.map((option) => <button type="button" key={option.value} aria-pressed={value.includes(option.value)} onClick={() => onValueChange(value.includes(option.value) ? [] : [option.value])}>{option.label}</button>)}</div> }));
 vi.mock("@/components/arc/avatar/avatar", () => ({ Avatar: ({ name, className }: { name: string; className?: string }) => <span className={className} role="img" aria-label={name}>{name}</span> }));
 vi.mock("@/components/arc/badge/badge", () => ({ Badge: ({ children }: { children: React.ReactNode }) => <span>{children}</span> }));
 vi.mock("@/components/arc/empty-state/empty-state", () => ({ EmptyState: ({ title, description }: { title: string; description: string }) => <section><strong>{title}</strong><p>{description}</p></section> }));
@@ -58,15 +59,15 @@ describe("SupervisorLeadsRadar", () => {
     render(<SupervisorLeadsRadar data={data} now={now} />);
     fireEvent.click(within(screen.getByRole("group", { name: "Situação dos leads" })).getByRole("button", { name: "Abertos" }));
     expect(screen.getByRole("link", { name: /João Lima/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Paulo Dias/ }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Corretor" })).getByRole("button", { name: /Paulo/ }));
     expect(screen.queryByRole("link", { name: /Maria Silva/ })).toBeNull();
     expect(screen.getByRole("link", { name: /João Lima/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    fireEvent.click(within(screen.getByRole("group", { name: "Filtrar por tag" })).getByRole("button", { name: /Indicação/ }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Tags" })).getByRole("button", { name: /Indicação/ }));
     expect(screen.getByRole("link", { name: /Maria Silva/ })).toBeTruthy();
     expect(screen.queryByRole("link", { name: /João Lima/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Buscar lead ou corretor" }), { target: { value: "0000" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Buscar lead" }), { target: { value: "0000" } });
     expect(screen.getByRole("link", { name: /Maria Silva/ })).toBeTruthy();
   });
 });
