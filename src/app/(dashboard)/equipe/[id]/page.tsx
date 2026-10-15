@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { getTeamMemberProfile, MEMBER_PROFILE_LEADS_LIMIT } from "@/features/team/member-profile";
+import { getBrokerMonthGoal } from "@/features/goals/lite-goals-queries";
+import { isTeamManagementEnabled } from "@/features/team-management-ui/flag";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { MemberDutyCalendar } from "./_components/member-duty-calendar";
 import { MemberLeadsTabs } from "./_components/member-leads-tabs";
@@ -82,6 +84,8 @@ export default async function TeamMemberProfilePage({
   const managerLite = context.role === "manager" && audience === "manager";
   if (managerLite && profile.member.role !== "broker") redirect("/not-found");
   if (managerLite) {
+    // Meta do mês do corretor: só com a gestão de equipes ligada. O gestor vê, não edita a meta do corretor.
+    const monthGoalRow = (await isTeamManagementEnabled()) ? await getBrokerMonthGoal({ context, brokerId: profile.member.userId, now: new Date() }).catch(() => null) : null;
     const notes = await listBrokerNotes(profile.member.userId).catch(() => []);
     const teamData = await getManagerLiteTeam(context);
     const brokerIds = teamData.members.filter((member) => member.status === "active" && member.userId).map((member) => member.userId!);
@@ -109,10 +113,13 @@ export default async function TeamMemberProfilePage({
       managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
       managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={active} canResetPassword />}
       showSupervisorActions={false}
+      monthGoal={monthGoalRow ? { brokerId: profile.member.userId, period: monthGoalRow.period, goal: monthGoalRow.goal, canEdit: false } : undefined}
     />;
   }
   const supervisorLite = context.role === "supervisor" && audience === "supervisor";
   if (supervisorLite) {
+    // Meta do mês do corretor da equipe: o supervisor edita pelo mesmo bottom-sheet da equipe.
+    const monthGoalRow = (await isTeamManagementEnabled()) ? await getBrokerMonthGoal({ context, brokerId: profile.member.userId, now: new Date() }).catch(() => null) : null;
     if (profile.member.role !== "broker") redirect("/not-found");
     const notes = await listBrokerNotes(profile.member.userId).catch(() => []);
     const teamData = profile.member.role === "broker" ? await getCachedSupervisorWorkspaceData().catch(() => null) : null;
@@ -187,6 +194,7 @@ export default async function TeamMemberProfilePage({
         managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
         managementActions={<LiteBrokerProfileActions userId={profile.member.userId} name={profile.member.name} email={profile.member.email} phone={profile.member.brokerPhone ?? ""} active={profile.member.membershipStatus === "active" && profile.member.userStatus === "active"} canResetPassword={false} />}
         showSupervisorActions
+        monthGoal={monthGoalRow ? { brokerId: profile.member.userId, period: monthGoalRow.period, goal: monthGoalRow.goal, canEdit: true } : undefined}
       />
     );
   }

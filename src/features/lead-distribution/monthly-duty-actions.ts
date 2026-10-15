@@ -788,6 +788,7 @@ async function notifyPlantaoChange(tx: Transaction, input: {
   const day = `${input.occurrence.dutyDate.slice(8, 10)}/${input.occurrence.dutyDate.slice(5, 7)}`;
   const slot = `das ${input.occurrence.startsAt.slice(0, 5)} às ${input.occurrence.endsAt.slice(0, 5)}`;
   const added = input.kind === "added";
+  // The key has no send time: the same action on the same plantão for the same broker is one notification.
   await tx.insert(schema.notifications).values({
     id: randomUUID(),
     tenantId: input.tenantId,
@@ -797,9 +798,9 @@ async function notifyPlantaoChange(tx: Transaction, input: {
     message: added
       ? `Você está escalado no plantão ${input.scheduleName}, em ${day}, ${slot}.`
       : `Você saiu do plantão ${input.scheduleName}, em ${day}, ${slot}.`,
-    idempotencyKey: `duty-direct:${input.kind}:${input.occurrence.id}:${input.brokerId}:${input.now.getTime()}`,
+    idempotencyKey: `duty-direct:${input.kind}:${input.occurrence.id}:${input.brokerId}`,
     createdAt: input.now,
-  });
+  }).onConflictDoNothing();
 }
 
 /** Adds a broker to a plantão of the published escala. The dated row is written now; no new revision. */

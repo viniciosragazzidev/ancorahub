@@ -21,6 +21,9 @@ import { removeBrokerFromMyTeamAction } from "@/features/supervisor-workspace/my
 import { recognizeBrokerAction } from "@/features/journey/recognition-actions";
 import { RecognizeSheet } from "@/features/journey/components/recognize-sheet";
 
+import type { LiteGoalView } from "@/features/goals/lite-goals-queries";
+import { BrokerMonthGoal } from "@/features/team-management-extras/goals-section";
+
 import styles from "./supervisor-broker-profile.module.css";
 
 export type BrokerPerformanceWindow = 7 | 30;
@@ -98,6 +101,8 @@ export type SupervisorBrokerProfileProps = {
   };
   managementActions?: ReactNode;
   showSupervisorActions?: boolean;
+  /** Meta do mês do corretor (Lite com gestão de equipes). canEdit: quem pode editar (o supervisor da equipe). */
+  monthGoal?: { brokerId: string; period: string; goal: LiteGoalView | null; canEdit: boolean };
 };
 
 const numberFormat = new Intl.NumberFormat("pt-BR");
@@ -173,6 +178,7 @@ export function SupervisorBrokerProfile({
   managerProfile,
   managementActions,
   showSupervisorActions = true,
+  monthGoal,
 }: SupervisorBrokerProfileProps) {
   const [notes, setNotes] = useState(initialNotes);
   const [recognizeOpen, setRecognizeOpen] = useState(false);
@@ -241,6 +247,7 @@ export function SupervisorBrokerProfile({
           </div>
         </section>
 
+        {monthGoal ? <BrokerMonthGoal brokerId={monthGoal.brokerId} brokerName={member.name} period={monthGoal.period} goal={monthGoal.goal} canEdit={monthGoal.canEdit} /> : null}
         <div className={styles.columns}>
           <div className={styles.column}>
             <section className={`${styles.card} ${styles.situation}`} aria-labelledby="broker-situation-title">

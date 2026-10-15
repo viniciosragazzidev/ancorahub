@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getTeamMetrics } from "@/features/team-management/metrics";
 import { saoPauloDayKey } from "@/features/team-management/health-input";
@@ -108,4 +108,55 @@ export async function getTeamGoalsView(input: { context: TenantContext; supervis
   };
 }
 
-// TODO(Cinzel/Cadastro): meta individual no perfil do corretor (/equipe/[id]) fica para depois: arquivo do Cinzel.
+/**
+ * Meta do mês de um corretor (perfil do corretor). Como em getTeamGoalsView: metas de cotações, SLA e tempo
+ * de resposta são recalculadas agora pelo G0 no escopo de quem vê. Quem chama já checou o acesso ao corretor.
+ */
+export async function getBrokerMonthGoal(input: { context: TenantContext; brokerId: string; now: Date }): Promise<{ period: string; goal: LiteGoalView | null }> {
+  const { context, brokerId, now } = input;
+  const period = saoPauloDayKey(now).slice(0, 7);
+  const [row] = await getDatabase().select({
+    id: schema.goals.id,
+    name: schema.goals.name,
+    targetType: schema.goals.targetType,
+    targetValue: schema.goals.targetValue,
+    currentValue: schema.goalProgress.currentValue,
+    percentage: schema.goalProgress.percentage,
+  })
+    .from(schema.goals)
+    .leftJoin(schema.goalProgress, eq(schema.goalProgress.goalId, schema.goals.id))
+    .where(and(
+      eq(schema.goals.tenantId, context.tenantId),
+      eq(schema.goals.active, true),
+      eq(schema.goals.period, period),
+      eq(schema.goals.scope, "broker"),
+      eq(schema.goals.scopeId, brokerId),
+    ))
+    .orderBy(desc(schema.goals.createdAt))
+    .limit(1);
+  if (!row) return { period, goal: null };
+
+  const targetValue = Number(row.targetValue);
+  let current = Number(row.currentValue ?? 0);
+  let percentage = Number(row.percentage ?? 0);
+  if (isMetricGoalType(row.targetType)) {
+    const metrics = await getTeamMetrics(context, { window: 30, now });
+    const progress = metricGoalProgress({ targetType: row.targetType, targetValue, window: windowForGoal({ scope: "broker", scopeId: brokerId }, metrics) });
+    current = progress.current;
+    percentage = progress.percentage;
+  }
+  return {
+    period,
+    goal: {
+      id: row.id,
+      scope: "broker",
+      scopeId: brokerId,
+      name: row.name,
+      targetType: row.targetType,
+      targetValue,
+      period,
+      current,
+      percentage: Math.round(Math.min(100, Math.max(0, percentage))),
+    },
+  };
+}

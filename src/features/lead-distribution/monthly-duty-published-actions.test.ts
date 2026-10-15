@@ -28,7 +28,7 @@ vi.mock("@/shared/db", async (importOriginal) => {
   const tx = {
     execute: async () => [],
     select: selectChain,
-    insert: (table: unknown) => ({ values: async (values: Record<string, unknown>) => { state.inserts.push({ table, values }); return []; } }),
+    insert: (table: unknown) => ({ values: (values: Record<string, unknown>) => { state.inserts.push({ table, values }); return { onConflictDoNothing: async () => []  }; } }),
     update: (table: unknown) => ({
       set: (set: Record<string, unknown>) => ({ where: async () => { state.updates.push({ table, set }); return []; } }),
     }),
@@ -91,6 +91,8 @@ describe("adicionar corretor a um plantão publicado (ação de servidor)", () =
     const notice = state.inserts.find((item) => item.table === schema.notifications);
     expect(notice?.values).toMatchObject({ recipientUserId: "bruno", type: "duty_plantao_added" });
     expect(String(notice?.values.message)).toContain("Manhã");
+    // Deduplication: the key names the action, not the moment it was sent.
+    expect(notice?.values.idempotencyKey).toBe(`duty-direct:added:${OCCURRENCE_ID}:bruno`);
   });
 
   it("adds straight to the published escala when there is no newer draft", async () => {

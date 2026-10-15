@@ -8,6 +8,7 @@ import { buildUnitOverview } from "@/features/team-management-ui/build-overview"
 import { isTeamManagementEnabled } from "@/features/team-management-ui/flag";
 import { loadTeamPage } from "@/features/team-management-ui/team-page-loader";
 import { TeamPageViewComponent } from "@/features/team-management-ui/team-page-view";
+import { TeamExtrasSection } from "@/features/team-management-extras/team-extras-section";
 import { UnitOverviewView } from "@/features/team-management-ui/unit-overview";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
@@ -22,7 +23,12 @@ export default async function GestaoPage() {
     // Supervisor Lite: a própria equipe, a mesma tela do perfil da equipe (G2).
     const page = await loadTeamPage({ context, audience, flagOn: true, requestedSupervisorId: context.userId });
     if (page.access !== "render") redirect("/equipe/minha");
-    return <TeamPageViewComponent view={page.view} />;
+    return (
+      <>
+        <TeamPageViewComponent view={page.view} />
+        <TeamExtrasSection context={context} supervisorId={context.userId} canEditBrokers />
+      </>
+    );
   }
   if (decision === "denied") redirect("/access-denied");
 

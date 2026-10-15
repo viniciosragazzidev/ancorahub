@@ -11,6 +11,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/features/supervisor-workspace/notes-actions", () => ({ addSupervisorNoteAction: vi.fn() }));
 vi.mock("@/features/supervisor-workspace/my-team-actions", () => ({ removeBrokerFromMyTeamAction: vi.fn() }));
 vi.mock("@/features/journey/recognition-actions", () => ({ recognizeBrokerAction: vi.fn() }));
+vi.mock("@/features/team-management-extras/goals-section", () => ({ BrokerMonthGoal: () => null }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { href: string }) => (
     <a href={href} {...props}>{children}</a>
