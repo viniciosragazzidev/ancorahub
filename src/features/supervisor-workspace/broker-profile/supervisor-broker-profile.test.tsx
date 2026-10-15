@@ -3,6 +3,12 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockAddSupervisorNote = vi.hoisted(() => vi.fn());
+const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: navigation.push }),
+  usePathname: () => "/equipe/broker-1",
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/features/supervisor-workspace/notes-actions", () => ({ addSupervisorNoteAction: mockAddSupervisorNote }));
 vi.mock("@/features/supervisor-workspace/my-team-actions", () => ({ removeBrokerFromMyTeamAction: vi.fn() }));
 vi.mock("@/features/journey/recognition-actions", () => ({ recognizeBrokerAction: vi.fn() }));
@@ -72,7 +78,7 @@ const profile: SupervisorBrokerProfileProps = {
   performance: { window: 7, items: [{ key: "accepted", label: "Aceites", value: "9", trend: null, better: "up" }] },
 };
 
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); navigation.push.mockClear(); });
 beforeEach(() => mockAddSupervisorNote.mockReset());
 
 describe("SupervisorBrokerProfile", () => {

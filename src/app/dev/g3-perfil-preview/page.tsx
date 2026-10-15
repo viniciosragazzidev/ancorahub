@@ -6,6 +6,7 @@ import { notFound, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { SupervisorBrokerProfile, type SupervisorBrokerProfileProps } from "@/features/supervisor-workspace/broker-profile/supervisor-broker-profile";
+import { normalizeBrokerPerformanceWindow } from "@/features/team-management-ui/build-broker-performance";
 
 /** Dev-only preview of the G3 broker profile with fake data. /dev/g3-perfil-preview?view=gestor|supervisor */
 // Fixed clock: server and client must render the same text (no Date.now() here).
@@ -33,30 +34,21 @@ const sharedProfile = {
   ],
   performance: {
     window: 7 as const,
+    teamMedianAcceptSeconds: 88,
     items: [
       { key: "accepted", label: "Aceites", value: "14", trend: "up" as const, better: "up" as const },
       { key: "accept-time", label: "Tempo mediano para aceitar", value: "1 min 05 s", trend: "down" as const, better: "down" as const },
       { key: "on-time", label: "Primeiro contato no prazo", value: "86%", trend: "flat" as const, better: "up" as const },
+      { key: "redistributions", label: "Redistribuições", value: "3", trend: "down" as const, better: "down" as const },
+      { key: "quotes", label: "Cotações", value: "9", trend: "up" as const, better: "up" as const },
+      { key: "sales", label: "Vendas", value: "4", trend: "up" as const, better: "up" as const },
+      { key: "conversion", label: "Conversão", value: "24%", trend: "up" as const, better: "up" as const },
+      { key: "losses", label: "Perdas", value: "2", trend: "down" as const, better: "down" as const },
     ],
   },
   ranking: { medianAcceptSeconds: 65, positions: ["2º nos que mais aceitam"], periodDays: 7 },
   joinedAt: iso(-200),
-  pulse: {
-    week: [2, 3, 1, 4, 2, 1, 1].map((accepted, index) => ({ date: `d${index}`, label: ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"][index]!, accepted })),
-    medianAcceptSeconds: 65,
-    teamMedianSeconds: 88,
-    onTimeContactRate: 86,
-    funnel: [
-      { status: "distributed", label: "Novos", total: 3 },
-      { status: "in_contact", label: "Em atendimento", total: 4 },
-      { status: "quote_sent", label: "Cotações", total: 2 },
-      { status: "negotiation", label: "Negociação", total: 2 },
-      { status: "documentation_pending", label: "Documentação", total: 1 },
-    ],
-    attention: [
-      { id: "lead-9", name: "Roberto Dias", status: "in_contact", assignedAt: iso(-3), stageEnteredAt: iso(-4), firstContactAt: iso(-3) },
-    ],
-  },
+  weeklyAcceptances: [2, 3, 1, 4, 2, 1, 1].map((accepted, index) => ({ date: `d${index}`, label: ["seg", "ter", "qua", "qui", "sex", "sáb", "dom"][index]!, accepted })),
 };
 
 const gestorProps: SupervisorBrokerProfileProps = {
@@ -80,8 +72,28 @@ const supervisorProps: SupervisorBrokerProfileProps = {
 };
 
 function Showcase() {
-  const view = useSearchParams().get("view") === "gestor" ? "gestor" : "supervisor";
-  return <SupervisorBrokerProfile key={view} {...(view === "gestor" ? gestorProps : supervisorProps)} />;
+  const params = useSearchParams();
+  const view = params.get("view") === "gestor" ? "gestor" : "supervisor";
+  const window = normalizeBrokerPerformanceWindow(params.get("janela") ?? undefined);
+  const props = view === "gestor" ? gestorProps : supervisorProps;
+  const performance = props.performance ? {
+    ...props.performance,
+    window,
+    teamMedianAcceptSeconds: window === 30 ? 102 : 88,
+    items: window === 30
+      ? [
+          { key: "accepted", label: "Aceites", value: "43", trend: "up" as const, better: "up" as const },
+          { key: "accept-time", label: "Tempo mediano para aceitar", value: "1 min 42 s", trend: "down" as const, better: "down" as const },
+          { key: "on-time", label: "Primeiro contato no prazo", value: "91%", trend: "up" as const, better: "up" as const },
+          { key: "redistributions", label: "Redistribuições", value: "8", trend: "down" as const, better: "down" as const },
+          { key: "quotes", label: "Cotações", value: "24", trend: "up" as const, better: "up" as const },
+          { key: "sales", label: "Vendas", value: "8", trend: "up" as const, better: "up" as const },
+          { key: "conversion", label: "Conversão", value: "21%", trend: "up" as const, better: "up" as const },
+          { key: "losses", label: "Perdas", value: "5", trend: "flat" as const, better: "down" as const },
+        ]
+      : props.performance.items,
+  } : null;
+  return <SupervisorBrokerProfile key={`${view}-${window}`} {...props} performance={performance} />;
 }
 
 export default function G3ProfilePreviewPage() {

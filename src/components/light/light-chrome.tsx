@@ -2,7 +2,10 @@
 
 import { CHAT_RAIL_REFRESH_EVENT } from "@/components/chat/chat-events";
 import { TipHost } from "@/components/chat/tip-host";
+import Link from "next/link";
 import { Suspense, useEffect, useState, type ReactNode, type RefObject } from "react";
+
+import { Button } from "@/components/ui/button";
 
 import "@/components/arc/venancor-scope.css";
 import { useLightAvailability, type LightAvailability } from "@/components/light-top-nav";
@@ -102,7 +105,20 @@ export function LightChrome({
   const withRail = (content: ReactNode) => withAssist(
     <LightAvailabilityProvider value={shell}>
       <div className="lite-split">
-        <aside className="lite-rail arc-venancor" aria-label="Conversas" aria-busy={!chatRail}>
+        <aside className="lite-rail arc-venancor" aria-label="Painel lateral" aria-busy={!chatRail}>
+          {audience === "manager" && teamManagementEnabled ? (
+            <nav aria-label="Atalhos da unidade" className="border-b border-(--border) p-3">
+              <Button
+                render={<Link href="/gestao" aria-current={pathname === "/gestao" ? "page" : undefined} />}
+                variant="secondary"
+                size="lg"
+                className="w-full justify-between rounded-2xl text-left"
+              >
+                <span>Gestão</span>
+                <span aria-hidden="true">›</span>
+              </Button>
+            </nav>
+          ) : null}
           {chatRail ? (
             <ChatHome mode="rail" viewerName={chatRail.viewerName} assistants={chatRail.assistants} leads={chatRail.leads} nowIso={chatRail.nowIso} canQuote={chatRail.canQuote} leadsBadgeCount={chatRail.leadsBadgeCount} />
           ) : (

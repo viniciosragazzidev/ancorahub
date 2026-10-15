@@ -57,7 +57,7 @@ async function loadQualificationSection<T>(section: string, loader: () => Promis
   }
 }
 
-export default async function QualificacaoPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> } = {}) {
+export default async function QualificacaoPage({ searchParams }: { searchParams?: Promise<{ tab?: string }> }) {
   // Messages and roteiros moved to Atendimento; old links keep working.
   const tab = (await searchParams)?.tab;
   if (tab === "meta_templates") redirect("/atendimento/mensagens");

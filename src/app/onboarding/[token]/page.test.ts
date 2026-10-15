@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractRealToken } from "./page";
+import { extractRealToken } from "@/features/onboarding/extract-real-token";
 
 describe("extractRealToken", () => {
   it("remove o prefixo codificado %7B%7Bid%7D%7D do token", () => {

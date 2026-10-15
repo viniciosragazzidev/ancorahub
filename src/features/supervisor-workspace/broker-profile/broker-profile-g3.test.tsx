@@ -2,6 +2,12 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: navigation.push }),
+  usePathname: () => "/equipe/broker-1",
+  useSearchParams: () => new URLSearchParams(),
+}));
 vi.mock("@/features/supervisor-workspace/notes-actions", () => ({ addSupervisorNoteAction: vi.fn() }));
 vi.mock("@/features/supervisor-workspace/my-team-actions", () => ({ removeBrokerFromMyTeamAction: vi.fn() }));
 vi.mock("@/features/journey/recognition-actions", () => ({ recognizeBrokerAction: vi.fn() }));
@@ -20,7 +26,7 @@ vi.mock("@/components/arc/empty-state/empty-state", () => ({ EmptyState: ({ titl
 
 import { BrokerPerformanceSection, SupervisorBrokerProfile, SupervisorNoteHistory, type BrokerPerformanceView, type SupervisorBrokerProfileProps } from "./supervisor-broker-profile";
 
-afterEach(() => cleanup());
+afterEach(() => { cleanup(); navigation.push.mockClear(); });
 
 const performance: BrokerPerformanceView = {
   window: 7,
@@ -153,6 +159,13 @@ describe("SupervisorBrokerProfile situation and recognitions", () => {
     const { container } = render(<SupervisorBrokerProfile {...baseProfile} situation={{ dutyToday: null, newLeads: 0, nextTask: null }} performance={performance} />);
 
     expect(container.textContent).not.toContain("—");
+  });
+
+  it("changes the URL window so the server can load the selected G0 period", () => {
+    render(<SupervisorBrokerProfile {...baseProfile} performance={performance} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "30 dias" }));
+    expect(navigation.push).toHaveBeenCalledWith("/equipe/broker-1?janela=30", { scroll: false });
   });
 });
 

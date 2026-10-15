@@ -7,13 +7,14 @@ export type KpiTrend = "up" | "flat" | "down" | null;
 export type UnitKpi = {
   key: string;
   label: string;
-  /** null = indicador ainda sem dado (antes do G0). */
+  /** null = indicador sem dado disponível no escopo ou na janela atual. */
   value: string | null;
   trend: KpiTrend;
   better: "up" | "down";
 };
 
 export type TeamHealthCard = {
+  id: string;
   supervisorId: string;
   teamName: string;
   supervisorName: string;
@@ -23,6 +24,9 @@ export type TeamHealthCard = {
   band: HealthBand | null;
   strengths: string[];
   concerns: string[];
+  trend: KpiTrend;
+  isUnassigned: boolean;
+  brokerNames: string[];
 };
 
 export type SupervisorRow = {
@@ -44,6 +48,7 @@ export type UnassignedGroup = {
 export type UnitOverview = {
   kpis: UnitKpi[];
   teamsNeedingAttention: number;
+  unassignedNeedsAttention: boolean;
   metricsAvailable: boolean;
   teams: TeamHealthCard[];
   supervisors: SupervisorRow[];

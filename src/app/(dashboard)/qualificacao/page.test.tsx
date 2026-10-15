@@ -48,7 +48,7 @@ describe("/qualificacao", () => {
       mocks.getAgentTrainingCenter,
     ]) loader.mockResolvedValue([]);
 
-    await expect(QualificacaoPage()).resolves.toBeDefined();
+    await expect(QualificacaoPage({})).resolves.toBeDefined();
     expect(mocks.getQualificationTenantSettings).toHaveBeenCalledWith("tenant-test");
     expect(mocks.getToolPermissions).toHaveBeenCalledWith("tenant-test");
     expect(mocks.getQualificationStats).toHaveBeenCalledWith("tenant-test");
@@ -71,6 +71,6 @@ describe("/qualificacao", () => {
     ]) loader.mockResolvedValue([]);
     mocks.getWhatsAppDiagnosticStatus.mockRejectedValue(new Error("database temporarily unavailable"));
 
-    await expect(QualificacaoPage()).resolves.toBeDefined();
+    await expect(QualificacaoPage({})).resolves.toBeDefined();
   });
 });

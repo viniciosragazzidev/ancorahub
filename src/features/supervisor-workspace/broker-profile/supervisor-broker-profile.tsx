@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { ReactNode } from "react";
 
@@ -28,6 +29,7 @@ export type BrokerPerformanceTrend = "up" | "flat" | "down" | null;
 /** Desempenho recebido de fora: a seção só desenha, não busca dado. */
 export type BrokerPerformanceView = {
   window: BrokerPerformanceWindow;
+  teamMedianAcceptSeconds?: number | null;
   items: Array<{ key: string; label: string; value: string; trend: BrokerPerformanceTrend; better: "up" | "down" }>;
 };
 
@@ -83,15 +85,9 @@ export type SupervisorBrokerProfileProps = {
   notes: SupervisorNote[];
   joinedAt?: string;
   situation?: BrokerSituation;
-  /** TODO(G0): the Cinzel's metrics layer (src/features/team-management/) replaces this prop. */
   performance?: BrokerPerformanceView | null;
   recognitions?: BrokerRecognitionView[];
-  pulse?: {
-    week: Array<{ date: string; label: string; accepted: number }>;
-    medianAcceptSeconds: number | null; teamMedianSeconds: number | null; onTimeContactRate: number | null;
-    funnel: Array<{ status: string; label: string; total: number }>;
-    attention: Array<{ id: string; name: string; status: string; assignedAt: string | null; stageEnteredAt: string | null; firstContactAt: string | null }>;
-  };
+  weeklyAcceptances?: Array<{ date: string; label: string; accepted: number }>;
   managerProfile?: {
     temperature: { hot: number; warm: number; cold: number; unknown: number };
     quotes: { total: number; sent: number };
@@ -173,7 +169,7 @@ export function SupervisorBrokerProfile({
   situation,
   performance,
   recognitions = [],
-  pulse,
+  weeklyAcceptances = [],
   managerProfile,
   managementActions,
   showSupervisorActions = true,
@@ -188,6 +184,9 @@ export function SupervisorBrokerProfile({
   const [noteSheetOpen, setNoteSheetOpen] = useState(false);
   const isOnline = member.availabilityStatus === "available" || member.availabilityStatus === "on_duty";
   const [now] = useState(() => Date.now());
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   async function submitNote() {
     setNoteFeedback("");
@@ -209,6 +208,12 @@ export function SupervisorBrokerProfile({
   }
 
   const nextTaskOverdue = Boolean(situation?.nextTask?.dueAt && new Date(situation.nextTask.dueAt).getTime() < now);
+
+  function changePerformanceWindow(window: BrokerPerformanceWindow) {
+    const query = new URLSearchParams(searchParams.toString());
+    query.set("janela", String(window));
+    router.push(`${pathname}?${query.toString()}`, { scroll: false });
+  }
 
   return (
     <div className={`arc-venancor ${styles.page}`}>
@@ -312,8 +317,9 @@ export function SupervisorBrokerProfile({
           <div className={styles.column}>
             <BrokerPerformanceSection
               performance={performance ?? null}
-              chart={pulse?.week}
-              teamMedianSeconds={pulse?.teamMedianSeconds ?? null}
+              onWindowChange={changePerformanceWindow}
+              chart={weeklyAcceptances}
+              teamMedianSeconds={performance?.teamMedianAcceptSeconds ?? null}
               positions={ranking?.positions ?? []}
             />
 
@@ -332,9 +338,6 @@ export function SupervisorBrokerProfile({
               ) : <EmptyState title="Nenhum reconhecimento recente" description="Os reconhecimentos com pontos aparecem aqui." />}
             </section>
 
-            {pulse ? (
-              <section className={`${styles.card} ${styles.attentionCard}`} aria-labelledby="member-attention-title"><div className={styles.sectionHeading}><h2 id="member-attention-title">Atenção agora</h2><span>{pulse.attention.length || "·"}</span></div>{pulse.attention.length ? <ul className={styles.attentionList}>{pulse.attention.map((lead) => <li key={lead.id}><Link href={`/leads/${encodeURIComponent(lead.id)}`}><strong>{lead.name}</strong><span>{lead.firstContactAt ? "Sem avanço há mais de 3 dias" : "Sem primeiro contato"}</span></Link><Link className={styles.handoffLink} href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`}>Repassar</Link></li>)}</ul> : <EmptyState title="Nenhum lead precisa de atenção" description="Os leads parados ou atrasados vão aparecer aqui." />}</section>
-            ) : null}
           </div>
         </div>
 
@@ -427,7 +430,7 @@ export function BrokerPerformanceSection({
                 className={styles.windowButton}
                 aria-pressed={active}
                 disabled={disabled}
-                title={disabled ? "Período de 30 dias chega com a camada de métricas" : undefined}
+                title={disabled ? "Período alternativo indisponível" : undefined}
                 onClick={() => onWindowChange?.(window)}
               >
                 {window} dias

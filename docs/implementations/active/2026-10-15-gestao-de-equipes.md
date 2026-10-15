@@ -80,6 +80,7 @@ Cada fase passa pelo portão de design Lite (prints claro/escuro, celular 390 e 
 - Frase de exceção: "2 equipes precisam de atenção".
 - **Saúde das equipes:** um card por equipe (identidade, supervisor, score, 2 frases), ordenado Crítico → Atenção → Saudável. Corretores sem supervisor aparecem como grupo "Sem equipe".
 - **Comparar supervisores:** tabela compacta (equipe, SLA, aceite, conversão, saúde, tendência). Sem pódio.
+- Estado: G1 está ligado a `getTeamMetrics` e usa `teamHealthInputFor` para os scores atual e anterior. Leads da unidade usa `commercial.leads_received`; corretores ativos e equipes mostram `s/h` enquanto não houver histórico de roster.
 
 ### G2. Equipe e supervisor (`/gestao/equipes/[id]`, e a home do supervisor)
 - Para o supervisor, `/gestao` abre aqui.
@@ -94,6 +95,9 @@ Cada fase passa pelo portão de design Lite (prints claro/escuro, celular 390 e 
 - **Feedback:** reaproveitar `supervisor_notes`, com 2 tipos novos (ponto de melhoria, acompanhamento) e "revisar em" opcional, que vira lembrete ao supervisor.
 - Reconhecimentos recebidos (ledger de pontos e broadcasts de reconhecimento).
 - Metas individuais (G5).
+- Estado: o perfil consome as janelas canônicas 7/30 via `?janela=7|30`; o pulso permanece apenas no gráfico de aceites da semana.
+
+O G2 foi incorporado nesta branch pelo merge de `feat/diretor-visual-lite` em 2026-10-15 (`f4850eed`). O supervisor continua vendo a própria equipe em `/gestao`.
 
 ### G4. Alertas automáticos e insights
 Regras puras sobre a camada G0, cada uma com frase pronta:
