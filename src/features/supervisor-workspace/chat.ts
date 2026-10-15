@@ -101,6 +101,46 @@ export function buildSupervisorLeadThreads(data: SupervisorWorkspaceData, now: D
   });
 }
 
+const TEAM_STATUS_LABEL: Record<string, string> = { new: "novo", distributed: "aguardando contato", in_contact: "em atendimento", quote_sent: "cotação enviada", negotiation: "em negociação", documentation_pending: "documentação", under_analysis: "em análise" };
+
+export type TeamLeadForThread = {
+  id: string; name: string; status: string; ownerId: string | null; ownerName: string | null;
+  assignedAt: Date | string | null; firstContactAt: Date | string | null;
+};
+
+/**
+ * The Leads tab of the manager (unit) and supervisor (team) rail: every open lead of the brokers they
+ * manage, late first contact on top, then the newest. The open lead is the read-only manager view.
+ */
+export function buildTeamLeadThreads(leads: TeamLeadForThread[], slaMinutes: number, now: Date, limit = 80): ThreadSummary[] {
+  const toDate = (value: Date | string | null) => (value ? new Date(value) : null);
+  return leads
+    .map((lead) => {
+      const assignedAt = toDate(lead.assignedAt);
+      const minutes = minutesSince(assignedAt, now);
+      const late = !lead.firstContactAt && minutes !== null && minutes > slaMinutes;
+      const owner = lead.ownerId && lead.ownerName ? firstName(lead.ownerName) : "Sem corretor";
+      const situation = late ? `contato atrasado${minutes !== null ? ` há ${formatDuration(minutes * 60)}` : ""}` : TEAM_STATUS_LABEL[lead.status] ?? "em andamento";
+      return { late, assignedAt, thread: {
+        id: `lead:${lead.id}`,
+        kind: "lead" as const,
+        leadId: lead.id,
+        name: lead.name,
+        preview: `${owner} · ${situation}`,
+        at: assignedAt?.toISOString() ?? null,
+        unread: false,
+        waitingYou: late,
+        href: `/leads/${lead.id}`,
+        shape: "mochi" as const,
+        hue: null,
+        initials: initials(lead.name),
+      } };
+    })
+    .sort((a, b) => Number(b.late) - Number(a.late) || (b.assignedAt?.getTime() ?? 0) - (a.assignedAt?.getTime() ?? 0))
+    .slice(0, limit)
+    .map((item) => item.thread);
+}
+
 const date = (id: string, now: Date): ChatBlock => ({ type: "date", id, label: `Hoje, ${hhmm(now)}` });
 const say = (id: string, text: string): ChatBlock => ({ type: "assistant", id, text });
 
@@ -116,29 +156,10 @@ function emptyTeam(now: Date, prefix: string): ChatScript {
 }
 
 /** Equipe: who is available, who needs the supervisor, a card per broker. */
-/** P2: free brokers of the unit, one tap to add each (the server re-checks every rule). */
-function freeBrokersBlocks(data: SupervisorWorkspaceData): ChatBlock[] {
-  if (!data.freeBrokers.length) return [];
-  return [
-    say("equipe-free", `${data.freeBrokers.length === 1 ? "1 corretor" : `${data.freeBrokers.length} corretores`} da sua unidade ${data.freeBrokers.length === 1 ? "está" : "estão"} sem supervisor.`),
-    {
-      type: "question",
-      id: "equipe-free-choice",
-      prompt: "Quer adicionar à sua equipe?",
-      choices: data.freeBrokers.slice(0, 6).map((broker) => ({
-        id: `add-${broker.userId}`,
-        label: `Adicionar ${broker.name}`,
-        reply: `Adicionar ${firstName(broker.name)} à minha equipe`,
-        action: { kind: "server" as const, name: "team.addBroker" as const, payload: { brokerId: broker.userId } },
-      })),
-    },
-  ];
-}
-
 function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
   if (!data.team.length) {
     const empty = emptyTeam(now, "equipe");
-    return { ...empty, blocks: [...empty.blocks, ...freeBrokersBlocks(data)] };
+    return empty;
   }
   const needing = brokersNeedingAttention(data.team);
   const online = data.team.filter((broker) => broker.availability === "available").length;
@@ -163,7 +184,6 @@ function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
   } else {
     blocks.push(say("equipe-ok", "Ninguém com lead parado. Bom momento para reconhecer quem está indo bem."));
   }
-  blocks.push(...freeBrokersBlocks(data));
   blocks.push({
     type: "question",
     id: "equipe-choice",

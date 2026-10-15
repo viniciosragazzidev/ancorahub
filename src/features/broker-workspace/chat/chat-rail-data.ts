@@ -6,7 +6,8 @@ import { getBrokerJourneyData } from "@/features/engagement/journey-queries";
 import type { ThreadSummary } from "@/components/chat/types";
 import { getBrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
-import { buildSupervisorLeadThreads, buildSupervisorThreads } from "@/features/supervisor-workspace/chat";
+import { buildSupervisorLeadThreads, buildSupervisorThreads, buildTeamLeadThreads } from "@/features/supervisor-workspace/chat";
+import { getSupervisorLiteRadar } from "@/features/supervisor-workspace/lite-queries";
 import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
@@ -46,7 +47,10 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
       return {
         viewerName: data.viewer.name,
         assistants: [...buildSupervisorThreads(data, now), { id: "assistant:mensagens", kind: "assistant", name: "Mensagens da equipe", verified: true, preview: "As conversas de WhatsApp dos seus corretores.", at: now.toISOString(), unread: false, waitingYou: false, href: "/mensagens", shape: "onigiri", hue: 30 }],
-        leads: buildSupervisorLeadThreads(data, now),
+        // Every open lead of the team (late first), not only the ones waiting for first contact.
+        leads: await getSupervisorLiteRadar(context, now)
+          .then((radar) => buildTeamLeadThreads(radar.leads, data.slaMinutes, now))
+          .catch(() => buildSupervisorLeadThreads(data, now)),
         nowIso: now.toISOString(),
         canQuote: false,
       };
@@ -66,7 +70,7 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
           { id: "assistant:mensagens", kind: "assistant", name: "Mensagens da unidade", verified: true, preview: "As conversas de WhatsApp dos corretores da unidade.", at: now.toISOString(), unread: false, waitingYou: false, href: "/mensagens", shape: "onigiri", hue: 30 },
           { id: "assistant:ancora", kind: "assistant", assistant: "ancora", name: "Notificações", verified: true, preview: "Avisos e atualizações da unidade.", at: now.toISOString(), unread: false, waitingYou: false, href: "/notificacoes", shape: "jack", hue: 175 },
         ],
-        leads: [], nowIso: now.toISOString(), canQuote: false, leadsBadgeCount: waiting,
+        leads: buildTeamLeadThreads(data.leads, data.slaMinutes, now), nowIso: now.toISOString(), canQuote: false, leadsBadgeCount: waiting,
         managerUnitSummary: {
           leads: data.leads.length,
           unassigned: waiting,
