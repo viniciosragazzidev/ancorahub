@@ -734,6 +734,7 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
   return view;
 }
 
+
 // ─── Published escala: add or remove one broker on one plantão, without a new revision ───
 
 const publishedEditSchema = z.object({
@@ -743,22 +744,65 @@ const publishedEditSchema = z.object({
   force: z.boolean().optional(),
 });
 
-/**
- * The PUBLISHED escala that holds this plantão. It must be the newest revision:
- * a newer draft is resolved (published or discarded) before the published one is changed.
- */
-async function loadPublishedOccurrence(tx: Transaction, tenantId: string, targetId: string) {
-  const monthKey = targetId.slice(-10).slice(0, 7);
-  const latest = await loadLatestPlan(tx, tenantId, monthKey);
-  if (!latest || latest.status !== "published") {
-    throw new Error("A escala publicada deste mês não é a última revisão. Publique ou descarte o rascunho mais novo antes de mexer nos plantões publicados.");
-  }
-  const occurrence = asArray<MonthlyPlanOccurrence>(latest.occurrences).find((item) => item.id === targetId);
-  if (!occurrence) throw new Error("Este plantão não está na escala publicada.");
-  return { plan: latest, occurrence, assignments: asArray<StoredAssignment>(latest.assignments), monthKey };
+/** Occurrence ids are `${scheduleId}:${dutyDate}`. */
+const dutyDateOfOccurrence = (targetId: string) => targetId.slice(-10);
+
+function previousMonthKey(monthKey: string) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7);
 }
 
-/** Adds a broker to a plantão of the published escala. The dated roster row is written now; no new revision. */
+/**
+ * The PUBLISHED escala that holds this plantão (its own month, or the previous one
+ * when that escala runs into this month) and the newer draft of that escala, if any.
+ * The change goes to the published escala: its list and its dated row. A newer draft
+ * gets the same change, so the people shown there are the same until it is published.
+ */
+async function loadPublishedOccurrence(tx: Transaction, tenantId: string, targetId: string) {
+  const dutyDate = dutyDateOfOccurrence(targetId);
+  const monthKey = dutyDate.slice(0, 7);
+  const candidates = await tx.select().from(schema.dutyScheduleMonthlyPlans)
+    .where(and(
+      eq(schema.dutyScheduleMonthlyPlans.tenantId, tenantId),
+      eq(schema.dutyScheduleMonthlyPlans.status, "published"),
+      inArray(schema.dutyScheduleMonthlyPlans.monthKey, [monthKey, previousMonthKey(monthKey)]),
+    ))
+    .orderBy(desc(schema.dutyScheduleMonthlyPlans.revision));
+  const plan = candidates.find((item) => asArray<MonthlyPlanOccurrence>(item.occurrences).some((occurrence) => occurrence.id === targetId));
+  if (!plan) throw new Error("Este plantão não está na escala publicada.");
+  const occurrence = asArray<MonthlyPlanOccurrence>(plan.occurrences).find((item) => item.id === targetId)!;
+  const latest = await loadLatestPlan(tx, tenantId, plan.monthKey);
+  const draft = latest && latest.status === "draft" && latest.revision > plan.revision ? latest : null;
+  return { plan, occurrence, assignments: asArray<StoredAssignment>(plan.assignments), draft };
+}
+
+/** In-app notification to a broker about a change on his plantão (no WhatsApp). */
+async function notifyPlantaoChange(tx: Transaction, input: {
+  tenantId: string;
+  brokerId: string;
+  kind: "added" | "removed";
+  occurrence: MonthlyPlanOccurrence;
+  scheduleName: string;
+  now: Date;
+}) {
+  const day = `${input.occurrence.dutyDate.slice(8, 10)}/${input.occurrence.dutyDate.slice(5, 7)}`;
+  const slot = `das ${input.occurrence.startsAt.slice(0, 5)} às ${input.occurrence.endsAt.slice(0, 5)}`;
+  const added = input.kind === "added";
+  await tx.insert(schema.notifications).values({
+    id: randomUUID(),
+    tenantId: input.tenantId,
+    recipientUserId: input.brokerId,
+    type: added ? "duty_plantao_added" : "duty_plantao_removed",
+    title: added ? "Você foi escalado num plantão" : "Você saiu de um plantão",
+    message: added
+      ? `Você está escalado no plantão ${input.scheduleName}, em ${day}, ${slot}.`
+      : `Você saiu do plantão ${input.scheduleName}, em ${day}, ${slot}.`,
+    idempotencyKey: `duty-direct:${input.kind}:${input.occurrence.id}:${input.brokerId}:${input.now.getTime()}`,
+    createdAt: input.now,
+  });
+}
+
+/** Adds a broker to a plantão of the published escala. The dated row is written now; no new revision. */
 export async function addBrokerToPublishedOccurrenceAction(input: unknown): Promise<MonthlyDutyPlanView> {
   const context = await writeScope();
   const { occurrenceId: targetId, brokerId, force } = publishedEditSchema.parse(input);
@@ -766,11 +810,14 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
 
   const monthKey = await db.transaction(async (tx) => {
     await lockPlans(tx, context.tenantId);
-    const { plan, occurrence, assignments, monthKey: monthOfPlan } = await loadPublishedOccurrence(tx, context.tenantId, targetId);
+    const { plan, occurrence, assignments, draft } = await loadPublishedOccurrence(tx, context.tenantId, targetId);
     const now = new Date();
     const schedule = (await loadActiveSchedules(tx, context.tenantId)).find((item) => item.id === occurrence.scheduleId) ?? null;
     const broker = (await loadPlanningBrokers(tx, context.tenantId)).find((item) => item.id === brokerId) ?? null;
-    const weekly = await tx.select({ id: schema.dutyRosterAssignments.id }).from(schema.dutyRosterAssignments)
+    // Weekly roster: the broker is already on this plantão every week if a weekly row covers the day.
+    const dayMidnight = zonedMidnight(occurrence.dutyDate, "America/Sao_Paulo").getTime();
+    const weeklyRows = await tx.select({ id: schema.dutyRosterAssignments.id, validFrom: schema.dutyRosterAssignments.validFrom, validUntil: schema.dutyRosterAssignments.validUntil })
+      .from(schema.dutyRosterAssignments)
       .where(and(
         eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
         eq(schema.dutyRosterAssignments.scheduleId, occurrence.scheduleId),
@@ -778,8 +825,8 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
         eq(schema.dutyRosterAssignments.status, "active"),
         isNull(schema.dutyRosterAssignments.dutyDate),
         eq(schema.dutyRosterAssignments.dayOfWeek, dayOfWeekOf(occurrence.dutyDate)),
-      ))
-      .limit(1);
+      ));
+    const onWeeklyRoster = weeklyRows.some((row) => row.validFrom.getTime() <= dayMidnight && (!row.validUntil || row.validUntil.getTime() > dayMidnight));
     const allowed = occurrence.allowedBrokerIds.includes(brokerId);
     const problem = publishedAddProblem({
       ended: occurrenceEnded(occurrence, now),
@@ -788,7 +835,7 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
       allowedInType: allowed,
       force: Boolean(force),
       scheduleActive: Boolean(schedule),
-      onWeeklyRoster: weekly.length > 0,
+      onWeeklyRoster,
     });
     if (problem) throw new Error(problem);
     if (!broker || !schedule) throw new Error("Este plantão ou corretor não está disponível para a escala.");
@@ -833,16 +880,31 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
       });
     }
 
-    const occurrences = asArray<MonthlyPlanOccurrence>(plan.occurrences).map((item) => (item.id === targetId && !allowed
+    const entry: StoredAssignment = { occurrenceId: targetId, brokerId, origin: "manual", rosterAssignmentId: rosterId };
+    const withBroker = (item: MonthlyPlanOccurrence) => (item.id === targetId && !item.allowedBrokerIds.includes(brokerId)
       ? { ...item, allowedBrokerIds: [...item.allowedBrokerIds, brokerId], forcedBrokerIds: [...new Set([...(item.forcedBrokerIds ?? []), brokerId])] }
-      : item));
+      : item);
     await tx.update(schema.dutyScheduleMonthlyPlans).set({
-      assignments: [...assignments, { occurrenceId: targetId, brokerId, origin: "manual", rosterAssignmentId: rosterId }],
-      occurrences,
+      assignments: [...assignments, entry],
+      occurrences: asArray<MonthlyPlanOccurrence>(plan.occurrences).map(withBroker),
       updatedAt: now,
     }).where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
+
+    // A newer draft that still lists this plantão shows the same person (no duplicate).
+    if (draft) {
+      const draftOccurrence = asArray<MonthlyPlanOccurrence>(draft.occurrences).find((item) => item.id === targetId);
+      const draftAssignments = asArray<StoredAssignment>(draft.assignments);
+      if (draftOccurrence && !occurrenceEnded(draftOccurrence, now) && !draftAssignments.some((item) => item.occurrenceId === targetId && item.brokerId === brokerId)) {
+        await tx.update(schema.dutyScheduleMonthlyPlans).set({
+          assignments: [...draftAssignments, entry],
+          occurrences: asArray<MonthlyPlanOccurrence>(draft.occurrences).map(withBroker),
+          updatedAt: now,
+        }).where(eq(schema.dutyScheduleMonthlyPlans.id, draft.id));
+      }
+    }
     await audit(tx, context.userId, plan.id, !allowed ? "duty_schedule_monthly_plan.published_broker_forced" : "duty_schedule_monthly_plan.published_broker_added");
-    return monthOfPlan;
+    await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "added", occurrence, scheduleName: schedule.name, now });
+    return plan.monthKey;
   });
 
   revalidatePath(PLANTAO_PATH);
@@ -860,7 +922,7 @@ export async function removeBrokerFromPublishedOccurrenceAction(input: unknown):
 
   const monthKey = await db.transaction(async (tx) => {
     await lockPlans(tx, context.tenantId);
-    const { plan, occurrence, assignments, monthKey: monthOfPlan } = await loadPublishedOccurrence(tx, context.tenantId, targetId);
+    const { plan, occurrence, assignments, draft } = await loadPublishedOccurrence(tx, context.tenantId, targetId);
     const now = new Date();
     const entry = assignments.find((item) => item.occurrenceId === targetId && item.brokerId === brokerId);
     const problem = publishedRemoveProblem({
@@ -870,6 +932,8 @@ export async function removeBrokerFromPublishedOccurrenceAction(input: unknown):
       started: occurrenceStarted(occurrence, now),
     });
     if (problem) throw new Error(problem);
+    const scheduleName = (await tx.select({ name: schema.unitDutySchedules.name }).from(schema.unitDutySchedules)
+      .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), eq(schema.unitDutySchedules.id, occurrence.scheduleId))).limit(1))[0]?.name ?? "plantão";
 
     await tx.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: now })
       .where(and(
@@ -884,8 +948,18 @@ export async function removeBrokerFromPublishedOccurrenceAction(input: unknown):
       assignments: assignments.filter((item) => item !== entry),
       updatedAt: now,
     }).where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
+    if (draft) {
+      const draftAssignments = asArray<StoredAssignment>(draft.assignments);
+      if (draftAssignments.some((item) => item.occurrenceId === targetId && item.brokerId === brokerId)) {
+        await tx.update(schema.dutyScheduleMonthlyPlans).set({
+          assignments: draftAssignments.filter((item) => !(item.occurrenceId === targetId && item.brokerId === brokerId)),
+          updatedAt: now,
+        }).where(eq(schema.dutyScheduleMonthlyPlans.id, draft.id));
+      }
+    }
     await audit(tx, context.userId, plan.id, "duty_schedule_monthly_plan.published_broker_removed");
-    return monthOfPlan;
+    await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "removed", occurrence, scheduleName, now });
+    return plan.monthKey;
   });
 
   revalidatePath(PLANTAO_PATH);
