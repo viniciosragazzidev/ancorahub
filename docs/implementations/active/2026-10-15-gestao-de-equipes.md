@@ -123,8 +123,8 @@ Personalização da equipe (cor e ícone: 2 colunas em `supervisor_teams`), mura
 
 Migrations do MVP: só `supervisor_notes` (tipos + `follow_up_at`) em G3 e `goal_target_type` em G5. O snapshot diário fica para G6.
 
-## 7. Decisões que dependem do Vinicios
-1. Rota `/gestao` (recomendado) ou `/equipes` como no pedido original.
-2. Pesos do score e faixas (proposta na seção 3).
-3. Conversão = vendas / leads atribuídos na janela (proposta) ou / leads aceitos.
-4. Destaques e "maior evolução" visíveis para o corretor também, ou só para gestor e supervisor no MVP.
+## 7. Decisões do Vinicios (2026-10-15)
+1. Rota: **`/gestao`**.
+2. Score: pesos e faixas da seção 3, como propostos.
+3. Conversão: **vendas / leads atribuídos na janela**.
+4. Destaques e "maior evolução": **só gestor e supervisor no MVP** (o corretor vê depois).
