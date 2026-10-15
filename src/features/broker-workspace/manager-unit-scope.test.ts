@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 import type { TenantContext } from "@/shared/auth/types";
-import { getManagerUnitScope } from "./manager-unit-scope";
+import { canAccessManagerUnit, getManagerUnitScope } from "./manager-unit-scope";
 
-const base: TenantContext = { userId: "manager-1", tenantId: "tenant-1", role: "manager", jobTitle: "manager", branchId: "branch-1" };
+const manager: TenantContext = { userId: "manager-1", tenantId: "tenant-1", role: "manager", jobTitle: "manager", branchId: "branch-a" };
 
-describe("manager Lite unit scope", () => {
-  it("returns tenant and authenticated branch together", () => {
-    expect(getManagerUnitScope(base)).toEqual({ tenantId: "tenant-1", branchId: "branch-1" });
+describe("manager unit scope", () => {
+  it("limits unit routes to the authenticated unit", () => {
+    expect(canAccessManagerUnit(manager, "branch-a")).toBe(true);
+    expect(canAccessManagerUnit(manager, "branch-b")).toBe(false);
+    expect(getManagerUnitScope({ ...manager, branchId: null })).toBeNull();
   });
-  it("fails closed when the manager has no unit or another role", () => {
-    expect(getManagerUnitScope({ ...base, branchId: null })).toBeNull();
-    expect(getManagerUnitScope({ ...base, role: "director" })).toBeNull();
+
+  it("never derives a unit scope for another role", () => {
+    expect(getManagerUnitScope({ ...manager, role: "supervisor" })).toBeNull();
+    expect(canAccessManagerUnit({ ...manager, role: "supervisor" }, "branch-a")).toBe(false);
   });
 });

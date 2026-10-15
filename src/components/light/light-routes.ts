@@ -62,6 +62,7 @@ export const LIGHT_MANAGER_ALLOWED_ROUTES: readonly RegExp[] = [
   /^\/mensagens$/,
   new RegExp(`^/mensagens/${ID}$`),
   /^\/empresas$/,
+  new RegExp(`^/unidades/${ID}$`),
 ];
 
 export function isLightRouteAllowed(pathname: string, audience: "broker" | "supervisor" | "manager" = "broker") {
@@ -226,6 +227,7 @@ const RULES: readonly RouteRule[] = [
   { test: under("/equipe"), route: { title: "Corretor", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/mensagens"), route: { title: "Mensagens", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/mensagens"), route: { title: "Conversa", tab: "mais", isRoot: false, parentHref: "/mensagens", backToParent: true } },
+  { test: under("/unidades"), route: { title: "Minha unidade", tab: "mais", isRoot: false, parentHref: "/equipe" } },
   { test: exact("/clientes"), route: { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" } },
   { test: under("/clientes"), route: { title: "Cliente", tab: "mais", isRoot: false, parentHref: "/clientes" } },
   { test: exact("/empresas"), route: { title: "Empresas", tab: "mais", isRoot: false, parentHref: "/dashboard" } },

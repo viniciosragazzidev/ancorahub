@@ -27,7 +27,11 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") redirect("/equipe/minha");
   if (context.role === "broker") redirect("/access-denied");
   if (context.role === "manager" && (await getLiteAudience(context)) === "manager") {
-    return <ManagerLiteTeam initialData={await getManagerLiteTeam(context)} />;
+    const [initialData, initialTransfers] = await Promise.all([
+      getManagerLiteTeam(context),
+      getPendingBrokerTransferRequestsAction().catch((error) => { console.error("[equipe-lite] transfer requests unavailable", error instanceof Error ? error.message : error); return []; }),
+    ]);
+    return <ManagerLiteTeam initialData={initialData} initialTransfers={initialTransfers} />;
   }
   const params = await searchParams;
   if (params.visao === "unidades") {

@@ -10,11 +10,14 @@ import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/querie
 import { teamLeaderboard } from "@/features/engagement/leaderboard-queries";
 
 export type SupervisorTeamPageData = {
+  branchId: string;
+  branchName: string | null;
   team: { name: string; description: string; imageUrl: string | null } | null;
   ranking: { position: number; positionChange: number | null } | null;
   overview: { brokers: number; inService: number; late: number };
   members: Array<{ id: string; name: string; imageUrl: string | null; availability: string; receivedToday: number; inService: number; late: number }>;
   invites: Array<{ id: string; brokerId: string; brokerName: string; createdAt: string }>;
+  pendingAccessInvites: Array<{ id: string; brokerProfileId: string; brokerName: string; email: string | null; createdAt: string }>;
   brokers: Array<{ id: string; name: string; imageUrl: string | null; supervisorId: string | null; supervisorName: string | null; inviteId: string | null }>;
 };
 
@@ -25,7 +28,9 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
   }
 
   const db = getDatabase();
-  const [teamRows, memberRows, inviteRows, brokerRows, workspace] = await Promise.all([
+  const [branchRows, teamRows, memberRows, inviteRows, pendingAccessRows, brokerRows, workspace] = await Promise.all([
+    db.select({ name: schema.branches.name }).from(schema.branches)
+      .where(and(eq(schema.branches.id, context.branchId), eq(schema.branches.tenantId, context.tenantId))).limit(1),
     db.select({ name: schema.supervisorTeams.name, description: schema.supervisorTeams.description, imageUrl: schema.supervisorTeams.imageUrl })
       .from(schema.supervisorTeams)
       .where(and(eq(schema.supervisorTeams.tenantId, context.tenantId), eq(schema.supervisorTeams.supervisorId, context.userId), eq(schema.supervisorTeams.branchId, context.branchId)))
@@ -47,6 +52,25 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
       .innerJoin(schema.user, eq(schema.user.id, schema.supervisorTeamInvites.brokerId))
       .where(and(eq(schema.supervisorTeamInvites.tenantId, context.tenantId), eq(schema.supervisorTeamInvites.supervisorId, context.userId), eq(schema.supervisorTeamInvites.status, "pending")))
       .orderBy(desc(schema.supervisorTeamInvites.createdAt)),
+    db.select({
+      id: schema.brokerInvitations.id,
+      brokerProfileId: schema.brokerProfiles.id,
+      brokerName: schema.brokerProfiles.professionalName,
+      email: schema.brokerInvitations.email,
+      createdAt: schema.brokerInvitations.createdAt,
+    }).from(schema.brokerInvitations)
+      .innerJoin(schema.brokerProfiles, and(
+        eq(schema.brokerProfiles.id, schema.brokerInvitations.brokerProfileId),
+        eq(schema.brokerProfiles.tenantId, context.tenantId),
+      ))
+      .where(and(
+        eq(schema.brokerInvitations.tenantId, context.tenantId),
+        eq(schema.brokerInvitations.branchId, context.branchId),
+        eq(schema.brokerInvitations.role, "broker"),
+        eq(schema.brokerInvitations.supervisorId, context.userId),
+        eq(schema.brokerInvitations.status, "PENDING"),
+        eq(schema.brokerProfiles.branchId, context.branchId),
+      )).orderBy(desc(schema.brokerInvitations.createdAt)),
     db.select({ id: schema.tenantMemberships.userId, name: schema.user.name, imageUrl: schema.user.image, supervisorId: schema.tenantMemberships.supervisorId })
       .from(schema.tenantMemberships)
       .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
@@ -73,6 +97,8 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
   const pendingInviteByBroker = new Map(inviteRows.map((row) => [row.brokerId, row.id]));
 
   return {
+    branchId: context.branchId,
+    branchName: branchRows[0]?.name ?? null,
     team: teamRows[0] ?? null,
     ranking: teamStanding ? { position: teamStanding.position, positionChange: teamStanding.positionChange } : null,
     overview: {
@@ -91,6 +117,7 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
       };
     }).sort((a, b) => Number(b.late > 0) - Number(a.late > 0) || b.late - a.late || a.name.localeCompare(b.name, "pt-BR")),
     invites: inviteRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
+    pendingAccessInvites: pendingAccessRows.map((row) => ({ ...row, createdAt: row.createdAt.toISOString() })),
     brokers: brokerRows.filter((row) => row.supervisorId !== context.userId).map((row) => ({
       ...row,
       supervisorName: row.supervisorId ? supervisorNameById.get(row.supervisorId) ?? "Outra equipe" : null,

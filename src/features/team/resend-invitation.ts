@@ -31,6 +31,7 @@ export async function resendTeamInvitation(rawId: unknown) {
         id: schema.tenantMemberships.id, userId: schema.tenantMemberships.userId,
         role: schema.tenantMemberships.role, jobTitle: schema.tenantMemberships.jobTitle,
         customRoleId: schema.tenantMemberships.customRoleId, branchId: schema.tenantMemberships.branchId,
+        supervisorId: schema.tenantMemberships.supervisorId,
         status: schema.tenantMemberships.status, userStatus: schema.user.status,
         name: schema.user.name, email: schema.user.email,
       }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.tenantMemberships.userId, schema.user.id))
@@ -55,6 +56,8 @@ export async function resendTeamInvitation(rawId: unknown) {
     const jobTitle = membership?.jobTitle ?? previous?.jobTitle ?? role;
     const customRoleId = membership ? membership.customRoleId : previous?.customRoleId ?? null;
     const branchId = membership ? membership.branchId : profile?.branchId;
+    const supervisorId = membership?.supervisorId ?? previous?.supervisorId ?? null;
+    const supervisedBrokerIds = previous?.supervisedBrokerIds ?? [];
     requireCanManageMember(context, { role, branchId: branchId ?? null, userId: membership?.userId ?? profile?.userId ?? memberId });
     if (membership?.status === "inactive" || membership?.userStatus === "disabled" || (profile && ["INACTIVE", "SUSPENDED", "ARCHIVED"].includes(profile.lifecycleStatus))) {
       throw new Error("O membro está desativado. Reative o acesso antes de enviar um convite.");
@@ -79,7 +82,8 @@ export async function resendTeamInvitation(rawId: unknown) {
     }
     if (!profile) throw new Error("Não foi possível preparar o perfil para ativação.");
     const invitation = await createBrokerInvitation(tx, context.tenantId, branchId, profile.id,
-      membership?.email ?? profile.invitedEmail ?? previous?.email ?? null, role, jobTitle, customRoleId);
+      membership?.email ?? profile.invitedEmail ?? previous?.email ?? null, role, jobTitle, customRoleId,
+      { supervisorId, supervisedBrokerIds });
     // Superseded links must not be delivered by a later recovery run.
     const oldInvitations = tx.select({ id: schema.brokerInvitations.id }).from(schema.brokerInvitations)
       .where(and(eq(schema.brokerInvitations.tenantId, context.tenantId), eq(schema.brokerInvitations.brokerProfileId, profile.id),

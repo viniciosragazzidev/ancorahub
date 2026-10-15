@@ -2,8 +2,6 @@ import "server-only";
 
 import { and, count, eq, gte, inArray, isNull, lt, sql } from "drizzle-orm";
 
-import { AuthorizationError } from "@/shared/auth/errors";
-import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { brazilDayKey } from "@/shared/trends";
 import { DEFAULT_PERIOD, periodStart, type PeriodValue } from "@/shared/period";
@@ -15,7 +13,7 @@ export type BranchMember = {
   userId: string;
   name: string;
   email: string;
-  role: "director" | "manager" | "broker";
+  role: "director" | "manager" | "supervisor" | "broker";
   jobTitle: string;
   availabilityStatus: "available" | "paused";
   membershipStatus: "active" | "inactive";

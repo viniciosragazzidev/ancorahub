@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => {
   const tables = Object.fromEntries(["tenants", "branches", "user", "tenantMemberships", "brokerProfiles", "brokerInvitations", "whatsappOutboundMessages", "auditLogs"].map(name => [name,
-    Object.fromEntries(["id", "tenantId", "userId", "role", "jobTitle", "customRoleId", "branchId", "status", "name", "email", "brokerProfileId", "createdAt", "recipientId", "purpose"].map(column => [column, `${name}.${column}`])),
+    Object.fromEntries(["id", "tenantId", "userId", "role", "jobTitle", "customRoleId", "branchId", "supervisorId", "supervisedBrokerIds", "status", "name", "email", "brokerProfileId", "createdAt", "recipientId", "purpose"].map(column => [column, `${name}.${column}`])),
   ]));
   const profileId = "00000000-0000-4000-8000-000000000001";
   const memberId = "00000000-0000-4000-8000-000000000002";
@@ -72,7 +72,7 @@ describe("resendTeamInvitation", () => {
     if (status) state.invitations.previous = { id: "old", status, expiresAt: new Date(0), role: "manager", jobTitle: "manager", customRoleId: "custom-role" };
     const result = await resendTeamInvitation(state.profileId);
     expect(result).toMatchObject({ invitationId: "new-invitation", token: "new-token", whatsappStatus: "queued" });
-    expect(state.create).toHaveBeenCalledWith(state.db, "tenant-a", "branch-a", state.profileId, "pessoa@example.com", status ? "manager" : "broker", status ? "manager" : "broker", status ? "custom-role" : null);
+    expect(state.create).toHaveBeenCalledWith(state.db, "tenant-a", "branch-a", state.profileId, "pessoa@example.com", status ? "manager" : "broker", status ? "manager" : "broker", status ? "custom-role" : null, { supervisorId: null, supervisedBrokerIds: [] });
     expect(enqueueBrokerInvitation).toHaveBeenCalledWith(expect.objectContaining({ invitationId: "new-invitation", tenantId: "tenant-a", requestedBy: "director-a" }));
     expect(state.writes).toContainEqual({ table: state.tables.auditLogs, values: expect.objectContaining({ entidadeId: "new-invitation", acao: "reenviou_convite" }) });
     expect(state.writes).toContainEqual({ table: state.tables.whatsappOutboundMessages, values: expect.objectContaining({ status: "cancelled" }) });
@@ -81,7 +81,7 @@ describe("resendTeamInvitation", () => {
     state.controls.membershipExists = true; state.profile.userId = state.userId;
     state.invitations.previous = { role: "director", jobTitle: "director", customRoleId: "old-role" };
     await resendTeamInvitation(state.memberId);
-    expect(state.create).toHaveBeenCalledWith(state.db, "tenant-a", "branch-a", state.profileId, "pessoa@example.com", "broker", "broker", null);
+    expect(state.create).toHaveBeenCalledWith(state.db, "tenant-a", "branch-a", state.profileId, "pessoa@example.com", "broker", "broker", null, { supervisorId: null, supervisedBrokerIds: [] });
     expect(JSON.stringify(state.filters)).toContain('"field":"tenantMemberships.tenantId","value":"tenant-a"');
     expect(JSON.stringify(state.filters)).toContain('"field":"brokerProfiles.tenantId","value":"tenant-a"');
   });
@@ -89,6 +89,30 @@ describe("resendTeamInvitation", () => {
     state.invitations.requested = { brokerProfileId: state.profileId, status: "REVOKED" };
     await resendTeamInvitation("00000000-0000-4000-8000-000000000009");
     expect(state.create).toHaveBeenCalledOnce();
+  });
+  it("preserves the initial broker selection when a supervisor invitation is resent", async () => {
+    const selectedBrokerIds = ["broker-a", "broker-b"];
+    state.invitations.previous = {
+      role: "supervisor",
+      jobTitle: "supervisor",
+      customRoleId: null,
+      supervisorId: null,
+      supervisedBrokerIds: selectedBrokerIds,
+    };
+
+    await resendTeamInvitation(state.profileId);
+
+    expect(state.create).toHaveBeenCalledWith(
+      state.db,
+      "tenant-a",
+      "branch-a",
+      state.profileId,
+      "pessoa@example.com",
+      "supervisor",
+      "supervisor",
+      null,
+      { supervisorId: null, supervisedBrokerIds: selectedBrokerIds },
+    );
   });
   it("prepares a legacy pending member without a profile and returns a manual link when phone is missing", async () => {
     state.controls.profileExists = false; state.controls.membershipExists = true;

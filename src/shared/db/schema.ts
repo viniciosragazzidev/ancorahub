@@ -4192,6 +4192,10 @@ export const brokerInvitations = pgTable(
     role: tenantRole("role").notNull().default("broker"),
     jobTitle: text("job_title").notNull().default("broker"),
     customRoleId: text("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
+    /** A broker invited by a supervisor joins that supervisor's team on acceptance. */
+    supervisorId: text("supervisor_id").references(() => user.id, { onDelete: "set null" }),
+    /** Brokers selected for a newly invited supervisor, revalidated when the invitation is accepted. */
+    supervisedBrokerIds: jsonb("supervised_broker_ids").$type<string[]>().notNull().default([]),
     tokenHash: text("token_hash").notNull().unique(),
     tokenCiphertext: text("token_ciphertext"),
     status: text("status", { enum: ["PENDING", "ACCEPTED", "EXPIRED", "REVOKED", "REPLACED"] })

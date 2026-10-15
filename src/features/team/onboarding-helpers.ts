@@ -48,6 +48,7 @@ export async function createBrokerInvitation(
   role: CreatableTeamRole = "broker",
   jobTitle: string = role,
   customRoleId: string | null = null,
+  teamAssignment: { supervisorId?: string | null; supervisedBrokerIds?: string[] } = {},
 ) {
   // Set all previous invitations for this broker to REPLACED
   await tx
@@ -77,6 +78,8 @@ export async function createBrokerInvitation(
     role,
     jobTitle,
     customRoleId,
+    supervisorId: teamAssignment.supervisorId ?? null,
+    supervisedBrokerIds: teamAssignment.supervisedBrokerIds ?? [],
     tokenHash,
     tokenCiphertext,
     status: "PENDING",

@@ -11,7 +11,12 @@ export function canRevokeTeamInvitation(
     branchId: target.branchId,
   })) return false;
   if (context.role === "supervisor") {
-    return Boolean(target.userId && target.role === "broker" && target.supervisorId === context.userId);
+    return Boolean(
+      target.role === "broker"
+      && context.branchId
+      && target.branchId === context.branchId
+      && target.supervisorId === context.userId
+    );
   }
   return true;
 }

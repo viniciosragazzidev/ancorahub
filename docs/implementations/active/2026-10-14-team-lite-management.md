@@ -43,3 +43,13 @@ The manager desktop reuses the existing ChatHome rail used by brokers and superv
 ### T126b: rail and home visual parity
 
 The manager desktop keeps the broker Lite's shared rail header and row components, adds the unit waiting-lead badge and unit-only summaries for Leads da unidade, Minha unidade, Desempenho da unidade, and Notificações. The home uses the same cached rail data and existing four-stat tile layout, including active brokers without a ready WhatsApp connection. Supervisor and manager mobile headers retain their prior WhatsApp button behavior. The WhatsApp count is scoped to the manager's active brokers in the same tenant and branch. No new visual primitive or token was introduced. Validation: `reports/agent/verification/2026-10-14-manager-lite-rail-visual.md`.
+
+## E4 Equipe e unidade (2026-10-14)
+
+O Gestor Lite tem resumo somente leitura da unidade em `/unidades/<branchId>`, aprovado pela allowlist e validado pelo tenant e pela unidade autenticados. O resumo exibe indicadores, membros e destaques sem oferecer controles de distribuicao. A pagina reutiliza o Lite e inclui estados vazios, skeleton, animacao com `motion/react` e respeito a `useReducedMotion`.
+
+O supervisor pode convidar um corretor novo para a unidade e equipe atuais. O Gestor pode convidar corretor ou supervisor para sua unidade e selecionar corretores livres para atribuicao inicial opcional. A migration 0199 persiste `supervisorId` e `supervisedBrokerIds` nos convites. O aceite revalida tenant, unidade, papel e disponibilidade dos corretores selecionados antes de atribuir a equipe. Reenvio preserva esses dados; listagem, reenvio e cancelamento dos convites pendentes continuam escopados no servidor.
+
+O perfil da unidade do Gestor e somente leitura. Convites do supervisor aparecem no painel de convites pendentes, junto dos pedidos de equipe. Corretor e supervisor seguem usando suas telas existentes; supervisor continua limitado a `supervisorId = context.userId`.
+
+Validacao direcionada: 11 arquivos e 53 testes focados passaram; `npm run type-check` passou; ESLint registrou zero erros e dois avisos existentes de `no-explicit-any` em `onboarding-helpers.ts`. `git diff --check` passou. Nenhum teste de banco, suite completa, `agent:verify` ou build de producao foi executado. Os 12 prints comparativos de gestor, unidade e supervisor em desktop e celular, claro e escuro, estao em `tmp/e4/`; a evidência está em `reports/agent/verification/2026-10-14-lite-e4-equipe-unidade.md`. Os componentes Arc usados pelo Lite continuam no tema claro definido pelo escopo Venancor.

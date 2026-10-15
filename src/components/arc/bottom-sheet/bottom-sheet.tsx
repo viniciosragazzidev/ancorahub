@@ -95,7 +95,7 @@ export function BottomSheet({ trigger, open: openProp, defaultOpen = false, onOp
     return () => window.clearTimeout(timer);
   }, [open, trigger]);
   return <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
-    {trigger ? <DialogPrimitive.Trigger>{trigger}</DialogPrimitive.Trigger> : null}
+    {trigger ? <DialogPrimitive.Trigger asChild>{trigger}</DialogPrimitive.Trigger> : null}
     {/* The sheet stays mounted while it leaves, so a close can be caught and reversed mid-flight. */}
     <AnimatePresence>{open && <DialogPrimitive.Portal key="sheet" forceMount><Sheet {...props} onDismiss={dismiss} /></DialogPrimitive.Portal>}</AnimatePresence>
   </DialogPrimitive.Root>;

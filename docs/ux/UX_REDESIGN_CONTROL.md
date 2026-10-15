@@ -17,6 +17,22 @@ Início, Leads, Equipe, Notificações e Configurações; abaixo de 1024px ela s
 oculta, preservando a navegação mobile existente. Reutiliza a coluna e os tokens
 compartilhados do Lite, sem nova primitive, token ou regra de domínio.
 
+## 2026-10-14: E4, Equipe e unidade no Lite
+
+Papel: Gestor (`manager`) administra somente membros da unidade autenticada e o
+Supervisor (`supervisor`) administra somente corretores da própria equipe. Em
+`/equipe`, o gestor consulta corretores e convites da unidade, adiciona corretor
+ou supervisor, revisa pedidos de transferência e abre perfis. Em
+`/unidades/<branchId>`, consulta métricas, membros e ranking sem controles de
+distribuição. Em `/equipe/minha`, o supervisor mantém suas abas e ganha convite
+para criar corretor novo já vinculado à equipe. Ações principais: convidar,
+aprovar ou recusar transferência, abrir perfil e consultar a unidade. Estados:
+unidade ausente, listas vazias, convites pendentes, pedidos pendentes, envio,
+sucesso, erro e carregamento. Disclosure: convites e decisões ficam em sheets ou
+cards de ação; dados de operação e ranking permanecem em leitura. Reutiliza
+primitivas Arc e tokens Lite existentes, com entrada da página, listas em
+stagger, toque leve e reduced motion. Sem novo token ou primitive.
+
 ## 2026-10-14: T122, refinamento visual do aviso de WhatsApp
 
 ### T127 mobile follow-up
@@ -358,3 +374,16 @@ Corretor sem mudança de layout: a lista compacta continua e só ganha a entrada
 animada. Pendências: skeleton Lite no carregamento da rota (`loading.tsx` ainda é o
 genérico), prints lado a lado com a tela do corretor e ação de renovação com escopo
 de equipe (E0). Registro: DEC-143.
+## 2026-10-14: E4, equipe e unidade no Lite
+
+Papéis e rotas: gestor em `/equipe` e `/unidades/<branchId>`, limitado à unidade
+autenticada; supervisor permanece em `/equipe/minha` e na equipe vinculada ao seu
+`supervisorId`. Ações principais: aprovar transferências, convidar pessoas dentro
+do escopo e consultar métricas da unidade. A tela da unidade é somente leitura;
+configuração de filas, disponibilidade e escala ficam fora desta etapa. Estados:
+carregamento com skeleton compartilhado, lista, convites pendentes, transferência,
+unidade vazia, ausência de dados e erro recuperável. Disclosure por sheet de convite
+e ações individuais; abas usam `SegmentedControl` compartilhado. Reutiliza Arc, Lite,
+`motion/react`, `useReducedMotion` e tokens existentes, sem nova primitive ou token.
+O visual Lite continua claro, sem tema escuro. Prints sintéticos desktop e celular
+ficam em `tmp/e4/`; a etapa não avança a UX-M1.10.

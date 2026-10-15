@@ -14,7 +14,7 @@ vi.mock("@/shared/db", async (importOriginal) => {
 });
 
 import { schema } from "@/shared/db";
-import { requestBrokerTransferAction } from "./transfer-actions";
+import { decideBrokerTransferAction, requestBrokerTransferAction } from "./transfer-actions";
 
 type Query = {
   from: (...args: unknown[]) => Query;
@@ -128,5 +128,16 @@ describe("supervisor transfer actions", () => {
     expect(result).toEqual({ ok: false, reason: "A equipe de destino já tem 30 corretores." });
     expect(state.inserts).toHaveLength(0);
     expect(mockPublish).not.toHaveBeenCalled();
+  });
+
+  it("does not let a Lite manager decide a transfer outside their authenticated unit", async () => {
+    mockContext.mockResolvedValue({ ...supervisor, userId: "manager-1", role: "manager", branchId: "branch-1", supervisorTeamScope: undefined });
+    mockAudience.mockResolvedValue("manager");
+    state.rows = [[{ branchId: "branch-2" }]];
+
+    const result = await decideBrokerTransferAction("44444444-4444-4444-8444-444444444444", true);
+
+    expect(result).toEqual({ ok: false, reason: "Pedido não encontrado ou fora da sua unidade." });
+    expect(state.inserts).toHaveLength(0);
   });
 });

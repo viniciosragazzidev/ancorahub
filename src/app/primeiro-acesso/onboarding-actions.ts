@@ -2,7 +2,7 @@
 
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -127,6 +127,24 @@ export async function completeOnboardingAction(
 
     // 5. Run transactional activation
     await db.transaction(async (tx) => {
+      let acceptedSupervisorId: string | null = null;
+      if (invitation.role === "broker" && invitation.supervisorId) {
+        const [supervisor] = await tx.select({ userId: schema.tenantMemberships.userId })
+          .from(schema.tenantMemberships)
+          .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+          .where(and(
+            eq(schema.tenantMemberships.tenantId, invitation.tenantId),
+            eq(schema.tenantMemberships.userId, invitation.supervisorId),
+            eq(schema.tenantMemberships.branchId, invitation.branchId),
+            eq(schema.tenantMemberships.role, "supervisor"),
+            eq(schema.tenantMemberships.status, "active"),
+            eq(schema.user.status, "active"),
+            eq(schema.user.active, true),
+          )).limit(1).for("update");
+        if (!supervisor) throw new Error("A equipe deste convite não está mais ativa. Peça um novo convite ao gestor.");
+        acceptedSupervisorId = supervisor.userId;
+      }
+
       if (!existingUser) {
         await tx.insert(schema.user).values({
           id: userId,
@@ -192,6 +210,7 @@ export async function completeOnboardingAction(
             role: invitation.role,
             jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
             customRoleId: invitation.customRoleId,
+            supervisorId: acceptedSupervisorId,
             status: "active",
             updatedAt: new Date(),
           })
@@ -203,11 +222,59 @@ export async function completeOnboardingAction(
           tenantId: invitation.tenantId,
           userId,
           branchId: invitation.branchId,
+          supervisorId: acceptedSupervisorId,
           role: invitation.role,
           jobTitle: invitation.jobTitle as typeof schema.teamJobTitleValues[number],
           customRoleId: invitation.customRoleId,
           status: "active",
         });
+      }
+
+      if (invitation.role === "supervisor" && invitation.supervisedBrokerIds.length) {
+        const requestedIds = [...new Set(invitation.supervisedBrokerIds.filter((id): id is string => typeof id === "string" && id.length > 0))];
+        if (requestedIds.length) {
+          const stillAvailable = await tx.select({ userId: schema.tenantMemberships.userId })
+            .from(schema.tenantMemberships)
+            .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+            .where(and(
+              eq(schema.tenantMemberships.tenantId, invitation.tenantId),
+              eq(schema.tenantMemberships.branchId, invitation.branchId),
+              eq(schema.tenantMemberships.role, "broker"),
+              eq(schema.tenantMemberships.status, "active"),
+              eq(schema.user.status, "active"),
+              eq(schema.user.active, true),
+              isNull(schema.tenantMemberships.supervisorId),
+              inArray(schema.tenantMemberships.userId, requestedIds),
+            )).for("update");
+          const availableIds = stillAvailable.map((row) => row.userId);
+          if (availableIds.length) {
+            await tx.update(schema.tenantMemberships).set({ supervisorId: userId, updatedAt: new Date() })
+              .where(and(
+                eq(schema.tenantMemberships.tenantId, invitation.tenantId),
+                eq(schema.tenantMemberships.branchId, invitation.branchId),
+                eq(schema.tenantMemberships.role, "broker"),
+                eq(schema.tenantMemberships.status, "active"),
+                isNull(schema.tenantMemberships.supervisorId),
+                inArray(schema.tenantMemberships.userId, availableIds),
+              ));
+          }
+          await tx.insert(schema.auditLogs).values({
+            id: randomUUID(),
+            userId,
+            entidade: "supervisor_team",
+            entidadeId: userId,
+            acao: `supervisor_team.invitation_members_assigned:${availableIds.length}`,
+          });
+          if (availableIds.length !== requestedIds.length) {
+            await tx.insert(schema.auditLogs).values({
+              id: randomUUID(),
+              userId,
+              entidade: "supervisor_team",
+              entidadeId: userId,
+              acao: `supervisor_team.invitation_members_skipped:${requestedIds.length - availableIds.length}`,
+            });
+          }
+        }
       }
 
       // Update broker profile
