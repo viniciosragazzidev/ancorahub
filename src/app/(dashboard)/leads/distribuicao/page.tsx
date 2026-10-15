@@ -38,6 +38,8 @@ import { resolveDistributionView } from "@/features/lead-distribution/distributi
 import { getHoldDisqualifiedLeads } from "@/features/lead-distribution/disqualified-routing-settings";
 import { getDddRoutingSettings } from "@/features/lead-distribution/ddd-routing-settings";
 import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-routing-panel";
+import { ColdLeadRequalificationPanel } from "./_components/cold-lead-requalification-panel";
+import { getColdLeadRequalificationReview } from "@/features/ai-qualification/cold-lead-requalification";
 
 export const dynamic = "force-dynamic";
 
@@ -551,7 +553,7 @@ export default async function LeadDistributionPage({
   const newByBranch = new Map<string, number>();
   leadStatsByBranch.forEach((row) => {
     if (!row.branchId) return;
-    if (activeStatuses.includes(row.status as any)) {
+    if (activeStatuses.some((status) => status === row.status)) {
       const currentActive = leadsByBranch.get(row.branchId) ?? 0;
       leadsByBranch.set(row.branchId, currentActive + Number(row.count));
     }
@@ -594,11 +596,15 @@ export default async function LeadDistributionPage({
       allowedBrokerIds: queuePolicy?.allowedBrokerIds ?? [],
       allowedSourceIds: queuePolicy?.allowedSourceIds ?? [],
       holdColdLeads: queuePolicy?.holdColdLeads ?? false,
+      coldLeadRequalification: queuePolicy?.coldLeadRequalification ?? { enabled: false, intervalMinutes: 120, maxAttempts: 3 },
       waiting: queueWaiting.get(queue.id) ?? 0,
       members: queue.branchId ? (countsByBranch.get(queue.branchId) ?? 0) : totalBrokers,
       activeLeads: queue.branchId ? (leadsByBranch.get(queue.branchId) ?? 0) : totalNewLeads,
     };
   });
+  const coldLeadReview = context.role === "director"
+    ? await getColdLeadRequalificationReview(context)
+    : null;
 
   return (
     <>
@@ -654,6 +660,8 @@ export default async function LeadDistributionPage({
             }
             filasContent={
               context.role === "director" ? (
+                <div className="space-y-5">
+                  {coldLeadReview ? <ColdLeadRequalificationPanel {...coldLeadReview} /> : null}
                   <QueueControlCenter
                     queues={queuesForControl}
                     branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
@@ -708,6 +716,7 @@ export default async function LeadDistributionPage({
                       },
                     ]}
                   />
+                </div>
               ) : null
             }
             operarContent={

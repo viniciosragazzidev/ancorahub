@@ -47,7 +47,7 @@ describe("FollowUpRulesPanel cold-lead rule", () => {
   it("shows the default rule as enabled and exposes only its pause switch", () => {
     render(<FollowUpRulesPanel rules={[coldRule]} />);
 
-    expect(screen.getByText(/Template FIRST_CONTACT · uma tentativa · dias úteis, 08h–18h/)).toBeInTheDocument();
+    expect(screen.getByText(/Cadencia configurada por fila; chave de ativacao do tenant/)).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "Pausar Reativação de lead frio" })).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByRole("button", { name: "Editar" })).not.toBeInTheDocument();
   });

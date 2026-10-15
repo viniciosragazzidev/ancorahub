@@ -190,6 +190,11 @@ function readDistributionPolicy(value: unknown): IntelligentDistributionPolicy {
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
     holdColdLeads: raw.holdColdLeads === true,
+    coldLeadRequalification: {
+      enabled: raw.coldLeadRequalification?.enabled === true,
+      intervalMinutes: Number.isInteger(raw.coldLeadRequalification?.intervalMinutes) ? Math.max(15, Math.min(1440, raw.coldLeadRequalification!.intervalMinutes)) : 120,
+      maxAttempts: Number.isInteger(raw.coldLeadRequalification?.maxAttempts) ? Math.max(1, Math.min(10, raw.coldLeadRequalification!.maxAttempts)) : 3,
+    },
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }

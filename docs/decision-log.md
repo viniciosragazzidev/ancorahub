@@ -1766,3 +1766,12 @@ supervisor. Membros que entraram em outra equipe não são movidos por esse flux
 As ações e leituras repetem o escopo no servidor e mantêm auditoria. A tela da
 unidade é somente leitura para distribuição e disponibilidade. O comportamento
 do Diretor e o modo normal com a flag desligada permanecem iguais.
+
+
+## DEC-144 - Requalificacao de leads frios por fila
+
+**Solicitada pelo usuario em 2026-10-15 (P2 da semana).** A Central de Distribuicao oferece ao Diretor uma area para revisar os leads frios recebidos no dia operacional (desde 19h, America/Sao_Paulo) por fila, separados entre sem resposta e com resposta que permaneceram frios. A acao manual reenvia o template Meta FIRST_CONTACT aprovado e usa o mesmo fluxo oficial de qualificacao; a requalificacao nao cria canal nem muda o estado cold antes de resposta, para que a retencao T121 continue impedindo atribuicao prematura. Resposta sem owner retoma a maquina existente; ao virar morno/quente, volta a distribuicao normal.
+
+Cada fila guarda coldLeadRequalification no JSONB da politica existente, sem migration. A automacao e desligada por padrao; quando ligada, usa intervalo configuravel (padrao 2h), no maximo 3 tentativas automaticas por lead, todos os dias entre 08h e 20h no fuso de Sao Paulo, somente enquanto nao houver mensagem inbound apos o ultimo convite de qualificacao. O sistema global do Super-admin e a politica do tenant continuam como chaves de desligamento. O registro de tentativas usa linhas e chaves unicas ja existentes em whatsapp_outbound_messages; nao cria coluna nem tabela.
+
+O lock transacional do cron impede duas varreduras simultaneas. Chaves de idempotencia por tentativa impedem dois envios concorrentes; a acao manual explicita pode exceder o limite automatico, mas respeita o intervalo da fila (ou 2h quando a automacao esta desligada). Opt-out, numero invalido, lead fechado, atribuido, arquivado, removido ou fora da fila impedem o envio. Eventos manuais e automaticos sao auditados sem gravar conteudo da conversa.

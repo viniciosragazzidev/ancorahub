@@ -2,6 +2,18 @@ import type { AssignmentStrategy, DutyFallbackPolicy } from "./types";
 
 export type EligibleBroker = { id: string; createdAt: Date; activeLeads: number; capacity: number | null };
 
+export type ColdLeadRequalificationPolicy = {
+  enabled: boolean;
+  intervalMinutes: number;
+  maxAttempts: number;
+};
+
+export const defaultColdLeadRequalificationPolicy: ColdLeadRequalificationPolicy = {
+  enabled: false,
+  intervalMinutes: 120,
+  maxAttempts: 3,
+};
+
 /**
  * An offer accepted by the broker confirms ownership (BR-023). No automatic
  * flow — worker, SLA sweep or exclusion — may move the lead away from them.
@@ -63,6 +75,7 @@ export type IntelligentDistributionPolicy = {
   allowedBranchIds?: string[];
   allowedSourceIds?: string[];
   holdColdLeads: boolean;
+  coldLeadRequalification: ColdLeadRequalificationPolicy;
   ranking: { enabled: boolean; conversionWeight: number; slaWeight: number; manualPriorityWeight: number };
 };
 
@@ -85,12 +98,14 @@ export type RankedBroker = EligibleBroker & {
 
 export const defaultIntelligentDistributionPolicy: IntelligentDistributionPolicy = {
   excludedBrokerIds: [], excludedBranchIds: [], allowedBrokerIds: [], allowedBranchIds: [], allowedSourceIds: [], holdColdLeads: false,
+  coldLeadRequalification: defaultColdLeadRequalificationPolicy,
   ranking: { enabled: true, conversionWeight: 45, slaWeight: 35, manualPriorityWeight: 20 },
 };
 
 export function readDistributionPolicy(value: unknown): IntelligentDistributionPolicy {
   if (!value || typeof value !== "object" || Array.isArray(value)) return defaultIntelligentDistributionPolicy;
   const raw = value as Partial<IntelligentDistributionPolicy>;
+  const requalification = raw.coldLeadRequalification;
   return {
     excludedBrokerIds: Array.isArray(raw.excludedBrokerIds) ? raw.excludedBrokerIds.filter((id): id is string => typeof id === "string") : [],
     excludedBranchIds: Array.isArray(raw.excludedBranchIds) ? raw.excludedBranchIds.filter((id): id is string => typeof id === "string") : [],
@@ -98,6 +113,15 @@ export function readDistributionPolicy(value: unknown): IntelligentDistributionP
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
     holdColdLeads: raw.holdColdLeads === true,
+    coldLeadRequalification: {
+      enabled: requalification?.enabled === true,
+      intervalMinutes: requalification && Number.isInteger(requalification.intervalMinutes)
+        ? Math.min(1440, Math.max(15, requalification.intervalMinutes))
+        : defaultColdLeadRequalificationPolicy.intervalMinutes,
+      maxAttempts: requalification && Number.isInteger(requalification.maxAttempts)
+        ? Math.min(10, Math.max(1, requalification.maxAttempts))
+        : defaultColdLeadRequalificationPolicy.maxAttempts,
+    },
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }
