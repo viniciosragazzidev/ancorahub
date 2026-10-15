@@ -56,7 +56,7 @@ export function brokerInsights(input: { broker: TeamMetricBroker; brokers: reado
 export function teamInsights(input: { team: TeamMetricTeam; windowDays: 7 | 30 }): Insight[] {
   const { team, windowDays } = input;
   const insights: Insight[] = [];
-  const previousLabel = windowDays === 7 ? "na semana anterior" : "nos 30 dias anteriores";
+  const previousLabel = windowDays === 7 ? "que na semana anterior" : "que nos 30 dias anteriores";
 
   const received = changePercent(team.current.received, team.previous.received);
   if (received !== null && received >= INSIGHT_THRESHOLDS.leadsRisePercent) {
@@ -66,7 +66,7 @@ export function teamInsights(input: { team: TeamMetricTeam; windowDays: 7 | 30 }
   const slaDelta = team.current.slaRate - team.previous.slaRate;
   if (slaDelta >= INSIGHT_THRESHOLDS.slaRisePoints) {
     const points = Math.round(slaDelta);
-    insights.push({ id: "sla_up", subjectType: "team", subjectId: team.id, tone: "positive", message: `O SLA da equipe subiu ${points} pontos ${previousLabel}.`, weight: points });
+    insights.push({ id: "sla_up", subjectType: "team", subjectId: team.id, tone: "positive", message: `O SLA da equipe subiu ${points} pontos em relação ${windowDays === 7 ? "à semana anterior" : "aos 30 dias anteriores"}.`, weight: points });
   }
   return insights;
 }

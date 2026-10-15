@@ -69,7 +69,7 @@ describe("insights em frase (G4)", () => {
     const up = teamInsights({ team: teamOf([], { received: 124 }, { received: 100 }), windowDays: 7 });
     const small = teamInsights({ team: teamOf([], { received: 110 }, { received: 100 }), windowDays: 7 });
 
-    expect(up.map((item) => item.message)).toEqual(["A equipe recebeu 24% mais leads na semana anterior."]);
+    expect(up.map((item) => item.message)).toEqual(["A equipe recebeu 24% mais leads que na semana anterior."]);
     expect(small).toEqual([]);
   });
 
