@@ -25,9 +25,9 @@ export function teamAvatarHue(name: string) {
   return hash % 360;
 }
 
-export function MyTeamPage({ initialData }: { initialData: SupervisorTeamPageData }) {
+export function MyTeamPage({ initialData, initialTab = "members" }: { initialData: SupervisorTeamPageData; initialTab?: "members" | "invites" | "unit" }) {
   const [data, setData] = useState(initialData);
-  const [activeTab, setActiveTab] = useState<"members" | "invites" | "unit">("members");
+  const [activeTab, setActiveTab] = useState<"members" | "invites" | "unit">(initialTab);
   const [feedback, setFeedback] = useState("");
   const [pending, startTransition] = useTransition();
   const reducedMotion = useReducedMotion() ?? false;

@@ -55,7 +55,7 @@ describe("supervisor Lite chat", () => {
     const script = buildSupervisorScript("equipe", created, now);
     expect(script.status?.label).toBe("Equipe Horizonte · sem corretores");
     const choice = script.blocks.find((block) => block.type === "question");
-    expect(choice && choice.type === "question" ? choice.choices[0]!.label : null).toBe("Adicionar corretores");
+    expect(choice && choice.type === "question" ? choice.choices.map((item) => item.label) : null).toEqual(["Abrir Equipe Horizonte", "Adicionar corretores", "Editar a equipe"]);
   });
 
   it("team script opens each broker's profile and offers a message to the team", () => {
