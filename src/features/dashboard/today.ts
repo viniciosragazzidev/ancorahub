@@ -4,20 +4,19 @@ import { and, count, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-or
 
 import { getAttentionSnapshot } from "@/features/reports/metrics/metrics-service";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
-import { zonedMidnight, localDateKey } from "@/features/lead-distribution/monthly-duty-plan";
+import { operationDayStart } from "@/features/reports/metrics/lead-quality-period";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { getDashboardWelcome } from "./welcome";
 
-const TZ = "America/Sao_Paulo";
 /** Distribution states of a lead that is waiting for a broker. */
 const WAITING_STATES = ["queued", "unassigned", "returned_to_queue"] as const;
 
 export type DashboardTodayQueue = { id: string | null; name: string; hue: number | null; today: number; waiting: number };
 export type DashboardToday = {
-  /** Leads that arrived today (São Paulo day). */
+  /** Leads that arrived in today's operation day (since 19:00, like the quality report). */
   received: number;
-  /** Leads handed to a broker today. */
+  /** Leads handed to a broker in today's operation day. */
   distributed: number;
   /** Leads waiting for a broker right now (any day). */
   waiting: number;
@@ -33,7 +32,8 @@ export type DashboardToday = {
 export async function getDashboardToday(context: TenantContext, now = new Date(), resolvedScope?: Awaited<ReturnType<typeof resolveReportDataScope>>): Promise<DashboardToday> {
   const db = getDatabase();
   const scope = resolvedScope ?? await resolveReportDataScope(context);
-  const todayStart = zonedMidnight(localDateKey(now, TZ), TZ);
+  // The operation day turns at 19:00, the same window as Qualidade dos leads ("Hoje").
+  const todayStart = operationDayStart(now);
   const alive = and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), scope.leadScope);
   const waitingWhere = and(alive, isNull(schema.leads.corretorId), inArray(schema.leads.distributionStatus, [...WAITING_STATES]));
   const todayWhere = and(alive, gte(schema.leads.createdAt, todayStart));

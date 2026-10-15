@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { leadQualityPeriodLabel, leadQualityRange, leadQualityWindow, leadShiftOf, parseLeadQualityPeriod } from "./lead-quality-period";
+import { leadQualityPeriodLabel, leadQualityRange, leadQualityWindow, leadShiftOf, operationDayStart, parseLeadQualityPeriod } from "./lead-quality-period";
 
 describe("lead quality period", () => {
   it("parses today and the shared day options", () => {
@@ -17,6 +17,15 @@ describe("lead quality period", () => {
       since: new Date("2026-10-01T22:00:00.000Z"),
       until: new Date("2026-10-02T22:00:00.000Z"),
     });
+  });
+
+  it("from 19:00 on, today is the operation day that just started", () => {
+    // 02/10 20:00 in São Paulo: the new operation day began at 19:00.
+    expect(leadQualityWindow("today", new Date("2026-10-02T23:00:00.000Z"))).toEqual({
+      since: new Date("2026-10-02T22:00:00.000Z"),
+      until: new Date("2026-10-03T22:00:00.000Z"),
+    });
+    expect(operationDayStart(new Date("2026-10-02T21:59:00.000Z"))).toEqual(new Date("2026-10-01T22:00:00.000Z"));
   });
 
   it("the three-day window starts Friday at 19:00 when viewed on Monday", () => {

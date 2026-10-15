@@ -126,9 +126,19 @@ export function leadQualityWindow(period: LeadQualityPeriod, now = new Date()): 
     }
     return { since: periodStart(period, now), until: null };
   }
+  const since = operationDayStart(now);
+  return { since, until: new Date(since.getTime() + 24 * 60 * 60 * 1000) };
+}
+
+/**
+ * Start of the operation day `now` is in: the last 19:00 (São Paulo) at or before `now`.
+ * Before 19:00 it is yesterday's 19:00; from 19:00 on, today's. Shared by the dashboard
+ * ("Chegaram no turno") and the quality report ("Hoje") so both count the same leads.
+ */
+export function operationDayStart(now = new Date()) {
   const today = zonedParts(now, LEAD_QUALITY_TIMEZONE);
-  const until = wallClockToUtc(today.year, today.month, today.day, OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
-  return { since: new Date(until.getTime() - 24 * 60 * 60 * 1000), until };
+  const turn = wallClockToUtc(today.year, today.month, today.day, OPERATION_DAY_STARTS_AT, LEAD_QUALITY_TIMEZONE);
+  return turn <= now ? turn : new Date(turn.getTime() - 24 * 60 * 60 * 1000);
 }
 
 /** Shift of a lead: 13:30–19:00 is the second; 19:00–13:30 (across midnight) the first. */
