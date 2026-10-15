@@ -154,7 +154,8 @@ function emptyTeam(now: Date, prefix: string, identity?: SupervisorWorkspaceData
         date(`${prefix}-date`, now),
         say(`${prefix}-empty`, `A equipe ${identity.name} já está criada${identity.description ? ` (${identity.description})` : ""}, mas ainda não tem corretores. Adicione corretores da sua unidade ou envie convites.`),
         { type: "question", id: `${prefix}-empty-choice`, prompt: "Vamos completar a equipe?", choices: [
-          { id: "add-brokers", label: "Adicionar corretores", hint: "Da sua unidade, em Minha equipe", action: { kind: "href", href: "/equipe/minha" } },
+          { id: "open-team", label: `Abrir ${identity.name}`, hint: "Membros, convites e corretores da unidade", action: { kind: "href", href: "/equipe/minha" } },
+          { id: "add-brokers", label: "Adicionar corretores", hint: "Corretores da sua unidade sem equipe", action: { kind: "href", href: "/equipe/minha?aba=unidade" } },
           { id: "team-settings", label: "Editar a equipe", hint: "Nome, descrição e foto", action: { kind: "href", href: "/equipe/minha/configurar" } },
         ] },
       ],
@@ -204,7 +205,7 @@ function teamScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
     choices: [
       ...(needing[0] ? [{ id: "open-needing", label: `Ver ${firstName(needing[0].name)}`, action: { kind: "href" as const, href: `/equipe/${needing[0].userId}` } }] : []),
       { id: "message", label: "Mandar recado para a equipe", hint: "Pela Central de relacionamento", action: { kind: "href", href: "/relacionamento" } },
-      { id: "team-page", label: "Minha equipe", hint: "Perfil, membros e convites", action: { kind: "href", href: "/equipe/minha" } },
+      { id: "team-page", label: data.teamIdentity ? `Abrir ${data.teamIdentity.name}` : "Minha equipe", hint: "Perfil, membros e convites", action: { kind: "href", href: "/equipe/minha" } },
     ],
   });
   const teamLabel = data.teamIdentity?.name;
