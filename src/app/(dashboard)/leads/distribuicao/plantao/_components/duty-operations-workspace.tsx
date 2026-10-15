@@ -1344,7 +1344,9 @@ export function DutyOperationsWorkspace({ snapshot, queues = [], monthlyScheduli
       if (!item) continue;
       for (const occurrence of item.occurrences) {
         if (occurrence.assignedCount <= 0 || !occurrence.dutyDate.startsWith(month)) continue;
-        (item.status === "published" ? published : draft).add(occurrence.scheduleId);
+        // A newer draft that keeps a plantão the published revision already staffed: that plantão is live, not pending.
+        const live = item.status === "published" || item.publishedOccurrenceIds.includes(occurrence.id);
+        (live ? published : draft).add(occurrence.scheduleId);
       }
     }
     for (const id of published) draft.delete(id);
