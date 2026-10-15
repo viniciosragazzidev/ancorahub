@@ -163,7 +163,10 @@ export function WhatsAppConnectDialog({
   const awaitingAuth = method === "code" ? providerStatus === "SCAN_QR_CODE" || Boolean(pairingCode) : hasQr;
   const phase: PairingPhase = ready
     ? "ready"
-    : derivePairingPhase({ status: connection.status, providerStatus, hasQr: awaitingAuth, sawQr });
+    // No código, o QR que o servidor manda nunca aparece na tela: só um código já
+    // gerado conta como "o celular pode estar finalizando". Senão a tela pulava
+    // direto para "Finalizando vínculo" sem o corretor informar o número.
+    : derivePairingPhase({ status: connection.status, providerStatus, hasQr: awaitingAuth, sawQr: method === "code" ? Boolean(pairingCode) : sawQr });
   const stalled = phase === "pairing" && pairingSince !== null && now - pairingSince > PAIRING_STALL_SECONDS * 1_000;
   const badge = {
     status: PHASE_BADGE_STATUS[phase],

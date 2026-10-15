@@ -83,6 +83,19 @@ describe("WhatsAppConnectDialog mobile access", () => {
     expect(screen.queryByText("Conexão somente pelo computador")).not.toBeInTheDocument();
   });
 
+  it("keeps the code screen when the server sends a QR the broker never saw", async () => {
+    // Old WhatsApp server (no providerStatus) or a session restart: a QR arriving in the
+    // background of the code method must not read as "the phone scanned it".
+    mocks.start.mockResolvedValue({ success: true, status: "initializing", sessionId: "session-synthetic", qrCode: "qr-synthetic" });
+    mocks.poll.mockResolvedValue({ ...readySnapshot, status: "initializing", providerStatus: null, qrCode: null });
+    render(<WhatsAppConnectDialog initial={{ ...readyConnection, status: "disconnected", sessionId: null, sessionName: null }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Conectar WhatsApp" }));
+    await waitFor(() => expect(mocks.poll).toHaveBeenCalled());
+    expect(await screen.findByText("Conecte com um código")).toBeInTheDocument();
+    expect(screen.queryByText("Finalizando vínculo…")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Gerar código" })).toBeInTheDocument();
+  });
+
   it("generates the pairing code for the broker's number and shows it", async () => {
     mocks.start.mockResolvedValue({ success: true, status: "initializing", sessionId: "session-synthetic", providerStatus: "SCAN_QR_CODE" });
     mocks.poll.mockResolvedValue({ ...readySnapshot, status: "initializing", providerStatus: "SCAN_QR_CODE" });
