@@ -66,7 +66,7 @@ const draft: MonthlyDutyPlanView = {
     id: "11111111-1111-4111-8111-111111111111:2026-12-07", scheduleId: "11111111-1111-4111-8111-111111111111", scheduleName: "PME · Manhã", dutyDate: "2026-12-07", startsAt: "09:00", endsAt: "13:30",
     minimumBrokers: 2, maximumBrokers: 3, allowedBrokerIds: ["broker-1"], typeId: PME, attendanceMode: "online",
     brokers: [{ id: "broker-1", name: "Corretor Exemplo", code: "C101", branchId: "branch-1", branchName: "Unidade Centro", forced: false, origin: "generated" }],
-    assignedCount: 1, ended: false,
+    assignedCount: 1, ended: false, started: false,
   }],
   totalAssigned: 1,
   belowMinimum: 1,
@@ -75,6 +75,7 @@ const draft: MonthlyDutyPlanView = {
   warnings: [],
   canEdit: true,
   replacesPublished: false,
+  publishedOccurrenceIds: [],
 };
 
 function Harness({ enabled = true, canEdit = true, onCreate = vi.fn() }: { enabled?: boolean; canEdit?: boolean; onCreate?: () => void }) {

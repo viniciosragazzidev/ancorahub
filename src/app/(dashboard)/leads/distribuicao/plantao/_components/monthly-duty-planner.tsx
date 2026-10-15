@@ -17,7 +17,9 @@ import { toast } from "@/components/ui/sonner";
 import {
   generateMonthlyDutyPlanAction,
   getMonthlyDutyPlanAction,
+  addBrokerToPublishedOccurrenceAction,
   publishMonthlyDutyPlanAction,
+  removeBrokerFromPublishedOccurrenceAction,
   updateMonthlyDutyDraftAction,
   type MonthlyDutyPlanView,
 } from "@/features/lead-distribution/monthly-duty-actions";
@@ -335,7 +337,11 @@ export function MonthlyDutyPlanner({
 
   function editDraft(occurrenceId: string, brokerId: string, operation: "add" | "remove", force = false) {
     if (!plan) return;
-    run(`${operation}:${occurrenceId}:${brokerId}`, () => updateMonthlyDutyDraftAction({ planId: plan.id, occurrenceId, brokerId, operation, force }),
+    // A published escala is changed in place (one dated row, no new revision); a draft is redrawn by hand.
+    const task = published
+      ? () => (operation === "add" ? addBrokerToPublishedOccurrenceAction({ occurrenceId, brokerId, force }) : removeBrokerFromPublishedOccurrenceAction({ occurrenceId, brokerId }))
+      : () => updateMonthlyDutyDraftAction({ planId: plan.id, occurrenceId, brokerId, operation, force });
+    run(`${operation}:${occurrenceId}:${brokerId}`, task,
       operation === "add" ? "Corretor adicionado ao plantão." : "Corretor removido do plantão.",
       operation === "add" ? () => setAddingTo(null) : undefined);
   }
@@ -693,7 +699,7 @@ export function MonthlyDutyPlanner({
                           const info = typeInfo.get(key);
                           const below = occurrence.assignedCount < occurrence.minimumBrokers;
                           const full = occurrence.maximumBrokers !== null && occurrence.assignedCount >= occurrence.maximumBrokers;
-                          const editable = canEdit && !published && !occurrence.ended;
+                          const editable = canEdit && !occurrence.ended;
                           const shown = filterBranch ? occurrence.brokers.filter((broker) => broker.branchId === filterBranch) : occurrence.brokers;
                           const modality = occurrence.attendanceMode ?? (schedules.find((schedule) => schedule.id === occurrence.scheduleId)?.attendanceMode === "presencial" ? "presencial" : "online");
                           const candidates = eligibleBrokers
@@ -741,7 +747,7 @@ export function MonthlyDutyPlanner({
                                     {broker.code ? <span className="font-semibold tabular-nums">{broker.code}</span> : null}
                                     <span>{broker.name}</span>
                                     {!filterBranch && broker.branchName ? <span className="text-muted-foreground">· {broker.branchName}</span> : null}
-                                    {editable && broker.origin !== "weekly" ? (
+                                    {editable && broker.origin !== "weekly" && !occurrence.started ? (
                                       <button type="button" aria-label={`Remover ${broker.name} de ${occurrence.scheduleName} em ${dateLabel(date)}`} disabled={pending} onClick={() => editDraft(occurrence.id, broker.id, "remove")} className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50">
                                         {busyKey === `remove:${occurrence.id}:${broker.id}` ? <Loader2Icon className="size-3 animate-spin" /> : <X className="size-3" />}
                                       </button>
