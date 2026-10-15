@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, gte, inArray, isNull, lt, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, gt, inArray, isNull, lt, lte, ne, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase, schema } from "@/shared/db";
@@ -20,7 +20,9 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
-import { getColdLeadReactivationAt, isEligibleColdLeadForReactivation } from "@/features/ai-qualification/cold-lead-reactivation-policy";
+import { isEligibleColdLeadForReactivation } from "@/features/ai-qualification/cold-lead-reactivation-policy";
+import { COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX, isWithinRequalificationBusinessWindow, nextRequalificationBusinessWindowAt } from "@/features/ai-qualification/cold-lead-requalification-policy";
+import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
 import { BROKER_CHAT_NOTICE, teamNoticeByKey, teamNoticeForPurpose } from "@/features/team-notices/catalog";
@@ -244,7 +246,10 @@ async function isCurrentLeadOffer(row: {
 }
 
 async function isCurrentColdLeadReactivation(row: OutboundRow) {
-  if (!row.idempotencyKey.startsWith("cold-lead-reactivation:") || row.purpose !== "leadQualification") return true;
+  const isLegacy = row.idempotencyKey.startsWith("cold-lead-reactivation:");
+  const isRequalification = row.idempotencyKey.startsWith(COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX);
+  if (isLegacy) return false; // DEC-144 replaces unsent legacy cadence rows; sent rows remain attempt history.
+  if (!isRequalification || row.purpose !== "leadQualification") return true;
   if (await getFeatureFlag(FEATURE_FLAGS.COLD_LEAD_REACTIVATION) !== "true") return false;
   const leadId = row.recipientId;
   if (!leadId) return false;
@@ -253,6 +258,8 @@ async function isCurrentColdLeadReactivation(row: OutboundRow) {
     qualificationStatus: schema.leads.qualificationStatus,
     qualificationState: schema.leads.qualificationState,
     qualificationCompletedAt: schema.leads.qualificationCompletedAt,
+    createdAt: schema.leads.createdAt,
+    queueId: schema.leads.queueId,
     corretorId: schema.leads.corretorId,
     status: schema.leads.status,
     distributionStatus: schema.leads.distributionStatus,
@@ -271,12 +278,38 @@ async function isCurrentColdLeadReactivation(row: OutboundRow) {
       eq(schema.aiQualificationFollowUpRules.trigger, "cold_lead_reactivation"),
     )).limit(1);
   if (!rule?.enabled) return false;
-  const [conversation] = await db.select({ optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt })
+  const isAutomatic = isLegacy || row.idempotencyKey.startsWith(`${COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX}auto:`);
+  if (isAutomatic) {
+    if (!lead.queueId) return false;
+    const [queuePolicy] = await db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies).where(and(
+      eq(schema.leadDistributionPolicies.tenantId, row.tenantId),
+      eq(schema.leadDistributionPolicies.queueId, lead.queueId),
+      isNull(schema.leadDistributionPolicies.profileKey),
+    )).limit(1);
+    if (!readDistributionPolicy(queuePolicy?.policy).coldLeadRequalification.enabled) return false;
+  }
+  const promptAt = isAutomatic
+    ? await db.select({ sentAt: schema.whatsappOutboundMessages.sentAt, createdAt: schema.whatsappOutboundMessages.createdAt, idempotencyKey: schema.whatsappOutboundMessages.idempotencyKey })
+      .from(schema.whatsappOutboundMessages).where(and(
+        eq(schema.whatsappOutboundMessages.tenantId, row.tenantId),
+        eq(schema.whatsappOutboundMessages.recipientId, leadId),
+        ne(schema.whatsappOutboundMessages.id, row.id),
+      )).then((rows) => rows.filter((entry) => entry.sentAt && (entry.idempotencyKey.startsWith(COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX) || entry.idempotencyKey === `cold-lead-reactivation:${leadId}`))
+        .sort((a, b) => b.sentAt!.getTime() - a.sentAt!.getTime())[0]?.sentAt ?? lead.createdAt)
+    : row.createdAt;
+  const [newReply] = await db.select({ id: schema.whatsappMessages.id }).from(schema.whatsappMessages).where(and(
+    eq(schema.whatsappMessages.tenantId, row.tenantId),
+    eq(schema.whatsappMessages.leadId, leadId),
+    notInArray(schema.whatsappMessages.direction, ["outbound", "outgoing"]),
+    gt(schema.whatsappMessages.sentAt, promptAt),
+  )).limit(1);
+  if (newReply) return false;
+  const [conversation] = await db.selectDistinctOn([schema.aiConversations.tenantId, schema.aiConversations.leadId], { status: schema.aiConversations.status, optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt })
     .from(schema.aiConversations).where(and(
       eq(schema.aiConversations.tenantId, row.tenantId),
       eq(schema.aiConversations.leadId, leadId),
-    )).limit(1);
-  return !conversation?.optOutAt && !conversation?.wrongNumberAt;
+    )).orderBy(schema.aiConversations.tenantId, schema.aiConversations.leadId, desc(schema.aiConversations.updatedAt)).limit(1);
+  return !conversation?.optOutAt && !conversation?.wrongNumberAt && !["WAITING_HUMAN", "HUMAN_ACTIVE"].includes(conversation?.status ?? "");
 }
 
 async function isCurrentColdLeadAcknowledgement(row: OutboundRow) {
@@ -309,14 +342,18 @@ async function isCurrentColdLeadAcknowledgement(row: OutboundRow) {
 }
 
 async function deferColdLeadReactivationOutsideWindow(row: OutboundRow, now: Date) {
-  if (!row.idempotencyKey.startsWith("cold-lead-reactivation:") || row.purpose !== "leadQualification" || !row.recipientId) return false;
+  const automaticRequalification = row.idempotencyKey.startsWith("cold-lead-reactivation:")
+    || row.idempotencyKey.startsWith(`${COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX}auto:`);
+  if (!row.idempotencyKey.startsWith("cold-lead-reactivation:") && !automaticRequalification) return false;
+  if (row.purpose !== "leadQualification" || !row.recipientId) return false;
+  if (automaticRequalification && isWithinRequalificationBusinessWindow(now)) return false;
   const [lead] = await getDatabase().select({ qualificationCompletedAt: schema.leads.qualificationCompletedAt })
     .from(schema.leads).where(and(
       eq(schema.leads.id, row.recipientId),
       eq(schema.leads.tenantId, row.tenantId),
     )).limit(1);
   if (!lead?.qualificationCompletedAt) return false;
-  const scheduledAt = getColdLeadReactivationAt(lead.qualificationCompletedAt, now);
+  const scheduledAt = nextRequalificationBusinessWindowAt(now);
   if (scheduledAt <= now) return false;
   await getDatabase().update(schema.whatsappOutboundMessages).set({
     status: "pending",
@@ -1180,7 +1217,7 @@ export async function processMetaOutboundBatch(limit = 10, tenantId?: string, ou
         }
       };
 
-      const coldReactivationMessage = row.idempotencyKey.startsWith("cold-lead-reactivation:");
+      const coldReactivationMessage = row.idempotencyKey.startsWith("cold-lead-reactivation:") || row.idempotencyKey.startsWith(COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX);
       const coldAcknowledgementMessage = row.idempotencyKey.startsWith("cold-lead-reactivation-ack:");
       if ((coldReactivationMessage && !await isCurrentColdLeadReactivation(row))
         || (coldAcknowledgementMessage && !await isCurrentColdLeadAcknowledgement(row))) {

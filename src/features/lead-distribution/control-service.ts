@@ -30,6 +30,11 @@ const queueInput = z.object({
   allowedBrokerIds: z.array(z.string().uuid()).default([]),
   allowedSourceIds: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   holdColdLeads: z.boolean().default(false),
+  coldLeadRequalification: z.object({
+    enabled: z.boolean().default(false),
+    intervalMinutes: z.number().int().min(15).max(1440).default(120),
+    maxAttempts: z.number().int().min(1).max(10).default(3),
+  }).default({ enabled: false, intervalMinutes: 120, maxAttempts: 3 }),
   name: z.string().trim().min(3).max(60),
   assignmentMode: z.enum(["automatic", "manual"]),
   assignmentStrategy: z.enum(["round_robin", "capacity"]),
@@ -124,6 +129,11 @@ function readPolicy(value: unknown): IntelligentDistributionPolicy {
     allowedBranchIds: Array.isArray(raw.allowedBranchIds) ? raw.allowedBranchIds.filter((id): id is string => typeof id === "string") : [],
     allowedSourceIds: Array.isArray(raw.allowedSourceIds) ? raw.allowedSourceIds.filter((id): id is string => typeof id === "string") : [],
     holdColdLeads: raw.holdColdLeads === true,
+    coldLeadRequalification: {
+      enabled: raw.coldLeadRequalification?.enabled === true,
+      intervalMinutes: Number.isInteger(raw.coldLeadRequalification?.intervalMinutes) ? Math.max(15, Math.min(1440, raw.coldLeadRequalification!.intervalMinutes)) : 120,
+      maxAttempts: Number.isInteger(raw.coldLeadRequalification?.maxAttempts) ? Math.max(1, Math.min(10, raw.coldLeadRequalification!.maxAttempts)) : 3,
+    },
     ranking: { ...defaultIntelligentDistributionPolicy.ranking, ...(raw.ranking ?? {}) },
   };
 }
@@ -406,6 +416,7 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
     allowedBrokerIds: input.allowedBrokerIds,
     allowedSourceIds,
     holdColdLeads: input.holdColdLeads,
+    coldLeadRequalification: input.coldLeadRequalification,
   };
 
   if (existingPolicy) {
@@ -435,6 +446,12 @@ export async function saveDistributionQueue(context: TenantContext, rawInput: un
         tenantId: context.tenantId,
         changes: { holdColdLeads: { from: previousHoldColdLeads, to: input.holdColdLeads } },
       },
+    });
+  }
+  if (JSON.stringify(readPolicy(previousQueuePolicy?.policy).coldLeadRequalification) !== JSON.stringify(input.coldLeadRequalification)) {
+    await db.insert(schema.platformAuditLogs).values({
+      id: randomUUID(), actorUserId: context.userId, action: "queue.updated", targetType: "lead_queue", targetId: queueId!,
+      metadata: { tenantId: context.tenantId, changes: { coldLeadRequalification: { from: readPolicy(previousQueuePolicy?.policy).coldLeadRequalification, to: input.coldLeadRequalification } } },
     });
   }
 

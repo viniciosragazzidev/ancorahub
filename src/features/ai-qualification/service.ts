@@ -329,7 +329,9 @@ export async function handleColdLeadInbound(input: {
       updatedAt: now,
     }).where(and(
       eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
-      eq(schema.whatsappOutboundMessages.idempotencyKey, `cold-lead-reactivation:${input.leadId}`),
+      eq(schema.whatsappOutboundMessages.recipientId, input.leadId),
+      eq(schema.whatsappOutboundMessages.recipientType, "lead"),
+      eq(schema.whatsappOutboundMessages.purpose, "leadQualification"),
       inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
     ));
     await db.insert(schema.auditLogs).values({

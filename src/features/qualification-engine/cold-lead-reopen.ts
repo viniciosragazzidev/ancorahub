@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, isNotNull, notInArray } from "drizzle-orm";
+import { and, eq, inArray, isNull, isNotNull, like, notInArray, or } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
@@ -81,7 +81,13 @@ export async function reopenColdLeadForQualification(input: { tenantId: string; 
       updatedAt: now,
     }).where(and(
       eq(schema.whatsappOutboundMessages.tenantId, input.tenantId),
-      eq(schema.whatsappOutboundMessages.idempotencyKey, `cold-lead-reactivation:${input.leadId}`),
+      eq(schema.whatsappOutboundMessages.recipientId, input.leadId),
+      eq(schema.whatsappOutboundMessages.purpose, "leadQualification"),
+      or(
+        eq(schema.whatsappOutboundMessages.idempotencyKey, `cold-lead-reactivation:${input.leadId}`),
+        like(schema.whatsappOutboundMessages.idempotencyKey, `cold-lead-requalification:auto:${input.leadId}:%`),
+        like(schema.whatsappOutboundMessages.idempotencyKey, `cold-lead-requalification:manual:${input.leadId}:%`),
+      ),
       inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"]),
     ));
 

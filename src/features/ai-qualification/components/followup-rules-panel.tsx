@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { saveFollowUpRuleAction, deleteFollowUpRuleAction } from "@/features/ai-qualification/actions";
+import type { FollowUpRuleInput } from "@/features/ai-qualification/followup-service";
 
 const followUpTriggerValues = [
   "no_first_response",
@@ -70,7 +71,7 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
         id: rule.id,
         name: rule.name,
         enabled: !rule.enabled,
-        trigger: rule.trigger as any,
+        trigger: rule.trigger as FollowUpRuleInput["trigger"],
         delayMinutes: rule.delayMinutes,
         maxAttempts: rule.maxAttempts,
         minimumIntervalMinutes: rule.minimumIntervalMinutes,
@@ -78,13 +79,13 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
         allowedStartTime: rule.allowedStartTime,
         allowedEndTime: rule.allowedEndTime,
         timezone: rule.timezone,
-        messageMode: rule.messageMode as any,
+        messageMode: rule.messageMode as FollowUpRuleInput["messageMode"],
         fixedMessage: rule.fixedMessage ?? undefined,
         templateId: rule.templateId ?? undefined,
         stopConditions: rule.stopConditions ?? ["client_responded"],
       });
       if (Array.isArray(updated)) {
-        setRules(updated as any);
+        setRules(updated as FollowUpRule[]);
         toast.success(`Regra "${rule.name}" ${!rule.enabled ? "ativada" : "desativada"}.`);
       }
     } catch {
@@ -97,7 +98,7 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
     try {
       const updated = await deleteFollowUpRuleAction(ruleId);
       if (Array.isArray(updated)) {
-        setRules(updated as any);
+        setRules(updated as FollowUpRule[]);
         toast.success("Regra removida.");
       }
     } catch {
@@ -116,7 +117,7 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
         id: editingRule.id,
         name: editingRule.name.trim(),
         enabled: editingRule.enabled ?? true,
-        trigger: (editingRule.trigger as any) ?? "qualification_abandoned",
+        trigger: (editingRule.trigger as FollowUpRuleInput["trigger"] | undefined) ?? "qualification_abandoned",
         delayMinutes: Number(editingRule.delayMinutes) || 120,
         maxAttempts: Number(editingRule.maxAttempts) || 3,
         minimumIntervalMinutes: Number(editingRule.minimumIntervalMinutes) || 60,
@@ -130,7 +131,7 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
       });
 
       if (Array.isArray(updated)) {
-        setRules(updated as any);
+        setRules(updated as FollowUpRule[]);
         setEditingRule(null);
         toast.success("Regra de follow-up salva com sucesso.");
       } else {
@@ -273,7 +274,7 @@ export function FollowUpRulesPanel({ rules: initialRules, canEdit = true }: Foll
                   <p className="text-xs text-muted-foreground">
                     Gatilho: <span className="font-medium text-foreground">{triggerLabels[rule.trigger] ?? rule.trigger}</span>
                     {rule.trigger === "cold_lead_reactivation"
-                      ? " · Template FIRST_CONTACT · uma tentativa · dias úteis, 08h–18h"
+                      ? "Cadencia configurada por fila; chave de ativacao do tenant"
                       : ` · Aguarda ${rule.delayMinutes}m · Max ${rule.maxAttempts}x`}
                   </p>
                   {rule.trigger !== "cold_lead_reactivation" && rule.fixedMessage && (

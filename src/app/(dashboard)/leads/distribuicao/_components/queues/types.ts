@@ -16,6 +16,7 @@ export type Queue = {
   maxPendingOffersPerBroker?: number;
   aiQualificationEnabled?: boolean;
   holdColdLeads?: boolean;
+  coldLeadRequalification?: { enabled: boolean; intervalMinutes: number; maxAttempts: number };
   attendanceFlowId?: string | null;
   colorHue?: number | null;
   waiting: number;

@@ -97,6 +97,7 @@ const emptyQueue = {
   maxPendingOffersPerBroker: "1",
   aiQualificationEnabled: true,
   holdColdLeads: false,
+  coldLeadRequalification: { enabled: false, intervalMinutes: "120", maxAttempts: "3" },
   attendanceFlowId: null as string | null,
   status: "active",
   colorHue: null as number | null,
@@ -331,6 +332,11 @@ export function QueueControlCenter({
       maxPendingOffersPerBroker: String(queue.maxPendingOffersPerBroker ?? 1),
       aiQualificationEnabled: queue.aiQualificationEnabled ?? true,
       holdColdLeads: queue.holdColdLeads ?? false,
+      coldLeadRequalification: {
+        enabled: queue.coldLeadRequalification?.enabled ?? false,
+        intervalMinutes: String(queue.coldLeadRequalification?.intervalMinutes ?? 120),
+        maxAttempts: String(queue.coldLeadRequalification?.maxAttempts ?? 3),
+      },
       attendanceFlowId: queue.attendanceFlowId ?? null,
       status: queue.status,
       colorHue: queue.colorHue ?? pickDistinctHue(usedHuesExcept(queue.id)),
@@ -427,6 +433,11 @@ export function QueueControlCenter({
       maxPendingOffersPerBroker: Math.max(0, Math.trunc(Number(form.maxPendingOffersPerBroker) || 0)),
       aiQualificationEnabled: form.aiQualificationEnabled,
       holdColdLeads: form.holdColdLeads,
+      coldLeadRequalification: {
+        enabled: form.coldLeadRequalification.enabled,
+        intervalMinutes: Math.max(15, Math.min(1440, Math.trunc(Number(form.coldLeadRequalification.intervalMinutes) || 120))),
+        maxAttempts: Math.max(1, Math.min(10, Math.trunc(Number(form.coldLeadRequalification.maxAttempts) || 3))),
+      },
       ...(attendanceFlows ? { attendanceFlowId: form.attendanceFlowId } : {}),
       status: form.status,
       colorHue: form.colorHue,
@@ -968,6 +979,25 @@ export function QueueControlCenter({
                 <p className="text-[11px] leading-relaxed text-muted-foreground">
                   Ligado: o plantão desta fila só recebe leads quentes e mornos. Os frios ficam na fila, sem corretor, para você distribuir manualmente.
                 </p>
+              </div>
+
+              <div className="rounded-[var(--radius-card)] border border-border/70 p-4 space-y-3">
+                <label className="flex cursor-pointer items-center justify-between gap-3 text-sm font-semibold text-foreground">
+                  <span>Follow-up automatico de leads frios</span>
+                  <Checkbox
+                    checked={form.coldLeadRequalification.enabled}
+                    onCheckedChange={(checked) => setForm({ ...form, coldLeadRequalification: { ...form.coldLeadRequalification, enabled: checked === true } })}
+                  />
+                </label>
+                <p className="text-[11px] leading-relaxed text-muted-foreground">Desligado por padrao. Quando ligado, envia somente se o lead nao respondeu ao ultimo convite, entre 08h e 20h em Sao Paulo.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="grid gap-1 text-xs text-muted-foreground">Intervalo (minutos)
+                    <Input type="number" min={15} max={1440} step={15} value={form.coldLeadRequalification.intervalMinutes} onChange={(event) => setForm({ ...form, coldLeadRequalification: { ...form.coldLeadRequalification, intervalMinutes: event.target.value } })} />
+                  </label>
+                  <label className="grid gap-1 text-xs text-muted-foreground">Tentativas maximas
+                    <Input type="number" min={1} max={10} value={form.coldLeadRequalification.maxAttempts} onChange={(event) => setForm({ ...form, coldLeadRequalification: { ...form.coldLeadRequalification, maxAttempts: event.target.value } })} />
+                  </label>
+                </div>
               </div>
 
               {attendanceFlows ? (

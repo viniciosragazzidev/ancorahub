@@ -53,7 +53,7 @@
 - **Status de veiculação Meta**: estado de entrega informado pela Meta para campanha/anúncio. É independente da elegibilidade de captura definida no CRM.
 - **Catálogo de integrações**: ponto de entrada administrativo que lista conectores disponíveis e planejados. Ele não concede acesso por si só: cada conector conserva sua própria autorização, configuração e controles de capacidade.
 - **Canal legado OpenWA**: conexão temporária por QR Code mantida apenas durante a migração. Não deve receber novas capacidades estruturais.
-- **Reativação de lead frio**: único reenvio do template Meta oficial FIRST_CONTACT para um lead que concluiu a qualificação, permanece sem corretor e não pediu opt-out; resposta retoma a qualificação somente enquanto não atribuído.
+- **Requalificacao de lead frio**: revisao ou reenvio governado do template Meta FIRST_CONTACT para lead frio sem corretor e sem opt-out; cadencia pode ser ligada por fila, e resposta retoma a qualificacao oficial sem liberar distribuicao antes de ficar morno/quente.
 - **Histórico de conversa**: conjunto de mensagens armazenadas pelo CRM para um telefone dentro de um tenant. Excluir o histórico não exclui o lead, cliente, integrante da equipe, convite ou demais registros operacionais vinculados.
 - **Atendimento externo temporário**: enquanto o chat interno não estiver operacional, o Corretor inicia o atendimento auditado no CorreTop e é direcionado ao WhatsApp pessoal pelo número autorizado do lead. A interface não apresenta mensagens como se estivessem sincronizadas.
 

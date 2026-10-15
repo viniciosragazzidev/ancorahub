@@ -444,3 +444,11 @@ por categoria e com documentação local.
 - O Tipo de CNPJ continua separado da classificação comercial, e respostas ausentes em
   leads existentes não sobrescrevem valores já registrados. Outros canais não mudam.
 - Implementação: `docs/implementations/completed/2026-09-24-meta-lead-product-details.md`.
+
+
+# 15/10/2026 - Requalificacao de leads frios
+
+- Central de Distribuicao do Diretor lista leads frios por fila no dia operacional e separa sem resposta de resposta que permaneceu fria. Reenvio manual usa template Meta FIRST_CONTACT, exige confirmacao e informa envios e pulos.
+- A politica JSONB da fila permite habilitar follow-up automatico (padrao desligado), intervalo e limite de tentativas; job existente usa lock advisory, janela 08h-20h Sao Paulo, opt-out e idempotencia.
+- Respostas retomam a qualificacao existente; o estado frio permanece ate resposta para preservar T121. Nenhuma migration.
+- Implementacao: docs/implementations/active/2026-10-15-requalificar-frios.md.

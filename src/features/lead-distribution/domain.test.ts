@@ -51,7 +51,10 @@ describe("provisional assignment rotation guard", () => {
 describe("retenção de leads frios por fila", () => {
   it("usa false por padrão e retém somente qualification_status cold", () => {
     expect(defaultIntelligentDistributionPolicy.holdColdLeads).toBe(false);
+    expect(defaultIntelligentDistributionPolicy.coldLeadRequalification).toEqual({ enabled: false, intervalMinutes: 120, maxAttempts: 3 });
     expect(readDistributionPolicy({ holdColdLeads: true }).holdColdLeads).toBe(true);
+    expect(readDistributionPolicy({ coldLeadRequalification: { enabled: true, intervalMinutes: 5, maxAttempts: 12 } }).coldLeadRequalification)
+      .toEqual({ enabled: true, intervalMinutes: 15, maxAttempts: 10 });
     expect(shouldHoldColdLead("cold", true)).toBe(true);
     for (const status of ["warm", "hot", "pending", "qualified", "ia_disabled", "qualifying", null]) {
       expect(shouldHoldColdLead(status, true)).toBe(false);
