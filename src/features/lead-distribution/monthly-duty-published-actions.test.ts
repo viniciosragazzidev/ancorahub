@@ -91,8 +91,8 @@ describe("adicionar corretor a um plantão publicado (ação de servidor)", () =
     const notice = state.inserts.find((item) => item.table === schema.notifications);
     expect(notice?.values).toMatchObject({ recipientUserId: "bruno", type: "duty_plantao_added" });
     expect(String(notice?.values.message)).toContain("Manhã");
-    // Deduplication: the key names the action, not the moment it was sent.
-    expect(notice?.values.idempotencyKey).toBe(`duty-direct:added:${OCCURRENCE_ID}:bruno`);
+    // Key: the action, the plantão, the broker, the roster row and the moment of the change.
+    expect(String(notice?.values.idempotencyKey)).toMatch(new RegExp(`^duty-direct:added:${OCCURRENCE_ID}:bruno:`));
   });
 
   it("adds straight to the published escala when there is no newer draft", async () => {

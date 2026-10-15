@@ -783,12 +783,15 @@ async function notifyPlantaoChange(tx: Transaction, input: {
   kind: "added" | "removed";
   occurrence: MonthlyPlanOccurrence;
   scheduleName: string;
+  /** The dated roster row that changed state. */
+  rosterId: string;
   now: Date;
 }) {
   const day = `${input.occurrence.dutyDate.slice(8, 10)}/${input.occurrence.dutyDate.slice(5, 7)}`;
   const slot = `das ${input.occurrence.startsAt.slice(0, 5)} às ${input.occurrence.endsAt.slice(0, 5)}`;
   const added = input.kind === "added";
-  // The key has no send time: the same action on the same plantão for the same broker is one notification.
+  // One notification per real transition: the row, the kind and the moment of the change (the row's updatedAt is the same instant).
+  // Repeating a click changes nothing, so it is refused before this point; a retry of the same write hits the unique key.
   await tx.insert(schema.notifications).values({
     id: randomUUID(),
     tenantId: input.tenantId,
@@ -798,7 +801,7 @@ async function notifyPlantaoChange(tx: Transaction, input: {
     message: added
       ? `Você está escalado no plantão ${input.scheduleName}, em ${day}, ${slot}.`
       : `Você saiu do plantão ${input.scheduleName}, em ${day}, ${slot}.`,
-    idempotencyKey: `duty-direct:${input.kind}:${input.occurrence.id}:${input.brokerId}`,
+    idempotencyKey: `duty-direct:${input.kind}:${input.occurrence.id}:${input.brokerId}:${input.rosterId}:${input.now.getTime()}`,
     createdAt: input.now,
   }).onConflictDoNothing();
 }
@@ -904,7 +907,7 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
       }
     }
     await audit(tx, context.userId, plan.id, !allowed ? "duty_schedule_monthly_plan.published_broker_forced" : "duty_schedule_monthly_plan.published_broker_added");
-    await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "added", occurrence, scheduleName: schedule.name, now });
+    await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "added", occurrence, scheduleName: schedule.name, rosterId, now });
     return plan.monthKey;
   });
 
@@ -959,7 +962,7 @@ export async function removeBrokerFromPublishedOccurrenceAction(input: unknown):
       }
     }
     await audit(tx, context.userId, plan.id, "duty_schedule_monthly_plan.published_broker_removed");
-    await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "removed", occurrence, scheduleName, now });
+    await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "removed", occurrence, scheduleName, rosterId: entry?.rosterAssignmentId ?? "sem-linha", now });
     return plan.monthKey;
   });
 
