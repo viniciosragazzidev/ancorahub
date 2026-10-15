@@ -84,12 +84,21 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
           const items = byDate.get(date) ?? [];
           const past = date < today;
           const isToday = date === today;
+          const hasItems = items.length > 0;
           return (
             <div
               key={date}
               role="gridcell"
               aria-label={`${date.slice(8, 10)}/${date.slice(5, 7)}: ${items.length} plantões`}
-              className={cn("group/day flex min-h-24 flex-col gap-1 p-1.5", past ? "bg-[color-mix(in_oklab,var(--card)_65%,var(--muted))]" : "bg-card", isToday && "ring-2 ring-inset ring-primary/60")}
+              className={cn(
+                "group/day flex min-h-24 flex-col gap-1 p-1.5",
+                past
+                  ? "bg-[color-mix(in_oklab,var(--card)_65%,var(--muted))]"
+                  : hasItems
+                    ? "bg-[color-mix(in_oklab,var(--primary)_8%,var(--card))] dark:bg-[color-mix(in_oklab,var(--primary)_14%,var(--card))]"
+                    : "bg-card",
+                isToday && "ring-2 ring-inset ring-primary/60",
+              )}
             >
               <div className="flex items-center justify-between">
                 <span className={cn("text-[11px] font-semibold tabular-nums", past ? "text-muted-foreground/70" : "text-foreground", isToday && "text-primary")}>
