@@ -185,6 +185,13 @@ export const FEATURE_FLAGS = {
     allowedValues: ["true", "false"] as const,
     description: "Força o Gestor a usar a experiência Lite, começando por Leads.",
   },
+  TEAM_MANAGEMENT: {
+    key: "feature_team_management_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita a camada de métricas da Gestão de Equipes para gestor e supervisor.",
+  },
 
   SUPERVISOR_TEAM_SCOPE: {
     key: "feature_supervisor_team_scope_enabled",

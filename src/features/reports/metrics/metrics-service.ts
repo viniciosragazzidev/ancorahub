@@ -8,7 +8,7 @@ import type { PeriodValue } from "@/shared/period";
 import { fillTrendDays } from "@/shared/period";
 
 import type { FunnelStage } from "./metrics-math";
-import { buildFunnelRows, percentage, safeRate } from "./metrics-math";
+import { buildFunnelRows, cohortConversionRate, percentage, safeRate } from "./metrics-math";
 import { resolveReportDataScope, type ReportDataScope } from "./metric-scope";
 import {
   type CohortConversion,
@@ -127,7 +127,7 @@ export async function resolveCohortConversion(
     if (row.status === "lost") lost += Number(row.total);
   }
 
-  return { received, converted, lost, rate: percentage(converted, received) };
+  return { received, converted, lost, rate: cohortConversionRate(converted, received) };
 }
 
 

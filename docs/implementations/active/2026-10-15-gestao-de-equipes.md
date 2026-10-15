@@ -36,7 +36,7 @@ Janela padrão de **7 dias**, alternável para **30 dias**. Tendência = janela 
 - **Tempo de aceite:** mediana de `accepted_at - offered_at`.
 - **Redistribuições:** ofertas que expiraram, foram recusadas ou substituídas (EXPIRED, DECLINED, REPLACED).
 - **SLA:** % dos leads atribuídos na janela com primeiro contato dentro do prazo do tenant.
-- **Conversão:** vendas / leads atribuídos na janela.
+- **Conversão:** Gestão de Equipes consome `commercial.conversion_rate` do catálogo canônico (`src/features/reports/metrics`), na coorte de entrada (leads recebidos na janela que chegaram a `converted` ÷ leads recebidos). As novas métricas operacionais ficam no catálogo como família `team`, com dimensões unidade/equipe; nenhuma métrica é recalculada pela feature.
 - **Retornos vencidos:** tarefas abertas com `due_at` passado.
 - **Sem próxima ação:** lead em atendimento sem nenhuma tarefa aberta.
 - **Sem atividade:** corretor ativo sem aceite nem mudança de etapa há 2 dias úteis.
@@ -126,5 +126,5 @@ Migrations do MVP: só `supervisor_notes` (tipos + `follow_up_at`) em G3 e `goal
 ## 7. Decisões do Vinicios (2026-10-15)
 1. Rota: **`/gestao`**.
 2. Score: pesos e faixas da seção 3, como propostos.
-3. Conversão: **vendas / leads atribuídos na janela**.
+3. Conversão: **métrica canônica `commercial.conversion_rate` da DEC-090**, por coorte de entrada. Este registro substitui a hipótese inicial de vendas ÷ leads atribuídos.
 4. Destaques e "maior evolução": **só gestor e supervisor no MVP** (o corretor vê depois).
