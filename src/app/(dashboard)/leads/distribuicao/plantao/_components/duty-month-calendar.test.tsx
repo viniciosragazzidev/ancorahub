@@ -49,4 +49,22 @@ describe("DutyMonthCalendar", () => {
     expect(screen.queryByRole("gridcell", { name: /26\/09/ })).toBeNull();
     expect(screen.queryByRole("gridcell", { name: /27\/09/ })).toBeNull();
   });
+
+  it("gives days with plantões a stronger highlight than empty days", () => {
+    render(
+      <DutyMonthCalendar
+        month="2026-09"
+        schedules={[{ ...pme23, id: "pme30", name: "PME 30/09" }]}
+        progressById={new Map([["pme30", { dates: [{ date: "2026-09-30", done: false }] }]])}
+        publishedScheduleIds={new Set()}
+        gapScheduleIds={new Set()}
+        repeatingScheduleIds={new Set()}
+        canCreate
+        onOpen={vi.fn()}
+        onCreateOnDate={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("gridcell", { name: /30\/09/ }).className).toContain("color-mix(in_oklab,var(--primary)");
+    expect(screen.getByRole("gridcell", { name: /29\/09/ }).className).not.toContain("color-mix(in_oklab,var(--primary)");
+  });
 });

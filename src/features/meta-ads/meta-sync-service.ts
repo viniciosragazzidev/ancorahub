@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import { subscribePageToLeadgen } from "@/features/communication-channels/meta-cloud-client";
@@ -15,11 +15,19 @@ const MISSING_ADS_READ_MESSAGE = "A conexão Meta atual não recebeu leitura da 
 const META_RATE_LIMIT_BASE_COOLDOWN_MS = 60 * 60 * 1000;
 const META_RATE_LIMIT_MAX_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 const META_SCHEDULED_SYNC_MIN_INTERVAL_MS = 60 * 60 * 1000;
+const META_SYNC_STALE_AFTER_MS = 15 * 60 * 1000;
+const INTERRUPTED_SYNC_DETAILS = "Interrompida: o servidor reiniciou durante a sincronização";
 
 type MetaSyncOptions = { scheduled?: boolean };
 
+/** Local abort (server restart), never a Meta answer: must not feed the rate-limit backoff. */
+function isInterruptedSync(errorDetails: string | null | undefined) {
+  return typeof errorDetails === "string" && errorDetails.startsWith("Interrompida:");
+}
+
 function isPersistedMetaRateLimit(errorDetails: string | null) {
   return typeof errorDetails === "string"
+    && !isInterruptedSync(errorDetails)
     && /user request limit reached|request limit reached|rate.?limit/i.test(errorDetails);
 }
 
@@ -74,6 +82,17 @@ export async function runMetaTenantSync(
   const syncLogId = randomUUID();
   let totalSynced = 0;
 
+  // A server restart mid-sync leaves its log "in_progress" forever. Close stale ones
+  // (same window as the lock below) before reading the history, so the screen stops
+  // showing "Em andamento" for days; "Interrompida" is not a Meta rate-limit failure.
+  await db.update(schema.metaSyncLogs)
+    .set({ status: "error", errorDetails: INTERRUPTED_SYNC_DETAILS, completedAt: new Date() })
+    .where(and(
+      eq(schema.metaSyncLogs.tenantId, tenantId),
+      eq(schema.metaSyncLogs.status, "in_progress"),
+      lt(schema.metaSyncLogs.startedAt, new Date(startTime - META_SYNC_STALE_AFTER_MS)),
+    ));
+
   const recentLogs = await db.select({
     status: schema.metaSyncLogs.status,
     errorDetails: schema.metaSyncLogs.errorDetails,
@@ -91,7 +110,7 @@ export async function runMetaTenantSync(
   const latestLog = recentLogs[0];
   // One sync at a time: the cron and the "Sincronizar" button could start two
   // full syncs together. A recent "in_progress" means another one is running.
-  if (latestLog?.status === "in_progress" && startTime - latestLog.startedAt.getTime() < 15 * 60_000) {
+  if (latestLog?.status === "in_progress" && startTime - latestLog.startedAt.getTime() < META_SYNC_STALE_AFTER_MS) {
     return { success: false, itemsSynced: 0, error: "Já existe uma sincronização da Meta em andamento. Aguarde ela terminar." };
   }
   if (consecutiveRateLimitFailures > 0 && latestLog) {

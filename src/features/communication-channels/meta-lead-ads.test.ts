@@ -30,20 +30,20 @@ describe("Meta Lead Ads normalization", () => {
       .toThrow("Esta Página Meta já está conectada a outra empresa.");
   });
 
-  it("ignores only campaigns explicitly disabled by the Director and otherwise resolves an active queue", () => {
+  it("ignores a campaign the Director disabled or left without an active queue, and otherwise captures its queue", () => {
     expect(resolveMetaCampaignIntake({ campaignRoute: { enabled: false, queueId: null, queueStatus: null } }))
       .toEqual({ action: "ignore", queueId: null });
     expect(resolveMetaCampaignIntake({ campaignRoute: { enabled: true, queueId: "queue-1", queueStatus: "active" } }))
       .toEqual({ action: "capture", queueId: "queue-1" });
     expect(resolveMetaCampaignIntake({ campaignRoute: { enabled: true, queueId: "queue-1", queueStatus: "inactive" } }))
-      .toEqual({ action: "capture", queueId: null });
+      .toEqual({ action: "ignore", queueId: null });
   });
 
-  it("uses an enabled child route to refine the queue selected by an eligible campaign", () => {
+  it("never lets an enabled child route override the queue selected by the campaign", () => {
     expect(resolveMetaCampaignIntake({
       adRoute: { enabled: true, queueId: "queue-ad", queueStatus: "active" },
       campaignRoute: { enabled: true, queueId: "queue-campaign", queueStatus: "active" },
-    })).toEqual({ action: "capture", queueId: "queue-ad" });
+    })).toEqual({ action: "capture", queueId: "queue-campaign" });
   });
 
   it("does not confuse an active Meta campaign with CRM eligibility in selective mode", () => {

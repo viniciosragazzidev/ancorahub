@@ -47,6 +47,13 @@ describe("summarizeLastSync", () => {
     expect(summarizeLastSync([log("mystery", 5)], null, now)).toMatchObject({ tone: "secondary", label: "mystery" });
   });
 
+  it("shows an in_progress that aged past the lock window as interrupted", () => {
+    const stale = summarizeLastSync([{ ...log("in_progress", 20), completedAt: null }], null, now);
+    expect(stale).toMatchObject({ tone: "warning", label: "Interrompida" });
+    expect(stale.detail).toContain("clique em Sincronizar");
+    expect(summarizeLastSync([{ ...log("in_progress", 10), completedAt: null }], null, now)).toMatchObject({ tone: "info", label: "Em andamento" });
+  });
+
   it("does not claim item counts for a failed sync", () => {
     expect(summarizeLastSync([log("error", 5, 0)], null, now).detail).not.toMatch(/iten|item/);
   });
