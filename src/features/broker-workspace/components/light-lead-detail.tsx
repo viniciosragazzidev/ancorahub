@@ -836,21 +836,9 @@ export function LightLeadDetail({
                   ) : null}
 
                   <div>
-                    <span className="text-muted-foreground block text-[11px]">Origem / Campanha</span>
-                    <strong className="font-semibold text-foreground truncate block">
-                      {lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook / Meta")}
-                    </strong>
-                  </div>
-                  <div>
                     <span className="text-muted-foreground block text-[11px]">Cidade / Filial</span>
                     <strong className="font-semibold text-foreground truncate block">
                       {lead.city || lead.branchName || "Não informada"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground block text-[11px]">Data de Entrada</span>
-                    <strong className="font-semibold text-foreground truncate block">
-                      {new Date(lead.createdAt).toLocaleDateString("pt-BR")}
                     </strong>
                   </div>
                   <div>
@@ -892,6 +880,7 @@ export function LightLeadDetail({
             />
             <PersonRecordDetails
               kind="lead"
+              hideRegistrationDate
               createdAt={new Date(lead.createdAt)}
               consentimentoLgpd={lead.consentimentoLgpd ?? false}
               dependents={(lead.beneficiaries || []).map((b) => ({

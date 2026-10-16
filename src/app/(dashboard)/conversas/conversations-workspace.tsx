@@ -485,7 +485,7 @@ export function ConversationsWorkspace({
           aria-label="Perfil do cliente"
           className={cn("hidden min-h-0 overflow-y-auto border-l border-border bg-card lg:flex lg:flex-col", !profileOpen && "lg:hidden")}
         >
-          {selected ? <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} /> : null}
+          {selected ? <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} /> : null}
         </aside>
       </div>
 
@@ -497,7 +497,7 @@ export function ConversationsWorkspace({
                 <SheetTitle>Perfil do atendimento</SheetTitle>
                 <SheetDescription>Contexto e ações disponíveis para {selected.nome}.</SheetDescription>
               </SheetHeader>
-              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} />
+              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} />
             </>
           ) : null}
         </SheetContent>
@@ -1641,9 +1641,12 @@ function renderQualificationRatingBadge(status: string, qualStatus?: string | nu
 function ClientProfile({
   client,
   onUpdateConversation,
+  hideOrigin = false,
 }: {
   client: ConversationItem;
   onUpdateConversation?: (leadId: string, updates: Partial<ConversationItem>) => void;
+  /** Brokers do not see where the lead came from. */
+  hideOrigin?: boolean;
 }) {
   const approvedDocuments = client.documents.filter((document) => document.status === "approved").length;
   const pendingDocuments = client.documents.filter((document) => document.status === "pending").length;
@@ -1853,7 +1856,7 @@ function ClientProfile({
 
           <ProfileSection title="Resumo do atendimento">
             <dl className="grid grid-cols-2 gap-2">
-              <ProfileTag label="Origem" value={client.origem} />
+              {hideOrigin ? null : <ProfileTag label="Origem" value={client.origem} />}
               <ProfileTag label="Plano" value={client.planName ?? "Não informado"} />
               {client.carrierName ? <ProfileTag label="Operadora" value={client.carrierName} /> : null}
               <ProfileTag label="Consentimento" tone={client.consentimentoLgpd ? "success" : "warning"} value={client.consentimentoLgpd ? "Registrado" : "Não registrado"} />

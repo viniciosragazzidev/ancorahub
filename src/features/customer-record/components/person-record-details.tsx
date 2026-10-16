@@ -20,8 +20,11 @@ export function PersonRecordDetails({
   dependents,
   documentCount,
   formData,
+  hideRegistrationDate = false,
 }: {
   kind: "lead" | "client";
+  /** Brokers do not see when the lead reached the brokerage. */
+  hideRegistrationDate?: boolean;
   createdAt: Date;
   birthDate?: string | null;
   consentimentoLgpd: boolean;
@@ -41,7 +44,7 @@ export function PersonRecordDetails({
           <div className="rounded-lg border border-border/70 bg-muted/20 p-3"><p className="text-[10px] uppercase tracking-wide text-muted-foreground">Documentos</p><p className="mt-1 text-sm font-semibold">{documentCount}</p></div>
         </div>
         <div className="space-y-2 text-xs">
-          <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-muted-foreground"><CalendarBlank className="size-3.5" /> Cadastro</span><span className="font-medium">{new Intl.DateTimeFormat("pt-BR").format(createdAt)}</span></div>
+          {hideRegistrationDate ? null : <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-muted-foreground"><CalendarBlank className="size-3.5" /> Cadastro</span><span className="font-medium">{new Intl.DateTimeFormat("pt-BR").format(createdAt)}</span></div>}
           <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-muted-foreground"><CalendarBlank className="size-3.5" /> Aniversário</span><span className="font-medium">{birthDate ? new Intl.DateTimeFormat("pt-BR").format(new Date(`${birthDate}T00:00:00`)) : "Ainda não informado"}</span></div>
           <div className="flex items-center justify-between gap-3"><span className="flex items-center gap-2 text-muted-foreground"><CheckCircle className="size-3.5" /> Consentimento LGPD</span><Badge variant={consentimentoLgpd ? "success" : "outline"}>{consentimentoLgpd ? "Registrado" : "Pendente"}</Badge></div>
         </div>

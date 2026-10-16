@@ -400,8 +400,7 @@ export function LightLeadsList({
 
                     <div className="flex flex-col gap-3 border-t border-border/50 pt-3 sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-[11px] text-muted-foreground">
-                        Entrada {formatDate(lead.createdAt)}
-                        {lead.dueAt ? ` · Retorno ${formatDate(lead.dueAt)}` : ""}
+                        {lead.dueAt ? `Retorno ${formatDate(lead.dueAt)}` : ""}
                       </span>
                       <div className="flex gap-2">
                         <Link

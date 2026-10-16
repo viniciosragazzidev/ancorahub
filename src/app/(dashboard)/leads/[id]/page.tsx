@@ -272,6 +272,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     : [];
 
   const isManagement = context.role === "manager" || context.role === "director";
+  // Brokers never see when the lead arrived or which campaign/source it came from.
+  const isBrokerRole = context.role === "broker";
   const shouldMask = isMarketing && lead.branchId !== context.branchId;
 
   const canSeePersonalData = (context.role !== "broker" || lead.corretorId !== context.userId || lead.status !== "distributed") && !shouldMask;
@@ -309,8 +311,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-muted-foreground">
-                  <span>Criado em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}</span>
-                  <span>•</span>
+                  {isBrokerRole ? null : (
+                    <>
+                      <span>Criado em {new Intl.DateTimeFormat("pt-BR", { dateStyle: "long", timeZone: "America/Sao_Paulo" }).format(lead.createdAt)}</span>
+                      <span>•</span>
+                    </>
+                  )}
                   <span>Unidade: <strong className="font-semibold text-foreground">{lead.branchNome ?? "Geral / Matriz"}</strong></span>
                 </div>
                 <div className="flex max-w-full flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
@@ -327,11 +333,15 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                       <a className="max-w-[220px] truncate text-primary hover:underline font-medium" href={`mailto:${lead.email}`}>{lead.email}</a>
                     ) : canSeePersonalData ? "Não informado" : maskedEmail}
                   </span>
-                  <span className="hidden text-border sm:inline">•</span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <Buildings className="size-3.5 shrink-0 text-muted-foreground/80" />
-                    {lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}
-                  </span>
+                  {isBrokerRole ? null : (
+                    <>
+                      <span className="hidden text-border sm:inline">•</span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Buildings className="size-3.5 shrink-0 text-muted-foreground/80" />
+                        {lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}
+                      </span>
+                    </>
+                  )}
                   <span className="hidden text-border sm:inline">•</span>
                   <span className="inline-flex items-center gap-1.5">
                     <UserPlus className="size-3.5 shrink-0 text-muted-foreground/80" />
@@ -578,7 +588,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 )}
 
                 {/* ── Origem Meta Ads ──────────────── */}
-                {(lead.origem === "webhook" || lead.sourceCampaign || lead.metaCampaignId) && (
+                {!isBrokerRole && (lead.origem === "webhook" || lead.sourceCampaign || lead.metaCampaignId) && (
                   <Card className="border-primary/20 bg-primary/8 shadow-none">
                     <CardHeader className="pb-2">
                       <div className="flex items-center gap-2">
@@ -601,7 +611,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 )}
 
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <PersonRecordDetails kind="lead" createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />
+                  <PersonRecordDetails kind="lead" hideRegistrationDate={isBrokerRole} createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />
                   <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />
                 </div>
 
@@ -676,15 +686,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-muted text-muted-foreground">
-                    <Share className="size-4" />
+                {isBrokerRole ? null : (
+                  <div className="flex items-start gap-3">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-muted text-muted-foreground">
+                      <Share className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Origem</p>
+                      <p className="mt-0.5 text-sm font-medium">{lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Origem</p>
-                    <p className="mt-0.5 text-sm font-medium">{lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook")}</p>
-                  </div>
-                </div>
+                )}
 
                 <div className="flex items-start gap-3">
                   <div className="flex size-8 shrink-0 items-center justify-center rounded-[var(--radius-card)] bg-muted text-muted-foreground">
