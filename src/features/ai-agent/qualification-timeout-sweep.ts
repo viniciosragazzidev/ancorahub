@@ -1,12 +1,14 @@
 ﻿import "server-only";
 
-import { and, desc, eq, gt, isNotNull, isNull, ne, notInArray, or } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, ne, notInArray, or } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { transitionConversationState } from "./conversation-state-machine";
 import { resolveQualificationTimeoutRoute } from "./qualification-timeout-routing";
+import type { ConversationMemory } from "./memory";
+import { hasQualificationTimedOut, qualificationTimeoutOutcome } from "./qualification-timeout-policy";
 
 export interface QualificationTimeoutSweepResult {
   tenantsChecked: number;
@@ -45,8 +47,6 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       .limit(1);
 
     const timeoutMinutes = Math.max(1, config?.timeoutMinutes ?? 15);
-    const cutoffDate = new Date(now - timeoutMinutes * 60 * 1000);
-
     // Seleciona todos os leads em qualificação que não possuem corretor atribuído
     const qualifyingLeads = await db
       .select({
@@ -110,6 +110,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           automationState: schema.aiConversations.automationState,
           lastActivityAt: schema.aiConversations.lastActivityAt,
           updatedAt: schema.aiConversations.updatedAt,
+          memory: schema.aiConversations.memory,
         })
         .from(schema.aiConversations)
         .where(
@@ -149,20 +150,50 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         lead.createdAt ??
         new Date();
 
-      // Se a última atividade ainda estiver dentro da janela de tolerância, não expirar
-      if (lastActivityAt >= cutoffDate) {
+      const [latestReopen] = await db
+        .select({ createdAt: schema.auditLogs.createdAt })
+        .from(schema.auditLogs)
+        .innerJoin(
+          schema.leads,
+          and(
+            eq(schema.auditLogs.entidade, "lead"),
+            eq(schema.auditLogs.entidadeId, schema.leads.id),
+          ),
+        )
+        .where(
+          and(
+            eq(schema.leads.id, lead.id),
+            eq(schema.leads.tenantId, tenant.id),
+            eq(schema.auditLogs.acao, "qualification.manually_reverted_to_qualifying"),
+          ),
+        )
+        .orderBy(desc(schema.auditLogs.createdAt))
+        .limit(1);
+
+      // Reabrir manualmente reinicia a janela; atividade posterior ainda prevalece.
+      if (!hasQualificationTimedOut({
+        lastActivityAt,
+        reopenedAt: latestReopen?.createdAt,
+        now: new Date(now),
+        timeoutMinutes,
+      })) {
         continue;
       }
 
       timedOutLeadsCount += 1;
       const updateTime = new Date();
 
-      // Verificar se o lead interagiu: uma mensagem do cliente DEPOIS da primeira.
-      // Um lead de WhatsApp nasce da mensagem do próprio cliente; contá-la deixava
-      // todo lead de WhatsApp como Morno sem ter respondido a qualificação (13/10).
-      const repliedAfter = new Date((lead.createdAt ?? new Date(0)).getTime() + 5_000);
-      const [incomingMessage] = await db
-        .select({ id: schema.whatsappMessages.id })
+      // Somente uma resposta válida a uma pergunta já enviada classifica como morno.
+      // A primeira mensagem de intake (ex.: "quero cotação empresarial") não basta.
+      const conversationMessages = await db
+        .select({
+          id: schema.whatsappMessages.id,
+          messageId: schema.whatsappMessages.messageId,
+          senderRole: schema.whatsappMessages.senderRole,
+          body: schema.whatsappMessages.body,
+          direction: schema.whatsappMessages.direction,
+          sentAt: schema.whatsappMessages.sentAt,
+        })
         .from(schema.whatsappMessages)
         .where(
           and(
@@ -171,14 +202,15 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
               eq(schema.whatsappMessages.leadId, lead.id),
               and(isNotNull(schema.whatsappMessages.phone), eq(schema.whatsappMessages.phone, lead.telefone ?? ""))
             ),
-            notInArray(schema.whatsappMessages.direction, ["outbound", "outgoing"]),
-            gt(schema.whatsappMessages.sentAt, repliedAfter)
           )
         )
-        .limit(1);
+        .orderBy(schema.whatsappMessages.sentAt);
 
-      const hasInteracted = Boolean(incomingMessage);
-      const targetQualificationStatus = hasInteracted ? "warm" : "cold";
+      const timeoutOutcome = qualificationTimeoutOutcome(
+        aiConv?.memory as ConversationMemory | null | undefined,
+        conversationMessages,
+      );
+      const targetQualificationStatus = timeoutOutcome.qualificationStatus;
 
       const campaignId = lead.metaCampaignId || lead.sourceCampaign;
       const [configuredRoute] = campaignId
@@ -218,13 +250,13 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       }
 
       await db.transaction(async (tx) => {
-        // 1. Atualizar Lead: Status Morno/Frio + Finalizar Qualificação + Mover p/ Fila de Distribuição
+        // 1. Atualizar temperatura, preservar qualificação parcial e mover para a fila.
         await tx
           .update(schema.leads)
           .set({
             qualificationStatus: targetQualificationStatus,
-            qualificationState: "QUALIFIED",
-            qualificationCompletedAt: updateTime,
+            qualificationState: timeoutOutcome.qualificationState,
+            qualificationCompletedAt: null,
             queueId: targetRoute.queueId || null,
             branchId: resolvedBranchId,
             status: "new",
@@ -240,9 +272,9 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           leadId: lead.id,
           userId: systemUserId,
           tipo: "system_alert",
-          conteudo: hasInteracted
-            ? `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead interagiu com o atendimento e foi qualificado como Morno (Warm), permanecendo na fila de distribuição configurada.`
-            : `Qualificação finalizada por estouro do tempo limite de resposta (${timeoutMinutes} min). Lead não respondeu a nenhuma mensagem e foi qualificado como Frio (Cold), permanecendo na fila de distribuição configurada.`,
+          conteudo: targetQualificationStatus === "warm"
+            ? `Tempo limite da qualificação excedido (${timeoutMinutes} min). Lead respondeu a uma pergunta com dado válido, foi classificado como Morno e permaneceu com qualificação parcial na fila configurada.`
+            : `Tempo limite da qualificação excedido (${timeoutMinutes} min). Lead não informou dado válido em resposta à qualificação, foi classificado como Frio e permaneceu com qualificação parcial na fila configurada.`,
         });
 
         await tx.insert(schema.leadDistributionEvents).values({
@@ -287,7 +319,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           tenantId: tenant.id,
           conversationId: aiConv.id,
           newStatus: "CLOSED",
-          reason: `Estouro do tempo limite de qualificação (${timeoutMinutes} min sem resposta). IA encerrada.`,
+          reason: `Estouro do tempo limite de qualificação (${timeoutMinutes} min sem dado válido). IA encerrada.`,
         }).catch(() => undefined);
       }
 

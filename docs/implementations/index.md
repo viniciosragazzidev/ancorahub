@@ -1,6 +1,7 @@
 # Índice de Implementações
 
 | Data | Registro | Estado | Resumo |
+| 2026-10-16 | completed/2026-10-16-qualification-timeout-valid-response.md | implementado; testes focados e type-check passaram; build bloqueado pelo ambiente | Timeout agora exige dado valido de resposta para classificar como morno, grava estado parcial e reinicia o prazo na reabertura manual. |
 | 2026-10-08 | `completed/2026-10-08-broker-workspace-data.md` | implementado no código; índices pendentes de aplicação | Dados leves de escala e indicadores diários do corretor na home, sem alteração de UI. |
 | 2026-10-07 | `completed/2026-10-07-meta-sync-rate-limit-backoff.md` | implementado no código | Evitar chamadas Meta repetidas após rate limit e limitar sincronização automática a uma vez por hora. |
 | 2026-10-07 | `completed/2026-10-07-meta-campaign-routing-single-home.md` | type-check e build passaram | Captura e fila são configuradas no detalhe da campanha; anúncios/formulários herdam a fila ativa e intake sem rota é ignorado. |
