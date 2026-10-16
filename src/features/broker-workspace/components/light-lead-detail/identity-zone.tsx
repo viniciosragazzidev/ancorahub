@@ -8,7 +8,7 @@ import type { LightLeadDetailData } from "./types";
 import type { LeadDetailController } from "./use-lead-detail";
 
 /** Centered identity: avatar, name, stage chip and, for a new lead, the acceptance deadline. */
-export function IdentityHeader({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
+export function IdentityHeader({ lead, c, mode = "broker" }: { lead: LightLeadDetailData; c: LeadDetailController; mode?: "broker" | "management" }) {
   const { isDistributed, leadStatus, slaRemainingMinutes } = c;
   const tone: BadgeTone = isDistributed ? "info" : leadStatus === "converted" ? "success" : "neutral";
 
@@ -17,7 +17,7 @@ export function IdentityHeader({ lead, c }: { lead: LightLeadDetailData; c: Lead
       <Avatar name={lead.nome} size="xl" className="light-avatar" />
       <div className="flex min-w-0 max-w-full flex-col items-center gap-1">
         <h1 className="max-w-full break-words text-2xl font-bold tracking-tight text-(--foreground)">{lead.nome}</h1>
-        {isDistributed ? (
+        {mode === "management" ? null : isDistributed ? (
           <p className="text-sm text-(--text-secondary)">Os dados de contato aparecem depois que você aceitar o lead.</p>
         ) : lead.email ? (
           <p className="max-w-full truncate text-sm text-(--text-secondary)">{lead.email}</p>
@@ -41,15 +41,35 @@ export function IdentityHeader({ lead, c }: { lead: LightLeadDetailData; c: Lead
 }
 
 /** Everything the client told us (AI qualification and form), before and after acceptance. */
-export function ClientInfoCard({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
+const qualificationLabels: Record<string, string> = {
+  pending: "Pendente",
+  qualifying: "Em qualificação",
+  waiting_human: "Aguardando equipe",
+  qualified: "Qualificado",
+  hot: "Quente",
+  warm: "Morno",
+  cold: "Frio",
+  disqualified: "Desqualificado",
+  no_whatsapp_contact: "Sem resposta no WhatsApp",
+  meta_blocked: "Bloqueado pelo Meta",
+  ia_disabled: "Qualificação manual",
+  in_progress: "Em andamento",
+  completed: "Concluída",
+};
+
+export function ClientInfoCard({ lead, c, mode = "broker" }: { lead: LightLeadDetailData; c: LeadDetailController; mode?: "broker" | "management" }) {
   // Contact data stays hidden until the broker accepts.
-  const info = (lead.clientInfo ?? []).filter((item) => !(c.isDistributed && item.key === "email"));
-  if (!info.length) return null;
+  const info = (lead.clientInfo ?? []).filter((item) => !(mode === "management" || c.isDistributed) || item.key !== "email");
+  const qualification = lead.qualificationStatus ?? lead.qualificationState;
+  const normalizedQualification = qualification?.toLowerCase() ?? "";
+  const qualificationLabel = qualification ? qualificationLabels[normalizedQualification] ?? qualification.replaceAll("_", " ") : null;
+  if (!info.length && !qualificationLabel) return null;
   return (
     <section aria-labelledby="client-info-heading" className="arc-venancor rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
       <h2 id="client-info-heading" className="text-base font-semibold text-(--foreground)">
         Informações do cliente
       </h2>
+      {qualificationLabel ? <p className="mt-2 text-sm text-(--text-secondary)">Qualificação: <span className="font-medium text-(--foreground)">{qualificationLabel}</span></p> : null}
       <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
         {info.map((item) => (
           <div key={item.key} className="min-w-0">

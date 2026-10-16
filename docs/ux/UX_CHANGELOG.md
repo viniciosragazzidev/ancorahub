@@ -1,5 +1,16 @@
 # Histórico de Alterações de UX/UI (UX Changelog)
 
+## 2026-10-16 — Ficha completa de lead no Lite de supervisão
+
+- Supervisor e gestor consultam qualificação, informações do lead e transcript do
+  WhatsApp na mesma página, usando a ficha Lite do corretor e o ChatScreen existente.
+- O transcript, a qualificação e a área de tarefas/documentos do gestor ficam em
+  leitura. Repasse, cobrança, alteração de etapa e reatribuição mantêm os fluxos
+  existentes e os escopos server-side de equipe/unidade.
+- Sem token, primitive, regra de escrita ou migration nova. Tsc e Vitest focados
+  passaram; QA visual pela prévia local ficou pendente porque a rota não compilou.
+  Registro: `docs/implementations/active/2026-10-16-supervisor-lead-detail.md`.
+
 ## 2026-10-02 — Cadastros desativados no planejamento de plantões
 
 - Seleção e validação da escala passam a permitir corretores desativados conforme

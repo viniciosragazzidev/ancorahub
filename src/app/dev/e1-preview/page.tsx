@@ -44,6 +44,24 @@ export default async function E1PreviewPage({ searchParams }: { searchParams: Pr
       <RouteAs path="/leads/lead-1" />
       <SupervisorLeadDetail
         lead={{ id: "lead-1", name: "Marina Alves", status: "in_contact", ownerId: "b1", ownerName: "Paulo Dias", ownerImage: null, productName: "Plano Essencial", assignedAt: new Date("2026-10-12T12:00:00Z"), branchName: "Central" }}
+        lightLead={{
+          id: "lead-1", nome: "Marina Alves", telefone: null, email: null, status: "in_contact", qualificationStatus: "warm", qualificationState: "QUALIFIED",
+          corretorId: "b1", corretorNome: "Paulo Dias", branchName: "Central", planName: "Plano Essencial", summary: "Busca um plano familiar com cobertura na região central.",
+          livesCount: 3, urgency: "Contratação nos próximos 30 dias", city: "São Paulo", createdAt: "2026-10-12T11:45:00Z", assignedAt: "2026-10-12T12:00:00Z",
+          isCurrentBroker: false, tipo: "PF", origem: "whatsapp", sourceCampaign: null, tipoCnpj: null,
+          beneficiaries: [], formData: null, consentimentoLgpd: true,
+          clientInfo: [{ key: "planType", label: "Tipo de plano", value: "Familiar" }, { key: "lives", label: "Vidas", value: "3" }, { key: "city", label: "Cidade", value: "São Paulo" }],
+        }}
+        requirements={[]}
+        leadDocuments={[{ id: "d1", filename: "rg.pdf", status: "approved" }, { id: "d2", filename: "comprovante.pdf", status: "pending" }]}
+        conversation={{
+          leadId: "lead-1", leadName: "Marina Alves", brokerName: "Paulo Dias", messages: [
+            { id: "m1", body: "Olá! Quero saber mais sobre um plano familiar.", at: "2026-10-12T11:47:00Z", fromClient: true, byAi: false, mediaKind: null },
+            { id: "m2", body: "Claro, quantas pessoas vão entrar no plano?", at: "2026-10-12T11:48:00Z", fromClient: false, byAi: true, mediaKind: null },
+            { id: "m3", body: "Seremos três pessoas.", at: "2026-10-12T11:49:00Z", fromClient: true, byAi: false, mediaKind: null },
+          ],
+        }}
+        brokerWhatsAppConnected
         timeline={[{ id: "t1", tipo: "status_change", conteudo: "Lead atribuído ao corretor", userName: "Sistema", createdAt: "2026-10-12T12:00:00Z" }]}
         now={now}
         managerBrokers={[{ id: "b2", name: "Ana Souza", image: null, availability: "available" }, { id: "b3", name: "Carla Mendes", image: null, availability: "paused" }]}

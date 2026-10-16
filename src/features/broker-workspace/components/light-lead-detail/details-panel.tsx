@@ -18,7 +18,7 @@ function Fact({ label, value }: { label: string; value: string }) {
 }
 
 /** Collapsible lead facts, attendance summary and the AI conversation diagnostic. */
-export function DetailsZone({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
+export function DetailsZone({ lead, c, showAiInsight = true }: { lead: LightLeadDetailData; c: LeadDetailController; showAiInsight?: boolean }) {
   const { detailsExpanded, setDetailsExpanded } = c;
   const product = lead.planName || lead.carrierName || lead.clientInfo?.find((item) => item.key === "planType")?.value || "Não informado";
   const leadType = lead.tipo === "PJ" || lead.tipo === "PME" ? "Pessoa jurídica (PJ ou PME)" : "Pessoa física (PF)";
@@ -59,7 +59,7 @@ export function DetailsZone({ lead, c }: { lead: LightLeadDetailData; c: LeadDet
           </div>
         ) : null}
       </section>
-      {detailsExpanded ? (
+      {detailsExpanded && showAiInsight ? (
         <AiConversationInsightCard
           leadId={lead.id}
           assessment={lead.aiIntelligence}

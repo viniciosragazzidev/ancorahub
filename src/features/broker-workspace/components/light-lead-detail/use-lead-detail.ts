@@ -20,16 +20,18 @@ export function useLeadDetail({
   lead,
   requirements,
   documents,
+  initialDetailsExpanded = false,
 }: {
   lead: LightLeadDetailData;
   requirements: LiteRequirement[];
   documents: ConfirmationDocument[];
+  initialDetailsExpanded?: boolean;
 }) {
     const { celebrate: celebrateSuccess, node: successOverlay } = useSuccessOverlay();
     const router = useRouter();
     const [accepted, setAccepted] = useState(lead.status !== "distributed" && lead.status !== "new");
     const [leadStatus, setLeadStatus] = useState(lead.status);
-    const [detailsExpanded, setDetailsExpanded] = useState(false);
+    const [detailsExpanded, setDetailsExpanded] = useState(initialDetailsExpanded);
 
     const [accepting, startAcceptTransition] = useTransition();
     const [showDeclineModal, setShowDeclineModal] = useState(false);

@@ -29,6 +29,7 @@ export function LightLeadDetail({
   documents = [],
   carriers = [],
   availabilityStatus = "available",
+  mode = "broker",
 }: {
   lead: LightLeadDetailData;
   /** Kept for the page contract; the responsible broker is no longer printed on this screen. */
@@ -37,12 +38,28 @@ export function LightLeadDetail({
   documents?: ConfirmationDocument[];
   carriers?: CarrierOption[];
   availabilityStatus?: "available" | "paused" | "offline";
+  mode?: "broker" | "management";
 }) {
-  const c = useLeadDetail({ lead, requirements, documents });
+  const isManagement = mode === "management";
+  const c = useLeadDetail({ lead, requirements, documents, initialDetailsExpanded: isManagement });
 
   // Lead already taken by someone else (or finished): nothing to act on.
-  if (!lead.isCurrentBroker && c.isDistributed === false) {
+  if (!isManagement && !lead.isCurrentBroker && c.isDistributed === false) {
     return <UnavailableLeadView availabilityStatus={availabilityStatus} />;
+  }
+
+  if (isManagement) {
+    return (
+      <div className="arc-venancor flex w-full flex-col text-foreground">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-2 sm:px-6">
+          <LeadNotices lead={lead} />
+          <IdentityHeader lead={lead} c={c} mode="management" />
+          <ClientInfoCard lead={lead} c={c} mode="management" />
+          <SaleSection c={c} mode="management" />
+          <DetailsZone lead={lead} c={c} showAiInsight={false} />
+        </div>
+      </div>
+    );
   }
 
   return (

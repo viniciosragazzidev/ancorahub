@@ -1,14 +1,15 @@
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/arc/avatar/avatar";
-import { Badge } from "@/components/arc/badge/badge";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { Button } from "@/components/ui/button";
+import { LightLeadDetail } from "@/features/broker-workspace/components/light-lead-detail";
+import type { ConfirmationDocument, LightLeadDetailData, LiteRequirement } from "@/features/broker-workspace/components/light-lead-detail/types";
+import type { TeamConversationDetail } from "@/features/team-conversations/types";
 import { ManagerLeadTransferForm, type TransferBroker } from "@/features/manager-workspace/manager-lead-transfer-form";
-import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { ManagerLeadStatusSheet } from "@/features/manager-workspace/manager-lead-status-sheet";
 
-import styles from "./supervisor-lead-detail.module.css";
+import { TeamLeadConversation } from "./team-lead-conversation";
 
 type TimelineItem = { id: string; tipo: string; conteudo: string | null; userName: string | null; createdAt: Date | string };
 type TaskItem = { id: string; title: string; dueAt: Date | null; completedAt: Date | null; priority: string };
@@ -16,45 +17,81 @@ type DocumentItem = { id: string; filename: string; status: string; requirementN
 
 const documentStatusLabels: Record<string, string> = { pending: "Pendente", uploaded: "Enviado", approved: "Aprovado", rejected: "Recusado" };
 
-/** Tarefas e documentos do lead no gestor Lite: leitura, na mesma linguagem das listas da unidade. */
 function LeadTasksAndDocuments({ tasks, documents }: { tasks: TaskItem[]; documents: DocumentItem[] }) {
   const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" });
-  return <>
-    <section className={styles.timeline} aria-labelledby="lead-tasks-title"><h2 id="lead-tasks-title">Tarefas ({tasks.length})</h2>
-      {tasks.length ? <ul className={styles.rows}>{tasks.map((task) => <li key={task.id}><strong className={task.completedAt ? styles.done : undefined}>{task.title}</strong><small>{task.completedAt ? "Concluída" : task.dueAt ? `Prazo ${dateFormat.format(new Date(task.dueAt))}` : "Sem prazo"}</small></li>)}</ul> : <p className={styles.empty}>Nenhuma tarefa para este lead.</p>}
+  return <div className="grid gap-6 sm:grid-cols-2">
+    <section className="flex flex-col gap-3" aria-labelledby="lead-tasks-title">
+      <h2 id="lead-tasks-title" className="text-base font-semibold text-(--foreground)">Tarefas ({tasks.length})</h2>
+      {tasks.length ? <ul className="grid gap-3">{tasks.map((task) => <li key={task.id} className="flex flex-col gap-1">
+        <strong className={`text-sm font-medium ${task.completedAt ? "text-(--text-muted) line-through" : "text-(--foreground)"}`}>{task.title}</strong>
+        <span className="text-xs text-(--text-secondary)">{task.completedAt ? "Concluída" : task.dueAt ? `Prazo ${dateFormat.format(new Date(task.dueAt))}` : "Sem prazo"}</span>
+      </li>)}</ul> : <p className="text-sm text-(--text-secondary)">Nenhuma tarefa para este lead.</p>}
     </section>
-    <section className={styles.timeline} aria-labelledby="lead-documents-title"><h2 id="lead-documents-title">Documentos ({documents.length})</h2>
-      {documents.length ? <ul className={styles.rows}>{documents.map((document) => <li key={document.id}><strong>{document.filename}</strong><small>{[document.requirementName, documentStatusLabels[document.status] ?? document.status.replaceAll("_", " ")].filter(Boolean).join(" · ")}</small></li>)}</ul> : <p className={styles.empty}>Nenhum documento enviado.</p>}
+    <section className="flex flex-col gap-3" aria-labelledby="lead-documents-title">
+      <h2 id="lead-documents-title" className="text-base font-semibold text-(--foreground)">Documentos ({documents.length})</h2>
+      {documents.length ? <ul className="grid gap-3">{documents.map((document) => <li key={document.id} className="flex flex-col gap-1">
+        <strong className="text-sm font-medium text-(--foreground)">{document.filename}</strong>
+        <span className="text-xs text-(--text-secondary)">{[document.requirementName, documentStatusLabels[document.status] ?? document.status.replaceAll("_", " ")].filter(Boolean).join(" · ")}</span>
+      </li>)}</ul> : <p className="text-sm text-(--text-secondary)">Nenhum documento enviado.</p>}
     </section>
-  </>;
+  </div>;
 }
 
-export function SupervisorLeadDetail({ lead, timeline, now, managerBrokers, tasks, documents }: {
+function LeadTimeline({ items }: { items: TimelineItem[] }) {
+  const dateFormat = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Sao_Paulo" });
+  return <section className="flex flex-col gap-3" aria-labelledby="lead-timeline-title">
+    <h2 id="lead-timeline-title" className="text-base font-semibold text-(--foreground)">Linha do tempo</h2>
+    {items.length ? <ol className="grid gap-4">{items.map((item) => <li key={item.id} className="flex flex-col gap-1">
+      <span className="text-sm font-medium text-(--foreground)">{item.tipo.replaceAll("_", " ")}</span>
+      {item.conteudo ? <p className="break-words text-sm text-(--text-secondary)">{item.conteudo}</p> : null}
+      <time className="text-xs text-(--text-muted)" dateTime={new Date(item.createdAt).toISOString()}>{item.userName ? `${item.userName} · ` : ""}{dateFormat.format(new Date(item.createdAt))}</time>
+    </li>)}</ol> : <EmptyState title="Ainda não há atualizações neste lead" description="As próximas atividades aparecem aqui." />}
+  </section>;
+}
+
+export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocuments, conversation, brokerWhatsAppConnected, timeline, now, managerBrokers, tasks, documents }: {
   lead: { id: string; name: string; status: string; ownerId: string | null; ownerName: string | null; ownerImage: string | null; productName: string | null; assignedAt: Date | null; branchName: string | null };
+  lightLead: LightLeadDetailData;
+  requirements: LiteRequirement[];
+  leadDocuments: ConfirmationDocument[];
+  conversation: TeamConversationDetail;
+  brokerWhatsAppConnected: boolean;
   timeline: TimelineItem[];
   now: string;
   managerBrokers?: TransferBroker[];
-  /** Gestor Lite only: the lead's tasks and documents (the supervisor view leaves them out). */
   tasks?: TaskItem[];
   documents?: DocumentItem[];
 }) {
   const since = lead.assignedAt ? new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" }).format(-Math.max(0, Math.floor((new Date(now).getTime() - lead.assignedAt.getTime()) / 86_400_000)), "day") : "sem atribuição";
-  return <div className={`arc-venancor ${styles.page}`}>
-    <Link href="/leads" className={styles.back}>{managerBrokers ? "← Leads da unidade" : "← Leads da equipe"}</Link>
-    <header className={styles.header}><div><h1>{lead.name}</h1><p>{lead.productName ?? "Lead da equipe"} · {lead.branchName ?? "Unidade"}</p><Badge>{(LEAD_STATUS_LABELS as Record<string, string>)[lead.status] ?? lead.status.replaceAll("_", " ")}</Badge></div></header>
-    <section className={styles.owner} aria-label="Corretor responsável">
-      <Avatar name={lead.ownerName ?? "Corretor"} src={lead.ownerImage ?? undefined} size="lg" className={styles.avatar} />
-      <div><span>Com o corretor</span><strong>{lead.ownerName ?? "Sem corretor"}</strong><small>{since}</small></div>
-      {lead.ownerId && !managerBrokers ? <Link href={`/equipe/${encodeURIComponent(lead.ownerId)}`}>Ver corretor</Link> : null}
+  const isManager = Boolean(managerBrokers);
+
+  return <main className="arc-venancor mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-4 text-(--foreground) sm:px-6 sm:py-6">
+    <Link href="/leads" className="w-max text-sm text-(--text-muted) hover:text-(--foreground)">{isManager ? "← Leads da unidade" : "← Leads da equipe"}</Link>
+
+    <section className="flex items-center gap-3" aria-label="Corretor responsável">
+      <Avatar name={lead.ownerName ?? "Corretor"} src={lead.ownerImage ?? undefined} size="lg" />
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-sm text-(--text-secondary)">Com o corretor</span>
+        <strong className="truncate text-sm font-semibold">{lead.ownerName ?? "Sem corretor"}</strong>
+        <span className="text-xs text-(--text-muted)">{since}</span>
+      </div>
+      {lead.ownerId && !isManager ? <Link className="text-sm font-medium text-(--chat-action-text)" href={`/equipe/${encodeURIComponent(lead.ownerId)}`}>Ver corretor</Link> : null}
     </section>
-    {managerBrokers ? <div className={styles.actions}><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} /></div> : null}
-    {managerBrokers ? <section className={styles.timeline} aria-label="Repassar lead"><h2>Repassar lead</h2><ManagerLeadTransferForm leadId={lead.id} leadName={lead.name} brokers={managerBrokers} /></section> : <div className={styles.actions}>
+
+    {isManager ? <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-2"><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} /></div>
+      <section className="flex flex-col gap-2" aria-label="Repassar lead">
+        <h2 className="text-base font-semibold">Repassar lead</h2>
+        <ManagerLeadTransferForm leadId={lead.id} leadName={lead.name} brokers={managerBrokers ?? []} />
+      </section>
+    </div> : <div className="flex flex-wrap gap-2">
       <Button variant="outline" render={<Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} />}>Repassar</Button>
       {lead.ownerId ? <Button render={<Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} />}>Cobrar corretor</Button> : null}
     </div>}
+
+    <LightLeadDetail lead={lightLead} requirements={requirements} documents={leadDocuments} mode="management" />
+    <TeamLeadConversation conversation={conversation} brokerWhatsAppConnected={brokerWhatsAppConnected} />
     {tasks && documents ? <LeadTasksAndDocuments tasks={tasks} documents={documents} /> : null}
-    <section className={styles.timeline} aria-labelledby="lead-timeline-title"><h2 id="lead-timeline-title">Linha do tempo</h2>
-      {timeline.length ? <ol>{timeline.map((item) => <li key={item.id}><span className={styles.dot} /><div><strong>{item.tipo.replaceAll("_", " ")}</strong>{item.conteudo ? <p>{item.conteudo}</p> : null}<small>{item.userName ? `${item.userName} · ` : ""}{new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(item.createdAt))}</small></div></li>)}</ol> : <EmptyState title="Ainda não há atualizações neste lead" description="As próximas atividades aparecem aqui." />}
-    </section>
-  </div>;
+    <LeadTimeline items={timeline} />
+  </main>;
 }
