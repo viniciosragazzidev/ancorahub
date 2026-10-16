@@ -16,6 +16,8 @@ describe("bulk distribution recovery", () => {
       { id: "qualifying", status: "new", distributionStatus: "queued", qualificationState: "IN_PROGRESS", qualificationStatus: "qualifying" },
       { id: "lost", status: "lost", distributionStatus: "unassigned", qualificationState: "COMPLETED", qualificationStatus: "qualified" },
       { id: "disqualified", status: "new", distributionStatus: "unassigned", qualificationState: "COMPLETED", qualificationStatus: "disqualified" },
+      { id: "meta-blocked", status: "new", distributionStatus: "queued", qualificationState: "COMPLETED", qualificationStatus: "meta_blocked" },
+      { id: "cold-partial", status: "new", distributionStatus: "queued", qualificationState: "PARTIAL", qualificationStatus: "cold" },
       { id: "assigned", status: "distributed", distributionStatus: "assigned", qualificationState: "COMPLETED", qualificationStatus: "qualified" },
     ])).toEqual([]);
   });

@@ -8,7 +8,7 @@ import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/
 import { transitionConversationState } from "./conversation-state-machine";
 import { resolveQualificationTimeoutRoute } from "./qualification-timeout-routing";
 import type { ConversationMemory } from "./memory";
-import { hasQualificationTimedOut, qualificationTimeoutOutcome } from "./qualification-timeout-policy";
+import { hasQualificationTimedOut, qualificationTimeoutDistributionStatus, qualificationTimeoutOutcome } from "./qualification-timeout-policy";
 
 export interface QualificationTimeoutSweepResult {
   tenantsChecked: number;
@@ -211,6 +211,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         conversationMessages,
       );
       const targetQualificationStatus = timeoutOutcome.qualificationStatus;
+      const targetDistributionStatus = qualificationTimeoutDistributionStatus(targetQualificationStatus);
 
       const campaignId = lead.metaCampaignId || lead.sourceCampaign;
       const [configuredRoute] = campaignId
@@ -250,7 +251,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
       }
 
       await db.transaction(async (tx) => {
-        // 1. Atualizar temperatura, preservar qualificação parcial e mover para a fila.
+        // 1. Preserve the queue and incomplete qualification. No-valid-data cold leads wait for manual requalification.
         await tx
           .update(schema.leads)
           .set({
@@ -260,7 +261,7 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
             queueId: targetRoute.queueId || null,
             branchId: resolvedBranchId,
             status: "new",
-            distributionStatus: "queued",
+            distributionStatus: targetDistributionStatus,
             distributionUpdatedAt: updateTime,
             updatedAt: updateTime,
           })
@@ -284,10 +285,12 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           fromBranchId: lead.branchId,
           toBranchId: resolvedBranchId,
           toQueueId: targetRoute.queueId || null,
-          action: "qualification_timeout_queued",
+          action: targetDistributionStatus === "manual_hold" ? "qualification_timeout_manual_hold" : "qualification_timeout_queued",
           source: "qualification_timeout",
-          strategy: "automatic",
-          reason: `Tempo de resposta da qualificação excedido (${timeoutMinutes} min).`,
+          strategy: targetDistributionStatus === "manual_hold" ? "manual" : "automatic",
+          reason: targetDistributionStatus === "manual_hold"
+            ? `Tempo limite excedido (${timeoutMinutes} min) sem dado válido. Aguarda requalificação manual.`
+            : `Tempo de resposta da qualificação excedido (${timeoutMinutes} min).`,
           actorId: systemUserId,
           createdAt: updateTime,
         });
@@ -298,7 +301,9 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
           userId: systemUserId,
           entidade: "lead",
           entidadeId: lead.id,
-          acao: "qualification.timeout_auto_distributed",
+          acao: targetDistributionStatus === "manual_hold"
+            ? "qualification.timeout_manual_hold"
+            : "qualification.timeout_auto_distributed",
         });
 
         // 4. Encerrar Sessão legada de qualificação se existir
@@ -323,14 +328,16 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
         }).catch(() => undefined);
       }
 
-      // 6. Tentativa imediata de distribuição para corretor da unidade
-      await enqueueAndProcessLeadDistribution({
-        tenantId: tenant.id,
-        leadId: lead.id,
-        source: "qualification_timeout",
-      });
-
-      distributedLeadsCount += 1;
+      // Only an actual valid reply can be routed after timeout. Cold leads stay
+      // visible to the manual requalification panel without entering a job.
+      if (targetDistributionStatus === "queued") {
+        await enqueueAndProcessLeadDistribution({
+          tenantId: tenant.id,
+          leadId: lead.id,
+          source: "qualification_timeout",
+        });
+        distributedLeadsCount += 1;
+      }
     }
   }
 

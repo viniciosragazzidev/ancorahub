@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, gt, gte, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, gte, inArray, isNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -683,10 +683,10 @@ function availableDutyLeadConditions(context: Awaited<ReturnType<typeof getRequi
     inArray(schema.leads.queueId, queueIds),
     isNull(schema.leads.corretorId),
     inArray(schema.leads.distributionStatus, ["queued", "unassigned", "returned_to_queue"]),
-    or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
-    or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "meta_blocked")),
+    or(isNull(schema.leads.qualificationStatus), notInArray(schema.leads.qualificationStatus, ["disqualified", "not_qualified", "meta_blocked"])),
     or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
     or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
+    or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "cold"), isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "PARTIAL")),
     isNull(schema.leads.distributionRemovedAt),
     isNull(schema.leads.deletedAt),
     isNull(schema.leads.archivedAt),

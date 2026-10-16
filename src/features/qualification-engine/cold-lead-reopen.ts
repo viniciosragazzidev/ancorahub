@@ -38,11 +38,23 @@ export async function reopenColdLeadForQualification(input: { tenantId: string; 
       eq(schema.leads.id, input.leadId),
       eq(schema.leads.tenantId, input.tenantId),
       eq(schema.leads.qualificationStatus, "cold"),
-      inArray(schema.leads.qualificationState, ["QUALIFIED", "COMPLETED"]),
-      isNotNull(schema.leads.qualificationCompletedAt),
+      or(
+        and(
+          inArray(schema.leads.qualificationState, ["QUALIFIED", "COMPLETED"]),
+          isNotNull(schema.leads.qualificationCompletedAt),
+          or(
+            isNull(schema.leads.distributionStatus),
+            notInArray(schema.leads.distributionStatus, ["assigned", "manual_hold", "held", "removed", "returned_to_queue"]),
+          ),
+        ),
+        and(
+          eq(schema.leads.qualificationState, "PARTIAL"),
+          isNull(schema.leads.qualificationCompletedAt),
+          eq(schema.leads.distributionStatus, "manual_hold"),
+        ),
+      ),
       isNull(schema.leads.corretorId),
       notInArray(schema.leads.status, ["lost", "converted", "under_analysis"]),
-      notInArray(schema.leads.distributionStatus, ["assigned", "manual_hold", "held", "removed", "returned_to_queue"]),
       isNull(schema.leads.distributionRemovedAt),
       isNull(schema.leads.archivedAt),
       isNull(schema.leads.deletedAt),

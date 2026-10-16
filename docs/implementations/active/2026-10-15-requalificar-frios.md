@@ -52,3 +52,10 @@ ou iniciar servidor conectado a banco.
 
 Desligar `coldLeadRequalification.enabled` nas filas e a chave global do
 Super-admin. O fluxo de qualificacao inbound existente permanece ativo.
+
+
+## Complemento 2026-10-16
+
+Timeout frio sem resposta válida permanece em `manual_hold` com qualificação `PARTIAL` e sem data de conclusão. O painel manual também aceita essa combinação para requalificação; a resposta inbound reabre a qualificação pelo fluxo oficial. A cadência automática continua excluindo `manual_hold`.
+
+Validação do complemento: `npx tsc --noEmit -p .` passou; 8 arquivos Vitest relacionados, 93 testes passaram; ESLint dirigido sem erros. `npm run build` falhou antes da compilação por Turbopack rejeitar o junction de `node_modules` fora da raiz do filesystem.

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, asc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, ilike, inArray, isNotNull, isNull, lt, lte, ne, not, notInArray, or, sql } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -12,7 +12,7 @@ import { getLocalDutyParts } from "@/features/leads/assignment";
 
 import { processQueuedLead } from "./service";
 import { expireOutdatedLeadOffers } from "./offers";
-import { COLD_HELD_BY_QUEUE_REASON_PREFIX, HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
+import { automaticDistributionHoldReason, COLD_HELD_BY_QUEUE_REASON_PREFIX, HELD_DISTRIBUTION_RETRY_MS, distributionRetryDelayMilliseconds, isDeferredDistributionReason, isHeldDistributionReason } from "./domain";
 import { groupByTemperatureRank, type TemperatureRank } from "./temperature-priority";
 import { dutyScheduleBranchCondition, isDutyScheduleBranchCompatible } from "./duty-job-schedule-scope";
 
@@ -21,6 +21,21 @@ const JOB_TYPE = "process_queued_lead";
 /** Same rule as temperatureRank(): hot 0, cold 2, anything else (warm or no temperature) 1. */
 const leadTemperatureRank = () => sql<number>`case ${schema.leads.qualificationStatus} when 'hot' then 0 when 'cold' then 2 else 1 end`;
 const ACTIVE_JOB_STATUSES = ["pending", "retrying"] as const;
+
+function automaticQualificationFilter() {
+  return and(
+    or(
+      isNull(schema.leads.qualificationStatus),
+      notInArray(schema.leads.qualificationStatus, ["disqualified", "not_qualified", "meta_blocked"]),
+    ),
+    or(
+      isNull(schema.leads.qualificationStatus),
+      ne(schema.leads.qualificationStatus, "cold"),
+      isNull(schema.leads.qualificationState),
+      ne(schema.leads.qualificationState, "PARTIAL"),
+    ),
+  );
+}
 
 const defaults = {
   enabled: true,
@@ -206,10 +221,10 @@ async function seedQueuedLeadJobs(config: DistributionJobConfig, tenantId?: stri
           isNull(schema.leads.serviceStartedAt),
         ),
       ),
-      // Lost, disqualified, archived or soft-deleted leads are terminal and must never
-      // be re-seeded into (or continue through) the distribution queue.
+      // Unqualified leads never enter automatic distribution, regardless of
+      // routing rules. Cold partial timeout leads wait for manual requalification.
       ne(schema.leads.status, "lost"),
-      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
+      automaticQualificationFilter(),
       isNull(schema.leads.deletedAt),
       isNull(schema.leads.archivedAt),
       // Removed from distribution by a manager: never re-seeded.
@@ -265,7 +280,8 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
       isNull(schema.leads.archivedAt),
       isNull(schema.leads.distributionRemovedAt),
       ne(schema.leads.status, "lost"),
-      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
+      or(isNull(schema.leads.distributionStatus), ne(schema.leads.distributionStatus, "manual_hold")),
+      automaticQualificationFilter(),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
       eq(schema.unitDutySchedules.status, "active"),
@@ -349,7 +365,8 @@ async function recoverStuckLeadAssignments(now: Date, config: DistributionJobCon
       isNull(schema.leads.corretorId),
       lte(schema.leads.distributionUpdatedAt, cutoff),
       ne(schema.leads.status, "lost"),
-      or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "disqualified")),
+      or(isNull(schema.leads.distributionStatus), ne(schema.leads.distributionStatus, "manual_hold")),
+      automaticQualificationFilter(),
       isNull(schema.leads.deletedAt),
       isNull(schema.leads.archivedAt),
       not(ilike(schema.leads.nome, "Lead WhatsApp (%)")),
@@ -385,6 +402,8 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
       eq(schema.leadDistributionJobs.type, JOB_TYPE),
       inArray(schema.leadDistributionJobs.status, [...ACTIVE_JOB_STATUSES]),
       lte(schema.leadDistributionJobs.runAfter, now),
+      or(isNull(schema.leads.distributionStatus), ne(schema.leads.distributionStatus, "manual_hold")),
+      automaticQualificationFilter(),
       tenantId ? eq(schema.leadDistributionJobs.tenantId, tenantId) : undefined,
       leadId ? eq(schema.leadDistributionJobs.leadId, leadId) : undefined,
     ))
@@ -504,11 +523,11 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   // same free broker inside a batch.
   for (const wave of groupByTemperatureRank(claimedJobs, (claimed) => claimed.rank).map((group) => group.map((claimed) => claimed.job))) {
     await runWithConcurrency(wave, Math.min(5, wave.length || 1), async (job) => {
-      const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, deletedAt: schema.leads.deletedAt, archivedAt: schema.leads.archivedAt, nome: schema.leads.nome })
+      const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, qualificationState: schema.leads.qualificationState, distributionStatus: schema.leads.distributionStatus, deletedAt: schema.leads.deletedAt, archivedAt: schema.leads.archivedAt, nome: schema.leads.nome })
         .from(schema.leads)
         .where(and(eq(schema.leads.id, job.leadId), eq(schema.leads.tenantId, job.tenantId)))
         .limit(1);
-      if (!currentLead || currentLead.deletedAt || currentLead.archivedAt || currentLead.status === "lost" || currentLead.qualificationStatus === "disqualified" || /^Lead WhatsApp\s*\(/i.test(currentLead.nome?.trim() ?? "")) {
+      if (!currentLead || currentLead.deletedAt || currentLead.archivedAt || currentLead.status === "lost" || currentLead.distributionStatus === "manual_hold" || automaticDistributionHoldReason(currentLead.qualificationStatus, currentLead.qualificationState) || /^Lead WhatsApp\s*\(/i.test(currentLead.nome?.trim() ?? "")) {
         await completeJob(job.id);
         result.skipped += 1;
         return;

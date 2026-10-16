@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createEmptyMemory } from "@/features/ai-agent/memory";
-import { deriveLeadQualificationStatus } from "./qualification-status";
+import { deriveLeadQualificationStatus, metaBlockedQualificationLabel } from "./qualification-status";
 
 describe("lead qualification status", () => {
   it("marks a complete family request as warm", () => {
@@ -16,5 +16,11 @@ describe("lead qualification status", () => {
 
   it("keeps a neutral completed qualification as qualified", () => {
     expect(deriveLeadQualificationStatus(createEmptyMemory())).toBe("qualified");
+  });
+
+  it("shows the blocked delivery label instead of qualified", () => {
+    expect(metaBlockedQualificationLabel("meta_blocked")).toBe("Envio bloqueado pela Meta");
+    expect(metaBlockedQualificationLabel("META_BLOCKED")).toBe("Envio bloqueado pela Meta");
+    expect(metaBlockedQualificationLabel("qualified")).toBeNull();
   });
 });

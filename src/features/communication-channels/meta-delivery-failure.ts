@@ -76,14 +76,23 @@ export function initialMessageFailureStatus(failureCode?: string | null): "meta_
   return META_BLOCKED_CODES.has(failureCode?.trim() ?? "") ? "meta_blocked" : "disqualified";
 }
 
+export function initialMessageFailureLeadDisposition(failureCode?: string | null) {
+  return {
+    status: "new" as const,
+    distributionStatus: "manual_hold" as const,
+    qualificationStatus: initialMessageFailureStatus(failureCode),
+    qualificationState: "COMPLETED" as const,
+  };
+}
+
 /** The lead note: what happened, why (Meta's reason when known) and what the team does next. */
 export function initialMessageFailureNote(failureCode?: string | null) {
   const failure = getDirectorFacingMetaDeliveryFailure(failureCode);
   const why = failure ? ` Motivo (${failure.code}): ${failure.title}. ${failure.message}` : "";
   if (initialMessageFailureStatus(failureCode) === "meta_blocked") {
-    return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi enviado para a distribuição como "Envio bloqueado pela Meta" para um corretor entrar em contato.`;
+    return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead ficou fora da distribuição automática como "Envio bloqueado pela Meta", aguardando ação manual.`;
   }
-  return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi desqualificado.`;
+  return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead foi desqualificado e mantido fora da distribuição automática, aguardando ação manual.`;
 }
 
 /** Chat to a broker set to the company WhatsApp while it is down, outside the broker's Meta window. */

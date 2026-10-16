@@ -18,6 +18,7 @@ import {
   COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX,
   isRequalificationInCooldown,
   isWithinRequalificationBusinessWindow,
+  isEligibleColdLeadForManualRequalification,
   nextRequalificationBusinessWindowAt,
   normalizeColdLeadRequalificationPolicy,
   partitionColdLeadsByResponse,
@@ -282,7 +283,7 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
 
     for (const leadId of uniqueLeadIds) {
       const lead = byId.get(leadId);
-      if (!lead || lead.queueId !== queue.id || !isEligibleColdLeadForReactivation(lead)) {
+      if (!lead || lead.queueId !== queue.id || !isEligibleColdLeadForManualRequalification(lead)) {
         skipped.push({ leadId, name: lead?.nome ?? "Lead", reason: "Lead saiu da fila ou nao esta mais elegivel." });
         if (lead) await recordAudit({ tenantId: context.tenantId, actorUserId: context.userId, leadId, action: "cold_lead_requalification.manual.skipped", metadata: { reason: "not_eligible" } });
         continue;

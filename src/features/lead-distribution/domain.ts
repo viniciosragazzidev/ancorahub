@@ -133,6 +133,23 @@ export function shouldHoldColdLead(qualificationStatus: string | null | undefine
   return holdColdLeads && qualificationStatus === "cold";
 }
 
+/** Qualification states that must never enter automatic broker distribution. */
+export function automaticDistributionHoldReason(
+  qualificationStatus: string | null | undefined,
+  qualificationState: string | null | undefined,
+) {
+  if (qualificationStatus === "meta_blocked") {
+    return "Envio bloqueado pela Meta; aguarda ação manual.";
+  }
+  if (qualificationStatus === "disqualified" || qualificationStatus === "not_qualified") {
+    return "Lead desqualificado; aguarda ação manual.";
+  }
+  if (qualificationStatus === "cold" && qualificationState === "PARTIAL") {
+    return "Lead frio sem dados válidos de qualificação; aguarda requalificação manual.";
+  }
+  return null;
+}
+
 const BROKER_COOLDOWN_MS = 5 * 60 * 1000;
 
 /**

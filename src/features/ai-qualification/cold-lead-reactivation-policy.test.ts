@@ -5,6 +5,7 @@ import {
   getColdLeadReactivationRuleDefaults,
   getColdLeadInboundAction,
   isEligibleColdLeadForReactivation,
+  isEligibleColdLeadForQualificationResume,
 } from "./cold-lead-reactivation-policy";
 
 describe("cold lead reactivation policy", () => {
@@ -26,6 +27,24 @@ describe("cold lead reactivation policy", () => {
     expect(isEligibleColdLeadForReactivation({ ...eligible, status: "under_analysis" })).toBe(false);
     expect(isEligibleColdLeadForReactivation({ ...eligible, qualificationStatus: "disqualified" })).toBe(false);
     expect(isEligibleColdLeadForReactivation({ ...eligible, distributionRemovedAt: new Date() })).toBe(false);
+    expect(isEligibleColdLeadForReactivation({ ...eligible, distributionStatus: "manual_hold" })).toBe(false);
+  });
+
+  it("resumes a cold partial timeout held for manual requalification after inbound", () => {
+    const timeoutHold = {
+      qualificationStatus: "cold",
+      qualificationState: "PARTIAL",
+      qualificationCompletedAt: null,
+      corretorId: null,
+      status: "new",
+      distributionStatus: "manual_hold",
+      distributionRemovedAt: null,
+      archivedAt: null,
+      deletedAt: null,
+    };
+    expect(isEligibleColdLeadForQualificationResume(timeoutHold)).toBe(true);
+    expect(isEligibleColdLeadForQualificationResume({ ...timeoutHold, corretorId: "broker-1" })).toBe(false);
+    expect(isEligibleColdLeadForQualificationResume({ ...timeoutHold, distributionRemovedAt: new Date() })).toBe(false);
   });
 
   it("waits two hours and keeps dispatch inside weekday business hours in Sao Paulo", () => {

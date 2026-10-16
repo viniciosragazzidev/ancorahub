@@ -1,3 +1,5 @@
+import { automaticDistributionHoldReason } from "./domain";
+
 export type BulkDistributionCandidate = {
   id: string;
   status: string;
@@ -13,8 +15,6 @@ const recoverableDistributionStatuses = new Set([
 ]);
 
 const terminalLeadStatuses = new Set(["converted", "lost"]);
-const terminalQualificationStatuses = new Set(["disqualified", "not_qualified"]);
-
 /**
  * Keeps the bulk recovery action aligned with the automatic worker: only
  * operational leads that are ready for an offer may be re-enqueued.
@@ -27,6 +27,6 @@ export function selectBulkDistributionCandidateIds(
     .filter((lead) => !terminalLeadStatuses.has(lead.status))
     .filter((lead) => lead.qualificationState !== "IN_PROGRESS")
     .filter((lead) => lead.qualificationStatus !== "qualifying")
-    .filter((lead) => !lead.qualificationStatus || !terminalQualificationStatuses.has(lead.qualificationStatus))
+    .filter((lead) => !automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState))
     .map((lead) => lead.id);
 }

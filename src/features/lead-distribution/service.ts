@@ -6,14 +6,12 @@ import { operationDayStart } from "./broker-day-history";
 import { getDatabase, schema } from "@/shared/db";
 import { AuthorizationError } from "@/shared/auth/errors";
 import type { TenantContext } from "@/shared/auth/types";
-import { calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
+import { automaticDistributionHoldReason, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, isAutomaticDistributionBranch, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, shouldHoldColdLead, type IntelligentDistributionPolicy } from "./domain";
 import type { AssignmentSource, DutyFallbackPolicy, LeadAssignmentResult, LeadRoutingResult } from "./types";
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { createLeadOffersForBrokers, loadBrokerPacingOffers } from "./offers";
 import { signalLeadOwnershipChange } from "./ownership-signal";
 import { earliestPacingRetryAt, evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type OfferPacingDecision } from "./offer-pacing";
-import { resolveLeadDestinationRule } from "./routing-engine";
-import { getHoldDisqualifiedLeads, shouldHoldDisqualifiedLead } from "./disqualified-routing-settings";
 import { DDD_OUTCOME_LABELS, decideDddRouting } from "./ddd-routing";
 import { getDddRoutingSettings } from "./ddd-routing-settings";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
@@ -638,6 +636,10 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (lead.distributionStatus === "manual_hold") {
     return { status: "manual_required", leadId, reason: "A atribuição foi removida manualmente; o lead aguarda uma nova ação manual." };
   }
+  const qualificationHoldReason = automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState);
+  if (qualificationHoldReason) {
+    return { status: "manual_required", leadId, reason: qualificationHoldReason };
+  }
   if (lead.deletedAt || lead.archivedAt || !["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"].includes(lead.status)) {
     return { status: "manual_required", leadId, reason: "Lead inativo; distribuição bloqueada." };
   }
@@ -665,30 +667,6 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   // customer leads and must never enter the broker offer cycle.
   if (/^Lead WhatsApp\s*\(/i.test(lead.nome?.trim() ?? "")) {
     return { status: "manual_required", leadId, reason: "Mensagem interna sem lead válido; distribuição ignorada." };
-  }
-  if (lead.qualificationStatus === "disqualified" && await getHoldDisqualifiedLeads(context.tenantId)) {
-    const formData = lead.formData && typeof lead.formData === "object" && !Array.isArray(lead.formData)
-      ? lead.formData as Record<string, unknown>
-      : {};
-    const readFormValue = (keys: string[]) => keys
-      .map((key) => formData[key])
-      .find((value) => value !== null && value !== undefined && String(value).trim() !== "");
-    const rawLives = readFormValue(["vidas", "n_vidas", "dependentes", "lives"]);
-    const parsedLives = rawLives === undefined ? undefined : Number(rawLives);
-    const { matchedRule } = await resolveLeadDestinationRule(context.tenantId, {
-      planType: String(readFormValue(["tipo", "tipoPlano", "tipo_plano", "plano", "planType"]) ?? lead.tipo),
-      source: String(readFormValue(["origem", "source", "canal", "sourceChannel"]) ?? lead.sourceChannel ?? lead.origem),
-      city: String(readFormValue(["cidade", "city", "localidade"]) ?? ""),
-      lives: Number.isFinite(parsedLives) ? parsedLives : undefined,
-      qualificationStatus: lead.qualificationStatus,
-      branchId: lead.branchId,
-    });
-    if (shouldHoldDisqualifiedLead({
-      holdDisqualifiedLeads: true,
-      matchedRuleMode: matchedRule?.distributionMode,
-    })) {
-      return { status: "queued", leadId, reason: "Lead desqualificado mantido em espera pela regra global de segurança." };
-    }
   }
   const canRotateCurrentOwner = canRotateProvisionalLeadOwner({
     corretorId: lead.corretorId,
@@ -1504,9 +1482,11 @@ export async function distributeQualifiedLead(input: {
       nome: schema.leads.nome,
       branchId: schema.leads.branchId,
       qualificationStatus: schema.leads.qualificationStatus,
+      qualificationState: schema.leads.qualificationState,
       qualificationScore: schema.leads.qualificationScore,
       queueId: schema.leads.queueId,
       corretorId: schema.leads.corretorId,
+      distributionStatus: schema.leads.distributionStatus,
       archivedAt: schema.leads.archivedAt,
     })
     .from(schema.leads)
@@ -1514,6 +1494,9 @@ export async function distributeQualifiedLead(input: {
     .limit(1);
 
   if (!lead) return { distributed: false, reason: "lead_not_found" };
+  if (lead.distributionStatus === "manual_hold") return { distributed: false, reason: "manual_hold" };
+  const qualificationHoldReason = automaticDistributionHoldReason(lead.qualificationStatus, lead.qualificationState);
+  if (qualificationHoldReason) return { distributed: false, reason: "qualification_manual_hold", detail: qualificationHoldReason };
   if (lead.corretorId) return { distributed: true, brokerId: lead.corretorId, reason: "already_assigned" };
 
   const { resolveQualificationDestination } = await import("@/features/ai-qualification/destination-routing-service");

@@ -129,6 +129,10 @@ export function qualificationTimeoutOutcome(
   };
 }
 
+export function qualificationTimeoutDistributionStatus(qualificationStatus: "warm" | "cold") {
+  return qualificationStatus === "cold" ? "manual_hold" as const : "queued" as const;
+}
+
 /** Manual re-open resets the SLA clock while a newer message still takes precedence. */
 export function qualificationTimeoutAnchor(lastActivityAt: Date, reopenedAt?: Date | null) {
   return reopenedAt && reopenedAt.getTime() > lastActivityAt.getTime() ? reopenedAt : lastActivityAt;

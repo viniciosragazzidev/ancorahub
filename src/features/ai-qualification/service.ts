@@ -14,7 +14,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { startQualificationConversationForLead } from "@/features/ai-agent/conversation-state-machine";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
-import { getColdLeadInboundAction, isEligibleColdLeadForReactivation } from "./cold-lead-reactivation-policy";
+import { getColdLeadInboundAction, isEligibleColdLeadForQualificationResume } from "./cold-lead-reactivation-policy";
 import { reopenColdLeadForQualification } from "@/features/qualification-engine/cold-lead-reopen";
 import { parseOptOut, parseWrongNumber, type QuickReplyMessageKind } from "@/features/ai-agent/quick-reply";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -408,7 +408,7 @@ export async function handleColdLeadInbound(input: {
     return { handled: true as const, action };
   }
 
-  if (action !== "resume_qualification" || !isEligibleColdLeadForReactivation(lead)) {
+  if (action !== "resume_qualification" || !isEligibleColdLeadForQualificationResume(lead)) {
     return { handled: true as const, action: "ignore" as const };
   }
   const useLegacyEngine = await getFeatureFlag(FEATURE_FLAGS.QUALIFICATION_ENGINE) === "false";

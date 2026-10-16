@@ -3,6 +3,7 @@ import type { ConversationMemory } from "./memory";
 import {
   hasQualificationTimedOut,
   qualificationTimeoutAnchor,
+  qualificationTimeoutDistributionStatus,
   qualificationTimeoutOutcome,
   type QualificationTimeoutMessage,
 } from "./qualification-timeout-policy";
@@ -69,6 +70,11 @@ describe("qualification timeout policy", () => {
     ];
 
     expect(qualificationTimeoutOutcome(memory, messages).qualificationStatus).toBe("cold");
+  });
+
+  it("holds cold timeouts for manual requalification and queues warm timeouts", () => {
+    expect(qualificationTimeoutDistributionStatus("cold")).toBe("manual_hold");
+    expect(qualificationTimeoutDistributionStatus("warm")).toBe("queued");
   });
 
   it("restarts the timeout from re-open unless a newer message exists", () => {

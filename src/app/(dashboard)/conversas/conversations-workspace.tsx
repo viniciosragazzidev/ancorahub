@@ -23,6 +23,7 @@ import { brokerDisplayName, CONTACT_SHORTCUT, contactShortcutMessage, isContactS
 import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
 import { LeadTagsPicker } from "@/features/lead-tags/components/lead-tags-picker";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
+import { metaBlockedQualificationLabel } from "@/features/leads/qualification-status";
 import type { LeadTag } from "@/features/lead-tags/rules";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -1498,6 +1499,14 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
 
   if (isDistributedOrQualified) {
     const targetStatus = qualStatus || leadStatus;
+    const metaBlockedLabel = metaBlockedQualificationLabel(targetStatus);
+    if (metaBlockedLabel) {
+      return (
+        <Badge variant="outline" className="max-w-32 truncate px-1.5 text-[10px] border-gray-500/30 bg-gray-500/10 text-muted-foreground font-medium">
+          {metaBlockedLabel}
+        </Badge>
+      );
+    }
     if (targetStatus.includes("hot") || targetStatus.includes("quente")) {
       return (
         <Badge variant="outline" className="max-w-32 gap-1 truncate px-1.5 text-[10px] border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold">
@@ -1599,6 +1608,14 @@ function formatDateDivider(value: string) {
 
 function renderQualificationRatingBadge(status: string, qualStatus?: string | null) {
   const norm = (qualStatus || status || "").toLowerCase();
+  const metaBlockedLabel = metaBlockedQualificationLabel(norm);
+  if (metaBlockedLabel) {
+    return (
+      <Badge variant="outline" className="border-gray-500/30 bg-gray-500/10 text-muted-foreground font-medium text-xs gap-1">
+        {metaBlockedLabel}
+      </Badge>
+    );
+  }
   if (norm.includes("hot") || norm.includes("quente")) {
     return (
       <Badge variant="outline" className="border-rose-500/30 bg-rose-500/10 text-rose-600 dark:text-rose-400 font-semibold text-xs gap-1">

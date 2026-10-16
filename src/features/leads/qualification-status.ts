@@ -28,6 +28,12 @@ export const LEAD_QUALIFICATION_LABELS: Record<LeadQualificationStatus, string> 
   meta_blocked: "Envio bloqueado pela Meta",
 };
 
+export function metaBlockedQualificationLabel(status: string | null | undefined) {
+  return status?.trim().toLowerCase() === "meta_blocked"
+    ? LEAD_QUALIFICATION_LABELS.meta_blocked
+    : null;
+}
+
 /** Classifies only from explicit conversation signals; absence of a signal stays qualified. */
 export function deriveLeadQualificationStatus(memory: ConversationMemory): LeadQualificationStatus {
   const intent = memory.intent?.value.toLowerCase() ?? "";

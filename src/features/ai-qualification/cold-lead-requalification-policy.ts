@@ -10,6 +10,8 @@ export type ColdLeadRequalificationInput = {
   id: string;
   createdAt: Date;
   qualificationStatus: string | null;
+  qualificationState?: string | null;
+  qualificationCompletedAt?: Date | null;
   corretorId: string | null;
   status: string;
   distributionStatus: string | null;
@@ -28,15 +30,23 @@ export function selectColdLeadsForOperationDay<T extends ColdLeadRequalification
   leads: readonly T[],
   since: Date,
 ) {
-  return leads.filter((lead) => lead.createdAt >= since
-    && lead.qualificationStatus === "cold"
+  return leads.filter((lead) => lead.createdAt >= since && isEligibleColdLeadForManualRequalification(lead));
+}
+
+/** Manual review may include an incomplete cold timeout explicitly held for requalification. */
+export function isEligibleColdLeadForManualRequalification(lead: ColdLeadRequalificationInput) {
+  const isColdTimeoutHold = lead.distributionStatus === "manual_hold"
+    && lead.qualificationState === "PARTIAL"
+    && !lead.qualificationCompletedAt;
+  return lead.qualificationStatus === "cold"
     && !lead.corretorId
     && lead.queueId !== null
     && !["lost", "converted", "under_analysis", "deleted", "archived"].includes(lead.status)
-    && !["assigned", "manual_hold", "held", "removed", "returned_to_queue"].includes(lead.distributionStatus ?? "")
+    && !["assigned", "held", "removed", "returned_to_queue"].includes(lead.distributionStatus ?? "")
+    && (lead.distributionStatus !== "manual_hold" || isColdTimeoutHold)
     && !lead.distributionRemovedAt
     && !lead.archivedAt
-    && !lead.deletedAt);
+    && !lead.deletedAt;
 }
 
 export function partitionColdLeadsByResponse<T extends { id: string; createdAt: Date }>(

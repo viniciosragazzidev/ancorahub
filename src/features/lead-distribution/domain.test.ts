@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isHeldDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, readDistributionPolicy, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shouldHoldColdLead, shouldReleaseUnacceptedProvisionalOwner, shuffle } from "./domain";
+import { automaticDistributionHoldReason, buildManualOfferLeadReleaseUpdate, buildPendingLeadOfferLeadUpdate, calculateBrokerRankingScore, canRotateProvisionalLeadOwner, chooseBroker, COLD_HELD_BY_QUEUE_REASON, defaultIntelligentDistributionPolicy, getDutyCoverage, isAcceptedOfferAssignment, isAutomaticDistributionBranch, isBlockingActiveOffer, isDeferredDistributionReason, isHeldDistributionReason, isValidDutyWindow, LEAD_OFFER_ACCEPT_GRACE_MS, OFFER_ENQUEUE_GRACE_MS, rankBrokers, readDistributionPolicy, resolveDistributionCandidate, resolveDistributionPolicyScope, resolveDutyFallbackDecision, resolveLeadOfferAcceptance, resolveLeadOfferCycle, resolveQueueCandidateBranchIds, reserveDistributionBranch, selectDistributionBranch, shouldHoldColdLead, shouldReleaseUnacceptedProvisionalOwner, shuffle } from "./domain";
 
 describe("provisional assignment rotation guard", () => {
   it("does not rotate a lead after the broker has started or contacted the customer", () => {
@@ -234,6 +234,15 @@ describe("lead offer ownership", () => {
 });
 
 describe("lead distribution domain", () => {
+  it("requires manual action for Meta-blocked, disqualified, and cold partial timeout leads", () => {
+    expect(automaticDistributionHoldReason("meta_blocked", "COMPLETED")).toContain("Meta");
+    expect(automaticDistributionHoldReason("disqualified", "COMPLETED")).toContain("manual");
+    expect(automaticDistributionHoldReason("not_qualified", "COMPLETED")).toContain("manual");
+    expect(automaticDistributionHoldReason("cold", "PARTIAL")).toContain("requalificação manual");
+    expect(automaticDistributionHoldReason("cold", "COMPLETED")).toBeNull();
+    expect(automaticDistributionHoldReason("warm", "PARTIAL")).toBeNull();
+  });
+
   it("chooses the lowest active workload when capacity is available", () => {
     const result = chooseBroker([
       { id: "a", createdAt: new Date("2026-01-01"), activeLeads: 4, capacity: 5 },

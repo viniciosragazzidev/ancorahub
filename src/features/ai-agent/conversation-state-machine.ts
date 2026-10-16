@@ -17,7 +17,7 @@ import {
 } from "./guardrails";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { getPreferredMetaCloudChannel, sendMetaCloudChannelText } from "@/features/communication-channels/service";
-import { initialMessageFailureNote, initialMessageFailureStatus } from "@/features/communication-channels/meta-delivery-failure";
+import { initialMessageFailureLeadDisposition, initialMessageFailureNote } from "@/features/communication-channels/meta-delivery-failure";
 import { resolveCanonicalWhatsAppDestination } from "@/features/communication-channels/phone-resolution";
 import { sendOpenWaText } from "@/lib/integrations/openwa";
 import { publishNotification } from "@/features/notifications/send-push-helper";
@@ -136,16 +136,22 @@ export async function handleInitialMessageFailure({
     await db
       .update(schema.leads)
       .set({
-        status: "distributed",
-        distributionStatus: "queued",
-        // Undelivered is disqualified (the tenant's disqualified-lead rules
-        // decide where it goes); a lead Meta blocked (130472, 131049) does
-        // have WhatsApp and is told apart.
-        qualificationStatus: initialMessageFailureStatus(failureCode),
-        qualificationState: "COMPLETED",
+        ...initialMessageFailureLeadDisposition(failureCode),
         updatedAt: now,
       })
       .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
+
+    await db.insert(schema.leadDistributionEvents).values({
+      id: randomUUID(),
+      tenantId,
+      leadId,
+      action: "initial_message_failed_manual_hold",
+      source: "ai_qualification",
+      strategy: "manual",
+      reason: "A primeira mensagem de qualificação não foi entregue; o lead aguarda ação manual.",
+      actorId: systemUserId,
+      createdAt: now,
+    });
 
     await db
       .insert(schema.leadInteractions)
@@ -166,16 +172,10 @@ export async function handleInitialMessageFailure({
         userId: systemUserId,
         entidade: "lead",
         entidadeId: leadId,
-        acao: `lead.initial_message_failed_distributed:${reason}`,
+        acao: `lead.initial_message_failed_manual_hold:${reason}`,
         createdAt: now,
       })
       .onConflictDoNothing();
-
-    // Straight to a broker: the lead must be contacted by a person now.
-    const { enqueueAndProcessLeadDistribution } = await import("@/features/lead-distribution/jobs");
-    await enqueueAndProcessLeadDistribution({ tenantId, leadId, source: "human_handoff" }).catch((error) => {
-      console.warn("[handleInitialMessageFailure] distribution deferred to the queue sweep:", error instanceof Error ? error.message.slice(0, 160) : error);
-    });
   } catch (err) {
     console.warn("[handleInitialMessageFailure] DB operation skipped or warning:", err);
   }

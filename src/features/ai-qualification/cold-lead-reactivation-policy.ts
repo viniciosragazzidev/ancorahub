@@ -58,6 +58,20 @@ export function isEligibleColdLeadForReactivation(lead: ColdLeadReactivationCand
     && !lead.deletedAt;
 }
 
+/** Also admits the no-valid-data timeout hold after a new inbound for qualification resume. */
+export function isEligibleColdLeadForQualificationResume(lead: ColdLeadReactivationCandidate) {
+  if (isEligibleColdLeadForReactivation(lead)) return true;
+  return lead.qualificationStatus === "cold"
+    && lead.qualificationState === "PARTIAL"
+    && lead.qualificationCompletedAt === null
+    && !lead.corretorId
+    && lead.distributionStatus === "manual_hold"
+    && !["lost", "converted", "under_analysis", "deleted", "archived"].includes(lead.status)
+    && !lead.distributionRemovedAt
+    && !lead.archivedAt
+    && !lead.deletedAt;
+}
+
 type ZonedParts = { year: number; month: number; day: number; hour: number; minute: number; weekday: number };
 
 function zonedParts(date: Date): ZonedParts {

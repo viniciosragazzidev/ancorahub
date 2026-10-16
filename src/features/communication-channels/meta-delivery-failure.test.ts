@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { companyChatSendFailedMessage, companyChatUnavailableMessage, getDirectorFacingMetaDeliveryFailure, initialMessageFailureNote, initialMessageFailureStatus } from "./meta-delivery-failure";
+import { companyChatSendFailedMessage, companyChatUnavailableMessage, getDirectorFacingMetaDeliveryFailure, initialMessageFailureLeadDisposition, initialMessageFailureNote, initialMessageFailureStatus } from "./meta-delivery-failure";
 
 describe("getDirectorFacingMetaDeliveryFailure", () => {
   it("explica com segurança o bloqueio de cobrança da WABA", () => {
@@ -21,17 +21,32 @@ describe("falha da primeira mensagem do atendimento virtual", () => {
   it("mensagem não entregue: registra o motivo e desqualifica o lead", () => {
     expect(initialMessageFailureStatus("131026")).toBe("disqualified");
     expect(initialMessageFailureStatus(null)).toBe("disqualified");
+    expect(initialMessageFailureLeadDisposition("131026")).toEqual({
+      status: "new",
+      distributionStatus: "manual_hold",
+      qualificationStatus: "disqualified",
+      qualificationState: "COMPLETED",
+    });
     const note = initialMessageFailureNote("131026");
     expect(note).toContain("Motivo (131026): Mensagem não pôde ser entregue.");
     expect(note).toContain("o lead foi desqualificado");
+    expect(note).toContain("fora da distribuição automática, aguardando ação manual");
     expect(initialMessageFailureNote(null)).not.toContain("Motivo");
   });
 
   it("130472/131049: o lead tem WhatsApp, a Meta é que bloqueou — não é desqualificado", () => {
     expect(initialMessageFailureStatus("130472")).toBe("meta_blocked");
     expect(initialMessageFailureStatus("131049")).toBe("meta_blocked");
+    expect(initialMessageFailureLeadDisposition("130472")).toEqual({
+      status: "new",
+      distributionStatus: "manual_hold",
+      qualificationStatus: "meta_blocked",
+      qualificationState: "COMPLETED",
+    });
     const note = initialMessageFailureNote("130472");
     expect(note).toContain("Envio bloqueado pela Meta");
+    expect(note).toContain("fora da distribuição automática");
+    expect(note).toContain("aguardando ação manual");
     expect(note).not.toMatch(/desqualificad/i);
   });
 });

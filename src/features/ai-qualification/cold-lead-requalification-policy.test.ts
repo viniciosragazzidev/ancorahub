@@ -3,6 +3,7 @@ import { operationDayStart } from "@/features/reports/metrics/lead-quality-perio
 import {
   countRequalificationAttempts,
   isRequalificationInCooldown,
+  isEligibleColdLeadForManualRequalification,
   isWithinRequalificationBusinessWindow,
   nextRequalificationBusinessWindowAt,
   partitionColdLeadsByResponse,
@@ -20,6 +21,8 @@ describe("cold lead requalification policy", () => {
       id,
       createdAt: new Date(since.getTime() + 1_000),
       qualificationStatus: "cold",
+      qualificationState: "COMPLETED",
+      qualificationCompletedAt: new Date(since.getTime()),
       corretorId: null,
       status: "new",
       distributionStatus: "queued",
@@ -31,10 +34,18 @@ describe("cold lead requalification policy", () => {
     });
     expect(selectColdLeadsForOperationDay([
       lead("today"),
+      lead("timeout-held", { distributionStatus: "manual_hold", qualificationState: "PARTIAL", qualificationCompletedAt: null }),
       lead("old", { createdAt: new Date(since.getTime() - 1) }),
       lead("warm", { qualificationStatus: "warm" }),
       lead("owned", { corretorId: "broker" }),
-    ], since).map((item) => item.id)).toEqual(["today"]);
+      lead("other-manual-hold", { distributionStatus: "manual_hold" }),
+    ], since).map((item) => item.id)).toEqual(["today", "timeout-held"]);
+    expect(isEligibleColdLeadForManualRequalification(lead("timeout-held", {
+      distributionStatus: "manual_hold",
+      qualificationState: "PARTIAL",
+      qualificationCompletedAt: null,
+    }))).toBe(true);
+    expect(isEligibleColdLeadForManualRequalification(lead("other-manual-hold", { distributionStatus: "manual_hold" }))).toBe(false);
   });
 
   it("separates no-response leads from replied leads that stayed cold", () => {
