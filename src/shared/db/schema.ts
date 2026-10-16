@@ -4740,7 +4740,13 @@ export const knowledgeSources = pgTable(
     createdAt,
     updatedAt,
   },
-  (table) => [index("knowledge_sources_tenant_idx").on(table.tenantId, table.status)]
+  (table) => [
+    index("knowledge_sources_tenant_idx").on(table.tenantId, table.status),
+    // One operator-material file per tenant (migration 0205).
+    uniqueIndex("knowledge_sources_operator_hash_unique")
+      .on(table.tenantId, table.hashMd5)
+      .where(sql`${table.category} = 'operator_material' and ${table.hashMd5} is not null`),
+  ]
 );
 
 /** Canonical knowledge documents generated after ingestion. */
@@ -4782,7 +4788,11 @@ export const knowledgeChunks = pgTable(
     createdAt,
     updatedAt,
   },
-  (table) => [index("knowledge_chunks_tenant_doc_idx").on(table.tenantId, table.documentId)]
+  (table) => [
+    index("knowledge_chunks_tenant_doc_idx").on(table.tenantId, table.documentId),
+    // Trigram index behind the term search (migration 0205).
+    index("knowledge_chunks_text_fold_trgm_idx").using("gin", sql`ancora_fold(${table.text}) gin_trgm_ops`),
+  ]
 );
 
 /** Suggestions for updating structured CRM data from uploaded materials. */

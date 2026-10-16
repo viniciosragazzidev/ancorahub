@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, gte, desc, isNull, lte, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { extractSearchKeywords, stripAccents } from "./search-terms";
+import { isUndefinedFunctionError } from "@/shared/db/postgres-errors";
 import { buildTermSearch } from "./term-search-sql";
 
 export type HybridSearchResult = {
@@ -45,10 +46,11 @@ export async function executeHybridKnowledgeSearch(params: {
   const keywords = extractSearchKeywords(params.query);
   // Without an embedding the database has to pick the candidates by term. Ordering by recency
   // alone cut the answer out whenever newer, unrelated material existed.
-  const termSearch = queryEmbedding ? null : buildTermSearch(schema.knowledgeChunks.text, keywords);
 
   // Query chunks with tenant isolation, authority level, validity and term filters
-  const chunks = await db
+  const search = (mode: "function" | "inline") => {
+    const termSearch = queryEmbedding ? null : buildTermSearch(schema.knowledgeChunks.text, keywords, mode);
+    return db
     .select({
       chunkId: schema.knowledgeChunks.id,
       documentId: schema.knowledgeChunks.documentId,
@@ -81,6 +83,17 @@ export async function executeHybridKnowledgeSearch(params: {
       desc(schema.knowledgeChunks.createdAt),
     )
     .limit(maxLimit * 5);
+  };
+
+  let chunks: Awaited<ReturnType<typeof search>>;
+  try {
+    chunks = await search("function");
+  } catch (error) {
+    // Migration 0205 (ancora_fold and its index) is applied by hand and may be missing: the
+    // same search works without it, only slower.
+    if (!isUndefinedFunctionError(error)) throw error;
+    chunks = await search("inline");
+  }
 
   // Keyword relevance scoring heuristic, accent-insensitive like the SQL filter
   const scored = chunks.map((c) => {

@@ -188,6 +188,7 @@ async function ingestOperatorPdf(input: GroupCaptureInput, providerPath: string)
       validFrom: validity.validFrom,
       validUntil: validity.validUntil,
     });
+    if (!documentId) return { status: "duplicate_material" };
     return { status: "captured", documentId };
   } catch (error) {
     // Log the outcome only, never the phone, the body or the file name.
@@ -246,6 +247,7 @@ async function ingestOperatorImage(input: GroupCaptureInput, providerPath: strin
       validUntil: validity.validUntil,
       chunkNotice: IMAGE_MATERIAL_NOTICE,
     });
+    if (!documentId) return { status: "duplicate_material" };
     return { status: "captured", documentId };
   } catch (error) {
     console.warn("[waha-group-capture] image_failed", {
@@ -255,7 +257,12 @@ async function ingestOperatorImage(input: GroupCaptureInput, providerPath: strin
   }
 }
 
-/** Stores the file (when R2 is on), then the source, the document and its chunks. Returns the document id. */
+/**
+ * Stores the source, the document and its chunks, and the original file when R2
+ * is on. Returns the document id, or null when the same file is already being
+ * published: a unique index on the file hash settles two copies that arrive
+ * together, and the second stops before doing any work.
+ */
 async function publishOperatorMaterial(input: {
   tenantId: string;
   providerMessageId: string;
@@ -269,73 +276,88 @@ async function publishOperatorMaterial(input: {
   validUntil: Date | null;
   /** Prepended to every chunk, e.g. the warning on text read from an image. */
   chunkNotice?: string;
-}): Promise<string> {
+}): Promise<string | null> {
   const db = getDatabase();
   const sourceId = randomUUID();
   const documentId = randomUUID();
 
-  // Keep the original file when R2 is on; otherwise keep only the extracted text.
-  let fileUrl = `waha-group:${input.providerMessageId}`;
-  if (await isR2StorageEnabled()) {
-    const storageKey = `documents/${input.tenantId}/operator-material/${sourceId}-${input.fileName.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
-    await uploadR2Object(storageKey, input.body, input.fileType);
-    fileUrl = `/api/documents/download?key=${encodeURIComponent(storageKey)}`;
+  // Claim the hash first: the first copy wins.
+  const [claimed] = await db
+    .insert(schema.knowledgeSources)
+    .values({
+      id: sourceId,
+      tenantId: input.tenantId,
+      fileName: input.fileName,
+      fileType: input.fileType,
+      fileSize: input.body.byteLength,
+      fileUrl: `waha-group:${input.providerMessageId}`,
+      hashMd5: input.hashMd5,
+      category: OPERATOR_MATERIAL_CATEGORY,
+      status: "parsing",
+    })
+    .onConflictDoNothing()
+    .returning({ id: schema.knowledgeSources.id });
+  if (!claimed) return null;
+
+  try {
+    // Keep the original file when R2 is on; otherwise keep only the extracted text.
+    if (await isR2StorageEnabled()) {
+      const storageKey = `documents/${input.tenantId}/operator-material/${sourceId}-${input.fileName.replace(/[^a-zA-Z0-9.\-_]/g, "_")}`;
+      await uploadR2Object(storageKey, input.body, input.fileType);
+      await db
+        .update(schema.knowledgeSources)
+        .set({ fileUrl: `/api/documents/download?key=${encodeURIComponent(storageKey)}`, updatedAt: new Date() })
+        .where(eq(schema.knowledgeSources.id, sourceId));
+    }
+
+    await db.insert(schema.knowledgeDocuments).values({
+      id: documentId,
+      tenantId: input.tenantId,
+      sourceId,
+      title: input.fileName.replace(/\.[^/.]+$/, ""),
+      canonicalContent: input.chunkNotice ? `${input.chunkNotice}\n\n${input.text}` : input.text,
+      category: OPERATOR_MATERIAL_CATEGORY,
+      authorityLevel: input.authorityLevel,
+      status: "published",
+      version: 1,
+      validFrom: input.validFrom,
+      validUntil: input.validUntil,
+    });
+
+    const chunks = chunkOperatorText(input.text);
+    if (chunks.length > 0) {
+      await db.insert(schema.knowledgeChunks).values(
+        chunks.map((chunkText, chunkIndex) => {
+          const text = input.chunkNotice ? `${input.chunkNotice}\n${chunkText}` : chunkText;
+          return {
+            id: randomUUID(),
+            tenantId: input.tenantId,
+            documentId,
+            chunkIndex,
+            text,
+            tokenCount: Math.ceil(text.length / 4),
+            authorityLevel: input.authorityLevel,
+            metadata: {
+              category: OPERATOR_MATERIAL_CATEGORY,
+              sourceId,
+              fileName: input.fileName,
+              ...(input.chunkNotice ? { readFrom: "image" } : {}),
+            },
+          };
+        }),
+      );
+    }
+
+    await db
+      .update(schema.knowledgeSources)
+      .set({ status: "parsed", updatedAt: new Date() })
+      .where(eq(schema.knowledgeSources.id, sourceId));
+
+    return documentId;
+  } catch (error) {
+    // A half-published source would hold the hash and block the same file forever.
+    await db.delete(schema.knowledgeDocuments).where(eq(schema.knowledgeDocuments.sourceId, sourceId)).catch(() => undefined);
+    await db.delete(schema.knowledgeSources).where(eq(schema.knowledgeSources.id, sourceId)).catch(() => undefined);
+    throw error;
   }
-
-  await db.insert(schema.knowledgeSources).values({
-    id: sourceId,
-    tenantId: input.tenantId,
-    fileName: input.fileName,
-    fileType: input.fileType,
-    fileSize: input.body.byteLength,
-    fileUrl,
-    hashMd5: input.hashMd5,
-    category: OPERATOR_MATERIAL_CATEGORY,
-    status: "parsing",
-  });
-
-  await db.insert(schema.knowledgeDocuments).values({
-    id: documentId,
-    tenantId: input.tenantId,
-    sourceId,
-    title: input.fileName.replace(/\.[^/.]+$/, ""),
-    canonicalContent: input.chunkNotice ? `${input.chunkNotice}\n\n${input.text}` : input.text,
-    category: OPERATOR_MATERIAL_CATEGORY,
-    authorityLevel: input.authorityLevel,
-    status: "published",
-    version: 1,
-    validFrom: input.validFrom,
-    validUntil: input.validUntil,
-  });
-
-  const chunks = chunkOperatorText(input.text);
-  if (chunks.length > 0) {
-    await db.insert(schema.knowledgeChunks).values(
-      chunks.map((chunkText, chunkIndex) => {
-        const text = input.chunkNotice ? `${input.chunkNotice}\n${chunkText}` : chunkText;
-        return {
-          id: randomUUID(),
-          tenantId: input.tenantId,
-          documentId,
-          chunkIndex,
-          text,
-          tokenCount: Math.ceil(text.length / 4),
-          authorityLevel: input.authorityLevel,
-          metadata: {
-            category: OPERATOR_MATERIAL_CATEGORY,
-            sourceId,
-            fileName: input.fileName,
-            ...(input.chunkNotice ? { readFrom: "image" } : {}),
-          },
-        };
-      }),
-    );
-  }
-
-  await db
-    .update(schema.knowledgeSources)
-    .set({ status: "parsed", updatedAt: new Date() })
-    .where(eq(schema.knowledgeSources.id, sourceId));
-
-  return documentId;
 }

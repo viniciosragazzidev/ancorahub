@@ -1065,6 +1065,13 @@
                         "when":  1791662005000,
                         "tag":  "0204_waha_group_sources",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  152,
+                        "version":  "7",
+                        "when":  1791662006000,
+                        "tag":  "0205_knowledge_search_indexes",
+                        "breakpoints":  true
                     }
                 ]
 }
