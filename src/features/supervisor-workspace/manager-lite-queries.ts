@@ -7,6 +7,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { getManagerUnitScope } from "@/features/broker-workspace/manager-unit-scope";
 import type { RadarFunnel, RadarLead, RadarTeamMember } from "./supervisor-leads-radar";
 import { getLeadTimeline } from "@/features/leads/queries";
+import { buildTeamLeadLightDetail, getTeamLeadPresentationSupplements } from "./team-lead-detail-presentation";
 
 const ACTIVE_STATUSES = ["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"] as const;
 
@@ -87,13 +88,38 @@ export async function getManagerLiteLeadDetail(context: TenantContext, leadId: s
   if (context.role !== "manager" || !scope) return null;
   const db = getDatabase();
   const [[lead], brokers] = await Promise.all([
-    db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, ownerId: schema.leads.corretorId, ownerName: schema.user.name, ownerImage: schema.user.image, productName: schema.carrierPlans.name, assignedAt: schema.leads.assignedAt, branchName: schema.branches.name })
+    db.select({
+      id: schema.leads.id,
+      name: schema.leads.nome,
+      phone: schema.leads.telefone,
+      email: schema.leads.email,
+      status: schema.leads.status,
+      qualificationStatus: schema.leads.qualificationStatus,
+      qualificationState: schema.leads.qualificationState,
+      qualificationDetails: schema.leads.qualificationDetails,
+      formData: schema.leads.formData,
+      consentimentoLgpd: schema.leads.consentimentoLgpd,
+      tipo: schema.leads.tipo,
+      origem: schema.leads.origem,
+      sourceCampaign: schema.leads.sourceCampaign,
+      sourceChannel: schema.leads.sourceChannel,
+      sourceMetadata: schema.leads.sourceMetadata,
+      ownerId: schema.leads.corretorId,
+      ownerName: schema.user.name,
+      ownerImage: schema.user.image,
+      productName: schema.carrierPlans.name,
+      assignedAt: schema.leads.assignedAt,
+      createdAt: schema.leads.createdAt,
+      branchName: schema.branches.name,
+    })
       .from(schema.leads).leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId)).leftJoin(schema.carrierPlans, eq(schema.carrierPlans.id, schema.leads.planId)).leftJoin(schema.branches, and(eq(schema.branches.id, schema.leads.branchId), eq(schema.branches.tenantId, schema.leads.tenantId)))
       .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, scope.tenantId), eq(schema.leads.branchId, scope.branchId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt))).limit(1),
     db.select({ id: schema.user.id, name: schema.user.name, image: schema.user.image, availability: schema.tenantMemberships.availabilityStatus }).from(schema.tenantMemberships).innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
       .where(and(eq(schema.tenantMemberships.tenantId, scope.tenantId), eq(schema.tenantMemberships.branchId, scope.branchId), eq(schema.tenantMemberships.role, "broker"), eq(schema.tenantMemberships.status, "active"), eq(schema.user.active, true), eq(schema.user.status, "active"))).orderBy(schema.user.name),
   ]);
   if (!lead) return null;
+  const supplements = await getTeamLeadPresentationSupplements(context, leadId, lead.ownerId);
+  if (!supplements) return null;
   // The lead is already inside the manager's unit (checked above), so its tasks and documents are read by lead id.
   const [timeline, tasks, documents] = await Promise.all([
     getLeadTimeline(leadId),
@@ -109,9 +135,17 @@ export async function getManagerLiteLeadDetail(context: TenantContext, leadId: s
   ]);
   return {
     lead: { id: lead.id, name: lead.name ?? "Lead", status: lead.status, ownerId: lead.ownerId, ownerName: lead.ownerName, ownerImage: lead.ownerImage, productName: lead.productName, assignedAt: lead.assignedAt, branchName: lead.branchName },
+    lightLead: buildTeamLeadLightDetail({
+      ...lead,
+      planName: lead.productName,
+    }, supplements.beneficiaries),
     timeline: timeline ?? [],
     tasks,
     documents,
     brokers: brokers.map((broker) => ({ id: broker.id, name: broker.name ?? "Corretor", image: broker.image ?? null, availability: broker.availability ?? "offline" })),
+    requirements: supplements.requirements,
+    leadDocuments: supplements.documents,
+    conversation: supplements.conversation,
+    brokerWhatsAppConnected: supplements.brokerWhatsAppConnected,
   };
 }

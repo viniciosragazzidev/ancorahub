@@ -1,3 +1,15 @@
+## 2026-10-16: P11, ficha de lead completa no Lite de supervisão
+
+Papéis: supervisor na própria equipe e gestor na própria unidade. A ação principal
+é consultar a qualificação, as informações e a conversa do WhatsApp no mesmo
+detalhe; as ações atuais de repasse, cobrança, etapa e reatribuição permanecem nos
+seus papéis. Conversa, qualificação, tarefas e documentos do gestor são somente
+leitura; não há envio de mensagem ou formulário de corretor. Reutiliza o detalhe
+Arc do corretor, o ChatScreen e o leitor escopado de conversas da equipe, sem token,
+primitive ou animação nova. Registro:
+`docs/implementations/active/2026-10-16-supervisor-lead-detail.md`. Tsc e testes
+focados passaram; prévia Webpack não respondeu para capturar QA visual, pendente.
+
 ## 2026-10-14: T124, Gestor Lite com Leads como primeira etapa
 
 Papel: Gestor (`manager`); objetivo: acompanhar e repassar leads da própria unidade.

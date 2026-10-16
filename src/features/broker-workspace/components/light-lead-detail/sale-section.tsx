@@ -6,7 +6,7 @@ import { stageLabel } from "./format";
 import type { LeadDetailController } from "./use-lead-detail";
 
 /** Current stage and the sale documentation flow (register, in review, approved, rejected). */
-export function SaleSection({ c }: { c: LeadDetailController }) {
+export function SaleSection({ c, mode = "broker" }: { c: LeadDetailController; mode?: "broker" | "management" }) {
   const {
     isDistributed,
     leadStatus,
@@ -18,7 +18,7 @@ export function SaleSection({ c }: { c: LeadDetailController }) {
     setShowSaleConfirm,
   } = c;
 
-  if (isDistributed) return null;
+  if (isDistributed && mode === "broker") return null;
 
   const canRegisterSale =
     !approvedDocument &&
@@ -39,7 +39,7 @@ export function SaleSection({ c }: { c: LeadDetailController }) {
         ) : null}
       </div>
 
-      {approvedDocument && leadStatus !== "converted" ? (
+      {mode === "broker" && approvedDocument && leadStatus !== "converted" ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--success)">Documentação aprovada pelo supervisor</p>
           <p className="text-sm text-(--text-secondary)">
@@ -51,7 +51,7 @@ export function SaleSection({ c }: { c: LeadDetailController }) {
         </div>
       ) : null}
 
-      {!approvedDocument && rejectedDocument && leadStatus !== "converted" ? (
+      {mode === "broker" && !approvedDocument && rejectedDocument && leadStatus !== "converted" ? (
         <div className="flex flex-col gap-3 border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--warning)">Documentação rejeitada pelo supervisor</p>
           <p className="text-sm text-(--text-secondary)">
@@ -63,14 +63,14 @@ export function SaleSection({ c }: { c: LeadDetailController }) {
         </div>
       ) : null}
 
-      {!approvedDocument && !rejectedDocument && leadStatus === "documentation_pending" ? (
+      {mode === "broker" && !approvedDocument && !rejectedDocument && leadStatus === "documentation_pending" ? (
         <div className="border-t border-(--border) pt-4">
           <p className="text-sm font-medium text-(--foreground)">Documentação em análise</p>
           <p className="mt-1 text-sm text-(--text-secondary)">Aguardando aprovação do supervisor.</p>
         </div>
       ) : null}
 
-      {canRegisterSale ? (
+      {mode === "broker" && canRegisterSale ? (
         <div className="border-t border-(--border) pt-4">
           <Button variant="secondary" onClick={handleRequestSale} loading={requestingSale} disabled={requestingSale}>
             Registrar venda

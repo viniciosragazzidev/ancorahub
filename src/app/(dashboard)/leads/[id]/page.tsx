@@ -39,6 +39,7 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { readLeadIntelligence } from "@/features/broker-workspace/chat/intelligence";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { SupervisorLeadDetail } from "@/features/supervisor-workspace/supervisor-lead-detail";
+import { buildTeamLeadLightDetail, getTeamLeadPresentationSupplements } from "@/features/supervisor-workspace/team-lead-detail-presentation";
 import { ManagerLiteLeadDetailPage } from "@/features/manager-workspace/manager-lite-leads";
 
 import { getRequirementsForLead, getLeadDocuments, getLeadDocumentChecklist } from "@/features/documents/actions";
@@ -145,8 +146,45 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
 
   if (!lead) notFound();
   if (context.role === "supervisor" && (await getLiteAudience(context)) === "supervisor") {
-    const timeline = await getLeadTimeline(id);
-    return <SupervisorLeadDetail lead={{ id: lead.id, name: lead.nome, status: lead.status, ownerId: lead.corretorId, ownerName: lead.corretorNome, ownerImage: lead.corretorImage, productName: lead.productName, assignedAt: lead.assignedAt, branchName: lead.branchNome }} timeline={timeline ?? []} now={new Date().toISOString()} />;
+    const [timeline, supplements] = await Promise.all([
+      getLeadTimeline(id),
+      getTeamLeadPresentationSupplements(context, id, lead.corretorId),
+    ]);
+    if (!supplements) notFound();
+    const lightLead = buildTeamLeadLightDetail({
+      id: lead.id,
+      name: lead.nome,
+      phone: lead.telefone,
+      email: lead.email,
+      status: lead.status,
+      qualificationStatus: lead.qualificationStatus,
+      qualificationState: lead.qualificationState,
+      qualificationDetails: lead.qualificationDetails,
+      formData: lead.formData,
+      consentimentoLgpd: lead.consentimentoLgpd,
+      tipo: lead.tipo,
+      origem: lead.origem,
+      sourceCampaign: lead.sourceCampaign,
+      sourceChannel: lead.sourceChannel,
+      sourceMetadata: lead.sourceMetadata,
+      createdAt: lead.createdAt,
+      assignedAt: lead.assignedAt,
+      ownerId: lead.corretorId,
+      ownerName: lead.corretorNome,
+      ownerImage: lead.corretorImage,
+      branchName: lead.branchNome,
+      planName: lead.productName,
+    }, supplements.beneficiaries);
+    return <SupervisorLeadDetail
+      lead={{ id: lead.id, name: lead.nome, status: lead.status, ownerId: lead.corretorId, ownerName: lead.corretorNome, ownerImage: lead.corretorImage, productName: lead.productName, assignedAt: lead.assignedAt, branchName: lead.branchNome }}
+      lightLead={lightLead}
+      requirements={supplements.requirements}
+      leadDocuments={supplements.documents}
+      conversation={supplements.conversation}
+      brokerWhatsAppConnected={supplements.brokerWhatsAppConnected}
+      timeline={timeline ?? []}
+      now={new Date().toISOString()}
+    />;
   }
   const [metaCampaign, metaAd, metaForm] = await Promise.all([
     lead.metaCampaignId
