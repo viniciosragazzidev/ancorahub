@@ -40,7 +40,7 @@ export async function syncWahaGroups(input: { wahaNumberId: string; tenantId: st
     .limit(1);
   if (!number) throw new Error("Número WAHA não encontrado.");
 
-  const groups = parseGroupChats(await getWahaChats({ sessionName: number.relaySessionId, limit: 500 }));
+  const groups = parseGroupChats(await getWahaChats({ sessionName: number.relaySessionId, limit: 500, kind: "group" }));
   const now = new Date();
 
   for (const group of groups) {

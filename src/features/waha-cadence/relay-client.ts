@@ -207,11 +207,11 @@ export async function getWahaProfilePictureUrl(input: { sessionName: string; pho
   return typeof data.url === "string" ? data.url : null;
 }
 
-export async function getWahaChats(input: { sessionName: string; limit?: number }) {
+export async function getWahaChats(input: { sessionName: string; limit?: number; kind?: "group" }) {
   const config = relayConfig();
   if (config.transport !== "fastify") throw new Error("WAHA_CHATS_REQUIRES_FASTIFY");
   const limit = Math.min(Math.max(Math.trunc(input.limit ?? 500), 1), 500);
-  const response = await fetch(`${config.url}/internal/waha/connections/${encodeURIComponent(input.sessionName)}/chats?limit=${limit}`, {
+  const response = await fetch(`${config.url}/internal/waha/connections/${encodeURIComponent(input.sessionName)}/chats?limit=${limit}${input.kind === "group" ? "&kind=group" : ""}`, {
     headers: getFastifyHeaders(config.secret, false),
     cache: "no-store",
     signal: AbortSignal.timeout(20_000),

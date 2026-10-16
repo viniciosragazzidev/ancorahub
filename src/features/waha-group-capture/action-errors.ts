@@ -8,7 +8,7 @@ import { postgresErrorCode } from "@/shared/db/postgres-errors";
  */
 function describeChatsFailure(detail: string, fallback: string): string {
   const reason = detail.trim().toLowerCase();
-  if (reason === "not found" || reason === "404") {
+  if (reason === "not found" || reason === "waha_not_found" || reason === "404") {
     return `${fallback} O serviço de WhatsApp (relay) que está no ar não tem a rota de listar conversas: atualize o serviço services/whatsapp-api para a versão atual e tente de novo.`;
   }
   if (reason === "unauthorized" || reason === "forbidden" || reason === "401" || reason === "403") {
