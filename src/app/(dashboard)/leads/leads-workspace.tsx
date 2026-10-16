@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 
 import {
@@ -182,6 +182,9 @@ const kanbanTone: Record<string, { dot: string; column: string; count: string }>
     count: "border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   },
 };
+
+/** True for brokers: cards must not show when the lead reached the brokerage. */
+const HideLeadArrivalContext = createContext(false);
 
 export function LeadsWorkspace({
   leads,
@@ -551,6 +554,7 @@ export function LeadsWorkspace({
   }
 
   return (
+    <HideLeadArrivalContext.Provider value={contextRole === "broker"}>
     <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-4">
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs value={activeTab} onValueChange={handleViewChange} className="flex min-h-0 flex-1 flex-col">
@@ -864,6 +868,7 @@ export function LeadsWorkspace({
         onLeadPatch={(patch) => applyLeadPatch([selectedLead.id], (lead) => ({ ...lead, ...patch }))}
       /> : null}
     </div>
+    </HideLeadArrivalContext.Provider>
   );
 }
 
@@ -977,6 +982,7 @@ function KanbanLeadCard({
   slaFirstContactMinutes?: number;
   slaStagnantDays?: number;
 }) {
+  const hideArrival = useContext(HideLeadArrivalContext);
   const selected = isSelected(lead.id);
   const sla = useMemo(() => computeSlaInfo(lead, slaFirstContactMinutes, slaStagnantDays), [lead, slaFirstContactMinutes, slaStagnantDays]);
   const phoneDigits = lead.telefone ? lead.telefone.replace(/\D/g, "") : "";
@@ -1060,7 +1066,7 @@ function KanbanLeadCard({
             </span>
             <LeadHealthBadge health={computeLeadHealth(lead, slaFirstContactMinutes, slaStagnantDays)} />
           </div>
-          <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>
+          {hideArrival ? null : <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{formatDate(lead.createdAt, { day: "2-digit", month: "short" })}</span>}
         </div>
       </button>
     </Card>

@@ -210,7 +210,9 @@ const QUALIFICATION_CONFIG: Record<string, { label: string; className: string }>
 
 export const getLeadsColumns = (
   onOpenDrawer: (lead: LeadRow) => void,
-): ColumnDef<LeadRow>[] => [
+  options: { hideOrigin?: boolean } = {},
+): ColumnDef<LeadRow>[] => {
+  const columns: ColumnDef<LeadRow>[] = [
   {
     id: "select",
     header: ({ table }) => (
@@ -545,4 +547,7 @@ export const getLeadsColumns = (
     enableSorting: false,
     enableHiding: false,
   },
-];
+  ];
+  // Brokers do not see when the lead reached the brokerage.
+  return options.hideOrigin ? columns.filter((column) => column.id !== "createdAt") : columns;
+};

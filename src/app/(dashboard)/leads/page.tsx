@@ -752,6 +752,7 @@ async function LeadsPageContent({
           initialBranch={filters.branch}
           initialCorretor={filters.corretor}
           initialOrigem={filters.origem}
+          hideOriginFilters={context.role === "broker"}
           initialPageSize={filters.pageSize}
           initialQualification={filters.qualification}
           initialSearch={filters.search}

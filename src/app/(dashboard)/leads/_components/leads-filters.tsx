@@ -47,6 +47,7 @@ export function LeadsFilters({
   initialBranch,
   initialTipo,
   initialOrigem,
+  hideOriginFilters = false,
   initialQualification,
   initialCorretor,
   initialPageSize,
@@ -62,6 +63,8 @@ export function LeadsFilters({
   initialBranch?: string;
   initialTipo?: string;
   initialOrigem?: string;
+  /** Brokers do not filter by origin or campaign. */
+  hideOriginFilters?: boolean;
   initialQualification?: string;
   initialCorretor?: string;
   initialPageSize?: string;
@@ -310,7 +313,7 @@ export function LeadsFilters({
                 </div>
 
                 {/* Origem */}
-                <div className="space-y-1.5">
+                {hideOriginFilters ? null : <div className="space-y-1.5">
                   <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                     Origem da Oportunidade
                   </label>
@@ -336,7 +339,7 @@ export function LeadsFilters({
                       </Button>
                     ))}
                   </div>
-                </div>
+                </div>}
 
                 {/* Tag */}
                 {tags.length ? (
@@ -356,7 +359,7 @@ export function LeadsFilters({
                 ) : null}
 
                 {/* Campanhas Meta */}
-                <div className="space-y-1.5">
+                {hideOriginFilters ? null : <div className="space-y-1.5">
                   <label className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                     Campanhas Meta
                   </label>
@@ -371,7 +374,7 @@ export function LeadsFilters({
                     ]}
                     value={eligibleCampaigns ? "1" : ""}
                   />
-                </div>
+                </div>}
 
                 {/* Status / Etapa */}
                 <div className="space-y-1.5">
