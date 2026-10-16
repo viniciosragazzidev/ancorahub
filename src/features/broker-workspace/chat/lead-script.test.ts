@@ -200,6 +200,21 @@ describe("hideArrival", () => {
     expect(script.blocks.some((block) => block.id === "s-arrived")).toBe(true);
   });
 
+  it("hides the dates and times of the conversation", () => {
+    const script = buildLeadConversationScript({
+      lead: lead(),
+      events: [{ id: "e1", tipo: "system_alert", conteudo: "Qualificação finalizada", userId: "me", userName: "Eu", createdAt: new Date("2026-10-07T02:25:00.000Z") }],
+      messages: [{ id: "m1", body: "Plano para 71 anos", direction: "incoming", senderRole: "user", sentAt: new Date("2026-10-07T10:23:00.000Z") }],
+      viewerId: "me",
+      now,
+      whatsappUrl: null,
+      hideArrival: true,
+    });
+    expect(script.blocks.some((block) => block.type === "date")).toBe(false);
+    expect(script.blocks.find((block) => block.id === "wa-m1")).toMatchObject({ at: undefined });
+    expect(script.blocks.find((block) => block.id === "ev-e1")).toMatchObject({ text: "Qualificação finalizada" });
+  });
+
   it("shows the date of the first contact by default", () => {
     const script = buildLeadConversationScript({ lead: lead(), events: [], viewerId: "me", now, whatsappUrl: null });
     expect(script.blocks.some((block) => block.id === "d-created")).toBe(true);

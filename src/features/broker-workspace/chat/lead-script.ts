@@ -105,13 +105,14 @@ function factRows(lead: LeadConversationLead): ChatFactRow[] {
 }
 
 /** A history row becomes a chat block: the broker's notes on the right, everything else as a centered note. */
-function eventBlock(event: LeadConversationEvent, viewerId: string): ChatBlock {
-  const at = time(event.createdAt);
+function eventBlock(event: LeadConversationEvent, viewerId: string, hideTimes = false): ChatBlock {
+  const at = hideTimes ? undefined : time(event.createdAt);
+  const suffix = at ? ` · ${at}` : "";
   if (event.tipo === "note" && event.userId === viewerId) return { type: "user", id: `ev-${event.id}`, text: event.conteudo, at };
   if (event.tipo === "note") return { type: "system", id: `ev-${event.id}`, strong: event.userName ?? "Equipe", text: `anotou: ${event.conteudo}` };
   if (event.tipo === "whatsapp_msg") return { type: "assistant", id: `ev-${event.id}`, text: event.conteudo, at };
-  if (isAiFeedback(event)) return { type: "system", id: `ev-${event.id}`, strong: "Sugestão da IA", text: `${aiNextAction(event.conteudo)} · ${at}` };
-  return { type: "system", id: `ev-${event.id}`, text: `${event.conteudo} · ${at}` };
+  if (isAiFeedback(event)) return { type: "system", id: `ev-${event.id}`, strong: "Sugestão da IA", text: `${aiNextAction(event.conteudo)}${suffix}` };
+  return { type: "system", id: `ev-${event.id}`, text: `${event.conteudo}${suffix}` };
 }
 
 const isAiFeedback = (event: LeadConversationEvent) => event.conteudo.startsWith("[IA Feedback]");
@@ -299,7 +300,7 @@ export function buildLeadConversationScript({
   /** WhatsApp mirror, only for the lead's own broker. */
   messages?: LeadConversationMessage[];
   advice?: LeadConversationAdvice | null;
-  /** Brokers do not see when the lead reached the brokerage (no date for the first contact). */
+  /** Brokers do not see when the lead reached the brokerage, nor the dates and times of the conversation. */
   hideArrival?: boolean;
 }): ChatScript {
   const origin = originLabel(lead);
@@ -307,7 +308,7 @@ export function buildLeadConversationScript({
   // History and WhatsApp in one timeline: the latest of each, in time order.
   type Entry = { at: Date; block: ChatBlock; id: string };
   const history: Entry[] = [
-    ...withLatestAiFeedback([...events]).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT).map((event) => ({ at: event.createdAt, id: event.id, block: eventBlock(event, viewerId) })),
+    ...withLatestAiFeedback([...events]).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT).map((event) => ({ at: event.createdAt, id: event.id, block: eventBlock(event, viewerId, hideArrival) })),
     ...[...messages].sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-MESSAGES_LIMIT).map((message) => ({
       at: message.sentAt,
       id: `wa-${message.id}`,
@@ -315,7 +316,7 @@ export function buildLeadConversationScript({
         type: "whatsapp" as const,
         id: `wa-${message.id}`,
         text: message.body,
-        at: time(message.sentAt),
+        at: hideArrival ? undefined : time(message.sentAt),
         // Outbound with senderRole "assistant" is the AI qualification; other outbound is the broker.
         from: !isOutboundMessage(message.direction) ? "client" as const : message.senderRole === "assistant" ? "qualification" as const : "broker" as const,
       },
@@ -332,7 +333,8 @@ export function buildLeadConversationScript({
   let lastDay = dayKey(lead.createdAt);
   for (const entry of history) {
     const key = dayKey(entry.at);
-    if (key !== lastDay) {
+    // Brokers see the conversation without dates or times (when the client wrote is not shown).
+    if (key !== lastDay && !hideArrival) {
       blocks.push({ type: "date", id: `d-${entry.id}`, label: dateLabel(entry.at, now) });
       lastDay = key;
     }
