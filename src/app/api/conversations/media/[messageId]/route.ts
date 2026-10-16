@@ -36,6 +36,7 @@ export async function GET(
         userId: context.userId,
         role: context.role,
         branchId: context.branchId ?? null,
+        supervisorTeamScope: context.supervisorTeamScope,
       },
     });
     if (!media) {

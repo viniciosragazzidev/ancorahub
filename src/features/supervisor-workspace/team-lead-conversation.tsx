@@ -3,6 +3,7 @@
 import { ChatScreen } from "@/components/chat/chat-screen";
 import type { ChatBlock, ChatScript } from "@/components/chat/types";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { conversationMediaUrl, mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
 import type { TeamConversationDetail, TeamConversationMessage } from "@/features/team-conversations/types";
 
 const timeLabel = new Intl.DateTimeFormat("pt-BR", {
@@ -28,7 +29,10 @@ export function readOnlyWhatsAppBlocks(messages: TeamConversationMessage[]): Cha
   return messages.map((message) => ({
     type: "whatsapp",
     id: `team-wa-${message.id}`,
-    text: message.body.trim() || mediaLabel(message.mediaKind),
+    // Voice notes play from the media route (scope checked there); a placeholder body is not shown as text.
+    ...(message.mediaKind === "audio"
+      ? { audio: { url: conversationMediaUrl(message.id) }, text: mediaPlaceholderLabel(message.body) ? "" : message.body.trim() }
+      : { text: message.body.trim() || mediaLabel(message.mediaKind) }),
     at: timeLabel.format(new Date(message.at)),
     from: message.fromClient ? "client" : message.byAi ? "qualification" : "broker",
   }));

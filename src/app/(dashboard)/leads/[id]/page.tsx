@@ -299,7 +299,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       const [timelineRows, waMessages] = await Promise.all([
         getLeadTimeline(id),
         lightContact.reveal
-          ? db.select({ id: schema.whatsappMessages.id, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole })
+          ? db.select({ id: schema.whatsappMessages.id, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole, mediaKind: schema.whatsappMessages.mediaKind })
             .from(schema.whatsappMessages)
             .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id)))
             .orderBy(desc(schema.whatsappMessages.sentAt))
@@ -339,7 +339,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         hideArrival: true,
         now,
         whatsappUrl: buildWhatsAppUrl(lightContact.telefone, `Olá, ${lead.nome.split(" ")[0] || lead.nome}! Sou seu corretor e vou seguir com seu atendimento por aqui.`),
-        messages: waMessages.filter((message) => message.body && message.sentAt).map((message) => ({ id: message.id, body: message.body ?? "", direction: message.direction, sentAt: new Date(message.sentAt as Date | string), senderRole: message.senderRole })),
+        // Voice notes have no text: they stay in the history as a player.
+        messages: waMessages.filter((message) => (message.body || message.mediaKind === "audio") && message.sentAt).map((message) => ({ id: message.id, body: message.body ?? "", direction: message.direction, sentAt: new Date(message.sentAt as Date | string), senderRole: message.senderRole, mediaKind: message.mediaKind })),
         advice: lightContact.reveal ? { nextBestAction: intelligence.nextBestAction, pendingFrom: intelligence.pendingFrom } : null,
       });
       const leadInitials = lead.nome.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("") || "?";

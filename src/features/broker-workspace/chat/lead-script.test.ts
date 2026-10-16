@@ -157,6 +157,40 @@ describe("WhatsApp in the lead conversation", () => {
     expect(script.blocks.find((block) => block.id === "a-next")).toMatchObject({ text: "Maria está esperando sua resposta." });
     expect(ids.indexOf("a-advice")).toBeLessThan(ids.indexOf("q-main"));
   });
+
+  it("keeps a voice note in the history as an audio block, not as an empty bubble", () => {
+    const script = buildLeadConversationScript({
+      lead: lead(),
+      events: [],
+      viewerId: "me",
+      now,
+      whatsappUrl: null,
+      messages: [
+        { id: "m-audio", body: "", direction: "incoming", sentAt: new Date("2026-10-09T14:56:00.000Z"), mediaKind: "audio" },
+        { id: "m-placeholder", body: "[audio]", direction: "outgoing", sentAt: new Date("2026-10-09T14:57:00.000Z"), mediaKind: "audio" },
+        { id: "m-caption", body: "Ouve isso", direction: "outgoing", sentAt: new Date("2026-10-09T14:58:00.000Z"), mediaKind: "audio" },
+      ],
+    });
+
+    expect(script.blocks.find((block) => block.id === "wa-m-audio")).toMatchObject({ type: "whatsapp", from: "client", text: "", audio: { url: "/api/conversations/media/m-audio" } });
+    expect(script.blocks.find((block) => block.id === "wa-m-placeholder")).toMatchObject({ text: "", audio: { url: "/api/conversations/media/m-placeholder" } });
+    expect(script.blocks.find((block) => block.id === "wa-m-caption")).toMatchObject({ text: "Ouve isso", audio: { url: "/api/conversations/media/m-caption" } });
+  });
+
+  it("hides the time of a voice note from the broker when the arrival is hidden", () => {
+    const script = buildLeadConversationScript({
+      lead: lead(),
+      events: [],
+      viewerId: "me",
+      now,
+      whatsappUrl: null,
+      hideArrival: true,
+      messages: [{ id: "m-audio", body: "", direction: "incoming", sentAt: new Date("2026-10-09T14:56:00.000Z"), mediaKind: "audio" }],
+    });
+
+    expect(script.blocks.find((block) => block.id === "wa-m-audio")).toMatchObject({ audio: { url: "/api/conversations/media/m-audio" } });
+    expect(script.blocks.find((block) => block.id === "wa-m-audio")).not.toMatchObject({ at: expect.anything() });
+  });
 });
 
 describe("block ids", () => {

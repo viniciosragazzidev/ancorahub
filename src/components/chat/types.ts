@@ -69,7 +69,7 @@ export type ChatBlock =
   | { type: "notice"; id: string; noticeType: string; leadId: string | null; title: string; message: string | null; at: string; atIso: string; unread: boolean }
   | { type: "user"; id: string; text: string; at?: string }
   /** A mirrored WhatsApp message: the client, the AI qualification or the broker, each with its own light bubble. */
-  | { type: "whatsapp"; id: string; text: string; at?: string; from: "client" | "qualification" | "broker" }
+  | { type: "whatsapp"; id: string; text: string; at?: string; from: "client" | "qualification" | "broker"; audio?: { url: string } }
   | { type: "facts"; id: string; title: string; subtitle?: string; rows: ChatFactRow[]; href?: string; hrefLabel?: string }
   | { type: "list"; id: string; title: string; subtitle?: string; items: ChatListItem[]; emptyText?: string }
   | { type: "bars"; id: string; title: string; subtitle?: string; values: Array<{ label: string; value: number; highlight?: boolean }>; format?: "count" | "currency" }

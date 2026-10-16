@@ -37,6 +37,16 @@
 .bubbleLabel { font-size: var(--text-xs); color: var(--text-muted); }
 .bubbleText { margin: 0; font-size: var(--text-base); line-height: 1.45; white-space: pre-line; overflow-wrap: anywhere; }
 
+/* ---------- audio inside a WhatsApp bubble ---------- */
+.audio { display: flex; align-items: center; gap: 10px; width: min(240px, 100%); min-width: 0; }
+.audioButton { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 0; border-radius: 999px; background: var(--chat-action); color: white; cursor: pointer; }
+.audioButton:focus-visible { outline: 2px solid var(--chat-action); outline-offset: 2px; }
+.audioBody { flex: 1; min-width: 0; display: grid; gap: 4px; }
+.audioTrack { position: relative; width: 100%; height: 4px; padding: 0; border: 0; border-radius: 999px; background: var(--surface-muted); overflow: hidden; cursor: pointer; }
+.audioFill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--chat-action); }
+.audioTime { font-size: var(--text-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.audioUnavailable { margin: 0; font-size: var(--text-sm); color: var(--text-muted); }
+
 /* ---------- button block (real link: WhatsApp) ---------- */
 .buttonBlock { display: grid; gap: 10px; justify-items: start; }
 .linkButton {

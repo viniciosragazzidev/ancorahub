@@ -231,7 +231,7 @@ function guessUploadFilename(kind: ConversationMediaKind, mimeType: string) {
 }
 
 /** Resolves a media message for an authorized viewer, tenant-scoped. */
-export async function resolveConversationMediaForViewer(input: { messageId: string; viewer: { tenantId: string; userId: string; role: string; branchId: string | null } }) {
+export async function resolveConversationMediaForViewer(input: { messageId: string; viewer: { tenantId: string; userId: string; role: string; branchId: string | null; supervisorTeamScope?: boolean } }) {
   const db = getDatabase();
   const [message] = await db
     .select({
@@ -261,8 +261,33 @@ export async function resolveConversationMediaForViewer(input: { messageId: stri
       .where(and(eq(schema.leads.id, message.leadId), eq(schema.leads.tenantId, input.viewer.tenantId)))
       .limit(1);
     if (!lead) return null;
-    if (input.viewer.role === "broker" && lead.corretorId !== input.viewer.userId) return null;
-    if (input.viewer.role === "manager" && lead.branchId && input.viewer.branchId && lead.branchId !== input.viewer.branchId) return null;
+    if (input.viewer.role === "director") return message;
+    if (input.viewer.role === "broker") {
+      if (lead.corretorId !== input.viewer.userId) return null;
+      return message;
+    }
+    if (input.viewer.role === "manager") {
+      if (!lead.branchId || !input.viewer.branchId || lead.branchId !== input.viewer.branchId) return null;
+      return message;
+    }
+    if (input.viewer.role === "supervisor") {
+      // Supervisor: the lead's broker is in his own team (supervisor of the broker = viewer, same unit).
+      if (!input.viewer.supervisorTeamScope || !input.viewer.branchId || !lead.corretorId) return null;
+      const [member] = await db
+        .select({ branchId: schema.tenantMemberships.branchId, supervisorId: schema.tenantMemberships.supervisorId })
+        .from(schema.tenantMemberships)
+        .where(and(
+          eq(schema.tenantMemberships.tenantId, input.viewer.tenantId),
+          eq(schema.tenantMemberships.userId, lead.corretorId),
+          eq(schema.tenantMemberships.role, "broker"),
+          eq(schema.tenantMemberships.status, "active"),
+        ))
+        .limit(1);
+      if (!member || member.branchId !== input.viewer.branchId || member.supervisorId !== input.viewer.userId) return null;
+      return message;
+    }
+    // Any other role has no lead scope here.
+    return null;
   } else {
     // Broker-channel media (aba Corretores / internal). Only management roles
     // consult this history through the workspace; brokers read their own chats

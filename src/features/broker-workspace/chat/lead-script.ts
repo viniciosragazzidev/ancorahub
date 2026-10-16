@@ -2,6 +2,8 @@ import type { ChatBlock, ChatChoice, ChatFactRow, ChatScript } from "@/component
 import { DECLINE_REASONS } from "@/features/broker-workspace/components/light-lead-detail/types";
 import { LEAD_STATUS_LABELS, MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
 
+import { conversationMediaUrl, mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
+
 import { isOutboundMessage, nextStepText } from "./intelligence";
 
 const TIME_ZONE = "America/Sao_Paulo";
@@ -43,7 +45,7 @@ export type LeadConversationEvent = {
 };
 
 /** A WhatsApp message mirrored by the CRM (client on the left, broker on the right). */
-export type LeadConversationMessage = { id: string; body: string; direction: string; sentAt: Date; senderRole?: string | null };
+export type LeadConversationMessage = { id: string; body: string; direction: string; sentAt: Date; senderRole?: string | null; mediaKind?: string | null };
 
 /** What the AI read in the WhatsApp conversation. */
 export type LeadConversationAdvice = { nextBestAction: string | null; pendingFrom: string | null };
@@ -319,6 +321,8 @@ export function buildLeadConversationScript({
         at: hideArrival ? undefined : time(message.sentAt),
         // Outbound with senderRole "assistant" is the AI qualification; other outbound is the broker.
         from: !isOutboundMessage(message.direction) ? "client" as const : message.senderRole === "assistant" ? "qualification" as const : "broker" as const,
+        // Audio plays from the authenticated media route; a caption-less voice note is the bubble itself.
+        ...(message.mediaKind === "audio" ? { audio: { url: conversationMediaUrl(message.id) }, text: mediaPlaceholderLabel(message.body) ? "" : message.body } : {}),
       },
     })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime());

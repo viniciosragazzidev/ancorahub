@@ -11,6 +11,7 @@ import type { ChatBlock, ChatChoice, ChatLeadRow, ChatListItem } from "./types";
 import { LiveBlockView } from "./live-blocks";
 import { ConsentCard } from "./consent-card";
 import { PausedHero } from "./paused-hero";
+import { ChatAudioPlayer } from "./chat-audio";
 import { PresenceCallout } from "./presence-callout";
 
 const LETTERS = "ABCDEFGHIJ";
@@ -257,7 +258,8 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe
       return (
         <div className={`${styles.bubble} ${tone}`}>
           <span className={styles.bubbleLabel}>{label}{block.at ? ` · ${block.at}` : ""}</span>
-          <p className={styles.bubbleText}>{block.text}</p>
+          {block.audio ? <ChatAudioPlayer url={block.audio.url} /> : null}
+          {block.text ? <p className={styles.bubbleText}>{block.text}</p> : null}
         </div>
       );
     }
