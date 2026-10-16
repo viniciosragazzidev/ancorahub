@@ -262,6 +262,8 @@ describe("WAHA group messages", () => {
   it("flags a group message so it cannot become a lead", () => {
     const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload(groupPayload));
     expect(event.message?.isGroup).toBe(true);
+    expect(event.message?.groupId).toBe("120363000000000000");
+    expect(event.message?.from).toBe("5521999990000");
   });
 
   it("does not flag a direct contact message", () => {

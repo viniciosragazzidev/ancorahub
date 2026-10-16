@@ -80,6 +80,8 @@ export const wahaWebhookSchema = z.object({
      * id digits, not a contact phone, and the message must never create a lead.
      */
     isGroup: z.boolean().optional(),
+    /** The group id (the part before `@g.us`), only for group messages. */
+    groupId: z.string().min(1).max(100).optional(),
     /** Provider-origin metadata used only for observability and outgoing reconciliation. */
     source: z.string().trim().min(1).max(64).optional(),
     /** Caption for media messages */
@@ -122,6 +124,10 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
   const isGroupJid = (value: unknown) => typeof value === "string" && value.endsWith("@g.us");
   // In a group, `from`/`to` hold the group id, which is not a phone. The sender
   // (participant) is the phone that goes in `from`; the group id is never `to`.
+  const groupFields = (chat: unknown, to: unknown) => {
+    const jid = isGroupJid(chat) ? chat : isGroupJid(to) ? to : null;
+    return typeof jid === "string" ? { isGroup: true, groupId: jid.replace(/@g\.us$/, "") } : {};
+  };
   const groupAuthorJid = (chat: unknown, participant: unknown) =>
     isGroupJid(chat) && typeof participant === "string" && participant.trim() ? normalizeJid(participant) : undefined;
   // An `@lid` is a privacy id, not a phone: prefer the phone the relay
@@ -240,7 +246,7 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
             contactJid(innerPayload.from, attached.fromPn),
           to: isGroupJid(innerPayload.to) ? undefined : contactJid(innerPayload.to, attached.toPn) || undefined,
           ...(contactLidUnresolved ? { contactLidUnresolved: true } : {}),
-          ...(isGroupJid(innerPayload.from) || isGroupJid(innerPayload.to) ? { isGroup: true } : {}),
+          ...groupFields(innerPayload.from, innerPayload.to),
           body: bodyText,
           type: mappedType,
           fromMe,
@@ -328,9 +334,7 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
       to: isGroupJid((message as Record<string, unknown>).to)
         ? undefined
         : normalizeJid((message as Record<string, unknown>).to),
-      ...(isGroupJid((message as Record<string, unknown>).from) || isGroupJid((message as Record<string, unknown>).to)
-        ? { isGroup: true }
-        : {}),
+      ...groupFields((message as Record<string, unknown>).from, (message as Record<string, unknown>).to),
     },
   };
 }

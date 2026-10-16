@@ -932,6 +932,20 @@
                         "when":  1791417600000,
                         "tag":  "0185_meta_ad_account_default_queue",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx": 133,
+                        "version": "7",
+                        "when": 1791504000000,
+                        "tag": "0203_waha_group_messages",
+                        "breakpoints": true
+                    },
+                    {
+                        "idx": 134,
+                        "version": "7",
+                        "when": 1791590400000,
+                        "tag": "0204_waha_group_sources",
+                        "breakpoints": true
                     }
                 ]
 }

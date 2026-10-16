@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
+import { consultarCotacaoExpress } from "@/features/tenant-intelligence/rag/cotacao-express-actions";
 import {
   Sparkle,
   Robot,
@@ -200,6 +201,34 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
       (c) => textToSend.toLowerCase().includes(c.command) || textToSend.toLowerCase().includes(c.label.toLowerCase())
     );
 
+    // Cotação Express consulta o material de operadora no servidor (RAG), sem valores fixos.
+    if (matchedCmd?.command === "/cotacao-express") {
+      const assistantMsgId = `msg_ai_${Date.now()}`;
+      const appendAssistant = (content: string) =>
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: assistantMsgId,
+            sender: "assistant",
+            content,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          },
+        ]);
+
+      consultarCotacaoExpress(textToSend)
+        .then((result) => {
+          if (result.status === "answered") {
+            const sources = result.sources.map((source) => source.title).join(", ");
+            appendAssistant(`${result.answer}\n\nFontes: ${sources}`);
+          } else {
+            appendAssistant(result.message);
+          }
+        })
+        .catch(() => appendAssistant("Não foi possível consultar a cotação agora. Tente novamente em instantes."))
+        .finally(() => setIsTyping(false));
+      return;
+    }
+
     setTimeout(() => {
       const assistantMsgId = `msg_ai_${Date.now()}`;
 
@@ -208,28 +237,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
         let mcpToolCall: McpToolCall;
         let responseContent = "";
 
-        if (matchedCmd.command === "/cotacao-express") {
-          mcpToolCall = {
-            id: `mcp_${Date.now()}`,
-            toolName: "mcp:calculate_quote_options",
-            displayName: "mcp:quote_calculator",
-            args: {
-              ages: [42, 38, 12, 8],
-              operators: ["Bradesco Saúde", "Amil", "SulAmérica"],
-              plan_type: "PME Flex",
-              copay: true,
-            },
-            status: "completed",
-            executionTimeMs: 142,
-            result: {
-              bradesco: "R$ 3.840,00/mês (Top Nacional)",
-              amil: "R$ 3.420,00/mês (S750 Promo)",
-              sulamerica: "R$ 3.690,00/mês (Exato Apt)",
-              recommended: "Bradesco Saúde (Melhor rede hospitalar regional)",
-            },
-          };
-          responseContent = `Elaborei o estudo comparativo de cotação PME para as 4 vidas informadas. Os valores e opções de operadoras foram consultados em tempo real no banco do Âncora CRM via MCP.`;
-        } else if (matchedCmd.command === "/lead-resumo") {
+        if (matchedCmd.command === "/lead-resumo") {
           mcpToolCall = {
             id: `mcp_${Date.now()}`,
             toolName: "mcp:leads_query",

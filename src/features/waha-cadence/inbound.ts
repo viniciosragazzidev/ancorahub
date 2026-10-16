@@ -24,7 +24,8 @@ import {
   WAHA_CADENCE_FEATURE,
 } from "./contract";
 import { brazilNinthDigitVariant, contactNumberShape, phoneSubscriberSuffix, samePhoneSubscriber } from "./phone-matching";
-import { storeWahaMessageMedia } from "./message-media";
+import { storeWahaMessageMedia, wahaFilePath } from "./message-media";
+import { captureWahaGroupMessage, findActiveWahaGroupSource } from "@/features/waha-group-capture/service";
 
 type SessionSource =
   | { kind: "number"; number: typeof schema.wahaNumbers.$inferSelect }
@@ -255,6 +256,34 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   // become leads, conversations or AI replies. Group capture is a separate path.
   if (event.message.isGroup) {
     await markIgnored(db, registered.id, "group_message");
+    // Capture runs after the response (it downloads files and reads PDFs), and
+    // only for the dedicated company number, never for broker connections.
+    const groupMessage = event.message;
+    const groupId = groupMessage.groupId;
+    // Only groups the company selected as active for this number are read.
+    const groupSource = source.kind === "number" && groupId
+      ? await findActiveWahaGroupSource(source.number.id, groupId)
+      : null;
+    if (groupSource && groupId) {
+      const media = groupMessage.media;
+      after(() =>
+        captureWahaGroupMessage({
+          tenantId: groupSource.tenantId,
+          providerMessageId: groupMessage.id,
+          groupId,
+          authorPhone: groupMessage.from,
+          messageType: groupMessage.type,
+          body: groupMessage.body,
+          fileName: media?.fileName,
+          mimeType: media?.mimeType,
+          providerPath: media?.providerPath ?? wahaFilePath(media?.url) ?? undefined,
+        }).catch((error) => {
+          console.warn("[waha-group-capture] failed", {
+            error: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+          });
+        }),
+      );
+    }
     return { processed: 0, ignored: "group_message" as const };
   }
 
