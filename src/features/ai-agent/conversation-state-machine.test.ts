@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { generateAiResponse } from "./service";
-import { handleInitialMessageFailure, isExistingQualificationConversation, resolveMemoryResetContext } from "./conversation-state-machine";
+import { handleInitialMessageFailure, isExistingQualificationConversation, resolveMemoryResetContext, resolveQualifiedLeadType } from "./conversation-state-machine";
 import { createEmptyMemory, extractFieldsFromMessage, type ConversationMemory } from "./memory";
 
 describe("ai-agent service & state machine", () => {
@@ -15,6 +15,20 @@ describe("ai-agent service & state machine", () => {
     delete process.env.AI_PROVIDER_ORDER;
     delete process.env.DATABASE_URL;
     delete process.env.SUPABASE_DB_URL;
+  });
+
+  describe("resolveQualifiedLeadType", () => {
+    it("persists business evidence as PJ even when the previous plan answer was individual", () => {
+      expect(resolveQualifiedLeadType({
+        planType: { value: "individual", confidence: 1 },
+        companyHasCnpj: { value: "true", confidence: 1 },
+      })).toBe("PJ");
+    });
+
+    it("persists explicit business plans as PJ and personal plans as PF", () => {
+      expect(resolveQualifiedLeadType({ planType: { value: "empresarial", confidence: 1 } })).toBe("PJ");
+      expect(resolveQualifiedLeadType({ planType: { value: "familiar", confidence: 1 } })).toBe("PF");
+    });
   });
 
   describe("isExistingQualificationConversation", () => {

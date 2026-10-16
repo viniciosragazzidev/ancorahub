@@ -24,6 +24,40 @@ describe("number of lives in real conversations", () => {
 });
 
 describe("conversation memory", () => {
+  it("reclassifies a prior individual plan as business and asks for lives again when the old value was implied", () => {
+    const individual = extractFieldsFromMessage("Individual", createEmptyMemory(), "msg-individual");
+    expect(individual.numberOfLives).toMatchObject({ value: "1", confidence: 0 });
+
+    const updated = extractFieldsFromMessage("Na verdade é pra minha empresa", individual, "msg-company");
+
+    expect(updated.planType).toMatchObject({
+      value: "empresarial",
+      confidence: 1,
+      sourceMessageId: "msg-company",
+    });
+    expect(updated.numberOfLives).toBeUndefined();
+    expect(updated.collectedFields).not.toContain("numberOfLives");
+  });
+
+  it("does not infer a business plan or positive CNPJ from a denial", () => {
+    const updated = extractFieldsFromMessage("Não tenho CNPJ", createEmptyMemory(), "msg-no-cnpj");
+
+    expect(updated.companyHasCnpj).toBeUndefined();
+    expect(updated.planType).toBeUndefined();
+    expect(updated.collectedFields).not.toContain("companyHasCnpj");
+  });
+
+  it("classifies an MEI mention as a business plan", () => {
+    const updated = extractFieldsFromMessage("Sou MEI", createEmptyMemory(), "msg-mei");
+
+    expect(updated.planType).toMatchObject({
+      value: "empresarial",
+      confidence: 1,
+      sourceMessageId: "msg-mei",
+    });
+    expect(updated.collectedFields).toContain("planType");
+  });
+
   it("records a bare number as lives when it answers the last lives question", () => {
     const memory = { ...createEmptyMemory(), lastQuestionAsked: "Quantas vidas serão incluídas no plano?" };
 
