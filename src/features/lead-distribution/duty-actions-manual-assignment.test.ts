@@ -27,7 +27,7 @@ const state = vi.hoisted(() => {
 vi.mock("server-only", () => ({}));
 vi.mock("drizzle-orm", () => {
   const expression = (...args: unknown[]) => ({ args });
-  return { and: expression, asc: expression, eq: expression, gt: expression, gte: expression, inArray: expression, isNull: expression, lt: expression, ne: expression, or: expression, sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) };
+  return { and: expression, asc: expression, eq: expression, gt: expression, gte: expression, inArray: expression, isNull: expression, lt: expression, ne: expression, notInArray: expression, or: expression, sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }) };
 });
 vi.mock("@/shared/db", () => ({ getDatabase: () => state.db, schema: state.schema }));
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: () => Promise.resolve(state.context) }));
