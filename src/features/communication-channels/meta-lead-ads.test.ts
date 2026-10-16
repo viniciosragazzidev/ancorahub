@@ -104,6 +104,28 @@ describe("Meta Lead Ads normalization", () => {
     })).not.toHaveProperty("unmappedFormFields");
   });
 
+  it("turns a PF lead whose form says it has a company into a PME lead, but not when it says no", () => {
+    const company = normalizeMetaLead({
+      id: "leadgen_company",
+      field_data: [
+        { name: "full_name", values: ["Ana Lima"] },
+        { name: "tipo_de_plano", values: ["individual"] },
+        { name: "você_possui_cnpj?", values: ["sim"] },
+      ],
+    });
+    expect(company).toMatchObject({ leadType: "PME", companyEvidence: "Você possui cnpj?: sim" });
+    const person = normalizeMetaLead({
+      id: "leadgen_person",
+      field_data: [
+        { name: "full_name", values: ["Ana Lima"] },
+        { name: "tipo_de_plano", values: ["individual"] },
+        { name: "você_possui_cnpj?", values: ["não"] },
+      ],
+    });
+    expect(person).toMatchObject({ leadType: "PF" });
+    expect(person).not.toHaveProperty("companyEvidence");
+  });
+
   it("preserves the campaign identity needed for the queue entry rule", () => {
     expect(normalizeMetaLead({ id: "leadgen_campaign", campaign_id: "campaign_1", campaign_name: "PME Salvador", field_data: [] }))
       .toMatchObject({ campaignId: "campaign_1", campaignName: "PME Salvador" });

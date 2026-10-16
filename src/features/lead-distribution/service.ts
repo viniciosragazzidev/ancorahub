@@ -14,6 +14,9 @@ import { signalLeadOwnershipChange } from "./ownership-signal";
 import { earliestPacingRetryAt, evaluateBrokerOfferPacing, isOfferPacingEnabled, normalizeOfferPacing, type OfferPacingDecision } from "./offer-pacing";
 import { DDD_OUTCOME_LABELS, decideDddRouting } from "./ddd-routing";
 import { getDddRoutingSettings } from "./ddd-routing-settings";
+import { isPersonQueueName } from "./pme-queue-matching";
+import { resolvePmeQueueFor } from "./pme-queue-routing";
+import { isCompanyLeadType } from "@/features/leads/company-lead-detection";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
 import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
@@ -691,12 +694,34 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (sourceQueueId && shouldHoldColdLead(lead.qualificationStatus, (await loadDistributionPolicy(context.tenantId, sourceQueueId, null)).value.holdColdLeads)) {
     return { status: "queued", leadId, reason: COLD_HELD_BY_QUEUE_REASON };
   }
+  // Lead empresa (tipo PJ/PME, pelo anúncio ou pela qualificação da IA) numa
+  // fila PF/Premium vai para a fila PME antes de qualquer oferta (Vinicios, 16/10).
+  const isCompanyLead = isCompanyLeadType(lead.tipo);
+  const pmeQueue = isCompanyLead ? await resolvePmeQueueFor(context.tenantId, lead.queueId) : null;
+  if (pmeQueue) {
+    const previousQueueId = lead.queueId;
+    const routedAt = new Date();
+    const moved = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(schema.leads).set({ queueId: pmeQueue.id, distributionUpdatedAt: routedAt, updatedAt: routedAt })
+        .where(and(
+          eq(schema.leads.id, leadId),
+          eq(schema.leads.tenantId, context.tenantId),
+          previousQueueId ? eq(schema.leads.queueId, previousQueueId) : isNull(schema.leads.queueId),
+        ))
+        .returning({ id: schema.leads.id });
+      if (!updated) return false;
+      await tx.insert(schema.leadDistributionEvents).values({ id: randomUUID(), tenantId: context.tenantId, leadId, fromBranchId: lead.branchId, toBranchId: lead.branchId, fromQueueId: previousQueueId, toQueueId: pmeQueue.id, action: "company_pme_routed", source: "company_rule", strategy: "automatic", reason: `Lead é empresa (tipo ${lead.tipo}): vai para a fila ${pmeQueue.name}.`, actorId: context.userId, createdAt: routedAt });
+      return true;
+    });
+    if (moved) lead.queueId = pmeQueue.id;
+  }
   const dddDecision = decideDddRouting(await getDddRoutingSettings(context.tenantId), lead.telefone);
   if (dddDecision?.queueId && dddDecision.queueId !== lead.queueId) {
-    const [dddQueue] = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues)
+    const [dddQueue] = await db.select({ id: schema.leadQueues.id, name: schema.leadQueues.name }).from(schema.leadQueues)
       .where(and(eq(schema.leadQueues.id, dddDecision.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active")))
       .limit(1);
-    if (dddQueue) {
+    // A regra de DDD não devolve um lead empresa para uma fila PF/Premium.
+    if (dddQueue && !(isCompanyLead && isPersonQueueName(dddQueue.name))) {
       const previousQueueId = lead.queueId;
       const routedAt = new Date();
       const moved = await db.transaction(async (tx) => {

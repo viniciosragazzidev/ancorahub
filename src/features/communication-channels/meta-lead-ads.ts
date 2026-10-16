@@ -16,6 +16,8 @@ import { MetaCloudApiError } from "./meta-cloud-client";
 import { getMetaLeadAdsWebhookConfig } from "./meta-cloud-config";
 import { isMetaLeadAdsTenantPilotEnabled } from "./meta-lead-ads-platform";
 import { resolveMetaCapturePolicy } from "@/features/meta-ads/meta-capture-policy";
+import { resolvePmeQueueFor } from "@/features/lead-distribution/pme-queue-routing";
+import { formAnswerCompanyEvidence, formAnswersCompanyEvidence } from "@/features/leads/company-lead-detection";
 
 export { resolveMetaCapturePolicy as resolveMetaCampaignIntake } from "@/features/meta-ads/meta-capture-policy";
 
@@ -150,9 +152,15 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
   const operadora = firstField(fields, CARRIER_FIELD_NAMES).slice(0, 120);
   // A CNPJ type (MEI, ME, LTDA…) means a company plan even when the form has
   // no explicit plan-type question.
-  const leadType = (tipoPlano ? normalizeLeadType(tipoPlano) : undefined) ?? (tipoCnpj ? "PME" : undefined);
   const unmappedFormFields = collectUnmappedQuestionNames(fields);
   const formAnswers = collectUnmappedAnswers(fields);
+  // An answer saying the client is a company ("Você tem CNPJ?: sim", "para
+  // minha empresa") makes it a company lead even if the plan type said PF.
+  const companyEvidence = formAnswersCompanyEvidence(formAnswers)
+    ?? (tipoPlano && normalizeLeadType(tipoPlano) !== "PF" ? formAnswerCompanyEvidence(tipoPlano) : null);
+  const leadType = companyEvidence
+    ? "PME"
+    : (tipoPlano ? normalizeLeadType(tipoPlano) : undefined) ?? (tipoCnpj ? "PME" : undefined);
 
   // Fallbacks amigáveis para ferramentas de testes da Meta (Lead Gen Testing Tool)
   if (nome.includes("<test lead:") || nome.includes("dummy data")) {
@@ -181,6 +189,7 @@ export function normalizeMetaLead(record: MetaLeadAdRecord) {
     ...(tipoPlano ? { tipoPlano } : {}),
     ...(operadora ? { operadora } : {}),
     ...(leadType ? { leadType } : {}),
+    ...(companyEvidence ? { companyEvidence } : {}),
     ...(unmappedFormFields.length ? { unmappedFormFields } : {}),
     ...(formAnswers.length ? { formAnswers } : {}),
     ...(record.adset_id ? { adSetId: record.adset_id } : {}),
@@ -391,9 +400,12 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
           ignored += 1;
           continue;
         }
-        const bypassPlantao = source.distributionMode === "direct_leads" && !campaignIntake.queueId;
+        // Lead empresa vindo de campanha da fila PF/Premium entra direto na fila PME.
+        const pmeQueue = lead.leadType === "PJ" || lead.leadType === "PME" ? await resolvePmeQueueFor(source.tenantId, campaignIntake.queueId) : null;
+        const intakeQueueId = pmeQueue?.id ?? campaignIntake.queueId;
+        const bypassPlantao = source.distributionMode === "direct_leads" && !intakeQueueId;
         const result = await createLeadFromWebhookSync({
-          tenantId: source.tenantId, branchId: source.branchId ?? null, queueId: campaignIntake.queueId, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
+          tenantId: source.tenantId, branchId: source.branchId ?? null, queueId: intakeQueueId, credentialId: source.leadWebhookCredentialId, createdByUserId: credential.createdBy,
           payload: { nome: lead.nome, telefone: lead.telefone, email: lead.email, website: "" }, idempotencyKey: `meta-leadgen-${lead.externalId}`,
           requestMetadata: { requestId: resolveRequestId(request.headers.get("x-request-id")), userAgent: request.headers.get("user-agent"), receivedAt },
           bypassPlantao,
@@ -417,6 +429,8 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
               operadora: lead.operadora ?? null,
               unmappedFormFields: lead.unmappedFormFields ?? null,
               formAnswers: lead.formAnswers ?? null,
+              companyEvidence: lead.companyEvidence ?? null,
+              ...(pmeQueue ? { companyRoutedFromQueueId: campaignIntake.queueId ?? null, companyRoutedToQueue: pmeQueue.name } : {}),
             },
           },
         });
