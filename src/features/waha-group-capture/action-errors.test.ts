@@ -34,6 +34,29 @@ describe("describeActionError", () => {
     );
   });
 
+  it("tells a relay without the chats route to be updated, instead of showing its raw answer", () => {
+    const message = describeActionError(new Error("WAHA_CHATS_FAILED:Not Found"), "Não foi possível listar os grupos.");
+
+    expect(message).not.toContain("WAHA_CHATS_FAILED");
+    expect(message).toContain("services/whatsapp-api");
+    expect(message).toContain("atualize");
+    expect(describeActionError(new Error("WAHA_CHATS_FAILED:404"), FALLBACK)).toContain("services/whatsapp-api");
+  });
+
+  it("explains the other ways the relay can refuse to list the chats", () => {
+    expect(describeActionError(new Error("WAHA_CHATS_FAILED:WAHA_UNAVAILABLE"), FALLBACK)).toContain("O WAHA não respondeu");
+    expect(describeActionError(new Error("WAHA_CHATS_FAILED:502"), FALLBACK)).toContain("O WAHA não respondeu");
+    expect(describeActionError(new Error("WAHA_CHATS_FAILED:Unauthorized"), FALLBACK)).toContain("token");
+    expect(describeActionError(new Error("WAHA_CHATS_FAILED:401"), FALLBACK)).toContain("token");
+    expect(describeActionError(new Error("WAHA_CHATS_REQUIRES_FASTIFY"), FALLBACK)).toContain("VPS_API_URL");
+  });
+
+  it("keeps an unknown relay answer short and readable", () => {
+    const message = describeActionError(new Error("WAHA_CHATS_FAILED:" + "x".repeat(300)), FALLBACK);
+    expect(message.length).toBeLessThan(FALLBACK.length + 120);
+    expect(message).toContain("recusou a listagem");
+  });
+
   it("lets the errors the code raised itself through", () => {
     expect(describeActionError(new Error("Apenas o Diretor pode gerenciar os materiais de operadoras."), FALLBACK)).toBe(
       "Apenas o Diretor pode gerenciar os materiais de operadoras.",
