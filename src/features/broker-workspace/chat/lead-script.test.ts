@@ -185,3 +185,23 @@ describe("dateLabel", () => {
     expect(dateLabel(new Date("2026-10-01T12:00:00.000Z"), now)).toBe("01/10, 09:00");
   });
 });
+
+describe("hideArrival", () => {
+  it("drops the date of the first contact but keeps the conversation", () => {
+    const script = buildLeadConversationScript({
+      lead: lead({ origem: null, sourceCampaign: null }),
+      events: [],
+      viewerId: "me",
+      now,
+      whatsappUrl: null,
+      hideArrival: true,
+    });
+    expect(script.blocks.some((block) => block.id === "d-created")).toBe(false);
+    expect(script.blocks.some((block) => block.id === "s-arrived")).toBe(true);
+  });
+
+  it("shows the date of the first contact by default", () => {
+    const script = buildLeadConversationScript({ lead: lead(), events: [], viewerId: "me", now, whatsappUrl: null });
+    expect(script.blocks.some((block) => block.id === "d-created")).toBe(true);
+  });
+});
