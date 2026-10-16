@@ -61,6 +61,14 @@ export function getDirectorFacingMetaDeliveryFailure(
 const META_BLOCKED_CODES = new Set(["130472", "131049"]);
 
 /**
+ * Start of the note written when the first message cannot be delivered (see
+ * initialMessageFailureNote). It is for the team that distributes leads, so the
+ * broker's timeline filters on this prefix and never shows it.
+ */
+export const INITIAL_MESSAGE_FAILURE_NOTE_PREFIX =
+  "⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.";
+
+/**
  * How a failed first message classifies the lead: undelivered (e.g. 131026,
  * the number has no WhatsApp) is disqualified; blocked by Meta is told apart.
  */

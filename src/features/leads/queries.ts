@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { assertTenantAccess } from "@/shared/auth/authorization";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -8,6 +8,7 @@ import { AuthorizationService } from "@/shared/auth/authorization-service";
 import { buildLeadResourceScope, toEffectiveLeadAccessContext } from "@/features/leads/lead-authorization";
 import { evaluateShadowAuthorization } from "@/shared/auth/shadow-mode";
 import { getDatabase, schema } from "@/shared/db";
+import { INITIAL_MESSAGE_FAILURE_NOTE_PREFIX } from "@/features/communication-channels/meta-delivery-failure";
 
 export async function getLeadTimeline(leadId: string) {
   const context = await getRequiredTenantContext();
@@ -59,7 +60,15 @@ export async function getLeadTimeline(leadId: string) {
     })
     .from(schema.leadInteractions)
     .leftJoin(schema.user, eq(schema.leadInteractions.userId, schema.user.id))
-    .where(eq(schema.leadInteractions.leadId, leadId))
+    .where(
+      and(
+        eq(schema.leadInteractions.leadId, leadId),
+        // The Meta delivery failure note is for the distribution team, not the broker.
+        context.role === "broker"
+          ? sql`not (${schema.leadInteractions.tipo} = 'note' and coalesce(${schema.leadInteractions.conteudo}, '') like ${`${INITIAL_MESSAGE_FAILURE_NOTE_PREFIX}%`})`
+          : undefined,
+      ),
+    )
     .orderBy(desc(schema.leadInteractions.createdAt));
 }
 
