@@ -31,6 +31,7 @@ import { withRadarSignals } from "@/features/supervisor-workspace/radar-signals"
 import { Skeleton } from "@/components/arc/skeleton/skeleton";
 import type { TenantContext } from "@/shared/auth/types";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
+import { stripLeadOriginForRole } from "@/features/leads/broker-visibility";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { getDatabase, schema } from "@/shared/db";
@@ -223,7 +224,8 @@ async function LeadsPageContent({
         livesCount: livesCount && Number.isFinite(livesCount) ? livesCount : null,
         city: readStr("cidade"),
         summary: readStr("resumoAtendimento") ?? readStr("resumoNecessidade"),
-        createdAt: lead.createdAt,
+        // The creation date is when it reached the brokerage; the broker only gets the assignment.
+        createdAt: lead.assignedAt ?? lead.createdAt,
         // When it reached this broker, like the Fila: a lead created days ago and handed out today is today's.
         arrivedAt: lead.assignedAt ?? lead.createdAt,
         dutyName: lead.dutyName,
@@ -807,7 +809,7 @@ async function LeadsPageContent({
         {leads.length || qualifyingLeads.length || unassignedRows.length ? (
           <div className="space-y-4">
             <LeadsWorkspace
-              leads={leads.map((lead) => ({
+              leads={stripLeadOriginForRole(context.role, leads.map((lead) => ({
                 ...lead,
                 tags: tagsByLead.get(lead.id) ?? [],
                 sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
@@ -820,12 +822,12 @@ async function LeadsPageContent({
                 serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
                 firstContactAt: lead.firstContactAt?.toISOString() ?? null,
                 qualificationDetails: (lead.qualificationDetails as Record<string, unknown>) ?? null,
-              }))}
-              qualifyingLeads={qualifyingLeads.map((lead) => ({
+              })))}
+              qualifyingLeads={stripLeadOriginForRole(context.role, qualifyingLeads.map((lead) => ({
                 ...lead,
                 tags: tagsByLead.get(lead.id) ?? [],
                 sourceMetadata: readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata),
-              }))}
+              })))}
               queues={activeQueues}
               contextRole={leadManagementActionsEnabled ? context.role : "broker"}
               showUnassignedFilter={canViewUnassigned}

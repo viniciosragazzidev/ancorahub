@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
+import { stripLeadOriginForRole } from "@/features/leads/broker-visibility";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 const activeLeadStatuses = [
@@ -389,7 +390,8 @@ async function MinhaFilaContent() {
         productName: extra?.planName ?? null,
         city: readDetail(extra?.qualificationDetails, "cidade") ?? readDetail(extra?.qualificationDetails, "city"),
         summary: readDetail(extra?.qualificationDetails, "resumoAtendimento") ?? readDetail(extra?.qualificationDetails, "resumoNecessidade"),
-        createdAt: l.createdAt,
+        // The creation date is when it reached the brokerage; the broker only gets the assignment.
+        createdAt: l.assignedAt ?? l.createdAt,
         // When it reached this broker (distribution), the lead's creation otherwise.
         arrivedAt: l.assignedAt ?? l.createdAt,
         dutyName: l.dutyName,
@@ -420,7 +422,7 @@ async function MinhaFilaContent() {
       status: "lost",
       isLost: true,
       lostReason: "Redistribuído por inatividade / tempo limite estourado",
-      createdAt: l.createdAt,
+      createdAt: lostLeadsMap.get(l.id)?.createdAt ?? l.stageEnteredAt ?? l.createdAt,
       updatedAt: lostLeadsMap.get(l.id)?.createdAt ?? l.stageEnteredAt,
     }));
 
@@ -693,7 +695,7 @@ async function MinhaFilaContent() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <BrokerQueueClient leads={enrichedLeads} />
+            <BrokerQueueClient leads={stripLeadOriginForRole(context.role, enrichedLeads)} />
           </CardContent>
         </Card>
       </main>
