@@ -341,7 +341,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
               </CardContent>
             </Card>
 
-            <PersonRecordDetails kind="client" createdAt={client.createdAt} consentimentoLgpd={lead?.consentimentoLgpd ?? false} dependents={beneficiaries} documentCount={leadDocs.length} />
+            <PersonRecordDetails kind="client" hideRegistrationDate={context.role === "broker"} createdAt={client.createdAt} consentimentoLgpd={lead?.consentimentoLgpd ?? false} dependents={beneficiaries} documentCount={leadDocs.length} />
 
             {/* Sales Summary Card */}
             <Card className="border-border bg-card shadow-sm">

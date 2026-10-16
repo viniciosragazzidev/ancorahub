@@ -39,7 +39,9 @@ export function LeadsDataTable({
   leads,
   pagination,
   onRowClick,
+  contextRole,
 }: LeadsDataTableProps) {
+  const hideOrigin = contextRole === "broker";
   const tableData: LeadRow[] = React.useMemo(() => {
     return leads.map((item) => ({
       id: item.id,
@@ -48,7 +50,7 @@ export function LeadsDataTable({
       email: null,
       status: item.status,
       source: item.origem,
-      whatsappEntry: readWhatsappEntry(item),
+      whatsappEntry: hideOrigin ? null : readWhatsappEntry(item),
       tags: item.tags,
       planType: getLeadProductLabel({ tipo: item.tipo, sourceChannel: item.sourceChannel, sourceMetadata: item.sourceMetadata }),
       lives: 1,
@@ -74,8 +76,8 @@ export function LeadsDataTable({
         if (original && onRowClick) {
           onRowClick(original);
         }
-      }),
-    [leads, onRowClick]
+      }, { hideOrigin }),
+    [leads, onRowClick, hideOrigin]
   );
 
   const handleRowClick = React.useCallback((row: LeadRow) => {
