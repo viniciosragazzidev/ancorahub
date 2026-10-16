@@ -289,6 +289,7 @@ export function buildLeadConversationScript({
   whatsappUrl,
   messages = [],
   advice = null,
+  hideArrival = false,
 }: {
   lead: LeadConversationLead;
   events: LeadConversationEvent[];
@@ -298,6 +299,8 @@ export function buildLeadConversationScript({
   /** WhatsApp mirror, only for the lead's own broker. */
   messages?: LeadConversationMessage[];
   advice?: LeadConversationAdvice | null;
+  /** Brokers do not see when the lead reached the brokerage (no date for the first contact). */
+  hideArrival?: boolean;
 }): ChatScript {
   const origin = originLabel(lead);
   const rows = factRows(lead);
@@ -320,7 +323,7 @@ export function buildLeadConversationScript({
   ].sort((a, b) => a.at.getTime() - b.at.getTime());
 
   const blocks: ChatBlock[] = [
-    { type: "date", id: "d-created", label: dateLabel(lead.createdAt, now) },
+    ...(hideArrival ? [] : [{ type: "date" as const, id: "d-created", label: dateLabel(lead.createdAt, now) }]),
     { type: "system", id: "s-arrived", strong: lead.nome, text: `chegou${origin ? ` ${origin}` : ""}` },
   ];
   if (rows.length) blocks.push({ type: "facts", id: "f-lead", title: lead.nome, subtitle: LEAD_STATUS_LABELS[lead.status] ?? lead.status, rows, href: `/leads/${lead.id}?ficha=1`, hrefLabel: "Ver ficha" });
