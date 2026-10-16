@@ -1,18 +1,15 @@
 import "server-only";
 
-import { and, eq, gt, isNull, lte, or } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
-import type { BrokerActiveDuty } from "@/features/broker-workspace/queries";
 import { loadDutyNow, type DutyNow } from "@/features/broker-workspace/duty-now";
+import { addCalendarDays, buildDutySummary, loadBrokerDutyRows } from "@/features/broker-workspace/duty-summary";
+import type { BrokerActiveDuty } from "@/features/broker-workspace/queries";
+import { getSaoPauloDateKey } from "@/features/lead-distribution/dated-duty-roster";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-
-const SAO_PAULO_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
-
-/** Hora de início/fim do plantão no dia de hoje (São Paulo, sem horário de verão). */
-function onDay(dayKey: string, time: string) {
-  return new Date(`${dayKey}T${time.slice(0, 5)}:00-03:00`);
-}
+import { getSystemSetting } from "@/features/system-settings/queries";
+import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 
 /**
  * Pode o viewer ver o plantão deste corretor? Diretor: todos. Gestor: corretores da própria unidade.
@@ -43,48 +40,40 @@ async function viewerCanSeeBroker(input: { tenantId: string; viewerId: string; r
   return input.role === "manager" || member.supervisorId === input.viewerId;
 }
 
-/** Plantões que o corretor está agora: a escala publicada de hoje e a semanal válida. */
+/** As duas flags que a leitura do plantão usa (escala mensal e confirmação de presença), como na tela do corretor. */
+async function readDutyFlags() {
+  const [monthly, presence] = await Promise.all([
+    getSystemSetting(FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.key),
+    getSystemSetting(FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.key),
+  ]);
+  return {
+    monthly: (monthly ?? FEATURE_FLAGS.DUTY_MONTHLY_SCHEDULING.defaultValue) === "true",
+    presence: (presence ?? FEATURE_FLAGS.DUTY_PRESENCE_CONFIRMATION.defaultValue) === "true",
+  };
+}
+
+/**
+ * Plantões que o corretor está agora, pela mesma leitura da tela do corretor (buildDutySummary):
+ * escala mensal publicada, semanal válida, fuso do plantão. Olha ontem e hoje, para pegar o noturno
+ * que começou ontem.
+ */
 async function dutiesRunningNow(tenantId: string, brokerId: string, now: Date): Promise<BrokerActiveDuty[]> {
-  const today = SAO_PAULO_DAY.format(now);
-  const weekday = new Date(`${today}T12:00:00-03:00`).getUTCDay();
-  const rows = await getDatabase().select({
-    scheduleId: schema.dutyRosterAssignments.scheduleId,
-    startsAt: schema.dutyRosterAssignments.startsAt,
-    endsAt: schema.dutyRosterAssignments.endsAt,
-    pausedAt: schema.dutyRosterAssignments.pausedAt,
-    scheduleName: schema.unitDutySchedules.name,
-    attendanceMode: schema.unitDutySchedules.attendanceMode,
-    queueName: schema.leadQueues.name,
-    branchName: schema.branches.name,
-  })
-    .from(schema.dutyRosterAssignments)
-    .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyRosterAssignments.tenantId)))
-    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.id, schema.unitDutySchedules.queueId), eq(schema.leadQueues.tenantId, schema.dutyRosterAssignments.tenantId)))
-    .leftJoin(schema.branches, and(eq(schema.branches.id, schema.unitDutySchedules.branchId), eq(schema.branches.tenantId, schema.dutyRosterAssignments.tenantId)))
-    .where(and(
-      eq(schema.dutyRosterAssignments.tenantId, tenantId),
-      eq(schema.dutyRosterAssignments.brokerId, brokerId),
-      eq(schema.dutyRosterAssignments.status, "active"),
-      or(
-        eq(schema.dutyRosterAssignments.dutyDate, today),
-        and(isNull(schema.dutyRosterAssignments.dutyDate), eq(schema.dutyRosterAssignments.dayOfWeek, weekday), lte(schema.dutyRosterAssignments.validFrom, now), or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now))),
-      ),
-    ));
-  return rows
-    .map((row) => ({
-      scheduleId: row.scheduleId,
-      scheduleName: row.scheduleName,
-      queueName: row.queueName ?? null,
-      branchName: row.branchName ?? null,
-      dutyDate: today,
-      startsAt: onDay(today, row.startsAt),
-      endsAt: onDay(today, row.endsAt),
-      paused: Boolean(row.pausedAt),
-      presenceStatus: "not_required" as const,
-      attendanceMode: row.attendanceMode,
-    }))
-    .filter((duty) => duty.startsAt <= now && now < duty.endsAt)
-    .sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime() || a.scheduleId.localeCompare(b.scheduleId));
+  const yesterdayKey = addCalendarDays(getSaoPauloDateKey(now), -1);
+  const [inputs, flags] = await Promise.all([
+    loadBrokerDutyRows({ tenantId, brokerId, now, fromDateKey: yesterdayKey }),
+    readDutyFlags(),
+  ]);
+  const summary = await buildDutySummary({
+    tenantId,
+    rows: inputs.rows,
+    publishedRows: inputs.publishedRows,
+    now,
+    monthlySchedulingEnabled: flags.monthly,
+    presenceRequired: flags.presence,
+    availabilityStatus: "available",
+    dayOffsets: [-1, 0],
+  });
+  return summary?.activeAll ?? [];
 }
 
 /**
@@ -108,4 +97,3 @@ export async function getBrokerDutyNowForViewer(input: { brokerId: string; sched
   if (!active) return { access: "idle" };
   return { access: "ok", duty: await loadDutyNow({ tenantId: context.tenantId, brokerId: input.brokerId, now, running, active }) };
 }
-
