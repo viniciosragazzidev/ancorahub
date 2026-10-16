@@ -75,6 +75,11 @@ export const wahaWebhookSchema = z.object({
      * hold LID digits, not a phone, and must not be matched to a lead.
      */
     contactLidUnresolved: z.boolean().optional(),
+    /**
+     * The chat is a WhatsApp group (`@g.us`). `from`/`to` then hold the group
+     * id digits, not a contact phone, and the message must never create a lead.
+     */
+    isGroup: z.boolean().optional(),
     /** Provider-origin metadata used only for observability and outgoing reconciliation. */
     source: z.string().trim().min(1).max(64).optional(),
     /** Caption for media messages */
@@ -113,6 +118,12 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
 
   const normalizeJid = (value: unknown) =>
     typeof value === "string" ? value.replace(/@[^\s]+$/, "").replace(/\D/g, "") : value;
+  // Group chats end in `@g.us`. Detect them before normalizeJid strips the suffix.
+  const isGroupJid = (value: unknown) => typeof value === "string" && value.endsWith("@g.us");
+  // In a group, `from`/`to` hold the group id, which is not a phone. The sender
+  // (participant) is the phone that goes in `from`; the group id is never `to`.
+  const groupAuthorJid = (chat: unknown, participant: unknown) =>
+    isGroupJid(chat) && typeof participant === "string" && participant.trim() ? normalizeJid(participant) : undefined;
   // An `@lid` is a privacy id, not a phone: prefer the phone the relay
   // attached (`payload._ancora.{from,to}Pn`, see whatsapp-api lid.ts).
   const contactJid = (value: unknown, phone: unknown) =>
@@ -224,9 +235,12 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
         occurredAt,
         message: {
           id: messageId,
-          from: contactJid(innerPayload.from, attached.fromPn),
-          to: contactJid(innerPayload.to, attached.toPn) || undefined,
+          from:
+            groupAuthorJid(innerPayload.from, innerPayload.participant ?? innerPayload.author) ??
+            contactJid(innerPayload.from, attached.fromPn),
+          to: isGroupJid(innerPayload.to) ? undefined : contactJid(innerPayload.to, attached.toPn) || undefined,
           ...(contactLidUnresolved ? { contactLidUnresolved: true } : {}),
+          ...(isGroupJid(innerPayload.from) || isGroupJid(innerPayload.to) ? { isGroup: true } : {}),
           body: bodyText,
           type: mappedType,
           fromMe,
@@ -306,8 +320,17 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
     ...raw,
     message: {
       ...(message as Record<string, unknown>),
-      from: normalizeJid((message as Record<string, unknown>).from),
-      to: normalizeJid((message as Record<string, unknown>).to),
+      from:
+        groupAuthorJid(
+          (message as Record<string, unknown>).from,
+          (message as Record<string, unknown>).participant ?? (message as Record<string, unknown>).author,
+        ) ?? normalizeJid((message as Record<string, unknown>).from),
+      to: isGroupJid((message as Record<string, unknown>).to)
+        ? undefined
+        : normalizeJid((message as Record<string, unknown>).to),
+      ...(isGroupJid((message as Record<string, unknown>).from) || isGroupJid((message as Record<string, unknown>).to)
+        ? { isGroup: true }
+        : {}),
     },
   };
 }

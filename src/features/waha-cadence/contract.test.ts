@@ -244,3 +244,34 @@ describe("WAHA events already normalized by the infra relay", () => {
     })).toThrow();
   });
 });
+
+describe("WAHA group messages", () => {
+  const groupPayload = {
+    event: "message",
+    session: "waha_test",
+    payload: {
+      id: "true_120363000000000000@g.us_ABC",
+      from: "120363000000000000@g.us",
+      participant: "5521999990000@c.us",
+      body: "Tabela Unimed 2026 em anexo",
+      type: "chat",
+      fromMe: false,
+    },
+  };
+
+  it("flags a group message so it cannot become a lead", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload(groupPayload));
+    expect(event.message?.isGroup).toBe(true);
+  });
+
+  it("does not flag a direct contact message", () => {
+    const event = wahaWebhookSchema.parse(
+      normalizeWahaWebhookPayload({
+        event: "message",
+        session: "waha_test",
+        payload: { id: "true_5521999990000@c.us_XYZ", from: "5521999990000@c.us", body: "Oi", type: "chat", fromMe: false },
+      }),
+    );
+    expect(event.message?.isGroup).toBeUndefined();
+  });
+});

@@ -251,6 +251,13 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     return { processed: 0, ignored: "unknown_session" as const };
   }
 
+  // Group chats (`@g.us`) are operator material, not contacts: they never
+  // become leads, conversations or AI replies. Group capture is a separate path.
+  if (event.message.isGroup) {
+    await markIgnored(db, registered.id, "group_message");
+    return { processed: 0, ignored: "group_message" as const };
+  }
+
   // A contact WhatsApp only exposed as `@lid` (no phone mapping from the
   // relay) cannot be matched to a lead; flag it distinctly instead of letting
   // the LID digits pass for an unknown phone.
