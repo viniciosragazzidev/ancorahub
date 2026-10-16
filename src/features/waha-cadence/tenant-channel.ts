@@ -45,6 +45,39 @@ export function tenantChannelSessionName(tenantId: string) {
   return `tenant_${createHash("sha256").update(`tenant-channel:${tenantId}`).digest("hex").slice(0, 16)}`;
 }
 
+export const MATERIALS_CHANNEL_LABEL = "Canal de materiais";
+
+/** Session of the number that only reads operator groups for quoting material. */
+export function materialsChannelSessionName(tenantId: string) {
+  return `materials_${createHash("sha256").update(`materials-channel:${tenantId}`).digest("hex").slice(0, 16)}`;
+}
+
+/**
+ * One WAHA number per kind of company channel. The scope keeps them apart: the
+ * director channel is found by scope "tenant", so a second row with that scope
+ * would be picked in its place.
+ */
+type ChannelConfig = {
+  scope: string;
+  label: string;
+  sessionName: (tenantId: string) => string;
+  auditPrefix: string;
+};
+
+const DIRECTORATE_CHANNEL: ChannelConfig = {
+  scope: "tenant",
+  label: TENANT_CHANNEL_LABEL,
+  sessionName: tenantChannelSessionName,
+  auditPrefix: "tenant_channel",
+};
+
+const MATERIALS_CHANNEL: ChannelConfig = {
+  scope: "tenant_materials",
+  label: MATERIALS_CHANNEL_LABEL,
+  sessionName: materialsChannelSessionName,
+  auditPrefix: "materials_channel",
+};
+
 function assertDirector(context: TenantContext) {
   if (context.role !== "director") throw new Error("Apenas o Diretor pode gerenciar o número da empresa.");
 }
@@ -90,9 +123,9 @@ async function readRelayState(sessionName: string): Promise<RelayResponse> {
   return { ...status, qr: qr?.qr ?? null };
 }
 
-async function findChannel(tenantId: string) {
+async function findChannel(config: ChannelConfig, tenantId: string) {
   const [row] = await getDatabase().select().from(schema.wahaNumbers)
-    .where(and(eq(schema.wahaNumbers.tenantId, tenantId), eq(schema.wahaNumbers.scope, "tenant")))
+    .where(and(eq(schema.wahaNumbers.tenantId, tenantId), eq(schema.wahaNumbers.scope, config.scope)))
     .orderBy(desc(schema.wahaNumbers.createdAt))
     .limit(1);
   return row ?? null;
@@ -120,8 +153,8 @@ function pairedPhoneUpdate(row: { displayPhoneNumber: string; connectedAt: Date 
   return !row?.connectedAt || formatPhone(row.displayPhoneNumber) !== phone ? { connectedAt: now } : {};
 }
 
-export async function getTenantChannel(context: TenantContext): Promise<TenantChannelView | null> {
-  let row = await findChannel(context.tenantId);
+async function getChannel(config: ChannelConfig, context: TenantContext): Promise<TenantChannelView | null> {
+  let row = await findChannel(config, context.tenantId);
   if (!row) return null;
   // WAHA only reports the paired phone a moment after WORKING, when the QR
   // screen has already stopped polling: fill it in (and the status) on load.
@@ -150,10 +183,10 @@ async function audit(context: TenantContext, entidadeId: string, acao: string) {
  * Cria (ou reaproveita) a sessão da empresa no WAHA e devolve o primeiro QR.
  * `fresh` descarta a sessão atual antes — "gerar novo QR" quando o pareamento travou.
  */
-export async function startTenantChannel(context: TenantContext, options: { fresh?: boolean } = {}): Promise<TenantChannelState> {
+async function startChannel(config: ChannelConfig, context: TenantContext, options: { fresh?: boolean } = {}): Promise<TenantChannelState> {
   assertDirector(context);
   const db = getDatabase();
-  const sessionName = tenantChannelSessionName(context.tenantId);
+  const sessionName = config.sessionName(context.tenantId);
   if (options.fresh) {
     await relay(`/internal/waha/connections/${encodeURIComponent(sessionName)}/disconnect`, { method: "POST", timeoutMs: 30_000 }).catch(() => null);
   }
@@ -167,7 +200,7 @@ export async function startTenantChannel(context: TenantContext, options: { fres
   const phone = status === "ready" ? formatPhone(live.phoneNumber) : null;
   const now = new Date();
 
-  const existing = await findChannel(context.tenantId);
+  const existing = await findChannel(config, context.tenantId);
   if (existing) {
     await db.update(schema.wahaNumbers).set({
       relaySessionId: sessionName,
@@ -181,7 +214,7 @@ export async function startTenantChannel(context: TenantContext, options: { fres
       lastErrorCode: null,
       updatedAt: now,
     }).where(eq(schema.wahaNumbers.id, existing.id));
-    await audit(context, existing.id, options.fresh ? "tenant_channel.restarted" : "tenant_channel.started");
+    await audit(context, existing.id, options.fresh ? `${config.auditPrefix}.restarted` : `${config.auditPrefix}.started`);
   } else {
     const id = randomUUID();
     await db.insert(schema.wahaNumbers).values({
@@ -191,8 +224,8 @@ export async function startTenantChannel(context: TenantContext, options: { fres
       displayPhoneNumber: phone ?? `pendente-${id.slice(0, 8)}`,
       tenantId: context.tenantId,
       branchId: null,
-      scope: "tenant",
-      label: TENANT_CHANNEL_LABEL,
+      scope: config.scope,
+      label: config.label,
       capabilities: { inbound: true, cadence: false, ai: false },
       status: normalizeWahaRelayStatus(live.status ?? "STARTING"),
       connectedAt: phone ? now : null,
@@ -200,7 +233,7 @@ export async function startTenantChannel(context: TenantContext, options: { fres
       lastHealthAt: now,
       updatedAt: now,
     });
-    await audit(context, id, "tenant_channel.created");
+    await audit(context, id, `${config.auditPrefix}.created`);
   }
 
   return {
@@ -212,9 +245,9 @@ export async function startTenantChannel(context: TenantContext, options: { fres
 }
 
 /** Leitura do polling do QR: status real do WAHA; grava só quando algo mudou. */
-export async function readTenantChannelState(context: TenantContext): Promise<TenantChannelState> {
+async function readChannelState(config: ChannelConfig, context: TenantContext): Promise<TenantChannelState> {
   assertDirector(context);
-  const row = await findChannel(context.tenantId);
+  const row = await findChannel(config, context.tenantId);
   if (!row) return { status: "disconnected", providerStatus: null, qrCode: null, phone: null };
   const live = await readRelayState(row.relaySessionId);
   const status = live.exists === false ? "disconnected" : normalizeWahaUiStatus(live.status);
@@ -231,17 +264,31 @@ export async function readTenantChannelState(context: TenantContext): Promise<Te
       lastHealthAt: now,
       updatedAt: now,
     }).where(eq(schema.wahaNumbers.id, row.id));
-    if (status === "ready" && row.status !== "active") await audit(context, row.id, "tenant_channel.connected");
+    if (status === "ready" && row.status !== "active") await audit(context, row.id, `${config.auditPrefix}.connected`);
   }
   return { status, providerStatus: live.providerStatus ?? null, qrCode: status === "initializing" ? (live.qr ?? null) : null, phone: phone ?? formatPhone(row.displayPhoneNumber) };
 }
 
 /** Encerra a sessão no WAHA (para e apaga) e remove o registro. */
-export async function disconnectTenantChannel(context: TenantContext) {
+async function disconnectChannel(config: ChannelConfig, context: TenantContext) {
   assertDirector(context);
-  const row = await findChannel(context.tenantId);
+  const row = await findChannel(config, context.tenantId);
   if (!row) return;
   await relay(`/internal/waha/connections/${encodeURIComponent(row.relaySessionId)}/disconnect`, { method: "POST", timeoutMs: 30_000 });
   await getDatabase().delete(schema.wahaNumbers).where(eq(schema.wahaNumbers.id, row.id));
-  await audit(context, row.id, "tenant_channel.disconnected");
+  await audit(context, row.id, `${config.auditPrefix}.disconnected`);
 }
+
+// Director channel: the number the directorate uses with the brokers.
+export const getTenantChannel = (context: TenantContext) => getChannel(DIRECTORATE_CHANNEL, context);
+export const startTenantChannel = (context: TenantContext, options: { fresh?: boolean } = {}) =>
+  startChannel(DIRECTORATE_CHANNEL, context, options);
+export const readTenantChannelState = (context: TenantContext) => readChannelState(DIRECTORATE_CHANNEL, context);
+export const disconnectTenantChannel = (context: TenantContext) => disconnectChannel(DIRECTORATE_CHANNEL, context);
+
+// Materials channel: a dedicated number that only reads operator groups.
+export const getMaterialsChannel = (context: TenantContext) => getChannel(MATERIALS_CHANNEL, context);
+export const startMaterialsChannel = (context: TenantContext, options: { fresh?: boolean } = {}) =>
+  startChannel(MATERIALS_CHANNEL, context, options);
+export const readMaterialsChannelState = (context: TenantContext) => readChannelState(MATERIALS_CHANNEL, context);
+export const disconnectMaterialsChannel = (context: TenantContext) => disconnectChannel(MATERIALS_CHANNEL, context);

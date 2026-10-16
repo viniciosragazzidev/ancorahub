@@ -15,7 +15,7 @@ import {
   ROTATED_QR_LIFETIME_SECONDS,
 } from "@/features/waha-cadence/pairing-phase";
 import type { WahaUiStatus } from "@/features/waha-cadence/status";
-import type { TenantChannelView } from "@/features/waha-cadence/tenant-channel";
+import type { TenantChannelState, TenantChannelView } from "@/features/waha-cadence/tenant-channel";
 import {
   disconnectTenantChannelAction,
   pollTenantChannelAction,
@@ -23,6 +23,33 @@ import {
 } from "../actions";
 
 const POLL_MS = 2_500;
+
+type ActionResult<T> = ({ success: true } & T) | { success: false; error: string };
+
+/** The server actions that drive one channel: the card is the same for every kind of company number. */
+export type ChannelActions = {
+  start: (options?: { fresh?: boolean }) => Promise<ActionResult<TenantChannelState>>;
+  poll: () => Promise<ActionResult<TenantChannelState>>;
+  disconnect: () => Promise<ActionResult<object>>;
+};
+
+const DIRECTORATE_ACTIONS: ChannelActions = {
+  start: startTenantChannelAction,
+  poll: pollTenantChannelAction,
+  disconnect: disconnectTenantChannelAction,
+};
+
+const DIRECTORATE_TEXTS = {
+  title: "Número da empresa",
+  description:
+    "WhatsApp da diretoria para falar com os corretores. Separado dos números pessoais dos corretores e das notificações oficiais, que seguem pela API da Meta.",
+  subject: "Número da empresa",
+  pairingHint: "No celular do número da empresa, abra o WhatsApp.",
+  idleHint:
+    "Nenhum número conectado. Use um celular dedicado à empresa — ele passa a ser o canal da diretoria com os corretores.",
+};
+
+export type ChannelCardTexts = typeof DIRECTORATE_TEXTS;
 
 const STATUS_BADGE: Record<WahaUiStatus, { status: DsStatusBadgeStatus; label: string }> = {
   ready: { status: "success", label: "Conectado" },
@@ -39,7 +66,15 @@ function formatPhone(digits: string | null) {
   return `+${digits}`;
 }
 
-export function TenantChannelCard({ initialChannel }: { initialChannel: TenantChannelView | null }) {
+export function TenantChannelCard({
+  initialChannel,
+  actions = DIRECTORATE_ACTIONS,
+  texts = DIRECTORATE_TEXTS,
+}: {
+  initialChannel: TenantChannelView | null;
+  actions?: ChannelActions;
+  texts?: ChannelCardTexts;
+}) {
   const router = useRouter();
   const [status, setStatus] = useState<WahaUiStatus>(initialChannel?.status ?? "disconnected");
   const [phone, setPhone] = useState<string | null>(initialChannel?.phone ?? null);
@@ -79,7 +114,7 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
     let cancelled = false;
     let timer: number | undefined;
     const tick = async () => {
-      const result = await pollTenantChannelAction();
+      const result = await actions.poll();
       if (cancelled) return;
       if (result.success) {
         setStatus(result.status);
@@ -89,7 +124,7 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
         if (result.status === "ready") {
           setPairing(false);
           resetPairing();
-          toast.success("Número da empresa conectado.");
+          toast.success(`${texts.subject} conectado.`);
           router.refresh();
           return;
         }
@@ -106,7 +141,7 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [pairing, router, showQr]);
+  }, [pairing, router, showQr, actions, texts.subject]);
 
   useEffect(() => {
     if (!pairing) return;
@@ -120,7 +155,7 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
   function connect(fresh: boolean) {
     resetPairing();
     startTransition(async () => {
-      const result = await startTenantChannelAction({ fresh });
+      const result = await actions.start({ fresh });
       if (!result.success) {
         setStatus("error");
         toast.error(result.error);
@@ -141,7 +176,7 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
 
   function disconnect() {
     startTransition(async () => {
-      const result = await disconnectTenantChannelAction();
+      const result = await actions.disconnect();
       setConfirmingDisconnect(false);
       if (!result.success) {
         toast.error(result.error);
@@ -151,7 +186,7 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
       setPhone(null);
       setPairing(false);
       resetPairing();
-      toast.success("Número da empresa desconectado.");
+      toast.success(`${texts.subject} desconectado.`);
       router.refresh();
     });
   }
@@ -168,11 +203,8 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
               <WhatsappLogo className="size-5" aria-hidden />
             </span>
             <div className="min-w-0">
-              <CardTitle>Número da empresa</CardTitle>
-              <CardDescription className="mt-1 max-w-2xl leading-5">
-                WhatsApp da diretoria para falar com os corretores. Separado dos números pessoais dos
-                corretores e das notificações oficiais, que seguem pela API da Meta.
-              </CardDescription>
+              <CardTitle>{texts.title}</CardTitle>
+              <CardDescription className="mt-1 max-w-2xl leading-5">{texts.description}</CardDescription>
             </div>
           </div>
           <DsStatusBadge status={badge.status} label={badge.label} />
@@ -203,7 +235,7 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
             <div className="grid content-start gap-3">
               <PairingStepper phase={phase} />
               <ol className="list-decimal space-y-1 pl-4 text-xs leading-5 text-muted-foreground">
-                <li>No celular do número da empresa, abra o WhatsApp.</li>
+                <li>{texts.pairingHint}</li>
                 <li>Toque em Configurações → Aparelhos conectados → Conectar um aparelho.</li>
                 <li>Aponte a câmera para o QR ao lado.</li>
               </ol>
@@ -223,7 +255,7 @@ export function TenantChannelCard({ initialChannel }: { initialChannel: TenantCh
             <p className="max-w-xl text-sm leading-5 text-muted-foreground">
               {status === "error"
                 ? "A última tentativa de conexão falhou. Gere um novo QR para parear o número novamente."
-                : "Nenhum número conectado. Use um celular dedicado à empresa — ele passa a ser o canal da diretoria com os corretores."}
+                : texts.idleHint}
             </p>
             <Button size="sm" disabled={isPending} onClick={() => connect(status === "error")}>
               {isPending ? "Preparando QR…" : status === "error" ? "Gerar novo QR" : "Conectar número"}

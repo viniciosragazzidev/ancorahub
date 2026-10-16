@@ -4827,6 +4827,57 @@ export const knowledgeConflicts = pgTable(
   (table) => [index("knowledge_conflicts_tenant_idx").on(table.tenantId, table.status)]
 );
 
+/**
+ * Messages from operator groups captured for quoting material. They are never
+ * leads or conversations. The author is stored only as a non-reversible hash.
+ */
+export const wahaGroupMessages = pgTable(
+  "waha_group_messages",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    groupId: text("group_id").notNull(),
+    providerMessageId: text("provider_message_id").notNull(),
+    authorPhoneHash: text("author_phone_hash"),
+    messageType: text("message_type").notNull().default("text"),
+    body: text("body").notNull().default(""),
+    fileName: text("file_name"),
+    mimeType: text("mime_type"),
+    knowledgeDocumentId: text("knowledge_document_id").references(() => knowledgeDocuments.id, { onDelete: "set null" }),
+    // captured | duplicate_material | needs_ocr | too_large | error
+    captureStatus: text("capture_status").notNull().default("captured"),
+    createdAt,
+  },
+  (table) => [
+    uniqueIndex("waha_group_messages_tenant_message_unique").on(table.tenantId, table.providerMessageId),
+    index("waha_group_messages_tenant_group_idx").on(table.tenantId, table.groupId),
+  ]
+);
+
+/**
+ * Operator groups the dedicated company number reads for quoting material.
+ * A group is captured only when it is active here; the tenant is the one whose
+ * quote assistant receives the material.
+ */
+export const wahaGroupSources = pgTable(
+  "waha_group_sources",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    wahaNumberId: text("waha_number_id").notNull().references(() => wahaNumbers.id, { onDelete: "cascade" }),
+    groupId: text("group_id").notNull(),
+    groupName: text("group_name"),
+    active: boolean("active").notNull().default(false),
+    lastListedAt: timestamp("last_listed_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("waha_group_sources_unique").on(table.tenantId, table.wahaNumberId, table.groupId),
+    index("waha_group_sources_number_group_idx").on(table.wahaNumberId, table.groupId),
+  ]
+);
+
 /** Agent definitions created in Agent Builder. */
 export const agentDefinitions = pgTable(
   "agent_definitions",

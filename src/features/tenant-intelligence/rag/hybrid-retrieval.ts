@@ -1,7 +1,9 @@
 import "server-only";
 
-import { and, eq, gte, desc, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gte, desc, isNull, lte, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
+import { extractSearchKeywords, stripAccents } from "./search-terms";
+import { buildTermSearch } from "./term-search-sql";
 
 export type HybridSearchResult = {
   chunkId: string;
@@ -39,7 +41,13 @@ export async function executeHybridKnowledgeSearch(params: {
     ? sql<number>`(${schema.knowledgeChunks.embedding} <=> ${vectorLiteral}::vector)`
     : null;
 
-  // Query chunks with tenant isolation and authority level filter
+  const now = new Date();
+  const keywords = extractSearchKeywords(params.query);
+  // Without an embedding the database has to pick the candidates by term. Ordering by recency
+  // alone cut the answer out whenever newer, unrelated material existed.
+  const termSearch = queryEmbedding ? null : buildTermSearch(schema.knowledgeChunks.text, keywords);
+
+  // Query chunks with tenant isolation, authority level, validity and term filters
   const chunks = await db
     .select({
       chunkId: schema.knowledgeChunks.id,
@@ -61,24 +69,25 @@ export async function executeHybridKnowledgeSearch(params: {
         eq(schema.knowledgeChunks.tenantId, params.tenantId),
         gte(schema.knowledgeChunks.authorityLevel, minAuthority),
         eq(schema.knowledgeDocuments.status, "published"),
-        or(isNull(schema.knowledgeDocuments.validUntil), gte(schema.knowledgeDocuments.validUntil, new Date())),
+        or(isNull(schema.knowledgeDocuments.validFrom), lte(schema.knowledgeDocuments.validFrom, now)),
+        or(isNull(schema.knowledgeDocuments.validUntil), gte(schema.knowledgeDocuments.validUntil, now)),
+        ...(termSearch ? [termSearch.anyMatch] : []),
         ...(params.category ? [eq(schema.knowledgeDocuments.category, params.category)] : [])
       )
     )
-    .orderBy(semanticDistance ?? desc(schema.knowledgeChunks.authorityLevel), desc(schema.knowledgeChunks.createdAt))
-    .limit(maxLimit * 3);
+    .orderBy(
+      ...(termSearch ? [desc(termSearch.hits)] : []),
+      semanticDistance ?? desc(schema.knowledgeChunks.authorityLevel),
+      desc(schema.knowledgeChunks.createdAt),
+    )
+    .limit(maxLimit * 5);
 
-  // Keyword relevance scoring heuristic
-  const keywords = params.query
-    .toLowerCase()
-    .split(/\s+/)
-    .filter((w) => w.length > 2);
-
+  // Keyword relevance scoring heuristic, accent-insensitive like the SQL filter
   const scored = chunks.map((c) => {
-    const textLower = c.text.toLowerCase();
+    const textPlain = stripAccents(c.text.toLowerCase());
     let hits = 0;
     for (const kw of keywords) {
-      if (textLower.includes(kw)) hits++;
+      if (textPlain.includes(kw)) hits++;
     }
     // Final score = keyword hits + authority weight
     const semanticScore = typeof c.semanticDistance === "number" ? Math.max(0, 1 - c.semanticDistance) * 20 : 0;

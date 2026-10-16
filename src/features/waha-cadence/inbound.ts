@@ -24,7 +24,8 @@ import {
   WAHA_CADENCE_FEATURE,
 } from "./contract";
 import { brazilNinthDigitVariant, contactNumberShape, phoneSubscriberSuffix, samePhoneSubscriber } from "./phone-matching";
-import { storeWahaMessageMedia } from "./message-media";
+import { storeWahaMessageMedia, wahaFilePath } from "./message-media";
+import { captureWahaGroupMessage, findActiveWahaGroupSource } from "@/features/waha-group-capture/service";
 
 type SessionSource =
   | { kind: "number"; number: typeof schema.wahaNumbers.$inferSelect }
@@ -144,7 +145,8 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   // Cadência é uma automação opt-in. Conversas Lite do corretor são
   // atendimento humano e continuam recebendo eventos enquanto a conexão WAHA
   // estiver habilitada pela plataforma.
-  if (source.kind === "number" && (await getSystemSetting(WAHA_CADENCE_FEATURE)) !== "true") {
+  // Group chats do not depend on the cadence: a number that only reads operator groups never sends one.
+  if (source.kind === "number" && !event.message?.isGroup && (await getSystemSetting(WAHA_CADENCE_FEATURE)) !== "true") {
     await markIgnored(db, registered.id, "feature_disabled");
     return { processed: 0, ignored: "feature_disabled" as const };
   }
@@ -249,6 +251,41 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   if (!tenantId) {
     await markIgnored(db, registered.id, "unknown_session");
     return { processed: 0, ignored: "unknown_session" as const };
+  }
+
+  // Group chats (`@g.us`) are operator material, not contacts: they never
+  // become leads, conversations or AI replies. Group capture is a separate path.
+  if (event.message.isGroup) {
+    await markIgnored(db, registered.id, "group_message");
+    // Capture runs after the response (it downloads files and reads PDFs), and
+    // only for the dedicated company number, never for broker connections.
+    const groupMessage = event.message;
+    const groupId = groupMessage.groupId;
+    // Only groups the company selected as active for this number are read.
+    const groupSource = source.kind === "number" && groupId
+      ? await findActiveWahaGroupSource(source.number.id, groupId)
+      : null;
+    if (groupSource && groupId) {
+      const media = groupMessage.media;
+      after(() =>
+        captureWahaGroupMessage({
+          tenantId: groupSource.tenantId,
+          providerMessageId: groupMessage.id,
+          groupId,
+          authorPhone: groupMessage.from,
+          messageType: groupMessage.type,
+          body: groupMessage.body,
+          fileName: media?.fileName,
+          mimeType: media?.mimeType,
+          providerPath: media?.providerPath ?? wahaFilePath(media?.url) ?? undefined,
+        }).catch((error) => {
+          console.warn("[waha-group-capture] failed", {
+            error: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+          });
+        }),
+      );
+    }
+    return { processed: 0, ignored: "group_message" as const };
   }
 
   // A contact WhatsApp only exposed as `@lid` (no phone mapping from the

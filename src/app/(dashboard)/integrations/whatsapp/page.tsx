@@ -9,6 +9,7 @@ import { and, asc, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { WhatsAppPage } from "../../settings/whatsapp-page";
 import { DirectorWhatsAppView } from "./director-whatsapp-view";
+import { MaterialsWhatsAppView } from "./materials-whatsapp-view";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,14 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
     return <>
       <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
       <DirectorWhatsAppView context={context} />
+    </>;
+  }
+
+  if (visao === "materiais") {
+    if (context.role !== "director") redirect("/access-denied");
+    return <>
+      <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
+      <MaterialsWhatsAppView context={context} />
     </>;
   }
 

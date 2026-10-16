@@ -1051,6 +1051,20 @@
                         "when":  1791662003000,
                         "tag":  "0202_broker_metric_daily",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  150,
+                        "version":  "7",
+                        "when":  1791662004000,
+                        "tag":  "0203_waha_group_messages",
+                        "breakpoints":  true
+                    },
+                    {
+                        "idx":  151,
+                        "version":  "7",
+                        "when":  1791662005000,
+                        "tag":  "0204_waha_group_sources",
+                        "breakpoints":  true
                     }
                 ]
 }

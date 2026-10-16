@@ -61,6 +61,21 @@ export const FEATURE_FLAGS = {
     description: "Habilita o agente de IA integrado ao WAHA.",
   },
 
+  WAHA_GROUP_CAPTURE: {
+    key: "feature_waha_group_capture_enabled",
+    scope: "global",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Lê os grupos de operadoras escolhidos no número de materiais e publica PDFs e imagens como material de cotação.",
+  },
+
+  OPERATOR_MATERIAL_TTL_DAYS: {
+    key: "operator_material_ttl_days",
+    scope: "global",
+    defaultValue: "45",
+    description: "Dias de validade de uma tabela de operadora que não informa o fim da vigência. 0 desliga a expiração.",
+  },
+
   WAHA_INTERNAL_BROKER_NOTIFICATIONS: {
     key: "feature_waha_internal_broker_notifications_enabled",
     scope: "global",
