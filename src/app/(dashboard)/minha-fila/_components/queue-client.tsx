@@ -35,11 +35,6 @@ const statusLabels: Record<string, { label: string; color: string }> = {
   lost: { label: "Perdido", color: "bg-destructive text-destructive" },
 };
 
-const sourceLabels: Record<string, string> = {
-  webhook: "Automático",
-  manual: "Manual",
-};
-
 export function BrokerQueueClient({
   leads,
 }: {
@@ -126,10 +121,6 @@ export function BrokerQueueClient({
                   </p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <LeadStatusBadge status={lead.status} />
-                    <span className="text-xs text-muted-foreground">·</span>
-                    <span className="text-xs text-muted-foreground">
-                      {sourceLabels[lead.source] ?? lead.source}
-                    </span>
                     {lead.taskCount > 0 && (
                       <>
                         <span className="text-xs text-muted-foreground">·</span>
@@ -160,8 +151,6 @@ export function BrokerQueueClient({
           <TableRow>
             <TableHead className="pl-5">Lead</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Origem</TableHead>
-            <TableHead className="hidden md:table-cell">Criado em</TableHead>
             <TableHead className="hidden md:table-cell">Última interação</TableHead>
             <TableHead className="pr-5 text-right">Ação</TableHead>
           </TableRow>
@@ -189,14 +178,6 @@ export function BrokerQueueClient({
                 </TableCell>
                 <TableCell>
                   <LeadStatusBadge status={lead.status} />
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground">
-                  {sourceLabels[lead.source] ?? lead.source}
-                </TableCell>
-                <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
-                  {new Intl.DateTimeFormat("pt-BR", {
-                    dateStyle: "short",
-                  }).format(lead.createdAt)}
                 </TableCell>
                 <TableCell className="hidden text-xs text-muted-foreground md:table-cell">
                   {lead.lastInteractionAt

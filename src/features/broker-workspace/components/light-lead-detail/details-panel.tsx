@@ -45,9 +45,7 @@ export function DetailsZone({ lead, c, showAiInsight = true }: { lead: LightLead
               <Fact label="Produto ou plano" value={product} />
               <Fact label="Tipo de lead" value={leadType} />
               {lead.tipoCnpj ? <Fact label="Tipo de CNPJ" value={lead.tipoCnpj} /> : null}
-              <Fact label="Origem ou campanha" value={lead.sourceCampaign || (lead.origem === "manual" ? "Manual" : "Webhook ou Meta")} />
               <Fact label="Cidade ou filial" value={lead.city || lead.branchName || "Não informada"} />
-              <Fact label="Data de entrada" value={new Date(lead.createdAt).toLocaleDateString("pt-BR")} />
               <Fact label="Consentimento LGPD" value={lead.consentimentoLgpd ? "Confirmado" : "Não registrado"} />
             </dl>
             {lead.summary ? (

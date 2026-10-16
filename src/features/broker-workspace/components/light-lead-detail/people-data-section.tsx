@@ -19,6 +19,7 @@ export function PeopleDataSection({ lead, c }: { lead: LightLeadDetailData; c: L
             />
             <PersonRecordDetails
               kind="lead"
+              hideRegistrationDate
               createdAt={new Date(lead.createdAt)}
               consentimentoLgpd={lead.consentimentoLgpd ?? false}
               dependents={(lead.beneficiaries || []).map((b) => ({

@@ -101,10 +101,6 @@ const actionPrimary =
 const actionSecondary =
   "inline-flex h-11 w-full items-center justify-center rounded-full bg-(--surface-muted) px-5 text-sm font-semibold text-(--foreground) sm:w-auto";
 
-const TIME_ZONE = "America/Sao_Paulo";
-const dayKeyFormat = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
-const timeFormat = new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" });
-const weekdayFormat = new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, weekday: "long", day: "2-digit", month: "2-digit" });
 
 function arrival(lead: LightLeadItem) {
   const value = lead.arrivedAt ?? lead.createdAt;
@@ -112,45 +108,9 @@ function arrival(lead: LightLeadItem) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function dayLabel(date: Date, now: Date) {
-  const key = dayKeyFormat.format(date);
-  if (key === dayKeyFormat.format(now)) return "Hoje";
-  if (key === dayKeyFormat.format(new Date(now.getTime() - 86_400_000))) return "Ontem";
-  const label = weekdayFormat.format(date);
-  return label.charAt(0).toUpperCase() + label.slice(1);
-}
-
-/** Leads grouped by the day they arrived, newest first, each day newest first. */
-function groupByArrival(leads: LightLeadItem[], now: Date) {
-  const sorted = [...leads].sort((a, b) => (arrival(b)?.getTime() ?? 0) - (arrival(a)?.getTime() ?? 0));
-  const groups: Array<{ key: string; label: string; leads: LightLeadItem[] }> = [];
-  for (const lead of sorted) {
-    const date = arrival(lead);
-    const key = date ? dayKeyFormat.format(date) : "sem-data";
-    const last = groups.at(-1);
-    if (last?.key === key) last.leads.push(lead);
-    else groups.push({ key, label: date ? dayLabel(date, now) : "Sem data", leads: [lead] });
-  }
-  return groups;
-}
-
-/** "Chegou hoje às 14:32", "Chegou ontem às 09:10", "Chegou sexta, 09/10 às 18:00". */
-function arrivalPhrase(lead: LightLeadItem) {
-  const date = arrival(lead);
-  if (!date) return null;
-  const day = dayLabel(date, new Date());
-  const when = day === "Hoje" || day === "Ontem" ? day.toLowerCase() : day.split(",")[0]?.toLowerCase() + "," + (day.split(",")[1] ?? "");
-  return `Chegou ${when} às ${timeFormat.format(date)}`;
-}
-
-function ArrivalTime({ lead }: { lead: LightLeadItem }) {
-  const date = arrival(lead);
-  if (!date) return null;
-  return (
-    <time dateTime={date.toISOString()} className="shrink-0 text-xs tabular-nums text-(--text-muted)" suppressHydrationWarning>
-      <span className="sr-only">Chegou às </span>{timeFormat.format(date)}
-    </time>
-  );
+/** Newest arrival first. The arrival itself is never shown to the broker. */
+function sortByArrival(leads: LightLeadItem[]) {
+  return [...leads].sort((a, b) => (arrival(b)?.getTime() ?? 0) - (arrival(a)?.getTime() ?? 0));
 }
 
 function NeedsYouCard({ lead, dataTour }: { lead: LightLeadItem; dataTour?: string }) {
@@ -162,7 +122,6 @@ function NeedsYouCard({ lead, dataTour }: { lead: LightLeadItem; dataTour?: stri
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-semibold text-(--foreground)">{lead.name}</p>
           <p className="mt-0.5 text-sm text-(--text-secondary)">{withDuty(state.context, lead)}</p>
-          <p className="mt-0.5 text-xs text-(--text-muted)" suppressHydrationWarning>{arrivalPhrase(lead)}</p>
         </div>
         <Badge tone={state.tone}>{state.chip}</Badge>
       </div>
@@ -193,7 +152,6 @@ function CompactRow({ lead, dataTour }: { lead: LightLeadItem; dataTour?: string
           <span className="block truncate text-sm text-(--text-secondary)">{withDuty(state.context, lead)}</span>
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          <ArrivalTime lead={lead} />
           <Badge tone={state.tone} size="sm">{state.chip}</Badge>
         </span>
       </Link>
@@ -315,19 +273,11 @@ export function LightLeadsList({
                     Atendimentos
                   </h2>
                 )}
-                {groupByArrival(rest, new Date()).map((group, groupIndex) => (
-                  <div key={group.key} className="flex flex-col gap-2">
-                    <h3 className="px-1 text-sm font-medium text-(--text-secondary)" suppressHydrationWarning>
-                      {group.label}
-                      <span className="ml-2 tabular-nums text-(--text-muted)">{group.leads.length}</span>
-                    </h3>
-                    <ul className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
-                      {group.leads.map((lead, index) => (
-                        <CompactRow key={lead.id} lead={lead} dataTour={urgent.length === 0 && groupIndex === 0 && index === 0 ? "micro-queue-lead" : undefined} />
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                <ul className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
+                  {sortByArrival(rest).map((lead, index) => (
+                    <CompactRow key={lead.id} lead={lead} dataTour={urgent.length === 0 && index === 0 ? "micro-queue-lead" : undefined} />
+                  ))}
+                </ul>
               </section>
             ) : null}
           </>
