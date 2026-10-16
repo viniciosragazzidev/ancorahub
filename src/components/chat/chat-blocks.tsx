@@ -304,6 +304,14 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe
                   </>
                 );
                 const row = item.href ? <Link href={item.href} className={styles.listRow}>{content}</Link> : <div className={styles.listRow}>{content}</div>;
+                if (item.action) {
+                  return (
+                    <li key={item.id} className={styles.listItemWithAction}>
+                      {row}
+                      <Link href={item.action.href} className={styles.listAction} aria-label={`${item.action.label}: ${item.primary}`}>{item.action.label}</Link>
+                    </li>
+                  );
+                }
                 return <li key={item.id}>{item.swipe && onItemSwipe ? <SwipeRow item={{ ...item, swipe: item.swipe }} disabled={swipeDisabled} onSwipe={onItemSwipe}>{row}</SwipeRow> : row}</li>;
               })}
             </ul>

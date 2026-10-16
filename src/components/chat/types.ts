@@ -54,6 +54,8 @@ export type ChatListItem = {
   id: string; lead?: string; primary: string; secondary?: string; trailing?: string; href?: string;
   /** Swipe the row to the left (or its button, by keyboard) to run this action; the row leaves the list. */
   swipe?: { label: string; reply: string; action: Extract<ChatAction, { kind: "server" }> };
+  /** A small button beside the row (e.g. "Ver plantão"), opening its own page. */
+  action?: { label: string; href: string };
 };
 
 export type ChatBlock =

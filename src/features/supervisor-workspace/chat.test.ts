@@ -85,7 +85,7 @@ describe("supervisor Lite chat", () => {
   it("team duty lists today's plantão with presence and points at who has not confirmed", () => {
     const script = buildSupervisorScript("equipe-plantao", data(), now);
     const list = script.blocks.find((block) => block.type === "list");
-    expect(list && list.type === "list" ? list.items[0] : null).toMatchObject({ primary: "Bruno Reis", secondary: "PME Tarde · 13:30 às 19:00", trailing: "esperando confirmar", href: "/equipe/b2" });
+    expect(list && list.type === "list" ? list.items[0] : null).toMatchObject({ primary: "Bruno Reis", secondary: "PME Tarde · 13:30 às 19:00", trailing: "esperando confirmar", href: "/equipe/b2", action: { label: "Ver plantão", href: "/plantoes/corretor/b2" } });
     expect(script.status?.label).toBe("Confirmações pendentes");
   });
 });

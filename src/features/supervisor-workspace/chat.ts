@@ -317,6 +317,7 @@ function teamDutyScript(data: SupervisorWorkspaceData, now: Date): ChatScript {
       secondary: `${item.scheduleName} · ${item.startsAt} às ${item.endsAt}${item.paused ? " · pausado" : ""}`,
       trailing: PRESENCE[item.presence] ?? item.presence,
       href: `/equipe/${item.brokerId}`,
+      action: { label: "Ver plantão", href: `/plantoes/corretor/${item.brokerId}` },
     })),
   });
   const follow = [...absent, ...pending].slice(0, 3);

@@ -127,6 +127,14 @@
 .listPrimary { font-size: var(--text-sm); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .listSecondary { font-size: var(--text-xs); color: var(--text-muted); }
 .listTrailing { font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+/* A row with its own button on the right ("Ver plantão"). */
+.listItemWithAction { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding-right: 16px; }
+.listAction {
+  font-size: var(--text-sm); font-weight: 500; white-space: nowrap; text-decoration: none; color: var(--chat-action);
+  padding: 6px 12px; border-radius: 999px; background: var(--surface-muted);
+  transition: background-color var(--duration-fast) var(--ease-standard);
+}
+.listAction:hover { background: var(--surface-strong, var(--surface-muted)); }
 /* Swipe a row to the left to cancel it (Agenda). The action waits underneath, on the right. */
 .swipe { position: relative; overflow: hidden; isolation: isolate; }
 .swipeFront { position: relative; z-index: 1; background: var(--surface); touch-action: pan-y; cursor: grab; }
