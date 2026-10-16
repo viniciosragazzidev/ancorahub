@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
+import { stripLeadOriginForRole } from "@/features/leads/broker-visibility";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 
 const activeLeadStatuses = [
@@ -324,7 +325,8 @@ export default async function MinhaFilaPage() {
       name: l.name,
       phone: l.phone,
       status: l.status,
-      createdAt: l.createdAt,
+      // The creation date is when it reached the brokerage; the broker only gets the assignment.
+      createdAt: l.assignedAt ?? l.createdAt,
       updatedAt: l.stageEnteredAt,
       isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
       isAwaitingAcceptance: pendingOfferLeadIds.includes(l.id),
@@ -341,7 +343,7 @@ export default async function MinhaFilaPage() {
       status: "lost",
       isLost: true,
       lostReason: "Redistribuído por inatividade / tempo limite estourado",
-      createdAt: l.createdAt,
+      createdAt: lostLeadsMap.get(l.id)?.createdAt ?? l.stageEnteredAt ?? l.createdAt,
       updatedAt: lostLeadsMap.get(l.id)?.createdAt ?? l.stageEnteredAt,
     }));
 
@@ -614,7 +616,7 @@ export default async function MinhaFilaPage() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <BrokerQueueClient leads={enrichedLeads} />
+            <BrokerQueueClient leads={stripLeadOriginForRole(context.role, enrichedLeads)} />
           </CardContent>
         </Card>
       </main>

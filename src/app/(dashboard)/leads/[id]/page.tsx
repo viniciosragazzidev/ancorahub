@@ -179,13 +179,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       livesCount: qualificationDetails?.qtdVidas ? Number(qualificationDetails.qtdVidas) : null,
       urgency: qualificationDetails?.urgenciaContratacao || null,
       city: qualificationDetails?.cidade || (typeof (lead.qualificationDetails as Record<string, unknown> | null)?.city === "string" ? String((lead.qualificationDetails as Record<string, unknown>).city) : null),
-      createdAt: lead.createdAt,
+      // The creation date is when it reached the brokerage; the broker only gets the assignment.
+      createdAt: lead.assignedAt ?? lead.createdAt,
       assignedAt: lead.assignedAt,
       slaFirstContactMinutes: 15,
       isCurrentBroker: lead.corretorId === context.userId,
       tipo: lead.tipo,
-      origem: lead.origem,
-      sourceCampaign: lead.sourceCampaign,
+      origem: null,
+      sourceCampaign: null,
       tipoCnpj: metaLeadDetails.tipoCnpj,
       beneficiaries: lightBeneficiaries.map((b) => ({
         id: b.id,
