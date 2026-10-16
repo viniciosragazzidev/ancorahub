@@ -14,6 +14,7 @@ import {
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
+import { describeActionError } from "./action-errors";
 import { setGroupActive, syncWahaGroups } from "./groups-service";
 
 const PAGE_PATH = "/integrations/whatsapp";
@@ -21,7 +22,7 @@ const PAGE_PATH = "/integrations/whatsapp";
 type Result<T> = ({ success: true } & T) | { success: false; error: string };
 
 function failure(error: unknown, fallback: string) {
-  return { success: false as const, error: error instanceof Error ? error.message : fallback };
+  return { success: false as const, error: describeActionError(error, fallback) };
 }
 
 async function requireDirector() {

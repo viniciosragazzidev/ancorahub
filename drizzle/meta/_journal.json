@@ -1072,6 +1072,13 @@
                         "when":  1791662006000,
                         "tag":  "0205_knowledge_search_indexes",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  153,
+                        "version":  "7",
+                        "when":  1791662007000,
+                        "tag":  "0206_waha_numbers_materials_scope",
+                        "breakpoints":  true
                     }
                 ]
 }
