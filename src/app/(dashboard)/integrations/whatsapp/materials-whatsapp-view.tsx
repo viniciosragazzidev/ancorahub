@@ -11,6 +11,7 @@ import {
   startMaterialsChannelAction,
 } from "@/features/waha-group-capture/channel-actions";
 import { getCaptureStats } from "@/features/waha-group-capture/groups-service";
+import { safeLoad, type SafeLoad } from "@/features/waha-group-capture/safe-load";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -47,14 +48,15 @@ function formatDateTime(value: Date) {
 }
 
 export async function MaterialsWhatsAppView({ context }: { context: TenantContext }) {
-  const [channel, captureFlag, stats] = await Promise.all([
+  // The tables of this screen come from migrations applied by hand: a missing one must not take the page down.
+  const [channel, captureFlag, statsLoad] = await Promise.all([
     getMaterialsChannel(context),
     getFeatureFlag(FEATURE_FLAGS.WAHA_GROUP_CAPTURE),
-    getCaptureStats(context.tenantId, 7),
+    safeLoad("materials-stats", () => getCaptureStats(context.tenantId, 7)),
   ]);
 
-  const groups = channel
-    ? await getDatabase()
+  const groupsLoad = channel
+    ? await safeLoad("materials-groups", () => getDatabase()
         .select({
           id: schema.wahaGroupSources.id,
           groupId: schema.wahaGroupSources.groupId,
@@ -63,11 +65,16 @@ export async function MaterialsWhatsAppView({ context }: { context: TenantContex
         })
         .from(schema.wahaGroupSources)
         .where(and(eq(schema.wahaGroupSources.tenantId, context.tenantId), eq(schema.wahaGroupSources.wahaNumberId, channel.id)))
-        .orderBy(desc(schema.wahaGroupSources.active), asc(schema.wahaGroupSources.groupName))
-    : [];
+        .orderBy(desc(schema.wahaGroupSources.active), asc(schema.wahaGroupSources.groupName)))
+    : ({ ok: true, value: [] } satisfies SafeLoad<never[]>);
+
+  const groups = groupsLoad.ok ? groupsLoad.value : [];
+  const stats = statsLoad.ok ? statsLoad.value : null;
+  const missingTables = (!statsLoad.ok && statsLoad.missingTables) || (!groupsLoad.ok && groupsLoad.missingTables);
+  const loadFailed = !statsLoad.ok || !groupsLoad.ok;
 
   const captureOn = captureFlag === "true";
-  const statusRows = Object.entries(stats.byStatus).sort((a, b) => b[1] - a[1]);
+  const statusRows = Object.entries(stats?.byStatus ?? {}).sort((a, b) => b[1] - a[1]);
 
   return (
     <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) antialiased sm:gap-6 lg:p-6">
@@ -93,12 +100,27 @@ export async function MaterialsWhatsAppView({ context }: { context: TenantContex
           }}
         />
 
-        <MaterialGroupsCard
-          groups={groups}
-          channelReady={channel?.status === "ready"}
-          actions={{ refresh: refreshMaterialGroupsAction, toggle: setMaterialGroupActiveAction }}
-        />
+        {loadFailed ? (
+          <Card variant="overview" className="shadow-sm">
+            <CardContent className="px-5 py-4">
+              <p className="text-sm leading-5 text-foreground">
+                {missingTables
+                  ? "O banco ainda não tem as tabelas desta função (migrações 0203 e 0204). Peça ao administrador da plataforma para aplicar as migrações e recarregue a página. Você já pode conectar o número acima."
+                  : "Não foi possível carregar os grupos e o resumo agora. Tente recarregar a página."}
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
 
+        {groupsLoad.ok ? (
+          <MaterialGroupsCard
+            groups={groups}
+            channelReady={channel?.status === "ready"}
+            actions={{ refresh: refreshMaterialGroupsAction, toggle: setMaterialGroupActiveAction }}
+          />
+        ) : null}
+
+        {stats ? (
         <Card variant="overview" className="shadow-sm">
           <CardHeader className="gap-1 border-b border-border/70 px-5 py-4">
             <CardTitle>Últimos 7 dias</CardTitle>
@@ -122,6 +144,7 @@ export async function MaterialsWhatsAppView({ context }: { context: TenantContex
             )}
           </CardContent>
         </Card>
+        ) : null}
       </div>
     </main>
   );
