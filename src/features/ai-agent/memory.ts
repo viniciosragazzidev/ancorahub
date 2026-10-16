@@ -1,3 +1,5 @@
+import { companyEvidence } from "@/features/leads/company-lead-detection";
+
 /**
  * Phase 2 — Structured Conversation Memory
  *
@@ -158,6 +160,12 @@ const CNPJ_PATTERNS = [
   /\b(cnpj|empresa|pj)\b.*\b(sim|tenho|possui|tem)/i,
 ];
 
+export function hasPositiveCnpjEvidence(message: string): boolean {
+  return message.split(/[.!?\n]+/).some((sentence) =>
+    /\bcnpj\b/i.test(sentence) && companyEvidence(sentence)?.toLowerCase() === "cnpj",
+  );
+}
+
 const INTENT_PATTERNS = [
   /(?:gostaria|gostaríamos|queremos|quero|busco|procuro)\s+(?:de\s+)?(?:ver|conhecer|receber|encontrar)\s+([^.!?\n]+)/i,
   /(?:quero|gostaria|preciso de|estou atrás de|busco|procuro)\s+(?:um|uma|de|contratar|saber)\s+([^,.!?]+)/i,
@@ -212,6 +220,8 @@ export function extractFieldsFromMessage(
   };
 
   const trimmed = message.trim();
+  const hasCompanyEvidence = Boolean(companyEvidence(trimmed));
+  const hasCnpjEvidence = hasPositiveCnpjEvidence(trimmed);
   const isNameQuestion = /\bnome\b|como voce se chama|quem e voce/.test(
     normalizeForMatching(memory.lastQuestionAsked ?? ""),
   );
@@ -278,6 +288,17 @@ export function extractFieldsFromMessage(
     if (!memory.city && asksForCity && isLikelyCityAnswer(bareCity)) {
       memory.city = { value: bareCity, confidence: 1, sourceMessageId };
       addCollectedField(memory, "city");
+    }
+  }
+
+  // Positive company evidence overrides a previously stated individual/family
+  // plan because it changes which qualification flow the lead needs.
+  if (hasCompanyEvidence && memory.planType?.value !== "empresarial") {
+    memory.planType = { value: "empresarial", confidence: 1, sourceMessageId };
+    addCollectedField(memory, "planType");
+    if (memory.numberOfLives?.confidence === 0) {
+      delete memory.numberOfLives;
+      memory.collectedFields = memory.collectedFields.filter((field) => field !== "numberOfLives");
     }
   }
 
@@ -478,10 +499,10 @@ export function extractFieldsFromMessage(
   }
 
   // CNPJ detection
-  if (!memory.companyHasCnpj) {
+  if (memory.companyHasCnpj?.value !== "true") {
     // Mentioning a company/MEI is not proof that a CNPJ was provided. Only
     // advance this field when the message explicitly contains the CNPJ term.
-    if (/\bcnpj\b/i.test(trimmed) && CNPJ_PATTERNS.some((p) => p.test(trimmed))) {
+    if (hasCnpjEvidence && CNPJ_PATTERNS.some((p) => p.test(trimmed))) {
       memory.companyHasCnpj = { value: "true", confidence: 1, sourceMessageId };
       addCollectedField(memory, "companyHasCnpj");
     }

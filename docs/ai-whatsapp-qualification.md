@@ -18,6 +18,17 @@ Entrega parcial e reversível (DEC-050). A capacidade é controlada no Super-adm
 6. A sessão expira, pode ser desativada globalmente e possui proteção de atualização
    otimista para impedir duas respostas concorrentes.
 
+### Evidência de empresa na conversa
+
+Uma evidência positiva de empresa, CNPJ, MEI, PME ou plano empresarial na mensagem
+do lead classifica o plano como empresarial, mesmo que ele tenha respondido
+"individual" ou "familiar" antes. Se a única quantidade de vidas salva era o valor
+implícito de uma vida do plano individual, ela é removida para que a IA pergunte a
+quantidade correta. Uma negação como "não tenho CNPJ" não confirma CNPJ nem altera o
+tipo do plano. A persistência marca o lead como PJ quando o plano é empresarial ou
+quando a memória confirma CNPJ. A qualificação não escolhe a fila; o motor de
+distribuição continua responsável pelo roteamento.
+
 ## Limites atuais
 
 ### Observabilidade e resiliência do atendimento

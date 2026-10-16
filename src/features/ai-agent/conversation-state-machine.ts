@@ -801,6 +801,12 @@ export async function transitionConversationState({
   }
 }
 
+export function resolveQualifiedLeadType(memory: Pick<ConversationMemory, "planType" | "companyHasCnpj">): "PJ" | "PF" | undefined {
+  if (memory.planType?.value === "empresarial" || memory.companyHasCnpj?.value === "true") return "PJ";
+  if (memory.planType?.value === "individual" || memory.planType?.value === "familiar") return "PF";
+  return undefined;
+}
+
 async function persistLeadFieldsFromQualification(input: {
   tenantId: string;
   leadId: string;
@@ -813,8 +819,8 @@ async function persistLeadFieldsFromQualification(input: {
   if (rawName && !/^lead whatsapp/i.test(rawName)) leadUpdates.nome = rawName;
   const rawEmail = input.memory.email?.value?.trim().toLowerCase();
   if (rawEmail && rawEmail.includes("@")) leadUpdates.email = rawEmail;
-  if (input.memory.planType?.value === "empresarial") leadUpdates.tipo = "PJ";
-  if (["individual", "familiar"].includes(input.memory.planType?.value ?? "")) leadUpdates.tipo = "PF";
+  const leadType = resolveQualifiedLeadType(input.memory);
+  if (leadType) leadUpdates.tipo = leadType;
   if (input.qualificationStatus) leadUpdates.qualificationStatus = input.qualificationStatus;
   if (!Object.keys(leadUpdates).length) return;
 
@@ -1917,6 +1923,11 @@ export async function processInboundAiResponse({
   }
 
   // Merge any memory updates proposed by the LLM (from aiResult.structured)
+  const currentInboundHasPositiveCnpjEvidence = extractFieldsFromMessage(
+    userMessageBody,
+    createEmptyMemory(),
+    sourceIdentifier ?? undefined,
+  ).companyHasCnpj?.value === "true";
   if (aiResult.success && aiResult.structured?.memoryUpdates) {
     const addField = (key: string) => {
       if (!updatedMemory.collectedFields.includes(key)) {
@@ -1968,6 +1979,7 @@ export async function processInboundAiResponse({
         }
       } else if (field === "companyHasCnpj") {
         const val = /true|sim|yes/i.test(value) ? "true" : "false";
+        if (val === "true" && !currentInboundHasPositiveCnpjEvidence) continue;
         if (!updatedMemory.companyHasCnpj || confidence >= (updatedMemory.companyHasCnpj.confidence ?? 0)) {
           updatedMemory.companyHasCnpj = { value: val, confidence: confidence as 0 | 1, sourceMessageId: sourceIdentifier ?? undefined };
           addField("companyHasCnpj");
@@ -1975,6 +1987,10 @@ export async function processInboundAiResponse({
       }
     }
   }
+
+  // Reapply deterministic facts after model updates so structured suggestions cannot
+  // override positive company evidence from the inbound message.
+  updatedMemory = extractFieldsFromMessage(userMessageBody, updatedMemory, sourceIdentifier ?? undefined);
 
   // The model can extract a field from the same message it responds to. Re-evaluate
   // after those structured updates so the final answer is not an extra question and
