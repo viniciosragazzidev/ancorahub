@@ -9,7 +9,7 @@ describe("manager Lite routes", () => {
     for (const path of ["/dashboard/c/ancora", "/leads/dashboard", "/leads/arquivados", "/leads/distribuicao", "/leads/a/b", "/leads/distribuicao/plantao", "/equipe/cargos", "/equipe/convidar", "/equipe/dashboard", "/equipe/recuperacoes", "/equipe/minha", "/equipe/repassar", "/equipe/transferencia", "/equipe/a/b", "/clientes/a/b", "/empresas/abc", "/empresas/abc/leads", "/unidades", "/unidades/branch-1/subpage", "/relatorios", "/cotacao", "/primeiro-acesso/etapa"]) {
       expect(isLightRouteAllowed(path, "manager"), path).toBe(false);
     }
-    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(17);
+    expect(LIGHT_MANAGER_ALLOWED_ROUTES).toHaveLength(18);
     expect(isLightRouteAllowed("/gestao", "manager")).toBe(true);
     expect(isLightRouteAllowed("/gestao/a/b", "manager")).toBe(false);
     expect(isLightRouteAllowed("/mensagens", "manager")).toBe(true);

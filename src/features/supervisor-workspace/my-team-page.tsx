@@ -17,6 +17,7 @@ import { TeamInviteLiteSheet } from "@/features/team/team-invite-lite-sheet";
 import { addBrokerToMyTeamAction } from "./actions";
 import { cancelMyTeamInviteAction, inviteBrokerToMyTeamAction, removeBrokerFromMyTeamAction } from "./my-team-actions";
 import type { SupervisorTeamPageData } from "./my-team-queries";
+import { TeamOnDutyList } from "./team-on-duty-list";
 import styles from "./my-team-page.module.css";
 
 export function teamAvatarHue(name: string) {
@@ -88,6 +89,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
       <SegmentedControl label="Seções da equipe" value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} options={[{ value: "members", label: "Membros", accessory: <Badge size="sm">{data.members.length}</Badge> }, { value: "invites", label: "Convites", accessory: <Badge size="sm">{data.invites.length + data.pendingAccessInvites.length}</Badge> }, { value: "unit", label: "Unidade", accessory: <Badge size="sm">{data.brokers.length}</Badge> }]} />
       {feedback ? <motion.p className={styles.feedback} role="status" aria-live="polite" initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0.12 : 0.2 }}>{feedback}</motion.p> : null}
 
+      {activeTab === "members" ? <TeamOnDutyList duty={initialData.onDuty ?? []} /> : null}
       {activeTab === "members" ? <section className={styles.section} aria-labelledby="team-members-title"><h2 id="team-members-title" className="sr-only">Membros</h2>
         {data.members.length ? <motion.ul className={styles.list} variants={listVariants} initial={reducedMotion ? false : "hidden"} animate="visible">{data.members.map((member) => <motion.li key={member.id} className={styles.memberCard} data-attention={member.late > 0} variants={reducedMotion ? undefined : itemVariants} whileTap={reducedMotion ? undefined : { scale: 0.995 }}>
           <Link className={styles.memberLink} href={`/equipe/${encodeURIComponent(member.id)}`}><Avatar name={member.name} src={member.imageUrl ?? undefined} size="lg" status={member.availability === "available" ? "online" : "offline"} className={styles.avatar} style={{ "--team-hue": `${teamAvatarHue(member.name)}` } as React.CSSProperties} /><span>{member.name}<small><Badge tone={member.availability === "available" ? "success" : "neutral"} size="sm">{member.availability === "available" ? "Disponível" : member.availability === "paused" ? "Pausado" : "Fora do ar"}</Badge></small></span></Link>

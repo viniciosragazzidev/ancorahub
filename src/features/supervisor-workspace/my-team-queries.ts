@@ -5,7 +5,7 @@ import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { getSupervisorWorkspaceData } from "@/features/supervisor-workspace/queries";
+import { getSupervisorWorkspaceData, type TeamDuty } from "@/features/supervisor-workspace/queries";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { teamLeaderboard } from "@/features/engagement/leaderboard-queries";
 
@@ -19,6 +19,8 @@ export type SupervisorTeamPageData = {
   invites: Array<{ id: string; brokerId: string; brokerName: string; createdAt: string }>;
   pendingAccessInvites: Array<{ id: string; brokerProfileId: string; brokerName: string; email: string | null; createdAt: string }>;
   brokers: Array<{ id: string; name: string; imageUrl: string | null; supervisorId: string | null; supervisorName: string | null; inviteId: string | null }>;
+  /** Quem da equipe está de plantão agora. */
+  onDuty?: TeamDuty[];
 };
 
 export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageData> {
@@ -97,6 +99,7 @@ export async function getSupervisorTeamPageData(): Promise<SupervisorTeamPageDat
   const pendingInviteByBroker = new Map(inviteRows.map((row) => [row.brokerId, row.id]));
 
   return {
+    onDuty: workspace.duty,
     branchId: context.branchId,
     branchName: branchRows[0]?.name ?? null,
     team: teamRows[0] ?? null,

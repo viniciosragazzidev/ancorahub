@@ -3,6 +3,7 @@ import "server-only";
 import { and, desc, eq, gte, isNull, lt, ne, or } from "drizzle-orm";
 
 import { getCachedBrokerWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
+import type { BrokerActiveDuty } from "@/features/broker-workspace/queries";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -66,6 +67,16 @@ export async function getDutyNow(now = new Date(), scheduleId?: string | null): 
   // The plantão asked for (?plantao=), else the first one running.
   const active = running.find((duty) => duty.scheduleId === scheduleId) ?? running[0];
   if (!active || context.role !== "broker") return null;
+  return loadDutyNow({ tenantId: context.tenantId, brokerId: context.userId, now, running, active });
+}
+
+/**
+ * The leads of one broker in one plantão that is running now (the broker's own, or a broker
+ * of the viewer's scope when a supervisor or the gestor opens it). `running` is every plantão
+ * the broker has now; the first one decides which leads without a plantão belong here.
+ */
+export async function loadDutyNow(input: { tenantId: string; brokerId: string; now: Date; running: BrokerActiveDuty[]; active: BrokerActiveDuty }): Promise<DutyNow> {
+  const { tenantId, brokerId, now, running, active } = input;
   const db = getDatabase();
 
   const [offers, assigned] = await Promise.all([
@@ -81,8 +92,8 @@ export async function getDutyNow(now = new Date(), scheduleId?: string | null): 
     }).from(schema.leadOffers)
       .innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, schema.leadOffers.tenantId)))
       .where(and(
-        eq(schema.leadOffers.tenantId, context.tenantId),
-        eq(schema.leadOffers.brokerId, context.userId),
+        eq(schema.leadOffers.tenantId, tenantId),
+        eq(schema.leadOffers.brokerId, brokerId),
         eq(schema.leadOffers.dutyScheduleId, active.scheduleId),
         isNull(schema.leads.deletedAt),
         ne(schema.leadOffers.status, "CANCELLED"),
@@ -94,8 +105,8 @@ export async function getDutyNow(now = new Date(), scheduleId?: string | null): 
     db.select({ leadId: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, assignedAt: schema.leads.assignedAt, serviceStartedAt: schema.leads.serviceStartedAt })
       .from(schema.leads)
       .where(and(
-        eq(schema.leads.tenantId, context.tenantId),
-        eq(schema.leads.corretorId, context.userId),
+        eq(schema.leads.tenantId, tenantId),
+        eq(schema.leads.corretorId, brokerId),
         isNull(schema.leads.deletedAt),
         // Only leads of this plantão (or with no plantão): with PME and Presencial
         // at once, a lead offered in one showed up in the other as "atribuído".
@@ -115,7 +126,7 @@ export async function getDutyNow(now = new Date(), scheduleId?: string | null): 
     if (byLead.has(offer.leadId)) continue;
     const overdue = !offer.acceptedAt && ["PENDING", "SENT", "DELIVERED", "READ"].includes(offer.status) && offer.expiresAt <= now;
     const label = overdue ? { status: "Expirou", tone: "lost" as const } : OFFER_LABEL[offer.status] ?? { status: offer.status, tone: "wait" as const };
-    const stillMine = Boolean(offer.acceptedAt) && offer.leadOwner === context.userId;
+    const stillMine = Boolean(offer.acceptedAt) && offer.leadOwner === brokerId;
     byLead.set(offer.leadId, {
       leadId: offer.leadId,
       name: offer.name,
@@ -135,7 +146,7 @@ export async function getDutyNow(now = new Date(), scheduleId?: string | null): 
   const leads = [...byLead.values()].sort((a, b) => b.at.getTime() - a.at.getTime());
   // A lead of this plantão already moved past "novo/distribuído" = service started.
   const startedIds = new Set([
-    ...offers.filter((offer) => offer.acceptedAt && offer.leadOwner === context.userId && !NOT_STARTED.includes(offer.leadStatus)).map((offer) => offer.leadId),
+    ...offers.filter((offer) => offer.acceptedAt && offer.leadOwner === brokerId && !NOT_STARTED.includes(offer.leadStatus)).map((offer) => offer.leadId),
     ...assigned.filter((lead) => !NOT_STARTED.includes(lead.status)).map((lead) => lead.leadId),
   ]);
   const offerRows = leads.filter((lead) => lead.origin === "oferta");
