@@ -36,7 +36,7 @@ export function LeadActionBar({ lead, c, inline = false }: { lead: LightLeadDeta
       aria-label="Ações do lead"
       className={inline ? "arc-venancor" : "arc-venancor fixed inset-x-4 bottom-[calc(22px+var(--mobile-safe-bottom))] z-40 md:left-[calc(72px+1rem)]"}
     >
-      <div className={inline ? "flex items-center gap-2" : "mx-auto flex max-w-2xl items-center gap-2 rounded-full bg-(--surface)/86 p-2 shadow-(--shadow-floating) backdrop-blur-xl backdrop-saturate-150"}>
+      <div className={inline ? "flex w-full flex-wrap items-center gap-2" : "mx-auto flex max-w-2xl items-center gap-2 rounded-full bg-(--surface)/86 p-2 shadow-(--shadow-floating) backdrop-blur-xl backdrop-saturate-150"}>
         {isDistributed ? (
           <>
             <Button variant="secondary" disabled={accepting} onClick={() => setShowDeclineModal(true)}>

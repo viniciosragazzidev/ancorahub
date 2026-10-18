@@ -60,8 +60,17 @@ export function ChatScreen({
   instant = false,
   tourTargets,
   fill = false,
+  embedded = false,
+  emptyText,
 }: {
   identity: Identity;
+  /**
+   * Inside the lead screen (2026-10-18): the columns already show who it is and what to do, so the
+   * conversation is only the history (no header, no composer), already scrolled to the newest message.
+   */
+  embedded?: boolean;
+  /** Shown when the conversation has nothing yet (embedded history). */
+  emptyText?: string;
   /** Fills the column that holds it (lead page, computer and phone) instead of the whole viewport. */
   fill?: boolean;
   backHref: string;
@@ -95,8 +104,8 @@ export function ChatScreen({
   const initial = useMemo(() => script.blocks.filter((block) => !hidden.has(block.id)), [hidden, script.blocks]);
 
   // Blocks already on screen, and the queue still to be "typed".
-  const [shown, setShown] = useState<ChatBlock[]>(() => (reduce || instant ? initial : initial.slice(0, 1)));
-  const [queue, setQueue] = useState<ChatBlock[]>(() => (reduce || instant ? [] : initial.slice(1)));
+  const [shown, setShown] = useState<ChatBlock[]>(() => (reduce || instant || embedded ? initial : initial.slice(0, 1)));
+  const [queue, setQueue] = useState<ChatBlock[]>(() => (reduce || instant || embedded ? [] : initial.slice(1)));
   const firstScroll = useRef(true);
   const [typing, setTyping] = useState(false);
   const [working, setWorking] = useState(false);
@@ -305,8 +314,8 @@ export function ChatScreen({
     ?? (lastQuestion && !answers[lastQuestion.id] ? "Responda aqui ou escolha uma opção acima" : script.composerPlaceholder ?? `Escreva para ${identity.name}`);
 
   return (
-    <div className={`${styles.root} ${fill ? styles.screenFill : styles.screen}`}>
-      <header className={styles.header}>
+    <div className={`${styles.root} ${embedded ? styles.screenEmbedded : fill ? styles.screenFill : styles.screen}`}>
+      {embedded ? null : <header className={styles.header}>
         {/* History first (never stacks a new entry, so back never loops between two screens); parent when opened from outside. */}
         {fill ? null : <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => goBackInApp(router, backHref)}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -324,11 +333,12 @@ export function ChatScreen({
           </div>
         </div>
         <div>{headerAction}</div>
-      </header>
+      </header>}
 
       <div ref={scrollRef} className={styles.scroll} aria-live="polite" aria-relevant="additions">
         {topNotice ? <div className={styles.topNotice}>{topNotice}</div> : null}
         <div data-tour={tourTargets?.conversation} className={styles.thread_}>
+          {embedded && emptyText && !shown.length ? <p className={styles.emptyThread}>{emptyText}</p> : null}
           {shown.map((block) => (
             <BlockRow key={block.id} block={block} chosenId={block.type === "question" ? answers[block.id] ?? null : null} working={working} handlers={rowHandlers} />
           ))}
@@ -344,7 +354,7 @@ export function ChatScreen({
         </div>
       </div>
 
-      <Composer
+      {embedded ? null : <Composer
         placeholder={placeholder}
         progress={progress}
         progressMascot={{ shape: identity.shape, hue: identity.hue }}
@@ -360,7 +370,7 @@ export function ChatScreen({
           try { enqueue(await onFreeText(text)); } finally { setWorking(false); }
         }}
         onMention={mention}
-      />
+      />}
     </div>
   );
 }

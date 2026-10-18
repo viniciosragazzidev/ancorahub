@@ -293,6 +293,7 @@ export function buildLeadConversationScript({
   messages = [],
   advice = null,
   hideArrival = false,
+  panel = false,
 }: {
   lead: LeadConversationLead;
   events: LeadConversationEvent[];
@@ -304,6 +305,12 @@ export function buildLeadConversationScript({
   advice?: LeadConversationAdvice | null;
   /** Brokers do not see when the lead reached the brokerage, nor the dates and times of the conversation. */
   hideArrival?: boolean;
+  /**
+   * The lead screen beside the conversation (2026-10-18): the header, the next step card with its buttons, the AI
+   * suggestion and the client data already sit in the columns, so the chat is only the history (Vinicios: "sugestão
+   * da IA aparecendo duas vezes").
+   */
+  panel?: boolean;
 }): ChatScript {
   const origin = originLabel(lead);
   const rows = factRows(lead);
@@ -329,10 +336,10 @@ export function buildLeadConversationScript({
 
   const blocks: ChatBlock[] = [
     ...(hideArrival ? [] : [{ type: "date" as const, id: "d-created", label: dateLabel(lead.createdAt, now) }]),
-    { type: "system", id: "s-arrived", strong: lead.nome, text: `chegou${origin ? ` ${origin}` : ""}` },
+    ...(panel ? [] : [{ type: "system" as const, id: "s-arrived", strong: lead.nome, text: `chegou${origin ? ` ${origin}` : ""}` }]),
   ];
-  if (rows.length) blocks.push({ type: "facts", id: "f-lead", title: lead.nome, subtitle: LEAD_STATUS_LABELS[lead.status] ?? lead.status, rows, href: `/leads/${lead.id}?ficha=1`, hrefLabel: "Ver ficha" });
-  if (lead.summary) blocks.push({ type: "assistant", id: "a-summary", text: lead.summary });
+  if (rows.length && !panel) blocks.push({ type: "facts", id: "f-lead", title: lead.nome, subtitle: LEAD_STATUS_LABELS[lead.status] ?? lead.status, rows, href: `/leads/${lead.id}?ficha=1`, hrefLabel: "Ver ficha" });
+  if (lead.summary && !panel) blocks.push({ type: "assistant", id: "a-summary", text: lead.summary });
 
   let lastDay = dayKey(lead.createdAt);
   for (const entry of history) {
@@ -345,7 +352,8 @@ export function buildLeadConversationScript({
     blocks.push(entry.block);
   }
 
-  blocks.push(...nextStep(lead, now, whatsappUrl, advice));
+  // In the panel the next step card and its buttons (Aceitar, WhatsApp, Etapa) do this.
+  if (!panel) blocks.push(...nextStep(lead, now, whatsappUrl, advice));
 
   const waiting = lead.isCurrentBroker && (lead.status === "distributed" || lead.status === "new" || IN_SERVICE.has(lead.status));
   return {

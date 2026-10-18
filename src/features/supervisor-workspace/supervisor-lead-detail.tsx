@@ -115,7 +115,7 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
   const showCobrar = !isManager && Boolean(cobrar) && !(urgentWait && cobrar);
 
   return (
-    <div className="arc-venancor">
+    <div className="arc-venancor h-full min-h-0">
       <LeadSocialLayout
         header={
           <div className="flex flex-col gap-3">

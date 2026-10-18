@@ -94,15 +94,11 @@ export function LightLeadDetail({
       <>
         <LeadSocialLayout
           header={<LeadHeaderBar name={lead.nome} statusLabel={stageLabel(c.leadStatus)} statusTone={statusTone} arrival={arrival} />}
-          next={
-            <div className="flex flex-col gap-4">
-              <NextStepCard step={step} />
-              <LeadActionBar lead={lead} c={c} inline />
-            </div>
-          }
+          // One card: what to do now and its buttons (Aceitar, WhatsApp, Etapa) right under it.
+          next={<NextStepCard step={step} action={<LeadActionBar lead={lead} c={c} inline />} />}
           details={
             <div className="flex flex-col gap-4">
-              <ClientInfoCard lead={lead} c={c} />
+              <ClientInfoCard lead={lead} c={c} withSummary />
               <SaleSection c={c} />
             </div>
           }

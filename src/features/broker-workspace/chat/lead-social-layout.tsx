@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
@@ -8,13 +8,21 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 
 import styles from "./lead-social.module.css";
 
+type Mode = "phone" | "two" | "three";
+
+/**
+ * The layout follows the width it really has, not the window: on computers the conversation list
+ * takes 360px on the left (Vinicios, 18/10: spacing and scroll broken at 1440).
+ */
+export const modeForWidth = (width: number): Mode => (width >= 1180 ? "three" : width >= 720 ? "two" : "phone");
+
 /**
  * The whole lead on one screen, like a social app (Vinicios, 17/10). Slots:
- * header (who and when it arrived), next (the next step), details (the client's full data),
- * side (actions and timeline), conversation (the chat).
+ * header (who and when it arrived), next (the next step and its buttons), details (the client's full data),
+ * side (timeline, tasks), conversation (the chat history).
  *
- * Computer 1280+: details | conversation | next and side, each column with its own scroll.
- * Computer 1024-1279: header, next, details and side in one column, conversation beside it.
+ * Wide (1180px+ of room): details | conversation | next and side, each column with its own scroll.
+ * Medium (720px+): header, next, details and side in one column, conversation beside it.
  * Phone: header, next step and conversation; the full data opens in a sheet.
  */
 export function LeadSocialLayout({ header, next, details, side, conversation }: {
@@ -24,54 +32,82 @@ export function LeadSocialLayout({ header, next, details, side, conversation }: 
   side?: ReactNode;
   conversation: ReactNode;
 }) {
-  const wide = useMediaQuery("(min-width: 1024px)");
-  const xl = useMediaQuery("(min-width: 1280px)");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [measured, setMeasured] = useState<Mode | null>(null);
+  // Without a measurable box (no layout yet, tests): the window decides.
+  const wideWindow = useMediaQuery("(min-width: 1024px)");
+  const mode = measured;
 
-  if (!wide) {
-    return (
-      <div className={styles.mobile}>
-        <div className={styles.mobileTop}>
-          {header}
+  // Measured before the first paint, then on every resize (rail, window, zoom).
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const measure = () => {
+      const width = root.getBoundingClientRect().width;
+      setMeasured(width > 0 ? modeForWidth(width) : wideWindow ? "two" : "phone");
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [wideWindow]);
+
+  const conversationColumn = (
+    <section className={styles.conversation} aria-labelledby="lead-conversation-title">
+      <h2 id="lead-conversation-title" className={styles.conversationTitle}>Conversa no WhatsApp</h2>
+      <div className={styles.conversationBody}>{conversation}</div>
+    </section>
+  );
+
+  let body: ReactNode = null;
+  if (mode === "phone") {
+    body = (
+      <div className={styles.phone}>
+        <div className={styles.phoneTop}>
+          <div className={styles.phoneHeader}>
+            <div className={styles.phoneHeaderMain}>{header}</div>
+            {details || side ? (
+              <BottomSheet trigger={<Button variant="secondary" size="sm" className="min-h-11 shrink-0">Ver dados</Button>} title="Dados do cliente" detents={[0.92]}>
+                <div className="flex flex-col gap-4 pb-6">
+                  {details}
+                  {side}
+                </div>
+              </BottomSheet>
+            ) : null}
+          </div>
           {next}
-          {details || side ? (
-            <BottomSheet trigger={<Button variant="secondary" className="min-h-11 w-full">Ver dados do cliente</Button>} title="Dados do cliente" detents={[0.92]}>
-              <div className="flex flex-col gap-4">
-                {details}
-                {side}
-              </div>
-            </BottomSheet>
-          ) : null}
         </div>
-        <div className={styles.conversation}>{conversation}</div>
+        {conversationColumn}
       </div>
     );
-  }
-
-  if (xl) {
-    return (
-      <div className={styles.wideXl}>
+  } else if (mode === "three") {
+    body = (
+      <div className={styles.three}>
         <div className={styles.column}>
           {header}
           {details}
         </div>
-        <div className={styles.conversation}>{conversation}</div>
+        {conversationColumn}
         <div className={styles.column}>
           {next}
           {side}
         </div>
       </div>
     );
+  } else if (mode === "two") {
+    body = (
+      <div className={styles.two}>
+        <div className={styles.column}>
+          {header}
+          {next}
+          {details}
+          {side}
+        </div>
+        {conversationColumn}
+      </div>
+    );
   }
 
-  return (
-    <div className={styles.wide}>
-      <div className={styles.column}>
-        {header}
-        {next}
-        {details}
-        {side}
-      </div>
-      <div className={styles.conversation}>{conversation}</div>
-    </div>
-  );
+  return <div ref={rootRef} className={styles.root} data-mode={mode ?? "measuring"}>{body}</div>;
 }

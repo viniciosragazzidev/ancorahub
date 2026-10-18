@@ -39,11 +39,13 @@ export function LeadConversation({
   const desktop = useMediaQuery("(min-width: 1024px) and (pointer: fine)");
   const [firstMessageOpen, setFirstMessageOpen] = useState(false);
   return (
-    <div className="arc-venancor">
+    <div className="arc-venancor h-full min-h-0">
       <ChatScreen
         identity={{ name, shape: "mochi", hue: null, initials }}
         backHref="/dashboard"
         fill
+        embedded
+        emptyText="A conversa com o cliente aparece aqui. Aceite o lead e chame no WhatsApp para começar."
         script={script}
         tourTargets={{ conversation: "micro-conv-messages", composer: "micro-conv-composer" }}
         // The lead page works by the replies above (Vinicios, 2026-10-12): no free text here.

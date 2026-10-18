@@ -83,6 +83,9 @@
 /* ---------- screen ---------- */
 .screen { height: var(--app-dvh, 100dvh); min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--surface); }
 /* The same conversation inside a column (lead page, 2026-10-17): fills its column, not the viewport. */
+/* Only the history inside the lead screen (2026-10-18): no header, no composer. */
+.screenEmbedded { height: 100%; min-height: 0; overflow: hidden; display: grid; grid-template-rows: minmax(0, 1fr); background: var(--surface); }
+.emptyThread { margin: auto 0; padding: 48px 24px; text-align: center; color: var(--text-muted); font-size: var(--text-sm); line-height: 1.5; }
 .screenFill { height: 100%; min-height: 0; overflow: hidden; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; background: var(--surface); }
 .header {
   position: sticky; top: 0; z-index: 5; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px;

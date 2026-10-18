@@ -57,27 +57,32 @@ const qualificationLabels: Record<string, string> = {
   completed: "Concluída",
 };
 
-export function ClientInfoCard({ lead, c, mode = "broker" }: { lead: LightLeadDetailData; c: LeadDetailController; mode?: "broker" | "management" }) {
+export function ClientInfoCard({ lead, c, mode = "broker", withSummary = false }: { lead: LightLeadDetailData; c: LeadDetailController; mode?: "broker" | "management"; /** The AI summary on top (lead screen, where the chat no longer repeats it). */ withSummary?: boolean }) {
   // Contact data stays hidden until the broker accepts.
   const info = (lead.clientInfo ?? []).filter((item) => !(mode === "management" || c.isDistributed) || item.key !== "email");
   const qualification = lead.qualificationStatus ?? lead.qualificationState;
   const normalizedQualification = qualification?.toLowerCase() ?? "";
   const qualificationLabel = qualification ? qualificationLabels[normalizedQualification] ?? qualification.replaceAll("_", " ") : null;
-  if (!info.length && !qualificationLabel) return null;
+  const summary = withSummary ? lead.summary : null;
+  if (!info.length && !qualificationLabel && !summary) return null;
   return (
     <section aria-labelledby="client-info-heading" className="arc-venancor rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
       <h2 id="client-info-heading" className="text-base font-semibold text-(--foreground)">
         Informações do cliente
       </h2>
+      {summary ? <p className="mt-2 text-sm leading-relaxed text-(--text-secondary)">{summary}</p> : null}
       {qualificationLabel ? <p className="mt-2 text-sm text-(--text-secondary)">Qualificação: <span className="font-medium text-(--foreground)">{qualificationLabel}</span></p> : null}
-      <dl className="mt-3 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-        {info.map((item) => (
-          <div key={item.key} className="min-w-0">
-            <dt className="text-sm text-(--text-secondary)">{item.label}</dt>
-            <dd className="break-words text-sm font-medium text-(--foreground)">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
+      {/* Label and value on one line: reads well in a narrow column and in the phone sheet. */}
+      {info.length ? (
+        <dl className="mt-3 flex flex-col">
+          {info.map((item) => (
+            <div key={item.key} className="flex min-w-0 items-baseline justify-between gap-4 py-2">
+              <dt className="shrink-0 text-sm text-(--text-secondary)">{item.label}</dt>
+              <dd className="min-w-0 break-words text-right text-sm font-medium text-(--foreground)">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
     </section>
   );
 }

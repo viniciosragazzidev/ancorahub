@@ -22,6 +22,6 @@ describe("LeadSocialLayout", () => {
     expect(screen.getByText("Cabeçalho da Maria")).toBeTruthy();
     expect(screen.getByText("Responder o cliente")).toBeTruthy();
     expect(screen.getByText("Conversa com a Maria")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Ver dados do cliente" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ver dados" })).toBeTruthy();
   });
 });

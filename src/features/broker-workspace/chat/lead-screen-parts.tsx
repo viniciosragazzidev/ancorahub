@@ -25,7 +25,7 @@ export function LeadHeaderBar({ name, statusLabel, statusTone = "neutral", arriv
     <header className="arc-venancor flex min-w-0 items-center gap-3" aria-label="Lead">
       <Avatar name={name} size="lg" />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <h1 className="truncate text-lg font-bold tracking-tight text-(--foreground)">{name}</h1>
+        <h1 className="line-clamp-2 break-words text-lg font-bold leading-tight tracking-tight text-(--foreground)">{name}</h1>
         {subline ? <p className="truncate text-sm text-(--text-secondary)">{subline}</p> : null}
         {/* The arrival is a full sentence: plain text that wraps, never a pill cut in half. */}
         {arrival ? (

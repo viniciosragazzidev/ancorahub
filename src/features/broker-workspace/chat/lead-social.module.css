@@ -1,53 +1,40 @@
-/* Lead as a social-network screen (Vinicios, 17/10). Tokens only, no drawn borders, one scroll per column. */
+/* Lead as a social-network screen (Vinicios, 17/10; spacing and scroll redone 18/10).
+   Tokens only, no drawn borders. It fills the screen that holds it (height: 100%), never the viewport:
+   the Lite shell already sizes that screen. One scroll per column; the page itself never scrolls. */
 
-.mobile {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  height: var(--app-dvh, 100dvh);
-  min-height: 0;
-  background: var(--surface);
-}
+@keyframes leadIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
-.mobileTop {
-  display: grid;
-  gap: 12px;
-  align-content: start;
-  max-height: 50dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 12px 16px 14px;
+.root { height: 100%; min-height: 0; background: var(--surface); }
+.root[data-mode="measuring"] { visibility: hidden; }
+.phone, .two, .three { animation: leadIn 200ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+@media (prefers-reduced-motion: reduce) { .phone, .two, .three { animation: none; } }
+
+/* Phone: compact top (who, when, what to do) and the conversation takes the rest. */
+.phone { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100%; min-height: 0; }
+.phoneTop {
+  display: grid; gap: 12px; align-content: start;
+  max-height: 55dvh; overflow-y: auto; overscroll-behavior: contain;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 14px;
   background: var(--surface-muted);
 }
+.phoneHeader { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.phoneHeaderMain { flex: 1; min-width: 0; }
 
-.wide,
-.wideXl {
-  display: grid;
-  height: var(--app-dvh, 100dvh);
-  min-height: 0;
-  background: var(--surface);
-}
-
-.wide {
-  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-}
-
-.wideXl {
-  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) minmax(300px, 360px);
-}
+/* Computers: fixed-height columns, each one scrolls on its own. */
+.two, .three { display: grid; height: 100%; min-height: 0; }
+.two { grid-template-columns: minmax(320px, 380px) minmax(0, 1fr); }
+.three { grid-template-columns: minmax(300px, 360px) minmax(0, 1fr) minmax(300px, 360px); }
 
 .column {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+  min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 24px 20px 32px;
   background: var(--surface-muted);
+  scrollbar-width: thin;
 }
+/* Cards keep their height inside the column (no squeezing when the column scrolls). */
+.column > * { flex-shrink: 0; }
 
-.conversation {
-  min-width: 0;
-  min-height: 0;
-  height: 100%;
-}
+.conversation { display: grid; grid-template-rows: auto minmax(0, 1fr); min-width: 0; min-height: 0; height: 100%; background: var(--surface); }
+.conversationTitle { margin: 0; padding: 16px 20px 4px; color: var(--text-muted); font-size: var(--text-sm); font-weight: 600; }
+.conversationBody { min-height: 0; height: 100%; }

@@ -78,6 +78,9 @@ export function TeamLeadConversation({ conversation, brokerWhatsAppConnected, fi
           composerDisabled
           instant
           fill={fill}
+          // Inside the lead screen the header above already names the lead: only the history here.
+          embedded={fill}
+          emptyText="Ainda não há mensagens nesta conversa."
         />
       </div>
     </section>
