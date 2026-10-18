@@ -1,16 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 
-import { Avatar } from "@/components/arc/avatar/avatar";
-import { AnimatedCounter } from "@/components/arc/animated-counter/animated-counter";
+import { Badge } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
-import { SearchField } from "@/components/arc/search-field/search-field";
-import { AssistantAvatar } from "@/components/chat/assistant-avatar";
-import { LitePageEnter, LiteList, LiteListItem } from "@/components/light/light-motion";
+import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection, PeopleStats } from "@/components/light/people-list/people-list";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 export type LightClientItem = {
@@ -28,12 +22,12 @@ type StatusFilter = "all" | "active" | "cancelled";
 
 /** Pill on the row, the same small rounded tag the broker's lead list uses. */
 const statusPill = {
-  active: { label: "Cliente ativo", className: "bg-(--surface-muted) text-(--chat-action-text)" },
-  cancelled: { label: "Cancelado", className: "bg-(--surface-muted) text-(--text-secondary)" },
+  active: { label: "Cliente ativo", tone: "info" },
+  cancelled: { label: "Cancelado", tone: "neutral" },
 } as const;
 
 const secondaryAction =
-  "inline-flex h-11 items-center justify-center rounded-full bg-(--surface-muted) px-4 text-sm font-semibold text-(--foreground)";
+  "inline-flex h-10 items-center justify-center rounded-full bg-(--surface-muted) px-4 text-sm font-semibold text-(--foreground)";
 
 const monthFormat = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric", timeZone: "America/Sao_Paulo" });
 
@@ -44,7 +38,7 @@ function monthLabel(value: Date | string) {
 }
 
 /**
- * Clientes of the broker: search, then one white card per client with WhatsApp and Abrir.
+ * Clientes of the broker in the phone-book list: one row per client (opens the client) with WhatsApp beside it.
  * `management`: the gestor and supervisor screen (big title, count blocks and months as groups);
  * the broker keeps the compact header and the flat list.
  */
@@ -76,124 +70,72 @@ export function LightClientsList({ clients, management = false }: { clients: Lig
 
   const searching = searchQuery.trim().length > 0;
 
-  function renderClient(client: LightClientItem) {
+  function renderClient(client: LightClientItem, index: number) {
     const convertedDate = new Date(client.convertedAt).toLocaleDateString("pt-BR", {
       day: "2-digit",
       month: "2-digit",
-      year: "numeric",
       timeZone: "America/Sao_Paulo",
     });
     const waUrl = buildWhatsAppUrl(client.phone);
+    const pill = management && client.status && client.status in statusPill ? statusPill[client.status as keyof typeof statusPill] : null;
 
     return (
-      <LiteListItem key={client.id} className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
-        <div className="flex min-w-0 items-center gap-3">
-          <Avatar name={client.name} size="lg" className="light-avatar" />
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-2">
-              <p className="truncate text-base font-semibold text-(--foreground)">{client.name}</p>
-              {management && client.status && client.status in statusPill ? (
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusPill[client.status as keyof typeof statusPill].className}`}>
-                  {statusPill[client.status as keyof typeof statusPill].label}
-                </span>
-              ) : null}
-            </div>
-            <p className="text-sm tabular-nums text-(--text-secondary)">Venda concluída em {convertedDate}</p>
-            {client.brokerName ? <p className="text-sm text-(--text-secondary)">Com {client.brokerName}</p> : null}
-            {client.phone ? <p className="text-sm tabular-nums text-(--text-secondary)">{client.phone}</p> : null}
-          </div>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          {waUrl ? (
-            <a href={waUrl} target="_blank" rel="noopener noreferrer" className={`${secondaryAction} sm:flex-1`}>
-              WhatsApp
-            </a>
-          ) : null}
-          <Link href={`/clientes/${client.id}`} className={`${secondaryAction} sm:flex-1`}>
-            Abrir cliente
-          </Link>
-        </div>
-      </LiteListItem>
+      <PeopleRow
+        key={client.id}
+        index={index}
+        href={`/clientes/${client.id}`}
+        name={client.name}
+        chip={pill ? <Badge tone={pill.tone} size="sm">{pill.label}</Badge> : client.brokerName ?? undefined}
+        preview={[client.brokerName && pill ? `Com ${client.brokerName}` : null, client.phone].filter(Boolean).join(" · ") || "Venda concluída"}
+        meta={convertedDate}
+        action={waUrl ? <a href={waUrl} target="_blank" rel="noopener noreferrer" className={secondaryAction}>WhatsApp</a> : undefined}
+      />
     );
   }
 
+  const countLabel = clients.length === 1 ? "1 cliente conquistado" : `${clients.length} clientes conquistados`;
+
   return (
-    <LitePageEnter className="flex min-h-full flex-col text-foreground">
-      <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-6 pt-2 sm:px-6">
-        {management ? (
-          <header className="flex flex-col gap-1">
-            <h1 className="text-[2rem] font-semibold leading-tight tracking-tight text-(--foreground)">Clientes</h1>
-            <p className="text-sm text-(--text-secondary)">
-              {clients.length === 1 ? "1 cliente conquistado" : `${clients.length} clientes conquistados`}
-            </p>
-          </header>
+    <PeoplePage title="Clientes" hideTitle={!management} subtitle={countLabel}>
+      {management ? (
+        <PeopleStats items={[
+          { value: clients.length, label: "Clientes" },
+          { value: new Set(clients.map((client) => client.brokerName ?? "")).size, label: "Corretores com clientes" },
+        ]} />
+      ) : null}
+
+      <PeopleFilters
+        label="Filtrar clientes por situação"
+        options={management ? [
+          { id: "all" as StatusFilter, label: "Todos", count: clients.length },
+          { id: "active" as StatusFilter, label: "Ativos", count: activeCount },
+          { id: "cancelled" as StatusFilter, label: "Cancelados", count: cancelledCount },
+        ] : undefined}
+        value={filter}
+        onChange={setFilter}
+        search={searchQuery}
+        onSearch={setSearchQuery}
+        searchPlaceholder="Buscar por nome ou telefone"
+        searchLabel="Buscar cliente"
+      />
+
+      {filteredClients.length > 0 ? (
+        management ? (
+          groups.map((group) => (
+            <PeopleSection key={group.label} id={`clientes-${group.label}`} title={group.label} count={group.items.length}>
+              {group.items.map(renderClient)}
+            </PeopleSection>
+          ))
         ) : (
-          <header>
-            <h1 className="sr-only">Clientes</h1>
-            <p className="text-sm text-(--text-secondary)">
-              {clients.length === 1 ? "1 cliente conquistado" : `${clients.length} clientes conquistados`}
-            </p>
-          </header>
-        )}
-
-        {management ? (
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-(--surface-muted) p-4">
-              <p className="text-2xl font-semibold tabular-nums text-(--foreground)"><AnimatedCounter value={clients.length} locale="pt-BR" /></p>
-              <p className="text-xs text-(--text-secondary)">Clientes</p>
-            </div>
-            <div className="rounded-2xl bg-(--surface-muted) p-4">
-              <p className="text-2xl font-semibold tabular-nums text-(--foreground)"><AnimatedCounter value={new Set(clients.map((client) => client.brokerName ?? "")).size} locale="pt-BR" /></p>
-              <p className="text-xs text-(--text-secondary)">Corretores com clientes</p>
-            </div>
-          </div>
-        ) : null}
-
-        <SearchField label="Buscar cliente" placeholder="Nome ou telefone" value={searchQuery} onValueChange={setSearchQuery} />
-
-        {management ? (
-          <SegmentedControl
-            label="Filtrar clientes por situação"
-            options={[
-              { value: "all", label: `Todos ${clients.length}` },
-              { value: "active", label: `Ativos ${activeCount}` },
-              { value: "cancelled", label: `Cancelados ${cancelledCount}` },
-            ]}
-            value={filter}
-            onValueChange={(value) => setFilter(value as StatusFilter)}
-          />
-        ) : null}
-
-        {filteredClients.length > 0 ? (
-          management ? (
-            <div className="flex flex-col gap-4">
-              {groups.map((group) => (
-                <section key={group.label} aria-label={group.label} className="flex flex-col gap-3">
-                  <p className="flex items-center gap-2 text-sm font-medium text-(--text-secondary)">
-                    {group.label}
-                    <span className="rounded-full bg-(--surface-muted) px-2 py-0.5 text-xs tabular-nums text-(--foreground)">{group.items.length}</span>
-                  </p>
-                  <LiteList className="flex flex-col gap-3" label={`Clientes de ${group.label}`}>
-                    {group.items.map(renderClient)}
-                  </LiteList>
-                </section>
-              ))}
-            </div>
-          ) : (
-            <LiteList className="flex flex-col gap-3" label="Clientes">
-              {filteredClients.map(renderClient)}
-            </LiteList>
-          )
-        ) : (
-          <EmptyState
-            label="Lista de clientes vazia"
-            icon={<AssistantAvatar shape="logo" hue={null} size={56} />}
-            title={searching ? `Nenhum resultado para "${searchQuery.trim()}"` : "Nenhum cliente ainda"}
-            description={searching ? "Tente outro nome ou telefone." : "Quando você concluir uma venda, o cliente aparece aqui."}
-            action={searching ? <Button variant="secondary" onClick={() => setSearchQuery("")}>Limpar busca</Button> : undefined}
-          />
-        )}
-      </div>
-    </LitePageEnter>
+          <PeopleSection label="Clientes">{filteredClients.map(renderClient)}</PeopleSection>
+        )
+      ) : (
+        <PeopleEmpty
+          title={searching ? `Nenhum resultado para "${searchQuery.trim()}"` : "Nenhum cliente ainda"}
+          description={searching ? "Tente outro nome ou telefone." : "Quando você concluir uma venda, o cliente aparece aqui."}
+          action={searching ? <Button variant="secondary" onClick={() => setSearchQuery("")}>Limpar busca</Button> : undefined}
+        />
+      )}
+    </PeoplePage>
   );
 }

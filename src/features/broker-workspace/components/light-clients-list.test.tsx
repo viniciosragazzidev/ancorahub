@@ -33,13 +33,13 @@ const clients: LightClientItem[] = [
 afterEach(() => cleanup());
 
 describe("LightClientsList", () => {
-  it("counts the clients, keeps the screen title only for assistive tech and links each card", () => {
+  it("counts the clients, keeps the screen title only for assistive tech and links each row", () => {
     render(<LightClientsList clients={clients} />);
 
     expect(screen.getByText("2 clientes conquistados")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "Clientes" }).className).toContain("sr-only");
     expect(screen.getByRole("link", { name: "WhatsApp" }).getAttribute("href")).toContain("wa.me/");
-    expect(screen.getAllByRole("link", { name: "Abrir cliente" })).toHaveLength(2);
+    expect(screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/clientes/"))).toHaveLength(2);
   });
 
   it("offers WhatsApp only to clients with a phone", () => {
@@ -82,6 +82,6 @@ describe("LightClientsList", () => {
     fireEvent.click(screen.getByRole("button", { name: /Cancelados/ }));
     expect(screen.queryByText("Marina Alves")).toBeNull();
     expect(screen.getByText("Paulo Dias")).toBeTruthy();
-    expect(screen.getAllByRole("link", { name: "Abrir cliente" })).toHaveLength(1);
+    expect(screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/clientes/"))).toHaveLength(1);
   });
 });

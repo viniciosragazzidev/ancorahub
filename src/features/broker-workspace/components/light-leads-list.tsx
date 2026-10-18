@@ -1,15 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
-import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import { SearchField } from "@/components/arc/search-field/search-field";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 import { AcceptLeadButton } from "@/features/broker-workspace/components/accept-lead-button";
 
@@ -96,11 +92,8 @@ function describeLead(lead: LightLeadItem): LeadState {
   return { tone: "neutral", chip: stage, context: lead.productName ? `${lead.productName}${lead.city ? ` em ${lead.city}` : ""}` : stage };
 }
 
-const actionPrimary =
-  "inline-flex h-11 w-full items-center justify-center rounded-full bg-(--accent) px-5 text-sm font-semibold text-(--accent-foreground) disabled:opacity-60 sm:w-auto";
-const actionSecondary =
-  "inline-flex h-11 w-full items-center justify-center rounded-full bg-(--surface-muted) px-5 text-sm font-semibold text-(--foreground) sm:w-auto";
-
+const acceptButton =
+  "inline-flex h-10 items-center justify-center rounded-full bg-(--accent) px-4 text-sm font-semibold text-(--accent-foreground) disabled:opacity-60";
 
 function arrival(lead: LightLeadItem) {
   const value = lead.arrivedAt ?? lead.createdAt;
@@ -113,49 +106,23 @@ function sortByArrival(leads: LightLeadItem[]) {
   return [...leads].sort((a, b) => (arrival(b)?.getTime() ?? 0) - (arrival(a)?.getTime() ?? 0));
 }
 
-function NeedsYouCard({ lead, dataTour }: { lead: LightLeadItem; dataTour?: string }) {
+/** A lead in the phone-book list: who it is, where it stands and, when new, the accept button beside it. */
+function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number; dataTour?: string }) {
   const state = describeLead(lead);
+  const urgent = needsYouNow(lead);
   return (
-    <li data-tour={dataTour} className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
-      <div className="flex items-start gap-3">
-        <Avatar name={lead.name} size="lg" className="light-avatar" />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-semibold text-(--foreground)">{lead.name}</p>
-          <p className="mt-0.5 text-sm text-(--text-secondary)">{withDuty(state.context, lead)}</p>
-        </div>
-        <Badge tone={state.tone}>{state.chip}</Badge>
-      </div>
-      {isNewLead(lead) ? (
-        <AcceptLeadButton leadId={lead.id} className={actionPrimary}>
-          Aceitar lead
-        </AcceptLeadButton>
-      ) : (
-        <Link
-          href={lead.isAwaitingResponse ? `/conversas/broker?leadId=${lead.id}` : `/leads/${lead.id}`}
-          className={actionSecondary}
-        >
-          {lead.isAwaitingResponse ? "Ver conversa" : "Atualizar etapa"}
-        </Link>
-      )}
-    </li>
-  );
-}
-
-function CompactRow({ lead, dataTour }: { lead: LightLeadItem; dataTour?: string }) {
-  const state = describeLead(lead);
-  return (
-    <li data-tour={dataTour} className="border-b border-(--border) last:border-b-0">
-      <Link href={`/leads/${lead.id}`} className="flex min-h-16 items-center gap-3 px-4 py-3 active:bg-(--surface-muted)">
-        <Avatar name={lead.name} size="md" className="light-avatar" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-(--foreground)">{lead.name}</span>
-          <span className="block truncate text-sm text-(--text-secondary)">{withDuty(state.context, lead)}</span>
-        </span>
-        <span className="flex shrink-0 flex-col items-end gap-1">
-          <Badge tone={state.tone} size="sm">{state.chip}</Badge>
-        </span>
-      </Link>
-    </li>
+    <PeopleRow
+      index={index}
+      dataTour={dataTour}
+      href={lead.isAwaitingResponse ? `/conversas/broker?leadId=${lead.id}` : `/leads/${lead.id}`}
+      name={lead.name}
+      chip={<Badge tone={state.tone} size="sm">{state.chip}</Badge>}
+      preview={withDuty(state.context, lead)}
+      previewTone={lead.isAwaitingResponse ? "waiting" : lead.isSlaAtRisk || lead.isOverdue ? "alert" : "muted"}
+      dot={urgent ? (lead.isSlaAtRisk || lead.isOverdue ? "alert" : "waiting") : null}
+      dotLabel={urgent ? "Precisa de você agora" : undefined}
+      action={isNewLead(lead) ? <AcceptLeadButton leadId={lead.id} className={acceptButton}>Aceitar lead</AcceptLeadButton> : undefined}
+    />
   );
 }
 
@@ -206,32 +173,31 @@ export function LightLeadsList({
   // "Em risco" only takes room in the bar while there is something at risk (or the broker came from the Inicio card).
   const tabs = (["new", "active", "returns", "risk", "closed"] as const).filter((value) => value !== "risk" || counts.risk > 0 || filter === "risk");
   const options = tabs.map((value) => ({
-    value,
+    id: value,
     label: { new: "Novos", active: "Atendendo", returns: "Retornos", risk: "Em risco", closed: "Fechados" }[value],
-    accessory: counts[value] > 0 ? <span className="tabular-nums">{counts[value]}</span> : undefined,
+    count: counts[value],
   }));
 
   return (
     <div className="flex min-h-full flex-col text-foreground">
       <LightAvailabilityBanner initialStatus={availabilityStatus} />
 
-      <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-6 pt-2 sm:px-6">
-        <div data-tour="micro-queue-search"><SearchField
-          label="Buscar lead"
-          placeholder="Nome, telefone ou produto"
-          value={searchQuery}
-          onValueChange={setSearchQuery}
-        /></div>
-
-        <div data-tour="micro-queue-tabs"><SegmentedControl
+      <PeoplePage>
+        <PeopleFilters
           label="Etapas da fila"
           options={options}
           value={filter}
-          onValueChange={(value) => setFilter(value as FilterTab)}
-        /></div>
+          onChange={setFilter}
+          search={searchQuery}
+          onSearch={setSearchQuery}
+          searchPlaceholder="Buscar por nome, telefone ou produto"
+          searchLabel="Buscar lead"
+          dataTourSegment="micro-queue-tabs"
+          dataTourSearch="micro-queue-search"
+        />
 
         {visible.length === 0 ? (
-          <EmptyState
+          <PeopleEmpty
             title={searching ? `Não encontramos nenhum lead com "${searchQuery.trim()}"` : EMPTY_COPY[filter].title}
             description={searching ? "Confira o nome ou telefone, ou limpe a busca para ver sua lista." : EMPTY_COPY[filter].description}
             action={
@@ -249,40 +215,23 @@ export function LightLeadsList({
         ) : (
           <>
             {urgent.length > 0 ? (
-              <section aria-labelledby="needs-you-heading" className="flex flex-col gap-3">
-                <h2 id="needs-you-heading" className="text-base font-semibold text-(--foreground)">
-                  Precisa de você agora
-                  <span className="ml-2 tabular-nums text-(--text-secondary)">{urgent.length}</span>
-                </h2>
-                <ul className="flex flex-col gap-3">
-                  {urgent.map((lead, index) => (
-                    <NeedsYouCard key={lead.id} lead={lead} dataTour={index === 0 ? "micro-queue-lead" : undefined} />
-                  ))}
-                </ul>
-              </section>
+              <PeopleSection id="needs-you-heading" title="Precisa de você agora" count={urgent.length}>
+                {urgent.map((lead, index) => (
+                  <LeadRow key={lead.id} lead={lead} index={index} dataTour={index === 0 ? "micro-queue-lead" : undefined} />
+                ))}
+              </PeopleSection>
             ) : null}
 
             {rest.length > 0 ? (
-              <section aria-labelledby="rest-heading" className="flex flex-col gap-3">
-                {urgent.length > 0 ? (
-                  <h2 id="rest-heading" className="text-base font-semibold text-(--foreground)">
-                    Demais atendimentos
-                  </h2>
-                ) : (
-                  <h2 id="rest-heading" className="sr-only">
-                    Atendimentos
-                  </h2>
-                )}
-                <ul className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
-                  {sortByArrival(rest).map((lead, index) => (
-                    <CompactRow key={lead.id} lead={lead} dataTour={urgent.length === 0 && index === 0 ? "micro-queue-lead" : undefined} />
-                  ))}
-                </ul>
-              </section>
+              <PeopleSection id="rest-heading" title={urgent.length > 0 ? "Demais atendimentos" : undefined}>
+                {sortByArrival(rest).map((lead, index) => (
+                  <LeadRow key={lead.id} lead={lead} index={urgent.length + index} dataTour={urgent.length === 0 && index === 0 ? "micro-queue-lead" : undefined} />
+                ))}
+              </PeopleSection>
             ) : null}
           </>
         )}
-      </div>
+      </PeoplePage>
     </div>
   );
 }

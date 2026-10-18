@@ -3,13 +3,10 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
-import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
 import { Button } from "@/components/arc/button/button";
 import { ChipGroup } from "@/components/arc/chip-group/chip-group";
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
-import { SearchField } from "@/components/arc/search-field/search-field";
-import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 
 export type RadarTag = { id: string; name: string; colorHue: number | null };
 export type RadarLead = {
@@ -82,90 +79,60 @@ function dayLabel(date: Date, now: Date) {
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
-// Same action pills as the broker's queue.
-const actionPrimary = "inline-flex h-11 flex-1 items-center justify-center rounded-full bg-(--accent) px-5 text-sm font-medium text-(--accent-foreground) sm:flex-none";
-const actionSecondary = "inline-flex h-11 flex-1 items-center justify-center rounded-full bg-(--surface-muted) px-5 text-sm font-medium text-(--foreground) sm:flex-none";
-
-function LeadTags({ tags, max }: { tags?: RadarTag[]; max: number }) {
-  if (!tags?.length) return null;
-  const rest = tags.length - max;
-  return (
-    <>
-      {tags.slice(0, max).map((tag) => <Badge key={tag.id} tone="neutral" size="sm">{tag.name}</Badge>)}
-      {rest > 0 ? <Badge tone="neutral" size="sm">+{rest}</Badge> : null}
-    </>
-  );
-}
+const actionPill = "inline-flex h-10 items-center justify-center rounded-full bg-(--surface-muted) px-4 text-sm font-medium text-(--foreground) whitespace-nowrap";
 
 type Item = { lead: RadarLead; bucket: Bucket; alerts: Alert[] };
 
-function AttentionCard({ item, isManager }: { item: Item; isManager: boolean }) {
-  const { lead, alerts } = item;
-  const [main, ...others] = alerts;
-  const owner = lead.ownerId ? firstName(lead.ownerName) : "Sem corretor";
-  return (
-    <li className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
-      <Link href={`/leads/${encodeURIComponent(lead.id)}`} className="flex items-start gap-3">
-        <Avatar name={lead.name} size="lg" className="light-avatar" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-medium text-(--foreground)">{lead.name}</span>
-          <span className="mt-0.5 block text-sm text-(--text-secondary)">{main!.text}</span>
-          <span className="mt-0.5 block truncate text-xs text-(--text-muted)">{[owner, statusName[lead.status] ?? "Em andamento", lead.productName].filter(Boolean).join(" · ")}</span>
-        </span>
-        <Badge tone={main!.tone}>{main!.chip}</Badge>
-      </Link>
-      {others.length || lead.tags?.length ? (
-        <div className="flex flex-wrap gap-1.5 pl-[60px]">
-          {others.map((alert) => <Badge key={alert.kind} tone={alert.tone} size="sm">{alert.chip}</Badge>)}
-          <LeadTags tags={lead.tags} max={3} />
-        </div>
-      ) : null}
-      {isManager ? (
-        lead.clientWaitingSince ? (
-          <div className="flex gap-2 sm:justify-end">
-            <Link href={`/mensagens/${encodeURIComponent(lead.id)}`} className={actionSecondary}>Ver conversa</Link>
-          </div>
-        ) : null
-      ) : (
-        <div className="flex gap-2 sm:justify-end">
-          <Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} className={actionSecondary}>Repassar</Link>
-          {lead.ownerId ? <Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} className={actionPrimary}>Cobrar {owner}</Link> : null}
-        </div>
-      )}
-    </li>
-  );
+function tagText(tags: RadarTag[] | undefined, max: number) {
+  if (!tags?.length) return null;
+  const rest = tags.length - max;
+  return tags.slice(0, max).map((tag) => tag.name).join(", ") + (rest > 0 ? ` +${rest}` : "");
 }
 
-function CompactRow({ item, slaMinutes, now }: { item: Item; slaMinutes: number; now: Date }) {
+/** One lead in the phone-book list: the main alert as the chip, who has it, and the action that resolves it. */
+function RadarRow({ item, index, isManager, slaMinutes, now }: { item: Item; index: number; isManager: boolean; slaMinutes: number; now: Date }) {
   const { lead, bucket, alerts } = item;
+  const [main, ...others] = alerts;
+  const owner = lead.ownerId ? firstName(lead.ownerName) : "Sem corretor";
   const remaining = bucket === "waiting" && lead.assignedAt
     ? Math.max(1, Math.ceil((new Date(lead.assignedAt).getTime() + slaMinutes * 60_000 - now.getTime()) / 60_000))
     : null;
-  const chip = alerts[0] ?? (bucket === "waiting"
+  const chip = main ?? (bucket === "waiting"
     ? { tone: "info" as BadgeTone, chip: "Novo" }
     : { tone: "neutral" as BadgeTone, chip: statusName[lead.status] ?? "Em andamento" });
-  const owner = lead.ownerId ? firstName(lead.ownerName) : "Sem corretor";
+  const preview = [
+    owner,
+    main ? main.text : remaining ? `${remaining} min para o 1º contato` : lead.productName,
+    others.length ? others.map((alert) => alert.chip).join(", ") : null,
+    tagText(lead.tags, 2),
+  ].filter(Boolean).join(" · ");
+  const action = main
+    ? isManager
+      ? lead.clientWaitingSince ? <Link href={`/mensagens/${encodeURIComponent(lead.id)}`} className={actionPill}>Ver conversa</Link> : undefined
+      : <span className="flex flex-wrap justify-end gap-2">
+          <Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} className={actionPill}>Repassar</Link>
+          {lead.ownerId ? <Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} className={actionPill}>Cobrar {owner}</Link> : null}
+        </span>
+    : undefined;
   return (
-    <li className="border-b border-(--border) last:border-b-0">
-      <Link href={`/leads/${encodeURIComponent(lead.id)}`} className="flex min-h-16 items-center gap-3 px-4 py-3 active:bg-(--surface-muted)">
-        <Avatar name={lead.name} size="md" className="light-avatar" />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-(--foreground)">{lead.name}</span>
-          <span className="block truncate text-sm text-(--text-secondary)">{[owner, remaining ? `${remaining} min para o 1º contato` : lead.productName].filter(Boolean).join(" · ")}</span>
-          {lead.tags?.length ? <span className="mt-1 flex flex-wrap gap-1"><LeadTags tags={lead.tags} max={2} /></span> : null}
-        </span>
-        <span className="flex shrink-0 flex-col items-end gap-1">
-          {lead.assignedAt ? <time dateTime={lead.assignedAt} className="text-xs tabular-nums text-(--text-muted)" suppressHydrationWarning>{timeFormat.format(new Date(lead.assignedAt))}</time> : null}
-          <Badge tone={chip.tone} size="sm">{chip.chip}</Badge>
-        </span>
-      </Link>
-    </li>
+    <PeopleRow
+      index={index}
+      href={`/leads/${encodeURIComponent(lead.id)}`}
+      name={lead.name}
+      chip={<Badge tone={chip.tone} size="sm">{chip.chip}</Badge>}
+      preview={preview}
+      previewTone={main?.kind === "late" ? "alert" : main?.kind === "client" ? "waiting" : "muted"}
+      meta={lead.assignedAt ? <time dateTime={lead.assignedAt} suppressHydrationWarning>{timeFormat.format(new Date(lead.assignedAt))}</time> : undefined}
+      dot={main ? (main.kind === "late" ? "alert" : "waiting") : null}
+      dotLabel={main ? main.chip : undefined}
+      action={action}
+    />
   );
 }
 
 /**
  * The manager's (unit) or supervisor's (team) lead list, built from the same Arc pieces as the
- * broker's queue: what needs attention now as cards, and the rest grouped by the day it arrived.
+ * broker's queue: the phone-book list, what needs attention first, the rest grouped by the day it arrived.
  */
 export function SupervisorLeadsRadar({ data, now, search = "", audience = "supervisor", initialTab }: { initialTab?: Tab; data: { team: RadarTeamMember[]; leads: RadarLead[]; funnel: RadarFunnel; slaMinutes: number }; now: string; search?: string; audience?: "supervisor" | "manager" }) {
   const isManager = audience === "manager";
@@ -232,68 +199,46 @@ export function SupervisorLeadsRadar({ data, now, search = "", audience = "super
   }, [visible, currentTime]);
 
   const options = (["attention", "new", "service", "all"] as const).map((value) => ({
-    value,
+    id: value,
     label: TAB_LABEL[value],
-    accessory: byTab[value].length ? <span className="tabular-nums">{byTab[value].length}</span> : undefined,
+    count: byTab[value].length,
   }));
 
   return (
-    <div className="flex min-h-full flex-col text-foreground">
-      <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-6 pt-2 sm:px-6">
-        <header>
-          <h1 className="text-2xl font-medium text-(--foreground)">{isManager ? "Leads da unidade" : "Leads da equipe"}</h1>
-          <p className="mt-1 text-sm text-(--text-secondary)">
-            {attentionTotal
-              ? <><span className="font-medium text-(--danger)">{attentionTotal === 1 ? "1 lead precisa" : `${attentionTotal} leads precisam`} de você</span> · {data.leads.length} em aberto</>
-              : `Tudo em dia · ${data.leads.length === 1 ? "1 lead em aberto" : `${data.leads.length} leads em aberto`}`}
-          </p>
-        </header>
+    <PeoplePage
+      title={isManager ? "Leads da unidade" : "Leads da equipe"}
+      subtitle={attentionTotal
+        ? <><span className="font-medium text-(--danger)">{attentionTotal === 1 ? "1 lead precisa" : `${attentionTotal} leads precisam`} de você</span> · {data.leads.length} em aberto</>
+        : `Tudo em dia · ${data.leads.length === 1 ? "1 lead em aberto" : `${data.leads.length} leads em aberto`}`}
+    >
+      <PeopleFilters label="Situação dos leads" options={options} value={tab} onChange={setTab} search={query} onSearch={setQuery} searchPlaceholder="Buscar por nome, telefone, corretor ou produto" searchLabel="Buscar lead" />
 
-        <SearchField label="Buscar lead" placeholder="Nome, telefone, corretor ou produto" value={query} onValueChange={setQuery} />
+      {brokerOptions.length ? <ChipGroup label="Corretor" options={brokerOptions} value={brokerIds} onValueChange={setBrokerIds} maxVisible={6} /> : null}
+      {tagOptions.length ? <ChipGroup label="Tags" options={tagOptions} value={tagIds} onValueChange={setTagIds} maxVisible={5} /> : null}
 
-        {brokerOptions.length ? <ChipGroup label="Corretor" options={brokerOptions} value={brokerIds} onValueChange={setBrokerIds} maxVisible={6} /> : null}
-        {tagOptions.length ? <ChipGroup label="Tags" options={tagOptions} value={tagIds} onValueChange={setTagIds} maxVisible={5} /> : null}
+      {filtering ? (
+        <div className="flex items-center justify-between gap-2 text-sm text-(--text-secondary)">
+          <span>{visible.length === 1 ? "1 lead" : `${visible.length} leads`} com esses filtros</span>
+          <Button variant="ghost" size="sm" onClick={clear}>Limpar filtros</Button>
+        </div>
+      ) : null}
 
-        <SegmentedControl label="Situação dos leads" options={options} value={tab} onValueChange={(value) => setTab(value as Tab)} />
-
-        {filtering ? (
-          <div className="flex items-center justify-between gap-2 text-sm text-(--text-secondary)">
-            <span>{visible.length === 1 ? "1 lead" : `${visible.length} leads`} com esses filtros</span>
-            <Button variant="ghost" size="sm" onClick={clear}>Limpar filtros</Button>
-          </div>
-        ) : null}
-
-        {!visible.length ? (
-          <EmptyState
-            title={filtering ? "Nenhum lead com esses filtros" : EMPTY_COPY[tab].title}
-            description={filtering ? "Troque o corretor, a tag ou a busca." : EMPTY_COPY[tab].description}
-          />
-        ) : tab === "attention" ? (
-          <section aria-labelledby="radar-attention" className="flex flex-col gap-3">
-            <h2 id="radar-attention" className="text-base font-medium text-(--foreground)">
-              Precisa de você agora
-              <span className="ml-2 tabular-nums text-(--text-secondary)">{visible.length}</span>
-            </h2>
-            <ul className="flex flex-col gap-3" aria-label="Leads que precisam de você">
-              {visible.map((item) => <AttentionCard key={item.lead.id} item={item} isManager={isManager} />)}
-            </ul>
-          </section>
-        ) : (
-          <section aria-label="Leads" className="flex flex-col gap-3">
-            {groups.map((group) => (
-              <div key={group.key} className="flex flex-col gap-2">
-                <h3 className="px-1 text-sm font-medium text-(--text-secondary)" suppressHydrationWarning>
-                  {group.label}
-                  <span className="ml-2 tabular-nums text-(--text-muted)">{group.items.length}</span>
-                </h3>
-                <ul className="overflow-hidden rounded-3xl bg-(--surface) shadow-(--shadow-resting)">
-                  {group.items.map((item) => <CompactRow key={item.lead.id} item={item} slaMinutes={data.slaMinutes} now={currentTime} />)}
-                </ul>
-              </div>
-            ))}
-          </section>
-        )}
-      </div>
-    </div>
+      {!visible.length ? (
+        <PeopleEmpty
+          title={filtering ? "Nenhum lead com esses filtros" : EMPTY_COPY[tab].title}
+          description={filtering ? "Troque o corretor, a tag ou a busca." : EMPTY_COPY[tab].description}
+        />
+      ) : tab === "attention" ? (
+        <PeopleSection id="radar-attention" title="Precisa de você agora" count={visible.length} label="Leads que precisam de você">
+          {visible.map((item, index) => <RadarRow key={item.lead.id} item={item} index={index} isManager={isManager} slaMinutes={data.slaMinutes} now={currentTime} />)}
+        </PeopleSection>
+      ) : (
+        groups.map((group) => (
+          <PeopleSection key={group.key} id={`radar-${group.key}`} title={group.label} count={group.items.length}>
+            {group.items.map((item, index) => <RadarRow key={item.lead.id} item={item} index={index} isManager={isManager} slaMinutes={data.slaMinutes} now={currentTime} />)}
+          </PeopleSection>
+        ))
+      )}
+    </PeoplePage>
   );
 }

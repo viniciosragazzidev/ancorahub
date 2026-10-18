@@ -41,7 +41,7 @@ describe("SupervisorLeadsRadar", () => {
     expect(screen.getByText("1 lead precisa de você")).toBeTruthy();
     const card = screen.getByRole("list", { name: "Leads que precisam de você" });
     expect(within(card).getByRole("link", { name: /Maria Silva/ }).getAttribute("href")).toBe("/leads/lead-1");
-    expect(within(card).getByText("Indicação")).toBeTruthy();
+    expect(within(card).getByText(/Indicação/)).toBeTruthy();
     expect(within(card).getByRole("link", { name: "Repassar" }).getAttribute("href")).toContain("/equipe/repassar?lead=lead-1");
     expect(within(card).getByRole("link", { name: /Cobrar Ana/ }).getAttribute("href")).toContain("brokerId=broker-1");
     expect(within(card).queryByText("João Lima")).toBeNull();
@@ -57,7 +57,7 @@ describe("SupervisorLeadsRadar", () => {
 
   it("filters by broker, tag and search across the tabs", () => {
     render(<SupervisorLeadsRadar data={data} now={now} />);
-    fireEvent.click(within(screen.getByRole("group", { name: "Situação dos leads" })).getByRole("button", { name: "Abertos" }));
+    fireEvent.click(within(screen.getByRole("group", { name: "Situação dos leads" })).getByRole("button", { name: /^Abertos/ }));
     expect(screen.getByRole("link", { name: /João Lima/ })).toBeTruthy();
     fireEvent.click(within(screen.getByRole("group", { name: "Corretor" })).getByRole("button", { name: /Paulo/ }));
     expect(screen.queryByRole("link", { name: /Maria Silva/ })).toBeNull();
@@ -67,7 +67,7 @@ describe("SupervisorLeadsRadar", () => {
     expect(screen.getByRole("link", { name: /Maria Silva/ })).toBeTruthy();
     expect(screen.queryByRole("link", { name: /João Lima/ })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Limpar filtros" }));
-    fireEvent.change(screen.getByRole("textbox", { name: "Buscar lead" }), { target: { value: "0000" } });
+    fireEvent.change(screen.getByRole("searchbox", { name: "Buscar lead" }), { target: { value: "0000" } });
     expect(screen.getByRole("link", { name: /Maria Silva/ })).toBeTruthy();
   });
 });

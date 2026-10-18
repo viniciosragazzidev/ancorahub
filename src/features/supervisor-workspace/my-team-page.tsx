@@ -18,7 +18,10 @@ import { addBrokerToMyTeamAction } from "./actions";
 import { cancelMyTeamInviteAction, inviteBrokerToMyTeamAction, removeBrokerFromMyTeamAction } from "./my-team-actions";
 import type { SupervisorTeamPageData } from "./my-team-queries";
 import { TeamOnDutyList } from "./team-on-duty-list";
+import { PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 import styles from "./my-team-page.module.css";
+
+const shortDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" });
 
 export function teamAvatarHue(name: string) {
   let hash = 0;
@@ -32,14 +35,6 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
   const [feedback, setFeedback] = useState("");
   const [pending, startTransition] = useTransition();
   const reducedMotion = useReducedMotion() ?? false;
-  const listVariants = {
-    hidden: {},
-    visible: { transition: { staggerChildren: 0.04 } },
-  };
-  const itemVariants = {
-    hidden: { opacity: 0, y: 7 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const } },
-  };
 
   function runAction(action: () => Promise<{ ok: boolean; message: string }>, onSuccess?: () => void) {
     setFeedback("");
@@ -90,28 +85,39 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
       {feedback ? <motion.p className={styles.feedback} role="status" aria-live="polite" initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reducedMotion ? 0.12 : 0.2 }}>{feedback}</motion.p> : null}
 
       {activeTab === "members" ? <TeamOnDutyList duty={initialData.onDuty ?? []} /> : null}
-      {activeTab === "members" ? <section className={styles.section} aria-labelledby="team-members-title"><h2 id="team-members-title" className="sr-only">Membros</h2>
-        {data.members.length ? <motion.ul className={styles.list} variants={listVariants} initial={reducedMotion ? false : "hidden"} animate="visible">{data.members.map((member) => <motion.li key={member.id} className={styles.memberCard} data-attention={member.late > 0} variants={reducedMotion ? undefined : itemVariants} whileTap={reducedMotion ? undefined : { scale: 0.995 }}>
-          <Link className={styles.memberLink} href={`/equipe/${encodeURIComponent(member.id)}`}><Avatar name={member.name} src={member.imageUrl ?? undefined} size="lg" status={member.availability === "available" ? "online" : "offline"} className={styles.avatar} style={{ "--team-hue": `${teamAvatarHue(member.name)}` } as React.CSSProperties} /><span>{member.name}<small><Badge tone={member.availability === "available" ? "success" : "neutral"} size="sm">{member.availability === "available" ? "Disponível" : member.availability === "paused" ? "Pausado" : "Fora do ar"}</Badge></small></span></Link>
-          <div className={styles.memberNumbers}><span><strong>{member.receivedToday}</strong> hoje</span><span><strong>{member.inService}</strong> em atendimento</span>{member.late ? <Badge tone="warning" size="sm">{member.late === 1 ? "1 atrasado" : `${member.late} atrasados`}</Badge> : null}</div>
-          <BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este membro." closeLabel="Fechar" detents={[0.38, 0.7]}>
+      {activeTab === "members" ? (data.members.length ? <PeopleSection id="team-members-title" title="Membros" count={data.members.length}>
+        {data.members.map((member, index) => <PeopleRow
+          key={member.id}
+          index={index}
+          href={`/equipe/${encodeURIComponent(member.id)}`}
+          name={member.name}
+          avatar={<Avatar name={member.name} src={member.imageUrl ?? undefined} size="lg" status={member.availability === "available" ? "online" : "offline"} className={styles.avatar} style={{ "--team-hue": `${teamAvatarHue(member.name)}` } as React.CSSProperties} />}
+          chip={<Badge tone={member.availability === "available" ? "success" : "neutral"} size="sm">{member.availability === "available" ? "Disponível" : member.availability === "paused" ? "Pausado" : "Fora do ar"}</Badge>}
+          preview={[`${member.receivedToday} hoje`, `${member.inService} em atendimento`, member.late ? (member.late === 1 ? "1 atrasado" : `${member.late} atrasados`) : null].filter(Boolean).join(" · ")}
+          previewTone={member.late ? "alert" : "muted"}
+          dot={member.late ? "alert" : null}
+          dotLabel={member.late ? "Tem lead atrasado" : undefined}
+          action={<BottomSheet className="arc-venancor" trigger={<button type="button" className={styles.memberMenuTrigger} aria-label={`Ações de ${member.name}`}>•••</button>} title={`Ações de ${member.name}`} description="Escolha uma ação para este membro." closeLabel="Fechar" detents={[0.38, 0.7]}>
             <MemberSheetActions memberId={member.id} memberName={member.name} pending={pending} onRemove={() => removeMember(member.id)} />
-          </BottomSheet>
-        </motion.li>)}</motion.ul> : <EmptyState title="Sua equipe ainda não tem membros" description="Adicione alguém da sua unidade ou envie um convite." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} action={<Button variant="outline" onClick={() => setActiveTab("unit")}>Ver corretores da unidade</Button>} />}
-      </section> : null}
+          </BottomSheet>}
+        />)}
+      </PeopleSection> : <EmptyState title="Sua equipe ainda não tem membros" description="Adicione alguém da sua unidade ou envie um convite." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} action={<Button variant="outline" onClick={() => setActiveTab("unit")}>Ver corretores da unidade</Button>} />) : null}
 
-      {activeTab === "invites" ? <section className={styles.section} aria-labelledby="team-invites-title"><div className={styles.sectionTitle}><h2 id="team-invites-title">Convites pendentes</h2></div>
-        {data.invites.length || data.pendingAccessInvites.length ? <motion.ul className={styles.list} variants={listVariants} initial={reducedMotion ? false : "hidden"} animate="visible">
-          {data.pendingAccessInvites.map((invite) => <motion.li key={invite.id} className={styles.row} variants={reducedMotion ? undefined : itemVariants}><span>{invite.brokerName}<small>Primeiro acesso · {invite.email ?? "sem e-mail"} · {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(invite.createdAt))}</small></span><div className={styles.brokerActions}><Button variant="outline" size="sm" disabled={pending} onClick={() => manageAccessInvite(resendInviteAction, invite.id)}>Reenviar</Button><Button variant="ghost" size="sm" disabled={pending} onClick={() => manageAccessInvite(revokeInviteAction, invite.id)}>Cancelar</Button></div></motion.li>)}
-          {data.invites.map((invite) => <motion.li key={invite.id} className={styles.row} variants={reducedMotion ? undefined : itemVariants}><span>{invite.brokerName}<small>Convite para entrar na equipe · {new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(invite.createdAt))}</small></span><Button variant="outline" size="sm" disabled={pending} onClick={() => cancelInvite(invite.id)}>Cancelar convite</Button></motion.li>)}
-        </motion.ul> : <EmptyState title="Nenhum convite pendente" description="Os convites enviados para corretores aparecem aqui." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />}
-      </section> : null}
+      {activeTab === "invites" ? (data.invites.length || data.pendingAccessInvites.length ? <PeopleSection id="team-invites-title" title="Convites pendentes" count={data.invites.length + data.pendingAccessInvites.length}>
+        {data.pendingAccessInvites.map((invite, index) => <PeopleRow key={invite.id} index={index} name={invite.brokerName} chip="Primeiro acesso" preview={`${invite.email ?? "sem e-mail"} · ${shortDate.format(new Date(invite.createdAt))}`} action={<div className={styles.brokerActions}><Button variant="outline" size="sm" disabled={pending} onClick={() => manageAccessInvite(resendInviteAction, invite.id)}>Reenviar</Button><Button variant="ghost" size="sm" disabled={pending} onClick={() => manageAccessInvite(revokeInviteAction, invite.id)}>Cancelar</Button></div>} />)}
+        {data.invites.map((invite, index) => <PeopleRow key={invite.id} index={data.pendingAccessInvites.length + index} name={invite.brokerName} chip="Convite para a equipe" preview={shortDate.format(new Date(invite.createdAt))} action={<Button variant="outline" size="sm" disabled={pending} onClick={() => cancelInvite(invite.id)}>Cancelar convite</Button>} />)}
+      </PeopleSection> : <EmptyState title="Nenhum convite pendente" description="Os convites enviados para corretores aparecem aqui." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />) : null}
 
-      {activeTab === "unit" ? <section className={styles.section} aria-labelledby="team-brokers-title"><div className={styles.sectionTitle}><h2 id="team-brokers-title">Corretores da sua unidade</h2></div>
-        {data.brokers.length ? <motion.ul className={styles.list} variants={listVariants} initial={reducedMotion ? false : "hidden"} animate="visible">{data.brokers.map((broker) => <motion.li key={broker.id} className={styles.row} variants={reducedMotion ? undefined : itemVariants}><span className={styles.memberLink}><Avatar name={broker.name} src={broker.imageUrl ?? undefined} size="md" className={styles.avatar} style={{ "--team-hue": `${teamAvatarHue(broker.name)}` } as React.CSSProperties} /><span>{broker.name}<small>{broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}</small></span></span>
-          {broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} onClick={() => addDirectly(broker.id)}>Adicionar</Button><Button variant="outline" size="sm" disabled={pending || !data.team} onClick={() => invite(broker.id)}>Convidar</Button></div>}
-        </motion.li>)}</motion.ul> : <EmptyState title="Não há outros corretores ativos" description="Quando houver corretores disponíveis na sua unidade, eles aparecerão aqui." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />}
-      </section> : null}
+      {activeTab === "unit" ? (data.brokers.length ? <PeopleSection id="team-brokers-title" title="Corretores da sua unidade" count={data.brokers.length}>
+        {data.brokers.map((broker, index) => <PeopleRow
+          key={broker.id}
+          index={index}
+          name={broker.name}
+          avatar={<Avatar name={broker.name} src={broker.imageUrl ?? undefined} size="lg" className={styles.avatar} style={{ "--team-hue": `${teamAvatarHue(broker.name)}` } as React.CSSProperties} />}
+          preview={broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}
+          action={broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} onClick={() => addDirectly(broker.id)}>Adicionar</Button><Button variant="outline" size="sm" disabled={pending || !data.team} onClick={() => invite(broker.id)}>Convidar</Button></div>}
+        />)}
+      </PeopleSection> : <EmptyState title="Não há outros corretores ativos" description="Quando houver corretores disponíveis na sua unidade, eles aparecerão aqui." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />) : null}
     </div>
   </motion.div>;
 }

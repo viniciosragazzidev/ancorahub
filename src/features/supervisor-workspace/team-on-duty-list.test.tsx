@@ -29,7 +29,7 @@ describe("TeamOnDutyList", () => {
 
     expect(screen.getByText("De plantão agora")).toBeTruthy();
     const maria = screen.getByText("Maria").closest("li") as HTMLElement;
-    expect(within(maria).getByText(/Manhã · 08:00 às 12:00 · presença confirmada/)).toBeTruthy();
+    expect(within(maria).getByText(/08:00 às 12:00 · presença confirmada/)).toBeTruthy();
     expect(maria.querySelector("a")?.getAttribute("href")).toBe("/plantoes/corretor/maria");
     expect(screen.getByText("Pausado")).toBeTruthy();
   });

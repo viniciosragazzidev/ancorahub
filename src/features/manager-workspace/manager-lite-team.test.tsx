@@ -21,7 +21,7 @@ describe("ManagerLiteTeam", () => {
     expect(screen.getAllByText("Centro")).toHaveLength(2);
     expect(screen.getByText("Corretores da unidade")).toBeTruthy();
     expect(screen.getByText("Ada Costa")).toBeTruthy();
-    const search = screen.getByRole("textbox", { name: "Buscar corretor por nome" });
+    const search = screen.getByRole("searchbox", { name: "Buscar corretor por nome" });
     fireEvent.change(search, { target: { value: "beto" } });
     expect(screen.getByText("Beto Lima")).toBeTruthy();
     expect(screen.queryByText("Ada Costa")).toBeNull();

@@ -70,7 +70,7 @@ describe("MyTeamPage pending first-access invitations", () => {
     mockResendAccessInvite.mockResolvedValue({ success: false, error: "Sem WhatsApp disponível." });
     render(<MyTeamPage initialData={{ ...base, pendingAccessInvites: [{ id: "invite-42", brokerProfileId: "profile-42", brokerName: "Caio Lima", email: "caio@example.com", createdAt: "2026-10-14T12:00:00.000Z" }] }} />);
     fireEvent.click(screen.getByRole("button", { name: /Convites/ }));
-    expect(screen.getByText(/Primeiro acesso · caio@example.com/)).toBeTruthy();
+    expect(screen.getByText(/caio@example.com/)).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Reenviar" }));
     await waitFor(() => expect(mockResendAccessInvite).toHaveBeenCalledTimes(1));
     expect(mockResendAccessInvite.mock.calls[0][1].get("invitationId")).toBe("invite-42");
