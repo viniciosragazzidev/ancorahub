@@ -16,7 +16,7 @@ const linkSecondary = `${linkBase} bg-(--surface-muted) text-(--foreground)`;
  * New lead: Recusar and Aceitar lead. After accepting: WhatsApp (the one primary
  * action), Ligar and Etapa. The phone only exists after acceptance.
  */
-export function LeadActionBar({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
+export function LeadActionBar({ lead, c, inline = false }: { lead: LightLeadDetailData; c: LeadDetailController; inline?: boolean }) {
   const {
     isDistributed,
     leadStatus,
@@ -34,9 +34,9 @@ export function LeadActionBar({ lead, c }: { lead: LightLeadDetailData; c: LeadD
     <nav
       data-tour="micro-lead-actions"
       aria-label="Ações do lead"
-      className="arc-venancor fixed inset-x-4 bottom-[calc(22px+var(--mobile-safe-bottom))] z-40 md:left-[calc(72px+1rem)]"
+      className={inline ? "arc-venancor" : "arc-venancor fixed inset-x-4 bottom-[calc(22px+var(--mobile-safe-bottom))] z-40 md:left-[calc(72px+1rem)]"}
     >
-      <div className="mx-auto flex max-w-2xl items-center gap-2 rounded-full bg-(--surface)/86 p-2 shadow-(--shadow-floating) backdrop-blur-xl backdrop-saturate-150">
+      <div className={inline ? "flex items-center gap-2" : "mx-auto flex max-w-2xl items-center gap-2 rounded-full bg-(--surface)/86 p-2 shadow-(--shadow-floating) backdrop-blur-xl backdrop-saturate-150"}>
         {isDistributed ? (
           <>
             <Button variant="secondary" disabled={accepting} onClick={() => setShowDeclineModal(true)}>

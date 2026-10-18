@@ -30,6 +30,7 @@ export function LightLeadDetail({
   carriers = [],
   availabilityStatus = "available",
   mode = "broker",
+  variant = "page",
 }: {
   lead: LightLeadDetailData;
   /** Kept for the page contract; the responsible broker is no longer printed on this screen. */
@@ -39,6 +40,8 @@ export function LightLeadDetail({
   carriers?: CarrierOption[];
   availabilityStatus?: "available" | "paused" | "offline";
   mode?: "broker" | "management";
+  /** "panel": the profile column beside the conversation (lead page, 2026-10-17); no fixed bar, no banner. */
+  variant?: "page" | "panel";
 }) {
   const isManagement = mode === "management";
   const c = useLeadDetail({ lead, requirements, documents, initialDetailsExpanded: isManagement });
@@ -46,6 +49,31 @@ export function LightLeadDetail({
   // Lead already taken by someone else (or finished): nothing to act on.
   if (!isManagement && !lead.isCurrentBroker && c.isDistributed === false) {
     return <UnavailableLeadView availabilityStatus={availabilityStatus} />;
+  }
+
+  if (variant === "panel" && !isManagement) {
+    return (
+      <div className="arc-venancor flex w-full flex-col gap-4 text-foreground">
+        <LeadNotices lead={lead} />
+        <IdentityHeader lead={lead} c={c} />
+        <div className="hidden lg:block">
+          <ClientInfoCard lead={lead} c={c} />
+        </div>
+        <SaleSection c={c} />
+        <LeadActionBar lead={lead} c={c} inline />
+        <DeclineSheet lead={lead} c={c} />
+        <StepSheet c={c} />
+        <SaleDocSheet lead={lead} c={c} requirements={requirements} />
+        <RegisterSalePanel
+          leadId={lead.id}
+          documents={documents}
+          carriers={carriers}
+          open={c.showSaleConfirm}
+          onOpenChange={c.setShowSaleConfirm}
+        />
+        {c.successOverlay}
+      </div>
+    );
   }
 
   if (isManagement) {

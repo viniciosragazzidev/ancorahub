@@ -59,8 +59,11 @@ export function ChatScreen({
   onButtonOpen,
   instant = false,
   tourTargets,
+  fill = false,
 }: {
   identity: Identity;
+  /** Fills the column that holds it (lead page, computer and phone) instead of the whole viewport. */
+  fill?: boolean;
   backHref: string;
   script: ChatScript;
   runAction?: ChatActionRunner;
@@ -302,7 +305,7 @@ export function ChatScreen({
     ?? (lastQuestion && !answers[lastQuestion.id] ? "Responda aqui ou escolha uma opção acima" : script.composerPlaceholder ?? `Escreva para ${identity.name}`);
 
   return (
-    <div className={`${styles.root} ${styles.screen}`}>
+    <div className={`${styles.root} ${fill ? styles.screenFill : styles.screen}`}>
       <header className={styles.header}>
         {/* History first (never stacks a new entry, so back never loops between two screens); parent when opened from outside. */}
         <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => goBackInApp(router, backHref)}>
