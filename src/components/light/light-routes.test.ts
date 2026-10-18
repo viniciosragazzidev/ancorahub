@@ -18,9 +18,11 @@ describe("Light routes", () => {
     expect(resolveLightRoute("/settings", new URLSearchParams("tab=placar"))).toMatchObject({ title: "Placar", parentHref: "/settings" });
   });
   it("keeps the allowed route list used by the dashboard layout", () => {
-    for (const path of ["/dashboard", "/minha-fila", "/leads/abc", "/conversas/broker", "/clientes/1", "/l/token", "/settings", "/notificacoes"]) {
+    for (const path of ["/dashboard", "/minha-fila", "/agenda", "/desempenho", "/leads/abc", "/conversas/broker", "/clientes/1", "/l/token", "/settings", "/notificacoes"]) {
       expect(isLightRouteAllowed(path)).toBe(true);
     }
+    expect(isLightRouteAllowed("/agenda", "supervisor")).toBe(false);
+    expect(isLightRouteAllowed("/desempenho", "manager")).toBe(false);
     for (const path of ["/equipe", "/relatorios", "/vendas", "/integrations/whatsapp"]) {
       expect(isLightRouteAllowed(path)).toBe(false);
     }
@@ -62,6 +64,9 @@ describe("Light routes", () => {
     const table: Array<[string, { title: string; tab: string; isRoot: boolean; parentHref: string | null }]> = [
       ["/dashboard", { title: "Início", tab: "inicio", isRoot: true, parentHref: null }],
       ["/minha-fila", { title: "Fila", tab: "fila", isRoot: false, parentHref: "/dashboard" }],
+      ["/agenda", { title: "Agenda", tab: "mais", isRoot: false, parentHref: "/dashboard" }],
+      ["/desempenho", { title: "Desempenho", tab: "mais", isRoot: false, parentHref: "/dashboard" }],
+      ["/plantoes/agora", { title: "Meu plantão agora", tab: "inicio", isRoot: false, parentHref: "/plantoes" }],
       ["/conversas/broker", { title: "Dicas de Atendimento", tab: "insights", isRoot: true, parentHref: null }],
       ["/notificacoes", { title: "Notificações", tab: "mais", isRoot: false, parentHref: "/dashboard" }],
       ["/clientes", { title: "Clientes", tab: "mais", isRoot: false, parentHref: "/dashboard" }],

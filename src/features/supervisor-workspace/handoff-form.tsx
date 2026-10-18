@@ -27,7 +27,7 @@ export function HandoffForm({ lead, brokers }: { lead: { id: string; name: strin
           <p className={css.muted}>O atendimento e o prazo recomeçam para ele, e o motivo ficou no histórico do lead.</p>
           <div className={css.actions}>
             <Link className={css.secondary} href={`/leads/${lead.id}`}>Abrir o lead</Link>
-            <Link className={css.primary} href="/dashboard/c/equipe-leads">Voltar aos leads da equipe</Link>
+            <Link className={css.primary} href="/leads">Voltar aos leads da equipe</Link>
           </div>
         </div>
       </div>

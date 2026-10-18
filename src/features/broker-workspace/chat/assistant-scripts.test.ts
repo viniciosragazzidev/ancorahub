@@ -19,7 +19,7 @@ describe("Jornada assistant", () => {
     const input = { data: workspace(), now, journey: journey(), capabilities: { quoteSimulator: false, dutyCalendar: false } };
     expect(buildAssistantThreads(input).some((t) => t.assistant === "jornada")).toBe(false);
     const thread = buildAssistantThreads({ ...input, capabilities: { ...input.capabilities, journey: true } }).find((t) => t.assistant === "jornada");
-    expect(thread).toMatchObject({ name: "Jornada", hue: 85, href: "/dashboard/c/jornada", waitingYou: false, preview: "Consultor, 85 pts na semana. 0 missões abertas." });
+    expect(thread).toMatchObject({ name: "Jornada", hue: 85, href: "/jornada", waitingYou: false, preview: "Consultor, 85 pts na semana. 0 missões abertas." });
   });
   it("keeps pending leads ahead of new celebrations and timestamps the latest event", () => {
     const data = journey(); data.celebrations = [{ ...dailySummary, seenAt: null }];
@@ -139,11 +139,11 @@ describe("broker chat assistant scripts", () => {
   it("declares assistant identities, mascots, hues and routes from the contract", () => {
     expect(ASSISTANTS).toMatchObject({
       ancora: { name: "Jack", shape: "jack", hue: 175, verified: true, href: "/dashboard/c/ancora" },
-      leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
-      plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
-      agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
+      leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/minha-fila" },
+      plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/plantoes/agora" },
+      agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/agenda" },
       cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },
-      desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/dashboard/c/desempenho" },
+      desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/desempenho" },
       insights: { name: "Dicas de Atendimento", shape: "salte", hue: 200, href: "/conversas/broker" },
     });
   });
@@ -153,10 +153,19 @@ describe("broker chat assistant scripts", () => {
     const withoutQuote = buildAssistantThreads({ data, capabilities: { quoteSimulator: false, dutyCalendar: false }, now });
     expect(withoutQuote.map((thread) => thread.assistant).sort()).toEqual(["agenda", "ancora", "desempenho", "insights", "leads", "plantao"]);
     expect(withoutQuote.some((thread) => thread.assistant === "plantao" || thread.assistant === "insights")).toBe(true);
+    expect(Object.fromEntries(withoutQuote.map((thread) => [thread.assistant, thread.href]))).toMatchObject({
+      ancora: "/dashboard/c/ancora",
+      leads: "/minha-fila",
+      plantao: "/plantoes/agora",
+      agenda: "/agenda",
+      desempenho: "/desempenho",
+      insights: "/conversas/broker",
+    });
 
     const withQuote = buildAssistantThreads({ data, capabilities: { quoteSimulator: true, dutyCalendar: true }, now });
     expect(withQuote).toHaveLength(7);
     expect(withQuote.some((thread) => thread.assistant === "cotacao")).toBe(true);
+    expect(withQuote.find((thread) => thread.assistant === "cotacao")?.href).toBe("/cotacao");
     expectNoEmDash(withQuote);
 
     const withNextDuty = workspace({ duty: {

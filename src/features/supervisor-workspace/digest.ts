@@ -60,7 +60,7 @@ export async function runSupervisorDigest(now = new Date()) {
         message: buildDigestLines(data).join(" "),
         // The lock screen shows no names or numbers: the details stay inside the app.
         pushBody: "Toque para ver como foi o dia da sua equipe.",
-        url: "/dashboard/c/equipe",
+        url: "/equipe/minha",
         tag: `supervisor-digest-${periodDay(now)}`,
         idempotencyKey: `supervisor-digest:${supervisor.userId}:${periodDay(now)}`,
       });

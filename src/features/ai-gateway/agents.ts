@@ -89,8 +89,8 @@ function toChoice(action: CatalogAction, label: string, index: number, targets: 
     case "open.lead": return targets.leadId ? { id, label, action: { kind: "href", href: `/leads/${targets.leadId}` } } : { id, label, action: { kind: "href", href: "/minha-fila" } };
     case "open.queue": return { id, label, action: { kind: "href", href: "/minha-fila" } };
     case "open.quote": return { id, label, action: { kind: "href", href: "/cotacao" } };
-    case "open.duty": return { id, label, action: { kind: "href", href: "/dashboard/c/plantao" } };
-    case "open.agenda": return { id, label, action: { kind: "href", href: "/dashboard/c/agenda" } };
+    case "open.duty": return { id, label, action: { kind: "href", href: "/plantoes/agora" } };
+    case "open.agenda": return { id, label, action: { kind: "href", href: "/agenda" } };
     case "open.insights": return targets.leadId ? { id, label, action: { kind: "href", href: `/conversas/broker?insight=${encodeURIComponent(targets.leadId)}` } } : { id, label, action: { kind: "href", href: "/conversas/broker" } };
     case "lead.registerContact": return targets.leadId ? { id, label, action: { kind: "server", name: "lead.registerContact", payload: { leadId: targets.leadId } } } : null;
     case "lead.scheduleReturn": return targets.leadId ? { id, label, action: { kind: "server", name: "lead.scheduleReturn", payload: { leadId: targets.leadId, when: "tomorrow" } } } : null;

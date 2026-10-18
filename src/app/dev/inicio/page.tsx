@@ -33,7 +33,7 @@ function Showcase() {
       viewerName="Vinicios Ragazzi"
       nowIso="2026-10-10T15:00:00.000Z"
       canQuote
-      assistants={[thread({}), thread({ id: "j", assistant: "jornada" as never, name: "Jornada", preview: "Nível 2 · 340 pts nesta semana", href: "/dashboard/c/jornada", shape: "mochi", hue: 85 })]}
+      assistants={[thread({}), thread({ id: "j", assistant: "jornada" as never, name: "Jornada", preview: "Nível 2 · 340 pts nesta semana", href: "/jornada", shape: "mochi", hue: 85 })]}
       leads={[thread({ id: "l1", kind: "lead", leadId: "l1", name: "Carla Mendes", preview: "Oi, queria saber do plano PME", waitingYou: true, href: "/leads/l1", initials: "CM", shape: "logo", hue: null })]}
       summary={{ receivedToday: 3, acceptedToday: 2, inServiceNow: 4, slaAtRiskNow: 1, duty: null, goal: null, next }}
       firstSteps={params.get("steps") === "1" ? steps : null}

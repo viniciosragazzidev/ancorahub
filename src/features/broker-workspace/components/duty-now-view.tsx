@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 
+import { Button } from "@/components/arc/button/button";
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
 import { formatDuration } from "@/features/engagement/ranking";
+import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
 
 import css from "./duty-now-view.module.css";
 
@@ -41,9 +44,12 @@ function remaining(endsAt: number, now: number) {
 }
 
 /** The plantão happening now: window, live progress, numbers and every lead received in it. */
-export function DutyNowView({ data, nowIso }: { data: DutyNowViewData; nowIso: string }) {
+export function DutyNowView({ data, nowIso, canManageAvailability = false }: { data: DutyNowViewData; nowIso: string; canManageAvailability?: boolean }) {
   const reduce = useReducedMotion();
+  const router = useRouter();
   const [now, setNow] = useState(() => new Date(nowIso).getTime());
+  const [availabilityMessage, setAvailabilityMessage] = useState<string | null>(null);
+  const [availabilityBusy, setAvailabilityBusy] = useState(false);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
     return () => window.clearInterval(timer);
@@ -52,6 +58,19 @@ export function DutyNowView({ data, nowIso }: { data: DutyNowViewData; nowIso: s
   const end = new Date(data.endsAt).getTime();
   const progress = Math.min(1, Math.max(0, (now - start) / Math.max(1, end - start)));
   const state = STATE[data.state];
+  async function toggleAvailability() {
+    const action = data.state === "pausado" ? "duty.resume" : "duty.pause";
+    setAvailabilityBusy(true);
+    try {
+      const result = await runChatServerAction(action, {});
+      setAvailabilityMessage(result.message);
+      if (result.ok) router.refresh();
+    } catch {
+      setAvailabilityMessage("Não consegui atualizar sua disponibilidade. Tente de novo.");
+    } finally {
+      setAvailabilityBusy(false);
+    }
+  }
   const stats = [
     { label: "Ofertas recebidas", value: String(data.totals.offered) },
     { label: "Aceitas", value: String(data.totals.accepted) },
@@ -159,9 +178,14 @@ export function DutyNowView({ data, nowIso }: { data: DutyNowViewData; nowIso: s
           )}
         </section>
 
-        <div className={css.footer}>
-          <Link href="/dashboard/c/plantao" className={css.link}>Pausar ou voltar a receber pela conversa do Plantão</Link>
-        </div>
+        {canManageAvailability && data.state !== "aguardando" ? (
+          <div className={css.footer}>
+            <Button variant={data.state === "pausado" ? "primary" : "secondary"} loading={availabilityBusy} onClick={toggleAvailability}>
+              {data.state === "pausado" ? "Voltar a receber" : "Pausar recebimento"}
+            </Button>
+            {availabilityMessage ? <p role="status" aria-live="polite" className="mt-2 text-sm text-(--text-secondary)">{availabilityMessage}</p> : null}
+          </div>
+        ) : null}
       </div>
     </div>
   );

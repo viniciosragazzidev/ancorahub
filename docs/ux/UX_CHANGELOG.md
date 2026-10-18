@@ -802,3 +802,7 @@ Papel: supervisor no Lite. Objetivo: montar a equipe, editar seu perfil e enviar
 ## 2026-10-15: G6, destaques e evolucao da equipe
 
 `/gestao` mostra o resumo dos ultimos sete dias e destaques automaticos no escopo da unidade ou equipe. O supervisor pode abrir o reconhecimento manual existente, com pontos e motivo. O perfil Lite do corretor recebe a evolucao mensal da metrica canonica de conversao; a secao fica oculta ate a tabela de snapshots existir. Reutiliza Card, Select, Button, Avatar e RecognizeSheet, sem token ou primitive nova.
+
+## 2026-10-17 - Navegacao direta no Lite (Frente A)
+
+Papeis: corretor e supervisor. Acao: abrir o destino de trabalho direto pelos atalhos de assistente; no plantao, pausar/retomar recebimento; na agenda, concluir, cancelar/desfazer e reagendar retornos. Jack continua com divulgacao em conversa; paginas mostram dados e acoes no contexto da tarefa. Estados de lista vazia, carregamento/erro, operacao pendente, sucesso e undo ficam legiveis e acionaveis. Reutiliza Arc, TeamOnDutyList e tokens existentes; sem primitive, token, borda ou movimento novo. A validacao global de UX-M1.10 permanece pendente.

@@ -17,9 +17,7 @@ export default async function BrokerDutyCalendarPage() {
     getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR),
   ]);
   if (experienceMode !== "LIGHT") redirect("/dashboard");
-  // Without the calendar, "Ver plantões" links land on the Plantão conversation (always there),
-  // never on a "Registro não encontrado" page.
-  if (calendarEnabled !== "true") redirect("/dashboard/c/plantao");
+  if (calendarEnabled !== "true") redirect("/plantoes/agora");
 
   const calendar = await getBrokerDutyCalendarData();
   return <LightDutyCalendar calendar={calendar} />;

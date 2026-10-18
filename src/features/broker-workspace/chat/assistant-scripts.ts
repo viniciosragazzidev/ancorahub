@@ -25,17 +25,17 @@ type AssistantDefinition = {
 
 export const ASSISTANTS: Record<AssistantId, AssistantDefinition> = {
   ancora: { name: "Jack", shape: "jack", hue: 175, verified: true, href: "/dashboard/c/ancora" },
-  leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/dashboard/c/leads" },
-  plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/dashboard/c/plantao" },
-  agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/dashboard/c/agenda" },
+  leads: { name: "Meus Leads", shape: "mochi", hue: 212, href: "/minha-fila" },
+  plantao: { name: "Plantão", shape: "onigiri", hue: 28, href: "/plantoes/agora" },
+  agenda: { name: "Agenda", shape: "cubo", hue: 150, href: "/agenda" },
   cotacao: { name: "Cotação", shape: "favo", hue: 268, href: "/cotacao" },
-  desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/dashboard/c/desempenho" },
+  desempenho: { name: "Desempenho", shape: "nuvem", hue: 330, href: "/desempenho" },
   insights: { name: "Dicas de Atendimento", shape: "salte", hue: 200, href: "/conversas/broker" },
-  jornada: { name: "Jornada", shape: "favo", hue: 85, href: "/dashboard/c/jornada" },
-  equipe: { name: "Equipe", shape: "mochi", hue: 150, href: "/dashboard/c/equipe" },
-  "equipe-leads": { name: "Leads da equipe", shape: "cubo", hue: 212, href: "/dashboard/c/equipe-leads" },
-  "equipe-plantao": { name: "Plantão da equipe", shape: "onigiri", hue: 28, href: "/dashboard/c/equipe-plantao" },
-  "equipe-desempenho": { name: "Desempenho da equipe", shape: "nuvem", hue: 330, href: "/dashboard/c/equipe-desempenho" },
+  jornada: { name: "Jornada", shape: "favo", hue: 85, href: "/jornada" },
+  equipe: { name: "Equipe", shape: "mochi", hue: 150, href: "/equipe/minha" },
+  "equipe-leads": { name: "Leads da equipe", shape: "cubo", hue: 212, href: "/leads" },
+  "equipe-plantao": { name: "Plantão da equipe", shape: "onigiri", hue: 28, href: "/equipe/plantao" },
+  "equipe-desempenho": { name: "Desempenho da equipe", shape: "nuvem", hue: 330, href: "/equipe/desempenho" },
 };
 
 /** Assistants that only exist in the supervisor Lite. */
@@ -549,7 +549,7 @@ function agendaScript(data: BrokerWorkspaceData, now: Date): ChatScript {
     };
   }
   const first = data.agenda[0];
-  const items = data.agenda.map((item) => ({
+  const items = data.agenda.slice(0, 6).map((item) => ({
     id: item.id,
     lead: item.leadName,
     primary: item.title,
@@ -558,7 +558,7 @@ function agendaScript(data: BrokerWorkspaceData, now: Date): ChatScript {
     href: item.href,
     swipe: { label: "Cancelar", reply: `Cancelar o retorno de ${item.leadName.split(" ")[0] || item.leadName}`, action: { kind: "server" as const, name: "lead.cancelReturn" as const, payload: { taskId: item.id, leadName: item.leadName } } },
   }));
-  const overdue = data.agenda.filter((item) => item.dueAt && item.dueAt.getTime() <= now.getTime()).length;
+  const overdue = data.agenda.slice(0, 6).filter((item) => item.dueAt && item.dueAt.getTime() <= now.getTime()).length;
   const summary = `Você tem ${items.length} ${items.length === 1 ? "item" : "itens"} na agenda${overdue ? `, ${overdue} já ${overdue === 1 ? "venceu" : "venceram"}` : ""}.`;
   const firstName = first.leadName.split(" ")[0] || first.leadName;
   return {

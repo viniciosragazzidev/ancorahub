@@ -812,7 +812,7 @@ export async function setDutyAbsenceAction(scheduleId: string, assignmentId: str
           : `A gestão desfez a falta no plantão de ${when}. Confirme sua presença para voltar a receber leads.`,
       pushTitle: absent ? "Falta no plantão" : "Falta desfeita",
       pushBody: absent ? `${schedule.name}, ${when}: falta registrada pela gestão.` : `${schedule.name}, ${when}: a falta foi desfeita.`,
-      url: "/dashboard/c/plantao",
+      url: "/plantoes/agora",
       tag: `duty-absence-${confirmationId}`,
       // Duplicates are already stopped by the conditional update above; the time keeps a later
       // mark → undo → mark cycle notifying again (a key without it would swallow the repeat).

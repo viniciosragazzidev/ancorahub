@@ -29,6 +29,13 @@ describe("supervisor Lite chat", () => {
   it("lists the team assistants with who needs the supervisor first", () => {
     const threads = buildSupervisorThreads(data(), now);
     expect(threads.map((thread) => thread.assistant)).toEqual(["ancora", "equipe", "equipe-leads", "equipe-plantao", "equipe-desempenho"]);
+    expect(Object.fromEntries(threads.map((thread) => [thread.assistant, thread.href]))).toMatchObject({
+      ancora: "/dashboard/c/ancora",
+      equipe: "/equipe/minha",
+      "equipe-leads": "/leads",
+      "equipe-plantao": "/equipe/plantao",
+      "equipe-desempenho": "/equipe/desempenho",
+    });
     expect(threads[1]!.preview).toContain("Ana precisa de você");
     expect(threads[1]!.waitingYou).toBe(true);
     expect(threads[2]!.preview).toContain("1 lead(s) com primeiro contato atrasado");

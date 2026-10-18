@@ -8,7 +8,7 @@ import { bestAssistMatch } from "@/features/assist/catalog";
 import { useAssist } from "@/features/assist/components/assist-layer";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import type { AgentId } from "@/features/ai-gateway/agents";
-import { JACK_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
+import { ASSISTANTS, JACK_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 
 import { ChatScreen } from "./chat-screen";
 import type { Mention } from "./composer";
@@ -46,7 +46,8 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
         return { ok: result.ok, message: result.message, warning: result.warning, followUp };
       }}
       onMention={(mention: Mention): ChatBlock[] => {
-        router.push(mention.handle === "cotacao" ? "/cotacao" : `/dashboard/c/${mention.handle}`);
+        const destination = ASSISTANTS[mention.handle as keyof typeof ASSISTANTS]?.href;
+        router.push(destination ?? `/dashboard/c/${encodeURIComponent(mention.handle)}`);
         return [];
       }}
       onFreeText={async (text): Promise<ChatBlock[]> => {

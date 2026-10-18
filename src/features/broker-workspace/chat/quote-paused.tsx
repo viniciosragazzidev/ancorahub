@@ -19,7 +19,7 @@ export function QuotePaused() {
         id: "quote-paused-next",
         prompt: "Enquanto isso, o que você quer fazer?",
         choices: [
-          { id: "leads", label: "Ver meus leads", action: { kind: "href", href: "/dashboard/c/leads" } },
+          { id: "leads", label: "Ver meus leads", action: { kind: "href", href: "/minha-fila" } },
           { id: "home", label: "Voltar ao Início", action: { kind: "href", href: "/dashboard" } },
         ],
       },

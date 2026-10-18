@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const navigation = vi.hoisted(() => ({ pathname: "/dashboard/c/plantao" }));
+const navigation = vi.hoisted(() => ({ pathname: "/plantoes/agora" }));
 vi.mock("next/navigation", () => ({ usePathname: () => navigation.pathname, useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), back: vi.fn(), replace: vi.fn() }) }));
 vi.mock("motion/react", async () => {
   const actual = await vi.importActual<typeof import("motion/react")>("motion/react");
@@ -17,7 +17,7 @@ afterEach(() => cleanup());
 const thread = (id: string, name: string, href: string, extra: Partial<ThreadSummary> = {}): ThreadSummary => ({
   id, kind: "assistant", name, preview: `${name} em dia.`, at: null, unread: false, waitingYou: false, href, shape: "mochi", hue: 212, ...extra,
 });
-const assistants = [thread("assistant:leads", "Leads", "/dashboard/c/leads", { assistant: "leads" }), thread("assistant:plantao", "Plantão", "/dashboard/c/plantao", { assistant: "plantao" })];
+const assistants = [thread("assistant:leads", "Leads", "/minha-fila", { assistant: "leads" }), thread("assistant:plantao", "Plantão", "/plantoes/agora", { assistant: "plantao" })];
 const leads = [thread("lead:1", "Maria Souza", "/leads/1", { kind: "lead", leadId: "1", waitingYou: true, initials: "MS" })];
 
 describe("ChatHome", () => {
@@ -46,7 +46,7 @@ describe("ChatHome", () => {
         leads={leads}
         nowIso="2026-10-10T12:00:00.000Z"
         canQuote
-        summary={{ receivedToday: 4, acceptedToday: 3, inServiceNow: 2, slaAtRiskNow: 1, duty: { title: "De plantão: PME", detail: "09:00 às 18:00", href: "/dashboard/c/plantao" }, goal: null }}
+        summary={{ receivedToday: 4, acceptedToday: 3, inServiceNow: 2, slaAtRiskNow: 1, duty: { title: "De plantão: PME", detail: "09:00 às 18:00", href: "/plantoes/agora" }, goal: null }}
       />,
     );
     expect(screen.getByText("Recebidos hoje")).toBeTruthy();
