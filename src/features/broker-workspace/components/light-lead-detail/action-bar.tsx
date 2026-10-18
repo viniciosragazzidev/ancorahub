@@ -7,7 +7,7 @@ import { Button } from "@/components/arc/button/button";
 import type { LightLeadDetailData } from "./types";
 import type { LeadDetailController } from "./use-lead-detail";
 
-const linkBase = "inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold";
+const linkBase = "inline-flex h-11 min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold outline-none transition-transform active:scale-[0.98] focus-visible:ring-2 focus-visible:ring-(--accent) focus-visible:ring-offset-2";
 const linkPrimary = `${linkBase} bg-(--accent) text-(--accent-foreground)`;
 const linkSecondary = `${linkBase} bg-(--surface-muted) text-(--foreground)`;
 

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 import { ChatScreen } from "@/components/chat/chat-screen";
 import styles from "@/components/chat/chat.module.css";
@@ -15,7 +15,6 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { runChatServerAction } from "./chat-actions";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import { WHATSAPP_LOCAL_PREFIX, whatsappButton } from "./lead-script";
-import { LeadSocialLayout } from "./lead-social-layout";
 import { ASSISTANTS } from "./assistant-scripts";
 
 /**
@@ -27,7 +26,6 @@ export function LeadConversation({
   name,
   initials,
   script,
-  profile,
 }: {
   leadId: string;
   name: string;
@@ -35,8 +33,6 @@ export function LeadConversation({
   /** Kept for the callers; the composer is off on the lead page since 2026-10-12. */
   canWrite: boolean;
   script: ChatScript;
-  /** The client's profile and actions, shown beside (computer) or above (phone) the conversation. */
-  profile: ReactNode;
 }) {
   const router = useRouter();
   // On a computer "WhatsApp" opens the first-message dialog (send from the system or connect); phones open the app.
@@ -44,7 +40,6 @@ export function LeadConversation({
   const [firstMessageOpen, setFirstMessageOpen] = useState(false);
   return (
     <div className="arc-venancor">
-      <LeadSocialLayout profile={profile}>
       <ChatScreen
         identity={{ name, shape: "mochi", hue: null, initials }}
         backHref="/dashboard"
@@ -116,7 +111,6 @@ export function LeadConversation({
           return [];
         }}
       />
-      </LeadSocialLayout>
       {desktop ? <FirstMessageDialog leadId={leadId} open={firstMessageOpen} onOpenChange={setFirstMessageOpen} onSent={() => router.refresh()} /> : null}
     </div>
   );

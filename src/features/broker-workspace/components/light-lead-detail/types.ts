@@ -30,6 +30,8 @@ export type LightLeadDetailData = {
   summary?: string | null;
   createdAt: Date | string;
   assignedAt?: Date | string | null;
+  /** The plantão that handed the lead out (its name, as the broker knows it). */
+  dutyName?: string | null;
   slaFirstContactMinutes?: number;
   isCurrentBroker: boolean;
   tipo?: string | null;
