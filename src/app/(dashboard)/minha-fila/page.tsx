@@ -392,8 +392,8 @@ async function MinhaFilaContent() {
         summary: readDetail(extra?.qualificationDetails, "resumoAtendimento") ?? readDetail(extra?.qualificationDetails, "resumoNecessidade"),
         // The creation date is when it reached the brokerage; the broker only gets the assignment.
         createdAt: l.assignedAt ?? l.createdAt,
-        // When it reached this broker (distribution), the lead's creation otherwise.
-        arrivedAt: l.assignedAt ?? l.createdAt,
+        // Distribution to the broker only; when the lead entered the company stays hidden.
+        arrivedAt: l.assignedAt ?? null,
         dutyName: l.dutyName,
         updatedAt: l.stageEnteredAt,
         dueAt,

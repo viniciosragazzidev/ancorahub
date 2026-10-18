@@ -122,7 +122,7 @@ export function LightClientsList({ clients, management = false }: { clients: Lig
       {filteredClients.length > 0 ? (
         management ? (
           groups.map((group) => (
-            <PeopleSection key={group.label} id={`clientes-${group.label}`} title={group.label} count={group.items.length}>
+            <PeopleSection key={group.label} id={`clientes-${group.label.replace(/\s+/g, "-")}`} title={group.label} count={group.items.length}>
               {group.items.map(renderClient)}
             </PeopleSection>
           ))

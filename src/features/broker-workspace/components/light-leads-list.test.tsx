@@ -37,7 +37,7 @@ vi.mock("@/components/arc/segmented-control/segmented-control", () => ({
   ),
 }));
 
-import { LightLeadsList, type LightLeadItem } from "./light-leads-list";
+import { arrivalLabel, LightLeadsList, type LightLeadItem } from "./light-leads-list";
 
 const base = { phone: null, createdAt: new Date("2026-10-08T12:00:00Z") };
 const leads: LightLeadItem[] = [
@@ -116,5 +116,25 @@ describe("LightLeadsList", () => {
   it("hides the Em risco tab when nothing is at risk", () => {
     render(<LightLeadsList leads={leads} />);
     expect(screen.queryByRole("button", { name: /^Em risco/ })).toBeNull();
+  });
+
+  it("shows when the lead was handed to the broker, never when it entered the company", () => {
+    const now = new Date("2026-10-17T18:00:00-03:00");
+    const lead = (arrivedAt: string | null): LightLeadItem => ({ ...base, id: "x", name: "X", status: "distributed", createdAt: new Date("2026-09-01T10:00:00-03:00"), arrivedAt });
+    expect(arrivalLabel(lead("2026-10-17T14:32:00-03:00"), now)).toBe("Hoje 14:32");
+    expect(arrivalLabel(lead("2026-10-16T09:10:00-03:00"), now)).toBe("Ontem 09:10");
+    expect(arrivalLabel(lead("2026-10-14T11:00:00-03:00"), now)).toBe("Há 3 dias (14/10)");
+    expect(arrivalLabel(lead(null), now)).toBeNull();
+  });
+
+  it("separates today's leads from older ones", () => {
+    const today = new Date().toISOString();
+    const old = new Date(Date.now() - 4 * 86_400_000).toISOString();
+    render(<LightLeadsList initialFilter="active" leads={[
+      { ...base, id: "t1", name: "Hoje Lead", status: "negotiation", arrivedAt: today },
+      { ...base, id: "o1", name: "Antigo Lead", status: "negotiation", arrivedAt: old },
+    ]} />);
+    expect(within(screen.getByRole("region", { name: /Recebidos hoje/ })).getByText("Hoje Lead")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: /Dias anteriores/ })).getByText("Antigo Lead")).toBeTruthy();
   });
 });

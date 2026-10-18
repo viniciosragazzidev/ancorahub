@@ -111,9 +111,11 @@ export type PeopleRowProps = {
   action?: ReactNode;
   index?: number;
   dataTour?: string;
+  /** Linha discreta (ex.: lead de dias atrás), para o de hoje se destacar. */
+  faded?: boolean;
 };
 
-export function PeopleRow({ name, href, seed, avatar, chip, preview, previewTone = "muted", meta, dot, dotLabel, action, index = 0, dataTour }: PeopleRowProps) {
+export function PeopleRow({ name, href, seed, avatar, chip, preview, previewTone = "muted", meta, dot, dotLabel, action, index = 0, dataTour, faded = false }: PeopleRowProps) {
   const content = (
     <>
       {avatar ?? <span className={styles.avatar} style={{ "--hue": peopleHue(seed ?? name) } as CSSProperties} aria-hidden="true">{peopleInitials(name)}</span>}
@@ -125,14 +127,14 @@ export function PeopleRow({ name, href, seed, avatar, chip, preview, previewTone
         {preview ? <span className={styles.preview} data-tone={previewTone}>{preview}</span> : null}
       </span>
       <span className={styles.meta}>
-        {meta ? <span>{meta}</span> : null}
+        {meta ? <span suppressHydrationWarning>{meta}</span> : null}
         {dot ? <span className={styles.dot} data-tone={dot} aria-label={dotLabel} role={dotLabel ? "img" : undefined} /> : null}
       </span>
     </>
   );
   return (
     <li className={styles.enter} style={enterStyle(index + 3)} data-tour={dataTour}>
-      <div className={styles.row} data-has-action={Boolean(action)}>
+      <div className={styles.row} data-has-action={Boolean(action)} data-faded={faded || undefined}>
         {href ? <Link href={href} className={styles.rowLink}>{content}</Link> : <div className={styles.rowLink}>{content}</div>}
         {action ? <div className={styles.action}>{action}</div> : null}
       </div>

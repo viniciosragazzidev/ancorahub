@@ -101,15 +101,59 @@ function arrival(lead: LightLeadItem) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** Newest arrival first. The arrival itself is never shown to the broker. */
+/** Newest arrival first. */
 function sortByArrival(leads: LightLeadItem[]) {
   return [...leads].sort((a, b) => (arrival(b)?.getTime() ?? 0) - (arrival(a)?.getTime() ?? 0));
+}
+
+const TIME_ZONE = "America/Sao_Paulo";
+const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const timeOf = new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" });
+const dayMonth = new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, day: "2-digit", month: "2-digit" });
+
+/**
+ * When the lead was handed to the broker (distribution). Never the moment the
+ * lead entered the company (createdAt): that stays hidden (Vinicios, 17/10).
+ */
+function distributedAt(lead: LightLeadItem) {
+  if (!lead.arrivedAt) return null;
+  const date = lead.arrivedAt instanceof Date ? lead.arrivedAt : new Date(lead.arrivedAt);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/** Days between the distribution to the broker and today, on the São Paulo calendar (0 = today). */
+export function arrivalDaysAgo(lead: LightLeadItem, now = new Date()) {
+  const date = distributedAt(lead);
+  if (!date) return null;
+  const toUtcDay = (value: Date) => { const [y, m, d] = dayKey.format(value).split("-").map(Number); return Date.UTC(y!, m! - 1, d!); };
+  return Math.round((toUtcDay(now) - toUtcDay(date)) / 86_400_000);
+}
+
+/**
+ * When the lead was distributed to the broker, always visible (Vinicios, 17/10:
+ * brokers opened a lead from days ago thinking it was today's). "Hoje 14:32",
+ * "Ontem 09:10", "Há 3 dias (14/10)".
+ */
+export function arrivalLabel(lead: LightLeadItem, now = new Date()) {
+  const date = distributedAt(lead);
+  const days = arrivalDaysAgo(lead, now);
+  if (!date || days === null) return null;
+  if (days <= 0) return `Hoje ${timeOf.format(date)}`;
+  if (days === 1) return `Ontem ${timeOf.format(date)}`;
+  return `Há ${days} dias (${dayMonth.format(date)})`;
+}
+
+/** Group header for the arrival day: "Recebidos hoje", "Recebidos ontem", "Dias anteriores". */
+function arrivalGroup(lead: LightLeadItem, now: Date) {
+  const days = arrivalDaysAgo(lead, now);
+  return days === null || days > 1 ? "Dias anteriores" : days === 1 ? "Recebidos ontem" : "Recebidos hoje";
 }
 
 /** A lead in the phone-book list: who it is, where it stands and, when new, the accept button beside it. */
 function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number; dataTour?: string }) {
   const state = describeLead(lead);
   const urgent = needsYouNow(lead);
+  const days = arrivalDaysAgo(lead);
   return (
     <PeopleRow
       index={index}
@@ -118,6 +162,8 @@ function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number
       name={lead.name}
       chip={<Badge tone={state.tone} size="sm">{state.chip}</Badge>}
       preview={withDuty(state.context, lead)}
+      meta={arrivalLabel(lead)}
+      faded={days !== null && days > 0 && !lead.isAwaitingResponse && !isNewLead(lead)}
       previewTone={lead.isAwaitingResponse ? "waiting" : lead.isSlaAtRisk || lead.isOverdue ? "alert" : "muted"}
       dot={urgent ? (lead.isSlaAtRisk || lead.isOverdue ? "alert" : "waiting") : null}
       dotLabel={urgent ? "Precisa de você agora" : undefined}
@@ -169,6 +215,18 @@ export function LightLeadsList({
   const urgent = filter === "closed" ? [] : visible.filter(needsYouNow).sort((a, b) => (arrival(b)?.getTime() ?? 0) - (arrival(a)?.getTime() ?? 0));
   const rest = filter === "closed" ? visible : visible.filter((lead) => !needsYouNow(lead));
   const searching = searchQuery.trim().length > 0;
+  // The rest by the day it arrived: today's leads never mix with older ones.
+  const restGroups = useMemo(() => {
+    const now = new Date();
+    const groups: Array<{ label: string; items: LightLeadItem[] }> = [];
+    for (const lead of sortByArrival(rest)) {
+      const label = arrivalGroup(lead, now);
+      const last = groups.at(-1);
+      if (last?.label === label) last.items.push(lead);
+      else groups.push({ label, items: [lead] });
+    }
+    return groups;
+  }, [rest]);
 
   // "Em risco" only takes room in the bar while there is something at risk (or the broker came from the Inicio card).
   const tabs = (["new", "active", "returns", "risk", "closed"] as const).filter((value) => value !== "risk" || counts.risk > 0 || filter === "risk");
@@ -222,13 +280,13 @@ export function LightLeadsList({
               </PeopleSection>
             ) : null}
 
-            {rest.length > 0 ? (
-              <PeopleSection id="rest-heading" title={urgent.length > 0 ? "Demais atendimentos" : undefined}>
-                {sortByArrival(rest).map((lead, index) => (
-                  <LeadRow key={lead.id} lead={lead} index={urgent.length + index} dataTour={urgent.length === 0 && index === 0 ? "micro-queue-lead" : undefined} />
+            {restGroups.map((group, groupIndex) => (
+              <PeopleSection key={group.label} id={`rest-${groupIndex}`} title={restGroups.length > 1 ? group.label : urgent.length > 0 ? "Demais atendimentos" : undefined} count={restGroups.length > 1 ? group.items.length : undefined}>
+                {group.items.map((lead, index) => (
+                  <LeadRow key={lead.id} lead={lead} index={urgent.length + index} dataTour={urgent.length === 0 && groupIndex === 0 && index === 0 ? "micro-queue-lead" : undefined} />
                 ))}
               </PeopleSection>
-            ) : null}
+            ))}
           </>
         )}
       </PeoplePage>
