@@ -13,12 +13,18 @@ export const quickReplyIntentValues = [
 export type QuickReplyIntent = (typeof quickReplyIntentValues)[number];
 
 /**
- * Terminal quick replies stop the automated conversation, but they must not
- * orphan a real lead. The lead can still be offered internally; the opt-out
- * guard remains responsible for preventing any outbound message to the lead.
+ * Terminal quick replies (no interest, already solved, wrong number) stop the automated
+ * conversation and keep the lead away from brokers: disqualified and held for the director,
+ * who can hand it back (Vinicios, 18/10). Before, it was queued as cold and reached a broker.
+ * The automatic-distribution guard (lead-distribution/domain.ts) also holds disqualified leads.
  */
-export function shouldQueueLeadAfterTerminalReply(intent: QuickReplyIntent | null | undefined) {
-  return intent === "OPT_OUT" || intent === "NO_LONGER_INTERESTED" || intent === "WRONG_NUMBER";
+export function terminalReplyLeadDisposition() {
+  return {
+    status: "new" as const,
+    distributionStatus: "manual_hold" as const,
+    qualificationStatus: "disqualified" as const,
+    qualificationState: "COMPLETED" as const,
+  };
 }
 
 export const conversationAutomationStateValues = ["AI_ACTIVE", "WAITING_HUMAN", "HUMAN_IN_PROGRESS", "PAUSED", "CLOSED"] as const;
@@ -127,7 +133,10 @@ export function parseHumanRequest(value: string | null | undefined) {
 
 export function parseOptOut(value: string | null | undefined) {
   const text = normalizeQuickReplyText(value);
-  return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse)$/.test(text) || /(nao tenho interesse|sem interesse|nao quero|nao tenho mais interesse|ja contratei|ja tenho|nao solicitei|nao pedi)/.test(text);
+  return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse)$/.test(text)
+    || /(nao tenho interesse|sem interesse|nao quero|nao tenho mais interesse|ja contratei|ja tenho|nao solicitei|nao pedi|(fechei|contratei) com outr)/.test(text)
+    // "Already solved" only as the whole answer: "já consegui os documentos" mid-conversation is not a no (18/10).
+    || /^ja (consegui|fechei|fiz|resolvi)( (o|um) plano)?( obrigad[oa])?$/.test(text);
 }
 
 /** Common questions mid-qualification now live with the situations (Atendimento → Situações). */

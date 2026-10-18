@@ -9,8 +9,9 @@ import {
   parseWrongNumber,
   resolveQuickReply,
   shouldContinueQualificationAfterMedia,
-  shouldQueueLeadAfterTerminalReply,
+  terminalReplyLeadDisposition,
 } from "./quick-reply";
+import { automaticDistributionHoldReason } from "@/features/lead-distribution/domain";
 
 describe("QuickReplyResolver", () => {
   it("normalizes greetings, confirmations and thanks without calling a model", () => {
@@ -36,11 +37,17 @@ describe("QuickReplyResolver", () => {
     expect(resolveQuickReply({ body: "atendente", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: false })).toMatchObject({ intent: "REQUEST_HUMAN", nextState: "WAITING_HUMAN" });
   });
 
-  it("keeps a terminal lead eligible for internal distribution", () => {
-    expect(shouldQueueLeadAfterTerminalReply("OPT_OUT")).toBe(true);
-    expect(shouldQueueLeadAfterTerminalReply("NO_LONGER_INTERESTED")).toBe(true);
-    expect(shouldQueueLeadAfterTerminalReply("WRONG_NUMBER")).toBe(true);
-    expect(shouldQueueLeadAfterTerminalReply("GREETING")).toBe(false);
+  it("holds a terminal lead for the director instead of distributing it (case Vanessa, 18/10)", () => {
+    expect(terminalReplyLeadDisposition()).toEqual({ status: "new", distributionStatus: "manual_hold", qualificationStatus: "disqualified", qualificationState: "COMPLETED" });
+    expect(automaticDistributionHoldReason(terminalReplyLeadDisposition().qualificationStatus, "COMPLETED")).not.toBeNull();
+  });
+
+  it("reads 'already solved' as no interest, without catching a mid-conversation 'já consegui os documentos'", () => {
+    for (const text of ["Já consegui", "já consegui, obrigada", "Não quero não", "Já fechei com outro corretor", "contratei com outra", "já tenho plano"]) {
+      expect(parseOptOut(text), text).toBe(true);
+    }
+    expect(parseOptOut("já consegui os documentos")).toBe(false);
+    expect(parseOptOut("quero sim")).toBe(false);
   });
 
   it("does not interrupt a pending qualification question with a greeting", () => {

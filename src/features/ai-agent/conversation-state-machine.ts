@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, desc, eq, gt, inArray, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { generateAiResponse, detectLanguage, detectHumanTransferRequest } from "./service";
 import { loadTenantAiAgentConfig } from "./tenant-config";
@@ -30,7 +30,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
 import { evaluateQualification, persistQualificationEvaluation, getNextQualificationQuestion, resolveDeterministicQualificationTurn, type DeterministicQualificationTurn } from "@/features/qualification-engine/service";
-import { shouldQueueLeadAfterTerminalReply } from "./quick-reply";
+import { terminalReplyLeadDisposition } from "./quick-reply";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { enqueueWahaAiReply } from "@/features/waha-cadence/service";
 import { handlePostClosingInboundMessage } from "@/features/ai-qualification/closing-state-service";
@@ -1426,21 +1426,11 @@ export async function processInboundAiResponse({
         .set(buildHumanHandoffLeadUpdate(now))
         .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
       await enqueueAndProcessLeadDistribution({ tenantId, leadId, source: "human_handoff" });
-    } else if (quickReply.intent === "OPT_OUT" || quickReply.intent === "NO_LONGER_INTERESTED" || quickReply.intent === "WRONG_NUMBER") {
-      await db.update(schema.leads).set({
-        qualificationStatus: "cold",
-        qualificationState: "QUALIFIED",
-        status: "distributed",
-        distributionStatus: "unassigned",
-        updatedAt: now,
-      }).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
-      if (shouldQueueLeadAfterTerminalReply(quickReply.intent)) {
-        await enqueueAndProcessLeadDistribution({
-          tenantId,
-          leadId,
-          source: "qualification_completed",
-        });
-      }
+    } else if ((quickReply.intent === "OPT_OUT" || quickReply.intent === "NO_LONGER_INTERESTED" || quickReply.intent === "WRONG_NUMBER") && !leadOwner?.corretorId) {
+      // Said no (or wrong number): never goes to a broker. Held for the director, who may hand it back
+      // (Vinicios, 18/10, case Vanessa Soares: "Não quero não" and she still reached Alan as cold).
+      await db.update(schema.leads).set({ ...terminalReplyLeadDisposition(), updatedAt: now })
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId), isNull(schema.leads.corretorId)));
     }
     const waitWindowMs = (cooldownConfig?.waitWindowMinutes ?? 30) * 60 * 1000;
     const waitWindowActive = conversation.quickReplyWaitWindowStartedAt && now.getTime() - conversation.quickReplyWaitWindowStartedAt.getTime() < waitWindowMs;
