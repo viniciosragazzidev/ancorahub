@@ -16,7 +16,7 @@ function data(overrides: Partial<SupervisorWorkspaceData> = {}): SupervisorWorks
     goal: null,
     duty: [{ brokerId: "b2", brokerName: "Bruno Reis", scheduleName: "PME Tarde", startsAt: "13:30", endsAt: "19:00", paused: false, presence: "pending" }],
     today: { receivedToday: 2, inService: 4, waiting: 1, late: 1 },
-    attention: [{ leadId: "l1", name: "Maria Souza", brokerName: "Ana Lima", assignedAt: new Date("2026-10-10T14:20:00-03:00"), late: true }],
+    attention: [{ leadId: "l1", name: "Maria Souza", brokerId: "broker-1", brokerName: "Ana Lima", assignedAt: new Date("2026-10-10T14:20:00-03:00"), late: true }],
     unreadNotifications: 0,
     latestNotificationTitle: null,
     slaMinutes: 15,

@@ -3,6 +3,7 @@ import { LightDashboardUnavailable } from "@/features/broker-workspace/component
 import { getCachedSupervisorWorkspaceData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { loadNeedsYouIfEnabled, type NeedsYouSummary } from "@/features/team-management-extras/needs-you-summary";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { buildSupervisorNowItems } from "./now-items";
 
 import type { SupervisorWorkspaceData } from "./queries";
 
@@ -14,6 +15,11 @@ function summaryOf(data: SupervisorWorkspaceData): HomeSummary {
     slaAtRiskNow: data.today.late,
     duty: null,
     goal: data.goal,
+    now: {
+      title: "Acontecendo agora",
+      emptyText: "Sem leads chegando ou atrasados. Confira a escala de hoje quando quiser.",
+      items: buildSupervisorNowItems(data, data.updatedAt),
+    },
     // The team's day (the broker's labels do not fit a supervisor).
     stats: [
       { label: "Corretores na equipe", value: data.team.length },

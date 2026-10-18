@@ -42,6 +42,8 @@ function makeData(overrides: Partial<BrokerWorkspaceData> = {}): BrokerWorkspace
   return {
     viewer: { tenantId: "t", userId: "u", name: "Ana Souza", branchName: "Centro", availabilityStatus: "available" },
     nextAction: null,
+    priorities: [],
+    pendingOffers: [],
     duty: null,
     today: emptyToday,
     inbox: [],

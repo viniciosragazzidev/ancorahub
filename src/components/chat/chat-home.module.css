@@ -84,3 +84,33 @@
 .headerPill:hover { background: var(--surface-muted); }
 .headerPill svg { width: 16px; height: 16px; }
 .emptyAction { display: flex; justify-content: center; padding: 4px 20px 16px; }
+
+.nowSection { display: grid; gap: 8px; width: 100%; padding: 14px; border-radius: var(--radius-panel); background: var(--surface-muted); box-shadow: var(--shadow-resting); text-align: left; }
+.nowMobile { margin: 2px 20px 12px; width: auto; }
+.nowDesktop { display: none; }
+.nowHeader { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.nowTitle { margin: 0; font-size: var(--text-base); font-weight: 600; letter-spacing: var(--tracking-display); }
+.nowCount { display: grid; min-width: 22px; height: 22px; place-items: center; padding: 0 6px; border-radius: 999px; background: var(--accent); color: var(--accent-foreground); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.nowList { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.nowItem { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; min-width: 0; padding: 8px 0; }
+.nowItemCopy { display: grid; gap: 3px; min-width: 0; }
+.nowItemTitle { overflow: hidden; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.nowItemDetail { color: var(--text-secondary); font-size: var(--text-xs); line-height: 1.4; }
+.nowCountdown { color: var(--danger); font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums; }
+.nowAction { display: inline-flex; min-width: 84px; min-height: 44px; align-items: center; justify-content: center; padding: 0 14px; border: 0; border-radius: 999px; background: var(--accent); color: var(--accent-foreground); box-shadow: var(--shadow-resting); font: inherit; font-size: var(--text-sm); font-weight: 600; text-align: center; text-decoration: none; white-space: nowrap; cursor: pointer; transition: transform var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+.nowAction:hover { background: var(--accent-strong); }
+.nowAction:active { transform: scale(.98); }
+.nowAction:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.nowItem[data-tone="urgent"] .nowItemTitle { color: var(--danger); }
+.nowItem[data-tone="waiting"] .nowItemTitle { color: var(--accent-strong); }
+.nowEmpty { margin: 0; color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.45; }
+
+@media (min-width: 1024px) {
+  .nowMobile { display: none; }
+  .nowDesktop { display: grid; margin: 6px 0 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nowAction { transition: none; }
+  .nowAction:active { transform: none; }
+}

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lte, not, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, ilike, inArray, isNull, lte, not, sql } from "drizzle-orm";
 
 import {
   prioritizeBrokerWorkspace,
@@ -44,6 +44,7 @@ export type BrokerActiveDuty = { scheduleId: string; scheduleName: string; queue
 export type BrokerWorkspaceData = {
   viewer: { tenantId: string; userId: string; name: string; branchName: string; availabilityStatus: "available" | "paused" | "offline" };
   nextAction: BrokerWorkspacePriority | null;
+  priorities: BrokerWorkspacePriority[];
   duty: {
     active: BrokerActiveDuty | null;
     /** Every plantão running now (a broker can be in PME and Presencial at once); the first one is `active`. */
@@ -56,7 +57,8 @@ export type BrokerWorkspaceData = {
   today: { awaitingResponse: number; overdueTasks: number; returnsDue: number; newLeads: number; pendingDocuments: number; pendingProposals: number; unreadNotifications: number; receivedToday: number; acceptedToday: number; inServiceNow: number; slaAtRiskNow: number };
   inbox: Array<{ id: string; source: "message" | "task" | "lead" | "document" | "proposal" | "notification"; title: string; description: string; href: string; severity: "critical" | "warning" | "normal" }>;
   agenda: Array<{ id: string; leadId: string; leadName: string; title: string; dueAt: Date | null; priority: "low" | "normal" | "urgent"; href: string }>;
-  queue: Array<{ id: string; name: string; status: string; source: string; nextAction: BrokerWorkspacePriority | null }>;
+  queue: Array<{ id: string; name: string; status: string; source: string; arrivedAt: Date | null; nextAction: BrokerWorkspacePriority | null }>;
+  pendingOffers: Array<{ leadId: string; name: string; offeredAt: Date; expiresAt: Date; scheduleName: string | null }>;
   goal: { name: string; percentage: number; currentValue: string; targetValue: string } | null;
   updatedAt: Date;
 };
@@ -100,7 +102,7 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
   const now = new Date();
   const { start: todayStart, end: tomorrowStart } = getSaoPauloDayBounds(now);
   const todayKey = getSaoPauloDateKey(now);
-  const [profile, leads, dutyInputs, todayCountRows] = await Promise.all([
+  const [profile, leads, dutyInputs, todayCountRows, pendingOfferRows] = await Promise.all([
     db
       .select({
         name: schema.user.name,
@@ -127,7 +129,7 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
       })
       .from(schema.leads)
       .where(and(eq(schema.leads.tenantId, context.tenantId), eq(schema.leads.corretorId, context.userId), isNull(schema.leads.deletedAt), not(ilike(schema.leads.nome, "Lead WhatsApp (%)")), inArray(schema.leads.status, activeLeadStatuses)))
-      .orderBy(desc(schema.leads.createdAt))
+      .orderBy(sql`${schema.leads.assignedAt} desc nulls last`, asc(schema.leads.id))
       .limit(200),
     loadBrokerDutyRows({ tenantId: context.tenantId, brokerId: context.userId, now, fromDateKey: todayKey }),
     db.select({
@@ -159,6 +161,25 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
     }).from(schema.tenantMemberships)
       .where(and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, context.userId)))
       .limit(1),
+    db.select({
+      leadId: schema.leadOffers.leadId,
+      name: schema.leads.nome,
+      offeredAt: schema.leadOffers.offeredAt,
+      expiresAt: schema.leadOffers.expiresAt,
+      scheduleName: schema.unitDutySchedules.name,
+    })
+      .from(schema.leadOffers)
+      .innerJoin(schema.leads, and(eq(schema.leads.id, schema.leadOffers.leadId), eq(schema.leads.tenantId, schema.leadOffers.tenantId)))
+      .leftJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.leadOffers.dutyScheduleId), eq(schema.unitDutySchedules.tenantId, schema.leadOffers.tenantId)))
+      .where(and(
+        eq(schema.leadOffers.tenantId, context.tenantId),
+        eq(schema.leadOffers.brokerId, context.userId),
+        inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
+        gt(schema.leadOffers.expiresAt, now),
+        isNull(schema.leads.deletedAt),
+      ))
+      .orderBy(asc(schema.leadOffers.expiresAt))
+      .limit(20),
   ]);
 
   const duty = await buildDutySummary({
@@ -267,24 +288,39 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
     })),
   ].slice(0, 8);
 
+  const pendingOffers = pendingOfferRows.map((offer) => ({
+    leadId: offer.leadId,
+    name: offer.name,
+    offeredAt: offer.offeredAt,
+    expiresAt: offer.expiresAt,
+    scheduleName: offer.scheduleName,
+  }));
+  const pendingOfferByLead = new Map<string, (typeof pendingOffers)[number]>();
+  for (const offer of pendingOffers) if (!pendingOfferByLead.has(offer.leadId)) pendingOfferByLead.set(offer.leadId, offer);
   const leadNameById = new Map(leads.map((lead) => [lead.id, lead.name]));
   // Leads that reached the broker today come first, newest first: older leads
   // with a pending reply were taking the top and brokers lost today's arrivals.
-  const arrivalOf = (lead: (typeof leads)[number]) => (lead.assignedAt ?? lead.createdAt).getTime();
-  const arrivedToday = (lead: (typeof leads)[number]) => arrivalOf(lead) >= todayStart.getTime();
+  const arrivalOf = (lead: (typeof leads)[number]) => pendingOfferByLead.get(lead.id)?.offeredAt ?? lead.assignedAt ?? null;
+  const arrivedToday = (lead: (typeof leads)[number]) => {
+    const arrivedAt = arrivalOf(lead);
+    return Boolean(arrivedAt && arrivedAt >= todayStart && arrivedAt < tomorrowStart);
+  };
   const todayLeadIds = new Set(leads.filter(arrivedToday).map((lead) => lead.id));
   const queue = [...leads]
     .sort((left, right) => {
       const todayLeft = arrivedToday(left);
       const todayRight = arrivedToday(right);
       if (todayLeft !== todayRight) return todayLeft ? -1 : 1;
-      if (todayLeft) return arrivalOf(right) - arrivalOf(left);
+      const arrivedLeft = arrivalOf(left)?.getTime() ?? Number.NEGATIVE_INFINITY;
+      const arrivedRight = arrivalOf(right)?.getTime() ?? Number.NEGATIVE_INFINITY;
+      if (arrivedLeft !== arrivedRight) return arrivedRight - arrivedLeft;
+      if (todayLeft) return 0;
       const normalizedLeft = priorityRankByLead.get(left.id) ?? Number.MAX_SAFE_INTEGER;
       const normalizedRight = priorityRankByLead.get(right.id) ?? Number.MAX_SAFE_INTEGER;
-      return normalizedLeft !== normalizedRight ? normalizedLeft - normalizedRight : right.createdAt.getTime() - left.createdAt.getTime();
+      return normalizedLeft !== normalizedRight ? normalizedLeft - normalizedRight : left.name.localeCompare(right.name);
     })
     .slice(0, 8)
-    .map((lead) => ({ id: lead.id, name: lead.name, status: lead.status, source: lead.source, nextAction: priorityByLead.get(lead.id) ?? null }));
+    .map((lead) => ({ id: lead.id, name: lead.name, status: lead.status, source: lead.source, arrivedAt: arrivalOf(lead), nextAction: priorityByLead.get(lead.id) ?? null }));
 
   return {
     viewer: {
@@ -295,6 +331,7 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
       availabilityStatus: profile[0]?.availabilityStatus ?? "available",
     },
     nextAction: (queue.find((lead) => todayLeadIds.has(lead.id) && lead.nextAction)?.nextAction) ?? priorities[0] ?? null,
+    priorities,
     today: {
       awaitingResponse: new Set(priorities.filter((priority) => priority.kind === "awaiting_response").map((priority) => priority.leadId)).size,
       overdueTasks: priorities.filter((priority) => priority.kind === "task_overdue").length,
@@ -309,6 +346,7 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
     inbox,
     agenda: tasks.map((task) => ({ id: task.id, leadId: task.leadId, leadName: leadNameById.get(task.leadId) ?? "Lead", title: task.title, dueAt: task.dueAt, priority: task.priority as BrokerWorkspacePriorityTask["priority"], href: `/leads/${task.leadId}#tarefas` })),
     queue,
+    pendingOffers,
     goal: goals[0] ? { name: goals[0].name, percentage: Number(goals[0].percentage ?? 0), currentValue: String(goals[0].currentValue ?? "0"), targetValue: String(goals[0].targetValue) } : null,
     updatedAt: now,
   };

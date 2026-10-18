@@ -4,9 +4,9 @@ import { and, desc, eq, gte, isNull, lt, ne, or } from "drizzle-orm";
 
 import { getCachedBrokerWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
 import type { BrokerActiveDuty } from "@/features/broker-workspace/queries";
-import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { buildDutyNowLeads, isWithinDutyWindow } from "./duty-now-domain";
 
 export type DutyNowLead = {
   leadId: string;
@@ -35,16 +35,6 @@ export type DutyNow = {
   state: "ativo" | "pausado" | "aguardando";
   leads: DutyNowLead[];
   totals: { offered: number; accepted: number; missed: number; started: number; medianAcceptSeconds: number | null };
-};
-
-const OFFER_LABEL: Record<string, { status: string; tone: DutyNowLead["tone"] }> = {
-  ACCEPTED: { status: "Aceito", tone: "ok" },
-  DECLINED: { status: "Recusado", tone: "lost" },
-  EXPIRED: { status: "Expirou", tone: "lost" },
-  PENDING: { status: "Esperando você", tone: "wait" },
-  SENT: { status: "Esperando você", tone: "wait" },
-  DELIVERED: { status: "Esperando você", tone: "wait" },
-  READ: { status: "Esperando você", tone: "wait" },
 };
 
 const NOT_STARTED = ["new", "distributed"];
@@ -121,33 +111,11 @@ export async function loadDutyNow(input: { tenantId: string; brokerId: string; n
       .limit(100),
   ]);
 
-  const byLead = new Map<string, DutyNowLead>();
-  for (const offer of offers) {
-    if (byLead.has(offer.leadId)) continue;
-    const overdue = !offer.acceptedAt && ["PENDING", "SENT", "DELIVERED", "READ"].includes(offer.status) && offer.expiresAt <= now;
-    const label = overdue ? { status: "Expirou", tone: "lost" as const } : OFFER_LABEL[offer.status] ?? { status: offer.status, tone: "wait" as const };
-    const stillMine = Boolean(offer.acceptedAt) && offer.leadOwner === brokerId;
-    byLead.set(offer.leadId, {
-      leadId: offer.leadId,
-      name: offer.name,
-      origin: "oferta",
-      // Accepted and later reassigned: the step belongs to the other broker now.
-      status: stillMine ? LEAD_STATUS_LABELS[offer.leadStatus] ?? label.status : offer.acceptedAt ? "Repassado" : label.status,
-      tone: stillMine ? "ok" : offer.acceptedAt ? "lost" : label.tone,
-      at: offer.offeredAt,
-      acceptSeconds: offer.acceptedAt ? Math.max(0, Math.round((offer.acceptedAt.getTime() - offer.offeredAt.getTime()) / 1000)) : null,
-      openable: stillMine,
-    });
-  }
-  for (const lead of assigned) {
-    if (byLead.has(lead.leadId) || !lead.assignedAt) continue;
-    byLead.set(lead.leadId, { leadId: lead.leadId, name: lead.name, origin: "atribuicao", status: LEAD_STATUS_LABELS[lead.status] ?? lead.status, tone: "ok", at: lead.assignedAt, acceptSeconds: null, openable: true });
-  }
-  const leads = [...byLead.values()].sort((a, b) => b.at.getTime() - a.at.getTime());
+  const leads = buildDutyNowLeads({ offers, assigned, active, brokerId, now });
   // A lead of this plantão already moved past "novo/distribuído" = service started.
   const startedIds = new Set([
-    ...offers.filter((offer) => offer.acceptedAt && offer.leadOwner === brokerId && !NOT_STARTED.includes(offer.leadStatus)).map((offer) => offer.leadId),
-    ...assigned.filter((lead) => !NOT_STARTED.includes(lead.status)).map((lead) => lead.leadId),
+    ...offers.filter((offer) => isWithinDutyWindow(offer.offeredAt, active.startsAt, active.endsAt) && offer.acceptedAt && offer.leadOwner === brokerId && !NOT_STARTED.includes(offer.leadStatus)).map((offer) => offer.leadId),
+    ...assigned.filter((lead) => isWithinDutyWindow(lead.assignedAt, active.startsAt, active.endsAt) && !NOT_STARTED.includes(lead.status)).map((lead) => lead.leadId),
   ]);
   const offerRows = leads.filter((lead) => lead.origin === "oferta");
 

@@ -1,3 +1,19 @@
+## 2026-10-17: Lite 2 D, Agora e menos passos
+
+Papeis: corretor na fila e no inicio; supervisor na equipe. O corretor ve no
+topo o que requer acao agora: aceite com prazo e plantao de origem, resposta do
+cliente e retorno vencido, ate tres itens. A chegada mostrada e a distribuicao ao
+corretor (`offeredAt` ou `assignedAt`); `createdAt` continua oculto. Aceitar abre a
+ficha do lead em seguida. `/plantoes/agora` lista somente distribuicoes dentro da
+janela do plantao atual. O supervisor ve chegadas de hoje, primeiro contato atrasado
+e escala/confirmacoes de hoje, com acao direta. Estados vazios e carregamento usam
+copy clara e skeletons Arc existentes. Entradas usam tokens de movimento Arc e
+`motion/react`, com `prefers-reduced-motion`, foco visivel e alvos de toque de 44px.
+Sem novo token, primitive ou regra de dominio. Registro:
+`docs/implementations/active/2026-10-17-lite2-agora.md`.
+Vitest focado e `tsc --noEmit` passaram; QA visual ficou pendente porque o ambiente
+local nao compilou o proxy do Next com a junction de `node_modules`.
+
 ## 2026-10-16: P11, ficha de lead completa no Lite de supervisão
 
 Papéis: supervisor na própria equipe e gestor na própria unidade. A ação principal

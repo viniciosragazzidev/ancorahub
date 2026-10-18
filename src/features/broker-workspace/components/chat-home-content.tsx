@@ -7,6 +7,7 @@ import { shortName } from "@/features/ai-gateway/privacy";
 import { LightDashboardUnavailable } from "@/features/broker-workspace/components/light-dashboard";
 import { getCachedBrokerWorkspaceData, getCachedBrokerJourneyData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { presenceAskOf } from "@/features/broker-workspace/chat/assistant-scripts";
+import { buildBrokerNowItems } from "@/features/broker-workspace/now-items";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
 
@@ -28,6 +29,11 @@ function summaryOf(data: BrokerWorkspaceData): HomeSummary {
         ? { title: `Próximo plantão: ${next.scheduleName}`, detail: `${day(next.startsAt)}, ${time(next.startsAt)} às ${time(next.endsAt)}`, href: "/plantoes/agora" }
         : null,
     goal: data.goal,
+    now: {
+      title: "Agora",
+      emptyText: "Sem aceite, resposta ou retorno vencido. Você está em dia.",
+      items: buildBrokerNowItems({ pendingOffers: data.pendingOffers, priorities: data.priorities, agenda: data.agenda, now: data.updatedAt }),
+    },
   };
 }
 

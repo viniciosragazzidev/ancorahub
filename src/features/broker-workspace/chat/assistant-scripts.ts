@@ -142,7 +142,7 @@ function threadForLead(lead: LeadQueueItem, now: Date): ThreadSummary {
     leadId: lead.id,
     name: lead.name,
     preview: action ? actionPreview(action, now) : statusPreview[lead.status] ?? "Abra a conversa para ver o atendimento.",
-    at: iso(action?.referenceAt),
+    at: iso(lead.arrivedAt),
     unread,
     waitingYou,
     attention: action?.kind === "new_lead",

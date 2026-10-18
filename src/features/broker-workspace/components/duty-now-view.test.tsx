@@ -40,6 +40,7 @@ describe("DutyNowView", () => {
     expect(screen.getByText("Recebendo leads")).toBeTruthy();
     expect(screen.getByText("50% do plantão")).toBeTruthy();
     expect(screen.getByText("Termina em 2 h 45 min")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Leads deste plantão \(hoje\)/ })).toBeTruthy();
     expect(screen.getByRole("link", { name: /Bruna Pfeiffer/ }).getAttribute("href")).toBe("/leads/l1");
     expect(screen.getByText(/aceito em 45 s/)).toBeTruthy();
     expect(screen.getByText(/Atribuído a você/)).toBeTruthy();

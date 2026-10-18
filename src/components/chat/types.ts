@@ -150,3 +150,15 @@ export type ThreadSummary = {
   /** Lead threads: hot/warm/cold ring. */
   temperature?: "hot" | "warm" | "cold" | null;
 };
+
+/** One action shown in the Lite home "Agora" block. */
+export type HomeNowItem = {
+  id: string;
+  title: string;
+  detail: string;
+  actionLabel: string;
+  href: string;
+  acceptLeadId?: string;
+  expiresAt?: string;
+  tone?: "urgent" | "waiting" | "warning" | "normal";
+};

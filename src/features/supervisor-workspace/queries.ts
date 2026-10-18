@@ -31,6 +31,7 @@ export type TeamBroker = {
 };
 
 export type TeamDuty = {
+  assignmentId?: string;
   brokerId: string;
   brokerName: string;
   scheduleName: string;
@@ -40,7 +41,7 @@ export type TeamDuty = {
   presence: "confirmed" | "pending" | "absent" | "expired" | "not_required";
 };
 
-export type AttentionLead = { leadId: string; name: string; brokerName: string; assignedAt: Date | null; late: boolean };
+export type AttentionLead = { leadId: string; name: string; brokerId: string | null; brokerName: string; assignedAt: Date | null; late: boolean };
 
 export type SupervisorWorkspaceData = {
   viewer: { userId: string; tenantId: string; name: string; branchName: string | null };
@@ -149,6 +150,7 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
   const local = getLocalDutyParts(now);
   const dutyRows = teamIds.length
     ? await db.select({
+      assignmentId: schema.dutyRosterAssignments.id,
       brokerId: schema.dutyRosterAssignments.brokerId,
       scheduleName: schema.unitDutySchedules.name,
       startsAt: schema.dutyRosterAssignments.startsAt,
@@ -169,13 +171,13 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
       .orderBy(asc(schema.dutyRosterAssignments.startsAt))
     : [];
   const presenceRows = dutyRows.length
-    ? await db.select({ brokerId: schema.dutyPresenceConfirmations.brokerId, status: schema.dutyPresenceConfirmations.status })
+    ? await db.select({ assignmentId: schema.dutyPresenceConfirmations.assignmentId, status: schema.dutyPresenceConfirmations.status })
       .from(schema.dutyPresenceConfirmations)
       .where(and(eq(schema.dutyPresenceConfirmations.tenantId, context.tenantId), inArray(schema.dutyPresenceConfirmations.brokerId, teamIds), eq(schema.dutyPresenceConfirmations.dutyDate, periodDay(now))))
       .orderBy(desc(schema.dutyPresenceConfirmations.createdAt))
     : [];
   const presenceBy = new Map<string, string>();
-  for (const row of presenceRows) if (!presenceBy.has(row.brokerId)) presenceBy.set(row.brokerId, row.status);
+  for (const row of presenceRows) if (!presenceBy.has(row.assignmentId)) presenceBy.set(row.assignmentId, row.status);
 
   const countBy = new Map(counts.map((row) => [row.brokerId, row]));
   const nameBy = new Map(teamRows.map((row) => [row.userId, row.name]));
@@ -206,8 +208,9 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
     team,
     freeBrokers: freeRows,
     duty: dutyRows.map((row) => {
-      const presence = presenceBy.get(row.brokerId);
+      const presence = presenceBy.get(row.assignmentId);
       return {
+        assignmentId: row.assignmentId,
         brokerId: row.brokerId,
         brokerName: nameBy.get(row.brokerId) ?? "Corretor",
         scheduleName: row.scheduleName,
@@ -227,6 +230,7 @@ export async function getSupervisorWorkspaceData(context: TenantContext, now = n
     attention: attentionRows.map((row) => ({
       leadId: row.leadId,
       name: row.name,
+      brokerId: row.brokerId,
       brokerName: nameBy.get(row.brokerId ?? "") ?? "Corretor",
       assignedAt: row.assignedAt,
       late: Boolean(row.assignedAt && row.assignedAt < lateBefore),
