@@ -172,7 +172,7 @@ function NowBlock({ items }: { items: LeadNowItem[] }) {
           const actionLabel = kind === "acceptance" ? "Aceitar" : kind === "response" ? "Responder" : "Ver retorno";
           const arrived = distributedAt(lead);
           const detail = kind === "acceptance"
-            ? [arrived ? `Recebido ${formatBrokerArrival(arrived)}` : null, lead.dutyName ? `Plantão ${lead.dutyName}` : "Plantão de origem"].filter(Boolean).join(" · ")
+            ? [arrived ? `Recebido ${formatBrokerArrival(arrived)}` : null, lead.dutyName ? `Plantão ${lead.dutyName}` : null].filter(Boolean).join(" · ")
             : kind === "response" ? "O cliente aguarda sua mensagem." : "O prazo combinado para falar com o cliente venceu.";
           return (
             <motion.li key={`${kind}-${lead.id}`} className={styles.nowItem} layout={!reduce} initial={reduce ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: motionTokens.duration.fast, delay: reduce ? 0 : index * motionTokens.stagger.item, ease: motionTokens.ease.enter }}>
@@ -252,7 +252,7 @@ function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number
       preview={withDuty(state.context === state.chip ? lead.summary || lead.city || "Toque para abrir o atendimento" : state.context, lead)}
       faded={days !== null && days > 0 && !lead.isAwaitingResponse && !isNewLead(lead)}
       previewTone={lead.isAwaitingResponse ? "waiting" : lead.isSlaAtRisk || lead.isOverdue ? "alert" : "muted"}
-      meta={handedAt ? <time className={styles.arrival} data-old={!isBrokerArrivalToday(handedAt) ? "true" : "false"} dateTime={handedAt.toISOString()} suppressHydrationWarning>Recebido {formatBrokerArrival(handedAt)}</time> : undefined}
+      meta={handedAt ? <time className={styles.arrival} data-old={!isBrokerArrivalToday(handedAt) ? "true" : "false"} dateTime={handedAt.toISOString()} suppressHydrationWarning>{(formatBrokerArrival(handedAt) ?? "").replace(/^./, (first) => first.toLocaleUpperCase("pt-BR"))}</time> : undefined}
       dot={urgent ? (lead.isSlaAtRisk || lead.isOverdue ? "alert" : "waiting") : null}
       dotLabel={urgent ? "Precisa de você agora" : undefined}
       action={isNewLead(lead) ? <AcceptLeadButton leadId={lead.id} className={acceptButton}>Aceitar lead</AcceptLeadButton> : undefined}

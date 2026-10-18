@@ -27,8 +27,13 @@ export function LeadHeaderBar({ name, statusLabel, statusTone = "neutral", arriv
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <h1 className="truncate text-lg font-bold tracking-tight text-(--foreground)">{name}</h1>
         {subline ? <p className="truncate text-sm text-(--text-secondary)">{subline}</p> : null}
+        {/* The arrival is a full sentence: plain text that wraps, never a pill cut in half. */}
+        {arrival ? (
+          <p className={`text-sm font-medium leading-snug ${arrival.stale ? "text-(--warning)" : "text-(--chat-action-text)"}`} data-stale={arrival.stale || undefined}>
+            {arrival.text}
+          </p>
+        ) : null}
         <div className="flex flex-wrap items-center gap-2">
-          {arrival ? <Badge tone={arrival.stale ? "warning" : "info"}>{arrival.text}</Badge> : null}
           <Badge tone={statusTone}>{statusLabel}</Badge>
         </div>
       </div>
