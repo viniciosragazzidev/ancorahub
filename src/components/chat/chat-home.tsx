@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 
 import BottomSheet from "@/components/arc/bottom-sheet/bottom-sheet";
+import { motionTokens } from "@/components/arc/motion-tokens";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { useLightAvailabilityContext } from "@/components/light/light-availability-context";
 
@@ -24,9 +25,67 @@ import { LiteWelcome } from "./lite-welcome";
 import { LiteTour } from "./tour/lite-tour";
 import { ThreadList } from "./thread-row";
 import { WeekRanking, type HomeHighlights } from "./week-ranking";
-import type { PresenceAskView, ThreadSummary } from "./types";
+import type { HomeNowItem, PresenceAskView, ThreadSummary } from "./types";
 
 type Tab = "assistentes" | "leads";
+
+function formatCountdown(expiresAt: string, now: number) {
+  const seconds = Math.max(0, Math.ceil((Date.parse(expiresAt) - now) / 1000));
+  if (seconds <= 0) return "Prazo encerrado";
+  const minutes = Math.ceil(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  return hours > 0 ? `Aceite em até ${hours} h ${minutes % 60} min` : `Aceite em até ${minutes} min`;
+}
+
+function NowSection({ data, mobile = false }: { data: NonNullable<HomeSummary["now"]>; mobile?: boolean }) {
+  const reduce = useReducedMotion();
+  const [clock, setClock] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setClock(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  return (
+    <motion.section
+      className={`${home.nowSection} ${mobile ? home.nowMobile : home.nowDesktop}`}
+      aria-label={data.title}
+      initial={reduce ? false : { opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: motionTokens.duration.standard, ease: motionTokens.ease.enter }}
+    >
+      <header className={home.nowHeader}>
+        <h2 className={home.nowTitle}>{data.title}</h2>
+        {data.items.length ? <span className={home.nowCount}>{data.items.length}</span> : null}
+      </header>
+      {data.items.length ? (
+        <ul className={home.nowList}>
+          {data.items.map((item, index) => (
+            <motion.li
+              key={item.id}
+              className={home.nowItem}
+              data-tone={item.tone ?? "normal"}
+              layout={!reduce}
+              initial={reduce ? false : { opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: motionTokens.duration.fast, delay: reduce ? 0 : index * motionTokens.stagger.item, ease: motionTokens.ease.enter }}
+            >
+              <div className={home.nowItemCopy}>
+                <strong className={home.nowItemTitle}>{item.title}</strong>
+                <span className={home.nowItemDetail}>{item.detail}</span>
+                {item.expiresAt ? <span className={home.nowCountdown}>{formatCountdown(item.expiresAt, clock)}</span> : null}
+              </div>
+              {item.acceptLeadId ? (
+                <AcceptLeadButton leadId={item.acceptLeadId} className={home.nowAction}>{item.actionLabel}</AcceptLeadButton>
+              ) : (
+                <Link className={home.nowAction} href={item.href}>{item.actionLabel}</Link>
+              )}
+            </motion.li>
+          ))}
+        </ul>
+      ) : <p className={home.nowEmpty}>{data.emptyText}</p>}
+    </motion.section>
+  );
+}
 
 function initialsOf(name: string) {
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR")).join("") || "?";
@@ -61,6 +120,7 @@ export type HomeSummary = {
   stats?: { label: string; value: number; alert?: boolean }[];
   /** "A próxima coisa é": the one most important thing now (offer > SLA > reply > return > mission). */
   next?: { label: string; detail: string; href: string; urgent: boolean; acceptLeadId?: string } | null;
+  now?: { title: string; emptyText: string; items: HomeNowItem[] } | null;
 };
 
 export type { HomeHighlights } from "./week-ranking";
@@ -122,6 +182,8 @@ export function ChatHome({
   const visible = (tab === "assistentes" ? assistants : leads).filter((thread) => matches(thread, query));
   const nextLead = leads.find((lead) => lead.waitingYou) ?? null;
   const next = summary?.next ?? null;
+  const hasNowItems = Boolean(summary?.now?.items.length);
+  const showNext = Boolean(next && !hasNowItems);
   const activeId = mode === "rail" ? [...assistants, ...leads].find((thread) => isActive(thread, pathname))?.id ?? null : null;
   const waitingAssistants = assistants.filter((thread) => thread.waitingYou);
 
@@ -174,6 +236,7 @@ export function ChatHome({
         </div>
       </header>
       {mode === "page" && (presence?.status === "pending" || presence?.status === "awaiting_release") ? <PresenceCallout ask={presence} /> : null}
+      {mode === "page" && summary?.now ? <NowSection data={summary.now} mobile /> : null}
       {mode === "page" && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
       {mode === "page" && highlights ? <WeekRanking data={highlights} /> : null}
       {list}
@@ -219,7 +282,7 @@ export function ChatHome({
         <motion.div initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }} className={home.centerInner}>
           <AssistantAvatar shape="logo" hue={null} size={56} />
           <h2 className={home.centerTitle}>{greeting(now)}, {firstName}</h2>
-          {next ? (
+          {hasNowItems ? <p className={home.centerSubtitle}>Veja o que precisa da sua atenção agora.</p> : next ? (
             <p className={home.centerSubtitle}>
               A próxima coisa é <strong className={home.nextLabel} data-urgent={next.urgent}>{next.label}</strong>. {next.detail}
             </p>
@@ -230,11 +293,12 @@ export function ChatHome({
                 ? `${waitingAssistants.map((thread) => thread.name).join(", ")} ${waitingAssistants.length === 1 ? "tem algo" : "têm algo"} para você. Escolha uma conversa à esquerda.`
                 : "Tudo em dia. Escolha uma conversa à esquerda para começar."}
           </p>}
-          {next?.acceptLeadId ? (
+          {summary?.now ? <NowSection data={summary.now} /> : null}
+          {showNext && next?.acceptLeadId ? (
             <AcceptLeadButton leadId={next.acceptLeadId} className={`${styles.pill} ${styles.pillPulse}`} style={{ marginTop: 6 }}>{next.label}</AcceptLeadButton>
-          ) : next ? (
+          ) : showNext && next ? (
             <Link href={next.href} className={styles.pill} style={{ marginTop: 6 }}>{next.label}</Link>
-          ) : nextLead ? (
+          ) : !summary?.now && nextLead ? (
             <Link href={nextLead.href} className={styles.pill} style={{ marginTop: 6 }}>{isSupervisor ? "Ver" : "Atender"} {nextLead.name.split(" ")[0]}</Link>
           ) : null}
 

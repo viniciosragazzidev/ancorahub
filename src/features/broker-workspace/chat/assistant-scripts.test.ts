@@ -57,6 +57,8 @@ function workspace(overrides: Partial<BrokerWorkspaceData> = {}): BrokerWorkspac
   return {
     viewer: { tenantId: "tenant-1", userId: "broker-1", name: "Ana Lima", branchName: "Centro", availabilityStatus: "available" },
     nextAction: null,
+    priorities: [],
+    pendingOffers: [],
     duty: null,
     today: {
       awaitingResponse: 0,
@@ -100,6 +102,7 @@ function lead(overrides: Partial<BrokerWorkspaceData["queue"][number]> = {}): Br
     name: "Clara Souza",
     status: "new",
     source: "Campanha",
+    arrivedAt: null,
     nextAction: priority(),
     ...overrides,
   };
@@ -363,8 +366,8 @@ describe("broker chat assistant scripts", () => {
     const other = { ...awaiting, leadId: "lead-8", title: "Carla Dias" } as BrokerWorkspacePriority;
     const script = buildAssistantScript("leads", {
       data: workspace({ nextAction: awaiting, queue: [
-        { id: "lead-9", name: "Bruno Melo", status: "in_contact", source: "meta", nextAction: awaiting },
-        { id: "lead-8", name: "Carla Dias", status: "in_contact", source: "meta", nextAction: other },
+        { id: "lead-9", name: "Bruno Melo", status: "in_contact", source: "meta", arrivedAt: new Date("2026-10-09T11:50:00-03:00"), nextAction: awaiting },
+        { id: "lead-8", name: "Carla Dias", status: "in_contact", source: "meta", arrivedAt: new Date("2026-10-09T11:40:00-03:00"), nextAction: other },
       ] }),
       now,
     });

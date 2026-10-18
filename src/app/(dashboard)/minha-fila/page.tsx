@@ -98,15 +98,24 @@ async function MinhaFilaContent() {
   // "Aguardando aceite" tab.
   const offerNow = new Date();
   const pendingOfferRows = await db
-    .select({ leadId: schema.leadOffers.leadId })
+    .select({
+      leadId: schema.leadOffers.leadId,
+      offeredAt: schema.leadOffers.offeredAt,
+      expiresAt: schema.leadOffers.expiresAt,
+      dutyName: schema.unitDutySchedules.name,
+    })
     .from(schema.leadOffers)
+    .leftJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.leadOffers.dutyScheduleId), eq(schema.unitDutySchedules.tenantId, schema.leadOffers.tenantId)))
     .where(and(
       eq(schema.leadOffers.tenantId, context.tenantId),
       eq(schema.leadOffers.brokerId, context.userId),
       inArray(schema.leadOffers.status, ["PENDING", "SENT", "DELIVERED", "READ"]),
       gt(schema.leadOffers.expiresAt, offerNow),
-    ));
+    ))
+    .orderBy(asc(schema.leadOffers.expiresAt));
   const pendingOfferLeadIds = Array.from(new Set(pendingOfferRows.map((row) => row.leadId)));
+  const pendingOfferByLead = new Map<string, (typeof pendingOfferRows)[number]>();
+  for (const offer of pendingOfferRows) if (!pendingOfferByLead.has(offer.leadId)) pendingOfferByLead.set(offer.leadId, offer);
   const brokerLeadScope = pendingOfferLeadIds.length > 0
     ? or(eq(schema.leads.corretorId, context.userId), inArray(schema.leads.id, pendingOfferLeadIds))
     : eq(schema.leads.corretorId, context.userId);
@@ -152,7 +161,7 @@ async function MinhaFilaContent() {
     )
     .innerJoin(schema.tenants, eq(schema.leads.tenantId, schema.tenants.id))
     .leftJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.leads.dutyScheduleId), eq(schema.unitDutySchedules.tenantId, schema.leads.tenantId)))
-    .orderBy(desc(schema.leads.createdAt));
+    .orderBy(sql`${schema.leads.assignedAt} desc nulls last`, desc(schema.leads.id));
 
   // Interactions per lead
   const interactions = leads.length
@@ -353,7 +362,7 @@ async function MinhaFilaContent() {
           .from(schema.leads)
           .leftJoin(schema.carrierPlans, eq(schema.leads.planId, schema.carrierPlans.id))
           .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, lightIds))),
-        db.select({ leadId: schema.leadTasks.leadId, dueAt: schema.leadTasks.dueAt })
+        db.select({ leadId: schema.leadTasks.leadId, dueAt: schema.leadTasks.dueAt, title: schema.leadTasks.title })
           .from(schema.leadTasks)
           .where(and(
             eq(schema.leadTasks.tenantId, context.tenantId),
@@ -365,10 +374,12 @@ async function MinhaFilaContent() {
       : [[], []];
     const extraById = new Map(extraRows.map((row) => [row.id, row]));
     const nextDueById = new Map<string, Date>();
+    const overdueReturnLeadIds = new Set<string>();
     for (const row of dueRows) {
       if (!row.leadId || !row.dueAt) continue;
       const current = nextDueById.get(row.leadId);
       if (!current || row.dueAt.getTime() < current.getTime()) nextDueById.set(row.leadId, row.dueAt);
+      if (row.dueAt.getTime() < Date.now() && /retorn|follow[ -]?up/i.test(row.title)) overdueReturnLeadIds.add(row.leadId);
     }
     const readDetail = (details: unknown, key: string) => {
       if (!details || typeof details !== "object" || Array.isArray(details)) return null;
@@ -378,6 +389,7 @@ async function MinhaFilaContent() {
 
     const activeLightLeads: LightLeadItem[] = leads.map((l) => {
       const extra = extraById.get(l.id);
+      const pendingOffer = pendingOfferByLead.get(l.id);
       const dueAt = nextDueById.get(l.id) ?? null;
       const awaitingAcceptance = pendingOfferLeadIds.includes(l.id);
       const isNew = awaitingAcceptance || l.status === "distributed" || l.status === "new";
@@ -392,12 +404,14 @@ async function MinhaFilaContent() {
         summary: readDetail(extra?.qualificationDetails, "resumoAtendimento") ?? readDetail(extra?.qualificationDetails, "resumoNecessidade"),
         // The creation date is when it reached the brokerage; the broker only gets the assignment.
         createdAt: l.assignedAt ?? l.createdAt,
-        // Distribution to the broker only; when the lead entered the company stays hidden.
-        arrivedAt: l.assignedAt ?? null,
-        dutyName: l.dutyName,
+        // Offer time is the distribution to this broker. Never fall back to brokerage capture.
+        arrivedAt: pendingOffer?.offeredAt ?? l.assignedAt ?? null,
+        expiresAt: pendingOffer?.expiresAt ?? null,
+        dutyName: pendingOffer?.dutyName ?? l.dutyName,
         updatedAt: l.stageEnteredAt,
         dueAt,
         isAwaitingResponse: latestMsgByLead.get(l.id)?.direction === "incoming",
+        awaitingResponseAt: latestMsgByLead.get(l.id)?.direction === "incoming" ? latestMsgByLead.get(l.id)?.sentAt ?? null : null,
         isAwaitingAcceptance: awaitingAcceptance,
         // Same first-contact SLA window the Inicio counter uses (overdue or in the last 20%).
         isSlaAtRisk:
@@ -412,6 +426,7 @@ async function MinhaFilaContent() {
             l.stageEnteredAt != null &&
             Date.now() - l.stageEnteredAt.getTime() > 3 * 24 * 60 * 60 * 1000) ||
           (!isNew && dueAt != null && dueAt.getTime() < Date.now()),
+        isOverdueReturn: overdueReturnLeadIds.has(l.id),
       };
     });
 

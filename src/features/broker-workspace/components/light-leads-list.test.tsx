@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const mocks = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), accept: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(""),
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push: mocks.push, refresh: mocks.refresh }),
 }));
-vi.mock("@/features/leads/accept-offer-action", () => ({ acceptLeadOfferAction: vi.fn() }));
+vi.mock("@/features/leads/accept-offer-action", () => ({ acceptLeadOfferAction: mocks.accept }));
 vi.mock("@/features/broker-workspace/components/light-availability-banner", () => ({ LightAvailabilityBanner: () => null }));
 // Arc components drive Motion springs that the global jsdom mock of motion/react does not implement.
 vi.mock("@/components/arc/avatar/avatar", () => ({ Avatar: ({ name }: { name: string }) => <span role="img" aria-label={name} /> }));
@@ -37,7 +38,7 @@ vi.mock("@/components/arc/segmented-control/segmented-control", () => ({
   ),
 }));
 
-import { arrivalLabel, LightLeadsList, type LightLeadItem } from "./light-leads-list";
+import { arrivalLabel, buildLeadNowItems, LightLeadsList, type LightLeadItem } from "./light-leads-list";
 
 const base = { phone: null, createdAt: new Date("2026-10-08T12:00:00Z") };
 const leads: LightLeadItem[] = [
@@ -49,9 +50,20 @@ const leads: LightLeadItem[] = [
   { ...base, id: "l1", name: "Fabio Perdeu", status: "lost", isLost: true },
 ];
 
+beforeEach(() => vi.clearAllMocks());
 afterEach(() => cleanup());
 
 describe("LightLeadsList", () => {
+  it("shows the top Agora steps in acceptance, reply and overdue return order", () => {
+    const now = new Date("2026-10-17T15:00:00-03:00");
+    const items = buildLeadNowItems([
+      { ...base, id: "r1", name: "Retorno", status: "quote_sent", isOverdueReturn: true, dueAt: new Date("2026-10-17T14:00:00-03:00") },
+      { ...base, id: "m1", name: "Respondeu", status: "in_contact", isAwaitingResponse: true, awaitingResponseAt: now },
+      { ...base, id: "a1", name: "Aceite", status: "distributed", isAwaitingAcceptance: true, expiresAt: new Date("2026-10-17T15:05:00-03:00"), arrivedAt: now, dutyName: "PRESENCIAL TARDE" },
+    ], now);
+    expect(items.map((item) => item.kind)).toEqual(["acceptance", "response", "return"]);
+  });
+
   it("opens on Novos with the new lead as a large card with the accept action", () => {
     render(<LightLeadsList leads={leads} />);
 
@@ -96,7 +108,7 @@ describe("LightLeadsList", () => {
 
     expect(screen.getByRole("heading", { name: /Não encontramos nenhum lead com "zzz"/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Limpar busca" }));
-    expect(screen.getByText("Ana Novo")).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: "Precisa de você agora" })).getByText("Ana Novo")).toBeTruthy();
   });
 
   it("adds an Em risco tab with every lead at SLA risk, accepted ones included", () => {
@@ -136,5 +148,31 @@ describe("LightLeadsList", () => {
     ]} />);
     expect(within(screen.getByRole("region", { name: /Recebidos hoje/ })).getByText("Hoje Lead")).toBeTruthy();
     expect(within(screen.getByRole("region", { name: /Dias anteriores/ })).getByText("Antigo Lead")).toBeTruthy();
+  });
+
+  it("shows arrival from distribution and takes acceptance straight to the lead", async () => {
+    const distributedAt = new Date();
+    const lead = { ...base, id: "today", name: "Chegou hoje", status: "distributed", arrivedAt: distributedAt, createdAt: new Date("2020-01-01T10:00:00Z"), isAwaitingAcceptance: true, dutyName: "PRESENCIAL TARDE" };
+    mocks.accept.mockResolvedValue({ success: true });
+    render(<LightLeadsList leads={[lead]} />);
+
+    const row = screen.getByRole("list", { name: "Precisa de você agora" });
+    expect(within(row).getByText(/Recebido hoje/)).toBeTruthy();
+    expect(row.textContent).not.toContain("2020");
+    expect(within(row).getByText(/PRESENCIAL TARDE/)).toBeTruthy();
+    expect(within(row).getByRole("button", { name: "Aceitar lead" })).toBeTruthy();
+    fireEvent.click(within(row).getByRole("button", { name: "Aceitar lead" }));
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/leads/today"));
+  });
+
+  it("orders rows by distribution even when brokerage capture dates are reversed", () => {
+    const leads: LightLeadItem[] = [
+      { ...base, id: "early", name: "Chegou antes", status: "in_contact", createdAt: new Date("2026-10-17T14:00:00Z"), arrivedAt: new Date("2026-10-15T12:00:00Z") },
+      { ...base, id: "late", name: "Chegou depois", status: "in_contact", createdAt: new Date("2026-10-15T12:00:00Z"), arrivedAt: new Date("2026-10-17T12:00:00Z") },
+    ];
+    render(<LightLeadsList leads={leads} initialFilter="active" />);
+    const links = screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/leads/"));
+    expect(links[0]?.textContent).toContain("Chegou depois");
+    expect(links[1]?.textContent).toContain("Chegou antes");
   });
 });

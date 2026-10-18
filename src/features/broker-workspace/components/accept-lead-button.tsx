@@ -2,6 +2,8 @@
 
 import { useTransition, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "motion/react";
+import { motionTokens } from "@/components/arc/motion-tokens";
 import { toast } from "@/components/ui/sonner";
 
 import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
@@ -13,6 +15,7 @@ import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
  */
 export function AcceptLeadButton({ leadId, className, children, style, "data-tour": dataTour }: { leadId: string; className?: string; children: ReactNode; style?: CSSProperties; "data-tour"?: string }) {
   const router = useRouter();
+  const reduce = useReducedMotion();
   const [pending, startTransition] = useTransition();
 
   function handleClick() {
@@ -30,8 +33,18 @@ export function AcceptLeadButton({ leadId, className, children, style, "data-tou
   }
 
   return (
-    <button type="button" className={className} style={style} data-tour={dataTour} disabled={pending} aria-busy={pending} onClick={handleClick}>
+    <motion.button
+      type="button"
+      className={className}
+      style={style}
+      data-tour={dataTour}
+      disabled={pending}
+      aria-busy={pending}
+      onClick={handleClick}
+      whileTap={reduce ? undefined : { scale: 0.98 }}
+      transition={motionTokens.spring.snappy}
+    >
       {children}
-    </button>
+    </motion.button>
   );
 }

@@ -35,7 +35,11 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
       topNotice={topNotice}
       runAction={async (action) => {
         const result = await runChatServerAction(action.name, action.payload);
-        // An accepted lead continues in its own conversation: offer it as the next reply.
+        if (action.name === "lead.accept" && result.ok && result.href?.startsWith("/") && !result.href.startsWith("//")) {
+          router.push(result.href);
+          return { ok: true, message: "Aceito. Abrindo o lead agora.", warning: result.warning, followUp: [] };
+        }
+        // Other local actions keep their destination available as the next reply.
         const followUp: ChatBlock[] = result.ok && result.href?.startsWith("/") && !result.href.startsWith("//")
           ? [{ type: "question", id: `after-${action.name}-${Date.now()}`, prompt: "Quer seguir com ele agora?", choices: [{ id: "open", label: "Abrir a conversa", action: { kind: "href", href: result.href } }] }]
           // External links (WhatsApp) become a button: opened by the tap, never blocked as a popup.
