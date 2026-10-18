@@ -146,6 +146,7 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),
   ne: vi.fn((a: unknown, b: unknown) => ({ field: a, value: b })),
   or: vi.fn((...args: unknown[]) => args),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ sql: strings.join("?"), values })),
 }));
 
 import { deleteTeamMemberAction, revokeInviteAction, updateTeamMemberAction } from "./actions";
