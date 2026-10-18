@@ -56,8 +56,9 @@ export const MICRO_TOURS: Record<MicroTourId, TourStep[]> = {
   // The lead opens on the conversation (/leads/[id]); the ficha is ?ficha=1. Each view has its own tour.
   "lead-conversa": [
     microStep("conversa-mensagens", "micro-conv-messages", "A conversa com o cliente", "As mensagens do WhatsApp com este lead aparecem aqui, a mais nova embaixo.", "mochi", 212),
-    microStep("conversa-responder", "micro-conv-composer", "Responda por aqui", "Escreva ou escolha uma das opções. A mensagem sai pelo seu WhatsApp conectado.", "cubo", 150),
-    microStep("conversa-ficha", "micro-conv-ficha", "Abra a ficha", "Toque aqui para ver nome, etapa, prazo e as ações do lead.", "mochi", 212),
+    // The lead screen since 18/10: the next step card holds the buttons and the client data sits beside the chat.
+    microStep("conversa-acoes", "micro-lead-actions", "O próximo passo", "Os botões fazem o que o cartão pede: aceitar, chamar no WhatsApp, ligar ou mudar a etapa.", "cubo", 150),
+    microStep("conversa-dados", "micro-lead-client", "Os dados do cliente", "O resumo da IA e o que o cliente contou ficam aqui. No celular, toque em Ver dados.", "mochi", 212),
   ],
   plantoes: [
     microStep("plantao-proximo", "micro-duty-highlight", "Seu próximo plantão", "Veja o horário e a unidade do próximo turno.", "onigiri", 28),

@@ -59,6 +59,16 @@ export function CelebrationHost() {
     return () => { window.removeEventListener(LEAD_OFFER_STATE_EVENT, onOffer); window.clearTimeout(timer); };
   }, []);
 
+  // The screen tour holds the celebrations until it closes (one overlay at a time).
+  const [tourActive, setTourActive] = useState(false);
+  useEffect(() => {
+    const read = () => setTourActive(document.documentElement.dataset.liteTour === "1");
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-lite-tour"] });
+    return () => observer.disconnect();
+  }, []);
+
   const onSeen = useCallback((ids: string[]) => {
     ids.forEach((id) => seen.current.add(id));
     setItems((current) => current.filter((item) => !ids.includes(item.id)));
@@ -66,5 +76,5 @@ export function CelebrationHost() {
   }, []);
 
   if (!items.length) return null;
-  return <CelebrationLayer items={items} blocked={offerActive || cooling} onSeen={onSeen} />;
+  return <CelebrationLayer items={items} blocked={offerActive || cooling || tourActive} onSeen={onSeen} />;
 }

@@ -55,6 +55,7 @@ export default async function LeadPreviewPage({ searchParams }: { searchParams: 
       { id: "m2", body: "Olá, Paulo! Sou a assistente da Âncora. Quantas vidas e quais idades?", direction: "outbound", senderRole: "assistant", sentAt: minutesAgo(89) },
       { id: "m3", body: "4 vidas: 34, 31, 8 e 5 anos.", direction: "inbound", sentAt: minutesAgo(88) },
       { id: "m4", body: "Oi Paulo, aqui é o Vinicios, seu corretor. Já vou montar as opções.", direction: "outbound", sentAt: minutesAgo(80) },
+      ...Array.from({ length: 24 }, (_, i) => ({ id: `x${i}`, body: i % 2 ? "Certo, vou ver aqui com a operadora e já te retorno com os valores." : "Tem coparticipação? E a carência para consulta, como fica?", direction: i % 2 ? "outbound" : "inbound", sentAt: minutesAgo(70 - i * 2) })),
       { id: "m5", body: "Perfeito, prefiro algo com rede boa em Niterói. Consegue me mandar hoje ainda?", direction: "inbound", sentAt: minutesAgo(5) },
     ],
   });

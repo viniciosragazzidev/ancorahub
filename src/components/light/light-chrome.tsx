@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import "@/components/arc/venancor-scope.css";
 import { useLightAvailability, type LightAvailability } from "@/components/light-top-nav";
 
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChatHome } from "@/components/chat/chat-home";
 import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { REALTIME_SYNC_BROWSER_EVENT } from "@/components/providers/realtime-events";
@@ -106,6 +107,8 @@ export function LightChrome({
     <LightAvailabilityProvider value={shell}>
       <div className="lite-split">
         <aside className="lite-rail arc-venancor" aria-label="Painel lateral" aria-busy={!chatRail}>
+          {/* ScrollArea: the bar shows only while scrolling (Vinicios, 18/10: no fixed bar beside the list). */}
+          <ScrollArea className="h-full" type="scroll">
           {audience === "manager" && teamManagementEnabled ? (
             <nav aria-label="Atalhos da unidade" className="border-b border-(--border) p-3">
               <Button
@@ -126,11 +129,13 @@ export function LightChrome({
               {Array.from({ length: 7 }, (_, index) => <span key={index} />)}
             </div>
           )}
+          </ScrollArea>
         </aside>
         <div className="lite-main">{content}</div>
       </div>
       {/* Points, missions and achievements of the broker show up here, never over a lead offer. */}
-      {journeyEnabled && audience === "broker" ? <CelebrationHost /> : null}
+      {/* Never while viewing as someone: it would show and mark seen the broker's own celebrations. */}
+      {journeyEnabled && audience === "broker" && !viewAs.viewingAs ? <CelebrationHost /> : null}
       {audience === "broker" ? <TipHost /> : null}
       {audience === "broker" ? <Suspense fallback={null}><LiteMicroTour pathname={pathname} /></Suspense> : null}
     </LightAvailabilityProvider>

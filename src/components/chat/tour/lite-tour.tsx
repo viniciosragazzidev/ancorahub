@@ -178,7 +178,9 @@ export function LiteTour({ variant = "broker", steps: configuredSteps, storageKe
     if (!autoStart || open) return;
     let timer: number | null = null;
     const maybeStart = () => {
-      if (timer !== null || document.documentElement.dataset.leadOffer === "1") return;
+      // A lead offer or a celebration on screen goes first; the tour starts after it closes.
+      const html = document.documentElement.dataset;
+      if (timer !== null || html.leadOffer === "1" || html.liteMoment === "1") return;
       try {
         if (readSeen(activeStorageKey) !== null) return;
       } catch {
@@ -191,7 +193,7 @@ export function LiteTour({ variant = "broker", steps: configuredSteps, storageKe
     };
     maybeStart();
     const observer = new MutationObserver(maybeStart);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-lead-offer"] });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-lead-offer", "data-lite-moment"] });
     return () => {
       observer.disconnect();
       if (timer !== null) window.clearTimeout(timer);
@@ -259,6 +261,13 @@ export function LiteTour({ variant = "broker", steps: configuredSteps, storageKe
     const back = returnFocus.current;
     if (back?.isConnected) window.setTimeout(() => back.focus({ preventScroll: true }), 0);
   }, [activeStorageKey]);
+
+  // While open, the celebrations wait (celebration-host reads this flag).
+  useEffect(() => {
+    if (!open) return;
+    document.documentElement.dataset.liteTour = "1";
+    return () => { delete document.documentElement.dataset.liteTour; };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;

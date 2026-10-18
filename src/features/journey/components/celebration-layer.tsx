@@ -126,6 +126,11 @@ function Sparks() {
 function BigMoment({ item, queued, onDone }: { item: JourneyCelebration; queued: number; onDone: () => void }) {
   const reduce = useReducedMotionConfig();
   const button = useRef<HTMLButtonElement>(null);
+  // Tells the screen tour to wait: one overlay at a time (18/10, tour ring drawn over this dialog).
+  useEffect(() => {
+    document.documentElement.dataset.liteMoment = "1";
+    return () => { delete document.documentElement.dataset.liteMoment; };
+  }, []);
   useEffect(() => {
     button.current?.focus({ preventScroll: true });
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onDone(); };

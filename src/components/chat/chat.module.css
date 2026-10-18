@@ -110,7 +110,9 @@
 .statusDot { width: 6px; height: 6px; border-radius: 999px; background: var(--chat-online); }
 .statusWaiting { color: var(--chat-action-text, var(--chat-action-strong)); }
 
-.scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; }
+.scroll { min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scroll-behavior: smooth; scrollbar-width: thin; scrollbar-color: transparent transparent; }
+/* The bar shows only while the pointer is over the conversation (like the ScrollArea beside it). */
+.scroll:hover { scrollbar-color: color-mix(in oklab, var(--foreground) 28%, transparent) transparent; }
 .topNotice { position: sticky; top: 0; z-index: 2; max-width: var(--chat-maxw); margin-inline: auto; padding: 2px var(--chat-gutter); background: var(--surface-card); }
 .thread_ { width: 100%; max-width: var(--chat-maxw); margin-inline: auto; padding: 12px var(--chat-gutter) 24px; display: grid; gap: 16px; }
 

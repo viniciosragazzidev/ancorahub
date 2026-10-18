@@ -339,6 +339,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         events: timeline.map((event) => ({ id: event.id, tipo: event.tipo, conteudo: event.conteudo ?? "", userId: event.userId, userName: event.userName, createdAt: event.createdAt })),
         viewerId: context.userId,
         hideArrival: true,
+        // The columns beside the chat show the data, the next step and the AI suggestion (no repeats).
+        panel: true,
         now,
         whatsappUrl: buildWhatsAppUrl(lightContact.telefone, `Olá, ${lead.nome.split(" ")[0] || lead.nome}! Sou seu corretor e vou seguir com seu atendimento por aqui.`),
         // Voice notes have no text: they stay in the history as a player.

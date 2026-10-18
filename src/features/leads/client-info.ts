@@ -55,9 +55,15 @@ const MEMORY_LABELS: Record<string, string> = {
   bestContactTime: "Melhor horário",
   hospital: "Hospital de preferência",
   observations: "Observações",
+  averageAge: "Média de idade",
+  birthDate: "Data de nascimento",
+  companyHasCnpj: "Tem CNPJ",
+  objections: "Objeções",
 };
 /** Shown by the main fields, or not client information. */
-const MEMORY_SKIP = new Set(["age", "city", "email", "planType", "numberOfLives", "customerName", "customerFirstName", "collectedFields", "updatedAt"]);
+const MEMORY_SKIP = new Set(["age", "city", "email", "planType", "numberOfLives", "customerName", "customerFirstName", "collectedFields", "updatedAt",
+  // The AI's own bookkeeping, not client data (18/10: "Last question asked" showed on the lead).
+  "lastQuestionAsked", "conversationSummary", "sourceMessageId", "confirmed"]);
 
 function readableKey(key: string) {
   const spaced = key.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").trim().toLowerCase();

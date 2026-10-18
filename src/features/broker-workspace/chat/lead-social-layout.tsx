@@ -4,6 +4,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Button } from "@/components/arc/button/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
 import styles from "./lead-social.module.css";
@@ -25,6 +26,15 @@ export const modeForWidth = (width: number): Mode => (width >= 1180 ? "three" : 
  * Medium (720px+): header, next, details and side in one column, conversation beside it.
  * Phone: header, next step and conversation; the full data opens in a sheet.
  */
+/** A side column: stays put while the chat scrolls, scrolls on its own, bar only while scrolling or hovering. */
+function Column({ children }: { children: ReactNode }) {
+  return (
+    <ScrollArea className={styles.column} type="scroll">
+      <div className={styles.columnInner}>{children}</div>
+    </ScrollArea>
+  );
+}
+
 export function LeadSocialLayout({ header, next, details, side, conversation }: {
   header: ReactNode;
   next: ReactNode;
@@ -84,26 +94,26 @@ export function LeadSocialLayout({ header, next, details, side, conversation }: 
   } else if (mode === "three") {
     body = (
       <div className={styles.three}>
-        <div className={styles.column}>
+        <Column>
           {header}
           {details}
-        </div>
+        </Column>
         {conversationColumn}
-        <div className={styles.column}>
+        <Column>
           {next}
           {side}
-        </div>
+        </Column>
       </div>
     );
   } else if (mode === "two") {
     body = (
       <div className={styles.two}>
-        <div className={styles.column}>
+        <Column>
           {header}
           {next}
           {details}
           {side}
-        </div>
+        </Column>
         {conversationColumn}
       </div>
     );

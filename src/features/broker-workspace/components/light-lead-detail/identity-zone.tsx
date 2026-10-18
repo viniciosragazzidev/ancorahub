@@ -66,7 +66,7 @@ export function ClientInfoCard({ lead, c, mode = "broker", withSummary = false }
   const summary = withSummary ? lead.summary : null;
   if (!info.length && !qualificationLabel && !summary) return null;
   return (
-    <section aria-labelledby="client-info-heading" className="arc-venancor rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+    <section aria-labelledby="client-info-heading" data-tour="micro-lead-client" className="arc-venancor rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
       <h2 id="client-info-heading" className="text-base font-semibold text-(--foreground)">
         Informações do cliente
       </h2>
