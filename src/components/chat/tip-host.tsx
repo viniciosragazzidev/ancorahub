@@ -8,13 +8,17 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { AssistantAvatar } from "./assistant-avatar";
 import styles from "./chat.module.css";
 
-type Tip = { id: string; leadId: string; title: string; text: string; cta: { label: string; href: string }; tone: "urgent" | "normal" };
+type Tip = {
+  id: string; leadId: string; title: string; text: string; cta: { label: string; href: string }; tone: "urgent" | "normal";
+  live?: { at: string; othersWaiting: number; quote?: string | null; stage?: string | null; insight?: string | null };
+};
 
 const FIRST_CHECK_MS = 25_000;
 const CHECK_EVERY_MS = 8 * 60_000;
 /** Never more than one tip in this window: a hint, not a flood. */
 const COOLDOWN_MS = 20 * 60_000;
-const VISIBLE_MS = 16_000;
+/** A little longer since 18/10: the tip now carries the client's message to read. */
+const VISIBLE_MS = 20_000;
 const STORE = "ancora:tips:v1";
 
 type Memory = { lastShownAt: number; seen: string[]; streakDay: string; streak: number };
@@ -35,11 +39,31 @@ function writeMemory(memory: Memory) {
 
 const today = () => new Date().toLocaleDateString("en-CA");
 
+function ago(at: string, now: number) {
+  const minutes = Math.max(0, Math.floor((now - Date.parse(at)) / 60_000));
+  if (minutes < 1) return "agora";
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return hours < 24 ? `há ${hours}h` : `há ${Math.floor(hours / 24)}d`;
+}
+
+/** The time since it started, counted live while the tip is on screen. */
+function LiveAgo({ at }: { at: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15_000);
+    return () => window.clearInterval(timer);
+  }, []);
+  return <time dateTime={at} className={styles.tipAgo}>{ago(at, now)}</time>;
+}
+
 /**
  * The Insights assistant pops up now and then with one quick tip ("Maria está
  * esperando você · Responder"), one tap to act. At most one every 20 minutes,
  * never the same tip twice, never on the lead it talks about, only while the app
  * is on screen. Following tips builds a small streak of the day.
+ * It shows what is happening now (18/10): the client's last message, the time
+ * counting live, the stage of the conversation and one hint from the AI reading.
  */
 export function TipHost() {
   const reduce = useReducedMotion();
@@ -115,10 +139,14 @@ export function TipHost() {
           <span className={styles.tipBody}>
             <span className={styles.tipLabel}>
               <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M8 1.8 9.4 6.6 14.2 8 9.4 9.4 8 14.2 6.6 9.4 1.8 8 6.6 6.6Z" fill="currentColor" /></svg>
-              Dica rápida{streak > 0 ? ` · ${streak} ${streak === 1 ? "seguida" : "seguidas"} hoje` : ""}
+              {tip.live?.stage ?? "Dica rápida"}{streak > 0 ? ` · ${streak} ${streak === 1 ? "seguida" : "seguidas"} hoje` : ""}
+              {tip.live ? <LiveAgo at={tip.live.at} /> : null}
             </span>
             <span className={styles.tipTitle}>{tip.title}</span>
+            {tip.live?.quote ? <span className={styles.tipQuote}><span>{`“${tip.live.quote}”`}</span></span> : null}
             <span className={styles.tipText}>{tip.text}</span>
+            {tip.live?.insight ? <span className={styles.tipInsight}>{tip.live.insight}</span> : null}
+            {tip.live?.othersWaiting ? <span className={styles.tipOthers}>+{tip.live.othersWaiting} {tip.live.othersWaiting === 1 ? "cliente esperando" : "clientes esperando"} resposta</span> : null}
             <span className={styles.tipActions}>
               <Link href={tip.cta.href} className={styles.tipCta} onClick={follow}>{tip.cta.label}</Link>
               <button type="button" className={styles.tipLater} onClick={() => setTip(null)}>Agora não</button>

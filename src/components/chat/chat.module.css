@@ -412,7 +412,7 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 @media (min-width: 1024px) { .tip { bottom: 24px; right: 24px; } }
 .tipMascot { flex: none; display: grid; }
 .tipBody { display: grid; gap: 3px; min-width: 0; }
-.tipLabel { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--chat-action-text, var(--chat-action)); }
+.tipLabel { display: flex; width: 100%; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; color: var(--chat-action-text, var(--chat-action)); }
 .tipTitle { font-size: var(--text-sm); font-weight: 500; color: var(--foreground); }
 .tipText { font-size: var(--text-sm); line-height: 1.45; color: var(--text-secondary); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .tipActions { display: flex; align-items: center; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
@@ -420,6 +420,12 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 .tipCta:active { transform: scale(0.97); }
 .tipLater { border: 0; background: none; font: inherit; font-size: var(--text-xs); color: var(--text-muted); cursor: pointer; padding: 8px; border-radius: 999px; }
 .tipLater:hover { background: var(--surface-muted); }
+.tipAgo { margin-left: auto; padding-left: 8px; font-weight: 400; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* The client's own words, like a message bubble: the tip talks about something real. */
+.tipQuote { display: block; margin: 4px 0 2px; padding: 8px 12px; border-radius: 4px 14px 14px 14px; background: var(--surface-muted); font-size: var(--text-sm); line-height: 1.4; color: var(--foreground); }
+.tipQuote > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.tipInsight { font-size: var(--text-xs); line-height: 1.45; color: var(--chat-tip-text); }
+.tipOthers { font-size: var(--text-xs); color: var(--text-muted); }
 .tipTimer { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--chat-action); opacity: 0.35; transform-origin: left center; }
 
 /* Dicas de Atendimento (2026-10-13): a tip bubble and the client in focus. */

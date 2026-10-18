@@ -1,8 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { after, NextResponse } from "next/server";
 
 import { getCachedBrokerWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
-import { nextStepText, readLeadIntelligence } from "@/features/broker-workspace/chat/intelligence";
+import { intelligenceLabel, intelligenceTips, isOutboundMessage, nextStepText, readLeadIntelligence } from "@/features/broker-workspace/chat/intelligence";
 import { pickBrokerTip } from "@/features/broker-workspace/tips/pick-tip";
 import { requestLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
@@ -37,8 +37,19 @@ export async function GET() {
     }
     const now = new Date();
     const tip = pickBrokerTip({ queue: data.queue, aiStep, now });
-    // The lead of the tip without a fresh analysis: read the conversation now, for the next tips and Insights.
     const ai = tip ? intelligence.get(tip.leadId) : null;
+    if (tip) {
+      // What is happening now: the client's last words, the stage and one hint the tip does not already say.
+      const recent = await getDatabase().select({ body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction })
+        .from(schema.whatsappMessages)
+        .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, tip.leadId)))
+        .orderBy(desc(schema.whatsappMessages.sentAt))
+        .limit(8);
+      const lastClient = recent.find((message) => message.body?.trim() && !isOutboundMessage(message.direction));
+      const insight = ai ? intelligenceTips(ai).find((text) => !/esperando você|está com ele/.test(text)) ?? null : null;
+      tip.live = { ...tip.live, quote: lastClient?.body?.trim().slice(0, 160) ?? null, stage: intelligenceLabel.stage(ai?.conversationStage), insight };
+    }
+    // The lead of the tip without a fresh analysis: read the conversation now, for the next tips and Insights.
     const stale = !ai?.lastAnalyzedAt || now.getTime() - Date.parse(ai.lastAnalyzedAt) > STALE_ANALYSIS_MS;
     if (tip && stale) after(() => requestLeadConversationAnalysis(tip.leadId, context.tenantId, context.userId).then(() => undefined));
     return NextResponse.json({ tip }, { headers: { "Cache-Control": "no-store" } });
