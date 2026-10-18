@@ -32,10 +32,10 @@ export function LightCompaniesList({ companies }: { companies: LightCompanyItem[
 
   return (
     <LitePageEnter className="flex min-h-full flex-col text-foreground">
-      <div className="arc-venancor mx-auto flex w-full max-w-4xl flex-1 flex-col gap-5 px-4 pb-6 pt-2 sm:px-6">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-[2rem] font-semibold leading-tight tracking-tight text-(--foreground)">Empresas</h1>
-          <p className="text-sm text-(--text-secondary)">Carteira PJ da sua unidade</p>
+      <div className="arc-venancor lite-page flex flex-1 flex-col gap-5">
+        <header>
+          <h1 className="lite-page-title">Empresas</h1>
+          <p className="lite-page-subtitle">Carteira PJ da sua unidade</p>
         </header>
 
         <div className="grid grid-cols-2 gap-3">

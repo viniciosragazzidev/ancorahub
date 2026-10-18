@@ -29,10 +29,10 @@ export default async function BrokerPerformancePage() {
   ];
 
   return (
-    <main className="arc-venancor mx-auto flex min-h-full w-full max-w-4xl flex-col gap-6 bg-(--surface) px-4 py-6 text-(--foreground) sm:px-6 sm:py-8">
-      <header className="grid gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Desempenho</h1>
-        <p className="max-w-2xl text-sm text-(--text-secondary)">{summary}</p>
+    <main className="arc-venancor lite-page flex min-h-full flex-col gap-6 bg-(--surface) text-(--foreground)">
+      <header>
+        <h1 className="lite-page-title">Desempenho</h1>
+        <p className="lite-page-subtitle">{summary}</p>
       </header>
 
       <section aria-labelledby="performance-today-title" className="grid gap-3">

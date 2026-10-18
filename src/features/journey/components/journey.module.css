@@ -2,7 +2,7 @@
    Spacing on a 4px grid; tokens from the Lite (arc-venancor). */
 
 .page { min-height: 100%; background: var(--surface); color: var(--foreground); }
-.inner { width: 100%; max-width: 640px; margin: 0 auto; padding: 24px 16px 56px; display: grid; gap: 28px; }
+.inner { width: 100%; max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; display: grid; gap: 28px; }
 
 .pageHeader h1 { margin: 0; font-size: var(--text-xl); font-weight: 500; letter-spacing: var(--tracking-display); }
 .pageHeader p { margin: 6px 0 0; color: var(--text-muted); font-size: var(--text-sm); }
@@ -144,7 +144,7 @@
 }
 
 @media (min-width: 720px) {
-  .inner { padding: 32px 24px 64px; gap: 32px; }
+  .inner { padding: 32px 24px 56px; gap: 32px; }
   .hero { padding: 24px; gap: 24px; }
 }
 .anchor { scroll-margin-top: 72px; }

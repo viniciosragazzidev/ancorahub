@@ -141,12 +141,12 @@ export function LightDutyCalendar({ calendar }: LightDutyCalendarProps) {
     : "";
 
   return (
-    <section aria-labelledby="duty-calendar-page-title" className="mx-auto w-full max-w-3xl px-4 pb-[max(120px,var(--mobile-safe-bottom,0px))] pt-6 sm:px-6">
-      <header className="space-y-1">
-        <h1 id="duty-calendar-page-title" className="text-[30px] font-bold leading-tight" style={{ letterSpacing: "var(--tracking-display)", color: "var(--foreground)" }}>
+    <section aria-labelledby="duty-calendar-page-title" className="lite-page" style={{ paddingBottom: "max(120px, var(--mobile-safe-bottom, 0px))" }}>
+      <header>
+        <h1 id="duty-calendar-page-title" className="lite-page-title">
           Plantões
         </h1>
-        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        <p className="lite-page-subtitle">
           {calendar.occurrences.length === 1 ? "1 plantão no período" : `${calendar.occurrences.length} plantões no período`}
         </p>
       </header>

@@ -14,10 +14,10 @@ export default async function SupervisorDutyPage() {
 
   const workspace = await getSupervisorWorkspaceData(context).catch(() => null);
   return (
-    <main className="arc-venancor mx-auto flex min-h-full w-full max-w-4xl flex-col gap-5 bg-(--surface) px-4 py-6 text-(--foreground) sm:px-6 sm:py-8">
-      <header className="grid gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Plantão da equipe</h1>
-        <p className="max-w-2xl text-sm text-(--text-secondary)">Veja quem da sua equipe está no plantão hoje.</p>
+    <main className="arc-venancor lite-page flex min-h-full flex-col gap-5 bg-(--surface) text-(--foreground)">
+      <header>
+        <h1 className="lite-page-title">Plantão da equipe</h1>
+        <p className="lite-page-subtitle">Veja quem da sua equipe está no plantão hoje.</p>
       </header>
       {workspace ? <TeamOnDutyList duty={workspace.duty} /> : <p role="status" className="rounded-3xl bg-(--surface-muted) p-5 text-sm text-(--text-secondary)">Não foi possível carregar a equipe agora. Tente novamente em instantes.</p>}
     </main>

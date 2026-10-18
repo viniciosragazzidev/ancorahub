@@ -14,10 +14,10 @@ export default async function BrokerAgendaPage() {
 
   const data = await getBrokerWorkspaceData();
   return (
-    <main className="arc-venancor mx-auto flex min-h-full w-full max-w-4xl flex-col gap-5 bg-(--surface) px-4 py-6 text-(--foreground) sm:px-6 sm:py-8">
-      <header className="grid gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Agenda</h1>
-        <p className="max-w-2xl text-sm text-(--text-secondary)">Acompanhe seus retornos e escolha o próximo passo com cada cliente.</p>
+    <main className="arc-venancor lite-page flex min-h-full flex-col gap-5 bg-(--surface) text-(--foreground)">
+      <header>
+        <h1 className="lite-page-title">Agenda</h1>
+        <p className="lite-page-subtitle">Acompanhe seus retornos e escolha o próximo passo com cada cliente.</p>
       </header>
       <Agenda items={data.agenda} maxItems={null} interactive heading="Seus retornos" />
     </main>

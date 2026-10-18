@@ -11,11 +11,10 @@ export default async function SupervisorTransferPage() {
   const candidates = await getBrokerTransferCandidatesAction();
 
   return (
-    <section className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-5 p-4 sm:p-6" aria-labelledby="transfer-page-title">
+    <section className="lite-page flex flex-1 flex-col gap-5" aria-labelledby="transfer-page-title">
       <header>
-        <p className="text-sm text-[var(--text-muted)]">Minha equipe</p>
-        <h1 id="transfer-page-title" className="mt-1 text-2xl font-semibold">Pedir corretor de outra equipe</h1>
-        <p className="mt-2 text-sm text-[var(--text-muted)]">A transferência só acontece depois da aprovação da gestão da unidade.</p>
+        <h1 id="transfer-page-title" className="lite-page-title">Pedir corretor de outra equipe</h1>
+        <p className="lite-page-subtitle">A transferência só acontece depois da aprovação da gestão da unidade.</p>
       </header>
       <TransferRequestForm candidates={candidates} />
     </section>
