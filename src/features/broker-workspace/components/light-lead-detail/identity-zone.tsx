@@ -62,7 +62,8 @@ export function ClientInfoCard({ lead, c, mode = "broker", withSummary = false }
   const info = (lead.clientInfo ?? []).filter((item) => !(mode === "management" || c.isDistributed) || item.key !== "email");
   const qualification = lead.qualificationStatus ?? lead.qualificationState;
   const normalizedQualification = qualification?.toLowerCase() ?? "";
-  const qualificationLabel = qualification ? qualificationLabels[normalizedQualification] ?? qualification.replaceAll("_", " ") : null;
+  // The broker never sees the qualification (Frio, Morno...): management only (Vinicios, 18/10, urgent).
+  const qualificationLabel = qualification && mode === "management" ? qualificationLabels[normalizedQualification] ?? qualification.replaceAll("_", " ") : null;
   const summary = withSummary ? lead.summary : null;
   if (!info.length && !qualificationLabel && !summary) return null;
   return (

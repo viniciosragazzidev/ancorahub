@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, lt, or, isNull } from "drizzle-orm";
+import { and, eq, inArray, lt, or, isNull } from "drizzle-orm";
 
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/types";
@@ -35,8 +35,20 @@ export async function runFeedbackSlaSweep(tenantId?: string): Promise<FeedbackSl
       .where(and(eq(schema.tenantMemberships.tenantId, tenant.id), eq(schema.tenantMemberships.role, "director"), eq(schema.tenantMemberships.status, "active"))).limit(1);
     if (!actor) continue;
 
+    // One warning per assignment: the sweep runs every few minutes and was writing the same alert
+    // hundreds of times in the lead's history and the broker's notifications (lead Lucia, 18/10: 350).
+    const warned = await db.select({ leadId: schema.auditLogs.entidadeId, createdAt: schema.auditLogs.createdAt }).from(schema.auditLogs)
+      .where(and(eq(schema.auditLogs.entidade, "lead"), eq(schema.auditLogs.acao, "lead.feedback_timeout_warning"), inArray(schema.auditLogs.entidadeId, leads.map((lead) => lead.id))));
+    const lastWarning = new Map<string, number>();
+    for (const row of warned) {
+      const at = new Date(row.createdAt).getTime();
+      if (at > (lastWarning.get(row.leadId) ?? 0)) lastWarning.set(row.leadId, at);
+    }
+
     for (const lead of leads) {
       if (!lead.corretorId || !lead.branchId) continue;
+      const warnedAt = lastWarning.get(lead.id);
+      if (warnedAt && lead.assignedAt && warnedAt >= lead.assignedAt.getTime()) continue;
       const brokerId = lead.corretorId;
       const now = new Date();
 

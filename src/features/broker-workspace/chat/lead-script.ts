@@ -126,10 +126,18 @@ function aiNextAction(conteudo: string) {
   return firstSentence.length > 180 ? `${firstSentence.slice(0, 177).trimEnd()}...` : firstSentence;
 }
 
-/** A new analysis comes with each client message: only the latest one is shown. */
+/**
+ * A new analysis comes with each client message: only the latest one is shown.
+ * The same system note repeated (the SLA alert was written on every sweep, 18/10) shows once, the latest.
+ */
 function withLatestAiFeedback(events: LeadConversationEvent[]) {
   const latest = events.filter(isAiFeedback).reduce<LeadConversationEvent | null>((last, event) => (!last || event.createdAt > last.createdAt ? event : last), null);
-  return events.filter((event) => !isAiFeedback(event) || event === latest);
+  const latestByText = new Map<string, LeadConversationEvent>();
+  for (const event of events) {
+    const kept = latestByText.get(event.conteudo);
+    if (!kept || event.createdAt > kept.createdAt) latestByText.set(event.conteudo, event);
+  }
+  return events.filter((event) => (isAiFeedback(event) ? event === latest : latestByText.get(event.conteudo) === event));
 }
 
 function declineQuestion(lead: LeadConversationLead): ChatBlock {

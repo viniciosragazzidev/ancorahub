@@ -18,7 +18,8 @@ export async function startServiceOnFirstMessage(input: {
   leadId: string;
   brokerId: string;
   branchId: string | null;
-  trigger?: "button" | "first_message" | "director";
+  /** offer_accepted: accepting the offer (WhatsApp or app) already starts the service (Vinicios, 18/10: one tap, not two). */
+  trigger?: "button" | "first_message" | "director" | "offer_accepted";
   /** Who performed the start when it is not the broker (director override). */
   actorId?: string;
 }): Promise<boolean> {
@@ -143,7 +144,9 @@ export async function startServiceOnFirstMessage(input: {
         ? "Diretor marcou o lead como em atendimento em nome do corretor."
         : input.trigger === "button"
           ? "Corretor iniciou o atendimento e os dados pessoais foram liberados."
-          : "Atendimento iniciado automaticamente pela primeira mensagem enviada no chat.",
+          : input.trigger === "offer_accepted"
+            ? "Corretor aceitou o lead, o atendimento começou e os dados pessoais foram liberados."
+            : "Atendimento iniciado automaticamente pela primeira mensagem enviada no chat.",
     });
 
     await tx.insert(schema.auditLogs).values({
@@ -153,7 +156,8 @@ export async function startServiceOnFirstMessage(input: {
       entidadeId: input.leadId,
       acao: input.trigger === "director"
         ? "diretor_marcou_em_atendimento"
-        : input.trigger === "button" ? "iniciou_atendimento_whatsapp" : "iniciou_atendimento_primeira_mensagem",
+        : input.trigger === "button" ? "iniciou_atendimento_whatsapp"
+          : input.trigger === "offer_accepted" ? "iniciou_atendimento_ao_aceitar_oferta" : "iniciou_atendimento_primeira_mensagem",
     });
 
     return true;

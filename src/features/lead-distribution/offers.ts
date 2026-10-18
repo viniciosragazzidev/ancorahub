@@ -9,6 +9,7 @@ import { buildLeadAssignmentConfirmedVariables, buildLeadOfferVariables } from "
 import { enqueueLeadEffectTx } from "@/features/leads/webhooks/services/lead-effect-outbox";
 import { signalLeadOwnershipChange } from "./ownership-signal";
 import { buildDeclinedLeadReleaseUpdate } from "@/features/leads/decline-policy";
+import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
 import { reserveQueueCapacitySlot } from "./queue-capacity";
 import { evaluateBrokerOfferPacing, isOfferPacingEnabled, type OfferPacingConfig, type PacingOffer } from "./offer-pacing";
@@ -864,6 +865,9 @@ export async function handleLeadOfferWebhookResponse(input: {
   });
 
   if (result.won && result.lead && result.broker) {
+    // Accepting is starting: no second "Aceitar lead" in the CRM (Vinicios, 18/10). Lead Lucia sat 5 days
+    // as "distributed" after the WhatsApp accept, the broker thinking it was already theirs.
+    await startServiceOnFirstMessage({ tenantId: input.tenantId, leadId: result.lead.id, brokerId: result.broker.id, branchId: result.lead.branchId, trigger: "offer_accepted" });
     await signalLeadOwnershipChange({
       tenantId: input.tenantId,
       leadId: result.lead.id,
