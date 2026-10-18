@@ -1,23 +1,27 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/hooks/use-media-query", () => ({ useMediaQuery: () => false }));
 
 import { LeadSocialLayout } from "./lead-social-layout";
 
 afterEach(() => cleanup());
 
 describe("LeadSocialLayout", () => {
-  it("puts the client's profile and the conversation side by side in the DOM order", () => {
+  it("shows the header, the next step and the conversation on the phone, with the full data in a sheet", () => {
     render(
-      <LeadSocialLayout profile={<p>Perfil da Maria</p>}>
-        <p>Conversa com a Maria</p>
-      </LeadSocialLayout>,
+      <LeadSocialLayout
+        header={<p>Cabeçalho da Maria</p>}
+        next={<p>Responder o cliente</p>}
+        details={<p>Dados completos</p>}
+        conversation={<p>Conversa com a Maria</p>}
+      />,
     );
 
-    const profile = screen.getByRole("complementary", { name: "Perfil do cliente" });
-    expect(profile.textContent).toBe("Perfil da Maria");
+    expect(screen.getByText("Cabeçalho da Maria")).toBeTruthy();
+    expect(screen.getByText("Responder o cliente")).toBeTruthy();
     expect(screen.getByText("Conversa com a Maria")).toBeTruthy();
-    // The profile comes first: on the phone it sits above the conversation.
-    expect(profile.compareDocumentPosition(screen.getByText("Conversa com a Maria")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Ver dados do cliente" })).toBeTruthy();
   });
 });

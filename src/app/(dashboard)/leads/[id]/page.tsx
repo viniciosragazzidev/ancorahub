@@ -33,6 +33,7 @@ import { lightContactFields, redactClientInfo } from "@/features/broker-workspac
 import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qualifying-lead-actions";
 import { AiConversationInsightCard } from "@/features/conversation-intelligence";
 import { buildLeadConversationScript } from "@/features/broker-workspace/chat/lead-script";
+import { isOutboundMessage } from "@/features/broker-workspace/chat/intelligence";
 import { LeadConversation } from "@/features/broker-workspace/chat/lead-conversation";
 import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
@@ -259,6 +260,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       // The creation date is when it reached the brokerage; the broker only gets the assignment.
       createdAt: lead.assignedAt ?? lead.createdAt,
       assignedAt: lead.assignedAt,
+      dutyName: lead.dutyScheduleName,
       slaFirstContactMinutes: 15,
       isCurrentBroker: lead.corretorId === context.userId,
       tipo: lead.tipo,
@@ -344,8 +346,10 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         advice: lightContact.reveal ? { nextBestAction: intelligence.nextBestAction, pendingFrom: intelligence.pendingFrom } : null,
       });
       const leadInitials = lead.nome.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("") || "?";
-      // Computador: perfil à esquerda, conversa à direita. Celular: perfil compacto no topo, conversa embaixo.
-      const profile = (
+      // The whole lead on one screen (2026-10-17): arrival, next step and client data beside the conversation.
+      const lastClient = waMessages.find((message) => message.sentAt && !isOutboundMessage(message.direction));
+      const lastBroker = waMessages.find((message) => message.sentAt && isOutboundMessage(message.direction) && message.senderRole !== "assistant");
+      return (
         <LightLeadDetail
           variant="panel"
           lead={lightLead}
@@ -358,9 +362,15 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
           }))}
           documents={lightLeadDocs.map((doc) => ({ id: doc.id, filename: doc.filename, status: doc.status }))}
           carriers={lightCarriers}
+          activity={{
+            lastClientAt: lastClient?.sentAt ? new Date(lastClient.sentAt as Date | string) : null,
+            lastBrokerAt: lastBroker?.sentAt ? new Date(lastBroker.sentAt as Date | string) : null,
+            nextAction: intelligence.nextBestAction,
+            now,
+          }}
+          conversation={<LeadConversation leadId={lead.id} name={lead.nome} initials={leadInitials} canWrite={lightLead.isCurrentBroker} script={script} />}
         />
       );
-      return <LeadConversation leadId={lead.id} name={lead.nome} initials={leadInitials} canWrite={lightLead.isCurrentBroker} script={script} profile={profile} />;
     }
 
     return (

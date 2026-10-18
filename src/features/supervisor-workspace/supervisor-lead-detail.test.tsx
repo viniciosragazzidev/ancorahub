@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+vi.mock("@/hooks/use-media-query", () => ({ useMediaQuery: () => true }));
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 

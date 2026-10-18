@@ -1,15 +1,17 @@
 import Link from "next/link";
 
-import { Avatar } from "@/components/arc/avatar/avatar";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { Button } from "@/components/ui/button";
 import { LightLeadDetail } from "@/features/broker-workspace/components/light-lead-detail";
+import { stageLabel } from "@/features/broker-workspace/components/light-lead-detail/format";
+import { arrivalView, nextStepFor } from "@/features/broker-workspace/chat/lead-arrival";
+import { LeadHeaderBar, NextStepCard } from "@/features/broker-workspace/chat/lead-screen-parts";
+import { LeadSocialLayout } from "@/features/broker-workspace/chat/lead-social-layout";
 import type { ConfirmationDocument, LightLeadDetailData, LiteRequirement } from "@/features/broker-workspace/components/light-lead-detail/types";
 import type { TeamConversationDetail } from "@/features/team-conversations/types";
 import { ManagerLeadTransferForm, type TransferBroker } from "@/features/manager-workspace/manager-lead-transfer-form";
 import { ManagerLeadStatusSheet } from "@/features/manager-workspace/manager-lead-status-sheet";
 
-import { LeadSocialLayout } from "@/features/broker-workspace/chat/lead-social-layout";
 
 import { TeamLeadConversation } from "./team-lead-conversation";
 
@@ -64,46 +66,54 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
   tasks?: TaskItem[];
   documents?: DocumentItem[];
 }) {
-  const since = lead.assignedAt ? new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" }).format(-Math.max(0, Math.floor((new Date(now).getTime() - lead.assignedAt.getTime()) / 86_400_000)), "day") : "sem atribuição";
+  const nowDate = new Date(now);
   const isManager = Boolean(managerBrokers);
-
-  // Perfil à esquerda (computador) ou no topo (celular); a conversa do WhatsApp ocupa o resto (Vinicios, 17/10).
-  const profile = (
-  <div className="flex flex-col gap-4">
-    <Link href="/leads" className="w-max text-sm text-(--text-muted) hover:text-(--foreground)">{isManager ? "← Leads da unidade" : "← Leads da equipe"}</Link>
-
-    <section className="flex items-center gap-3" aria-label="Corretor responsável">
-      <Avatar name={lead.ownerName ?? "Corretor"} src={lead.ownerImage ?? undefined} size="lg" />
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="text-sm text-(--text-secondary)">Com o corretor</span>
-        <strong className="truncate text-sm font-semibold">{lead.ownerName ?? "Sem corretor"}</strong>
-        <span className="text-xs text-(--text-muted)">{since}</span>
-      </div>
-      {lead.ownerId && !isManager ? <Link className="text-sm font-medium text-(--chat-action-text)" href={`/equipe/${encodeURIComponent(lead.ownerId)}`}>Ver corretor</Link> : null}
-    </section>
-
-    {isManager ? <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2"><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} /></div>
-      <section className="flex flex-col gap-2" aria-label="Repassar lead">
-        <h2 className="text-base font-semibold">Repassar lead</h2>
-        <ManagerLeadTransferForm leadId={lead.id} leadName={lead.name} brokers={managerBrokers ?? []} />
-      </section>
-    </div> : <div className="flex flex-wrap gap-2">
-      <Button variant="outline" render={<Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} />}>Repassar</Button>
-      {lead.ownerId ? <Button render={<Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} />}>Cobrar corretor</Button> : null}
-    </div>}
-
-    <LightLeadDetail lead={lightLead} requirements={requirements} documents={leadDocuments} mode="management" />
-    {tasks && documents ? <LeadTasksAndDocuments tasks={tasks} documents={documents} /> : null}
-    <LeadTimeline items={timeline} />
-  </div>
-  );
+  const arrival = lead.assignedAt ? arrivalView({ arrivedAt: new Date(lead.assignedAt), now: nowDate, viewer: "management", ownerName: lead.ownerName }) : null;
+  // The chat is ascending: the last message of each side is the latest one.
+  const lastClient = [...conversation.messages].reverse().find((message) => message.fromClient);
+  const lastBroker = [...conversation.messages].reverse().find((message) => !message.fromClient && !message.byAi);
+  const step = nextStepFor({
+    viewer: "management",
+    owned: true,
+    accepted: lightLead.status !== "distributed" && lightLead.status !== "new",
+    closed: lightLead.status === "converted" || lightLead.status === "lost",
+    ownerName: lead.ownerName,
+    lastClientAt: lastClient ? new Date(lastClient.at) : null,
+    lastBrokerAt: lastBroker ? new Date(lastBroker.at) : null,
+    nextAction: null,
+    now: nowDate,
+  });
 
   return (
-  <div className="arc-venancor">
-    <LeadSocialLayout profile={profile}>
-      <TeamLeadConversation conversation={conversation} brokerWhatsAppConnected={brokerWhatsAppConnected} fill />
-    </LeadSocialLayout>
-  </div>
+    <div className="arc-venancor">
+      <LeadSocialLayout
+        header={<LeadHeaderBar name={lead.name} statusLabel={stageLabel(lightLead.status)} arrival={arrival} subline={lead.ownerName ? `Com ${lead.ownerName}` : "Sem corretor"} />}
+        next={<NextStepCard step={step} />}
+        details={<LightLeadDetail variant="details" mode="management" lead={lightLead} requirements={requirements} documents={leadDocuments} />}
+        side={
+          <div className="flex flex-col gap-4">
+            <Link href="/leads" className="w-max text-sm text-(--text-muted) hover:text-(--foreground)">{isManager ? "← Leads da unidade" : "← Leads da equipe"}</Link>
+            {lead.ownerId && !isManager ? <Link className="w-max text-sm font-medium text-(--chat-action-text)" href={`/equipe/${encodeURIComponent(lead.ownerId)}`}>Ver corretor</Link> : null}
+            {isManager ? (
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-wrap gap-2"><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} /></div>
+                <section className="flex flex-col gap-2" aria-label="Repassar lead">
+                  <h2 className="text-base font-semibold">Repassar lead</h2>
+                  <ManagerLeadTransferForm leadId={lead.id} leadName={lead.name} brokers={managerBrokers ?? []} />
+                </section>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" render={<Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} />}>Repassar</Button>
+                {lead.ownerId ? <Button render={<Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} />}>Cobrar corretor</Button> : null}
+              </div>
+            )}
+            {tasks && documents ? <LeadTasksAndDocuments tasks={tasks} documents={documents} /> : null}
+            <LeadTimeline items={timeline} />
+          </div>
+        }
+        conversation={<TeamLeadConversation conversation={conversation} brokerWhatsAppConnected={brokerWhatsAppConnected} fill />}
+      />
+    </div>
   );
 }
