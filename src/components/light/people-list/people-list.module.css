@@ -19,7 +19,9 @@
 @media (max-width: 560px) { .stats { gap: 8px; } .stat { padding: 12px; } .stat strong { font-size: 1.4rem; } .stat span { font-size: var(--text-xs); } }
 
 .filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.segment { display: inline-flex; flex-wrap: wrap; max-width: 100%; padding: 4px; border-radius: 999px; background: var(--surface-muted); }
+.segment { display: inline-flex; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity; padding: 4px; border-radius: 999px; background: var(--surface-muted); }
+.segment::-webkit-scrollbar { display: none; }
+.segment button { scroll-snap-align: start; flex-shrink: 0; }
 .segment button { border: 0; border-radius: 999px; padding: 8px 14px; background: transparent; color: var(--text-muted); font: inherit; font-size: var(--text-sm); cursor: pointer; white-space: nowrap; transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease; }
 .segment button[aria-pressed="true"] { background: var(--surface); color: var(--foreground); box-shadow: var(--shadow-resting); }
 .segment button:focus-visible { outline: 2px solid var(--chat-action-text, #2563eb); outline-offset: 2px; }
@@ -46,7 +48,6 @@
   .row[data-has-action="true"] .action { padding-left: 74px; }
 }
 .avatar { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: hsl(var(--hue, 210) 52% 91%); color: hsl(var(--hue, 210) 42% 30%); font-weight: 600; flex-shrink: 0; }
-:global(.dark) .avatar, :global([data-theme="dark"]) .avatar { background: hsl(var(--hue, 210) 30% 24%); color: hsl(var(--hue, 210) 60% 86%); }
 .rowMain { min-width: 0; display: grid; gap: 2px; }
 .rowTop { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; color: var(--foreground); }

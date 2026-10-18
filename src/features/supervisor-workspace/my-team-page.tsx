@@ -91,7 +91,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           index={index}
           href={`/equipe/${encodeURIComponent(member.id)}`}
           name={member.name}
-          avatar={<Avatar name={member.name} src={member.imageUrl ?? undefined} size="lg" status={member.availability === "available" ? "online" : "offline"} className={styles.avatar} style={{ "--team-hue": `${teamAvatarHue(member.name)}` } as React.CSSProperties} />}
+          avatar={member.imageUrl ? <Avatar name={member.name} src={member.imageUrl} size="lg" status={member.availability === "available" ? "online" : "offline"} /> : undefined}
           chip={<Badge tone={member.availability === "available" ? "success" : "neutral"} size="sm">{member.availability === "available" ? "Disponível" : member.availability === "paused" ? "Pausado" : "Fora do ar"}</Badge>}
           preview={[`${member.receivedToday} hoje`, `${member.inService} em atendimento`, member.late ? (member.late === 1 ? "1 atrasado" : `${member.late} atrasados`) : null].filter(Boolean).join(" · ")}
           previewTone={member.late ? "alert" : "muted"}
@@ -113,7 +113,7 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           key={broker.id}
           index={index}
           name={broker.name}
-          avatar={<Avatar name={broker.name} src={broker.imageUrl ?? undefined} size="lg" className={styles.avatar} style={{ "--team-hue": `${teamAvatarHue(broker.name)}` } as React.CSSProperties} />}
+          avatar={broker.imageUrl ? <Avatar name={broker.name} src={broker.imageUrl} size="lg" /> : undefined}
           preview={broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}
           action={broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} onClick={() => addDirectly(broker.id)}>Adicionar</Button><Button variant="outline" size="sm" disabled={pending || !data.team} onClick={() => invite(broker.id)}>Convidar</Button></div>}
         />)}

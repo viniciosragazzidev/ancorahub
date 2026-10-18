@@ -140,7 +140,7 @@ export function ManagerLiteTeam({ initialData, initialTransfers }: { initialData
                   index={index}
                   href={member.status === "pending" ? undefined : `/equipe/${encodeURIComponent(member.userId ?? member.id)}`}
                   name={member.name}
-                  avatar={<Avatar name={member.name} src={member.image ?? undefined} size="lg" status={member.status === "pending" ? undefined : online ? "online" : "offline"} className={styles.avatar} />}
+                  avatar={member.image ? <Avatar name={member.name} src={member.image} size="lg" status={member.status === "pending" ? undefined : online ? "online" : "offline"} /> : undefined}
                   chip={<Badge tone={tone} size="sm">{label}</Badge>}
                   preview={[`${member.inService} em atendimento`, member.late > 0 ? `${member.late} atrasado${member.late === 1 ? "" : "s"}` : null].filter(Boolean).join(" · ")}
                   previewTone={member.late > 0 ? "alert" : "muted"}

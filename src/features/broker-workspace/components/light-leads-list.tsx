@@ -161,7 +161,7 @@ function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number
       href={lead.isAwaitingResponse ? `/conversas/broker?leadId=${lead.id}` : `/leads/${lead.id}`}
       name={lead.name}
       chip={<Badge tone={state.tone} size="sm">{state.chip}</Badge>}
-      preview={withDuty(state.context, lead)}
+      preview={withDuty(state.context === state.chip ? lead.summary || lead.city || "Toque para abrir o atendimento" : state.context, lead)}
       meta={arrivalLabel(lead)}
       faded={days !== null && days > 0 && !lead.isAwaitingResponse && !isNewLead(lead)}
       previewTone={lead.isAwaitingResponse ? "waiting" : lead.isSlaAtRisk || lead.isOverdue ? "alert" : "muted"}
