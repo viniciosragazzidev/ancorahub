@@ -1,15 +1,20 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({ runAction: vi.fn() }));
 
 vi.mock("motion/react", async () => {
   const actual = await vi.importActual<typeof import("motion/react")>("motion/react");
   return { ...actual, useReducedMotion: () => true };
 });
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("@/features/broker-workspace/chat/chat-actions", () => ({ runChatServerAction: mocks.runAction }));
 
 import { DutyNowView, type DutyNowViewData } from "./duty-now-view";
 
 afterEach(() => cleanup());
+beforeEach(() => mocks.runAction.mockResolvedValue({ ok: true, message: "Atualizado." }));
 
 const data: DutyNowViewData = {
   scheduleId: "s-tarde",
@@ -57,5 +62,14 @@ describe("DutyNowView", () => {
   it("shows no choice with a single plantão", () => {
     render(<DutyNowView nowIso="2026-10-10T18:00:00.000Z" data={data} />);
     expect(screen.queryByRole("navigation", { name: "Seus plantões agora" })).toBeNull();
+  });
+  it("lets the broker pause and resume from the duty page", async () => {
+    const { rerender } = render(<DutyNowView nowIso="2026-10-10T18:00:00.000Z" data={data} canManageAvailability />);
+    fireEvent.click(screen.getByRole("button", { name: "Pausar recebimento" }));
+    await waitFor(() => expect(mocks.runAction).toHaveBeenCalledWith("duty.pause", {}));
+
+    rerender(<DutyNowView nowIso="2026-10-10T18:00:00.000Z" data={{ ...data, state: "pausado" }} canManageAvailability />);
+    fireEvent.click(screen.getByRole("button", { name: "Voltar a receber" }));
+    await waitFor(() => expect(mocks.runAction).toHaveBeenCalledWith("duty.resume", {}));
   });
 });

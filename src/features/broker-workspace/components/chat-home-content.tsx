@@ -23,9 +23,9 @@ function summaryOf(data: BrokerWorkspaceData): HomeSummary {
     inServiceNow: data.today.inServiceNow,
     slaAtRiskNow: data.today.slaAtRiskNow,
     duty: active
-      ? { title: `De plantão: ${active.scheduleName}`, detail: `${time(active.startsAt)} às ${time(active.endsAt)}${active.paused ? " · pausado" : ""}`, href: "/dashboard/c/plantao" }
+      ? { title: `De plantão: ${active.scheduleName}`, detail: `${time(active.startsAt)} às ${time(active.endsAt)}${active.paused ? " · pausado" : ""}`, href: "/plantoes/agora" }
       : next
-        ? { title: `Próximo plantão: ${next.scheduleName}`, detail: `${day(next.startsAt)}, ${time(next.startsAt)} às ${time(next.endsAt)}`, href: "/dashboard/c/plantao" }
+        ? { title: `Próximo plantão: ${next.scheduleName}`, detail: `${day(next.startsAt)}, ${time(next.startsAt)} às ${time(next.endsAt)}`, href: "/plantoes/agora" }
         : null,
     goal: data.goal,
   };
@@ -38,7 +38,7 @@ function presenceNext(data: BrokerWorkspaceData): HomeSummary["next"] {
   return {
     label: presence.mode === "presencial" ? "Tirar a foto do plantão" : "Confirmar presença",
     detail: presence.mode === "presencial" ? `O ${presence.scheduleName} é presencial: esteja na unidade, tire a foto do local e o diretor libera você.` : `Confirme o ${presence.scheduleName} para começar a receber leads.`,
-    href: "/dashboard/c/plantao",
+    href: "/plantoes/agora",
     urgent: true,
   };
 }

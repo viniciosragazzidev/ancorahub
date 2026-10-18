@@ -15,6 +15,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 import { runChatServerAction } from "./chat-actions";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import { WHATSAPP_LOCAL_PREFIX, whatsappButton } from "./lead-script";
+import { ASSISTANTS } from "./assistant-scripts";
 
 /**
  * A lead as a conversation: the script plays, replies run the broker's lead
@@ -104,7 +105,8 @@ export function LeadConversation({
           return [{ type: "assistant", id: `note-${Date.now()}`, text: result.message }];
         }}
         onMention={(mention: Mention): ChatBlock[] => {
-          router.push(mention.handle === "cotacao" ? "/cotacao" : `/dashboard/c/${mention.handle}`);
+          const destination = ASSISTANTS[mention.handle as keyof typeof ASSISTANTS]?.href;
+          router.push(destination ?? `/dashboard/c/${encodeURIComponent(mention.handle)}`);
           return [];
         }}
       />

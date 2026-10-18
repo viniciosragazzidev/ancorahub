@@ -13,7 +13,7 @@ export default async function TeamPerformancePage() {
   const context = await getRequiredTenantContext();
   if (context.role !== "supervisor" || (await getLiteAudience(context)) !== "supervisor") redirect("/dashboard");
   const enabled = (await getFeatureFlag(FEATURE_FLAGS.TEAM_RANKING).catch(() => "false")) === "true";
-  if (!enabled) redirect("/dashboard/c/equipe-desempenho");
+  if (!enabled) redirect("/equipe/minha");
 
   const [internal, teams] = await Promise.all([
     teamInternal(context.tenantId, context.userId, new Date(), context.userId).catch(() => null),

@@ -1790,3 +1790,20 @@ Timeout frio mantém `qualificationState=PARTIAL`, `qualificationCompletedAt=nul
 ## DEC-147 — Evidência empresarial durante a qualificação por IA
 
 **Aprovada pelo Vinicios em 2026-10-16.** Se uma resposta do lead trouxer evidência positiva de empresa, CNPJ, MEI, PME ou plano empresarial, a qualificação passa a `empresarial` mesmo que uma resposta anterior tenha indicado `individual` ou `familiar`. Ao substituir `individual`, a IA remove apenas o número de vidas implícito (`confidence=0`) para perguntar a quantidade real; valores ditos explicitamente permanecem. Uma negação como "não tenho CNPJ" não é evidência empresarial nem confirma `companyHasCnpj`. A persistência classifica como `PJ` quando o plano é empresarial ou `companyHasCnpj=true`. A escolha/mudança de fila permanece fora da qualificação, a cargo do motor de distribuição.
+
+## DEC-148 — Assistentes Lite abrem páginas de trabalho
+
+**Aprovada pelo Vinicios em 2026-10-17 (P3).** No Lite do corretor e do supervisor,
+somente Jack permanece como conversa de assistente em `/dashboard/c/ancora`. Os
+atalhos dos demais assistentes abrem suas rotas de trabalho. Links legados em
+`/dashboard/c/<assistente>` continuam válidos e redirecionam para o destino da
+audiencia autenticada.
+
+`/agenda` passa a ser a página canônica dos retornos e tarefas do corretor Lite,
+com conclusão, cancelamento/desfazer e reagendamento pelas Server Actions
+existentes. `/desempenho` apresenta os indicadores diários e a meta do corretor. O
+supervisor consulta o plantão da própria equipe em `/equipe/plantao`; cada item
+mantém o destino autorizado `/plantoes/corretor/<brokerId>`. Tenant, equipe, dados
+e permissões continuam derivados e validados no servidor. A decisão altera somente
+navegação e apresentação; não muda regras de distribuição nem a autoridade de
+gestão.

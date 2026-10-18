@@ -7,6 +7,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 vi.mock("@/features/leads/accept-offer-action", () => ({ acceptLeadOfferAction: vi.fn() }));
+vi.mock("@/features/broker-workspace/chat/chat-actions", () => ({ runChatServerAction: vi.fn() }));
 vi.mock("@/features/broker-workspace/components/light-availability-banner", () => ({ LightAvailabilityBanner: () => null }));
 // Arc components drive Motion springs that the global jsdom mock of motion/react does not implement.
 vi.mock("@/components/arc/badge/badge", () => ({ Badge: ({ children }: { children: ReactNode }) => <span>{children}</span> }));

@@ -452,3 +452,7 @@ por categoria e com documentação local.
 - A politica JSONB da fila permite habilitar follow-up automatico (padrao desligado), intervalo e limite de tentativas; job existente usa lock advisory, janela 08h-20h Sao Paulo, opt-out e idempotencia.
 - Respostas retomam a qualificacao existente; o estado frio permanece ate resposta para preservar T121. Nenhuma migration.
 - Implementacao: docs/implementations/active/2026-10-15-requalificar-frios.md.
+
+## 2026-10-17 - Navegacao direta no Lite (Frente A)
+
+Os assistentes de leads, plantao, agenda, desempenho e equipe abrem as respectivas paginas; Jack permanece como a unica conversa de assistente. Aliases legados redirecionam por papel, mantendo o acesso autorizado. O corretor tem Agenda com concluir, cancelar/desfazer e reagendar, Desempenho e controle de pausa no plantao ativo. O supervisor tem pagina de plantao da equipe, com links para o plantao individual. DEC-148 e registro: docs/implementations/completed/2026-10-17-lite-nav-front-a.md. A reformulacao do perfil de lead e das listas continua nas Frentes B e C.

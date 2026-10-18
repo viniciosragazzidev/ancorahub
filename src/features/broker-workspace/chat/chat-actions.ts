@@ -119,8 +119,7 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
       }
       case "duty.pause": {
         await updateBrokerAvailabilityAction("paused");
-        // No automatic return yet: the broker resumes from the Plantão conversation.
-        return { ok: true, message: "Pausei você. Para voltar a receber, abra o Plantão e toque em \"Voltar a receber\"." };
+        return { ok: true, message: "Pausei você. Para voltar a receber, abra Plantão agora e toque em \"Voltar a receber\"." };
       }
       case "duty.resume": {
         await updateBrokerAvailabilityAction("available");
