@@ -1,4 +1,7 @@
-.card { display: grid; gap: 12px; width: 100%; padding: 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-panel); background: var(--surface); text-align: left; }
+/* No width: 100% here: with the phone's side margins (chat-home .firstSteps) it was 40px wider than the
+   screen when this file loaded last, a horizontal scroll and "Depois" off screen (Vinicios, 18/10).
+   The card fills its row by itself; on computers .centerHighlights gives the width. */
+.card { display: grid; gap: 12px; min-width: 0; max-width: 100%; box-sizing: border-box; padding: 16px; border: 1px solid var(--border-subtle); border-radius: var(--radius-panel); background: var(--surface); text-align: left; }
 .head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .ring { position: relative; width: 40px; height: 40px; display: grid; place-items: center; }
 .ring svg { position: absolute; inset: 0; }

@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
@@ -13,6 +14,9 @@ import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-da
 import { ViewAsBanner, type ViewAsState } from "@/features/super-admin/components/view-as";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
+
+// Client only: it reads the broker's WhatsApp session (server actions) and stays hidden until it knows.
+const WhatsAppMissingBanner = dynamic(() => import("@/components/whatsapp/whatsapp-missing-banner").then((mod) => mod.WhatsAppMissingBanner), { ssr: false });
 
 type Branding = {
   brandColor: string | null;
@@ -161,6 +165,7 @@ export function AppShell({
         }
       >
         <ViewAsBanner viewingAs={viewAs.viewingAs} />
+        {liteAudience === "broker" && !viewAs.viewingAs ? <WhatsAppMissingBanner /> : null}
         <LightChrome
           viewAs={viewAs}
           mainRef={canvasRef}

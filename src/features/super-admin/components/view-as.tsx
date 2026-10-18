@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
+import { useTopStrip } from "@/components/light/use-top-strip";
 
 import styles from "./view-as.module.css";
 
@@ -123,19 +124,9 @@ export function ViewAsBanner({ viewingAs }: { viewingAs: ViewAsState["viewingAs"
     if (!active) return;
     const html = document.documentElement;
     html.dataset.viewAs = "1";
-    // The banner sits above the app, and the body never scrolls (globals.css): the screens
-    // that fill the viewport (--app-dvh) give up the banner's height, or their end is cut off.
-    const banner = bannerRef.current;
-    const fit = () => html.style.setProperty("--app-dvh", `calc(100dvh - ${banner?.offsetHeight ?? 0}px)`);
-    fit();
-    const observer = banner && typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
-    if (banner) observer?.observe(banner);
-    return () => {
-      observer?.disconnect();
-      html.style.removeProperty("--app-dvh");
-      delete html.dataset.viewAs;
-    };
+    return () => { delete html.dataset.viewAs; };
   }, [active]);
+  useTopStrip(bannerRef, active);
   if (!viewingAs) return null;
   return (
     <div ref={bannerRef} className={styles.banner} role="status">
