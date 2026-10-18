@@ -9,6 +9,8 @@ import type { TeamConversationDetail } from "@/features/team-conversations/types
 import { ManagerLeadTransferForm, type TransferBroker } from "@/features/manager-workspace/manager-lead-transfer-form";
 import { ManagerLeadStatusSheet } from "@/features/manager-workspace/manager-lead-status-sheet";
 
+import { LeadSocialLayout } from "@/features/broker-workspace/chat/lead-social-layout";
+
 import { TeamLeadConversation } from "./team-lead-conversation";
 
 type TimelineItem = { id: string; tipo: string; conteudo: string | null; userName: string | null; createdAt: Date | string };
@@ -65,7 +67,9 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
   const since = lead.assignedAt ? new Intl.RelativeTimeFormat("pt-BR", { numeric: "auto" }).format(-Math.max(0, Math.floor((new Date(now).getTime() - lead.assignedAt.getTime()) / 86_400_000)), "day") : "sem atribuição";
   const isManager = Boolean(managerBrokers);
 
-  return <main className="arc-venancor mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-4 text-(--foreground) sm:px-6 sm:py-6">
+  // Perfil à esquerda (computador) ou no topo (celular); a conversa do WhatsApp ocupa o resto (Vinicios, 17/10).
+  const profile = (
+  <div className="flex flex-col gap-4">
     <Link href="/leads" className="w-max text-sm text-(--text-muted) hover:text-(--foreground)">{isManager ? "← Leads da unidade" : "← Leads da equipe"}</Link>
 
     <section className="flex items-center gap-3" aria-label="Corretor responsável">
@@ -90,8 +94,16 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
     </div>}
 
     <LightLeadDetail lead={lightLead} requirements={requirements} documents={leadDocuments} mode="management" />
-    <TeamLeadConversation conversation={conversation} brokerWhatsAppConnected={brokerWhatsAppConnected} />
     {tasks && documents ? <LeadTasksAndDocuments tasks={tasks} documents={documents} /> : null}
     <LeadTimeline items={timeline} />
-  </main>;
+  </div>
+  );
+
+  return (
+  <div className="arc-venancor">
+    <LeadSocialLayout profile={profile}>
+      <TeamLeadConversation conversation={conversation} brokerWhatsAppConnected={brokerWhatsAppConnected} fill />
+    </LeadSocialLayout>
+  </div>
+  );
 }

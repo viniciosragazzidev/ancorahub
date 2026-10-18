@@ -303,7 +303,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
             .from(schema.whatsappMessages)
             .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id)))
             .orderBy(desc(schema.whatsappMessages.sentAt))
-            .limit(20)
+            .limit(100)
           : Promise.resolve([]),
       ]);
       const timeline = timelineRows ?? [];
@@ -344,7 +344,23 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         advice: lightContact.reveal ? { nextBestAction: intelligence.nextBestAction, pendingFrom: intelligence.pendingFrom } : null,
       });
       const leadInitials = lead.nome.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("") || "?";
-      return <LeadConversation leadId={lead.id} name={lead.nome} initials={leadInitials} canWrite={lightLead.isCurrentBroker} script={script} />;
+      // Computador: perfil à esquerda, conversa à direita. Celular: perfil compacto no topo, conversa embaixo.
+      const profile = (
+        <LightLeadDetail
+          variant="panel"
+          lead={lightLead}
+          requirements={lightRequirements.map((req) => ({
+            id: req.id,
+            name: req.name,
+            description: req.description,
+            required: Boolean(req.required),
+            appliesPerBeneficiary: Boolean(req.appliesPerBeneficiary),
+          }))}
+          documents={lightLeadDocs.map((doc) => ({ id: doc.id, filename: doc.filename, status: doc.status }))}
+          carriers={lightCarriers}
+        />
+      );
+      return <LeadConversation leadId={lead.id} name={lead.nome} initials={leadInitials} canWrite={lightLead.isCurrentBroker} script={script} profile={profile} />;
     }
 
     return (

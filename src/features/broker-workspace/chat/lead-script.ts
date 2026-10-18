@@ -51,7 +51,7 @@ export type LeadConversationMessage = { id: string; body: string; direction: str
 export type LeadConversationAdvice = { nextBestAction: string | null; pendingFrom: string | null };
 
 const HISTORY_LIMIT = 15;
-const MESSAGES_LIMIT = 20;
+const MESSAGES_LIMIT = 100;
 const IN_SERVICE = new Set(["in_contact", "quote_sent", "negotiation"]);
 const LOSS_CHOICES: MotivoPerda[] = ["sem_contato", "sem_interesse", "preco", "ja_contratou", "encontrou_mais_barato", "desistiu", "outro"];
 const RETURN_CHOICES = [

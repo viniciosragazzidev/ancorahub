@@ -1,0 +1,37 @@
+/* Lead as a social-network screen: profile + conversation (Vinicios, 17/10). Tokens only, no drawn borders. */
+
+/* Phone: profile block on top (capped, scrolls), conversation fills the rest of the screen. */
+.layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  height: var(--app-dvh, 100dvh);
+  min-height: 0;
+  background: var(--surface);
+}
+
+.profile {
+  max-height: 42dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px 16px 14px;
+  background: var(--surface-muted);
+}
+
+.conversation {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+/* Computer: profile column on the left, conversation on the right, each with its own scroll. */
+@media (min-width: 1024px) {
+  .layout {
+    grid-template-rows: none;
+    grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+  }
+
+  .profile {
+    max-height: none;
+    padding: 20px;
+  }
+}

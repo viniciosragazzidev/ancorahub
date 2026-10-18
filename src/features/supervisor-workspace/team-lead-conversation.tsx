@@ -38,10 +38,10 @@ export function readOnlyWhatsAppBlocks(messages: TeamConversationMessage[]): Cha
   }));
 }
 
-export function TeamLeadConversation({ conversation, brokerWhatsAppConnected }: { conversation: TeamConversationDetail; brokerWhatsAppConnected: boolean }) {
+export function TeamLeadConversation({ conversation, brokerWhatsAppConnected, fill = false }: { conversation: TeamConversationDetail; brokerWhatsAppConnected: boolean; /** Fills the column of the lead layout (2026-10-17). */ fill?: boolean }) {
   if (!brokerWhatsAppConnected) {
     return (
-      <section aria-labelledby="team-lead-chat-heading" className="arc-venancor flex flex-col gap-3">
+      <section aria-labelledby="team-lead-chat-heading" className={fill ? "arc-venancor flex h-full min-h-0 flex-col gap-3" : "arc-venancor flex flex-col gap-3"}>
         <h2 id="team-lead-chat-heading" className="text-lg font-semibold text-(--foreground)">Conversa do WhatsApp</h2>
         <EmptyState
           title="Visualização ao vivo desativada, corretor não conectou o WhatsApp"
@@ -53,7 +53,7 @@ export function TeamLeadConversation({ conversation, brokerWhatsAppConnected }: 
 
   if (conversation.messages.length === 0) {
     return (
-      <section aria-labelledby="team-lead-chat-heading" className="arc-venancor flex flex-col gap-3">
+      <section aria-labelledby="team-lead-chat-heading" className={fill ? "arc-venancor flex h-full min-h-0 flex-col gap-3" : "arc-venancor flex flex-col gap-3"}>
         <h2 id="team-lead-chat-heading" className="text-lg font-semibold text-(--foreground)">Conversa do WhatsApp</h2>
         <EmptyState title="Ainda não há mensagens" description="As mensagens da conversa aparecerão aqui quando forem registradas." />
       </section>
@@ -68,15 +68,18 @@ export function TeamLeadConversation({ conversation, brokerWhatsAppConnected }: 
   const initials = conversation.leadName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toLocaleUpperCase("pt-BR") ?? "").join("") || "?";
 
   return (
-    <section aria-labelledby="team-lead-chat-heading" className="arc-venancor flex flex-col gap-3">
+    <section aria-labelledby="team-lead-chat-heading" className={fill ? "arc-venancor flex h-full min-h-0 flex-col gap-3" : "arc-venancor flex flex-col gap-3"}>
       <h2 id="team-lead-chat-heading" className="text-lg font-semibold text-(--foreground)">Conversa do WhatsApp</h2>
-      <ChatScreen
-        identity={{ name: conversation.leadName, shape: "mochi", hue: null, initials }}
-        backHref="/leads"
-        script={script}
-        composerDisabled
-        instant
-      />
+      <div className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
+        <ChatScreen
+          identity={{ name: conversation.leadName, shape: "mochi", hue: null, initials }}
+          backHref="/leads"
+          script={script}
+          composerDisabled
+          instant
+          fill={fill}
+        />
+      </div>
     </section>
   );
 }
