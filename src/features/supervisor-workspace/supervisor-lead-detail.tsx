@@ -15,6 +15,23 @@ import { ManagerLeadStatusSheet } from "@/features/manager-workspace/manager-lea
 
 import { TeamLeadConversation } from "./team-lead-conversation";
 
+const timelineLabels: Record<string, string> = {
+  status_change: "Mudança de etapa",
+  note: "Nota",
+  service_started: "Atendimento iniciado",
+  system_alert: "Aviso do sistema",
+  quote_generated: "Cotação gerada",
+  document_upload: "Documento enviado",
+  document_review: "Documento revisado",
+  distributed: "Lead distribuído",
+  accepted: "Lead aceito",
+  declined: "Lead recusado",
+};
+
+function timelineLabel(tipo: string) {
+  return timelineLabels[tipo] ?? "Atualização";
+}
+
 type TimelineItem = { id: string; tipo: string; conteudo: string | null; userName: string | null; createdAt: Date | string };
 type TaskItem = { id: string; title: string; dueAt: Date | null; completedAt: Date | null; priority: string };
 type DocumentItem = { id: string; filename: string; status: string; requirementName: string | null };
@@ -46,7 +63,7 @@ function LeadTimeline({ items }: { items: TimelineItem[] }) {
   return <section className="flex flex-col gap-3" aria-labelledby="lead-timeline-title">
     <h2 id="lead-timeline-title" className="text-base font-semibold text-(--foreground)">Linha do tempo</h2>
     {items.length ? <ol className="grid gap-4">{items.map((item) => <li key={item.id} className="flex flex-col gap-1">
-      <span className="text-sm font-medium text-(--foreground)">{item.tipo.replaceAll("_", " ")}</span>
+      <span className="text-sm font-medium text-(--foreground)">{timelineLabel(item.tipo)}</span>
       {item.conteudo ? <p className="break-words text-sm text-(--text-secondary)">{item.conteudo}</p> : null}
       <time className="text-xs text-(--text-muted)" dateTime={new Date(item.createdAt).toISOString()}>{item.userName ? `${item.userName} · ` : ""}{dateFormat.format(new Date(item.createdAt))}</time>
     </li>)}</ol> : <EmptyState title="Ainda não há atualizações neste lead" description="As próximas atividades aparecem aqui." />}
@@ -84,30 +101,48 @@ export function SupervisorLeadDetail({ lead, lightLead, requirements, leadDocume
     now: nowDate,
   });
 
+  const firstName = lead.ownerName?.split(" ")[0] ?? "corretor";
+  const cobrar = lead.ownerId ? `/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder` : null;
+  const repassarHref = `/equipe/repassar?lead=${encodeURIComponent(lead.id)}`;
+  // The waiting client is the one thing to act on: its button sits on the card, and the group leaves it out.
+  const urgentWait = !isManager && step.kind === "wait" && step.tone === "urgent";
+  const cardAction = urgentWait
+    ? (cobrar
+      ? <Button render={<Link href={cobrar} />}>Cobrar {firstName}</Button>
+      : <Button variant="outline" render={<Link href={repassarHref} />}>Repassar</Button>)
+    : undefined;
+  const showRepassar = !isManager && !(urgentWait && !cobrar);
+  const showCobrar = !isManager && Boolean(cobrar) && !(urgentWait && cobrar);
+
   return (
     <div className="arc-venancor">
       <LeadSocialLayout
-        header={<LeadHeaderBar name={lead.name} statusLabel={stageLabel(lightLead.status)} arrival={arrival} subline={lead.ownerName ? `Com ${lead.ownerName}` : "Sem corretor"} />}
-        next={<NextStepCard step={step} />}
+        header={
+          <div className="flex flex-col gap-3">
+            <Link href="/leads" className="w-max text-sm text-(--text-muted) hover:text-(--foreground)">{isManager ? "← Leads da unidade" : "← Leads da equipe"}</Link>
+            <LeadHeaderBar name={lead.name} statusLabel={stageLabel(lightLead.status)} arrival={arrival} subline={lead.ownerName ? `Com ${lead.ownerName}` : "Sem corretor"} />
+          </div>
+        }
+        next={
+          <div className="flex flex-col gap-4">
+            <NextStepCard step={step} action={cardAction} />
+            {isManager ? (
+              <div className="flex flex-col gap-3" aria-label="Ações de gestão">
+                <div className="flex flex-wrap gap-2"><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} /></div>
+                <ManagerLeadTransferForm leadId={lead.id} leadName={lead.name} brokers={managerBrokers ?? []} />
+              </div>
+            ) : showRepassar || showCobrar ? (
+              <div className="flex flex-wrap gap-2" aria-label="Ações de gestão">
+                {showRepassar ? <Button variant="outline" render={<Link href={repassarHref} />}>Repassar</Button> : null}
+                {showCobrar && cobrar ? <Button render={<Link href={cobrar} />}>Cobrar {firstName}</Button> : null}
+              </div>
+            ) : null}
+          </div>
+        }
         details={<LightLeadDetail variant="details" mode="management" lead={lightLead} requirements={requirements} documents={leadDocuments} />}
         side={
           <div className="flex flex-col gap-4">
-            <Link href="/leads" className="w-max text-sm text-(--text-muted) hover:text-(--foreground)">{isManager ? "← Leads da unidade" : "← Leads da equipe"}</Link>
             {lead.ownerId && !isManager ? <Link className="w-max text-sm font-medium text-(--chat-action-text)" href={`/equipe/${encodeURIComponent(lead.ownerId)}`}>Ver corretor</Link> : null}
-            {isManager ? (
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-wrap gap-2"><ManagerLeadStatusSheet leadId={lead.id} leadName={lead.name} currentStatus={lead.status} /></div>
-                <section className="flex flex-col gap-2" aria-label="Repassar lead">
-                  <h2 className="text-base font-semibold">Repassar lead</h2>
-                  <ManagerLeadTransferForm leadId={lead.id} leadName={lead.name} brokers={managerBrokers ?? []} />
-                </section>
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <Button variant="outline" render={<Link href={`/equipe/repassar?lead=${encodeURIComponent(lead.id)}`} />}>Repassar</Button>
-                {lead.ownerId ? <Button render={<Link href={`/relacionamento?brokerId=${encodeURIComponent(lead.ownerId)}&leadId=${encodeURIComponent(lead.id)}&action=reminder`} />}>Cobrar corretor</Button> : null}
-              </div>
-            )}
             {tasks && documents ? <LeadTasksAndDocuments tasks={tasks} documents={documents} /> : null}
             <LeadTimeline items={timeline} />
           </div>

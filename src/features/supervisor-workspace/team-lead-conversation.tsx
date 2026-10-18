@@ -42,7 +42,7 @@ export function TeamLeadConversation({ conversation, brokerWhatsAppConnected, fi
   if (!brokerWhatsAppConnected) {
     return (
       <section aria-labelledby="team-lead-chat-heading" className={fill ? "arc-venancor flex h-full min-h-0 flex-col gap-3" : "arc-venancor flex flex-col gap-3"}>
-        <h2 id="team-lead-chat-heading" className="text-lg font-semibold text-(--foreground)">Conversa do WhatsApp</h2>
+        <h2 id="team-lead-chat-heading" className={fill ? "sr-only" : "text-lg font-semibold text-(--foreground)"}>Conversa do WhatsApp</h2>
         <EmptyState
           title="Visualização ao vivo desativada, corretor não conectou o WhatsApp"
           description="A conversa ao vivo fica indisponível até o corretor reconectar o WhatsApp."
@@ -54,7 +54,7 @@ export function TeamLeadConversation({ conversation, brokerWhatsAppConnected, fi
   if (conversation.messages.length === 0) {
     return (
       <section aria-labelledby="team-lead-chat-heading" className={fill ? "arc-venancor flex h-full min-h-0 flex-col gap-3" : "arc-venancor flex flex-col gap-3"}>
-        <h2 id="team-lead-chat-heading" className="text-lg font-semibold text-(--foreground)">Conversa do WhatsApp</h2>
+        <h2 id="team-lead-chat-heading" className={fill ? "sr-only" : "text-lg font-semibold text-(--foreground)"}>Conversa do WhatsApp</h2>
         <EmptyState title="Ainda não há mensagens" description="As mensagens da conversa aparecerão aqui quando forem registradas." />
       </section>
     );
@@ -69,7 +69,7 @@ export function TeamLeadConversation({ conversation, brokerWhatsAppConnected, fi
 
   return (
     <section aria-labelledby="team-lead-chat-heading" className={fill ? "arc-venancor flex h-full min-h-0 flex-col gap-3" : "arc-venancor flex flex-col gap-3"}>
-      <h2 id="team-lead-chat-heading" className="text-lg font-semibold text-(--foreground)">Conversa do WhatsApp</h2>
+      <h2 id="team-lead-chat-heading" className={fill ? "sr-only" : "text-lg font-semibold text-(--foreground)"}>Conversa do WhatsApp</h2>
       <div className={fill ? "flex min-h-0 flex-1 flex-col" : undefined}>
         <ChatScreen
           identity={{ name: conversation.leadName, shape: "mochi", hue: null, initials }}
