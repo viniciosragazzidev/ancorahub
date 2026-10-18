@@ -308,9 +308,9 @@ export function ChatScreen({
     <div className={`${styles.root} ${fill ? styles.screenFill : styles.screen}`}>
       <header className={styles.header}>
         {/* History first (never stacks a new entry, so back never loops between two screens); parent when opened from outside. */}
-        <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => goBackInApp(router, backHref)}>
+        {fill ? null : <button type="button" className={styles.iconButton} aria-label="Voltar" onClick={() => goBackInApp(router, backHref)}>
           <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3.5 5.5 8 10 12.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>
-        </button>
+        </button>}
         <div className={styles.headerIdentity}>
           <AssistantAvatar shape={identity.shape} hue={identity.hue} size={32} state={working ? "working" : "idle"} initials={identity.initials} temperature={identity.temperature} />
           <div style={{ minWidth: 0 }}>

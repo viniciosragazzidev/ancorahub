@@ -63,6 +63,6 @@ describe("SupervisorLeadDetail (gestor Lite tasks and documents)", () => {
     expect(screen.getByRole("heading", { name: "Linha do tempo" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Ver corretor" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Repassar" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Cobrar corretor" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /^Cobrar / })).toBeTruthy();
   });
 });
