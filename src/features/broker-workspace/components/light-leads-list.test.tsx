@@ -157,7 +157,7 @@ describe("LightLeadsList", () => {
     render(<LightLeadsList leads={[lead]} />);
 
     const row = screen.getByRole("list", { name: "Precisa de você agora" });
-    expect(within(row).getByText(/Recebido hoje/)).toBeTruthy();
+    expect(within(row).getByText(/^Hoje \d{2}:\d{2}$/)).toBeTruthy();
     expect(row.textContent).not.toContain("2020");
     expect(within(row).getByText(/PRESENCIAL TARDE/)).toBeTruthy();
     expect(within(row).getByRole("button", { name: "Aceitar lead" })).toBeTruthy();
