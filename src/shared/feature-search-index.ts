@@ -193,6 +193,16 @@ export const FEATURE_SEARCH_INDEX: FeatureIndexItem[] = [
     iconName: "ClipboardText",
   },
   {
+    id: "validador-comprovante",
+    title: "Validador de Comprovante",
+    description: "Confere comprovante de pagamento contra proposta e boleto antes do adiantamento.",
+    keywords: ["ferramentas", "comprovante", "boleto", "adiantamento", "pagamento", "validar"],
+    url: "/ferramentas/validador-comprovante",
+    domain: "Operação",
+    permission: "acessar_ferramentas",
+    iconName: "Receipt",
+  },
+  {
     id: "documentos",
     title: "Central de Documentos",
     description: "Upload e aprovação de documentos de propostas e apólices.",

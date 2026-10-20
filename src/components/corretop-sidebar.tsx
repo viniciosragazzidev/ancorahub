@@ -23,6 +23,7 @@ import {
   ShieldCheck,
   Megaphone,
   HandHeart,
+  Toolbox,
 } from "@phosphor-icons/react";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
 import {
@@ -65,7 +66,7 @@ type NavItemConfig = {
   icon: typeof SquaresFour;
   url: string;
   permission: PermissionKey;
-  section: "Principal" | "Operação" | "Marketing" | "Administração";
+  section: "Principal" | "Operação" | "Marketing" | "Ferramentas" | "Administração";
   iconTone: string;
   isWhatsApp?: boolean;
   beta?: boolean;
@@ -176,6 +177,15 @@ const navigationItems: NavItemConfig[] = [
     url: "/marketing/campanhas",
     permission: "acessar_campanhas_meta",
     section: "Marketing",
+    iconTone: "text-blue-600 dark:text-blue-300",
+  },
+  {
+    label: "Ferramentas",
+    fullLabel: "Ferramentas de conferência",
+    icon: Toolbox,
+    url: "/ferramentas",
+    permission: "acessar_ferramentas",
+    section: "Ferramentas",
     iconTone: "text-blue-600 dark:text-blue-300",
   },
   {

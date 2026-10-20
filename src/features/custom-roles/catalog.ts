@@ -158,6 +158,11 @@ const labels: Record<PermissionKey, [string, string, string]> = {
     "Utilizar as ferramentas auxiliares de vendas.",
     "Vendas & Desempenho",
   ],
+  acessar_ferramentas: [
+    "Ferramentas de gestão",
+    "Usar as ferramentas de conferência, como o validador de comprovante.",
+    "Vendas & Desempenho",
+  ],
 
   // Marketing & Materiais
   acessar_materiais_divulgacao: [

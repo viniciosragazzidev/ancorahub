@@ -66,6 +66,7 @@ export const PERMISSIONS = {
   acessar_campanhas_meta: ["manager", "director"],
   acessar_integracao_meta: ["manager", "director"],
   acessar_ferramentas_vendas: ["broker", "manager", "director"],
+  acessar_ferramentas: ["manager", "director"],
 } as const satisfies Record<string, readonly TenantRole[]>;
 
 export type PermissionKey = keyof typeof PERMISSIONS;
