@@ -65,6 +65,8 @@ const updateMemberInput = z.object({
   ).transform((value) => value.toLowerCase()),
   role: memberRole,
   jobTitle: memberJobTitle,
+  /** Director only (20/10). Empty or missing keeps the current number. */
+  phone: z.string().trim().max(30).optional(),
   branchId: z.preprocess(
     (value) => value === "__tenant__" ? "" : value,
     z.string().uuid().optional().or(z.literal("")),
@@ -74,6 +76,44 @@ const updateMemberInput = z.object({
     z.string().uuid().nullable().optional(),
   ),
 });
+
+/**
+ * The member's new WhatsApp, normalized like the invite (digits, 10 to 15), or null when unchanged.
+ * Only the director may change it, and it stays unique in the company (it identifies the broker
+ * in the WhatsApp offers and the password recovery).
+ */
+async function resolveMemberPhoneChange(
+  db: ReturnType<typeof getDatabase>,
+  context: Awaited<ReturnType<typeof getRequiredTenantContext>>,
+  rawPhone: string | undefined,
+  memberId: string,
+) {
+  const digits = (rawPhone ?? "").replace(/\D/g, "");
+  if (!digits) return null;
+  const [profile] = await db.select({ id: schema.brokerProfiles.id, phone: schema.brokerProfiles.phone })
+    .from(schema.brokerProfiles)
+    .leftJoin(schema.tenantMemberships, and(
+      eq(schema.tenantMemberships.userId, schema.brokerProfiles.userId),
+      eq(schema.tenantMemberships.tenantId, schema.brokerProfiles.tenantId),
+    ))
+    .where(and(
+      eq(schema.brokerProfiles.tenantId, context.tenantId),
+      or(eq(schema.tenantMemberships.id, memberId), eq(schema.brokerProfiles.id, memberId)),
+    ))
+    .limit(1);
+  if (!profile) {
+    if (context.role === "director") throw new Error("Este acesso não tem perfil de corretor, então não tem WhatsApp para alterar.");
+    return null;
+  }
+  if (profile.phone === digits) return null;
+  if (context.role !== "director") throw new Error("Só o diretor pode alterar o WhatsApp do membro.");
+  if (digits.length < 10 || digits.length > 15) throw new Error("Informe um WhatsApp válido, com DDD.");
+  const [owner] = await db.select({ id: schema.brokerProfiles.id }).from(schema.brokerProfiles)
+    .where(and(eq(schema.brokerProfiles.tenantId, context.tenantId), eq(schema.brokerProfiles.phone, digits), ne(schema.brokerProfiles.id, profile.id)))
+    .limit(1);
+  if (owner) throw new Error("Já existe um acesso com este WhatsApp nesta corretora.");
+  return digits;
+}
 
 const memberIdInput = z.object({
   memberId: z.string().uuid(),
@@ -103,6 +143,7 @@ export async function updateTeamMemberAction(
     const supervisedBrokerIds = supervisedBrokersField.parse(formData.get("supervisedBrokerIds") ?? undefined);
     const context = await getRequiredTenantContext();
     const db = getDatabase();
+    const phone = await resolveMemberPhoneChange(db, context, input.phone, input.memberId);
 
     const [member] = await db
       .select({
@@ -234,6 +275,7 @@ export async function updateTeamMemberAction(
           professionalName: input.name,
           invitedEmail: input.email || null,
           branchId: normalizedBranchId,
+          ...(phone ? { phone } : {}),
           updatedAt: new Date(),
         }).where(and(
           eq(schema.brokerProfiles.id, pendingProfile.profileId),
@@ -379,6 +421,7 @@ export async function updateTeamMemberAction(
           // (the profile kept the old unit, so Conversas still filtered by it).
           // The profile's unit is required: "whole company" leaves it as it was.
           ...(normalizedBranchId ? { branchId: normalizedBranchId } : {}),
+          ...(phone ? { phone } : {}),
           updatedAt: new Date(),
         }).where(and(
           eq(schema.brokerProfiles.id, member.profileId),

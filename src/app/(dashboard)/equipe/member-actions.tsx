@@ -24,6 +24,8 @@ type TeamMember = {
   userId: string | null;
   name: string | null;
   email: string;
+  /** WhatsApp of the broker profile (digits); null for staff without a profile. */
+  phone?: string | null;
   role: TenantRole;
   jobTitle: string;
   status: "pending" | "active" | "disabled";
@@ -165,6 +167,21 @@ function EditMemberDialog({
               type="email"
             />
           </Field>
+          {/* The director fixes a wrong WhatsApp number (reminders, leads and password recovery go to it). */}
+          {currentRole === "director" ? (
+            <Field>
+              <FieldLabel htmlFor={`member-phone-${member.id}`}>WhatsApp</FieldLabel>
+              <Input
+                id={`member-phone-${member.id}`}
+                name="phone"
+                defaultValue={member.phone ?? ""}
+                disabled={pending}
+                inputMode="tel"
+                autoComplete="off"
+                placeholder="21 99999-9999"
+              />
+            </Field>
+          ) : null}
           <Field>
             <FieldLabel>Cargo</FieldLabel>
             <Select value={jobTitle} onValueChange={(val) => {
