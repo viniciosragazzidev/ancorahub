@@ -9,7 +9,8 @@ RUN apk add --no-cache libc6-compat
 FROM base AS dependencies
 
 COPY package.json package-lock.json ./
-RUN npm ci || npm install
+# npm's download cache survives between deploys: a lockfile change no longer downloads everything again.
+RUN --mount=type=cache,id=ancorahub-npm,target=/root/.npm npm ci || npm install
 
 FROM base AS builder
 
@@ -35,7 +36,11 @@ ENV NEXT_PUBLIC_META_WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID=$NEXT_PUBLIC_META_WHATSA
 
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
-RUN npm run build
+# Faster deploys (20/10): the build cache stays on the VPS between builds (only the changed files
+# recompile) and the type check is skipped here (tsc runs before every push). See next.config.ts.
+ENV SKIP_BUILD_TYPECHECK=1
+ENV NEXT_BUILD_FS_CACHE=1
+RUN --mount=type=cache,id=ancorahub-next-cache,target=/app/.next/cache npm run build
 
 FROM base AS runner
 

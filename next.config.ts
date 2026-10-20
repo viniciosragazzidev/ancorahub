@@ -2,6 +2,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Docker build on the VPS (Dockerfile sets both): types are checked before every push (tsc),
+  // so the build skips that pass, and Turbopack keeps its cache between deploys (20/10: 11 min builds).
+  typescript: { ignoreBuildErrors: process.env.SKIP_BUILD_TYPECHECK === "1" },
+  experimental: { turbopackFileSystemCacheForBuild: process.env.NEXT_BUILD_FS_CACHE === "1" },
   // takumi-pdf loads its WebAssembly from its own folder: keep it out of the bundle.
   serverExternalPackages: ["takumi-pdf"],
   // The lead quality PDF reads its Inter fonts at runtime.
