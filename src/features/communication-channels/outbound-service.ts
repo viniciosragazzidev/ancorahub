@@ -21,7 +21,7 @@ import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { resolveCanonicalWhatsAppDestination } from "./phone-resolution";
 import { resolveNamedTemplateBodyParameters } from "./template-parameters";
 import { isEligibleColdLeadForReactivation } from "@/features/ai-qualification/cold-lead-reactivation-policy";
-import { COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX, isWithinRequalificationBusinessWindow, nextRequalificationBusinessWindowAt } from "@/features/ai-qualification/cold-lead-requalification-policy";
+import { COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX, isEligibleColdLeadForManualRequalification, isWithinRequalificationBusinessWindow, nextRequalificationBusinessWindowAt } from "@/features/ai-qualification/cold-lead-requalification-policy";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
 import { findConnectedTenantChannelId, TENANT_CHANNEL_CONNECTED_STATUSES } from "@/features/waha-cadence/tenant-channel-routing";
 import { sendWahaRelayMessage } from "@/features/waha-cadence/relay-client";
@@ -270,7 +270,11 @@ async function isCurrentColdLeadReactivation(row: OutboundRow) {
     eq(schema.leads.id, leadId),
     eq(schema.leads.tenantId, row.tenantId),
   )).limit(1);
-  if (!lead || !isEligibleColdLeadForReactivation(lead)) return false;
+  // The director's Requalificar sends to the cold leads the panel lists, including the
+  // timeout holds (PARTIAL + manual_hold); the stricter automatic rule cancelled all 86 of them
+  // right before sending (20/10). The automatic sweep keeps its own rule.
+  const isManual = row.idempotencyKey.startsWith(`${COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX}manual:`);
+  if (!lead || !(isManual ? isEligibleColdLeadForManualRequalification({ ...lead, id: leadId }) : isEligibleColdLeadForReactivation(lead))) return false;
   const [rule] = await db.select({ enabled: schema.aiQualificationFollowUpRules.enabled })
     .from(schema.aiQualificationFollowUpRules).where(and(
       eq(schema.aiQualificationFollowUpRules.id, `cold-lead-reactivation:${row.tenantId}`),
