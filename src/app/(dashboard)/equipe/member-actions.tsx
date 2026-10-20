@@ -633,12 +633,15 @@ function ResetPasswordDialog({
 }) {
   const [pending, setPending] = useState(false);
   const [resetUrl, setResetUrl] = useState<string | null>(null);
+  // How the link went to the member's WhatsApp (sent automatically since 20/10).
+  const [whatsapp, setWhatsapp] = useState<"sent" | "failed" | "no_phone" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setResetUrl(null);
+      setWhatsapp(null);
       setErrorMessage(null);
       setCopied(false);
       setPending(false);
@@ -668,6 +671,8 @@ function ResetPasswordDialog({
           ? raw
           : `${typeof window !== "undefined" ? window.location.origin : ""}${raw}`;
         setResetUrl(fullUrl);
+        setWhatsapp(res.resetWhatsApp ?? null);
+        if (res.resetWhatsApp === "sent") toast.success(`Link enviado no WhatsApp de ${memberName}.`);
       } else {
         setErrorMessage(res.error ?? "Erro desconhecido ao gerar o link.");
       }
@@ -703,7 +708,7 @@ function ResetPasswordDialog({
           <LockKey size={18} /> Redefinir Senha do Membro
         </DialogTitle>
         <DialogDescription>
-          Gere um link seguro de redefinição de senha para <strong>{memberName}</strong>.
+          Gere um link seguro de redefinição de senha para <strong>{memberName}</strong>. Ele vai direto para o WhatsApp do membro.
         </DialogDescription>
 
         {errorMessage ? (
@@ -724,7 +729,7 @@ function ResetPasswordDialog({
                 onClick={handleGenerate}
                 type="button"
               >
-                {pending ? "Gerando Link..." : "Gerar Link de Redefinição"}
+                {pending ? "Gerando e enviando..." : "Gerar e enviar no WhatsApp"}
               </Button>
               <DialogClose
                 render={
@@ -737,6 +742,13 @@ function ResetPasswordDialog({
           </div>
         ) : (
           <div className="grid gap-4 mt-2">
+            {whatsapp === "sent" ? (
+              <ContextNote variant="success" className="text-xs">Link enviado no WhatsApp de {memberName}. Se precisar, copie abaixo e mande por outro canal.</ContextNote>
+            ) : whatsapp === "no_phone" ? (
+              <ContextNote variant="warning" className="text-xs">{memberName} não tem WhatsApp cadastrado. Copie a mensagem abaixo e envie.</ContextNote>
+            ) : whatsapp === "failed" ? (
+              <ContextNote variant="warning" className="text-xs">Não deu para enviar pelo WhatsApp agora. Copie a mensagem abaixo e envie.</ContextNote>
+            ) : null}
             <Field>
               <FieldLabel>Mensagem Pronta com o Link</FieldLabel>
               <textarea

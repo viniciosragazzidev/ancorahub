@@ -23,7 +23,7 @@ vi.mock("@/shared/db", () => ({ getDatabase: () => state.db, schema: state.schem
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: async () => state.context }));
 vi.mock("drizzle-orm", () => ({ and: (...values: unknown[]) => values, eq: (field: unknown, value: unknown) => ({ field, value }), or: (...values: unknown[]) => values }));
 vi.mock("better-auth/crypto", () => ({ hashPassword: async () => "hash" }));
-vi.mock("@/features/communication-channels/outbound-service", () => ({ enqueueMetaTemplateMessage: vi.fn() }));
+vi.mock("@/features/communication-channels/outbound-service", () => ({ enqueueMetaTemplateMessage: vi.fn(), enqueueMetaTextMessage: vi.fn(), processMetaOutboundBatch: vi.fn() }));
 vi.mock("@/shared/auth/credential-account", () => ({ buildCredentialAccount: vi.fn(), buildCredentialAccountPasswordUpdate: vi.fn(), CREDENTIAL_PROVIDER_ID: "credential" }));
 
 import { generatePasswordResetLinkForMember } from "./password-recovery";

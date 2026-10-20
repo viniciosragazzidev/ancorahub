@@ -7,7 +7,7 @@ import { and, eq, or } from "drizzle-orm";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { canGenerateMemberPasswordReset } from "./password-recovery-scope";
-import { enqueueMetaTemplateMessage } from "@/features/communication-channels/outbound-service";
+import { enqueueMetaTextMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import {
   buildCredentialAccount,
   buildCredentialAccountPasswordUpdate,
@@ -161,38 +161,10 @@ export async function approvePasswordReset(requestId: string) {
   // Revogar sessões atuais do usuário
   await db.delete(schema.session).where(eq(schema.session.userId, request.userId));
 
-  // Buscar telefone do usuário para enviar WhatsApp
-  const [profile] = await db
-    .select({ phone: schema.brokerProfiles.phone })
-    .from(schema.brokerProfiles)
-    .where(eq(schema.brokerProfiles.userId, request.userId))
-    .limit(1);
-
-  const [tenant] = await db
-    .select({ name: schema.tenants.name })
-    .from(schema.tenants)
-    .where(eq(schema.tenants.id, context.tenantId))
-    .limit(1);
-
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "").replace(/\/$/, "");
   const resetUrl = `${baseUrl}/recuperar-senha?token=${encodeURIComponent(token)}`;
-
-  // Tentar enviar WhatsApp via Meta Cloud
-  if (profile?.phone) {
-    try {
-      await enqueueMetaTemplateMessage({
-        tenantId: context.tenantId,
-        recipientType: "user",
-        destinationPhone: profile.phone,
-        purpose: "brokerInvitation", // Reusing template infrastructure
-        variables: [request.userEmail, tenant?.name ?? "Âncora Corretora", resetUrl],
-        requestedBy: context.userId,
-        idempotencyKey: `password-reset:${requestId}`,
-      });
-    } catch {
-      // Fallback silencioso se WhatsApp não estiver configurado
-    }
-  }
+  // It used to reuse the invitation template with the wrong variables, so the link never arrived.
+  await sendPasswordResetWhatsApp({ tenantId: context.tenantId, userId: request.userId, requestedBy: context.userId, resetUrl, requestId });
 
   return { success: true, resetUrl };
 }
@@ -290,6 +262,43 @@ export async function completePasswordReset(token: string, newPassword: string) 
 /**
  * Gera um link de redefinição de senha para um membro da equipe (solicitado por diretor ou gestor).
  */
+export type PasswordResetWhatsAppStatus = "sent" | "failed" | "no_phone";
+
+/**
+ * Sends the reset link to the member's own WhatsApp right away (Vinicios, 20/10: no copy and
+ * paste), as free text on the same route as the chat messages to brokers (no Meta template).
+ * When it fails the screen keeps the link to copy.
+ */
+async function sendPasswordResetWhatsApp(input: { tenantId: string; userId: string; requestedBy: string; resetUrl: string; requestId: string }): Promise<PasswordResetWhatsAppStatus> {
+  // A WhatsApp problem never stops the reset: the screen still shows the link to copy.
+  try {
+    const db = getDatabase();
+    const [member] = await db
+      .select({ name: schema.user.name, phone: schema.brokerProfiles.phone, tenantName: schema.tenants.name })
+      .from(schema.user)
+      .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.user.id), eq(schema.brokerProfiles.tenantId, input.tenantId)))
+      .leftJoin(schema.tenants, eq(schema.tenants.id, input.tenantId))
+      .where(eq(schema.user.id, input.userId))
+      .limit(1);
+    if (!member?.phone) return "no_phone";
+    const firstName = member.name?.trim().split(/\s+/)[0];
+    const queued = await enqueueMetaTextMessage({
+      tenantId: input.tenantId,
+      recipientType: "user",
+      recipientId: input.userId,
+      destinationPhone: member.phone,
+      purpose: "passwordReset",
+      body: `Olá${firstName ? `, ${firstName}` : ""}! A gestão da ${member.tenantName ?? "Âncora Saúde"} gerou um link para você criar uma nova senha no CRM:\n\n${input.resetUrl}\n\nO link vale por 24 horas. Se não foi você quem pediu, avise a sua gestão.`,
+      requestedBy: input.requestedBy,
+      idempotencyKey: `password-reset:${input.requestId}`,
+    });
+    const delivery = await processMetaOutboundBatch(1, input.tenantId, queued.id);
+    return delivery.sent ? "sent" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
 export async function generatePasswordResetLinkForMember(targetIdentifier: string) {
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") {
@@ -347,7 +356,8 @@ export async function generatePasswordResetLinkForMember(targetIdentifier: strin
 
   const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "").replace(/\/$/, "");
   const resetUrl = `${baseUrl}/recuperar-senha?token=${encodeURIComponent(token)}`;
+  const whatsappStatus = await sendPasswordResetWhatsApp({ tenantId: context.tenantId, userId: targetUserId, requestedBy: context.userId, resetUrl, requestId: id });
 
-  return { success: true, resetUrl };
+  return { success: true, resetUrl, whatsappStatus };
 }
 
