@@ -9,9 +9,9 @@ import { useTopStrip } from "@/components/light/use-top-strip";
 import styles from "./view-as.module.css";
 
 export type ViewAsState = { canViewAs: boolean; viewingAs: { name: string; role: string } | null };
-type Candidate = { userId: string; name: string; email: string; role: "broker" | "supervisor"; tenantName: string; branchName: string | null; image: string | null };
+type Candidate = { userId: string; name: string; email: string; role: "broker" | "supervisor" | "manager"; tenantName: string; branchName: string | null; image: string | null };
 
-const ROLE_LABEL: Record<string, string> = { broker: "Corretor", supervisor: "Supervisor" };
+const ROLE_LABEL: Record<string, string> = { broker: "Corretor", supervisor: "Supervisor", manager: "Gestor" };
 export const EXIT_VIEW_AS_HREF = "/api/super-admin/view-as/exit";
 
 const Bolt = ({ size = 18 }: { size?: number }) => (
@@ -38,7 +38,7 @@ export function ViewAsButton({ state, variant = "menu", onNavigate }: { state: V
     <>
       <button type="button" className={styles.button} data-variant={variant} onClick={() => setOpen(true)} aria-haspopup="dialog">
         <span className={styles.bolt}><Bolt /></span>
-        <span className={styles.label}><strong>Ver como</strong><small>Entre como um corretor ou supervisor</small></span>
+        <span className={styles.label}><strong>Ver como</strong><small>Entre como corretor, supervisor ou gestor</small></span>
       </button>
       <ViewAsSheet open={open} onOpenChange={setOpen} />
     </>
@@ -89,7 +89,7 @@ function ViewAsSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
       <div className={styles.sheet}>
         <div className={styles.searchWrap}>
           <svg className={styles.searchIcon} viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>
-          <input className={styles.search} type="search" value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder="Nome ou e-mail" aria-label="Buscar corretor ou supervisor" autoComplete="off" />
+          <input className={styles.search} type="search" value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder="Nome ou e-mail" aria-label="Buscar corretor, supervisor ou gestor" autoComplete="off" />
         </div>
         {error ? <p role="alert" className={styles.error}>{error}</p> : null}
         {users === null ? <p className={styles.muted} role="status">Carregando...</p> : null}

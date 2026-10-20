@@ -7,7 +7,7 @@ import { getDatabase, schema } from "@/shared/db";
 
 export const dynamic = "force-dynamic";
 
-export type ViewAsCandidate = { userId: string; name: string; email: string; role: "broker" | "supervisor"; tenantName: string; branchName: string | null; image: string | null };
+export type ViewAsCandidate = { userId: string; name: string; email: string; role: "broker" | "supervisor" | "manager"; tenantName: string; branchName: string | null; image: string | null };
 
 /** Brokers and supervisors a platform admin can view as (search by name or e-mail). */
 export async function GET(request: Request) {
