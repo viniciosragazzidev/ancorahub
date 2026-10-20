@@ -6,6 +6,29 @@ import {
 const TIME_ZONE = "America/Sao_Paulo";
 export const COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX = "cold-lead-requalification:";
 
+/**
+ * Automatic requalification (Vinicios, 20/10): one try, 3 hours after the lead turned cold,
+ * in every automatic queue (the per-queue switch no longer gates it). A manual send from the
+ * panel counts as that one try.
+ */
+export const AUTOMATIC_COLD_LEAD_REQUALIFICATION: ColdLeadRequalificationPolicy = { enabled: true, intervalMinutes: 180, maxAttempts: 1 };
+/** Leads that turned cold longer ago than this stay with the panel: the first run must not message the old backlog. */
+export const AUTOMATIC_REQUALIFICATION_LOOKBACK_HOURS = 24;
+
+/** When the lead turned cold: the qualification end, else the timeout hold (no valid data), else its arrival. */
+export function coldSinceAt(lead: { qualificationCompletedAt: Date | null; createdAt: Date }, timeoutHoldAt: Date | null | undefined) {
+  return lead.qualificationCompletedAt ?? timeoutHoldAt ?? lead.createdAt;
+}
+
+/** Due 3 hours after turning cold, only once, and only for leads that turned cold in the last 24 hours. */
+export function automaticRequalificationDue(input: { coldSince: Date; attempts: number; now: Date }) {
+  const policy = AUTOMATIC_COLD_LEAD_REQUALIFICATION;
+  const ageMs = input.now.getTime() - input.coldSince.getTime();
+  return input.attempts < policy.maxAttempts
+    && ageMs >= policy.intervalMinutes * 60_000
+    && ageMs <= AUTOMATIC_REQUALIFICATION_LOOKBACK_HOURS * 60 * 60_000;
+}
+
 export type ColdLeadRequalificationInput = {
   id: string;
   createdAt: Date;

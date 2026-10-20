@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({ userId: z.string().trim().min(1).max(80) });
 
-/** Start "Ver como": a platform admin picks an active broker or supervisor. */
+/** Start "Ver como": a platform admin picks an active broker, supervisor or gestor. */
 export async function POST(request: Request) {
   const admin = await getRequiredPlatformAdmin().catch(() => null);
   if (!admin) return NextResponse.json({ error: "Só o super admin pode usar o Ver como." }, { status: 403 });
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       eq(schema.user.active, true),
     ))
     .limit(1);
-  if (!target) return NextResponse.json({ error: "Esse usuário não é um corretor ou supervisor ativo." }, { status: 404 });
+  if (!target) return NextResponse.json({ error: "Esse usuário não é um corretor, supervisor ou gestor ativo." }, { status: 404 });
 
   (await cookies()).set(VIEW_AS_COOKIE, target.userId, {
     path: "/",

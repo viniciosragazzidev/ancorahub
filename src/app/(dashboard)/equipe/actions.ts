@@ -1270,14 +1270,14 @@ export async function importBrokersAction(
 export async function generateResetPasswordLinkAction(
   _prev: TeamActionState & { resetUrl?: string },
   formData: FormData,
-): Promise<TeamActionState & { resetUrl?: string }> {
+): Promise<TeamActionState & { resetUrl?: string; resetWhatsApp?: "sent" | "failed" | "no_phone" }> {
   try {
     const userId = String(formData.get("userId") ?? "").trim();
     if (!userId) throw new Error("ID do usuário é obrigatório.");
 
     const result = await generatePasswordResetLinkForMember(userId);
     invalidateTenantContextCache(); // role/unit/status changes apply at once
-    return { success: true, resetUrl: result.resetUrl };
+    return { success: true, resetUrl: result.resetUrl, resetWhatsApp: result.whatsappStatus };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Erro ao gerar link de redefinição de senha.";
     return { success: false, error: message };
