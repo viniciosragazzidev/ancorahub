@@ -39,7 +39,8 @@ function automaticQualificationFilter() {
 
 const defaults = {
   enabled: true,
-  batchSize: 25,
+  // 100 (was 25, 20/10): a batch must fit every lead that can be handed out, not just the oldest.
+  batchSize: 100,
   maxAttempts: 8,
   retryBaseSeconds: 60,
   leaseSeconds: 120,
@@ -284,6 +285,14 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
       automaticQualificationFilter(),
       or(isNull(schema.leads.qualificationState), ne(schema.leads.qualificationState, "IN_PROGRESS")),
       or(isNull(schema.leads.qualificationStatus), ne(schema.leads.qualificationStatus, "qualifying")),
+      // A lead held by a lasting rule (before 02/10, manual queue, other unit, source not allowed)
+      // keeps its 15-minute pause: waking it every tick put it back in every batch and starved
+      // the leads that can be handed out (20/10). Only "arrived before the plantão" is woken here.
+      or(
+        isNull(schema.leadDistributionJobs.lastErrorCode),
+        ne(schema.leadDistributionJobs.lastErrorCode, "HELD_BY_RULE"),
+        sql`${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%'`,
+      ),
       eq(schema.unitDutySchedules.status, "active"),
       eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
       lte(schema.unitDutySchedules.startsAt, local.time),
@@ -414,7 +423,8 @@ async function claimNextJob(workerId: string, config: DistributionJobConfig, ten
     // Leads held by a rule go last: they can't be handed out anyway, and being
     // hot/warm they used to take every batch ahead of the cold leads that can.
     .orderBy(
-      sql`case when ${schema.leadDistributionJobs.lastErrorMessage} like '${sql.raw(COLD_HELD_BY_QUEUE_REASON_PREFIX)}%'
+      sql`case when ${schema.leadDistributionJobs.lastErrorCode} = 'HELD_BY_RULE'
+        or ${schema.leadDistributionJobs.lastErrorMessage} like '${sql.raw(COLD_HELD_BY_QUEUE_REASON_PREFIX)}%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila está em modo manual%'
         or ${schema.leadDistributionJobs.lastErrorMessage} like 'A fila configurada pertence a outra unidade%'

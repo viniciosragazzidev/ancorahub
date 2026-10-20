@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { selectUnambiguousActiveOffer } from "./offers";
+import { orderByPreference, selectUnambiguousActiveOffer } from "./offers";
 
 describe("selectUnambiguousActiveOffer", () => {
   it("returns the only active offer", () => {
@@ -21,5 +21,17 @@ describe("selectUnambiguousActiveOffer", () => {
       { id: "offer-old", status: "EXPIRED" },
       offer,
     ])).toBe(offer);
+  });
+});
+
+describe("orderByPreference", () => {
+  it("keeps the ranking order (fewest leads first), not the database's", () => {
+    const fromDatabase = [{ id: "barbara" }, { id: "luciana" }, { id: "luiz" }, { id: "marco" }];
+    expect(orderByPreference(fromDatabase, ["luiz", "marco", "barbara", "luciana"]).map((broker) => broker.id))
+      .toEqual(["luiz", "marco", "barbara", "luciana"]);
+  });
+
+  it("sends brokers missing from the ranking to the end", () => {
+    expect(orderByPreference([{ id: "x" }, { id: "a" }], ["a"]).map((broker) => broker.id)).toEqual(["a", "x"]);
   });
 });

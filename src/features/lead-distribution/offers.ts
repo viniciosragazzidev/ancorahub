@@ -89,6 +89,17 @@ export async function loadBrokerPacingOffers(database: DatabaseLike, input: { te
   return byBroker;
 }
 
+/**
+ * Rows from an `inArray` query come back in the database's order, not the
+ * ranking's. Without this, the broker with the most leads of the plantão could
+ * get the offer ahead of one with fewer (20/10: Barbara 5 and Luciana 6 over
+ * Luiz and Marco with 3, all free).
+ */
+export function orderByPreference<T extends { id: string }>(rows: readonly T[], preferredIds: readonly string[]): T[] {
+  const rank = new Map(preferredIds.map((id, index) => [id, index]));
+  return [...rows].sort((left, right) => (rank.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(right.id) ?? Number.MAX_SAFE_INTEGER));
+}
+
 export async function createLeadOffersForBrokers(input: {
   tenantId: string;
   leadId: string;
@@ -140,8 +151,10 @@ export async function createLeadOffersForBrokers(input: {
     "produtoInteresse", "produto_interesse", "planoInteresse", "plano_interesse", "interesse",
   ]) ?? readSourcePlanType(lead.sourceMetadata) ?? leadTypeLabel);
 
-  // 2. Fetch brokers info
-  const brokers = await db
+  // 2. Fetch brokers info, kept in the caller's order: brokerIds comes ranked
+  // (fewest leads in the plantão first) and the first broker that passes the
+  // checks below gets the offer.
+  const fetchedBrokers = await db
     .select({
       id: schema.user.id,
       name: schema.user.name,
@@ -164,6 +177,7 @@ export async function createLeadOffersForBrokers(input: {
         inArray(schema.user.id, input.brokerIds),
       ),
     );
+  const brokers = orderByPreference(fetchedBrokers, input.brokerIds);
 
   const createdOffers: Array<{ offerId: string; brokerId: string; whatsappMessageId?: string }> = [];
   const claimedBrokerIds: string[] = [];
