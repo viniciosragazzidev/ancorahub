@@ -307,8 +307,12 @@ async function wakeJobsForActiveDuty(now: Date, tenantId?: string) {
     lockedBy: null,
     leaseExpiresAt: null,
     completedAt: null,
-    lastErrorCode: null,
-    lastErrorMessage: null,
+    // Only the "before the plantão started" reason is cleared: that is what this wake is for.
+    // A lasting hold (lead before 02/10, manual queue, other unit...) keeps its message so
+    // claimNextJob still sends it to the end. Clearing every message let ~30 such old hot
+    // leads fill each 25-job batch and starve the leads of the day (20/10, from 11h).
+    lastErrorCode: sql`case when ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%' then null else ${schema.leadDistributionJobs.lastErrorCode} end`,
+    lastErrorMessage: sql`case when ${schema.leadDistributionJobs.lastErrorMessage} like 'Lead chegou antes do início deste plantão%' then null else ${schema.leadDistributionJobs.lastErrorMessage} end`,
     updatedAt: now,
   }).where(inArray(schema.leadDistributionJobs.id, jobIds));
 
