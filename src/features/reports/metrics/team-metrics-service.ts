@@ -137,7 +137,7 @@ export async function resolveCanonicalTeamMetrics(
         ${branchId}::text as branch_id,
         ${supervisorId}::text as supervisor_id,
         ${managerScope}::boolean as is_manager,
-        ${now}::timestamptz as now_at,
+        ${now.toISOString()}::timestamptz as now_at,
         ${input.window}::int as window_days,
         case
           when t.sla_first_contact_minutes ~ '^[0-9]+$'
@@ -341,7 +341,8 @@ export async function resolveCanonicalTeamMetrics(
     ),
     unit_rollup as (
       select
-        w.window_key,
+        -- f, not w: this rollup reads unit_facts only (w broke /gestao for every gestor, 20/10).
+        f.window_key,
         sum(f.offers_received)::int as offers_received,
         sum(f.offers_accepted)::int as offers_accepted,
         percentile_cont(0.5) within group (order by f.accepted_seconds) filter (where f.accepted_seconds is not null) as median_acceptance_seconds,
