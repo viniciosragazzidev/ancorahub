@@ -6,6 +6,7 @@ import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { INITIAL_AGENT_TRIGGERS } from "./trigger-registry";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
 import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
+import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
 
 /**
  * Verifica se uma ação/gatilho já foi executada para o lead fornecido
@@ -87,6 +88,9 @@ export async function executeAgentTrigger(params: {
           updatedAt: now,
         },
   ).where(and(eq(schema.leads.id, params.leadId), eq(schema.leads.tenantId, params.tenantId)));
+  if (!isHumanHandoff && !isIntake) {
+    await enqueueMetaQualificationConversion({ tenantId: params.tenantId, leadId: params.leadId, qualificationStatus: newQualStatus, at: now });
+  }
 
   // Atualizar conversa se houver
   if (params.conversationId) {

@@ -1,6 +1,7 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import { MetaIntegrationHub } from "@/features/communication-channels/components/meta-integration-hub";
 import { getMetaConnectionState } from "@/features/meta-ads/actions";
+import { getMetaConversionsPanel } from "@/features/meta-ads/meta-conversion-service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCapability } from "@/shared/auth/authorization";
 
@@ -19,6 +20,8 @@ export default async function MetaIntegrationPage() {
     };
   });
   const canConfigure = context.role === "director" || context.jobTitle === "marketing" || context.role === "manager";
+  // Sending lead stages to Meta is a director decision; it never blocks the page.
+  const conversions = context.role === "director" ? await getMetaConversionsPanel(context.tenantId) : null;
 
   return (
     <>
@@ -27,6 +30,7 @@ export default async function MetaIntegrationPage() {
         <MetaIntegrationHub
           marketing={{ connection: marketing.connection, assets: marketing.assets, logs: marketing.logs }}
           canConfigure={canConfigure}
+          conversions={conversions}
         />
       </main>
     </>

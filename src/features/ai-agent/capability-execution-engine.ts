@@ -5,6 +5,7 @@ import { AGENT_CAPABILITIES, type AgentCapabilityDefinition, type QualificationF
 import { runCapabilityGuardPipeline, type GuardContext, type GuardCheckResult } from "./capability-guards";
 import { transitionConversationState } from "./conversation-state-machine";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
+import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
 
 export interface RequestCapabilityInput {
   capabilityKey: string;
@@ -185,6 +186,7 @@ export async function requestAgentCapability(input: RequestCapabilityInput): Pro
     qualificationCompletedAt: isCompleted ? now : null,
     updatedAt: now,
   }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
+  await enqueueMetaQualificationConversion({ tenantId: input.tenantId, leadId: input.leadId, qualificationStatus: targetQualStatus, at: now });
 
   if (input.conversationId) {
     const nextStatus = capability.key === "TRANSFER_TO_HUMAN" ? "WAITING_HUMAN" : isCompleted ? "CLOSED" : "WAITING_CUSTOMER";

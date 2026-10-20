@@ -11,6 +11,7 @@ import { decryptMetaToken } from "@/features/meta-ads/meta-oauth";
 import { resolveMetaCampaignAttribution, resolveMetaCampaignQueueRoute } from "@/features/meta-ads/campaign-route-resolver";
 import { runLeadDistributionProcessor } from "@/features/lead-distribution/jobs";
 import { runLeadEffectOutboxProcessor } from "@/features/leads/webhooks/services/lead-effect-outbox";
+import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-service";
 
 import { MetaCloudApiError } from "./meta-cloud-client";
 import { getMetaLeadAdsWebhookConfig } from "./meta-cloud-config";
@@ -436,6 +437,9 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         });
         console.log("[ingestMetaLeadAdsWebhook] createLeadFromWebhookSync result:", result);
         if (!result.success) throw new Error(result.code);
+        // Conversions API for CRM: "Lead recebido". Never throws; a replayed
+        // delivery hits the same (lead, stage) row and is ignored.
+        await enqueueMetaConversionEvent({ tenantId: source.tenantId, leadId: result.leadId, stage: "lead_received", at: receivedAt });
         try {
           await processMetaLeadImmediately({ tenantId: source.tenantId, leadId: result.leadId });
         } catch (error) {

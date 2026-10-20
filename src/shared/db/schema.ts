@@ -2040,6 +2040,62 @@ export const metaDatasets = pgTable(
   ],
 );
 
+/** Conversions API for CRM: per-tenant switch, target dataset and Events Manager test code. Off by default. */
+export const metaConversionSettings = pgTable(
+  "meta_conversion_settings",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").notNull().default(false),
+    datasetId: text("dataset_id"),
+    testEventCode: text("test_event_code"),
+    enabledAt: timestamp("enabled_at", { withTimezone: true }),
+    backfilledAt: timestamp("backfilled_at", { withTimezone: true }),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_conversion_settings_tenant_unique").on(table.tenantId),
+    index("meta_conversion_settings_updated_by_idx").on(table.updatedBy),
+  ],
+);
+
+/**
+ * Outbox of lead stage events for the Conversions API for CRM. One row per
+ * (lead, stage); the meta-conversions job sends pending rows to the dataset.
+ */
+export const metaConversionEvents = pgTable(
+  "meta_conversion_events",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").notNull().references(() => leads.id, { onDelete: "cascade" }),
+    stage: text("stage").notNull(),
+    eventName: text("event_name").notNull(),
+    eventId: text("event_id").notNull(),
+    /** Lead Ads leadgen id (user_data.lead_id). */
+    metaLeadId: text("meta_lead_id").notNull(),
+    eventTime: timestamp("event_time", { withTimezone: true }).notNull(),
+    status: text("status").notNull().default("pending"), // pending, sent, failed, skipped
+    attempts: integer("attempts").notNull().default(0),
+    /** Backoff and claim lease: a row is due only when this is in the past. */
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+    lastError: text("last_error"),
+    sentAt: timestamp("sent_at", { withTimezone: true }),
+    response: jsonb("response"),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    uniqueIndex("meta_conversion_events_tenant_lead_stage_unique").on(table.tenantId, table.leadId, table.stage),
+    uniqueIndex("meta_conversion_events_tenant_event_id_unique").on(table.tenantId, table.eventId),
+    index("meta_conversion_events_due_idx").on(table.status, table.nextAttemptAt, table.createdAt),
+    index("meta_conversion_events_tenant_status_idx").on(table.tenantId, table.status, table.updatedAt),
+    index("meta_conversion_events_lead_idx").on(table.leadId),
+  ],
+);
+
 /** Logs operacionais de sincronização da Meta */
 export const metaSyncLogs = pgTable(
   "meta_sync_logs",

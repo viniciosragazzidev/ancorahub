@@ -12,6 +12,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { generateCommissionSchedule } from "@/features/commissions/commission-rules-service";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { buildCustomerRenewalStatusScope } from "./customer-renewal-scope";
+import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-service";
 
 const registerSaleInput = z.object({
   leadId: z.string().min(1),
@@ -254,6 +255,9 @@ export async function registerSaleAction(rawInput: z.input<typeof registerSaleIn
     await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "sale", entidadeId: saleId, acao: "registrou" });
     await tx.insert(schema.notifications).values({ id: randomUUID(), tenantId: context.tenantId, recipientUserId: lead.corretorId ?? context.userId, leadId: lead.id, type: "sale_registered", title: "Venda registrada", message: `${lead.nome} foi convertido em cliente ativo. Vencimento: ${expirationDate}.`, createdAt: now });
   });
+
+  // Conversions API for CRM: "Venda" (Lead Ads leads only, never throws).
+  await enqueueMetaConversionEvent({ tenantId: context.tenantId, leadId: lead.id, stage: "sale", at: now });
 
   // Notify via push (outside transaction — non-blocking)
   if (lead.corretorId) {

@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { getDatabase, schema } from "@/shared/db";
 import { resolveSystemUserId } from "@/shared/tenant/system-user";
 import { enqueueAndProcessLeadDistribution } from "@/features/lead-distribution/jobs";
+import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
 import { transitionConversationState } from "./conversation-state-machine";
 import { resolveQualificationTimeoutRoute } from "./qualification-timeout-routing";
 import type { ConversationMemory } from "./memory";
@@ -317,6 +318,9 @@ export async function runQualificationTimeoutSweep(tenantIdFilter?: string): Pro
             )
           );
       });
+
+      // Conversions API for CRM: a warm timeout still counts as "Qualificado" (never throws).
+      await enqueueMetaQualificationConversion({ tenantId: tenant.id, leadId: lead.id, qualificationStatus: targetQualificationStatus, at: updateTime });
 
       // 5. Encerrar Atendimento do Robô de IA para este Lead (se houver conversa)
       if (aiConv?.id) {

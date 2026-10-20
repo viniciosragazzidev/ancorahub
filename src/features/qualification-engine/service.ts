@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
 import type { ConversationMemory } from "@/features/ai-agent/memory";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
+import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
 import { getDatabase, schema } from "@/shared/db";
 import {
   composeQuestionReply,
@@ -417,6 +418,9 @@ export async function persistQualificationEvaluation(input: {
       acao: `qualification.${result.state.toLowerCase()}:${result.classification}`,
     });
   });
+
+  // Conversions API for CRM: warm/hot become "Qualificado"/"Quente" (Lead Ads only, never throws).
+  await enqueueMetaQualificationConversion({ tenantId: input.tenantId, leadId: input.leadId, qualificationStatus: qualificationLeadColumns(result).qualificationStatus, at: now });
 
   return result;
 }

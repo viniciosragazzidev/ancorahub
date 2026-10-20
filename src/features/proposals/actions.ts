@@ -12,6 +12,7 @@ import { getSystemSetting } from "@/features/system-settings/queries";
 import type { ProposalStatus } from "@/shared/db/schema";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { buildStrictRoleLeadScope } from "@/features/leads/strict-role-scope";
+import { enqueueMetaConversionEvent } from "@/features/meta-ads/meta-conversion-service";
 
 async function assertFeatureEnabled() {
   const enabled = await getSystemSetting("feature_proposals_enabled");
@@ -473,6 +474,8 @@ export async function convertProposalToSaleAction(
       });
     });
 
+    // Conversions API for CRM: "Venda" (Lead Ads leads only, never throws).
+    await enqueueMetaConversionEvent({ tenantId: context.tenantId, leadId: lead.id, stage: "sale", at: now });
 
     return { success: true, saleId };
   } catch (error) {
