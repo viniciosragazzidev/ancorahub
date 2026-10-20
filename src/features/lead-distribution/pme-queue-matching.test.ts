@@ -15,11 +15,19 @@ describe("PME queue matching", () => {
     expect(isPmeQueueName("Fila PF")).toBe(false);
   });
 
-  it("sends a person queue to the PME queue of the same owner, then the same unit", () => {
+  it("sends every company lead to FILA PME - RENAN when it exists, FILA TATIANA included (20/10)", () => {
     const candidates = [queue("pme", "Fila PME"), queue("pme-renan", "FILA PME - RENAN"), queue("pme-outra", "Fila PME", "filial")];
-    expect(pickPmeQueue(queue("pf-renan", "FILA PF - RENAN"), candidates)?.id).toBe("pme-renan");
+    expect(isPersonQueueName("FILA TATIANA")).toBe(true);
+    expect(pickPmeQueue(queue("tatiana", "FILA TATIANA"), candidates)?.id).toBe("pme-renan");
+    expect(pickPmeQueue(queue("pf", "FILA PF"), candidates)?.id).toBe("pme-renan");
+    expect(pickPmeQueue(queue("premium", "Fila Premium", "filial"), candidates)?.id).toBe("pme-renan");
+    expect(pickPmeQueue(queue("pme-renan", "FILA PME - RENAN"), candidates)).toBeNull();
+  });
+
+  it("without FILA PME - RENAN, picks the PME queue of the same owner, then the same unit", () => {
+    const candidates = [queue("pme", "Fila PME"), queue("pme-joao", "FILA PME - JOAO"), queue("pme-outra", "Fila PME", "filial")];
+    expect(pickPmeQueue(queue("pf-joao", "FILA PF - JOAO"), candidates)?.id).toBe("pme-joao");
     expect(pickPmeQueue(queue("pf", "FILA PF"), candidates)?.id).toBe("pme");
-    expect(pickPmeQueue(queue("premium", "Fila Premium"), candidates)?.id).toBe("pme");
     expect(pickPmeQueue(queue("pf-filial", "Fila PF", "filial"), candidates)?.id).toBe("pme-outra");
   });
 
