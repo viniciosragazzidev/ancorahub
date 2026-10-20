@@ -1,9 +1,7 @@
-import { generateObject } from "ai";
-import type { z } from "zod";
+import { toJSONSchema, type z } from "zod";
 
-import { getAiEngineSettings } from "@/features/ai/engine";
-import { getAiModelInstance } from "@/features/ai/providers";
 import { aiExtractImageText } from "@/features/ai/vision";
+import { runGateway } from "@/features/ai-gateway/gateway";
 import { extractPdfText } from "@/features/waha-group-capture/pdf-text";
 
 import { findLinhasDigitaveis } from "./boleto";
@@ -17,6 +15,8 @@ import {
 
 const MAX_TEXT_CHARS = 40_000;
 const MIN_PDF_TEXT_CHARS = 40;
+
+export type ExtractionActor = { tenantId: string; userId: string };
 
 export class ExtractionError extends Error {
   constructor(message: string) {
@@ -63,40 +63,47 @@ async function readText(file: File): Promise<string> {
   return text;
 }
 
-async function structure<S extends z.ZodTypeAny>(schema: S, system: string, text: string): Promise<z.infer<S>> {
-  const settings = await getAiEngineSettings();
-  if (!settings.enabled) throw new ExtractionError("O motor de Inteligência Artificial está desativado.");
-
-  const keys = {
-    groqKey: settings.groqApiKey,
-    openaiKey: settings.openaiApiKey,
-    googleKey: settings.googleApiKey,
-    openrouterKey: settings.openrouterApiKey,
-  };
-  const candidates = [
-    { provider: settings.primaryProvider, model: settings.primaryModel },
-    ...(settings.fallbackProvider !== "none"
-      ? [{ provider: settings.fallbackProvider, model: settings.fallbackModel }]
-      : []),
-  ];
-
-  let lastError: unknown = null;
-  for (const candidate of candidates) {
-    try {
-      const result = await generateObject({
-        model: getAiModelInstance(candidate.provider, candidate.model, keys),
-        schema,
-        system,
-        prompt: text.slice(0, MAX_TEXT_CHARS),
-        temperature: 0,
-      });
-      return result.object as z.infer<S>;
-    } catch (error) {
-      lastError = error;
-      console.warn(`[payment-proof-validator] falha com ${candidate.provider}/${candidate.model}`, error);
-    }
+/**
+ * Organiza o texto nos campos do schema pelo gateway de IA. Só modelos pagos
+ * (sensitive): o texto tem CPF/CNPJ, que não pode ser mascarado nem ir para
+ * modelo gratuito que treina com os dados.
+ */
+async function structure<S extends z.ZodTypeAny>(
+  schema: S,
+  instruction: string,
+  text: string,
+  actor: ExtractionActor,
+): Promise<z.infer<S>> {
+  const result = await runGateway({
+    profile: "json-structured",
+    purpose: "payment_proof_validator",
+    tenantId: actor.tenantId,
+    userId: actor.userId,
+    sensitive: true,
+    temperature: 0,
+    maxTokens: 1500,
+    timeoutMs: 30_000,
+    schema,
+    messages: [
+      {
+        role: "system",
+        content:
+          `${instruction}
+Responda só com um objeto JSON neste JSON Schema, com números como números JSON (ex.: 535.98):
+` +
+          JSON.stringify(toJSONSchema(schema)),
+      },
+      { role: "user", content: text.slice(0, MAX_TEXT_CHARS) },
+    ],
+  });
+  if (result.ok) return result.value as z.infer<S>;
+  console.error("[payment-proof-validator] extração falhou", result.reason, result.attempts);
+  if (result.reason === "rate_limited") {
+    throw new ExtractionError("Muitas validações em sequência. Aguarde um minuto e tente de novo.");
   }
-  console.error("[payment-proof-validator] extração falhou", lastError);
+  if (result.reason === "no_provider") {
+    throw new ExtractionError("Nenhum modelo de IA pago está configurado para ler documentos (OpenRouter, Anthropic ou OpenAI).");
+  }
   throw new ExtractionError("Não foi possível ler o documento com a IA. Tente de novo em instantes.");
 }
 
@@ -104,9 +111,9 @@ async function structure<S extends z.ZodTypeAny>(schema: S, system: string, text
  * Lê um documento e devolve os campos estruturados. A linha digitável
  * encontrada por regra no texto vale mais que a lida pela IA.
  */
-export async function extractDocument(kind: DocumentKind, file: File): Promise<ExtractedDocument> {
+export async function extractDocument(kind: DocumentKind, file: File, actor: ExtractionActor): Promise<ExtractedDocument> {
   const text = await readText(file);
-  const data = await structure(SCHEMAS[kind], PROMPTS[kind], text);
+  const data = await structure(SCHEMAS[kind], PROMPTS[kind], text, actor);
 
   if (kind === "proposta") return { kind, data: proposalExtractionSchema.parse(data) };
 

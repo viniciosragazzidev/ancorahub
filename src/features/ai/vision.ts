@@ -4,12 +4,22 @@ import { getSystemSettings } from "@/features/system-settings/queries";
 
 import { getAiEngineSettings } from "./engine";
 import { getAiModelInstance } from "./providers";
-import { defaultModels, type AiProvider, type AiSettings } from "./types";
+import type { AiProvider, AiSettings } from "./types";
 
 /** Providers whose default models accept images. The Groq and OpenRouter defaults are text-only. */
 const VISION_PROVIDERS: ReadonlySet<AiProvider> = new Set<AiProvider>(["google", "openai"]);
 
 /** Thrown when no provider that can read images is available; callers record it instead of failing. */
+/**
+ * Models that read images when no vision model was configured. Not defaultModels:
+ * gemini-2.0-flash was retired (HTTP 404, 2026-10-12). AI_GEMINI_MODEL in Coolify
+ * swaps it without a deploy; the "latest" alias follows Google's current Flash.
+ */
+function visionDefaultModel(provider: AiProvider) {
+  if (provider === "google") return process.env.AI_GEMINI_MODEL?.trim() || "gemini-flash-latest";
+  return "gpt-4o-mini";
+}
+
 export class VisionNotConfiguredError extends Error {
   constructor(message: string) {
     super(message);
@@ -53,7 +63,7 @@ export function resolveVisionTarget(
     (provider === explicit ? vision.model?.trim() : "") ||
     (provider === settings.primaryProvider ? settings.primaryModel : "") ||
     (provider === fallback ? settings.fallbackModel : "") ||
-    defaultModels[provider];
+    visionDefaultModel(provider);
 
   return { provider, model };
 }

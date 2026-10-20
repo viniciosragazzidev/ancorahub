@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveVisionTarget } from "./vision";
 import type { AiSettings } from "./types";
@@ -17,6 +17,7 @@ function settings(overrides: Partial<AiSettings> = {}): AiSettings {
   };
 }
 
+beforeEach(() => vi.stubEnv("AI_GEMINI_MODEL", ""));
 afterEach(() => vi.unstubAllEnvs());
 
 describe("resolveVisionTarget", () => {
@@ -25,7 +26,7 @@ describe("resolveVisionTarget", () => {
     vi.stubEnv("OPENAI_API_KEY", "");
     expect(resolveVisionTarget(settings({ googleApiKey: "g" }), {})).toEqual({
       provider: "google",
-      model: "gemini-2.0-flash",
+      model: "gemini-flash-latest",
     });
   });
 
@@ -48,7 +49,7 @@ describe("resolveVisionTarget", () => {
     vi.stubEnv("GOOGLE_API_KEY", "");
     expect(
       resolveVisionTarget(settings({ googleApiKey: "g" }), { provider: "openai", model: "gpt-4o" }),
-    ).toEqual({ provider: "google", model: "gemini-2.0-flash" });
+    ).toEqual({ provider: "google", model: "gemini-flash-latest" });
   });
 
   it("ignores an explicit provider that cannot read images", () => {

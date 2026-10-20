@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Envie a proposta e o boleto em PDF." }, { status: 400 });
     }
 
-    const document = await extractDocument(kind.data, file);
+    const document = await extractDocument(kind.data, file, { tenantId: context.tenantId, userId: context.userId });
     return NextResponse.json({ document });
   } catch (error) {
     if (error instanceof AuthenticationError) return NextResponse.json({ error: "Sessão expirada." }, { status: 401 });
