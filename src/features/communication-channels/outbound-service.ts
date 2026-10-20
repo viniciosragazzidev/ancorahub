@@ -273,8 +273,8 @@ async function isCurrentColdLeadReactivation(row: OutboundRow) {
   // The director's Requalificar sends to the cold leads the panel lists, including the
   // timeout holds (PARTIAL + manual_hold); the stricter automatic rule cancelled all 86 of them
   // right before sending (20/10). The automatic sweep keeps its own rule.
-  const isManual = row.idempotencyKey.startsWith(`${COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX}manual:`);
-  if (!lead || !(isManual ? isEligibleColdLeadForManualRequalification({ ...lead, id: leadId }) : isEligibleColdLeadForReactivation(lead))) return false;
+  // Since 20/10 the automatic try (3 hours after turning cold, once) also reaches the timeout holds.
+  if (!lead || !isEligibleColdLeadForManualRequalification({ ...lead, id: leadId })) return false;
   const [rule] = await db.select({ enabled: schema.aiQualificationFollowUpRules.enabled })
     .from(schema.aiQualificationFollowUpRules).where(and(
       eq(schema.aiQualificationFollowUpRules.id, `cold-lead-reactivation:${row.tenantId}`),
@@ -284,13 +284,14 @@ async function isCurrentColdLeadReactivation(row: OutboundRow) {
   if (!rule?.enabled) return false;
   const isAutomatic = isLegacy || row.idempotencyKey.startsWith(`${COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX}auto:`);
   if (isAutomatic) {
+    // Every automatic queue takes part (decision of 20/10); a manual queue keeps its leads for people.
     if (!lead.queueId) return false;
-    const [queuePolicy] = await db.select({ policy: schema.leadDistributionPolicies.policy }).from(schema.leadDistributionPolicies).where(and(
-      eq(schema.leadDistributionPolicies.tenantId, row.tenantId),
-      eq(schema.leadDistributionPolicies.queueId, lead.queueId),
-      isNull(schema.leadDistributionPolicies.profileKey),
+    const [queue] = await db.select({ assignmentMode: schema.leadQueues.assignmentMode, status: schema.leadQueues.status }).from(schema.leadQueues).where(and(
+      eq(schema.leadQueues.id, lead.queueId),
+      eq(schema.leadQueues.tenantId, row.tenantId),
+      isNull(schema.leadQueues.deletedAt),
     )).limit(1);
-    if (!readDistributionPolicy(queuePolicy?.policy).coldLeadRequalification.enabled) return false;
+    if (!queue || queue.assignmentMode !== "automatic" || queue.status !== "active") return false;
   }
   const promptAt = isAutomatic
     ? await db.select({ sentAt: schema.whatsappOutboundMessages.sentAt, createdAt: schema.whatsappOutboundMessages.createdAt, idempotencyKey: schema.whatsappOutboundMessages.idempotencyKey })

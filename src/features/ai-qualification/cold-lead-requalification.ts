@@ -14,6 +14,10 @@ import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features
 import { ensureColdLeadReactivationRule } from "./followup-service";
 import { isEligibleColdLeadForReactivation } from "./cold-lead-reactivation-policy";
 import {
+  AUTOMATIC_COLD_LEAD_REQUALIFICATION,
+  AUTOMATIC_REQUALIFICATION_LOOKBACK_HOURS,
+  automaticRequalificationDue,
+  coldSinceAt,
   countRequalificationAttempts,
   COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX,
   isRequalificationInCooldown,
@@ -367,12 +371,16 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
     const tenantEnabled = await getActiveTenantRule(tenantId);
     if (!tenantEnabled) continue;
     const locked = await withTenantRequalificationLock(tenantId, async () => {
-      const policies = await db.select({ queueId: schema.leadDistributionPolicies.queueId, policy: schema.leadDistributionPolicies.policy })
-        .from(schema.leadDistributionPolicies).where(and(eq(schema.leadDistributionPolicies.tenantId, tenantId), isNull(schema.leadDistributionPolicies.profileKey)));
-      const enabledQueues = policies.map((row) => ({ queueId: row.queueId, config: normalizeColdLeadRequalificationPolicy(readDistributionPolicy(row.policy).coldLeadRequalification) }))
-        .filter((row): row is { queueId: string; config: typeof row.config } => Boolean(row.queueId && row.config.enabled));
-      if (!enabledQueues.length) return { candidates: 0, queued: 0, sent: 0, skipped: 0 };
-      const queueConfig = new Map(enabledQueues.map((row) => [row.queueId, row.config]));
+      // Every automatic queue, one try 3 hours after the lead turned cold (decision of 20/10):
+      // the per-queue switch no longer gates it, and the timeout holds (the panel's cold leads) count.
+      const cfg = AUTOMATIC_COLD_LEAD_REQUALIFICATION;
+      const queues = await db.select({ id: schema.leadQueues.id }).from(schema.leadQueues).where(and(
+        eq(schema.leadQueues.tenantId, tenantId), eq(schema.leadQueues.assignmentMode, "automatic"),
+        eq(schema.leadQueues.status, "active"), isNull(schema.leadQueues.deletedAt),
+      ));
+      if (!queues.length) return { candidates: 0, queued: 0, sent: 0, skipped: 0 };
+      // A lead turns cold minutes after arriving; the extra day covers late timeouts.
+      const arrivedSince = new Date(now.getTime() - (AUTOMATIC_REQUALIFICATION_LOOKBACK_HOURS + 24) * 60 * 60_000);
       const leads = await db.select({
         id: schema.leads.id,
         tenantId: schema.leads.tenantId,
@@ -390,16 +398,17 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
         archivedAt: schema.leads.archivedAt,
         deletedAt: schema.leads.deletedAt,
       }).from(schema.leads).where(and(
-        eq(schema.leads.tenantId, tenantId), inArray(schema.leads.queueId, enabledQueues.map((row) => row.queueId!)),
+        eq(schema.leads.tenantId, tenantId), inArray(schema.leads.queueId, queues.map((queue) => queue.id)),
         eq(schema.leads.qualificationStatus, "cold"), isNull(schema.leads.corretorId),
         isNull(schema.leads.distributionRemovedAt), isNull(schema.leads.archivedAt), isNull(schema.leads.deletedAt),
         notInArray(schema.leads.status, ["lost", "converted", "under_analysis"]),
-        notInArray(schema.leads.distributionStatus, ["assigned", "manual_hold", "held", "removed", "returned_to_queue"]),
-      )).orderBy(asc(schema.leads.qualificationCompletedAt)).limit(25);
-      const eligible = leads.filter((lead) => lead.queueId && isEligibleColdLeadForReactivation(lead));
+        notInArray(schema.leads.distributionStatus, ["assigned", "held", "removed", "returned_to_queue"]),
+        gte(schema.leads.createdAt, arrivedSince),
+      )).orderBy(asc(schema.leads.createdAt)).limit(200);
+      const eligible = leads.filter((lead) => lead.queueId && isEligibleColdLeadForManualRequalification(lead));
       if (!eligible.length) return { candidates: 0, queued: 0, sent: 0, skipped: 0 };
       const leadIds = eligible.map((lead) => lead.id);
-      const [conversations, inboundRows, outboundRows] = await Promise.all([
+      const [conversations, inboundRows, outboundRows, timeoutHolds] = await Promise.all([
         db.selectDistinctOn([schema.aiConversations.tenantId, schema.aiConversations.leadId], {
           leadId: schema.aiConversations.leadId, status: schema.aiConversations.status, optOutAt: schema.aiConversations.optOutAt, wrongNumberAt: schema.aiConversations.wrongNumberAt,
         }).from(schema.aiConversations).where(and(eq(schema.aiConversations.tenantId, tenantId), inArray(schema.aiConversations.leadId, leadIds)))
@@ -409,10 +418,17 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
           .orderBy(asc(schema.whatsappMessages.sentAt)),
         db.select({ recipientId: schema.whatsappOutboundMessages.recipientId, id: schema.whatsappOutboundMessages.id, idempotencyKey: schema.whatsappOutboundMessages.idempotencyKey, status: schema.whatsappOutboundMessages.status, sentAt: schema.whatsappOutboundMessages.sentAt, createdAt: schema.whatsappOutboundMessages.createdAt })
           .from(schema.whatsappOutboundMessages).where(and(eq(schema.whatsappOutboundMessages.tenantId, tenantId), inArray(schema.whatsappOutboundMessages.recipientId, leadIds))),
+        // When a lead without valid data turned cold: the timeout hold (it has no qualification end).
+        db.select({ leadId: schema.leadDistributionEvents.leadId, at: sql<string>`max(${schema.leadDistributionEvents.createdAt})` })
+          .from(schema.leadDistributionEvents).where(and(
+            eq(schema.leadDistributionEvents.tenantId, tenantId), inArray(schema.leadDistributionEvents.leadId, leadIds),
+            eq(schema.leadDistributionEvents.action, "qualification_timeout_manual_hold"),
+          )).groupBy(schema.leadDistributionEvents.leadId),
       ]);
       const conversationByLead = new Map(conversations.map((row) => [row.leadId, row]));
       const inboundByLead = new Map<string, Date>();
       for (const row of inboundRows) if (row.leadId) inboundByLead.set(row.leadId, row.sentAt);
+      const timeoutHoldByLead = new Map(timeoutHolds.map((row) => [row.leadId, new Date(row.at)]));
       const historyByLead = new Map<string, typeof outboundRows>();
       for (const row of outboundRows) {
         if (!row.recipientId || (!row.idempotencyKey.startsWith(REQUALIFICATION_PREFIX) && row.idempotencyKey !== `${LEGACY_PREFIX}${row.recipientId}`)) continue;
@@ -424,33 +440,28 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
       let sentCount = 0;
       let skippedCount = 0;
       for (const lead of eligible) {
-        if (!lead.queueId || !lead.qualificationCompletedAt) continue;
-        const cfg = queueConfig.get(lead.queueId);
-        if (!cfg) continue;
         const convo = conversationByLead.get(lead.id);
         const history = historyByLead.get(lead.id) ?? [];
         const attempts = countRequalificationAttempts(history);
-        const attempted = history.filter((row) => !["cancelled", "expired", "skipped"].includes(row.status));
         if (history.some((row) => ["queued", "pending", "processing"].includes(row.status))) { skippedCount += 1; continue; }
+        const coldSince = coldSinceAt(lead, timeoutHoldByLead.get(lead.id));
+        if (!automaticRequalificationDue({ coldSince, attempts, now })) continue;
+        const attempted = history.filter((row) => !["cancelled", "expired", "skipped"].includes(row.status));
         const latestAttempt = [...attempted].sort((a, b) => (b.sentAt ?? b.createdAt).getTime() - (a.sentAt ?? a.createdAt).getTime())[0];
-        const latestSentAt = [...attempted].filter((row) => row.sentAt).sort((a, b) => b.sentAt!.getTime() - a.sentAt!.getTime())[0]?.sentAt ?? null;
+        // The client wrote after turning cold: the conversation resumes on its own, no invite needed.
         const latestInboundAt = inboundByLead.get(lead.id) ?? null;
-        const hasInboundSinceLastPrompt = latestInboundAt
-          ? latestInboundAt.getTime() >= (latestSentAt?.getTime() ?? lead.createdAt.getTime() + 5_000)
-          : false;
         const decision = requalificationSendDecision({
           policy: cfg,
           attempts,
-          hasInboundSinceLastPrompt,
+          hasInboundSinceLastPrompt: Boolean(latestInboundAt && latestInboundAt.getTime() > coldSince.getTime()),
           optedOut: Boolean(convo?.optOutAt),
           wrongNumber: Boolean(convo?.wrongNumberAt),
-          eligible: isEligibleColdLeadForReactivation(lead) && !["WAITING_HUMAN", "HUMAN_ACTIVE"].includes(convo?.status ?? ""),
-          lastAttemptAt: latestAttempt?.sentAt ?? latestAttempt?.createdAt ?? lead.qualificationCompletedAt,
+          eligible: !["WAITING_HUMAN", "HUMAN_ACTIVE"].includes(convo?.status ?? ""),
+          lastAttemptAt: latestAttempt?.sentAt ?? latestAttempt?.createdAt ?? null,
           now,
         });
         if (!decision.allowed) { skippedCount += 1; continue; }
-        const dueAt = new Date((latestAttempt?.sentAt ?? latestAttempt?.createdAt ?? lead.qualificationCompletedAt).getTime() + cfg.intervalMinutes * 60_000);
-        if (dueAt > now || !isWithinRequalificationBusinessWindow(now)) continue;
+        if (!isWithinRequalificationBusinessWindow(now)) continue;
         const attempt = history.length + 1;
         try {
           const queued = await enqueueMetaTemplateMessage({

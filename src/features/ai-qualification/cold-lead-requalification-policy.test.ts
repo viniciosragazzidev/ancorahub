@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { operationDayStart } from "@/features/reports/metrics/lead-quality-period";
 import {
+  automaticRequalificationDue,
+  coldSinceAt,
   countRequalificationAttempts,
   isRequalificationInCooldown,
   isEligibleColdLeadForManualRequalification,
@@ -96,5 +98,30 @@ describe("cold lead requalification policy", () => {
     const result = await runWithRequalificationLock(async () => false, task);
     expect(result).toEqual({ acquired: false });
     expect(task).not.toHaveBeenCalled();
+  });
+});
+
+describe("automatic requalification (20/10: 3 hours after turning cold, once)", () => {
+  const coldSince = new Date("2026-10-20T12:00:00.000Z");
+  const at = (hours: number) => new Date(coldSince.getTime() + hours * 60 * 60_000);
+
+  it("waits 3 hours, then sends only once", () => {
+    expect(automaticRequalificationDue({ coldSince, attempts: 0, now: at(2.9) })).toBe(false);
+    expect(automaticRequalificationDue({ coldSince, attempts: 0, now: at(3) })).toBe(true);
+    expect(automaticRequalificationDue({ coldSince, attempts: 1, now: at(5) })).toBe(false);
+  });
+
+  it("leaves leads that turned cold more than 24 hours ago to the panel", () => {
+    expect(automaticRequalificationDue({ coldSince, attempts: 0, now: at(24) })).toBe(true);
+    expect(automaticRequalificationDue({ coldSince, attempts: 0, now: at(25) })).toBe(false);
+  });
+
+  it("counts the cold time from the qualification end, else the timeout hold, else the arrival", () => {
+    const createdAt = new Date("2026-10-20T10:00:00.000Z");
+    const hold = new Date("2026-10-20T10:15:00.000Z");
+    const completed = new Date("2026-10-20T10:20:00.000Z");
+    expect(coldSinceAt({ qualificationCompletedAt: completed, createdAt }, hold)).toEqual(completed);
+    expect(coldSinceAt({ qualificationCompletedAt: null, createdAt }, hold)).toEqual(hold);
+    expect(coldSinceAt({ qualificationCompletedAt: null, createdAt }, null)).toEqual(createdAt);
   });
 });
