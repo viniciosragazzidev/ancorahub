@@ -31,6 +31,31 @@ export function findDutyOccurrenceConfirmation<T extends ConfirmedDutyOccurrence
     && confirmation.shiftEndsAt.getTime() === input.window.endsAt.getTime());
 }
 
+export type DutyAttendanceMode = "online" | "presencial";
+
+/**
+ * The mode a broker actually works an occurrence in: the assignment's own
+ * override (a broker marked online inside a presencial plantão) or, when it
+ * has none, the plantão's mode. Every presence and eligibility reader goes
+ * through this, so the override can never apply in one place and not another.
+ */
+export function effectiveAttendanceMode(assignmentMode: string | null | undefined, scheduleMode: string | null | undefined): DutyAttendanceMode {
+  if (assignmentMode === "online" || assignmentMode === "presencial") return assignmentMode;
+  return scheduleMode === "presencial" ? "presencial" : "online";
+}
+
+/**
+ * Why the director cannot set this per-broker mode now (null = allowed). Only
+ * the Director edits the escala (same rule as adding/removing a broker), and
+ * "online" only means something inside a presencial plantão. Clearing the
+ * override (null) is always allowed.
+ */
+export function dutyAttendanceOverrideProblem(input: { role: string; scheduleMode: string; mode: "online" | null }): string | null {
+  if (input.role !== "director") return "Apenas o Diretor pode deixar um corretor online no plantão.";
+  if (input.mode === "online" && input.scheduleMode !== "presencial") return "Este plantão já é online: todos confirmam com um toque.";
+  return null;
+}
+
 /** An absence always blocks; an in-person shift requires a manager's check-in. */
 export function isDutyBrokerEligible(input: { attendanceMode: string; presenceRequired: boolean; status: string | null; confirmedBy: string | null }) {
   if (input.status === "absent") return false;

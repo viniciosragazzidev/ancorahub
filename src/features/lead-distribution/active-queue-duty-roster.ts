@@ -114,6 +114,7 @@ export async function getActiveQueueDutyRoster(input: {
       branchName: schema.branches.name,
       dutyDate: schema.dutyRosterAssignments.dutyDate,
       pausedAt: schema.dutyRosterAssignments.pausedAt,
+      attendanceMode: schema.dutyRosterAssignments.attendanceMode,
     })
     .from(schema.dutyRosterAssignments)
     .innerJoin(schema.tenantMemberships, and(
@@ -157,6 +158,7 @@ export async function getActiveQueueDutyRoster(input: {
       endsAt: broker.endsAt,
       validFrom: broker.validFrom,
       validUntil: broker.validUntil,
+      attendanceMode: broker.attendanceMode,
     })),
     schedules: activeSchedules.filter((schedule) => matchingScheduleIds.includes(schedule.id)),
     now,

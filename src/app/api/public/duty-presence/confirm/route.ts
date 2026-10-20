@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, exists, gt, lte, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
+import { effectiveAttendanceMode } from "@/features/lead-distribution/duty-presence-domain";
 import { wakeLeadsAwaitingEligibleBroker } from "@/features/lead-distribution/jobs";
 
 export const runtime = "nodejs";
@@ -17,11 +18,13 @@ export async function POST(request: NextRequest) {
   const db = getDatabase();
   const now = new Date();
   // Presencial is confirmed only in the app, with the photo of the place (the link page sends the broker there).
-  const [mode] = await db.select({ attendanceMode: schema.unitDutySchedules.attendanceMode })
+  // A broker marked online inside a presencial plantão confirms here with one tap.
+  const [mode] = await db.select({ attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode })
     .from(schema.dutyPresenceConfirmations)
     .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyPresenceConfirmations.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyPresenceConfirmations.tenantId)))
+    .leftJoin(schema.dutyRosterAssignments, and(eq(schema.dutyRosterAssignments.id, schema.dutyPresenceConfirmations.assignmentId), eq(schema.dutyRosterAssignments.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
-  if (mode?.attendanceMode === "presencial") return NextResponse.json({ success: false, error: "Este plantão é presencial: confirme pelo app, tirando uma foto do local." }, { status: 409 });
+  if (mode && effectiveAttendanceMode(mode.assignmentAttendanceMode, mode.attendanceMode) === "presencial") return NextResponse.json({ success: false, error: "Este plantão é presencial: confirme pelo app, tirando uma foto do local." }, { status: 409 });
   const result = await db.transaction(async (tx) => {
     const [confirmed] = await tx.update(schema.dutyPresenceConfirmations).set({ status: "confirmed", confirmedAt: now, updatedAt: now })
       .where(and(

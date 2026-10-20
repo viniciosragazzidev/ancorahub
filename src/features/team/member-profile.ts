@@ -228,7 +228,8 @@ export async function getTeamMemberProfile(memberUserId: string) {
       scheduleValidFrom: schema.unitDutySchedules.validFrom,
       scheduleValidUntil: schema.unitDutySchedules.validUntil,
       scheduleStatus: schema.unitDutySchedules.status,
-      attendanceMode: schema.unitDutySchedules.attendanceMode,
+      // The broker's own mode in the plantão: the per-assignment override wins (same rule as effectiveAttendanceMode).
+      attendanceMode: sql<string>`coalesce(${schema.dutyRosterAssignments.attendanceMode}, ${schema.unitDutySchedules.attendanceMode})`,
       typeName: schema.dutyScheduleTypes.name,
       typeHue: schema.dutyScheduleTypes.colorHue,
     }).from(schema.dutyRosterAssignments)

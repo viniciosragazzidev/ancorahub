@@ -12,7 +12,7 @@ import { dayOfWeekOf, occurrenceValidity } from "./monthly-duty-plan";
 import { releaseDutyPresenceManually, sendDutyPresenceInviteManually, type ManualDutyPresenceInviteResult } from "./duty-presence";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getBrokerDayHistory, type BrokerDayHistory } from "./broker-day-history";
-import { getRelevantDutyWindow, parseDutyLeadsSince } from "./duty-presence-domain";
+import { dutyAttendanceOverrideProblem, getRelevantDutyWindow, parseDutyLeadsSince } from "./duty-presence-domain";
 import { getDutyScheduleProfile } from "./duty-schedule-profile-queries";
 import { brokerOccurrenceAssignmentBounds, getDutyWindowOnDate } from "./duty-presence-domain";
 import { assignLeadToBroker } from "./service";
@@ -823,6 +823,56 @@ export async function setDutyAbsenceAction(scheduleId: string, assignmentId: str
     return { ok: true };
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível atualizar a falta." };
+  }
+}
+
+const attendanceOverrideSchema = z.object({
+  scheduleId: z.string().uuid(),
+  assignmentId: z.string().uuid(),
+  /** "online": this broker confirms with one tap inside a presencial plantão. null: follows the plantão. */
+  mode: z.enum(["online"]).nullable(),
+}).strict();
+
+/**
+ * The director marks one broker of a presencial plantão as online (20/10):
+ * he confirms with one tap, no photo and no release; the others stay
+ * presencial. Works on weekly and published rows alike. A confirmation
+ * already open for the occurrence keeps working under the new mode, since
+ * every presence reader resolves the mode from the assignment.
+ */
+export async function setDutyAssignmentAttendanceModeAction(input: unknown): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    const parsed = attendanceOverrideSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, reason: "Dados inválidos para o modo do corretor." };
+    const { scheduleId, assignmentId, mode } = parsed.data;
+    const { context, db, schedule } = await findScheduleForMutation(scheduleId);
+    const problem = dutyAttendanceOverrideProblem({ role: context.role, scheduleMode: schedule.attendanceMode, mode });
+    if (problem) return { ok: false, reason: problem };
+    const now = new Date();
+    const changed = await db.transaction(async (tx) => {
+      const rows = await tx.update(schema.dutyRosterAssignments)
+        .set({ attendanceMode: mode, updatedBy: context.userId, updatedAt: now })
+        .where(and(
+          eq(schema.dutyRosterAssignments.id, assignmentId),
+          eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+          eq(schema.dutyRosterAssignments.scheduleId, scheduleId),
+          eq(schema.dutyRosterAssignments.status, "active"),
+        ))
+        .returning({ id: schema.dutyRosterAssignments.id });
+      if (!rows.length) return false;
+      await tx.insert(schema.auditLogs).values({
+        id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignmentId,
+        acao: mode === "online" ? "duty_roster.attendance_online" : "duty_roster.attendance_follows_schedule", createdAt: now,
+      });
+      return true;
+    });
+    if (!changed) return { ok: false, reason: "Escalação não encontrada." };
+    // Online without the presence check is eligible right away: leads waiting get their turn.
+    if (mode === "online") await wakeLeadsAwaitingEligibleBroker(context.tenantId).catch(() => 0);
+    revalidateDutyWorkspace();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message : "Não foi possível mudar o modo do corretor." };
   }
 }
 

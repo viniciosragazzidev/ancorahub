@@ -6,7 +6,7 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { selectEffectiveDutyAssignments } from "./dated-duty-roster";
-import { dutyLeadsSinceStart, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
+import { dutyLeadsSinceStart, effectiveAttendanceMode, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, resolveDutyLeadWindowBounds, type DutyLeadsSinceOption } from "./duty-presence-domain";
 import { getSaoPauloDateKey } from "./dated-duty-roster";
 import { firstValidShift } from "./monthly-duty-plan";
 import { normalizeOfferPacing } from "./offer-pacing";
@@ -83,6 +83,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       endsAt: schema.dutyRosterAssignments.endsAt,
       validFrom: schema.dutyRosterAssignments.validFrom,
       validUntil: schema.dutyRosterAssignments.validUntil,
+      assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode,
     })
     .from(schema.dutyRosterAssignments)
     .innerJoin(schema.user, eq(schema.dutyRosterAssignments.brokerId, schema.user.id))
@@ -207,6 +208,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`,
       validFrom: schema.dutyRosterAssignments.validFrom,
       validUntil: schema.dutyRosterAssignments.validUntil,
+      attendanceMode: schema.dutyRosterAssignments.attendanceMode,
     }).from(schema.dutyRosterAssignments).where(and(
       eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
       eq(schema.dutyRosterAssignments.status, "active"),
@@ -257,7 +259,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   const candidateById = new Map(attributionSchedules.map((candidate) => [candidate.id, candidate]));
   const attributionEligibleIds = new Set(attributionAssignments.flatMap((row) => {
     const candidate = candidateById.get(row.scheduleId);
-    return candidate && (!(attributionPresenceRequired || candidate.attendanceMode === "presencial") || confirmedAssignmentIds.has(row.id))
+    return candidate && (!(attributionPresenceRequired || effectiveAttendanceMode(row.attendanceMode, candidate.attendanceMode) === "presencial") || confirmedAssignmentIds.has(row.id))
       ? [row.id]
       : [];
   }));
@@ -470,16 +472,18 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       queueName: schedule.legacyQueueName ?? (linkedQueues.length ? linkedQueues.map((queue) => queue.name).join(", ") : "Nenhuma fila vinculada"),
     },
     presenceEnabled,
-    roster: roster.map(({ phone, userActive, membershipStatus, startsAt, endsAt, ...entry }) => {
+    roster: roster.map(({ phone, userActive, membershipStatus, startsAt, endsAt, assignmentAttendanceMode, ...entry }) => {
+      // The mode this broker works the occurrence in: online inside a presencial plantão when the director said so (20/10).
+      const attendanceMode = effectiveAttendanceMode(assignmentAttendanceMode, schedule.attendanceMode);
       // Which shift this broker works (morning, afternoon, whole day) on a split plantão.
       const shift = assignmentShift(schedule, { startsAt, endsAt });
       const occurrence = occurrenceByAssignment.get(entry.id);
       const presence = occurrence ? presenceByAssignment.get(`${entry.id}:${occurrence.dutyDate}`) : null;
       // Same prerequisites the distribution engine applies before offering a lead.
-      const blockedReason = presence?.status === "absent" ? "Falta registrada neste plantão" : !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : schedule.attendanceMode === "presencial" && (!presence || presence.status !== "confirmed" || !presence.confirmedBy) ? "Aguardando presença na unidade" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
+      const blockedReason = presence?.status === "absent" ? "Falta registrada neste plantão" : !userActive || membershipStatus !== "active" ? "Conta inativa" : !phone ? "Sem telefone cadastrado (não recebe ofertas)" : attendanceMode === "presencial" && (!presence || presence.status !== "confirmed" || !presence.confirmedBy) ? "Aguardando presença na unidade" : presenceEnabled && occurrence && presence?.status !== "confirmed" ? "Aguardando confirmação do plantão" : null;
       const absent = presence?.status === "absent";
       // Presencial starts paused (2026-10-12): paused until the photo of the place (or the manager) releases the broker.
-      const onSitePending = schedule.attendanceMode === "presencial" && Boolean(occurrence) && (!presence || presence.status !== "confirmed" || !presence.confirmedBy);
+      const onSitePending = attendanceMode === "presencial" && Boolean(occurrence) && (!presence || presence.status !== "confirmed" || !presence.confirmedBy);
       // The manager can release from 30 minutes before the start (same window as the broker's own confirmation).
       const onSiteReleaseOpen = onSitePending && Boolean(occurrence && occurrence.startsAt <= new Date(now.getTime() + 30 * 60_000));
       const liveStatus = combineLiveStatusAcrossQueues((statusQueues.length ? statusQueues : [null]).map((queue) => classifyBrokerLiveOfferStatus({
@@ -495,6 +499,9 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       return {
       ...entry,
       phone,
+      attendanceMode,
+      /** Marked online by the director inside a presencial plantão. */
+      onlineOverride: schedule.attendanceMode === "presencial" && attendanceMode === "online",
       // Presencial confirmed by the broker with a photo of the place (2026-10-12).
       presencePhotoId: presence?.hasPhoto ? presence.confirmationId : null,
       // Presencial released without the photo: the manager's written reason.
@@ -509,7 +516,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       absent,
       onSitePending,
       onSiteReleaseOpen,
-      presenceStatus: absent ? "absent" as const : !occurrence || (!presenceEnabled && schedule.attendanceMode !== "presencial") ? "not_requested" as const : presence?.status === "confirmed" && !onSitePending ? "confirmed" as const : "pending" as const,
+      presenceStatus: absent ? "absent" as const : !occurrence || (!presenceEnabled && attendanceMode !== "presencial") ? "not_requested" as const : presence?.status === "confirmed" && !onSitePending ? "confirmed" as const : "pending" as const,
       confirmedAt: presence?.confirmedAt ?? null,
       /** Released by a director/manager (not the broker's own click). */
       releasedByName: presence?.releasedByName ?? null,

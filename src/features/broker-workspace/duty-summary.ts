@@ -2,7 +2,7 @@ import "server-only";
 
 import { and, asc, eq, gte, gt, isNotNull, lt, lte, or, sql, isNull } from "drizzle-orm";
 
-import { getDutyWindowOnDate } from "@/features/lead-distribution/duty-presence-domain";
+import { effectiveAttendanceMode, getDutyWindowOnDate } from "@/features/lead-distribution/duty-presence-domain";
 import { getSaoPauloDateKey, resolveEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 import { getDatabase, schema } from "@/shared/db";
 import { isBrokerReadyToReceive } from "./workspace-data-domain";
@@ -36,6 +36,7 @@ export async function loadBrokerDutyRows(input: { tenantId: string; brokerId: st
       dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`,
       monthlyPlanId: schema.dutyRosterAssignments.monthlyPlanId,
       attendanceMode: schema.unitDutySchedules.attendanceMode,
+      assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode,
       confirmationStatus: schema.dutyPresenceConfirmations.status,
       confirmedBy: schema.dutyPresenceConfirmations.confirmedBy,
       confirmationId: schema.dutyPresenceConfirmations.id,
@@ -119,6 +120,8 @@ export function buildDutySummary(input: {
     dutyDate: string | null;
     monthlyPlanId: string | null;
     attendanceMode: string;
+    /** Per-broker override of the plantão mode (NULL follows the plantão). */
+    assignmentAttendanceMode?: string | null;
     confirmationStatus: string | null;
     confirmedBy: string | null;
     confirmationId?: string | null;
@@ -150,7 +153,8 @@ export function buildDutySummary(input: {
         const weekday = row.dutyDate ? weekdayForDate(dutyDate) : row.dayOfWeek;
         const window = getDutyWindowOnDate({ dayOfWeek: weekday, startsAt: row.startsAt, endsAt: row.endsAt, timezone: row.timezone }, dutyDate);
         if (!window || window.startsAt < row.validFrom || (row.validUntil && window.startsAt >= row.validUntil)) return [];
-        return [{ row, ...window }];
+        // From here on `attendanceMode` is the mode this broker works the occurrence in.
+        return [{ row: { ...row, attendanceMode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode) }, ...window }];
       }));
   });
 

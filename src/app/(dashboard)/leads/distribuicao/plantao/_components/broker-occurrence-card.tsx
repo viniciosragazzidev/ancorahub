@@ -8,7 +8,7 @@ import { LeadStatusBadge } from "@/components/status-badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/sonner";
-import { assignDutyLeadToBrokerAction, getBrokerDayHistoryAction, getBrokerOccurrenceLeadsAction, getDutyAvailableLeadsAction, setDutyAbsenceAction } from "@/features/lead-distribution/duty-actions";
+import { assignDutyLeadToBrokerAction, getBrokerDayHistoryAction, getBrokerOccurrenceLeadsAction, getDutyAvailableLeadsAction, setDutyAbsenceAction, setDutyAssignmentAttendanceModeAction } from "@/features/lead-distribution/duty-actions";
 import { cn } from "@/lib/utils";
 import { BrokerPresenceReleaseButton } from "./broker-presence-release-button";
 import { BrokerDayHistoryTrigger } from "./broker-day-history-trigger";
@@ -18,7 +18,7 @@ type LeadResult = Extract<Awaited<ReturnType<typeof getBrokerOccurrenceLeadsActi
 type AvailableResult = Extract<Awaited<ReturnType<typeof getDutyAvailableLeadsAction>>, { ok: true }>;
 type Tab = "received" | "available";
 
-export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null }: {
+export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null, scheduleAttendanceMode = attendanceMode, canSetAttendanceMode = false }: {
   children: ReactNode;
   scheduleId: string;
   /** The page's "considerar leads a partir de" choice. */
@@ -31,7 +31,12 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
   paused: boolean;
   confirmedAt: string | null;
   absent: boolean;
+  /** The mode this broker works the occurrence in (his override, or the plantão's). */
   attendanceMode: string;
+  /** The plantão's own mode: a presencial plantão lets the director put one broker online. */
+  scheduleAttendanceMode?: string;
+  /** Director: can switch this broker between online and presencial in this plantão. */
+  canSetAttendanceMode?: boolean;
   onSitePending: boolean;
   /** Presencial: the manager's "release" opens 30 min before the start (before that the broker just shows paused). */
   onSiteReleaseOpen?: boolean;
@@ -129,6 +134,23 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
     });
   }
 
+  // "Online neste plantão": only inside a presencial plantão (the others stay presencial).
+  const onlineOverride = scheduleAttendanceMode === "presencial" && attendanceMode === "online";
+  function changeAttendanceMode() {
+    const message = onlineOverride
+      ? `Voltar ${brokerName} para presencial? Ele vai precisar tirar a foto do local e esperar a liberação.`
+      : `Deixar ${brokerName} online neste plantão? Ele confirma a presença com um toque, sem foto e sem liberação. Os demais seguem presenciais.`;
+    if (!window.confirm(message)) return;
+    startSaving(async () => {
+      const result = await setDutyAssignmentAttendanceModeAction({ scheduleId, assignmentId, mode: onlineOverride ? null : "online" });
+      if (result.ok) {
+        toast.success(onlineOverride ? `${brokerName} voltou a presencial.` : `${brokerName} está online neste plantão.`);
+        setOpen(false);
+        router.refresh();
+      } else toast.error(result.reason);
+    });
+  }
+
   return <>
     <div className="relative flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 px-3 py-2.5">
       <button type="button" onClick={show} className="absolute inset-0 rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Abrir detalhes de ${brokerName} neste plantão`} />
@@ -139,13 +161,14 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
     <DetailDrawer open={open} onOpenChange={setOpen} size="lg" title={brokerName} description={`${branchName ?? "Sem unidade"} · corretor nesta ocorrência do plantão`} summary={<div className="flex flex-wrap gap-2">
       <Badge variant={absent ? "destructive" : presenceStatus === "confirmed" ? "success" : "warning"}>{absent ? "Faltou" : presenceStatus === "confirmed" ? "Presença confirmada" : "Aguardando presença"}</Badge>
       <Badge variant="outline">{paused || onSitePending ? "Pausado" : "Ativo"}</Badge>
-      <Badge variant="outline">{attendanceMode === "presencial" ? "Presencial" : "Online"}</Badge>
+      <Badge variant={onlineOverride ? "info" : "outline"}>{attendanceMode === "presencial" ? "Presencial" : onlineOverride ? "Online neste plantão" : "Online"}</Badge>
       {presencePhotoId ? <a href={`/api/duty/presence/photo?id=${presencePhotoId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-muted">Ver foto do local</a> : null}
       <Badge variant="outline" className="tabular-nums" title="Ofertas enviadas a este corretor neste plantão hoje / aceitas por ele">
         {offers ? `${offers.offered} ${offers.offered === 1 ? "oferta enviada" : "ofertas enviadas"} / ${offers.accepted} ${offers.accepted === 1 ? "aceita" : "aceitas"}` : "Ofertas…"}
       </Badge>
     </div>} footer={<div className="flex flex-wrap justify-end gap-2">
       {attendanceMode === "presencial" && onSitePending && onSiteReleaseOpen && !absent ? <BrokerPresenceReleaseButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} inUnit withPhoto={Boolean(presencePhotoId)} /> : null}
+      {canSetAttendanceMode && scheduleAttendanceMode === "presencial" && !absent ? <Button type="button" size="sm" variant="outline" disabled={saving} onClick={changeAttendanceMode}>{onlineOverride ? "Voltar a presencial" : "Online neste plantão"}</Button> : null}
       <Button type="button" size="sm" variant={absent ? "outline" : "destructive"} disabled={saving} onClick={changeAbsence}>{absent ? "Desfazer falta" : "Marcar falta"}</Button>
     </div>}>
       <section className="space-y-1 text-sm">

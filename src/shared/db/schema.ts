@@ -1449,6 +1449,9 @@ export const dutyRosterAssignments = pgTable(
     // plan that published it. Both NULL on the weekly roster.
     dutyDate: date("duty_date"),
     monthlyPlanId: text("monthly_plan_id").references(() => dutyScheduleMonthlyPlans.id, { onDelete: "cascade" }),
+    // Per-broker override of the plantão mode (20/10): "online" lets one broker
+    // of a presencial plantão confirm with one tap. NULL follows the schedule.
+    attendanceMode: text("attendance_mode"),
     createdBy: text("created_by").notNull().references(() => user.id),
     updatedBy: text("updated_by").notNull().references(() => user.id),
     createdAt,
@@ -1460,6 +1463,7 @@ export const dutyRosterAssignments = pgTable(
     index("duty_roster_assignments_tenant_branch_idx").on(table.tenantId, table.branchId, table.dayOfWeek, table.startsAt),
     index("duty_roster_assignments_broker_idx").on(table.tenantId, table.brokerId, table.dayOfWeek),
     index("duty_roster_assignments_schedule_idx").on(table.scheduleId, table.status),
+    check("duty_roster_assignments_attendance_mode_check", sql`${table.attendanceMode} is null or ${table.attendanceMode} in ('online', 'presencial')`),
   ],
 );
 

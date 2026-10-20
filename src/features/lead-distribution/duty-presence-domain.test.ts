@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dutyLeadsSinceStart, findRunningDutySchedule, parseDutyLeadsSince, formatDutyStartHour, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, listCompletedDutyWindows } from "./duty-presence-domain";
+import { dutyAttendanceOverrideProblem, dutyLeadsSinceStart, effectiveAttendanceMode, findRunningDutySchedule, isDutyBrokerEligible, parseDutyLeadsSince, formatDutyStartHour, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, listCompletedDutyWindows } from "./duty-presence-domain";
 
 describe("completed duty history", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
@@ -213,5 +213,31 @@ describe("considerar leads a partir de", () => {
 
   it("on a Friday, 'sexta' means the previous Friday", () => {
     expect(dutyLeadsSinceStart("sexta", new Date("2026-10-16T15:00:00.000Z"))?.toISOString()).toBe("2026-10-09T22:00:00.000Z");
+  });
+});
+
+describe("modo do corretor no plantão (online dentro do presencial)", () => {
+  it("the assignment override wins; without it the plantão decides", () => {
+    expect(effectiveAttendanceMode("online", "presencial")).toBe("online");
+    expect(effectiveAttendanceMode("presencial", "online")).toBe("presencial");
+    expect(effectiveAttendanceMode(null, "presencial")).toBe("presencial");
+    expect(effectiveAttendanceMode(undefined, "online")).toBe("online");
+    // Unknown values never turn a plantão presencial.
+    expect(effectiveAttendanceMode("bogus", "online")).toBe("online");
+    expect(effectiveAttendanceMode(null, null)).toBe("online");
+  });
+
+  it("an online broker of a presencial plantão is eligible after his own tap", () => {
+    const attendanceMode = effectiveAttendanceMode("online", "presencial");
+    expect(isDutyBrokerEligible({ attendanceMode, presenceRequired: true, status: "confirmed", confirmedBy: null })).toBe(true);
+    expect(isDutyBrokerEligible({ attendanceMode: effectiveAttendanceMode(null, "presencial"), presenceRequired: true, status: "confirmed", confirmedBy: null })).toBe(false);
+  });
+
+  it("only the Director sets it, and online only inside a presencial plantão", () => {
+    expect(dutyAttendanceOverrideProblem({ role: "director", scheduleMode: "presencial", mode: "online" })).toBeNull();
+    expect(dutyAttendanceOverrideProblem({ role: "director", scheduleMode: "presencial", mode: null })).toBeNull();
+    expect(dutyAttendanceOverrideProblem({ role: "director", scheduleMode: "online", mode: null })).toBeNull();
+    expect(dutyAttendanceOverrideProblem({ role: "manager", scheduleMode: "presencial", mode: "online" })).toMatch(/Diretor/);
+    expect(dutyAttendanceOverrideProblem({ role: "director", scheduleMode: "online", mode: "online" })).toMatch(/já é online/);
   });
 });

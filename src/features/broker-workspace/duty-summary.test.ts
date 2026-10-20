@@ -74,3 +74,34 @@ describe("plantão lido como a tela do corretor", () => {
     expect(summary).toBeNull();
   });
 });
+
+describe("corretor online dentro de um plantão presencial", () => {
+  // With the presence check on (production): an online broker is asked to confirm.
+  const checkedAt = (now: Date, rows: ReturnType<typeof row>[]) => buildDutySummary({
+    tenantId: "t1", rows, publishedRows: [], now, monthlySchedulingEnabled: false, presenceRequired: true, availabilityStatus: "available", dayOffsets: [-1, 0],
+  });
+
+  it("is not asked for anything when the presence check is off", async () => {
+    const summary = await summaryAt(new Date("2026-10-16T05:00:00.000Z"), [row({ attendanceMode: "presencial", assignmentAttendanceMode: "online" })]);
+
+    expect(summary?.presence).toBeNull();
+    expect(summary?.active?.presenceStatus).toBe("not_required");
+  });
+
+  it("asks for a one-tap confirmation, never the photo or the director's release", async () => {
+    const now = new Date("2026-10-16T05:00:00.000Z");
+    const presencial = await checkedAt(now, [row({ attendanceMode: "presencial", confirmationStatus: "pending", hasPhoto: true, confirmationId: "c-1" })]);
+    const online = await checkedAt(now, [row({ attendanceMode: "presencial", assignmentAttendanceMode: "online", confirmationStatus: "pending", hasPhoto: true, confirmationId: "c-1" })]);
+
+    expect(presencial?.presence).toMatchObject({ mode: "presencial", status: "awaiting_release" });
+    expect(online?.presence).toMatchObject({ mode: "online", status: "pending" });
+    expect(online?.active?.attendanceMode).toBe("online");
+  });
+
+  it("counts his own tap as confirmed (no confirmedBy needed)", async () => {
+    const summary = await checkedAt(new Date("2026-10-16T05:00:00.000Z"), [row({ attendanceMode: "presencial", assignmentAttendanceMode: "online", confirmationStatus: "confirmed" })]);
+
+    expect(summary?.active?.presenceStatus).toBe("confirmed");
+    expect(summary?.presence).toMatchObject({ mode: "online", status: "confirmed" });
+  });
+});

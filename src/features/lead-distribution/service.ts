@@ -117,6 +117,7 @@ async function getRosterBrokerIds(
     validUntil: schema.dutyRosterAssignments.validUntil,
     branchId: schema.dutyRosterAssignments.branchId,
     dutyDate: schema.dutyRosterAssignments.dutyDate,
+    attendanceMode: schema.dutyRosterAssignments.attendanceMode,
   })
     .from(schema.dutyRosterAssignments)
     .where(and(

@@ -5,10 +5,11 @@ import { and, eq, gt, inArray, isNull, lte, lt, ne, or, sql } from "drizzle-orm"
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
-import { findDutyOccurrenceConfirmation, formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
+import { effectiveAttendanceMode, findDutyOccurrenceConfirmation, formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 
-type PresenceAssignment = { id: string; scheduleId: string; brokerId: string; dayOfWeek: number; startsAt: string; endsAt: string; validFrom: Date; validUntil: Date | null };
+// attendanceMode: the per-broker override (NULL/absent follows the schedule).
+type PresenceAssignment = { id: string; scheduleId: string; brokerId: string; dayOfWeek: number; startsAt: string; endsAt: string; validFrom: Date; validUntil: Date | null; attendanceMode?: string | null };
 type PresenceSchedule = { id: string; dayOfWeek: number; startsAt: string; endsAt: string; timezone: string; validFrom: Date; validUntil: Date | null; attendanceMode?: string };
 
 export async function isDutyPresenceConfirmationEnabled() {
@@ -59,8 +60,9 @@ export async function getPresenceEligibleAssignments(input: {
     ));
   const eligible = occurrences.filter(({ assignment, schedule, window }) => {
       const confirmation = findDutyOccurrenceConfirmation({ confirmations: confirmationRows, assignment, window, now: input.now });
-      return isDutyBrokerEligible({ attendanceMode: schedule.attendanceMode ?? "online", presenceRequired, status: confirmation?.status ?? null, confirmedBy: confirmation?.confirmedBy ?? null })
-        && (!(presenceRequired || schedule.attendanceMode === "presencial") || isConfirmationForActiveOccurrence({ confirmation, assignment, window, now: input.now }));
+      const attendanceMode = effectiveAttendanceMode(assignment.attendanceMode, schedule.attendanceMode);
+      return isDutyBrokerEligible({ attendanceMode, presenceRequired, status: confirmation?.status ?? null, confirmedBy: confirmation?.confirmedBy ?? null })
+        && (!(presenceRequired || attendanceMode === "presencial") || isConfirmationForActiveOccurrence({ confirmation, assignment, window, now: input.now }));
     });
   return {
     eligibleAssignmentIds: new Set(eligible.map(({ assignment }) => assignment.id)),
@@ -243,6 +245,7 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
     validUntil: schema.dutyRosterAssignments.validUntil,
     scheduleTimezone: schema.unitDutySchedules.timezone,
     attendanceMode: schema.unitDutySchedules.attendanceMode,
+    assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode,
   }).from(schema.dutyRosterAssignments)
     .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
     .where(and(eq(schema.dutyRosterAssignments.id, input.assignmentId), eq(schema.dutyRosterAssignments.tenantId, input.tenantId), eq(schema.dutyRosterAssignments.status, "active")))
@@ -258,7 +261,7 @@ export async function releaseDutyPresenceManually(input: { tenantId: string; ass
     eq(schema.dutyPresenceConfirmations.shiftStartsAt, window.startsAt),
     eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt),
   );
-  const presencial = assignment.attendanceMode === "presencial";
+  const presencial = effectiveAttendanceMode(assignment.assignmentAttendanceMode, assignment.attendanceMode) === "presencial";
   const [current] = presencial
     ? await db.select({ hasPhoto: sql<boolean>`${schema.dutyPresenceConfirmations.photoStorageKey} is not null` }).from(schema.dutyPresenceConfirmations).where(occurrence).limit(1)
     : [];
@@ -410,6 +413,7 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
     validUntil: schema.dutyRosterAssignments.validUntil,
     timezone: schema.unitDutySchedules.timezone,
     attendanceMode: schema.unitDutySchedules.attendanceMode,
+    assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode,
   }).from(schema.dutyRosterAssignments)
     .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyRosterAssignments.tenantId)))
     .where(and(
@@ -429,7 +433,7 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
     eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt), eq(schema.dutyPresenceConfirmations.status, "absent"),
   )).limit(1);
   if (absence) return { ok: false, reason: "absent" };
-  return { ok: true, occurrence: { assignmentId: row.id, scheduleId: row.scheduleId, mode: row.attendanceMode === "presencial" ? "presencial" : "online", window } };
+  return { ok: true, occurrence: { assignmentId: row.id, scheduleId: row.scheduleId, mode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode), window } };
 }
 
 /**
