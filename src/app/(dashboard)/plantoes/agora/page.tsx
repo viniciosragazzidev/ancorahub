@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { PresenceCallout } from "@/components/chat/presence-callout";
 import { DutyNowView } from "@/features/broker-workspace/components/duty-now-view";
+import { presenceAskOf } from "@/features/broker-workspace/chat/assistant-scripts";
 import { getCachedBrokerWorkspaceData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { getDutyNow } from "@/features/broker-workspace/duty-now";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
@@ -21,7 +23,15 @@ export default async function DutyNowPage({ searchParams }: { searchParams: Prom
     getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false"),
   ]);
 
+  // The presence link (WhatsApp reminder, "Abrir o app e tirar a foto") lands here: the photo has to be here too,
+  // also before the start, when the plantão is not "now" yet (20/10: brokers saw "não está de plantão" and no camera).
+  const ask = workspace ? presenceAskOf(workspace) : null;
+  const presence = ask && (ask.status === "pending" || ask.status === "awaiting_release")
+    ? <div className="arc-venancor" style={{ maxWidth: 560, margin: "0 auto", padding: "16px 16px 0" }}><PresenceCallout ask={ask} /></div>
+    : null;
+
   if (!duty) {
+    if (presence) return <div className="arc-venancor" style={{ minHeight: "100%", background: "var(--surface)", paddingTop: 32 }}>{presence}</div>;
     return (
       <div className="arc-venancor" style={{ minHeight: "100%", background: "var(--surface)" }}>
         <div style={{ maxWidth: 560, margin: "0 auto", padding: "48px 16px", textAlign: "center", display: "grid", gap: 12 }}>
@@ -34,6 +44,8 @@ export default async function DutyNowPage({ searchParams }: { searchParams: Prom
   }
 
   return (
+    <>
+    {presence}
     <DutyNowView
       nowIso={now.toISOString()}
       data={{
@@ -44,5 +56,6 @@ export default async function DutyNowPage({ searchParams }: { searchParams: Prom
       }}
       canManageAvailability={context.role === "broker"}
     />
+    </>
   );
 }
