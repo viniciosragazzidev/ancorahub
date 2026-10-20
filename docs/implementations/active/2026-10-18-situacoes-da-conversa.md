@@ -64,4 +64,8 @@ Fora do escopo: mudar a IA depois que o lead está com o corretor (a análise da
 - **Passo 1 (18/10, worktree ancorahub-lite-listas):** `terminalReplyLeadDisposition` (quick-reply.ts) deixa
   "não quero", "sem interesse", "número errado" como `disqualified` + `manual_hold`, sem distribuir; lead que já
   tem corretor não é mexido. `parseOptOut` passou a pegar "já consegui", "já fechei", "já resolvi" (só como a
-  resposta inteira) e "fechei/contratei com outro". Falta: conversa `CLOSED` sem dado válido (passo 1b) e os passos 2 a 5.
+  resposta inteira) e "fechei/contratei com outro". - **Passo 1b (18/10):** em `transitionConversationState` (CLOSED/PAUSED), lead ainda em qualificação e sem
+  corretor vira `cold` + `PARTIAL` + `manual_hold` (vai para o Requalificar, não para corretor). Corrigido junto:
+  o encerramento punha TODO lead em `distributed/unassigned` (desfazia a retenção do prazo estourado e voltava
+  lead em atendimento para "distribuído") e preenchia `qualificationCompletedAt`, o que tirava o frio retido
+  do painel Requalificar. Falta: passos 2 a 5.

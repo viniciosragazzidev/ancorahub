@@ -789,12 +789,19 @@ export async function transitionConversationState({
         updatedAt: now,
       }).where(and(eq(schema.leads.id, convLead.leadId), eq(schema.leads.tenantId, tenantId)));
     } else if (newStatus === "CLOSED" || newStatus === "PAUSED") {
+      // Closed or paused mid-qualification, without the client saying who they are: cold and held for the
+      // requalification (PARTIAL + manual_hold), never a broker (plan "situações da conversa", step 1b, 18/10).
+      // A lead already decided (held cold, queued warm, with a broker, disqualified) keeps its place: this used
+      // to set every lead to "distributed/unassigned", undoing the timeout hold and the broker's in_contact.
+      const stillQualifying = sql`${schema.leads.qualificationStatus} IN ('qualifying', 'pending') AND ${schema.leads.corretorId} IS NULL`;
       await db.update(schema.leads).set({
-        qualificationStatus: sql`CASE WHEN ${schema.leads.qualificationStatus} IN ('qualifying', 'pending') THEN 'cold' ELSE ${schema.leads.qualificationStatus} END`,
-        status: "distributed",
-        distributionStatus: "unassigned",
-        qualificationState: sql`CASE WHEN ${schema.leads.qualificationState} IN ('IN_PROGRESS', 'PENDING') THEN 'COLD' ELSE ${schema.leads.qualificationState} END`,
-        qualificationCompletedAt: sql`COALESCE(${schema.leads.qualificationCompletedAt}, ${now})`,
+        qualificationStatus: sql`CASE WHEN ${stillQualifying} THEN 'cold' ELSE ${schema.leads.qualificationStatus} END`,
+        qualificationState: sql`CASE WHEN ${stillQualifying} THEN 'PARTIAL' ELSE ${schema.leads.qualificationState} END`,
+        status: sql`CASE WHEN ${stillQualifying} THEN 'new' ELSE ${schema.leads.status} END`,
+        distributionStatus: sql`CASE WHEN ${stillQualifying} THEN 'manual_hold' ELSE ${schema.leads.distributionStatus} END`,
+        // A held cold lead stays "not completed": the Requalificar panel only lists those
+        // (cold-lead-requalification-policy.ts), and the timeout hold was vanishing from it here.
+        qualificationCompletedAt: sql`CASE WHEN ${stillQualifying} OR (${schema.leads.qualificationState} = 'PARTIAL' AND ${schema.leads.distributionStatus} = 'manual_hold') THEN ${schema.leads.qualificationCompletedAt} ELSE COALESCE(${schema.leads.qualificationCompletedAt}, ${now}) END`,
         updatedAt: now,
       }).where(and(eq(schema.leads.id, convLead.leadId), eq(schema.leads.tenantId, tenantId)));
     }
