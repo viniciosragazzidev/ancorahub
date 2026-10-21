@@ -523,6 +523,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       notificationStatus: presence?.notificationStatus ?? null,
       notificationErrorCode: presence?.notificationErrorCode ?? null,
       dutyDate: occurrence?.dutyDate ?? null,
+      /** The row's own date: set on the published escala, null on the weekly roster (only dated rows can be swapped). */
+      publishedDutyDate: entry.dutyDate,
       liveStatus: liveStatus.status,
       nextEventAt: liveStatus.nextEventAt,
       activeLeads: leadsPerBroker.get(entry.brokerId) ?? 0,

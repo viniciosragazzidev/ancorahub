@@ -1488,6 +1488,39 @@ export const dutyRosterPending = pgTable(
   ],
 );
 
+/**
+ * Troca de corretores entre dois plantões da escala publicada (21/10): o
+ * corretor de A passa para B e o de B passa para A. As duas linhas de
+ * duty_roster_assignments mudam de corretor; esta tabela guarda a troca para
+ * as duas mostrarem "Troca feita" e se o WhatsApp de cada um saiu.
+ */
+export const dutyRosterSwaps = pgTable(
+  "duty_roster_swaps",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    assignmentAId: text("assignment_a_id").notNull().references(() => dutyRosterAssignments.id, { onDelete: "cascade" }),
+    assignmentBId: text("assignment_b_id").notNull().references(() => dutyRosterAssignments.id, { onDelete: "cascade" }),
+    /** Corretor que estava em A (agora em B). */
+    brokerAId: text("broker_a_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    /** Corretor que estava em B (agora em A). */
+    brokerBId: text("broker_b_id").notNull().references(() => user.id, { onDelete: "cascade" }),
+    scheduleAId: text("schedule_a_id").notNull().references(() => unitDutySchedules.id, { onDelete: "cascade" }),
+    scheduleBId: text("schedule_b_id").notNull().references(() => unitDutySchedules.id, { onDelete: "cascade" }),
+    dutyDateA: date("duty_date_a").notNull(),
+    dutyDateB: date("duty_date_b").notNull(),
+    /** WhatsApp to broker A / B: sent, failed, no_phone (NULL while sending). */
+    whatsappAStatus: text("whatsapp_a_status"),
+    whatsappBStatus: text("whatsapp_b_status"),
+    swappedBy: text("swapped_by").references(() => user.id, { onDelete: "set null" }),
+    swappedAt: timestamp("swapped_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("duty_roster_swaps_assignment_a_idx").on(table.tenantId, table.assignmentAId),
+    index("duty_roster_swaps_assignment_b_idx").on(table.tenantId, table.assignmentBId),
+  ],
+);
+
 export const dutyPresenceConfirmations = pgTable(
   "duty_presence_confirmations",
   {

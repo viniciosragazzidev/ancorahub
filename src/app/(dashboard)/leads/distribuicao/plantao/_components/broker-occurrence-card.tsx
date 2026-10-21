@@ -12,13 +12,16 @@ import { assignDutyLeadToBrokerAction, getBrokerDayHistoryAction, getBrokerOccur
 import { cn } from "@/lib/utils";
 import { BrokerPresenceReleaseButton } from "./broker-presence-release-button";
 import { BrokerDayHistoryTrigger } from "./broker-day-history-trigger";
+import { DutySwapDoneNotice, DutySwapPicker } from "./duty-swap-picker";
+import { swapNoticeText, whatsappStatusLabel, type SwapNotice } from "@/features/lead-distribution/duty-swap";
+import type { DutySwapResult } from "@/features/lead-distribution/duty-swap-actions";
 
 const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" });
 type LeadResult = Extract<Awaited<ReturnType<typeof getBrokerOccurrenceLeadsAction>>, { ok: true }>;
 type AvailableResult = Extract<Awaited<ReturnType<typeof getDutyAvailableLeadsAction>>, { ok: true }>;
 type Tab = "received" | "available";
 
-export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null, scheduleAttendanceMode = attendanceMode, canSetAttendanceMode = false }: {
+export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null, scheduleAttendanceMode = attendanceMode, canSetAttendanceMode = false, canSwap = false, swapNotice = null }: {
   children: ReactNode;
   scheduleId: string;
   /** The page's "considerar leads a partir de" choice. */
@@ -48,6 +51,10 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
   canAssignLeads?: boolean;
   /** Presencial confirmed by the broker with a photo of the place: the confirmation id to open it. */
   presencePhotoId?: string | null;
+  /** Diretor/Gestor on a slot of the published escala: "Efetuar troca" with a broker of a future plantão. */
+  canSwap?: boolean;
+  /** This slot came from a swap: who it was swapped with and where this broker was before. */
+  swapNotice?: SwapNotice | null;
 }) {
   const [open, setOpen] = useState(false);
   const [leads, setLeads] = useState<LeadResult["leads"] | null>(null);
@@ -62,6 +69,8 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
   const [assigningId, setAssigningId] = useState<string | null>(null);
   // Offers sent to this broker in this plantão today, and how many were accepted.
   const [offers, setOffers] = useState<{ offered: number; accepted: number } | null>(null);
+  const [swapOpen, setSwapOpen] = useState(false);
+  const [swapDone, setSwapDone] = useState<Extract<DutySwapResult, { ok: true }> | null>(null);
 
   function loadOffers() {
     setOffers(null);
@@ -92,6 +101,8 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
 
   function show() {
     setOpen(true);
+    setSwapOpen(false);
+    setSwapDone(null);
     setTab("received");
     setAvailable(null);
     loadReceived();
@@ -161,6 +172,7 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
     <DetailDrawer open={open} onOpenChange={setOpen} size="lg" title={brokerName} description={`${branchName ?? "Sem unidade"} · corretor nesta ocorrência do plantão`} summary={<div className="flex flex-wrap gap-2">
       <Badge variant={absent ? "destructive" : presenceStatus === "confirmed" ? "success" : "warning"}>{absent ? "Faltou" : presenceStatus === "confirmed" ? "Presença confirmada" : "Aguardando presença"}</Badge>
       <Badge variant="outline">{paused || onSitePending ? "Pausado" : "Ativo"}</Badge>
+      {swapNotice ? <Badge variant="info" title={swapNoticeText(swapNotice)}>Troca feita</Badge> : null}
       <Badge variant={onlineOverride ? "info" : "outline"}>{attendanceMode === "presencial" ? "Presencial" : onlineOverride ? "Online neste plantão" : "Online"}</Badge>
       {presencePhotoId ? <a href={`/api/duty/presence/photo?id=${presencePhotoId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center rounded-full border border-border px-2.5 py-0.5 text-xs font-medium text-primary hover:bg-muted">Ver foto do local</a> : null}
       <Badge variant="outline" className="tabular-nums" title="Ofertas enviadas a este corretor neste plantão hoje / aceitas por ele">
@@ -168,9 +180,20 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
       </Badge>
     </div>} footer={<div className="flex flex-wrap justify-end gap-2">
       {attendanceMode === "presencial" && onSitePending && onSiteReleaseOpen && !absent ? <BrokerPresenceReleaseButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} inUnit withPhoto={Boolean(presencePhotoId)} /> : null}
+      {canSwap && !swapOpen ? <Button type="button" size="sm" variant="outline" disabled={saving} onClick={() => { setSwapDone(null); setSwapOpen(true); }}>Efetuar troca</Button> : null}
       {canSetAttendanceMode && scheduleAttendanceMode === "presencial" && !absent ? <Button type="button" size="sm" variant="outline" disabled={saving} onClick={changeAttendanceMode}>{onlineOverride ? "Voltar a presencial" : "Online neste plantão"}</Button> : null}
       <Button type="button" size="sm" variant={absent ? "outline" : "destructive"} disabled={saving} onClick={changeAbsence}>{absent ? "Desfazer falta" : "Marcar falta"}</Button>
     </div>}>
+      {swapDone ? <DutySwapDoneNotice result={swapDone} /> : null}
+      {swapOpen ? <DutySwapPicker assignmentId={assignmentId} onCancel={() => setSwapOpen(false)} onSwapped={(result) => {
+        setSwapOpen(false);
+        setSwapDone(result);
+        toast.success(`Troca feita entre ${result.source.brokerName} e ${result.target.brokerName}.`);
+        router.refresh();
+      }} /> : null}
+      {swapNotice && !swapDone ? <p role="status" className="rounded-lg border border-info/30 bg-info/10 px-3 py-2 text-xs">
+        <span className="font-medium">{swapNoticeText(swapNotice)}</span> {whatsappStatusLabel(swapNotice.whatsappStatus)}.
+      </p> : null}
       <section className="space-y-1 text-sm">
         <p><span className="text-muted-foreground">Contato:</span> {phone ?? "Não informado"}</p>
         <p><span className="text-muted-foreground">Confirmação:</span> {confirmedAt ? dateTime.format(new Date(confirmedAt)) : "Ainda não confirmada"}</p>

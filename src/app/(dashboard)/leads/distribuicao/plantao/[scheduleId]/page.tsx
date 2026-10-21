@@ -38,6 +38,8 @@ import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger
 import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigger";
 import { BrokerOccurrenceCard } from "../_components/broker-occurrence-card";
 import { PendingRoster } from "../_components/pending-roster";
+import { getDutySwapNotices } from "@/features/lead-distribution/duty-swap-queries";
+import { swapNoticeText } from "@/features/lead-distribution/duty-swap";
 import { ScheduleEscalarButton } from "../_components/schedule-escalar-button";
 import { listInvitedBrokers, listPendingRosterEntries } from "@/features/lead-distribution/duty-roster-pending";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
@@ -195,7 +197,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   })) ?? null;
   const readyNowCount = roster.filter((entry) => entry.liveStatus === "ready").length;
   const coverage = getDutyCoverage(roster.length, schedule.minimumBrokers);
-  const [branches, brokers, slaSettings, managementActionsSetting, assignmentChoiceSetting] = await Promise.all([
+  const [swapNotices, branches, brokers, slaSettings, managementActionsSetting, assignmentChoiceSetting] = await Promise.all([
+    // "Troca feita" on the slots of the published escala (never breaks the page).
+    getDutySwapNotices(context.tenantId, roster.map((entry) => ({ id: entry.id, brokerId: entry.brokerId }))),
     getCachedLeadsBranches(context.tenantId),
     getCachedLeadsBrokers(context.tenantId, context.role, context.branchId ?? null),
     getCachedSlaSettings(context.tenantId),
@@ -576,10 +580,11 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 ]).map((group) => <section key={group.key} aria-label={group.label} className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground">{group.label} <Badge variant="outline">{group.entries.length}</Badge></h4>
                   {group.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{group.entries.map((entry) => (
-              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} leadsSince={leadsSinceOption} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={entry.attendanceMode} scheduleAttendanceMode={schedule.attendanceMode} canSetAttendanceMode={context.role === "director"} onSitePending={entry.onSitePending} onSiteReleaseOpen={entry.onSiteReleaseOpen} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting !== "false"} presencePhotoId={entry.presencePhotoId ?? null} presenceReleaseNote={entry.presenceReleaseNote ?? null}>
+              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} leadsSince={leadsSinceOption} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={entry.attendanceMode} scheduleAttendanceMode={schedule.attendanceMode} canSetAttendanceMode={context.role === "director"} onSitePending={entry.onSitePending} onSiteReleaseOpen={entry.onSiteReleaseOpen} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting !== "false"} presencePhotoId={entry.presencePhotoId ?? null} presenceReleaseNote={entry.presenceReleaseNote ?? null} canSwap={entry.publishedDutyDate !== null} swapNotice={swapNotices.get(entry.id) ?? null}>
                 <div className="min-w-0">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-sm font-medium">{entry.brokerName}</span>
+                    {swapNotices.has(entry.id) ? <Badge variant="info" title={swapNoticeText(swapNotices.get(entry.id)!)}>Troca feita</Badge> : null}
                     {entry.onlineOverride ? <Badge variant="info" title="Online neste plantão presencial: confirma com um toque, sem foto">Online</Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Presença confirmada"}${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Confirmado"}${entry.confirmedAt ? ` em ${dateTime.format(entry.confirmedAt)}` : ""}`}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
                     {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
