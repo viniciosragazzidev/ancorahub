@@ -111,6 +111,7 @@ export default async function TeamMemberProfilePage({
       notes={notes} joinedAt={profile.member.joinedAt.toISOString()} weeklyAcceptances={pulse?.week ?? []}
       situation={{ dutyToday: undefined, newLeads, nextTask: extras.nextTask, whatsapp: extras.whatsapp }}
       performance={performance}
+      leadOffers={profile.metrics.offers}
       metricTimeline={timeline.available ? timeline.points : null}
       recognitions={extras.recognitions}
       managerProfile={{ temperature: profile.metrics.temperature, quotes: profile.metrics.quotes, sales: profile.metrics.sales, interactions: profile.metrics.interactions, tasks: profile.metrics.tasks, dutyDays: profile.dutyDays.map((day) => ({ date: new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date(`${day.date}T12:00:00-03:00`)), scheduleName: day.scheduleName, startsAt: day.startsAt, endsAt: day.endsAt, state: day.state })) }}
@@ -157,6 +158,7 @@ export default async function TeamMemberProfilePage({
           brokerCode: profile.member.brokerCode,
           statusLabel: profile.member.membershipStatus === "active" && profile.member.userStatus === "active" ? "Ativo" : "Desativado",
         }}
+        leadOffers={profile.metrics.offers}
         metrics={{
           portfolio: profile.metrics.leads.total,
           inService: profile.metrics.leads.active,

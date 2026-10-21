@@ -88,6 +88,7 @@ export type SupervisorBrokerProfileProps = {
   } | null;
   notes: SupervisorNote[];
   joinedAt?: string;
+  leadOffers?: { total: number; accepted: number; pending: number; notAccepted: number };
   situation?: BrokerSituation;
   performance?: BrokerPerformanceView | null;
   metricTimeline?: MonthlyBrokerMetricPoint[] | null;
@@ -173,6 +174,7 @@ export function SupervisorBrokerProfile({
   ranking,
   notes: initialNotes,
   joinedAt,
+  leadOffers,
   situation,
   performance,
   metricTimeline,
@@ -251,6 +253,15 @@ export function SupervisorBrokerProfile({
         </section>
 
         {monthGoal ? <BrokerMonthGoal brokerId={monthGoal.brokerId} brokerName={member.name} period={monthGoal.period} goal={monthGoal.goal} canEdit={monthGoal.canEdit} /> : null}
+        {leadOffers ? <section className={styles.card} aria-labelledby="broker-lead-offers-title">
+          <div className={styles.sectionHeading}><h2 id="broker-lead-offers-title">Leads enviados × aceitos</h2><span>Histórico completo</span></div>
+          <div className={styles.todayGrid}>
+            <div className={styles.todayMetric}><span>Leads enviados</span><strong>{numberFormat.format(leadOffers.total)}</strong></div>
+            <div className={styles.todayMetric}><span>Leads aceitos</span><strong>{numberFormat.format(leadOffers.accepted)}</strong></div>
+          </div>
+          <p className={styles.branch}>{leadOffers.total > 0 ? `${Math.round(leadOffers.accepted / leadOffers.total * 100)}% de aceite` : "Sem envios registrados"} · {numberFormat.format(leadOffers.pending)} aguardando resposta · {numberFormat.format(leadOffers.notAccepted)} não aceitos</p>
+          <p className={styles.branch}>Ofertas efetivamente enviadas no escopo permitido. Reenvios do mesmo lead contam novamente.</p>
+        </section> : null}
         <div className={styles.columns}>
           <div className={styles.column}>
             <section className={`${styles.card} ${styles.situation}`} aria-labelledby="broker-situation-title">
