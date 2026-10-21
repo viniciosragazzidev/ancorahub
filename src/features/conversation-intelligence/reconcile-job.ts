@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, desc, gt, inArray, isNotNull, lt, max, notInArray, sql } from "drizzle-orm";
+import { and, desc, gt, inArray, isNotNull, max, notInArray, sql } from "drizzle-orm";
 
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -36,7 +36,7 @@ export async function runConversationReconcileJob() {
     .from(schema.whatsappMessages)
     .where(and(isNotNull(schema.whatsappMessages.leadId), gt(schema.whatsappMessages.sentAt, new Date(now - LOOKBACK_MS))))
     .groupBy(schema.whatsappMessages.leadId, schema.whatsappMessages.tenantId)
-    .having(lt(lastMessageAt, new Date(now - QUIET_MS)))
+    .having(sql`max(${schema.whatsappMessages.sentAt}) < ${new Date(now - QUIET_MS).toISOString()}::timestamptz`)
     .orderBy(desc(lastMessageAt))
     .limit(400);
   if (!recent.length) return { analyzed: 0, moved: 0, candidates: 0 };

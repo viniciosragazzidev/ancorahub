@@ -51,7 +51,7 @@ async function realMetaCost(tenantId: string, since: Date) {
   try {
     const result = await getDatabase().execute(sql`select upper(pricing_category) as category, count(*)::int as count
       from whatsapp_outbound_messages
-      where tenant_id = ${tenantId} and created_at >= ${since} and recipient_type = 'lead' and pricing_billable = true and sent_at >= ${since}
+      where tenant_id = ${tenantId} and created_at >= ${since.toISOString()}::timestamptz and recipient_type = 'lead' and pricing_billable = true and sent_at >= ${since.toISOString()}::timestamptz
       group by 1`);
     const rows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as Array<{ category: string | null; count: number }>;
     if (!rows.length) return null;
@@ -120,13 +120,16 @@ function time(value: string | Date | null) {
  * recipient) and their inbound messages (by the tenant + lead index). Counts are made here.
  */
 async function loadCohort(tenantId: string, since: Date, branchId: string | null) {
+  // Raw SQL with postgres.js: a Date parameter is sent as Date.toString(), which Postgres
+  // rejects ("Wed Oct 14 2026 ... GMT+0000"); send ISO text with an explicit cast.
+  const sinceIso = since.toISOString();
   const result = await getDatabase().execute(sql`
     with cohort as (
       select l.id, l.status, l.qualification_status, l.qualification_state, l.corretor_id, l.motivo_perda,
         l.qualification_details->'turbo' as turbo,
         (l.qualification_details->'turbo'->>'firstContactAt')::timestamptz as turbo_at
       from leads l
-      where l.tenant_id = ${tenantId} and l.created_at >= ${since} and l.deleted_at is null
+      where l.tenant_id = ${tenantId} and l.created_at >= ${sinceIso}::timestamptz and l.deleted_at is null
         ${branchId ? sql`and l.branch_id = ${branchId}` : sql``}
     ),
     fc as (
@@ -134,7 +137,7 @@ async function loadCohort(tenantId: string, since: Date, branchId: string | null
         bool_or(o.delivered_at is not null or o.read_at is not null or o.status in ('delivered','read')) as delivered,
         bool_or(o.read_at is not null or o.status = 'read') as read
       from whatsapp_outbound_messages o
-      where o.tenant_id = ${tenantId} and o.created_at >= ${since}
+      where o.tenant_id = ${tenantId} and o.created_at >= ${sinceIso}::timestamptz
         and o.recipient_type = 'lead' and o.purpose = 'leadQualification' and o.status in ('sent','delivered','read')
       group by o.recipient_id
     ),
