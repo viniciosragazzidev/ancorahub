@@ -24,7 +24,7 @@ import { readCtwaAdReferral } from "./meta-ctwa-referral";
 import { channelLeadIntakeKey, parseChannelLeadIntake } from "./channel-lead-intake";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { COEXISTENCE_WEBHOOK_FIELDS } from "./meta-coexistence-events";
-import type { MetaWebhookPayload } from "./types";
+import type { MetaWebhookPayload, MetaWebhookStatus } from "./types";
 import { shouldStartOrResumeAiQualification } from "@/features/qualification-engine/service";
 
 export async function isMetaCloudWhatsAppEnabled() {
@@ -152,6 +152,22 @@ export function getMetaDeliveryFailure(status: { errors?: Array<{ code?: number;
   if (!error) return { code: "META_DELIVERY_FAILED", message: "A Meta não informou o motivo da falha de entrega." };
   const title = error.title?.trim() || "A Meta recusou a entrega para este destinatário.";
   return { code: String(error.code ?? "META_DELIVERY_FAILED"), message: title.slice(0, 240) };
+}
+
+/**
+ * Meta's price of the message (per-message pricing): category, charged or not, price type.
+ * Raw SQL on columns added by drizzle/0211 (not in the Drizzle schema), so it works before
+ * the migration: a missing column is ignored and the funnel falls back to the rate card.
+ */
+async function recordOutboundPricing(outboundId: string, pricing: NonNullable<MetaWebhookStatus["pricing"]>) {
+  try {
+    await getDatabase().execute(sql`update whatsapp_outbound_messages
+      set pricing_category = ${pricing.category ?? null}, pricing_billable = ${typeof pricing.billable === "boolean" ? pricing.billable : null}, pricing_type = ${pricing.type ?? null}
+      where id = ${outboundId}`);
+  } catch (error) {
+    const code = (error as { code?: string; cause?: { code?: string } })?.code ?? (error as { cause?: { code?: string } })?.cause?.code;
+    if (code !== "42703") console.warn("[meta-webhook] pricing not recorded", error instanceof Error ? error.message.slice(0, 160) : error);
+  }
 }
 
 async function registerWebhookEvent(input: { channelId: string | null; externalEventId: string; eventType: string; payloadHash: string }) {
@@ -541,6 +557,7 @@ export async function ingestMetaCloudWebhook(payload: MetaWebhookPayload, rawPay
         if (outbound && recordSentAt) {
           await db.update(schema.whatsappOutboundMessages).set({ sentAt: new Date() }).where(and(eq(schema.whatsappOutboundMessages.id, outbound.id), isNull(schema.whatsappOutboundMessages.sentAt)));
         }
+        if (outbound && status.pricing) await recordOutboundPricing(outbound.id, status.pricing);
 
         if (outbound?.purpose === "brokerInvitation" && outbound.recipientId && ["delivered", "read"].includes(status.status)) {
           await db.update(schema.brokerInvitations).set({ deliveryStatus: "sent", deliveryMessageId: status.id, deliveredAt: new Date() }).where(and(eq(schema.brokerInvitations.id, outbound.recipientId), eq(schema.brokerInvitations.tenantId, channel.tenantId)));

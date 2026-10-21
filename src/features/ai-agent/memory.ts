@@ -44,6 +44,10 @@ export type ConversationMemory = {
   collectedFields: string[];
   /** The last question the AI asked, verbatim */
   lastQuestionAsked?: string;
+  /** Objection recoveries already tried (one, then a second refusal closes politely). */
+  objectionAttempts?: number;
+  /** Who the plan is for when it is not the person talking ("filha", "pai"). */
+  beneficiaryRelation?: string;
   /** Short free-text summary of the conversation so far */
   conversationSummary?: string;
   /** ISO timestamp of last update */
@@ -362,6 +366,26 @@ export function extractFieldsFromMessage(
     if (memory.numberOfLives?.confidence === 0) {
       delete memory.numberOfLives;
       memory.collectedFields = memory.collectedFields.filter((field) => field !== "numberOfLives");
+    }
+  }
+
+  // A plan for a relative: "pra minha filha" is an individual plan for one other person;
+  // "eu e minha filha" is a family plan (case Adelair, 21/10).
+  if (!memory.planType) {
+    const normalizedRelative = normalizeForMatching(trimmed);
+    const relative = normalizedRelative.match(/\b(?:para|pra|pro|p\/)\s+(?:as?\s+|os?\s+)?(?:minha|meu|minhas|meus)\s+(filha|filho|filhas|filhos|mae|pai|esposa|marido|mulher|namorada|namorado|irma|irmao|avo|neta|neto|sobrinha|sobrinho|sogra|sogro|enteada|enteado)\b/);
+    const withSelf = /\b(?:pra mim e|para mim e|eu e (?:a |o )?(?:minha|meu))\b/.test(normalizedRelative);
+    if (withSelf) {
+      memory.planType = { value: "familiar", confidence: 1, sourceMessageId };
+      addCollectedField(memory, "planType");
+    } else if (relative && !/s$/.test(relative[1])) {
+      memory.planType = { value: "individual", confidence: 1, sourceMessageId };
+      memory.beneficiaryRelation = relative[1];
+      addCollectedField(memory, "planType");
+    } else if (relative) {
+      memory.planType = { value: "familiar", confidence: 1, sourceMessageId };
+      memory.beneficiaryRelation = relative[1];
+      addCollectedField(memory, "planType");
     }
   }
 

@@ -370,6 +370,9 @@ export async function runColdLeadRequalificationSweep(tenantIdFilter?: string, n
     await ensureColdLeadReactivationRule(tenantId);
     const tenantEnabled = await getActiveTenantRule(tenantId);
     if (!tenantEnabled) continue;
+    // The qualification turbo cadence sends its own +3h reminder (anc_t2_beneficio): no second message.
+    const { turboCadenceCoversRequalification } = await import("@/features/qualification-turbo/cadence-job");
+    if (await turboCadenceCoversRequalification(tenantId).catch(() => false)) continue;
     const locked = await withTenantRequalificationLock(tenantId, async () => {
       // Every automatic queue, one try 3 hours after the lead turned cold (decision of 20/10):
       // the per-queue switch no longer gates it, and the timeout holds (the panel's cold leads) count.

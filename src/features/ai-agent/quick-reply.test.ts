@@ -83,3 +83,54 @@ describe("QuickReplyResolver", () => {
     expect(resolveQuickReply({ body: "Quero entender as opções disponíveis para minha família", conversationState: "AI_ACTIVE", isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: false }).resolved).toBe(false);
   });
 });
+
+describe("botões dos templates da qualificação turbo", () => {
+  const base = { conversationState: "AI_ACTIVE" as const, isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: true };
+
+  it("'Pode encerrar' para a sequência; 'Agora não' é objeção e vai para a IA", () => {
+    expect(resolveQuickReply({ ...base, body: "Pode encerrar" }).intent).toBe("OPT_OUT");
+    expect(resolveQuickReply({ ...base, body: "Agora não" }).resolved).toBe(false);
+  });
+
+  it("recusa suave não encerra: a IA pergunta o motivo (caso Adelair)", () => {
+    for (const body of ["Eu já tenho", "já tenho plano", "Não tenho interesse", "sem interesse", "Não quero não"]) {
+      expect(resolveQuickReply({ ...base, body }).resolved, body).toBe(false);
+    }
+  });
+
+  it("comando explícito de parar encerra na hora", () => {
+    for (const body of ["sair", "pare de enviar mensagens", "não me mande mais mensagens", "não solicitei isso"]) {
+      expect(resolveQuickReply({ ...base, body }).intent, body).toBe("OPT_OUT");
+    }
+  });
+
+  it("'Prefiro ligação' passa o lead para um corretor ligar", () => {
+    const result = resolveQuickReply({ ...base, body: "Prefiro ligação" });
+    expect(result.intent).toBe("REQUEST_CALLBACK");
+    expect(result.nextState).toBe("WAITING_HUMAN");
+    expect(resolveQuickReply({ ...base, body: "Pode me ligar" }).intent).toBe("REQUEST_CALLBACK");
+  });
+
+  it("botões de continuar seguem para a próxima pergunta", () => {
+    for (const body of ["Por aqui no WhatsApp", "Quero ver as opções", "Quero receber", "Ainda procuro", "Prefiro por aqui"]) {
+      expect(resolveQuickReply({ ...base, body }).ruleKey, body).toBe("start_qualification");
+    }
+  });
+
+  it("botões de tipo de plano chegam à extração da resposta", () => {
+    for (const body of ["Só para mim", "Para minha família", "Para minha empresa"]) {
+      expect(resolveQuickReply({ ...base, body }).resolved, body).toBe(false);
+    }
+  });
+});
+
+describe("pedido de ligação só quando o lead pede (revisão 21/10)", () => {
+  const base = { conversationState: "AI_ACTIVE" as const, isNewConversation: false, hasPriorMessages: true, hasPendingQuestion: true };
+  it("'não quero ligação' não vira pedido de ligação", () => {
+    expect(resolveQuickReply({ ...base, body: "não quero ligação" }).intent).not.toBe("REQUEST_CALLBACK");
+    expect(resolveQuickReply({ ...base, body: "não precisa me ligar" }).intent).not.toBe("REQUEST_CALLBACK");
+  });
+  it("'pode me chamar por aqui' continua no WhatsApp", () => {
+    expect(resolveQuickReply({ ...base, body: "pode me chamar por aqui" }).intent).not.toBe("REQUEST_CALLBACK");
+  });
+});

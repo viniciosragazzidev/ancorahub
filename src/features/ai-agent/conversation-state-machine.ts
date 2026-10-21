@@ -25,7 +25,7 @@ import { publishNotification } from "@/features/notifications/send-push-helper";
 import { detectLateralSituation, quickReplyTuning } from "@/features/attendance-situations/catalog";
 import { loadTenantSituations } from "@/features/attendance-situations/service";
 import { recordLearningEvent } from "@/features/situation-learning/service";
-import { loadQuickReplyTemplates, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
+import { loadQuickReplyTemplates, parseExplicitStop, parseOptOut, parseSoftDecline, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
 import { composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { isAutomatedInboundMessage } from "./automated-inbound";
 import { getSystemSetting } from "@/features/system-settings/queries";
@@ -491,6 +491,8 @@ export async function startQualificationConversationForLead(
     nome: schema.leads.nome,
     qualificationStatus: schema.leads.qualificationStatus,
     qualificationState: schema.leads.qualificationState,
+    externalId: schema.leads.externalId,
+    sourceMetadata: schema.leads.sourceMetadata,
   })
     .from(schema.leads).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
   if (!lead?.telefone) return { started: false as const, reason: "missing_phone" as const };
@@ -641,8 +643,20 @@ export async function startQualificationConversationForLead(
     return { started: true as const, conversationId: conversation.id, resumed: true };
   }
 
+  // What the ad form already answered is never asked again (qualification turbo, plan 2026-10-21 §5C).
+  const approachInput = {
+    tipo: lead.tipo,
+    origem: lead.origem,
+    externalId: lead.externalId,
+    sourceCampaign: lead.sourceCampaign,
+    sourceMetadata: (lead.sourceMetadata as Record<string, unknown> | null) ?? null,
+  };
+  const { seedMemoryFromLeadForm } = await import("@/features/qualification-turbo/form-seed");
+  const seededForm = seedMemoryFromLeadForm(memory, approachInput);
+  const startMemory = seededForm.memory;
+
   const { resolveDeterministicQualificationTurn } = await import("@/features/qualification-engine/service");
-  const turn = resolveDeterministicQualificationTurn({ memory, policy: behavior.policy });
+  const turn = resolveDeterministicQualificationTurn({ memory: startMemory, policy: behavior.policy });
 
   const firstField = behavior.policy.requiredFields[0];
   const firstQuestion = COLLECTIBLE_FIELDS.find((field) => field.key === firstField)?.promptLabel ?? "nome";
@@ -664,29 +678,78 @@ export async function startQualificationConversationForLead(
     .limit(1);
 
   if (recentDup) {
-    await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", behaviorVersionId: behavior.versionId, memory: { ...memory, lastQuestionAsked: body }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+    await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", behaviorVersionId: behavior.versionId, memory: { ...startMemory, lastQuestionAsked: body }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
     return { started: true as const, conversationId: conversation.id, deduped: true };
   }
 
   // The configured FIRST_CONTACT event owns channel eligibility and fallback.
   let finalBody = body;
   let finalMessageId = `ai_msg_start_${crypto.randomUUID()}`;
+  let turboChoice: Awaited<ReturnType<typeof import("@/features/qualification-turbo/service").chooseFirstContact>> | null = null;
+  let sentTemplateName: string | null = null;
 
   try {
     const { getQualificationTenantSettings } = await import("@/features/ai-qualification/tenant-settings-service");
     const { enqueueAndProcessMetaEventMessage } = await import("@/features/communication-channels/outbound-service");
+    const { chooseFirstContact } = await import("@/features/qualification-turbo/service");
     const qualificationSettings = await getQualificationTenantSettings(input.tenantId);
     const botName = qualificationSettings?.assistantName?.trim() || "Assistente Âncora Saúde";
-    const delivery = await enqueueAndProcessMetaEventMessage({
+    // Approach by ad + A/B among approved templates; null keeps the configured FIRST_CONTACT.
+    turboChoice = await chooseFirstContact({
+      tenantId: input.tenantId,
+      leadId: input.leadId,
+      leadName: lead.nome || "Cliente",
+      botName,
+      lead: approachInput,
+      firstQuestionAnswered: Boolean(startMemory.planType?.value) && (startMemory.planType?.value !== "empresarial" || Boolean(startMemory.companyHasCnpj?.value)),
+    }).catch((error) => {
+      console.warn("[startQualificationConversationForLead] turbo choice failed, using the configured first contact", error);
+      return null;
+    });
+    const sendConfigured = () => enqueueAndProcessMetaEventMessage({
       tenantId: input.tenantId,
       recipientType: "lead",
       recipientId: input.leadId,
       destinationPhone: lead.telefone,
       purpose: "leadQualification",
-      variables: [lead.nome || "Cliente", botName, "Âncora Saúde"],
+      variables: turboChoice?.variables ?? [lead.nome || "Cliente", botName, "Âncora Saúde"],
       requestedBy: input.actorUserId,
       idempotencyKey: `qualification-engine:${input.leadId}:start:${conversation.id}`,
     });
+    let delivery: Awaited<ReturnType<typeof sendConfigured>>;
+    if (turboChoice?.templateName) {
+      try {
+        delivery = await enqueueAndProcessMetaEventMessage({
+          tenantId: input.tenantId,
+          recipientType: "lead",
+          recipientId: input.leadId,
+          destinationPhone: lead.telefone,
+          purpose: "leadQualification",
+          variables: turboChoice.variables,
+          requestedBy: input.actorUserId,
+          idempotencyKey: `qualification-engine:${input.leadId}:start:${conversation.id}:${turboChoice.templateName}`,
+          requireApprovedMetaTemplate: true,
+          templateName: turboChoice.templateName,
+        });
+        if (!["sent", "delivered", "read"].includes(delivery.status)) {
+          // Held or queued by the outbox: cancel it before sending the configured one, so the
+          // lead never gets two first messages. A row already being sent is left alone.
+          const cancelled = ["failed", "skipped", "cancelled"].includes(delivery.status)
+            ? [{ id: delivery.id }]
+            : await db.update(schema.whatsappOutboundMessages).set({ status: "cancelled", updatedAt: new Date() })
+              .where(and(eq(schema.whatsappOutboundMessages.id, delivery.id), eq(schema.whatsappOutboundMessages.tenantId, input.tenantId), inArray(schema.whatsappOutboundMessages.status, ["queued", "pending"])))
+              .returning({ id: schema.whatsappOutboundMessages.id });
+          if (cancelled.length) throw new Error(delivery.providerErrorMessage || "turbo_template_not_sent");
+        }
+        sentTemplateName = turboChoice.templateName;
+      } catch (turboError) {
+        console.warn("[startQualificationConversationForLead] turbo template failed, falling back to the configured first contact", turboError);
+        turboChoice = { ...turboChoice, templateName: null, variant: null };
+        delivery = await sendConfigured();
+      }
+    } else {
+      delivery = await sendConfigured();
+    }
     if (!["sent", "delivered", "read"].includes(delivery.status)) {
       throw new Error(delivery.providerErrorMessage || "A mensagem inicial não foi aceita pelo provedor.");
     }
@@ -719,8 +782,22 @@ export async function startQualificationConversationForLead(
   }
 
   await db.update(schema.leads).set({ qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: new Date() }).where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId)));
-  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", behaviorVersionId: behavior.versionId, memory: { ...memory, lastQuestionAsked: finalBody }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
-  await persistQualificationEvaluation({ tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, actorUserId: input.actorUserId, policy: behavior.policy, memory });
+  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", behaviorVersionId: behavior.versionId, memory: { ...startMemory, lastQuestionAsked: finalBody }, updatedAt: new Date() }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+  await persistQualificationEvaluation({ tenantId: input.tenantId, leadId: input.leadId, conversationId: conversation.id, actorUserId: input.actorUserId, policy: behavior.policy, memory: startMemory });
+  // Records the first touch: the reminder cadence and the A/B results start from it.
+  try {
+    const { writeTurboState } = await import("@/features/qualification-turbo/service");
+    const at = new Date().toISOString();
+    await writeTurboState(input.tenantId, input.leadId, {
+      approach: turboChoice?.approach ?? "direta",
+      variant: turboChoice?.variant ?? "padrao",
+      firstContactAt: at,
+      touches: [{ touch: "t0", template: sentTemplateName, at, status: "sent" }],
+      ...(seededForm.seeded.length ? { seededFromForm: seededForm.seeded } : {}),
+    });
+  } catch (error) {
+    console.warn("[startQualificationConversationForLead] turbo state not recorded", error);
+  }
   return { started: true as const, conversationId: conversation.id };
 }
 
@@ -1070,6 +1147,54 @@ async function applyCustomerCorrectionAfterHandoff(input: {
 /** Seconds the AI waits for the rest of a burst of customer messages before answering. */
 const DEFAULT_AI_DEBOUNCE_SECONDS = 8;
 
+/** One recovery attempt per conversation; the next refusal closes politely. */
+const MAX_OBJECTION_RECOVERIES = 1;
+const OBJECTION_RECOVERY_RULE = "objection_recovery";
+const DECLINE_AFTER_OBJECTION_RULE = "decline_after_objection";
+/** How long a conversation closed after an objection can be reopened by the customer. */
+const REOPEN_AFTER_DECLINE_MS = 14 * 24 * 60 * 60_000;
+
+/** Used when the interpreter is unavailable: still asks why instead of closing. */
+export function defaultObjectionReply(firstName: string) {
+  return `Entendi${firstName ? `, ${firstName}` : ""}. Posso te perguntar o motivo? Se você já tem plano, consigo comparar com o atual; se for para outra pessoa da família, também cotamos. E se preferir, um especialista te liga.`;
+}
+
+/**
+ * A conversation closed after an objection reopens when the customer writes
+ * again with anything but another refusal or an explicit stop. Explicit stops
+ * ("sair", "não me mande mais") never reopen.
+ */
+async function reopenAfterSoftDecline(input: {
+  tenantId: string;
+  leadId: string;
+  conversation: { id: string; optOutAt: Date | null };
+  body: string;
+}) {
+  if (!input.conversation.optOutAt || Date.now() - input.conversation.optOutAt.getTime() > REOPEN_AFTER_DECLINE_MS) return false;
+  if (parseExplicitStop(input.body) || parseOptOut(input.body) || input.body.trim().length < 3) return false;
+  const db = getDatabase();
+  const [lastEvent] = await db.select({ ruleKey: schema.aiQuickReplyEvents.ruleKey })
+    .from(schema.aiQuickReplyEvents)
+    .where(and(eq(schema.aiQuickReplyEvents.tenantId, input.tenantId), eq(schema.aiQuickReplyEvents.conversationId, input.conversation.id)))
+    .orderBy(desc(schema.aiQuickReplyEvents.createdAt))
+    .limit(1);
+  if (lastEvent?.ruleKey !== DECLINE_AFTER_OBJECTION_RULE) return false;
+  const [lead] = await db.select({ corretorId: schema.leads.corretorId }).from(schema.leads)
+    .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId))).limit(1);
+  if (!lead || lead.corretorId) return false;
+  const now = new Date();
+  await db.update(schema.aiConversations).set({ status: "WAITING_CUSTOMER", automationState: "AI_ACTIVE", optOutAt: null, updatedAt: now })
+    .where(and(eq(schema.aiConversations.id, input.conversation.id), eq(schema.aiConversations.tenantId, input.tenantId)));
+  await db.update(schema.leads).set({ qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", distributionStatus: "unassigned", updatedAt: now })
+    .where(and(eq(schema.leads.id, input.leadId), eq(schema.leads.tenantId, input.tenantId), isNull(schema.leads.corretorId), eq(schema.leads.qualificationStatus, "disqualified")));
+  await db.insert(schema.aiQuickReplyEvents).values({
+    id: crypto.randomUUID(), tenantId: input.tenantId, conversationId: input.conversation.id, leadId: input.leadId, sourceMessageId: null,
+    intent: "GREETING", ruleKey: "reopened_after_decline", templateKey: null, outcome: "reopened", estimatedTokensSaved: 0, notifiedUserId: null,
+  });
+  console.info("[qualification] reopened_after_decline", { tenantId: input.tenantId, leadId: input.leadId, conversationId: input.conversation.id });
+  return true;
+}
+
 export async function processInboundAiResponse({
   tenantId,
   leadId,
@@ -1226,7 +1351,13 @@ export async function processInboundAiResponse({
   }
 
   // 2. Quick Reply idempotency and closed-state gate run before AI.
-  if (conversation.status === "PAUSED") return { status: "ignored_PAUSED" };
+  if (conversation.status === "PAUSED") {
+    // Closed after an objection (not an explicit stop): the customer writing again with
+    // anything but another refusal reopens the qualification (case Adelair, 21/10).
+    const reopened = await reopenAfterSoftDecline({ tenantId, leadId, conversation, body: userMessageBody });
+    if (!reopened) return { status: "ignored_PAUSED" };
+    return processInboundAiResponse({ tenantId, leadId, phone, userMessageBody, messageKind, communicationChannelId, providerMessageId, whatsappMessageId, transport, openWaSessionId, wahaRunId, skipDebounce: true, correctionOnly });
+  }
   if (sourceIdentifier) {
     const [quickReplyEvent] = await db.select({ id: schema.aiQuickReplyEvents.id }).from(schema.aiQuickReplyEvents).where(and(eq(schema.aiQuickReplyEvents.tenantId, tenantId), eq(schema.aiQuickReplyEvents.sourceMessageId, sourceIdentifier), eq(schema.aiQuickReplyEvents.conversationId, conversation.id))).limit(1);
     if (quickReplyEvent || conversation.lastProcessedMessageId === sourceIdentifier) return { status: "ignored_duplicate" };
@@ -1427,12 +1558,13 @@ export async function processInboundAiResponse({
       notifiedUserId = leadOwner.corretorId;
       await publishNotification({ capability: "quick_reply_human", tenantId, recipientUserId: leadOwner.corretorId, leadId, type: "quick_reply_human", title: "Nova mensagem no atendimento", message: suppressed ? "O lead enviou nova mensagem; a resposta foi suprimida pelo cooldown." : "O lead enviou uma mensagem e o atendimento foi sinalizado.", pushTitle: "Mensagem de lead", pushBody: "Verifique o atendimento na plataforma.", url: `/leads/${leadId}`, tag: `quick-reply-${leadId}` });
     }
-    if (quickReply.intent === "REQUEST_HUMAN") {
+    const wantsCall = quickReply.intent === "REQUEST_CALLBACK" && quickReply.nextState === "WAITING_HUMAN";
+    if (quickReply.intent === "REQUEST_HUMAN" || wantsCall) {
       await transitionConversationState({
         tenantId,
         conversationId: conversation.id,
         newStatus: "WAITING_HUMAN",
-        reason: "Solicitação explícita de atendimento humano",
+        reason: wantsCall ? "O lead pediu ligação" : "Solicitação explícita de atendimento humano",
       });
       await db.update(schema.leads)
         .set(buildHumanHandoffLeadUpdate(now))
@@ -1667,6 +1799,53 @@ export async function processInboundAiResponse({
       }
 
     }
+  }
+
+  // Objection or refusal read in context by the interpreter (never a word list): ask why once,
+  // offering a concrete path; a second refusal closes politely (qualification turbo, 21/10).
+  const softDecline = !inboundIsAutomated && parseSoftDecline(userMessageBody);
+  const interpreterIntent = aiFallbackResult?.ok ? aiFallbackResult.intent : undefined;
+  const isObjection = interpreterIntent === "objection" || interpreterIntent === "decline" || (softDecline && !aiFallbackResult?.ok);
+  if (isObjection && fieldsExtractedFromCurrentMessage.length === 0 && fallbackAppliedCount === 0) {
+    const attempts = updatedMemory.objectionAttempts ?? 0;
+    const leadFirstName = lead?.nome && !/^lead\b/i.test(lead.nome.trim()) ? lead.nome.trim().split(/\s+/)[0] : "";
+    const firstName = updatedMemory.customerFirstName?.value ?? leadFirstName;
+    const recovering = attempts < MAX_OBJECTION_RECOVERIES;
+    const text = recovering
+      ? aiFallbackResult?.reply?.trim() || defaultObjectionReply(firstName)
+      : `Tudo bem${firstName ? `, ${firstName}` : ""}. Obrigado pela atenção. Se mudar de ideia ou quiser cotar para outra pessoa, é só me chamar por aqui.`;
+    const now = new Date();
+    const replyId = `ai_msg_objection_${crypto.randomUUID()}`;
+    await db.insert(schema.whatsappMessages).values({ id: replyId, tenantId, leadId, communicationChannelId: communicationChannelId ?? null, conversationId: conversation.id, senderRole: "assistant", provider: transport, phone, direction: "outbound", body: text, sentAt: now });
+    let deliveryStatus = "failed";
+    try {
+      const sent = await sendAiOutbound({ tenantId, phone, body: text, transport, openWaSessionId, wahaRunId, currentMessageId: replyId });
+      deliveryStatus = sent.status;
+      if (sent.messageId) await db.update(schema.whatsappMessages).set({ providerStatus: "sent", messageId: sent.messageId }).where(and(eq(schema.whatsappMessages.id, replyId), eq(schema.whatsappMessages.tenantId, tenantId)));
+    } catch (error) {
+      console.error("[qualification] objection_reply.failed", { tenantId, leadId, error: error instanceof Error ? error.message.slice(0, 240) : "unknown_error" });
+    }
+    const nextMemory: ConversationMemory = { ...updatedMemory, objectionAttempts: attempts + 1, lastQuestionAsked: recovering ? text : updatedMemory.lastQuestionAsked };
+    await db.update(schema.aiConversations).set({
+      memory: nextMemory,
+      status: recovering ? "WAITING_CUSTOMER" : "PAUSED",
+      automationState: recovering ? "AI_ACTIVE" : "PAUSED",
+      optOutAt: recovering ? undefined : now,
+      lastProcessedMessageId: sourceIdentifier ?? conversation.lastProcessedMessageId,
+      lastActivityAt: now,
+      updatedAt: now,
+    }).where(and(eq(schema.aiConversations.id, conversation.id), eq(schema.aiConversations.tenantId, tenantId)));
+    if (!recovering) {
+      await db.update(schema.leads).set({ ...terminalReplyLeadDisposition(), updatedAt: now })
+        .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId), isNull(schema.leads.corretorId)));
+    }
+    await db.insert(schema.aiQuickReplyEvents).values({
+      id: crypto.randomUUID(), tenantId, conversationId: conversation.id, leadId, sourceMessageId: sourceIdentifier ?? null,
+      intent: "NO_LONGER_INTERESTED", ruleKey: recovering ? OBJECTION_RECOVERY_RULE : DECLINE_AFTER_OBJECTION_RULE,
+      templateKey: aiFallbackResult?.objectionType ?? null, outcome: deliveryStatus, estimatedTokensSaved: 0, notifiedUserId: null,
+    });
+    console.info("[qualification] objection", { tenantId, leadId, conversationId: conversation.id, recovering, type: aiFallbackResult?.objectionType ?? (softDecline ? "soft_decline" : "unknown"), model: aiFallbackResult?.modelUsed ?? "rule" });
+    return { status: recovering ? "objection_recovery" : "declined_after_objection", deliveryStatus, reply: text };
   }
 
   const answeredNow = fieldsExtractedFromCurrentMessage.length > 0 || fallbackAppliedCount > 0;

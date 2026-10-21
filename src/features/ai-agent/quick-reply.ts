@@ -131,9 +131,27 @@ export function parseHumanRequest(value: string | null | undefined) {
   return /(falar|conversar|quero|preciso|chama|mande|manda|passa).{0,20}(atendente|corretor|humano|pessoa)/.test(text) || /^(atendente|corretor|humano|falar com atendente)$/.test(text);
 }
 
+/**
+ * An explicit command to stop messages (LGPD): always ends the automation at once.
+ * Softer refusals ("já tenho", "agora não", "sem interesse") are objections: the
+ * qualification interpreter reads them in context, asks why once and only then
+ * closes (case Adelair, 21/10: "Eu já tenho" closed the chat, then "quero pra minha filha").
+ */
+export function parseExplicitStop(value: string | null | undefined) {
+  const text = normalizeQuickReplyText(value);
+  return /^(sair|parar|pare|stop|remover|descadastrar|cancelar mensagens|pode encerrar|encerrar)$/.test(text)
+    || /(nao me (mande|envie|manda|chame) mais|pare de (me )?(enviar|mandar|chamar)|para de (me )?(enviar|mandar|chamar)|nao (quero|desejo) (mais )?receber|me (remova|tire|exclua) d|descadastr|nao solicitei|nao pedi|bloquear)/.test(text);
+}
+
+/** A refusal that is not an explicit stop: handled as an objection by the interpreter. */
+export function parseSoftDecline(value: string | null | undefined) {
+  return parseOptOut(value) && !parseExplicitStop(value);
+}
+
 export function parseOptOut(value: string | null | undefined) {
   const text = normalizeQuickReplyText(value);
-  return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse)$/.test(text)
+  // "Agora não" and "Pode encerrar" are the stop buttons of the qualification templates (turbo, 21/10).
+  return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse|agora nao|pode encerrar)$/.test(text)
     || /(nao tenho interesse|sem interesse|nao quero|nao tenho mais interesse|ja contratei|ja tenho|nao solicitei|nao pedi|(fechei|contratei) com outr)/.test(text)
     // "Already solved" only as the whole answer: "já consegui os documentos" mid-conversation is not a no (18/10).
     || /^ja (consegui|fechei|fiz|resolvi)( (o|um) plano)?( obrigad[oa])?$/.test(text);
@@ -144,7 +162,8 @@ export { matchFaqSituation, type FaqSituation } from "@/features/attendance-situ
 
 export function parseStartQualification(value: string | null | undefined) {
   const text = normalizeQuickReplyText(value);
-  return /^(iniciar atendimento|iniciar|iniciar qualificacao|comecar|vamos la|quero iniciar)$/.test(text);
+  // Plus the "continue" buttons of the qualification templates (turbo, 21/10).
+  return /^(iniciar atendimento|iniciar|iniciar qualificacao|comecar|vamos la|quero iniciar|por aqui no whatsapp|prefiro por aqui|quero ver as opcoes|quero receber|ainda procuro|pode montar)$/.test(text);
 }
 
 export function parseWrongNumber(value: string | null | undefined) {
@@ -156,7 +175,8 @@ function isWaiting(text: string) {
 }
 
 function isCallback(text: string) {
-  return /(me liga|ligue|ligar|retornar|retorno|pode me chamar)/.test(text);
+  if (/\bnao\b[^.!?]{0,25}(lig|telefon|cham)/.test(text)) return false;
+  return /(me liga|ligue|ligar|ligacao|retornar|retorno)/.test(text);
 }
 
 function isUrgent(text: string) {
@@ -168,7 +188,8 @@ function isGoodbye(text: string) {
 }
 
 export const quickReplyRules: QuickReplyRule[] = [
-  { key: "opt_out", intent: "OPT_OUT", templateKey: "opt_out.confirmed", priority: 100, resolve: (input) => parseOptOut(input.body) || taught(input, "opt_out") },
+  // Only explicit stops (or phrases the tenant taught) end the automation here; soft refusals go to the interpreter.
+  { key: "opt_out", intent: "OPT_OUT", templateKey: "opt_out.confirmed", priority: 100, resolve: (input) => parseExplicitStop(input.body) || taught(input, "opt_out") || (input.conversationState !== "AI_ACTIVE" && parseOptOut(input.body)) },
   { key: "wrong_number", intent: "WRONG_NUMBER", templateKey: "wrong_number.confirmed", priority: 95, resolve: (input) => parseWrongNumber(input.body) || taught(input, "wrong_number") },
   // Already with (or waiting for) a person: asking again gets the reminder
   // below instead of a second transfer and a second distribution.
@@ -177,8 +198,8 @@ export const quickReplyRules: QuickReplyRule[] = [
   { key: "human_already_contacted", intent: "HUMAN_ALREADY_CONTACTED", templateKey: "human.already_assigned", priority: 80, resolve: (input) => input.conversationState === "HUMAN_IN_PROGRESS" },
   { key: "waiting_human", intent: "WAITING_FOR_RESPONSE", templateKey: "human.waiting_reminder", priority: 75, resolve: (input) => input.conversationState === "WAITING_HUMAN" },
   { key: "waiting_response", intent: "WAITING_FOR_RESPONSE", templateKey: "human.waiting_reminder", priority: 74, resolve: (input) => isWaiting(normalizeQuickReplyText(input.body)) },
-  { key: "urgent", intent: "URGENT_REQUEST", templateKey: "urgent.requested", priority: 70, resolve: (input) => isUrgent(normalizeQuickReplyText(input.body)) || taught(input, "urgent") },
-  { key: "callback", intent: "REQUEST_CALLBACK", templateKey: "callback.requested", priority: 65, resolve: (input) => isCallback(normalizeQuickReplyText(input.body)) || taught(input, "callback") },
+  { key: "urgent", intent: "URGENT_REQUEST", templateKey: "urgent.requested", priority: 70, resolve: (input) => (isUrgent(normalizeQuickReplyText(input.body)) && !parseOptOut(input.body)) || taught(input, "urgent") },
+  { key: "callback", intent: "REQUEST_CALLBACK", templateKey: "callback.requested", priority: 65, resolve: (input) => (isCallback(normalizeQuickReplyText(input.body)) && !parseOptOut(input.body)) || taught(input, "callback") },
   // During AI qualification, greetings and short confirmations can be the
   // customer's answer to the persisted question. They must reach extraction
   // and the next-field resolver, never replace the flow with a generic reply.
@@ -253,6 +274,8 @@ export function resolveQuickReply(input: QuickReplyInput & { cooldownConfig?: Qu
   let nextState: ConversationAutomationState | undefined;
   if (rule.intent === "OPT_OUT" || rule.intent === "WRONG_NUMBER") nextState = "PAUSED";
   else if (rule.intent === "REQUEST_HUMAN") nextState = "WAITING_HUMAN";
+  // "Prefiro ligação" during the automated qualification: a broker takes it and calls.
+  else if (rule.intent === "REQUEST_CALLBACK" && input.conversationState === "AI_ACTIVE") nextState = "WAITING_HUMAN";
   else if (rule.intent === "GREETING") nextState = "AI_ACTIVE";
   return { resolved: true, intent: rule.intent, ruleKey: rule.key, templateKey: rule.templateKey, nextState, notifyHuman: rule.intent === "REQUEST_HUMAN" || rule.intent === "WAITING_FOR_RESPONSE" || rule.intent === "MEDIA_RECEIVED" || rule.intent === "URGENT_REQUEST" || rule.intent === "REQUEST_CALLBACK" || rule.intent === "HUMAN_ALREADY_CONTACTED" || rule.intent === "WRONG_NUMBER" };
 }

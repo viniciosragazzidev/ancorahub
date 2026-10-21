@@ -62,6 +62,7 @@ export const MESSAGE_EVENT_CATALOG = [
       leadName,
       { key: "nome_bot", label: "Nome do assistente", aliases: ["bot_name"], fallback: "Assistente" },
       { key: "empresa", label: "Nome da empresa", aliases: ["company"], fallback: "sua corretora" },
+      { key: "operadora", label: "Operadora pedida", aliases: ["operator"], fallback: "de saúde" },
     ],
   },
   {

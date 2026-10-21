@@ -15,6 +15,8 @@ import { listLeadQualityQueues } from "@/features/reports/metrics/lead-quality-e
 import { LeadQualityCenter } from "@/features/reports/components/lead-quality-center";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
+import { getQualificationFunnel, parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
+import { QualificationFunnelView } from "@/features/qualification-turbo/components/qualification-funnel-view";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -66,6 +68,11 @@ export default async function DashboardPage({
     }
 
     const canReadQuality = await canAccessLeadQualityCenter(context);
+    // Funil de qualificação (qualificação turbo): director and manager with the quality center.
+    if (activeTab === "funnel" && canReadQuality && (context.role === "director" || (context.role === "manager" && context.branchId))) {
+      const funnel = await getQualificationFunnel(context, parseFunnelPeriod(singleParam(resolvedSearchParams.period)));
+      return <QualificationFunnelView data={funnel} showQualityTab />;
+    }
     if (activeTab === "quality" && canReadQuality) {
       const focus = parseLeadQualityFocus(
         singleParam(resolvedSearchParams.dimension),

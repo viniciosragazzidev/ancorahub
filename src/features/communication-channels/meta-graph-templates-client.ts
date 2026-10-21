@@ -74,6 +74,8 @@ export async function createWabaMessageTemplate(
     language: string;
     category: MetaTemplateCategory;
     components: MetaGraphTemplateComponent[];
+    /** "NAMED" for {{nome}} style parameters. */
+    parameter_format?: "NAMED" | "POSITIONAL";
   },
 ) {
   return graphRequest<{ id?: string; status?: string; category?: string }>(

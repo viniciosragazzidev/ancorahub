@@ -217,6 +217,8 @@ export function buildQualificationFallbackPrompt(expectedField: string, expected
     `Se a mensagem indicar uma imagem ou documento, registre apenas que o arquivo foi recebido e não invente seu conteúdo. ` +
     `Retorne memoryUpdates com os campos canônicos (customerName, planType, numberOfLives, age, city, email, ` +
     `companyHasCnpj ou intent), usando planType individual, familiar ou empresarial. ` +
-    `Não escolha outra etapa, não repita a pergunta e não envie uma resposta livre: a aplicação escolherá a próxima pergunta. ` +
+    `"Para a minha filha", "pro meu pai" ou "só para o meu filho" é um plano individual para outra pessoa: planType individual e numberOfLives 1; "eu e minha filha" é familiar com 2 pessoas. ` +
+    `Uma resposta pode parecer recusa e na verdade responder a pergunta (ex.: "já tenho" quando a pergunta foi se a empresa tem CNPJ): leia sempre contra a pergunta pendente. ` +
+    `Não escolha outra etapa e não repita a pergunta: a aplicação escolherá a próxima pergunta. Só escreva "reply" para objeção ou recusa. ` +
     `Se não houver informação confiável, retorne memoryUpdates vazio e confidence baixo.`;
 }

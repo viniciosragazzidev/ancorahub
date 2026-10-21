@@ -103,7 +103,7 @@ function asStringRecord(value: unknown) {
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
 
-async function getActiveWabaId(tenantId: string) {
+export async function getActiveWabaId(tenantId: string) {
   const [channel] = await getDatabase().select({ wabaId: schema.communicationChannels.wabaId })
     .from(schema.communicationChannels)
     .where(and(
@@ -565,13 +565,51 @@ export async function resolveEventMessagePlan(input: {
 }
 
 /** Resolves an approved Meta template for a governed event, never free text. */
+/** An approved template of the active WABA by name (qualification approaches and reminders). */
+async function loadApprovedMetaResourceByName(tenantId: string, name: string): Promise<MetaResource | null> {
+  const wabaId = await getActiveWabaId(tenantId);
+  if (!wabaId) return null;
+  const [template] = await getDatabase().select({
+    id: schema.metaWhatsAppTemplates.id,
+    name: schema.metaWhatsAppTemplates.name,
+    language: schema.metaWhatsAppTemplates.language,
+    status: schema.metaWhatsAppTemplates.status,
+    bodyText: schema.metaWhatsAppTemplates.bodyText,
+    variables: schema.metaWhatsAppTemplates.variablesJson,
+  }).from(schema.metaWhatsAppTemplates).where(and(
+    eq(schema.metaWhatsAppTemplates.tenantId, tenantId),
+    eq(schema.metaWhatsAppTemplates.wabaId, wabaId),
+    eq(schema.metaWhatsAppTemplates.name, name),
+    eq(schema.metaWhatsAppTemplates.status, "APPROVED"),
+    isNull(schema.metaWhatsAppTemplates.deletedAt),
+  )).limit(1);
+  return template ? { ...template, variables: asStringArray(template.variables) } : null;
+}
+
 export async function resolveApprovedMetaEventTemplate(input: {
   tenantId: string;
   purpose: string;
   variables: string[];
+  /** A specific approved template instead of the event's configured one. */
+  templateName?: string;
 }): Promise<ResolvedEventMessagePlan | null> {
   const event = getMessageEventByPurpose(input.purpose);
   if (!event) return null;
+
+  if (input.templateName) {
+    const named = await loadApprovedMetaResourceByName(input.tenantId, input.templateName);
+    if (!named) return null;
+    const automatic = buildAutomaticMetaVariableMappings(event, named.variables);
+    return {
+      eventKey: event.key,
+      policyId: null,
+      policyVersion: null,
+      primary: makeMetaMessage(event, named, automatic.valid ? automatic.mappings : {}, input.variables),
+      fallback: null,
+      preferWahaDirect: false,
+      serviceWindowOpen: false,
+    };
+  }
 
   const policiesEnabled = await getFeatureFlag(FEATURE_FLAGS.MESSAGE_EVENT_POLICIES)
     .then((value) => value !== "false")

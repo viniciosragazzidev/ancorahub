@@ -328,6 +328,7 @@ export async function createTenantTemplate(
     language: string;
     category: MetaTemplateCategory;
     components: MetaGraphTemplateComponent[];
+    parameter_format?: "NAMED" | "POSITIONAL";
   },
 ) {
   const credentials = await resolveMetaChannelCredentials(tenantId);

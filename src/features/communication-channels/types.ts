@@ -46,6 +46,8 @@ export type MetaWebhookMessage = {
 export type MetaWebhookStatus = {
   id: string;
   status: string;
+  /** Per-message pricing since 1/7/2025 (PMP): category, whether it is charged, and the price type. */
+  pricing?: { billable?: boolean; pricing_model?: string; category?: string; type?: string };
   errors?: Array<{
     code?: number;
     title?: string;

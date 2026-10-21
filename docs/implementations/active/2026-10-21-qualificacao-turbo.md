@@ -1,6 +1,6 @@
 # Qualificação turbo: mais leads respondendo, mais leads quentes na distribuição
 
-Data: 21/10/2026 · Autor: Vigia (Claude) para Vinicios · Status: plano para aprovação, nada implementado
+Data: 21/10/2026 · Autor: Vigia (Claude) para Vinicios · Status: Fases 0 a 2 e parte da 3 implementadas na branch `feat/qualificacao-turbo` (ver seção 11)
 
 Objetivo: fazer o maior número possível de leads responder à primeira mensagem,
 qualificar rápido e chegar quente à distribuição, gastando o mínimo com a Meta.
@@ -456,3 +456,25 @@ dá para rodar 2 em paralelo em pontos diferentes (ex.: E1 no primeiro contato e
 - Categorias de template (utilidade × marketing), developers.facebook.com/documentation/business-messaging/whatsapp/templates/template-categorization
 - Qualidade de template, developers.facebook.com/documentation/business-messaging/whatsapp/templates/template-quality
 - Sequências de boas-vindas de clique para WhatsApp, developers.facebook.com/documentation/business-messaging/whatsapp/ctwa/welcome-message-sequences
+
+
+---
+
+## 11. O que foi implementado (21/10/2026, branch `feat/qualificacao-turbo`)
+
+| Pilar | Implementado | Onde |
+|---|---|---|
+| A. Primeira mensagem | Escolha por abordagem (direta, PME, operadora, clique para WhatsApp), template de madrugada, envio por template nomeado com volta automática ao template configurado se falhar | `qualification-turbo/approaches.ts`, `service.ts`, `ai-agent/conversation-state-machine.ts` (início) |
+| A. Templates | Pacote de 11 templates (utilidade e marketing) criado pelo CRM na Meta com parâmetros nomeados; tela com status, categoria, qualidade e aviso de reclassificação | `templates-pack.ts`, `actions.ts`, `/qualificacao/turbo` |
+| B. Cadência | Lembretes T1 a T4 com horários, intervalo mínimo, parada na resposta, "Agora não", corretor, limite 131049 (espera 24h, desiste na 2ª); substitui a requalificação de +3h quando o T2 está aprovado | `cadence.ts`, `cadence-job.ts`, `/api/internal/jobs/qualification-cadence` (runbook) |
+| C. Conversa curta | Formulário do anúncio entra na memória (tipo de plano, vidas, cidade, CNPJ); se já respondeu "para quem", a 1ª mensagem pergunta só como seguir | `form-seed.ts` |
+| C. Objeções | Recusa suave ("já tenho", "agora não", "tá caro"...) é lida pela IA no contexto: ela pergunta o motivo e oferece um caminho; a 2ª recusa encerra com educação; o cliente que volta com interesse reabre a conversa. Só comando explícito ("sair", "não me mande") encerra na hora | `ai-agent/quick-reply.ts`, `qualification-interpreter.ts`, `conversation-state-machine.ts` |
+| C. Entendimento | "Pra minha filha / pro meu pai" = plano individual para outra pessoa; "eu e minha filha" = familiar | `ai-agent/memory.ts` |
+| C. Botões | "Prefiro ligação" passa o lead para um corretor; botões de continuar seguem a qualificação | `quick-reply.ts` |
+| D. Experimentos | Sorteio estável por lead, Thompson sampling depois de 50 envios por variante, 10% explorando; liga/desliga "Aprender sozinho" | `experiments.ts` |
+| F. Custo | Preço por mensagem do webhook gravado (migration 0211, opcional); funil mostra custo real ou estimado | `communication-channels/service.ts`, `drizzle/0211_whatsapp_outbound_pricing.sql` |
+| Painel | Aba "Funil de qualificação" no `/dashboard` | ver `2026-10-21-painel-diretor.md` |
+
+Ainda não feito: cadência para quem respondeu e parou no meio (abandono), cadência dos leads de
+clique para WhatsApp, evento "Respondeu" na API de Conversões com `ctwa_clid`, sequências de
+boas-vindas nos anúncios e correção do filtro de provedor da janela de 24h.

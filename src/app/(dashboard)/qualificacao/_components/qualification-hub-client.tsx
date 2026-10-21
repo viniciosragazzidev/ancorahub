@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState, useEffect } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -519,6 +521,9 @@ const handleSaveFollowUpRule = async (e: React.FormEvent) => {
         title="Qualificação IA"
         rightSlot={
           <div className="flex items-center gap-2">
+            <Button render={<Link href="/qualificacao/turbo" />} variant="outline" size="sm" className="gap-1.5 text-xs">
+              Qualificação turbo
+            </Button>
             <BulkQualificationDialog />
             <Badge variant={enabled ? "success" : "secondary"} className="gap-1 px-2 py-1 text-xs">
               <span className={`size-2 rounded-full ${enabled ? "bg-emerald-500 animate-pulse" : "bg-muted-foreground"}`} />

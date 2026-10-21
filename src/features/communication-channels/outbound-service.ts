@@ -386,6 +386,8 @@ export async function enqueueMetaTemplateMessage(input: {
   scheduledAt?: Date;
   /** Never use text or an unapproved legacy name for this governed event. */
   requireApprovedMetaTemplate?: boolean;
+  /** With requireApprovedMetaTemplate: this approved template instead of the event's configured one. */
+  templateName?: string;
 }) {
   const requestedDestinationPhone = phoneSchema.parse(input.destinationPhone);
   const destinationPhone = await resolveCanonicalWhatsAppDestination({
@@ -412,7 +414,7 @@ export async function enqueueMetaTemplateMessage(input: {
     throw outboundChannelError("META_CHANNEL_UNAVAILABLE", "Não existe um canal oficial da Meta ativo para este tenant.");
   }
   const messagePlan = input.requireApprovedMetaTemplate
-    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables })
+    ? await resolveApprovedMetaEventTemplate({ tenantId: input.tenantId, purpose: input.purpose, variables, templateName: input.templateName })
     : input.purpose === "dutyPresenceConfirmation" ? null : await resolveEventMessagePlan({
       tenantId: input.tenantId,
       recipientType: input.recipientType,

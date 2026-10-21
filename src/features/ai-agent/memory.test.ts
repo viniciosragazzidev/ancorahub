@@ -225,3 +225,28 @@ describe("Michele's conversation (a plan for a 16-day-old grandchild)", () => {
     expect(extractFieldsFromMessage("Seria mais em Resende", askedCity).city?.value ?? "").not.toBe("Faz uma coisa");
   });
 });
+
+describe("plano para outra pessoa da família (caso Adelair, 21/10)", () => {
+  it("'quero pra minha filha' é plano individual para uma pessoa", () => {
+    const memory = extractFieldsFromMessage("Eu quero pra minha filha", createEmptyMemory(), "m1");
+    expect(memory.planType?.value).toBe("individual");
+    expect(memory.numberOfLives?.value).toBe("1");
+    expect(memory.beneficiaryRelation).toBe("filha");
+  });
+
+  it("'para o meu pai' também", () => {
+    expect(extractFieldsFromMessage("É para o meu pai", createEmptyMemory(), "m1").planType?.value).toBe("individual");
+  });
+
+  it("'eu e minha filha' é familiar", () => {
+    expect(extractFieldsFromMessage("Pra mim e minha filha", createEmptyMemory(), "m1").planType?.value).toBe("familiar");
+  });
+
+  it("'para os meus filhos' é familiar", () => {
+    expect(extractFieldsFromMessage("Quero para os meus filhos", createEmptyMemory(), "m1").planType?.value).toBe("familiar");
+  });
+
+  it("'para minha empresa' continua empresarial", () => {
+    expect(extractFieldsFromMessage("Para minha empresa", createEmptyMemory(), "m1").planType?.value).toBe("empresarial");
+  });
+});

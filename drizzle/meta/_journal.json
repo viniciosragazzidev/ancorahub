@@ -1100,6 +1100,13 @@
                         "when":  1791662010000,
                         "tag":  "0210_duty_roster_swaps",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  157,
+                        "version":  "7",
+                        "when":  1791748410000,
+                        "tag":  "0211_whatsapp_outbound_pricing",
+                        "breakpoints":  true
                     }
                 ]
 }
