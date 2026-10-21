@@ -47,11 +47,13 @@ export const maxDuration = 300;
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadId?: string; lead?: string; tab?: string }>;
+  searchParams: Promise<{ leadId?: string; lead?: string; tab?: string; brokerId?: string }>;
 }) {
-  const { leadId: leadIdParam, lead: leadAlias, tab } = await searchParams;
+  const { leadId: leadIdParam, lead: leadAlias, tab, brokerId: brokerIdParam } = await searchParams;
   // WhatsApp offer/assignment messages link here with `?lead=`.
   const leadId = leadIdParam ?? leadAlias;
+  const brokerId = typeof brokerIdParam === "string" && brokerIdParam.length <= 128 && brokerIdParam.trim() ? brokerIdParam : null;
+  const invalidBrokerId = brokerIdParam !== undefined && !brokerId;
   const context = await getRequiredTenantContext();
   if (!hasPermission(context.role, "acessar_conversas")) {
     redirect("/minha-fila");
@@ -144,6 +146,7 @@ export default async function ConversationsPage({
             isNull(schema.leads.deletedAt),
             isNull(schema.leads.archivedAt),
             ...(scope ? [scope] : []),
+            ...(invalidBrokerId ? [sql`false`] : brokerId ? [eq(schema.leads.corretorId, brokerId)] : []),
           ),
         )
         .orderBy(desc(schema.leads.stageEnteredAt))

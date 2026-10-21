@@ -1,13 +1,15 @@
 import "server-only";
 
-import { and, count, eq, gte, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 
 import { getAttentionSnapshot } from "@/features/reports/metrics/metrics-service";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
 import { operationDayStart } from "@/features/reports/metrics/lead-quality-period";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
+import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 import { getDashboardWelcome } from "./welcome";
+import { summarizeWhatsAppActivity } from "./whatsapp-activity";
 
 /** Distribution states of a lead that is waiting for a broker. */
 const WAITING_STATES = ["queued", "unassigned", "returned_to_queue"] as const;
@@ -79,6 +81,7 @@ export type BrokerWhatsAppStatus = {
   connected: number;
   /** First brokers still without WhatsApp, by name, to chase before the 20/10 rule. */
   notConnected: Array<{ id: string; name: string }>;
+  activity: ReturnType<typeof summarizeWhatsAppActivity>;
 };
 
 /**
@@ -86,7 +89,7 @@ export type BrokerWhatsAppStatus = {
  * Supervisor: team) and how many have their WhatsApp connected ("ready").
  */
 export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awaited<ReturnType<typeof resolveReportDataScope>>): Promise<BrokerWhatsAppStatus> {
-  const empty = { total: 0, connected: 0, notConnected: [] };
+  const empty: BrokerWhatsAppStatus = { total: 0, connected: 0, notConnected: [], activity: summarizeWhatsAppActivity([]) };
   const brokerScope = context.role === "director"
     ? undefined
     : context.role === "manager"
@@ -96,26 +99,67 @@ export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awa
         : null;
   if (brokerScope === null) return empty;
 
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const personalConnectionReady = sql<boolean>`exists (
+    select 1 from ${schema.whatsappConnections}
+    where ${schema.whatsappConnections.tenantId} = ${context.tenantId}
+      and ${schema.whatsappConnections.userId} = ${schema.tenantMemberships.userId}
+      and ${schema.whatsappConnections.status} = 'ready'
+  )`;
+
+  // whatsapp_messages ainda não guarda a sessão WAHA de origem. A métrica aproxima a origem pelo dono atual, pela conexão pessoal pronta e pela exclusão dos números conhecidos em waha_numbers.
   const rows = await getDatabase()
     .select({
       id: schema.tenantMemberships.userId,
       name: schema.user.name,
-      connected: sql<boolean>`exists (select 1 from ${schema.whatsappConnections} where ${schema.whatsappConnections.tenantId} = ${context.tenantId} and ${schema.whatsappConnections.userId} = ${schema.tenantMemberships.userId} and ${schema.whatsappConnections.status} = 'ready')`,
+      connected: personalConnectionReady,
+      // Only leads with a reply in the window: the joins keep every lead of the broker.
+      leadCount: sql<number>`(count(distinct ${schema.leads.id}) filter (where ${schema.whatsappMessages.id} is not null))::int`,
     })
     .from(schema.tenantMemberships)
     .innerJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
+    .leftJoin(schema.leads, and(
+      eq(schema.leads.tenantId, context.tenantId),
+      eq(schema.leads.corretorId, schema.tenantMemberships.userId),
+      isNull(schema.leads.deletedAt),
+      isNull(schema.leads.archivedAt),
+      scope.leadScope,
+      personalConnectionReady,
+    ))
+    .leftJoin(schema.whatsappMessages, and(
+      eq(schema.whatsappMessages.tenantId, context.tenantId),
+      eq(schema.whatsappMessages.leadId, schema.leads.id),
+      eq(schema.whatsappMessages.provider, "waha"),
+      inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+      gte(schema.whatsappMessages.sentAt, sevenDaysAgo),
+      lte(schema.whatsappMessages.sentAt, now),
+      notStatusBroadcastSql(schema.whatsappMessages.messageId),
+      sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
+      sql`not exists (
+        select 1 from ${schema.wahaNumbers}
+        where ${schema.wahaNumbers.tenantId} = ${context.tenantId}
+          and length(regexp_replace(coalesce(${schema.wahaNumbers.displayPhoneNumber}, ''), '[^0-9]', '', 'g')) >= 9
+          and length(regexp_replace(coalesce(${schema.whatsappMessages.phone}, ''), '[^0-9]', '', 'g')) >= 9
+          and right(regexp_replace(coalesce(${schema.wahaNumbers.displayPhoneNumber}, ''), '[^0-9]', '', 'g'), 9)
+            = right(regexp_replace(coalesce(${schema.whatsappMessages.phone}, ''), '[^0-9]', '', 'g'), 9)
+      )`,
+    ))
     .where(and(
       eq(schema.tenantMemberships.tenantId, context.tenantId),
       eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.status, "active"),
       brokerScope,
-    ));
+    ))
+    .groupBy(schema.tenantMemberships.userId, schema.user.name)
+    .orderBy(schema.user.name);
 
   const notConnected = rows.filter((row) => !row.connected).map((row) => ({ id: row.id, name: row.name }));
   return {
     total: rows.length,
     connected: rows.length - notConnected.length,
     notConnected: notConnected.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).slice(0, 6),
+    activity: summarizeWhatsAppActivity(rows),
   };
 }
 
