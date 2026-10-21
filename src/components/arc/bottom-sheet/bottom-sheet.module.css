@@ -15,7 +15,7 @@
   flex-direction: column;
   width: min(100%, 36rem);
   height: calc(var(--sheet-max) * 100vh + var(--sheet-extension));
-  height: calc(var(--sheet-max) * 100dvh + var(--sheet-extension));
+  height: calc(var(--sheet-max) * var(--app-dvh, 100dvh) + var(--sheet-extension));
   margin-inline: auto;
   overflow: hidden;
   padding-bottom: calc(var(--sheet-extension) + env(safe-area-inset-bottom, 0px));

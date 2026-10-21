@@ -17,6 +17,34 @@ const qualified = {
 };
 
 describe("buildLeadClientInfo", () => {
+  it("preserves complete answers, ages and yes/no responses", () => {
+    const observations = "Informação comercial completa. ".repeat(20).trim();
+    const items = buildLeadClientInfo({
+      qualificationDetails: { individualAges: [35, 32, 8], hasCnpj: false },
+      formData: { observacoes: observations, dependentes: 2 },
+    });
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Idades", value: "35, 32, 8" }),
+      expect.objectContaining({ label: "Tem CNPJ", value: "Não" }),
+      expect.objectContaining({ label: "Observações", value: observations }),
+      expect.objectContaining({ label: "Dependentes", value: "2" }),
+    ]));
+    expect(items.some((item) => item.key === "lives")).toBe(false);
+  });
+
+  it("keeps persisted Portuguese qualification fields visible to the broker", () => {
+    const items = buildLeadClientInfo({ qualificationDetails: {
+      cidade: "Cidade Exemplo", qtdVidas: "3", mediaIdades: "34",
+      urgenciaContratacao: "Este mês", operadora: "Operadora Exemplo",
+    } });
+    expect(items).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: "Cidade", value: "Cidade Exemplo" }),
+      expect.objectContaining({ label: "Vidas", value: "3" }),
+      expect.objectContaining({ label: "Urgência", value: "Este mês" }),
+      expect.objectContaining({ label: "Operadora de preferência", value: "Operadora Exemplo" }),
+    ]));
+  });
+
   it("brings what the client said to the AI and filled in the form", () => {
     expect(buildLeadClientInfo(qualified).map((item) => `${item.label}: ${item.value}`)).toEqual([
       "Tipo de plano: Familiar",

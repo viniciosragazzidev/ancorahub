@@ -99,6 +99,7 @@ export function LightLeadDetail({
           details={
             <div className="flex flex-col gap-4">
               <ClientInfoCard lead={lead} c={c} withSummary />
+              <PeopleDataSection lead={lead} c={c} showRecordDetails={false} />
               <SaleSection c={c} />
             </div>
           }

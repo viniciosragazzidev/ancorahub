@@ -5,7 +5,7 @@ import { PersonRecordDetails } from "@/features/customer-record/components/perso
 import { type LightLeadDetailData } from "./types";
 import type { LeadDetailController } from "./use-lead-detail";
 
-export function PeopleDataSection({ lead, c }: { lead: LightLeadDetailData; c: LeadDetailController }) {
+export function PeopleDataSection({ lead, c, showRecordDetails = true }: { lead: LightLeadDetailData; c: LeadDetailController; showRecordDetails?: boolean }) {
   const { isDistributed } = c;
   return (
     <>
@@ -17,7 +17,7 @@ export function PeopleDataSection({ lead, c }: { lead: LightLeadDetailData; c: L
               contactName={lead.nome}
               initialBeneficiaries={lead.beneficiaries || []}
             />
-            <PersonRecordDetails
+            {showRecordDetails ? <PersonRecordDetails
               kind="lead"
               hideRegistrationDate
               createdAt={new Date(lead.createdAt)}
@@ -41,7 +41,7 @@ export function PeopleDataSection({ lead, c }: { lead: LightLeadDetailData; c: L
                     }
                   : undefined
               }
-            />
+            /> : null}
           </div>
         )}
     </>

@@ -273,6 +273,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       corretorNome: lead.corretorNome,
       branchName: lead.branchNome,
       summary: qualificationDetails?.resumoAtendimento || qualificationDetails?.resumoNecessidade || null,
+      planName: lead.productName,
       livesCount: qualificationDetails?.qtdVidas ? Number(qualificationDetails.qtdVidas) : null,
       urgency: qualificationDetails?.urgenciaContratacao || null,
       city: qualificationDetails?.cidade || (typeof (lead.qualificationDetails as Record<string, unknown> | null)?.city === "string" ? String((lead.qualificationDetails as Record<string, unknown>).city) : null),
@@ -923,11 +924,16 @@ function maskEmail(email: string) {
 function readQualificationDetails(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {} as Record<string, string | null>;
   const details = value as Record<string, unknown>;
-  const read = (key: string) => typeof details[key] === "string" ? details[key] : null;
+  const read = (key: string) => typeof details[key] === "string" || typeof details[key] === "number" ? String(details[key]) : null;
   return {
-    numberOfLives: read("numberOfLives"),
-    averageAge: read("averageAge"),
+    numberOfLives: read("numberOfLives") ?? read("qtdVidas"),
+    qtdVidas: read("qtdVidas") ?? read("numberOfLives"),
+    averageAge: read("averageAge") ?? read("mediaIdades"),
     individualAges: read("individualAges"),
+    cidade: read("cidade") ?? read("city"),
+    resumoAtendimento: read("resumoAtendimento"),
+    resumoNecessidade: read("resumoNecessidade"),
+    urgenciaContratacao: read("urgenciaContratacao") ?? read("urgency"),
   };
 }
 

@@ -2,6 +2,8 @@
 
 import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge, type BadgeTone } from "@/components/arc/badge/badge";
+import { buildLeadClientInfo } from "@/features/leads/client-info";
+import { redactClientInfo } from "@/features/broker-workspace/lead-contact-privacy";
 
 import { stageLabel } from "./format";
 import type { LightLeadDetailData } from "./types";
@@ -57,9 +59,10 @@ const qualificationLabels: Record<string, string> = {
   completed: "Concluída",
 };
 
-export function ClientInfoCard({ lead, c, mode = "broker", withSummary = false }: { lead: LightLeadDetailData; c: LeadDetailController; mode?: "broker" | "management"; /** The AI summary on top (lead screen, where the chat no longer repeats it). */ withSummary?: boolean }) {
+export function ClientInfoCard({ lead, c, mode = "broker", withSummary = false }: { lead: LightLeadDetailData; c: Pick<LeadDetailController, "isDistributed">; mode?: "broker" | "management"; /** The AI summary on top (lead screen, where the chat no longer repeats it). */ withSummary?: boolean }) {
   // Contact data stays hidden until the broker accepts.
-  const info = (lead.clientInfo ?? []).filter((item) => !(mode === "management" || c.isDistributed) || item.key !== "email");
+  const merged = [...new Map([...buildLeadClientInfo(lead), ...(lead.clientInfo ?? [])].map((item) => [item.key, item])).values()];
+  const info = mode === "broker" && lead.isCurrentBroker && !c.isDistributed ? merged : redactClientInfo(merged);
   const qualification = lead.qualificationStatus ?? lead.qualificationState;
   const normalizedQualification = qualification?.toLowerCase() ?? "";
   // The broker never sees the qualification (Frio, Morno...): management only (Vinicios, 18/10, urgent).
@@ -78,8 +81,8 @@ export function ClientInfoCard({ lead, c, mode = "broker", withSummary = false }
         <dl className="mt-3 flex flex-col">
           {info.map((item) => (
             <div key={item.key} className="flex min-w-0 items-baseline justify-between gap-4 py-2">
-              <dt className="shrink-0 text-sm text-(--text-secondary)">{item.label}</dt>
-              <dd className="min-w-0 break-words text-right text-sm font-medium text-(--foreground)">{item.value}</dd>
+              <dt className="min-w-0 flex-1 break-words text-sm text-(--text-secondary) [overflow-wrap:anywhere]">{item.label}</dt>
+              <dd className="min-w-0 flex-1 whitespace-pre-wrap break-words text-right text-sm font-medium text-(--foreground) [overflow-wrap:anywhere]">{item.value}</dd>
             </div>
           ))}
         </dl>
