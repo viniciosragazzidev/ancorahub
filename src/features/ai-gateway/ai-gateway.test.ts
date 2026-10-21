@@ -130,3 +130,28 @@ describe("runGateway with the paid router", () => {
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body).provider).toEqual({ data_collection: "deny" });
   });
 });
+
+describe("interpreter profile (qualification interpreter and lateral answer)", () => {
+  it("tries Gemini Flash Lite and then Claude Haiku, both paid on OpenRouter, and is configurable by env", () => {
+    const chain = resolveChain("interpreter", { env: {}, hasKey: (provider) => provider === "openrouter", allow: (ref) => !isFreeTier(ref) });
+    expect(chain).toEqual([
+      { provider: "openrouter", model: "google/gemini-3.1-flash-lite" },
+      { provider: "openrouter", model: "anthropic/claude-haiku-5.5" },
+    ]);
+    expect(resolveChain("interpreter", { env: { AI_INTERPRETER_MODEL: "x/a", AI_INTERPRETER_FALLBACK_MODEL: "x/b" }, hasKey: () => true }).slice(0, 2).map((ref) => ref.model)).toEqual(["x/a", "x/b"]);
+    expect(defaultChains({}).interpreter.some((ref) => /llama/.test(ref.model))).toBe(false);
+  });
+
+  it("stops after maxAttempts and reports the last error (with timeout) so the caller can log the fallback", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("{\"error\":{\"message\":\"User not found.\",\"code\":401}}", { status: 401 }))
+      .mockRejectedValueOnce(Object.assign(new Error("aborted"), { name: "TimeoutError" }))
+      .mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "{\"text\":\"ok\"}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    process.env = { ...env, OPENROUTER_API_KEY: "o", ANTHROPIC_API_KEY: "a", GROQ_API_KEY: "", GOOGLE_API_KEY: "", OPENAI_API_KEY: "" };
+    const result = await runGateway({ profile: "interpreter", purpose: "qualification_fallback", tenantId: "t", userId: "conversation:c1", conversationId: "c1", sourceMessageId: "m1", messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), sensitive: true, timeoutMs: 6_000, maxAttempts: 2 });
+    expect(result).toMatchObject({ ok: false, reason: "all_failed", attempts: 2, lastError: "openrouter/anthropic/claude-haiku-5.5: timeout 6000ms" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(usage.log).toHaveBeenCalledWith(expect.objectContaining({ success: false, purpose: "qualification_fallback", conversationId: "c1", sourceMessageId: "m1", error: expect.stringContaining("HTTP 401") }));
+  });
+});

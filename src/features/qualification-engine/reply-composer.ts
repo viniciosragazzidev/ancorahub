@@ -83,6 +83,7 @@ export function questionVariants(key: QualificationFieldKey, memory: Conversatio
       return [
         "Você busca um plano só para você, para a família ou para uma empresa (CNPJ)?",
         "O plano seria individual, familiar ou empresarial (CNPJ)?",
+        "Me conta: o plano é só para você, para a sua família ou para uma empresa (CNPJ)?",
       ];
     case "numberOfLives":
       if (plan === "empresarial") return ["Quantas vidas vão entrar no plano, entre sócios, funcionários e dependentes?", "Quantas vidas a empresa quer incluir no plano, contando dependentes?"];
@@ -140,6 +141,7 @@ function fieldAcks(key: QualificationFieldKey, memory: ConversationMemory, name:
     }
     case "numberOfLives": {
       const count = lives(memory);
+      if (count === 1 && memory.planType?.value === "empresarial") return [{ text: "1 vida, anotado." }, { text: "Certo, 1 vida." }];
       if (count === 1) return [{ text: "Só você, anotado." }, { text: "Uma pessoa, certo." }];
       const unit = memory.planType?.value === "empresarial" ? "vidas" : "pessoas";
       return [{ text: `${count} ${unit}, anotado.` }, { text: `Certo, ${count} ${unit}.` }, ...named(`Perfeito, ${name}, ${count} ${unit}.`)];
@@ -191,6 +193,31 @@ export function composeQuestionReply(input: ComposeQuestionInput): string {
   const ack = acknowledgement(input, name);
   const body = input.last ? `Última pergunta: ${lowerFirst(question)}` : question;
   return ack ? `${ack} ${body}` : body;
+}
+
+/** A first name fit to greet with: not a placeholder such as "Lead WhatsApp 55..." or "Cliente". */
+export function greetingName(value: string | null | undefined) {
+  const first = (value ?? "").trim().split(/\s+/)[0] ?? "";
+  if (!first || /^lead$/i.test(first) || /cliente/i.test(first) || /\d/.test(first) || first.length < 2) return null;
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
+/**
+ * Opening of the first reply the AI sends in a conversation: greets the
+ * person by name and says who is talking ("Oi, Neuza! Me chamo Ana e falo da
+ * Âncora Saúde."). The qualification question follows it in the same message.
+ * A generic assistant name ("Assistente Âncora Corretora") is not used as a
+ * person's name.
+ */
+export function composeGreeting(input: { name?: string | null; assistantName?: string | null; companyName?: string | null; seed: string }) {
+  const name = greetingName(input.name);
+  const company = input.companyName?.trim() || "Âncora Saúde";
+  const assistant = input.assistantName?.trim();
+  const personal = assistant && !/^assistente\b/i.test(assistant) && assistant.split(/\s+/).length <= 3 ? assistant : null;
+  const who = personal ? `Me chamo ${personal} e falo da ${company}` : `Aqui é da ${company}`;
+  const hello = name ? [`Oi, ${name}!`, `Olá, ${name}, tudo bem?`, `Oi, ${name}, tudo bem?`] : ["Oi!", "Olá, tudo bem?", "Oi, tudo bem?"];
+  const close = ["Vou te ajudar com a cotação do seu plano de saúde.", "Vou cuidar da sua cotação de plano de saúde.", "Já te ajudo com o plano de saúde."];
+  return `${pick(hello, `${input.seed}:hello`)} ${who}. ${pick(close, `${input.seed}:close`)}`;
 }
 
 /** True when any wording of this question (current or legacy) was already sent. */

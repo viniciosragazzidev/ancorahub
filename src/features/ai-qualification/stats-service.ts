@@ -92,7 +92,7 @@ export async function getQualificationStats(tenantId: string): Promise<Qualifica
         promptTokens: sql<number>`coalesce(sum(${schema.aiAttendanceLogs.promptTokens}), 0)::int`,
         completionTokens: sql<number>`coalesce(sum(${schema.aiAttendanceLogs.completionTokens}), 0)::int`,
         totalTokens: sql<number>`coalesce(sum(${schema.aiAttendanceLogs.totalTokens}), 0)::int`,
-        totalErrors: sql<number>`count(case when ${schema.aiAttendanceLogs.status} = 'failed' then 1 end)::int`,
+        totalErrors: sql<number>`count(case when ${schema.aiAttendanceLogs.status} in ('failed', 'fallback') then 1 end)::int`,
       })
       .from(schema.aiAttendanceLogs)
       .where(eq(schema.aiAttendanceLogs.tenantId, tenantId));

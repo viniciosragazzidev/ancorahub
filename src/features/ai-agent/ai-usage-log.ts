@@ -19,7 +19,14 @@ export async function logAiUsage(input: {
   startedAt: number;
   usage?: Usage | null;
   success: boolean;
+  /**
+   * "fallback": the model did not answer and the rule engine took over. Logged
+   * apart from "failed" (one model attempt) so the screens show how often the
+   * customer was served without the AI.
+   */
+  status?: "success" | "failed" | "fallback";
   error?: string | null;
+  sourceMessageId?: string | null;
   conversationId?: string | null;
   leadId?: string | null;
 }) {
@@ -36,8 +43,10 @@ export async function logAiUsage(input: {
       totalTokens: input.usage?.total_tokens ?? 0,
       estimatedCost: typeof input.usage?.cost === "number" ? String(input.usage.cost) : "0",
       latencyMs: Math.max(0, Date.now() - input.startedAt),
-      status: input.success ? "success" : "failed",
+      status: input.status ?? (input.success ? "success" : "failed"),
       errorMessage: input.error?.slice(0, 240) ?? null,
+      // Not written to source_message_id: (tenant, conversation, source_message_id) is unique and
+      // belongs to the turn's own attendance log. Each attempt and the fallback row would collide.
     });
   } catch (error) {
     console.warn("[ai-usage] log_failed", { purpose: input.purpose, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });

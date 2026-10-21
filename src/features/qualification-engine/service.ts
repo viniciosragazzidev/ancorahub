@@ -315,6 +315,17 @@ export function evaluateQualification(
 }
 
 /**
+ * PME usually starts at 2 lives (the quote simulator enforces it), but a MEI
+ * with 1 life is accepted by some carriers. The AI does not refuse or re-ask:
+ * it records the answer and warns the broker, who knows the carrier rules.
+ */
+export const PME_SINGLE_LIFE_NOTE = "atenção: plano empresarial com 1 vida (PME costuma exigir 2+; conferir MEI/operadora)";
+
+export function isSingleLifeBusinessPlan(memory: ConversationMemory) {
+  return memory.planType?.value === "empresarial" && Number.parseInt(memory.numberOfLives?.value ?? "", 10) === 1;
+}
+
+/**
  * Creates the internal context that is persisted with the lead. This is kept
  * separate from the public qualification score so the broker can see the
  * facts captured by the assistant without losing the original conversation
@@ -324,6 +335,7 @@ export function buildPrivateQualificationContext(memory: ConversationMemory, upd
   const facts = [
     memory.planType?.value ? `tipo de plano: ${memory.planType.value}` : null,
     memory.numberOfLives?.value ? `vidas: ${memory.numberOfLives.value}` : null,
+    isSingleLifeBusinessPlan(memory) ? PME_SINGLE_LIFE_NOTE : null,
     memory.averageAge?.value ? `média de idade: ${memory.averageAge.value}` : memory.age?.value ? `idades: ${memory.age.value}` : null,
     memory.city?.value ? `cidade: ${memory.city.value}` : null,
     memory.email?.value ? `e-mail: ${memory.email.value}` : null,

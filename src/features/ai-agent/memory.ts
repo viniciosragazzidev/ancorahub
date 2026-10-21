@@ -145,6 +145,69 @@ const NUMBER_WORD_VALUES: Record<string, number> = {
 };
 const NUMBER_WORD_PATTERN = Object.keys(NUMBER_WORD_VALUES).join("|");
 
+// Words around a quantity that do not change it: "pode ser 1", "seria 2",
+// "umas 3", "acho que 4", "3 por enquanto".
+const LIVES_LEADING_FILLER = /^(?:e|entao|bom|olha|ah|hum|sim|acho que|creio que|pode ser|podem ser|pode colocar|coloca|coloque|pode por|seria|seriam|sera|serao|vai ser|vao ser|sao|e de|somos|seremos|temos|tenho|teremos|para|pra|por enquanto|inicialmente|no momento|a principio|so|apenas|somente|umas?|uns|cerca de|aproximadamente|mais ou menos|em torno de|tipo|no total|total de|total)\s+/;
+const LIVES_TRAILING_FILLER = /\s+(?:so|apenas|somente|por enquanto|no momento|mesmo|inicialmente|mais ou menos|aproximadamente|no total|ao todo|por ai|vidas?|pessoas?|funcionarios?|socios?|colaboradores?|beneficiari[oa]s?|integrantes?|dependentes?|familiares?)$/;
+
+function livesNumberToken(token: string): number | undefined {
+  const numeric = Number(token);
+  if (/^\d+$/.test(token) && Number.isInteger(numeric) && numeric > 0 && numeric < 100) return numeric;
+  return NUMBER_WORD_VALUES[token];
+}
+
+/**
+ * The question part of a reply: its last paragraph. Replies may carry a
+ * greeting or a lateral answer before the question ("O valor depende da
+ * idade... / Quantas vidas...?"); reading the next answer against that text
+ * would take "a partir de 59 é 529,47" as ages.
+ */
+export function pendingQuestionOf(reply: string) {
+  const paragraphs = reply.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean);
+  return paragraphs[paragraphs.length - 1] ?? reply.trim();
+}
+
+/**
+ * A short answer to the lives question, read in its context: "pode ser 1",
+ * "só 1", "1 pessoa", "somente eu", "eu e minha esposa", "umas 3", "três",
+ * "seria 2". Only call it when the pending question asks for the number of
+ * lives: out of context "seria 2" or "eu e minha esposa" are not quantities.
+ * Undefined when the answer is not clearly a quantity (e.g. "eu e meus
+ * filhos", where the count is unknown).
+ */
+export function readLivesAnswer(message: string): number | undefined {
+  let text = normalizeForMatching(message).replace(/[.!?;]+/g, " ").replace(/\s+/g, " ").trim();
+  for (let guard = 0; guard < 6; guard += 1) {
+    const next = text.replace(LIVES_LEADING_FILLER, "").replace(LIVES_TRAILING_FILLER, "").trim();
+    if (next === text) break;
+    text = next;
+  }
+  if (!text) return undefined;
+
+  const bare = text.match(new RegExp(`^(\\d{1,2}|${NUMBER_WORD_PATTERN})$`));
+  if (bare?.[1]) return livesNumberToken(bare[1]);
+
+  if (/^(?:eu|eu mesm[oa]|eu sozinh[oa]|sozinh[oa]|minha pessoa|mim|pra mim|para mim)$/.test(text)) return 1;
+
+  // "eu e minha esposa", "eu, minha esposa e meu filho", "eu e meus 2 filhos".
+  if (/^eu\s*(?:,|\be\b|\bmais\b)/.test(text)) {
+    const parts = text.split(/\s*(?:,|\be\b|\bmais\b)\s*/).map((part) => part.trim()).filter(Boolean);
+    let total = 0;
+    for (const part of parts) {
+      if (part === "eu") { total += 1; continue; }
+      const words = part.split(" ");
+      if (words.length > 4) return undefined;
+      const counted = words.map((word) => livesNumberToken(word)).find((value) => value !== undefined);
+      if (counted !== undefined) { total += counted; continue; }
+      // A plural without a number ("meus filhos") is an unknown count.
+      if (/^(?:meus|minhas|os|as)\b/.test(part) || /s$/.test(words[words.length - 1] ?? "")) return undefined;
+      total += 1;
+    }
+    return total > 0 && total < 100 ? total : undefined;
+  }
+  return undefined;
+}
+
 const AGE_PATTERNS = [
   /(\d+)\s*(?:anos|anos de idade)/i,
   /(?:tenho|idade)\s*(\d+)/i,
@@ -391,6 +454,16 @@ export function extractFieldsFromMessage(
       const value = onlyMe ? 1 : token ? numberToken(token) : undefined;
       if (value && value > 0 && value < 100) {
         memory.numberOfLives = { value: String(value), confidence: 1, sourceMessageId };
+        addCollectedField(memory, "numberOfLives");
+      }
+    }
+
+    // Any other short answer to the lives question: "pode ser 1", "seria 2",
+    // "umas 3", "eu e minha esposa".
+    if (!memory.numberOfLives && /quantas vidas|quantas pessoas|quantidade de pessoas|numero de vidas|beneficiari/.test(normalizeForMatching(memory.lastQuestionAsked ?? ""))) {
+      const contextual = readLivesAnswer(trimmed);
+      if (contextual) {
+        memory.numberOfLives = { value: String(contextual), confidence: 1, sourceMessageId };
         addCollectedField(memory, "numberOfLives");
       }
     }

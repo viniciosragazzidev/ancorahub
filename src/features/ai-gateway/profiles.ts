@@ -10,7 +10,7 @@ import { z } from "zod";
 export const PROVIDERS = ["groq", "openrouter", "google", "openai", "anthropic"] as const;
 export type AiProvider = (typeof PROVIDERS)[number];
 
-export const PROFILES = ["chat-fast", "chat-smart", "json-structured", "long-context"] as const;
+export const PROFILES = ["chat-fast", "chat-smart", "json-structured", "long-context", "interpreter"] as const;
 export type AiProfile = (typeof PROFILES)[number];
 
 export type ModelRef = { provider: AiProvider; model: string };
@@ -53,7 +53,8 @@ export function defaultChains(env: Env): Record<AiProfile, ModelRef[]> {
   const groqFast = env.AI_GROQ_FAST_MODEL || "openai/gpt-oss-20b";
   const groqSmart = env.AI_GROQ_SMART_MODEL || "openai/gpt-oss-120b";
   const openrouterFree = env.AI_OPENROUTER_FREE_MODEL || "google/gemma-4-31b-it:free";
-  const gemini = env.AI_GEMINI_MODEL || "gemini-2.0-flash";
+  // gemini-2.0-flash was retired (HTTP 404); the "latest" alias follows Google's current Flash (same as features/ai/vision.ts).
+  const gemini = env.AI_GEMINI_MODEL || "gemini-flash-latest";
   const anthropic = env.AI_ANTHROPIC_MODEL || "claude-haiku-5-5";
   const openai = env.AI_OPENAI_MODEL || "gpt-4o-mini";
   // Paid through OpenRouter first (decision of 2026-10-12): Claude Haiku 5.5, then GPT-OSS 120B. ~US$ 3,50/month today.
@@ -62,7 +63,16 @@ export function defaultChains(env: Env): Record<AiProfile, ModelRef[]> {
     { provider: "openrouter", model: env.AI_OPENROUTER_FALLBACK_MODEL || "openai/gpt-oss-120b" },
   ];
   const paid: ModelRef[] = [{ provider: "anthropic", model: anthropic }, { provider: "openai", model: openai }];
+  // 2026-10-21: the WhatsApp qualification interpreter and the lateral answer run inside the
+  // customer's turn, so they need a fast model that answers in ~1-2 s. Gemini Flash Lite
+  // (no thinking) first, Claude Haiku 5.5 (the gateway's paid default) as the second try;
+  // both paid on OpenRouter (no training on the client's data). Anthropic/OpenAI direct last.
+  const interpreter: ModelRef[] = [
+    { provider: "openrouter", model: env.AI_INTERPRETER_MODEL || "google/gemini-3.1-flash-lite" },
+    { provider: "openrouter", model: env.AI_INTERPRETER_FALLBACK_MODEL || "anthropic/claude-haiku-5.5" },
+  ];
   return {
+    interpreter: [...interpreter, ...paid],
     "chat-fast": [...routerPaid, ...paid, { provider: "groq", model: groqFast }, { provider: "groq", model: groqSmart }, { provider: "openrouter", model: openrouterFree }],
     "chat-smart": [...routerPaid, ...paid, { provider: "groq", model: groqSmart }, { provider: "google", model: gemini }, { provider: "openrouter", model: openrouterFree }],
     "json-structured": [...routerPaid, ...paid, { provider: "groq", model: groqSmart }, { provider: "google", model: gemini }, { provider: "openrouter", model: openrouterFree }],

@@ -8,6 +8,7 @@ import {
   buildMemoryContext,
   COLLECTIBLE_FIELDS,
   createEmptyMemory,
+  pendingQuestionOf,
   type ConversationMemory,
 } from "./memory";
 import { createSafeFallbackResponse } from "./ai-response-schema";
@@ -25,7 +26,8 @@ import { detectLateralSituation, quickReplyTuning } from "@/features/attendance-
 import { loadTenantSituations } from "@/features/attendance-situations/service";
 import { recordLearningEvent } from "@/features/situation-learning/service";
 import { loadQuickReplyTemplates, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
-import { DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
+import { composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
+import { isAutomatedInboundMessage } from "./automated-inbound";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { resolvePublishedAgentBehavior } from "@/features/agent-training/runtime";
@@ -37,6 +39,7 @@ import { handlePostClosingInboundMessage } from "@/features/ai-qualification/clo
 import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
 import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
 import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
+import { interpretQualificationTurn, type InterpreterResult } from "./qualification-interpreter";
 import { describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
 import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
 
@@ -870,7 +873,9 @@ async function completeDeterministicQualificationTurn(input: {
   }
   const memory = {
     ...input.memory,
-    lastQuestionAsked: isHandoff ? undefined : input.turn.reply,
+    // Only the question: a lateral answer or greeting before it ("O valor
+    // depende da idade...") would make the next answer be read as an age.
+    lastQuestionAsked: isHandoff ? undefined : pendingQuestionOf(input.turn.reply),
     updatedAt: now.toISOString(),
   };
 
@@ -1462,7 +1467,23 @@ export async function processInboundAiResponse({
   // 6. Extrair campos estruturados da mensagem e atualizar memória
   const expectedQuestionBeforeMessage = getNextQualificationQuestion(currentMemory, behavior.policy);
   const fieldsBeforeMessage = new Set(currentMemory.collectedFields);
-  let updatedMemory = extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
+  // The customer's own auto-reply or a copied instruction ("Digite sua idade
+  // por favor.") is not an answer: no fact is read from it.
+  const inboundIsAutomated = effectiveMessageKind === "text" && isAutomatedInboundMessage(userMessageBody);
+  if (inboundIsAutomated) {
+    // Two automated messages in a row: a bot is talking to our bot. Stay quiet
+    // instead of feeding the loop; the person's next real message resumes it.
+    const previousInbound = [...pastMessages].reverse().find((message) =>
+      (message.direction === "incoming" || message.direction === "inbound") && (!sourceIdentifier || message.messageId !== sourceIdentifier));
+    const sentBefore = pastMessages.some((message) => message.direction === "outbound" || message.senderRole === "assistant");
+    if (sentBefore && previousInbound && isAutomatedInboundMessage(previousInbound.body)) {
+      console.info("[qualification] automated_inbound_loop_ignored", { tenantId, leadId, conversationId: conversation.id });
+      return { status: "ignored_automated_inbound" };
+    }
+  }
+  let updatedMemory = inboundIsAutomated
+    ? { ...currentMemory, collectedFields: [...currentMemory.collectedFields] }
+    : extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
   const fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
 
   // 6a. Analisar nome do cadastro do lead se for um nome valido
@@ -1491,7 +1512,7 @@ export async function processInboundAiResponse({
   // coisa", said before the city question, is not a city.
   const questionNow = updatedMemory.lastQuestionAsked;
   for (const inc of allIncomingMsgs) {
-    if (inc.body) {
+    if (inc.body && !isAutomatedInboundMessage(inc.body)) {
       updatedMemory = extractFieldsFromMessage(inc.body, { ...updatedMemory, lastQuestionAsked: undefined });
     }
   }
@@ -1569,7 +1590,7 @@ export async function processInboundAiResponse({
   // exemplo, "Famíliar" ou "é para a família"). Nesse caso a IA atua apenas
   // como intérprete: ela propõe fatos estruturados e o motor determinístico
   // continua responsável por validar a memória e escolher a próxima etapa.
-  let aiFallbackResult: Awaited<ReturnType<typeof generateAiResponse>> | undefined;
+  let aiFallbackResult: InterpreterResult | undefined;
   let fallbackAppliedCount = 0;
   let fallbackAppliedFields: string[] = [];
   const pendingQuestionAfterExtraction = getNextQualificationQuestion(updatedMemory, behavior.policy, pastOutboundTexts);
@@ -1580,7 +1601,7 @@ export async function processInboundAiResponse({
       && pendingQuestionAfterExtraction.key !== expectedQuestionBeforeMessage.key
       && fieldsExtractedFromCurrentMessage.length > 0,
   );
-  if (pendingQuestionAfterExtraction && shouldUseQualificationFallback({
+  if (pendingQuestionAfterExtraction && !inboundIsAutomated && shouldUseQualificationFallback({
     hasPendingQuestion: Boolean(pendingQuestionAfterExtraction),
     expectedWasAnswered,
     advancedToAnotherField: currentMessageAdvancedToAnotherField,
@@ -1595,15 +1616,20 @@ export async function processInboundAiResponse({
 
     if (!pendingValue?.trim()) {
       try {
-        aiFallbackResult = await generateAiResponse({
+        // Gateway "interpreter" profile: fast model, a second one as fallback,
+        // 6 s each; the gateway logs every attempt and this logs the give-up.
+        aiFallbackResult = await interpretQualificationTurn({
           tenantId,
+          conversationId: conversation.id,
+          leadId,
+          sourceMessageId: sourceIdentifier ?? null,
           leadName: lead?.nome,
           leadType: lead?.tipo,
           messages: aiMessages,
-          customPrompt: buildQualificationFallbackPrompt(pendingQuestionAfterExtraction.key, pendingQuestionAfterExtraction.text),
-          preferredLanguage: "pt-BR",
-          memoryContext: buildMemoryContext({ ...updatedMemory, lastQuestionAsked: pendingQuestionAfterExtraction.text }),
-          tenantConfig,
+          // The question the customer actually saw (not the internal definition
+          // text): short answers such as "pode ser 1" only make sense against it.
+          prompt: buildQualificationFallbackPrompt(pendingQuestionAfterExtraction.key, currentMemory.lastQuestionAsked?.trim() || pendingQuestionAfterExtraction.text),
+          memoryContext: buildMemoryContext({ ...updatedMemory, lastQuestionAsked: currentMemory.lastQuestionAsked?.trim() || pendingQuestionAfterExtraction.text }),
         });
       } catch (error) {
         console.warn("[qualification] ai_fallback_failed_open", {
@@ -1614,7 +1640,7 @@ export async function processInboundAiResponse({
         });
       }
 
-      const applied = applyAiMemoryUpdates(updatedMemory, aiFallbackResult?.structured?.memoryUpdates, sourceIdentifier ?? undefined, normalizedInboundMessage);
+      const applied = applyAiMemoryUpdates(updatedMemory, aiFallbackResult?.memoryUpdates, sourceIdentifier ?? undefined, normalizedInboundMessage);
       if (applied.applied.length > 0) {
         updatedMemory = applied.memory;
         fallbackAppliedCount = applied.applied.length;
@@ -1635,26 +1661,11 @@ export async function processInboundAiResponse({
           conversationId: conversation.id,
           sourceMessageId: sourceIdentifier ?? null,
           model: aiFallbackResult?.modelUsed ?? "unavailable",
-          success: aiFallbackResult?.success ?? false,
+          success: aiFallbackResult?.ok ?? false,
+          error: aiFallbackResult?.error ?? null,
         });
       }
 
-      if (aiFallbackResult) await db.insert(schema.aiAttendanceLogs).values({
-        id: `log_qualification_fallback_${crypto.randomUUID()}`,
-        tenantId,
-        conversationId: conversation.id,
-        leadId,
-        provider: "qualification_fallback",
-        modelUsed: aiFallbackResult.modelUsed,
-        promptTokens: aiFallbackResult.promptTokens,
-        completionTokens: aiFallbackResult.completionTokens,
-        totalTokens: aiFallbackResult.totalTokens,
-        estimatedCost: aiFallbackResult.estimatedCost,
-        latencyMs: aiFallbackResult.latencyMs,
-        status: aiFallbackResult.success ? "success" : "failed",
-        errorMessage: aiFallbackResult.error?.slice(0, 240) ?? null,
-        sourceMessageId: sourceIdentifier ?? null,
-      }).onConflictDoNothing().catch((error) => console.warn("[qualification] fallback_attendance_log_failed", { conversationId: conversation.id, error: error instanceof Error ? error.message.slice(0, 160) : "unknown_error" }));
     }
   }
 
@@ -1663,6 +1674,18 @@ export async function processInboundAiResponse({
   // lives implied by an individual plan were not said, so they are not echoed.
   const answeredFields = Array.from(new Set([...fieldsExtractedFromCurrentMessage, ...fallbackAppliedFields]))
     .filter((field) => !(field === "numberOfLives" && (updatedMemory.numberOfLives?.confidence ?? 1) < 1));
+  // First reply of the conversation (the customer wrote first): say hello by
+  // name and who is talking before the first question.
+  let greeting: string | null = null;
+  if (pastOutboundTexts.size === 0) {
+    const [tenantInfo] = await db.select({ name: schema.tenants.name }).from(schema.tenants).where(eq(schema.tenants.id, tenantId)).limit(1);
+    greeting = composeGreeting({
+      name: updatedMemory.customerFirstName?.value ?? lead?.nome ?? null,
+      assistantName: tenantConfig.assistantName,
+      companyName: tenantInfo?.name ?? null,
+      seed: conversation.id,
+    });
+  }
   let deterministicTurn = resolveDeterministicQualificationTurn({
     memory: updatedMemory,
     policy: behavior.policy,
@@ -1670,7 +1693,8 @@ export async function processInboundAiResponse({
     pastOutboundTexts,
     answeredNow,
     answered: answeredFields,
-    previousReply: currentMemory.lastQuestionAsked ?? null,
+    // The greeting already used the name: the question must not repeat it.
+    previousReply: greeting ?? currentMemory.lastQuestionAsked ?? null,
     seed: `${conversation.id}:${pastOutboundTexts.size}`,
   });
   // The customer asked something instead of answering. A registered situation
@@ -1678,7 +1702,7 @@ export async function processInboundAiResponse({
   // text, or the transfer when that is its action; anything else the lateral
   // answer guided by the roteiros. Then the pending question follows; on any
   // failure the scripted reply goes alone.
-  if (deterministicTurn.kind === "collecting" && !answeredNow && effectiveMessageKind === "text") {
+  if (deterministicTurn.kind === "collecting" && !answeredNow && !inboundIsAutomated && effectiveMessageKind === "text") {
     const situation = detectLateralSituation(normalizedInboundMessage, tenantSituations);
     // Learning (Atendimento → Situações): every question asked here is recorded
     // with the situation that covered it; the uncovered ones become suggestions.
@@ -1699,6 +1723,12 @@ export async function processInboundAiResponse({
       learn(null, lateral);
       if (lateral) deterministicTurn = { ...deterministicTurn, reply: `${lateral}\n\n${deterministicTurn.reply}` };
     }
+  }
+  // An automated/ad text mid-conversation ("Digite sua idade e receba uma
+  // cotação...", the click-to-WhatsApp prefilled text) gets the pending
+  // question again, without echoing it as if the person had answered.
+  if (deterministicTurn.kind === "collecting" && greeting) {
+    deterministicTurn = { ...deterministicTurn, reply: `${greeting}\n\n${deterministicTurn.reply}` };
   }
   return completeDeterministicQualificationTurn({
     tenantId,
@@ -1912,7 +1942,9 @@ export async function processInboundAiResponse({
       totalTokens: aiResult.totalTokens,
       estimatedCost: aiResult.estimatedCost,
       latencyMs: aiResult.latencyMs,
-      status: "success",
+      // The model did not answer and the safe scripted reply went: visible as "fallback".
+      status: aiResult.modelUsed === "fallback-rule-engine" ? "fallback" : "success",
+      errorMessage: aiResult.error?.slice(0, 240) ?? null,
       sourceMessageId: sourceIdentifier ?? null,
     }).onConflictDoNothing();
   } catch (logErr) {

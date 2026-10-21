@@ -12,7 +12,7 @@ export type GatewayMessage = { role: "system" | "user" | "assistant"; content: s
 
 export type GatewayResult<T> =
   | { ok: true; value: T; text: string; model: ModelRef; attempts: number }
-  | { ok: false; reason: "disabled" | "no_provider" | "rate_limited" | "all_failed"; attempts: number };
+  | { ok: false; reason: "disabled" | "no_provider" | "rate_limited" | "all_failed"; attempts: number; lastError?: string };
 
 /** Keys already saved by the super-admin (plaintext today; F4 encrypts them). */
 const SETTING_KEY: Record<AiProvider, string> = {
@@ -64,6 +64,10 @@ export async function runGateway<T>(input: {
   temperature?: number;
   timeoutMs?: number;
   leadId?: string | null;
+  conversationId?: string | null;
+  sourceMessageId?: string | null;
+  /** Stop after this many models (the caller is inside a customer's turn and has a fallback). */
+  maxAttempts?: number;
   /** Client conversation or health data inside: only paid providers that do not train on it (LGPD art. 11). */
   sensitive?: boolean;
 }): Promise<GatewayResult<T>> {
@@ -80,7 +84,9 @@ export async function runGateway<T>(input: {
   if (!chain.length) return { ok: false, reason: "no_provider", attempts: 0 };
 
   let attempts = 0;
-  for (const ref of chain) {
+  let lastError: string | undefined;
+  const log = { tenantId: input.tenantId, purpose: input.purpose, leadId: input.leadId ?? null, conversationId: input.conversationId ?? null, sourceMessageId: input.sourceMessageId ?? null };
+  for (const ref of chain.slice(0, input.maxAttempts && input.maxAttempts > 0 ? input.maxAttempts : chain.length)) {
     attempts += 1;
     const startedAt = Date.now();
     const messages = isFreeTier(ref)
@@ -108,16 +114,21 @@ export async function runGateway<T>(input: {
         }),
         signal: AbortSignal.timeout(input.timeoutMs ?? 12_000),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        const detail = (await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
+        throw new Error(`HTTP ${response.status}${detail ? ` ${detail}` : ""}`);
+      }
       const body = await response.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: Parameters<typeof logAiUsage>[0]["usage"] };
       const text = body.choices?.[0]?.message?.content ?? "";
       const parsed = input.schema.safeParse(extractJson(text));
       if (!parsed.success) throw new Error("invalid_output");
-      void logAiUsage({ tenantId: input.tenantId, purpose: input.purpose, model: `${ref.provider}/${ref.model}`, startedAt, usage: body.usage ?? null, success: true, leadId: input.leadId ?? null });
+      void logAiUsage({ ...log, model: `${ref.provider}/${ref.model}`, startedAt, usage: body.usage ?? null, success: true });
       return { ok: true, value: parsed.data, text, model: ref, attempts };
     } catch (error) {
-      void logAiUsage({ tenantId: input.tenantId, purpose: input.purpose, model: `${ref.provider}/${ref.model}`, startedAt, success: false, error: error instanceof Error ? error.message : "error", leadId: input.leadId ?? null });
+      const message = error instanceof Error ? (error.name === "TimeoutError" ? `timeout ${input.timeoutMs ?? 12_000}ms` : error.message) : "error";
+      lastError = `${ref.provider}/${ref.model}: ${message}`;
+      void logAiUsage({ ...log, model: `${ref.provider}/${ref.model}`, startedAt, success: false, error: message });
     }
   }
-  return { ok: false, reason: "all_failed", attempts };
+  return { ok: false, reason: "all_failed", attempts, lastError };
 }

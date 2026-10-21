@@ -420,6 +420,7 @@ export async function generateAiResponse({
         transferReason: isQuotationOrHuman ? "Solicitou cotação ou atendimento humano" : "Fallback de indisponibilidade temporária de IA",
       },
       modelUsed: "fallback-rule-engine",
+      error: safeErr,
       promptTokens: 0,
       completionTokens: 0,
       totalTokens: 0,

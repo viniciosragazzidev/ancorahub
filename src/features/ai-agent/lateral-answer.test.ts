@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildLateralAnswerPrompt, isCustomerQuestion, sanitizeLateralAnswer } from "./lateral-answer";
+const mocks = vi.hoisted(() => ({ runGateway: vi.fn(), logAiUsage: vi.fn() }));
+vi.mock("@/features/ai-gateway/gateway", () => ({ runGateway: mocks.runGateway }));
+vi.mock("./ai-usage-log", () => ({ logAiUsage: mocks.logAiUsage }));
+vi.mock("@/features/ai-qualification/tenant-settings-service", () => ({ getQualificationTenantSettings: vi.fn(async () => null) }));
+vi.mock("@/features/ai-qualification/playbooks-storage", () => ({ getTenantPlaybooks: vi.fn(async () => []) }));
+vi.mock("@/features/ai-qualification/situational-response-engine", () => ({ buildSituationalPromptSection: vi.fn(() => "") }));
+
+import { buildLateralAnswerPrompt, generateLateralAnswer, isCustomerQuestion, sanitizeLateralAnswer } from "./lateral-answer";
 
 describe("lateral answer", () => {
   it("recognises the customer's questions, not their answers", () => {
@@ -36,5 +43,23 @@ describe("lateral answer", () => {
     expect(prompt).toContain("Não faça perguntas");
     expect(prompt).toContain("Corretora no RJ.");
     expect(prompt).toContain("Seja breve.");
+  });
+});
+
+describe("generateLateralAnswer through the AI gateway", () => {
+  beforeEach(() => { mocks.runGateway.mockReset(); mocks.logAiUsage.mockReset(); });
+  const input = { tenantId: "t1", question: "vocês atendem em Nova Iguaçu?", conversationId: "c1", leadId: "l1" };
+
+  it("uses the fast interpreter profile with paid models only and returns the sanitized answer", async () => {
+    mocks.runGateway.mockResolvedValue({ ok: true, value: { answer: "Sim, atendemos toda a Baixada. Qual sua idade?" }, text: "", model: { provider: "openrouter", model: "google/gemini-3.1-flash-lite" }, attempts: 1 });
+    expect(await generateLateralAnswer(input)).toBe("Sim, atendemos toda a Baixada.");
+    expect(mocks.runGateway).toHaveBeenCalledWith(expect.objectContaining({ profile: "interpreter", purpose: "lateral_answer", sensitive: true, maxAttempts: 2, conversationId: "c1" }));
+    expect(mocks.logAiUsage).not.toHaveBeenCalled();
+  });
+
+  it("logs status fallback with the reason when every model fails (21/10: OpenRouter 401)", async () => {
+    mocks.runGateway.mockResolvedValue({ ok: false, reason: "all_failed", attempts: 2, lastError: "openrouter/anthropic/claude-haiku-5.5: HTTP 401 User not found." });
+    expect(await generateLateralAnswer(input)).toBeNull();
+    expect(mocks.logAiUsage).toHaveBeenCalledWith(expect.objectContaining({ purpose: "lateral_answer", status: "fallback", success: false, error: expect.stringContaining("HTTP 401") }));
   });
 });

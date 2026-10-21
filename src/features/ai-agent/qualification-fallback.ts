@@ -211,6 +211,8 @@ export function buildQualificationFallbackPrompt(expectedField: string, expected
     `Leia o histórico e a mensagem mais recente. Extraia somente fatos que o cliente realmente informou agora, ` +
     `inclusive se houver erro de digitação ou se ele responder em linguagem natural. Não invente valores. ` +
     `Uma única mensagem pode conter vários fatos; extraia todos os campos confiáveis de uma vez. ` +
+    `Respostas curtas se referem à pergunta pendente: "pode ser 1", "só 1", "seria 2", "umas 3", "três" respondem a quantidade pedida; ` +
+    `"somente eu" é 1 pessoa e "eu e minha esposa" são 2. ` +
     `Números seguidos de "anos" são idades (ex.: "Para 12, 42 anos" são duas pessoas, de 12 e 42 anos: numberOfLives 2, age "12, 42"). ` +
     `Se a mensagem indicar uma imagem ou documento, registre apenas que o arquivo foi recebido e não invente seu conteúdo. ` +
     `Retorne memoryUpdates com os campos canônicos (customerName, planType, numberOfLives, age, city, email, ` +

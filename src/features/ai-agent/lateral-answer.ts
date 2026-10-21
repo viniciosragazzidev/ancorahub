@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Lateral answer for the qualification engine (fase 5): when the customer asks
  * something instead of answering the pending question, the agent answers in
@@ -47,19 +49,32 @@ export function buildLateralAnswerPrompt(input: { assistantName: string; company
 }
 
 const DEFAULT_CONTEXT = "Corretora especializada em planos de saúde individuais, familiares e empresariais, com as principais operadoras.";
-const LATERAL_TIMEOUT_MS = 8_000;
+/** Per model; the gateway tries two models at most, so the turn waits 8 s in the worst case. */
+const LATERAL_TIMEOUT_MS = 4_000;
+const LATERAL_MAX_ATTEMPTS = 2;
+const LATERAL_JSON_INSTRUCTION = 'Responda APENAS com um JSON válido, sem markdown: {"answer": "sua resposta ao cliente"}.';
 
-/** Short answer to the customer's question, or null (then the scripted reply goes alone). */
+export const lateralAnswerOutputSchema = z.object({ answer: z.string().max(2000) });
+
+/**
+ * Short answer to the customer's question, or null (then the scripted reply goes alone).
+ * Goes through the AI gateway ("interpreter" profile: fast model + a second one), like
+ * the qualification interpreter; every attempt is logged by the gateway, and giving up
+ * is logged with status "fallback" and the reason.
+ */
 export async function generateLateralAnswer(input: { tenantId: string; question: string; customerFirstName?: string | null; conversationId?: string | null; leadId?: string | null }) {
   const startedAt = Date.now();
-  let model = "";
+  const { logAiUsage } = await import("./ai-usage-log");
+  const giveUp = (error: string) => {
+    void logAiUsage({ tenantId: input.tenantId, purpose: "lateral_answer", model: "scripted-reply", startedAt, success: false, status: "fallback", error, conversationId: input.conversationId, leadId: input.leadId });
+    return null;
+  };
   try {
-    const [{ getQualificationTenantSettings }, { getTenantPlaybooks }, { buildSituationalPromptSection }, { createAiRouter }, { logAiUsage }] = await Promise.all([
+    const [{ getQualificationTenantSettings }, { getTenantPlaybooks }, { buildSituationalPromptSection }, { runGateway }] = await Promise.all([
       import("@/features/ai-qualification/tenant-settings-service"),
       import("@/features/ai-qualification/playbooks-storage"),
       import("@/features/ai-qualification/situational-response-engine"),
-      import("./model-router"),
-      import("./ai-usage-log"),
+      import("@/features/ai-gateway/gateway"),
     ]);
     const [settings, playbooks] = await Promise.all([
       getQualificationTenantSettings(input.tenantId).catch(() => null),
@@ -73,22 +88,30 @@ export async function generateLateralAnswer(input: { tenantId: string; question:
       situational: buildSituationalPromptSection({ playbooks, variables: { assistente_nome: assistantName, corretora_nome: "Âncora Saúde", cliente_nome: input.customerFirstName ?? "" } }),
       customInstructions: settings?.customInstructions?.trim() ?? "",
     });
-    const router = await createAiRouter(input.tenantId);
-    if (!router.providers.length) return null;
-    const call = router.call({ messages: [{ role: "system", content: system }, { role: "user", content: input.question }], temperature: 0.3, maxTokens: 140 });
-    const result = await Promise.race([call, new Promise<null>((resolve) => setTimeout(() => resolve(null), LATERAL_TIMEOUT_MS))]);
-    if (!result) {
-      void logAiUsage({ tenantId: input.tenantId, purpose: "lateral_answer", model: "timeout", startedAt, success: false, error: "timeout", conversationId: input.conversationId, leadId: input.leadId });
-      return null;
-    }
-    model = result.model;
-    const data = await result.response.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; cost?: number } };
-    const answer = sanitizeLateralAnswer(data.choices?.[0]?.message?.content);
-    void logAiUsage({ tenantId: input.tenantId, purpose: "lateral_answer", model, startedAt, usage: data.usage, success: Boolean(answer), error: answer ? null : "refused_or_empty", conversationId: input.conversationId, leadId: input.leadId });
+    const result = await runGateway({
+      profile: "interpreter",
+      purpose: "lateral_answer",
+      tenantId: input.tenantId,
+      userId: `conversation:${input.conversationId ?? "lateral"}`,
+      conversationId: input.conversationId ?? null,
+      leadId: input.leadId ?? null,
+      // The customer's own words: only paid models that do not train on them (LGPD art. 11).
+      sensitive: true,
+      temperature: 0.3,
+      maxTokens: 200,
+      timeoutMs: LATERAL_TIMEOUT_MS,
+      maxAttempts: LATERAL_MAX_ATTEMPTS,
+      schema: lateralAnswerOutputSchema,
+      messages: [{ role: "system", content: `${system}
+
+${LATERAL_JSON_INSTRUCTION}` }, { role: "user", content: input.question }],
+    });
+    if (!result.ok) return giveUp([result.reason, result.lastError].filter(Boolean).join(": "));
+    const answer = sanitizeLateralAnswer(result.value.answer);
+    if (!answer) return giveUp("refused_or_empty");
     return answer;
   } catch (error) {
-    void import("./ai-usage-log").then(({ logAiUsage }) => logAiUsage({ tenantId: input.tenantId, purpose: "lateral_answer", model: model || "unknown", startedAt, success: false, error: error instanceof Error ? error.message : String((error as { errText?: string } | null)?.errText ?? "unknown_error"), conversationId: input.conversationId, leadId: input.leadId })).catch(() => undefined);
     console.warn("[qualification] lateral_answer_failed_open", { tenantId: input.tenantId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown_error" });
-    return null;
+    return giveUp(error instanceof Error ? error.message : "unknown_error");
   }
 }
