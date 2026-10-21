@@ -138,3 +138,74 @@ export async function interpretQualificationTurn(input: {
   });
   return { ok: false, memoryUpdates: [], modelUsed: RULE_ENGINE_MODEL, latencyMs, attempts: result?.attempts ?? 0, error };
 }
+
+/**
+ * Second opinion on what the rules read from a longer message (case Edivaldo, 21/10:
+ * "tenho 63 anos ... tenho 63 anos" became "2 pessoas, 63 e 63"). The model only
+ * confirms or corrects age, number of people and plan type; giving up keeps the rules.
+ */
+export const VERIFIABLE_FIELDS = ["age", "numberOfLives", "planType"] as const;
+export type VerifiableField = (typeof VERIFIABLE_FIELDS)[number];
+
+const verificationSchema = z.object({
+  correct: z.boolean().catch(true),
+  corrections: z.array(z.object({
+    field: z.enum(VERIFIABLE_FIELDS),
+    value: z.string().max(80).nullable(),
+  })).max(3).catch([]),
+});
+
+/** Worth a check: a longer sentence, or more than one number. Short answers ("35") are trusted. */
+export function shouldVerifyExtraction(message: string) {
+  const numbers = message.match(/\d+/g)?.length ?? 0;
+  return message.trim().length >= 25 || numbers >= 2;
+}
+
+export async function verifyExtractedFacts(input: {
+  tenantId: string;
+  conversationId: string;
+  leadId?: string | null;
+  sourceMessageId?: string | null;
+  message: string;
+  lastQuestion?: string | null;
+  facts: Partial<Record<VerifiableField, string>>;
+}): Promise<{ ok: boolean; corrections: Array<{ field: VerifiableField; value: string | null }>; model: string }> {
+  const { runGateway } = await import("@/features/ai-gateway/gateway");
+  const system = [
+    "Você confere fatos que regras automáticas leram da mensagem de um cliente numa qualificação de plano de saúde.",
+    "Corrija só o que estiver errado e nada mais:",
+    "- age: idades das pessoas do plano, separadas por vírgula, uma por pessoa. A mesma pessoa repetindo a própria idade conta uma vez.",
+    "- numberOfLives: quantas pessoas entram no plano (número inteiro).",
+    "- planType: individual, familiar ou empresarial.",
+    "Use value null para remover um fato que a mensagem não informa. Não invente dados.",
+    'Responda APENAS com JSON: {"correct": true, "corrections": []} ou {"correct": false, "corrections": [{"field": "numberOfLives", "value": "1"}]}',
+  ].join("\n");
+  const user = [
+    input.lastQuestion ? `Pergunta feita ao cliente: "${input.lastQuestion}"` : "",
+    `Mensagem do cliente: "${input.message.slice(0, 600)}"`,
+    `Fatos lidos pelas regras: ${JSON.stringify(input.facts)}`,
+  ].filter(Boolean).join("\n");
+  try {
+    const result = await runGateway({
+      profile: "interpreter",
+      purpose: "qualification_verification",
+      tenantId: input.tenantId,
+      userId: `conversation:${input.conversationId}`,
+      conversationId: input.conversationId,
+      leadId: input.leadId ?? null,
+      sourceMessageId: input.sourceMessageId ?? null,
+      // The customer's conversation: only paid models that do not train on it (LGPD art. 11).
+      sensitive: true,
+      temperature: 0,
+      maxTokens: 200,
+      timeoutMs: INTERPRETER_TIMEOUT_MS,
+      maxAttempts: INTERPRETER_MAX_ATTEMPTS,
+      schema: verificationSchema,
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
+    });
+    if (!result.ok) return { ok: false, corrections: [], model: RULE_ENGINE_MODEL };
+    return { ok: true, corrections: result.value.correct ? [] : result.value.corrections, model: `${result.model.provider}/${result.model.model}` };
+  } catch {
+    return { ok: false, corrections: [], model: RULE_ENGINE_MODEL };
+  }
+}

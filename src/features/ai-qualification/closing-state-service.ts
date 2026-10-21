@@ -81,7 +81,11 @@ export async function executeDeterministicClosing(
   const settings = await getQualificationTenantSettings(tenantId);
   const firstName = leadName ? leadName.split(" ")[0] : "Cliente";
 
-  const closingMessage = (settings?.finalMessage ?? "Obrigado pelas informações, {{firstName}}! Sua qualificação foi concluída e um de nossos corretores entrará em contato em instantes.")
+  // At night (19h to 9h) the first available broker gets in touch as soon as possible, not "em instantes".
+  const { isAfterHoursInSaoPaulo } = await import("@/features/qualification-engine/reply-composer");
+  const closingMessage = (isAfterHoursInSaoPaulo()
+    ? "Obrigado pelas informações, {{firstName}}! Sua qualificação foi concluída. O mais breve possível, o primeiro corretor disponível entra em contato com você por aqui."
+    : settings?.finalMessage ?? "Obrigado pelas informações, {{firstName}}! Sua qualificação foi concluída e um de nossos corretores entrará em contato em instantes.")
     .replace("{{firstName}}", firstName);
 
   const now = new Date();

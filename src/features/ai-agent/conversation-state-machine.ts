@@ -26,7 +26,7 @@ import { detectLateralSituation, quickReplyTuning } from "@/features/attendance-
 import { loadTenantSituations } from "@/features/attendance-situations/service";
 import { recordLearningEvent } from "@/features/situation-learning/service";
 import { loadQuickReplyTemplates, parseExplicitStop, parseOptOut, parseSoftDecline, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
-import { composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
+import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { isAutomatedInboundMessage } from "./automated-inbound";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -39,7 +39,7 @@ import { handlePostClosingInboundMessage } from "@/features/ai-qualification/clo
 import { isConfirmedClosingDelivery } from "@/features/ai-qualification/closing-contract";
 import { buildHumanHandoffLeadUpdate } from "./human-handoff-state";
 import { applyAiMemoryUpdates, buildQualificationFallbackPrompt, shouldUseQualificationFallback } from "./qualification-fallback";
-import { interpretQualificationTurn, type InterpreterResult } from "./qualification-interpreter";
+import { interpretQualificationTurn, shouldVerifyExtraction, VERIFIABLE_FIELDS, verifyExtractedFacts, type InterpreterResult, type VerifiableField } from "./qualification-interpreter";
 import { describeQualificationCorrections, detectQualificationCorrections } from "./qualification-corrections";
 import { generateLateralAnswer, isCustomerQuestion } from "./lateral-answer";
 
@@ -1534,7 +1534,9 @@ export async function processInboundAiResponse({
     const rawTemplate = quickReply.templateKey ? templates[quickReply.templateKey] : undefined;
     const [leadForTemplate] = await db.select({ nome: schema.leads.nome }).from(schema.leads).where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId))).limit(1);
     // {{nome}} and {{resumo}}: never ask again what the customer already told.
-    const template = rawTemplate ? { ...rawTemplate, body: renderConversationVariables(rawTemplate.body, currentMemory, leadForTemplate?.nome) } : undefined;
+    // At night the "talk to a person" reply promises the first available broker, not "em instantes".
+    const nightBody = rawTemplate && quickReply.templateKey === "human.requested" && isAfterHoursInSaoPaulo() ? AFTER_HOURS_HUMAN_REQUEST_TEXT : rawTemplate?.body;
+    const template = rawTemplate ? { ...rawTemplate, body: renderConversationVariables(nightBody ?? rawTemplate.body, currentMemory, leadForTemplate?.nome) } : undefined;
     const now = new Date();
     const suppressed = Boolean(quickReply.suppressReason);
     let deliveryStatus = suppressed ? "suppressed_cooldown" : "disabled_template";
@@ -1616,7 +1618,41 @@ export async function processInboundAiResponse({
   let updatedMemory = inboundIsAutomated
     ? { ...currentMemory, collectedFields: [...currentMemory.collectedFields] }
     : extractFieldsFromMessage(userMessageBody, currentMemory, sourceIdentifier ?? undefined);
-  const fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
+  let fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
+
+  // 6-bis. The AI checks age, people and plan type the rules read from a longer message
+  // before the reply repeats them (case Edivaldo, 21/10: "63 anos" twice became 2 people).
+  const factsToVerify = fieldsExtractedFromCurrentMessage.filter((field): field is VerifiableField => (VERIFIABLE_FIELDS as readonly string[]).includes(field));
+  if (!inboundIsAutomated && factsToVerify.length && effectiveMessageKind === "text" && shouldVerifyExtraction(userMessageBody)) {
+    const facts: Partial<Record<VerifiableField, string>> = {};
+    for (const field of factsToVerify) facts[field] = (updatedMemory[field] as { value?: string } | undefined)?.value ?? "";
+    const verification = await verifyExtractedFacts({
+      tenantId, conversationId: conversation.id, leadId, sourceMessageId: sourceIdentifier ?? null,
+      message: userMessageBody, lastQuestion: currentMemory.lastQuestionAsked ?? null, facts,
+    });
+    const applied: string[] = [];
+    for (const correction of verification.corrections) {
+      if (!factsToVerify.includes(correction.field)) continue;
+      const value = correction.value?.trim() ?? "";
+      const valid = !value
+        || (correction.field === "numberOfLives" && /^\d{1,2}$/.test(value) && Number(value) > 0)
+        || (correction.field === "age" && /^\d{1,3}(\s*,\s*\d{1,3})*$/.test(value))
+        || (correction.field === "planType" && ["individual", "familiar", "empresarial"].includes(value));
+      if (!valid) continue;
+      if (!value) {
+        const { [correction.field]: _removed, ...rest } = updatedMemory;
+        void _removed;
+        updatedMemory = { ...rest, collectedFields: updatedMemory.collectedFields.filter((field) => field !== correction.field) } as ConversationMemory;
+      } else {
+        updatedMemory = { ...updatedMemory, [correction.field]: { value, confidence: 1, sourceMessageId: sourceIdentifier ?? undefined } };
+      }
+      applied.push(`${correction.field}=${value || "removido"}`);
+    }
+    if (applied.length) {
+      fieldsExtractedFromCurrentMessage = updatedMemory.collectedFields.filter((field) => !fieldsBeforeMessage.has(field));
+      console.info("[qualification] ai_verification_corrected", { tenantId, leadId, conversationId: conversation.id, applied, model: verification.model });
+    }
+  }
 
   // 6a. Analisar nome do cadastro do lead se for um nome valido
   if (lead?.nome && !lead.nome.startsWith("Lead WhatsApp") && !lead.nome.toLowerCase().includes("cliente") && !updatedMemory.customerName?.value) {
@@ -1706,7 +1742,7 @@ export async function processInboundAiResponse({
 
   if (detectHumanTransferRequest(userMessageBody)) {
     return transferToHuman(
-      renderConversationVariables(effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome),
+      renderConversationVariables(isAfterHoursInSaoPaulo() ? AFTER_HOURS_HUMAN_REQUEST_TEXT : effectiveHandoffText(tenantConfig.handoffMessage, DEFAULT_HUMAN_REQUEST_TEXT), updatedMemory, lead?.nome),
       "Solicitação explícita de atendimento humano",
     );
   }
@@ -1865,6 +1901,7 @@ export async function processInboundAiResponse({
       seed: conversation.id,
     });
   }
+  const afterHours = isAfterHoursInSaoPaulo();
   let deterministicTurn = resolveDeterministicQualificationTurn({
     memory: updatedMemory,
     policy: behavior.policy,
@@ -1906,6 +1943,10 @@ export async function processInboundAiResponse({
   // An automated/ad text mid-conversation ("Digite sua idade e receba uma
   // cotação...", the click-to-WhatsApp prefilled text) gets the pending
   // question again, without echoing it as if the person had answered.
+  // At night no broker answers "em instantes": the first available one gets in touch.
+  if (deterministicTurn.kind === "handoff" && afterHours) {
+    deterministicTurn = { ...deterministicTurn, reply: renderConversationVariables(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, updatedMemory, lead?.nome) };
+  }
   if (deterministicTurn.kind === "collecting" && greeting) {
     deterministicTurn = { ...deterministicTurn, reply: `${greeting}\n\n${deterministicTurn.reply}` };
   }

@@ -255,6 +255,21 @@ export const DEFAULT_HUMAN_REQUEST_TEXT = "Claro, {{nome}}! Já passei seu atend
 export const DEFAULT_QUALIFIED_HANDOFF_TEXT = "Obrigado, {{nome}}! Com essas informações ({{resumo}}), já passei seu atendimento para um corretor especialista. Ele continua a conversa por aqui em instantes.";
 
 /**
+ * Between 19h and 9h (São Paulo) no broker answers "em instantes": the brokers start at
+ * 9h, so the closing says the first available broker gets in touch as soon as possible
+ * (Vinicios, 21/10). Used instead of the configured text at night.
+ */
+export const AFTER_HOURS_QUALIFIED_HANDOFF_TEXT = "Obrigado, {{nome}}! Com essas informações ({{resumo}}), seu atendimento já está com a nossa equipe. O mais breve possível, o primeiro corretor disponível entra em contato com você por aqui.";
+export const AFTER_HOURS_HUMAN_REQUEST_TEXT = "Claro, {{nome}}! Já passei seu atendimento para a nossa equipe com o que você me contou ({{resumo}}). O mais breve possível, o primeiro corretor disponível continua a conversa por aqui.";
+export const AFTER_HOURS_START_HOUR = 19;
+export const AFTER_HOURS_END_HOUR = 9;
+
+export function isAfterHoursInSaoPaulo(now: Date = new Date()) {
+  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hourCycle: "h23" }).format(now));
+  return hour >= AFTER_HOURS_START_HOUR || hour < AFTER_HOURS_END_HOUR;
+}
+
+/**
  * Former default handoff texts, saved on tenants without being customized.
  * They give way to the current default (with name and summary); a text the
  * tenant actually wrote is kept.
