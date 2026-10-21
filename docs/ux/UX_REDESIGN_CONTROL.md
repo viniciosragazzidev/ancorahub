@@ -1,3 +1,13 @@
+## 2026-10-21: dados completos do lead e painel no celular
+
+Papel: corretor em `/leads/[id]`, inclusive na visualização do super-admin.
+Ação principal: consultar o cadastro e a qualificação disponíveis durante o atendimento.
+Disclosure: mesmos dados na coluna do desktop e no sheet "Ver dados" do celular,
+incluindo beneficiários. Estados: antes do aceite com contato protegido, após aceite
+com contato autorizado, dados parciais e observações longas. O portal reutiliza o
+tema Arc e a altura disponível abaixo dos avisos, com rolagem e fechamento existentes.
+Sem token, primitive, variante ou movimento novo. Não avança a etapa global UX-M1.10.
+
 ## 2026-10-21: busca da unidade e enviados versus aceitos
 
 Refinamento funcional do Lite autorizado pelo Vinicios. Na aba Unidade de Minha

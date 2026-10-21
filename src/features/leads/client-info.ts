@@ -9,7 +9,14 @@ import { readMetaLeadDisplayDetails } from "./meta-lead-display";
 export type LeadClientInfoItem = { key: string; label: string; value: string };
 
 export type LeadClientInfoInput = {
+  telefone?: string | null;
   email?: string | null;
+  city?: string | null;
+  livesCount?: number | null;
+  planName?: string | null;
+  carrierName?: string | null;
+  urgency?: string | null;
+  tipoCnpj?: string | null;
   tipo?: string | null;
   sourceChannel?: string | null;
   sourceMetadata?: unknown;
@@ -22,11 +29,15 @@ type Json = Record<string, unknown>;
 const asRecord = (value: unknown): Json => (value && typeof value === "object" && !Array.isArray(value) ? (value as Json) : {});
 
 function text(value: unknown): string | null {
+  if (typeof value === "boolean") return value ? "Sim" : "Não";
+  if (Array.isArray(value)) return value.map((item) => Array.isArray(item) ? null : text(item)).filter(Boolean).join(", ") || null;
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   if (typeof value !== "string") return null;
   const trimmed = value.replace(/\s+/g, " ").trim();
-  return trimmed ? trimmed.slice(0, 300) : null;
+  return trimmed || null;
 }
+
+const firstText = (...values: unknown[]) => values.map(text).find((value) => value !== null) ?? null;
 
 /** Values the AI kept in its memory, e.g. memory.intent.value. */
 function memoryValues(details: Json): Json {
@@ -82,15 +93,23 @@ export function buildLeadClientInfo(input: LeadClientInfoInput): LeadClientInfoI
     if (v && !items.some((item) => item.key === key)) items.push({ key, label, value: v });
   };
 
-  const planType = text(details.planType) ?? text(memory.planType) ?? meta.tipoPlano;
+  const planType = firstText(details.planType, details.tipoPlano, memory.planType, meta.tipoPlano, form.tipoPlano);
   push("planType", "Tipo de plano", planType ? PLAN_LABELS[planType.toLowerCase()] ?? planType : null);
-  push("lives", "Vidas", details.numberOfLives ?? memory.numberOfLives ?? form.qtdVidas ?? form.vidas ?? form.dependentes);
-  const ages = text(details.individualAges) ?? text(memory.age);
-  push("ages", "Idades", ages ?? (text(details.averageAge) ? `média de ${text(details.averageAge)} anos` : form.mediaIdades));
-  push("city", "Cidade", details.city ?? memory.city ?? form.cidade ?? form.city);
-  push("email", "E-mail", input.email ?? details.email ?? memory.email);
-  push("tipoCnpj", "Tipo de CNPJ", meta.tipoCnpj);
-  push("operadora", "Operadora de preferência", meta.operadora);
+  push("phone", "Telefone / WhatsApp", input.telefone);
+  push("planName", "Plano de interesse", firstText(input.planName, details.planName, details.plano));
+  push("lives", "Vidas", firstText(details.numberOfLives, details.qtdVidas, memory.numberOfLives, input.livesCount, form.qtdVidas, form.vidas));
+  const ages = firstText(details.individualAges, details.idades, memory.age, form.idades);
+  const averageAge = firstText(details.averageAge, details.mediaIdades, form.mediaIdades);
+  push("ages", "Idades", ages ?? (averageAge ? `média de ${averageAge} anos` : null));
+  push("city", "Cidade", firstText(details.city, details.cidade, memory.city, input.city, form.cidade, form.city));
+  push("email", "E-mail", firstText(input.email, details.email, memory.email));
+  push("tipoCnpj", "Tipo de CNPJ", firstText(meta.tipoCnpj, input.tipoCnpj, details.tipoCnpj));
+  push("operadora", "Operadora de preferência", firstText(meta.operadora, input.carrierName, details.operadora, details.preferredCarrier));
+  push("urgency", "Urgência", firstText(input.urgency, details.urgenciaContratacao, details.urgency));
+  for (const [key, label] of Object.entries(MEMORY_LABELS)) {
+    if (["urgency", "preferredCarrier", "averageAge"].includes(key)) continue;
+    push(`detail:${key}`, label, details[key]);
+  }
 
   for (const [key, value] of Object.entries(memory)) {
     if (MEMORY_SKIP.has(key)) continue;
@@ -107,9 +126,9 @@ export function buildLeadClientInfo(input: LeadClientInfoInput): LeadClientInfoI
   }
 
   // Legacy form fields kept in formData (manual/webhook leads).
-  const FORM_LABELS: Record<string, string> = { razaoSocial: "Razão social", cnpj: "CNPJ", funcionarios: "Funcionários", bairro: "Bairro", profissao: "Profissão", observacoes: "Observações", produtoInteresse: "Interesse" };
+  const FORM_LABELS: Record<string, string> = { dependentes: "Dependentes", razaoSocial: "Razão social", cnpj: "CNPJ", funcionarios: "Funcionários", bairro: "Bairro", profissao: "Profissão", observacoes: "Observações", produtoInteresse: "Interesse" };
   for (const [key, value] of Object.entries(form)) {
-    if (["qtdVidas", "vidas", "dependentes", "mediaIdades", "cidade", "city"].includes(key)) continue;
+    if (["qtdVidas", "vidas", "idades", "mediaIdades", "cidade", "city", "tipoPlano"].includes(key)) continue;
     push(`formData:${key}`, FORM_LABELS[key] ?? readableKey(key), value);
   }
 

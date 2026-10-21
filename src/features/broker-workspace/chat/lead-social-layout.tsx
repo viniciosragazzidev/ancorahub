@@ -78,7 +78,7 @@ export function LeadSocialLayout({ header, next, details, side, conversation }: 
           <div className={styles.phoneHeader}>
             <div className={styles.phoneHeaderMain}>{header}</div>
             {details || side ? (
-              <BottomSheet trigger={<Button variant="secondary" size="sm" className="min-h-11 shrink-0">Ver dados</Button>} title="Dados do cliente" detents={[0.92]}>
+              <BottomSheet className="arc-venancor" trigger={<Button variant="secondary" size="sm" className="min-h-11 shrink-0">Ver dados</Button>} title="Dados do cliente" closeLabel="Fechar dados do cliente" detents={[0.92]}>
                 <div className="flex flex-col gap-4 pb-6">
                   {details}
                   {side}
