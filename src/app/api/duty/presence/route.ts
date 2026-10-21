@@ -6,7 +6,7 @@ import { z } from "zod";
 import { wakeLeadsAwaitingEligibleBroker } from "@/features/lead-distribution/jobs";
 import { eq } from "drizzle-orm";
 
-import { confirmOwnDutyPresence, getDutyPhotoReviewers, resolveOwnDutyOccurrence } from "@/features/lead-distribution/duty-presence";
+import { confirmOwnDutyPresence, getDutyPhotoReviewers, resolveOwnDutyOccurrence, SELF_CONFIRM_LATE_MESSAGE } from "@/features/lead-distribution/duty-presence";
 import { publishNotification } from "@/features/notifications/send-push-helper";
 import { getDatabase, schema } from "@/shared/db";
 import { cleanPresencePhoto, isAllowedImage } from "@/features/lead-distribution/presence-photo";
@@ -37,6 +37,7 @@ export async function POST(request: Request) {
 
   const resolved = await resolveOwnDutyOccurrence({ tenantId: context.tenantId, brokerId: context.userId, assignmentId: assignmentId.data });
   if (!resolved.ok) {
+    if (resolved.reason === "late") return fail(SELF_CONFIRM_LATE_MESSAGE, 409);
     if (resolved.reason === "absent") return fail("A gestão marcou falta neste plantão. Fale com ela.", 409);
     return fail(resolved.reason === "outside_window" ? "A confirmação abre 30 minutos antes do plantão e vale até o fim dele." : "Não achei esse plantão na sua escala.", resolved.reason === "outside_window" ? 409 : 404);
   }
@@ -63,7 +64,12 @@ export async function POST(request: Request) {
 
   try {
     const result = await confirmOwnDutyPresence({ tenantId: context.tenantId, brokerId: context.userId, occurrence, photoStorageKey });
-    if (!result.ok) return fail(result.reason === "absent" ? "A gestão marcou falta neste plantão. Fale com ela." : "Tire a foto do local para confirmar.", 409);
+    if (!result.ok) {
+      if (result.reason === "late") return fail(SELF_CONFIRM_LATE_MESSAGE, 409);
+      if (result.reason === "outside_window") return fail("A confirmação abre 30 minutos antes do plantão e vale até o fim dele.", 409);
+      if (result.reason === "absent") return fail("A gestão marcou falta neste plantão. Fale com ela.", 409);
+      return fail("Tire a foto do local para confirmar.", 409);
+    }
     if (result.awaitingRelease) {
       // Presencial: the broker stays paused; the director/manager validates the photo and releases him.
       void notifyPhotoReviewers({ tenantId: context.tenantId, brokerId: context.userId, scheduleId: occurrence.scheduleId, confirmationId: result.confirmationId }).catch(() => undefined);

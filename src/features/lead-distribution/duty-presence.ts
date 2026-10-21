@@ -5,8 +5,10 @@ import { and, eq, gt, inArray, isNull, lte, lt, ne, or, sql } from "drizzle-orm"
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
-import { effectiveAttendanceMode, findDutyOccurrenceConfirmation, formatDutyStartHour, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
+import { effectiveAttendanceMode, findDutyOccurrenceConfirmation, formatDutyStartHour, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
+
+export { SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "./duty-presence-domain";
 
 // attendanceMode: the per-broker override (NULL/absent follows the schedule).
 type PresenceAssignment = { id: string; scheduleId: string; brokerId: string; dayOfWeek: number; startsAt: string; endsAt: string; validFrom: Date; validUntil: Date | null; attendanceMode?: string | null };
@@ -392,16 +394,13 @@ export async function sendDutyPresenceInviteManually(input: { tenantId: string; 
   }
 }
 
-/** From this long before the shift the broker can already confirm in the app (same as the WhatsApp reminder). */
-export const SELF_CONFIRM_OPENS_MINUTES = 30;
-
 export type OwnDutyOccurrence = { assignmentId: string; scheduleId: string; mode: "online" | "presencial"; window: DutyWindow };
 
 /**
  * The broker's own occurrence of an assignment that can be confirmed now
- * (30 min before the start until the end). Scope: tenant + the broker himself.
+ * (30 min before the start until 20 min after it). Scope: tenant + the broker himself.
  */
-export async function resolveOwnDutyOccurrence(input: { tenantId: string; brokerId: string; assignmentId: string; now?: Date }): Promise<{ ok: true; occurrence: OwnDutyOccurrence } | { ok: false; reason: "not_found" | "outside_window" | "absent" }> {
+export async function resolveOwnDutyOccurrence(input: { tenantId: string; brokerId: string; assignmentId: string; now?: Date }): Promise<{ ok: true; occurrence: OwnDutyOccurrence } | { ok: false; reason: "not_found" | "outside_window" | "late" | "absent" }> {
   const now = input.now ?? new Date();
   const [row] = await getDatabase().select({
     id: schema.dutyRosterAssignments.id,
@@ -425,7 +424,10 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
     )).limit(1);
   if (!row) return { ok: false, reason: "not_found" };
   const window = getWindow({ id: row.scheduleId, dayOfWeek: row.dayOfWeek, startsAt: row.startsAt, endsAt: row.endsAt, timezone: row.timezone, validFrom: row.validFrom, validUntil: row.validUntil }, now);
-  if (!window || now.getTime() < window.startsAt.getTime() - SELF_CONFIRM_OPENS_MINUTES * 60_000 || now >= window.endsAt) return { ok: false, reason: "outside_window" };
+  if (!window) return { ok: false, reason: "outside_window" };
+  const windowState = getSelfDutyConfirmationWindowState({ startsAt: window.startsAt, endsAt: window.endsAt, now });
+  if (windowState === "late") return { ok: false, reason: "late" };
+  if (windowState !== "available") return { ok: false, reason: "outside_window" };
   // An absence marked by the manager blocks before any photo is uploaded.
   const [absence] = await getDatabase().select({ id: schema.dutyPresenceConfirmations.id }).from(schema.dutyPresenceConfirmations).where(and(
     eq(schema.dutyPresenceConfirmations.tenantId, input.tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, row.id),
@@ -441,13 +443,13 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
  * Presencial (decision of 2026-10-12): the photo of the place is saved and the
  * broker stays PAUSED until the director/manager validates it and releases him
  * (releaseDutyPresenceManually sets confirmedBy). An absence is never overwritten,
- * and a release already done is kept.
+ * and a release already done is kept. The time window is revalidated here so a
+ * request that crosses the tolerance while uploading a photo cannot confirm.
  */
-export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId: string; occurrence: OwnDutyOccurrence; photoStorageKey: string | null; now?: Date }): Promise<{ ok: true; confirmationId: string; awaitingRelease: boolean } | { ok: false; reason: "photo_required" | "absent" }> {
+export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId: string; occurrence: OwnDutyOccurrence; photoStorageKey: string | null; now?: Date }): Promise<{ ok: true; confirmationId: string; awaitingRelease: boolean } | { ok: false; reason: "photo_required" | "outside_window" | "late" | "absent" }> {
   const now = input.now ?? new Date();
   const { occurrence } = input;
   const presencial = occurrence.mode === "presencial";
-  if (presencial && !input.photoStorageKey) return { ok: false, reason: "photo_required" };
   const db = getDatabase();
   const occurrenceWhere = and(
     eq(schema.dutyPresenceConfirmations.tenantId, input.tenantId), eq(schema.dutyPresenceConfirmations.assignmentId, occurrence.assignmentId),
@@ -457,7 +459,11 @@ export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId
   const [existing] = await db.select({ id: schema.dutyPresenceConfirmations.id, status: schema.dutyPresenceConfirmations.status, confirmedBy: schema.dutyPresenceConfirmations.confirmedBy })
     .from(schema.dutyPresenceConfirmations).where(occurrenceWhere).limit(1);
   if (existing?.status === "absent") return { ok: false, reason: "absent" };
-  if (presencial && existing?.status === "confirmed" && existing.confirmedBy) return { ok: true, confirmationId: existing.id, awaitingRelease: false };
+  if (existing?.status === "confirmed" && (!presencial || existing.confirmedBy)) return { ok: true, confirmationId: existing.id, awaitingRelease: false };
+  const windowState = getSelfDutyConfirmationWindowState({ startsAt: occurrence.window.startsAt, endsAt: occurrence.window.endsAt, now });
+  if (windowState === "late") return { ok: false, reason: "late" };
+  if (windowState !== "available") return { ok: false, reason: "outside_window" };
+  if (presencial && !input.photoStorageKey) return { ok: false, reason: "photo_required" };
   const answer = presencial
     ? { status: "pending", confirmedAt: null, confirmedBy: null, photoStorageKey: input.photoStorageKey, photoTakenAt: now, updatedAt: now }
     : { status: "confirmed", confirmedAt: now, confirmedBy: null, updatedAt: now };

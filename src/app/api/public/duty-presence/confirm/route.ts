@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { and, eq, exists, gt, lte, or, isNull } from "drizzle-orm";
+import { and, eq, exists, gt, gte, lte, or, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
-import { effectiveAttendanceMode } from "@/features/lead-distribution/duty-presence-domain";
+import { effectiveAttendanceMode, getSelfDutyConfirmationWindowState, SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "@/features/lead-distribution/duty-presence-domain";
 import { wakeLeadsAwaitingEligibleBroker } from "@/features/lead-distribution/jobs";
 
 export const runtime = "nodejs";
@@ -16,20 +16,25 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ success: false, error: "Link de confirmação inválido." }, { status: 400 });
 
   const db = getDatabase();
-  const now = new Date();
   // Presencial is confirmed only in the app, with the photo of the place (the link page sends the broker there).
   // A broker marked online inside a presencial plantão confirms here with one tap.
-  const [mode] = await db.select({ attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode })
+  const [mode] = await db.select({ status: schema.dutyPresenceConfirmations.status, attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt })
     .from(schema.dutyPresenceConfirmations)
     .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyPresenceConfirmations.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .leftJoin(schema.dutyRosterAssignments, and(eq(schema.dutyRosterAssignments.id, schema.dutyPresenceConfirmations.assignmentId), eq(schema.dutyRosterAssignments.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
+  const now = new Date();
+  const windowState = mode ? getSelfDutyConfirmationWindowState({ startsAt: mode.shiftStartsAt, endsAt: mode.shiftEndsAt, now }) : null;
+  if (mode?.status === "pending" && windowState === "late") return NextResponse.json({ success: false, error: SELF_CONFIRM_LATE_MESSAGE }, { status: 409 });
+  if (mode?.status === "pending" && windowState === "not_open") return NextResponse.json({ success: false, error: `A confirmação abre ${SELF_CONFIRM_OPENS_MINUTES} minutos antes do plantão.` }, { status: 409 });
   if (mode && effectiveAttendanceMode(mode.assignmentAttendanceMode, mode.attendanceMode) === "presencial") return NextResponse.json({ success: false, error: "Este plantão é presencial: confirme pelo app, tirando uma foto do local." }, { status: 409 });
   const result = await db.transaction(async (tx) => {
     const [confirmed] = await tx.update(schema.dutyPresenceConfirmations).set({ status: "confirmed", confirmedAt: now, updatedAt: now })
       .where(and(
         eq(schema.dutyPresenceConfirmations.id, parsed.data.id),
         eq(schema.dutyPresenceConfirmations.status, "pending"),
+        gte(schema.dutyPresenceConfirmations.shiftStartsAt, new Date(now.getTime() - SELF_CONFIRM_TOLERANCE_MINUTES * 60_000)),
+        lte(schema.dutyPresenceConfirmations.shiftStartsAt, new Date(now.getTime() + SELF_CONFIRM_OPENS_MINUTES * 60_000)),
         gt(schema.dutyPresenceConfirmations.shiftEndsAt, now),
         exists(tx.select({ id: schema.dutyRosterAssignments.id })
           .from(schema.dutyRosterAssignments)
@@ -57,9 +62,14 @@ export async function POST(request: NextRequest) {
       return { state: "confirmed" as const, tenantId: confirmed.tenantId };
     }
 
-    const [existing] = await tx.select({ status: schema.dutyPresenceConfirmations.status, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt })
+    const [existing] = await tx.select({ status: schema.dutyPresenceConfirmations.status, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt })
       .from(schema.dutyPresenceConfirmations).where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
     if (existing?.status === "confirmed") return { state: "already_confirmed" as const };
+    if (existing?.status === "pending") {
+      const existingWindowState = getSelfDutyConfirmationWindowState({ startsAt: existing.shiftStartsAt, endsAt: existing.shiftEndsAt, now });
+      if (existingWindowState === "late") return { state: "late" as const };
+      if (existingWindowState === "not_open") return { state: "not_open" as const };
+    }
     if (existing && existing.shiftEndsAt <= now) {
       await tx.update(schema.dutyPresenceConfirmations).set({ status: "expired", updatedAt: now })
         .where(and(eq(schema.dutyPresenceConfirmations.id, parsed.data.id), eq(schema.dutyPresenceConfirmations.status, "pending")));
@@ -67,6 +77,8 @@ export async function POST(request: NextRequest) {
     return { state: "unavailable" as const };
   });
 
+  if (result.state === "late") return NextResponse.json({ success: false, error: SELF_CONFIRM_LATE_MESSAGE }, { status: 409 });
+  if (result.state === "not_open") return NextResponse.json({ success: false, error: `A confirmação abre ${SELF_CONFIRM_OPENS_MINUTES} minutos antes do plantão.` }, { status: 409 });
   if (result.state === "unavailable") return NextResponse.json({ success: false, error: "Este link expirou ou não está mais disponível." }, { status: 410 });
   // A confirmed broker can receive leads from now on: retry those waiting.
   if (result.state === "confirmed") await wakeLeadsAwaitingEligibleBroker(result.tenantId).catch(() => 0);

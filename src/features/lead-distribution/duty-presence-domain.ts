@@ -4,6 +4,20 @@ export type DutyWindow = {
   endsAt: Date;
 };
 
+/** The broker may confirm starting 30 minutes before the shift. */
+export const SELF_CONFIRM_OPENS_MINUTES = 30;
+export const SELF_CONFIRM_TOLERANCE_MINUTES = 20;
+export const SELF_CONFIRM_LATE_MESSAGE = "Seu plantão já passou do tempo de tolerância (20 minutos após o início). Entre em contato com seu supervisor para ser liberado.";
+
+export type SelfDutyConfirmationWindowState = "not_open" | "available" | "late" | "ended";
+
+export function getSelfDutyConfirmationWindowState(input: { startsAt: Date; endsAt: Date; now: Date }): SelfDutyConfirmationWindowState {
+  if (input.now.getTime() < input.startsAt.getTime() - SELF_CONFIRM_OPENS_MINUTES * 60_000) return "not_open";
+  if (input.now.getTime() > input.startsAt.getTime() + SELF_CONFIRM_TOLERANCE_MINUTES * 60_000) return "late";
+  if (input.now >= input.endsAt) return "ended";
+  return "available";
+}
+
 export type ConfirmedDutyOccurrence = {
   assignmentId?: string;
   scheduleId: string;

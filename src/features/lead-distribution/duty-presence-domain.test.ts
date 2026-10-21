@@ -1,5 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { dutyAttendanceOverrideProblem, dutyLeadsSinceStart, effectiveAttendanceMode, findRunningDutySchedule, isDutyBrokerEligible, parseDutyLeadsSince, formatDutyStartHour, getDutyOccurrenceLeadWindow, getDutyWindowOnDate, getRelevantDutyWindow, isConfirmationForActiveOccurrence, isDutyWindowActive, listCompletedDutyWindows } from "./duty-presence-domain";
+import {
+  dutyAttendanceOverrideProblem,
+  dutyLeadsSinceStart,
+  effectiveAttendanceMode,
+  findRunningDutySchedule,
+  getSelfDutyConfirmationWindowState,
+  isDutyBrokerEligible,
+  parseDutyLeadsSince,
+  formatDutyStartHour,
+  getDutyOccurrenceLeadWindow,
+  getDutyWindowOnDate,
+  getRelevantDutyWindow,
+  isConfirmationForActiveOccurrence,
+  isDutyWindowActive,
+  listCompletedDutyWindows,
+  SELF_CONFIRM_LATE_MESSAGE,
+  SELF_CONFIRM_OPENS_MINUTES,
+  SELF_CONFIRM_TOLERANCE_MINUTES,
+} from "./duty-presence-domain";
 
 describe("completed duty history", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
@@ -24,6 +42,28 @@ describe("completed duty history", () => {
 
 describe("duty presence occurrence windows", () => {
   const shift = { dayOfWeek: 3, startsAt: "10:00", endsAt: "12:00", timezone: "America/Sao_Paulo" };
+
+  it("permits own confirmation until 20 minutes after start and rejects later attempts", () => {
+    const startsAt = new Date("2026-10-21T12:00:00.000Z");
+    const endsAt = new Date("2026-10-21T21:00:00.000Z");
+    const atMinute = (minute: number) => new Date(startsAt.getTime() + minute * 60_000);
+
+    expect(SELF_CONFIRM_TOLERANCE_MINUTES).toBe(20);
+    expect(SELF_CONFIRM_LATE_MESSAGE).toBe("Seu plantão já passou do tempo de tolerância (20 minutos após o início). Entre em contato com seu supervisor para ser liberado.");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(19) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(20) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(21) })).toBe("late");
+  });
+
+  it("keeps the 30-minute opening window before the shift unchanged", () => {
+    const startsAt = new Date("2026-10-21T12:00:00.000Z");
+    const endsAt = new Date("2026-10-21T21:00:00.000Z");
+    const atMinutesBefore = (minute: number) => new Date(startsAt.getTime() - minute * 60_000);
+
+    expect(SELF_CONFIRM_OPENS_MINUTES).toBe(30);
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinutesBefore(10) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinutesBefore(31) })).toBe("not_open");
+  });
 
   it("opens the reminder window 30 minutes before local shift start", () => {
     const now = new Date("2026-09-23T12:35:00.000Z"); // Wednesday, 09:35 in São Paulo

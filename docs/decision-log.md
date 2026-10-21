@@ -1323,12 +1323,19 @@ abre uma tela pública de confirmação com token aleatório, e a confirmação 
 presa ao tenant, ao vínculo individual da escala e à data local daquela
 ocorrência. Só corretores que confirmaram uma ocorrência ainda vigente entram
 na elegibilidade automática ou na lista de reatribuição manual desse plantão.
-Uma confirmação tardia vale imediatamente até o fim da mesma ocorrência; ela
-nunca libera semanas futuras. Sem elegíveis, o lead continua aguardando ou usa
+A confirmação própria abre 30 minutos antes do início e pode ser feita até 20
+minutos após o início da ocorrência. Depois desse limite, só a gestão pode
+liberar manualmente o corretor; a liberação vale até o fim da mesma ocorrência
+e nunca libera semanas futuras. Sem elegíveis, o lead continua aguardando ou usa
 somente a contingência que a fila já configurou. A tela de detalhes do plantão
 exibe status individual e horário confirmado. A alteração do kill switch pelo
 Super-admin é auditada. A flag nasce desligada para preservar filas existentes
 até que a aprovação do template, a migration e a agenda sejam validadas.
+
+**Complemento aprovado em 2026-10-21:** a tolerância de 20 minutos se aplica a
+todas as autoconfirmações, inclusive ao link do lembrete e ao envio de foto no
+app. O limite é inclusivo; tentativas posteriores informam ao corretor que
+procure o supervisor. A liberação manual da gestão não muda.
 
 ## DEC-120 — WAHA da empresa como canal da diretoria com os corretores
 

@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { CheckCircle2, Clock3 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { effectiveAttendanceMode } from "@/features/lead-distribution/duty-presence-domain";
+import { effectiveAttendanceMode, getSelfDutyConfirmationWindowState, SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES } from "@/features/lead-distribution/duty-presence-domain";
 import { getDatabase, schema } from "@/shared/db";
 import { ConfirmDutyPresenceButton } from "./confirm-duty-presence-button";
 
@@ -33,7 +33,10 @@ export default async function ConfirmPresencePage({ searchParams }: { searchPara
     ))
     .where(eq(schema.dutyPresenceConfirmations.id, confirmationId)).limit(1) : [];
 
-  const active = Boolean(record && record.status === "pending" && record.shiftEndsAt > new Date());
+  const now = new Date();
+  const windowState = record?.status === "pending" ? getSelfDutyConfirmationWindowState({ startsAt: record.shiftStartsAt, endsAt: record.shiftEndsAt, now }) : null;
+  const active = windowState === "available";
+  const late = windowState === "late";
   const confirmed = record?.status === "confirmed";
   const presencial = record ? effectiveAttendanceMode(record.assignmentAttendanceMode, record.attendanceMode) === "presencial" : false;
   return <main className="flex min-h-svh items-center justify-center bg-muted/40 p-4">
@@ -44,7 +47,7 @@ export default async function ConfirmPresencePage({ searchParams }: { searchPara
         <CardDescription>{record ? `${record.scheduleName} · ${new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeStyle: "short", timeZone: record.timezone }).format(record.shiftStartsAt)}` : "Confirme sua presença na escala informada pela equipe."}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 text-center">
-        {!confirmationId || !record ? <p role="alert" className="text-sm text-muted-foreground">Este link não é válido ou não está mais disponível. Peça um novo lembrete à gestão.</p> : confirmed ? <div className="space-y-2 text-sm"><CheckCircle2 className="mx-auto size-8 text-success" aria-hidden="true" /><p className="font-medium">Presença confirmada</p><p className="text-muted-foreground">Obrigado, {record.brokerName}. Você está elegível para receber leads deste plantão enquanto ele estiver ativo.</p></div> : active && presencial ? <><p className="text-sm text-muted-foreground">Olá, <span className="font-medium text-foreground">{record.brokerName}</span>. Este plantão é <span className="font-medium text-foreground">presencial</span>: você precisa estar na unidade durante todo o plantão. Já na unidade, abra o app e tire uma foto do local; o diretor valida a foto e libera você.</p><Link href="/plantoes/agora" className="inline-flex h-11 w-full items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground">Abrir o app e tirar a foto</Link></> : active ? <><p className="text-sm text-muted-foreground">Olá, <span className="font-medium text-foreground">{record.brokerName}</span>. Toque abaixo para confirmar que está disponível para este plantão.</p><ConfirmDutyPresenceButton confirmationId={record.id} /></> : <p role="alert" className="text-sm text-muted-foreground">O prazo deste plantão terminou. Entre em contato com a gestão se precisar de ajuda.</p>}
+        {!confirmationId || !record ? <p role="alert" className="text-sm text-muted-foreground">Este link não é válido ou não está mais disponível. Peça um novo lembrete à gestão.</p> : confirmed ? <div className="space-y-2 text-sm"><CheckCircle2 className="mx-auto size-8 text-success" aria-hidden="true" /><p className="font-medium">Presença confirmada</p><p className="text-muted-foreground">Obrigado, {record.brokerName}. Você está elegível para receber leads deste plantão enquanto ele estiver ativo.</p></div> : late ? <p role="alert" className="text-sm text-muted-foreground">{SELF_CONFIRM_LATE_MESSAGE}</p> : active && presencial ? <><p className="text-sm text-muted-foreground">Olá, <span className="font-medium text-foreground">{record.brokerName}</span>. Este plantão é <span className="font-medium text-foreground">presencial</span>: você precisa estar na unidade durante todo o plantão. Já na unidade, abra o app e tire uma foto do local; o diretor valida a foto e libera você.</p><Link href="/plantoes/agora" className="inline-flex h-11 w-full items-center justify-center rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground">Abrir o app e tirar a foto</Link></> : active ? <><p className="text-sm text-muted-foreground">Olá, <span className="font-medium text-foreground">{record.brokerName}</span>. Toque abaixo para confirmar que está disponível para este plantão.</p><ConfirmDutyPresenceButton confirmationId={record.id} /></> : windowState === "not_open" ? <p role="status" className="text-sm text-muted-foreground">A confirmação abre {SELF_CONFIRM_OPENS_MINUTES} minutos antes do início do plantão. Volte então para confirmar.</p> : <p role="alert" className="text-sm text-muted-foreground">O prazo deste plantão terminou. Entre em contato com a gestão se precisar de ajuda.</p>}
       </CardContent>
     </Card>
   </main>;
