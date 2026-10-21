@@ -11,6 +11,7 @@ import { Composer, type Mention } from "./composer";
 import styles from "./chat.module.css";
 import type { ChatAction, ChatBlock, ChatChoice, ChatLeadRow, ChatProgress, ChatScript, MascotShape, ChatListItem } from "./types";
 import { fetchMentionBlocks, isDataMention } from "./mention-client";
+import { openWhatsApp } from "@/lib/whatsapp-open";
 
 /** Result of a server action run from a reply. A message is shown as the assistant's answer. */
 export type ChatActionResult = { ok: boolean; message?: string; followUp?: ChatBlock[]; warning?: boolean };
@@ -196,7 +197,7 @@ export function ChatScreen({
     const action = choice.action;
     if (action.kind === "href") {
       // WhatsApp and other external links open beside the app; the conversation stays.
-      if (/^https?:/.test(action.href)) window.open(action.href, "_blank", "noopener");
+      if (/^https?:/.test(action.href)) { if (!openWhatsApp(action.href)) window.open(action.href, "_blank", "noopener"); }
       else router.push(action.href);
       return;
     }

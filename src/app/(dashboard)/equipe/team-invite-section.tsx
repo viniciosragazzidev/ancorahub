@@ -11,6 +11,8 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createTeamUserAction, importBrokersAction } from "./actions";
+import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
+import { openWhatsApp } from "@/lib/whatsapp-open";
 
 type CustomRoleOption = { id: string; name: string; scope: "none" | "own" | "branch" | "tenant" };
 type Props = { branches: { id: string; name: string }[]; canInviteManager: boolean; canInviteDirector?: boolean; customRoles?: CustomRoleOption[] };
@@ -133,7 +135,7 @@ export function TeamInviteSection({ branches, canInviteManager, canInviteDirecto
                   className="flex-1 gap-2 text-xs"
                   onClick={() => {
     const msg = `Olá${createdName ? `, ${createdName}` : ""}! Seja bem-vindo(a) à nossa equipe.\n\nPara concluir o seu cadastro e ativar o seu acesso ao CRM, acesse o seu link de ativação exclusivo abaixo:\n\n${createdLink}\n\nSe precisar de ajuda com o seu primeiro acesso, estou à disposição!`;
-                    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+                    openWhatsApp(buildWhatsAppWebUrl(null, msg));
                   }}
                 >
                   <WhatsappLogo className="size-4" /> Abrir no WhatsApp

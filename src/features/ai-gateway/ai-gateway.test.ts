@@ -68,7 +68,7 @@ describe("agents", () => {
     const blocks = replyToBlocks(AGENT_REGISTRY.leads, reply, { leadId: "l1", whatsappUrl: "https://wa.me/5521999998888" }, "1");
     const question = blocks.find((block) => block.type === "question");
     expect(question && question.type === "question" ? question.choices.map((choice) => choice.id) : []).toEqual(["ai-0-lead.registerContact"]);
-    expect(blocks.find((block) => block.type === "button")).toMatchObject({ href: "https://wa.me/5521999998888?text=Oi%20Maria%2C%20tudo%20bem%3F" });
+    expect(blocks.find((block) => block.type === "button")).toMatchObject({ href: "https://web.whatsapp.com/send?phone=5521999998888&text=Oi%20Maria%2C%20tudo%20bem%3F" });
   });
 
   it("tell the model the rules and the allowed action codes", () => {

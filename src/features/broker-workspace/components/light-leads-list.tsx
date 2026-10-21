@@ -11,7 +11,7 @@ import { motionTokens } from "@/components/arc/motion-tokens";
 import { PeopleEmpty, PeopleFilters, PeoplePage, PeopleRow, PeopleSection } from "@/components/light/people-list/people-list";
 import { LightAvailabilityBanner } from "@/features/broker-workspace/components/light-availability-banner";
 import { AcceptLeadButton } from "@/features/broker-workspace/components/accept-lead-button";
-import { formatBrokerArrival, isBrokerArrivalToday } from "@/features/broker-workspace/arrival";
+import { formatBrokerArrival, groupByArrivalDay, isBrokerArrivalToday } from "@/features/broker-workspace/arrival";
 import styles from "./light-leads-list.module.css";
 
 export type LightLeadItem = {
@@ -103,25 +103,6 @@ function describeLead(lead: LightLeadItem): LeadState {
 const acceptButton =
   "inline-flex h-11 items-center justify-center rounded-full bg-(--accent) px-4 text-sm font-semibold text-(--accent-foreground) disabled:opacity-60";
 
-function arrival(lead: LightLeadItem) {
-  const value = lead.arrivedAt;
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-/** Orders by distribution to this broker; brokerage capture dates never affect the client-facing list. */
-function sortByArrival(leads: LightLeadItem[]) {
-  return [...leads].sort((a, b) => {
-    const left = arrival(a)?.getTime();
-    const right = arrival(b)?.getTime();
-    if (left === undefined && right === undefined) return a.name.localeCompare(b.name);
-    if (left === undefined) return 1;
-    if (right === undefined) return -1;
-    return right - left;
-  });
-}
-
 export type LeadNowItem = { kind: "acceptance" | "response" | "return"; lead: LightLeadItem };
 
 export function buildLeadNowItems(leads: LightLeadItem[], now = new Date()): LeadNowItem[] {
@@ -169,7 +150,7 @@ function NowBlock({ items }: { items: LeadNowItem[] }) {
       <ul className={styles.nowList}>
         {items.map(({ kind, lead }, index) => {
           const label = kind === "acceptance" ? "Aceite pendente" : kind === "response" ? "Cliente respondeu" : "Retorno vencido";
-          const actionLabel = kind === "acceptance" ? "Aceitar" : kind === "response" ? "Responder" : "Ver retorno";
+          const actionLabel = kind === "acceptance" ? "Aceitar e chamar" : kind === "response" ? "Responder" : "Ver retorno";
           const arrived = distributedAt(lead);
           const detail = kind === "acceptance"
             ? [arrived ? `Recebido ${formatBrokerArrival(arrived)}` : null, lead.dutyName ? `Plantão ${lead.dutyName}` : null].filter(Boolean).join(" · ")
@@ -229,12 +210,6 @@ export function arrivalLabel(lead: LightLeadItem, now = new Date()) {
   return `Há ${days} dias (${dayMonth.format(date)})`;
 }
 
-/** Group header for the arrival day: "Recebidos hoje", "Recebidos ontem", "Dias anteriores". */
-function arrivalGroup(lead: LightLeadItem, now: Date) {
-  const days = arrivalDaysAgo(lead, now);
-  return days === null || days > 1 ? "Dias anteriores" : days === 1 ? "Recebidos ontem" : "Recebidos hoje";
-}
-
 /** A lead in the phone-book list: who it is, where it stands and, when new, the accept button beside it. */
 function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number; dataTour?: string }) {
   const state = describeLead(lead);
@@ -255,7 +230,7 @@ function LeadRow({ lead, index, dataTour }: { lead: LightLeadItem; index: number
       meta={handedAt ? <time className={styles.arrival} data-old={!isBrokerArrivalToday(handedAt) ? "true" : "false"} dateTime={handedAt.toISOString()} suppressHydrationWarning>{(formatBrokerArrival(handedAt) ?? "").replace(/^./, (first) => first.toLocaleUpperCase("pt-BR"))}</time> : undefined}
       dot={urgent ? (lead.isSlaAtRisk || lead.isOverdue ? "alert" : "waiting") : null}
       dotLabel={urgent ? "Precisa de você agora" : undefined}
-      action={isNewLead(lead) ? <AcceptLeadButton leadId={lead.id} className={acceptButton}>Aceitar lead</AcceptLeadButton> : undefined}
+      action={isNewLead(lead) ? <AcceptLeadButton leadId={lead.id} className={acceptButton}>Aceitar e chamar no WhatsApp</AcceptLeadButton> : undefined}
     />
   );
 }
@@ -300,22 +275,10 @@ export function LightLeadsList({
       );
   }, [leads, filter, searchQuery]);
 
-  // Newest arrival first (today's leads on top), not the order the leads were created.
-  const urgent = filter === "closed" ? [] : sortByArrival(visible.filter(needsYouNow));
-  const rest = filter === "closed" ? visible : visible.filter((lead) => !needsYouNow(lead));
   const searching = searchQuery.trim().length > 0;
-  // The rest by the day it arrived: today's leads never mix with older ones.
-  const restGroups = useMemo(() => {
-    const now = new Date();
-    const groups: Array<{ label: string; items: LightLeadItem[] }> = [];
-    for (const lead of sortByArrival(rest)) {
-      const label = arrivalGroup(lead, now);
-      const last = groups.at(-1);
-      if (last?.label === label) last.items.push(lead);
-      else groups.push({ label, items: [lead] });
-    }
-    return groups;
-  }, [rest]);
+  // Order of arrival to the broker (newest first), split by day: no priority
+  // section on top, the broker reads the list as the leads came (21/10).
+  const dayGroups = useMemo(() => groupByArrivalDay(visible, (lead) => lead.arrivedAt, new Date(), (lead) => lead.name), [visible]);
 
   // "Em risco" only takes room in the bar while there is something at risk (or the broker came from the Inicio card).
   const tabs = (["new", "active", "returns", "risk", "closed"] as const).filter((value) => value !== "risk" || counts.risk > 0 || filter === "risk");
@@ -362,21 +325,16 @@ export function LightLeadsList({
           />
         ) : (
           <>
-            {urgent.length > 0 ? (
-              <PeopleSection id="needs-you-heading" title="Precisa de você agora" count={urgent.length}>
-                {urgent.map((lead, index) => (
-                  <LeadRow key={lead.id} lead={lead} index={index} dataTour={index === 0 ? "micro-queue-lead" : undefined} />
-                ))}
-              </PeopleSection>
-            ) : null}
-
-            {restGroups.map((group, groupIndex) => (
-              <PeopleSection key={group.label} id={`rest-${groupIndex}`} title={restGroups.length > 1 ? group.label : urgent.length > 0 ? "Demais atendimentos" : undefined} count={restGroups.length > 1 ? group.items.length : undefined}>
-                {group.items.map((lead, index) => (
-                  <LeadRow key={lead.id} lead={lead} index={urgent.length + index} dataTour={urgent.length === 0 && groupIndex === 0 && index === 0 ? "micro-queue-lead" : undefined} />
-                ))}
-              </PeopleSection>
-            ))}
+            {dayGroups.map((group, groupIndex) => {
+              const offset = dayGroups.slice(0, groupIndex).reduce((total, previous) => total + previous.items.length, 0);
+              return (
+                <PeopleSection key={group.key} id={`dia-${group.key}`} title={group.label} count={group.items.length}>
+                  {group.items.map((lead, index) => (
+                    <LeadRow key={lead.id} lead={lead} index={offset + index} dataTour={offset + index === 0 ? "micro-queue-lead" : undefined} />
+                  ))}
+                </PeopleSection>
+              );
+            })}
           </>
         )}
       </PeoplePage>

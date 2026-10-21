@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 
+import { groupByArrivalDay } from "@/features/broker-workspace/arrival";
+
 import { AssistantAvatar } from "./assistant-avatar";
 import styles from "./chat.module.css";
 import type { ThreadSummary } from "./types";
@@ -26,7 +28,13 @@ function VerifiedBadge() {
   );
 }
 
-export function ThreadRow({ thread, now, index = 0, active = false }: { thread: ThreadSummary; now: Date; index?: number; active?: boolean }) {
+/** "09:41" in São Paulo time: inside a day group the separator already says the day. */
+function clockTime(iso: string | null) {
+  if (!iso) return "";
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(iso));
+}
+
+export function ThreadRow({ thread, now, index = 0, active = false, timeOnly = false }: { thread: ThreadSummary; now: Date; index?: number; active?: boolean; timeOnly?: boolean }) {
   const reduce = useReducedMotion();
   return (
     <motion.li
@@ -47,7 +55,7 @@ export function ThreadRow({ thread, now, index = 0, active = false }: { thread: 
         <span className={styles.threadMeta}>
           <span className={styles.threadTime}>
             {thread.pinned ? <svg viewBox="0 0 16 16" width="12" height="12" aria-label="Fixado" role="img" style={{ verticalAlign: "-1px", marginRight: 4 }}><path d="M9.6 2.2 13.8 6.4l-1.4.4-2.3 2.3.3 3-1.1 1.1-2.8-2.8L3 14l-.9-.9 3.5-3.5-2.8-2.8L3.9 5.7l3 .3 2.3-2.3.4-1.4Z" fill="currentColor" /></svg> : null}
-            {threadTime(thread.at, now)}
+            {timeOnly ? clockTime(thread.at) : threadTime(thread.at, now)}
           </span>
           {thread.unread || thread.waitingYou ? (
             <motion.span
@@ -64,8 +72,31 @@ export function ThreadRow({ thread, now, index = 0, active = false }: { thread: 
   );
 }
 
-export function ThreadList({ threads, now, emptyText, activeId = null }: { threads: ThreadSummary[]; now: Date; emptyText: string; activeId?: string | null }) {
+export function ThreadList({ threads, now, emptyText, activeId = null, groupByDay = false }: {
+  threads: ThreadSummary[];
+  now: Date;
+  emptyText: string;
+  activeId?: string | null;
+  /** Leads: order of arrival (newest first) split by day, "Hoje", "Ontem", "18/10 (sáb)". No priority sorting. */
+  groupByDay?: boolean;
+}) {
   if (!threads.length) return <p style={{ padding: "32px 20px", textAlign: "center", color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>{emptyText}</p>;
+  if (groupByDay) {
+    const groups = groupByArrivalDay(threads, (thread) => thread.at, now, (thread) => thread.name);
+    let index = 0;
+    return (
+      <div className={styles.threadDays}>
+        {groups.map((group) => (
+          <section key={group.key} aria-label={group.label}>
+            <h3 className={styles.threadDay}><span>{group.label}</span></h3>
+            <ul className={styles.threadList}>
+              {group.items.map((thread) => <ThreadRow key={thread.id} thread={thread} now={now} index={index++} active={thread.id === activeId} timeOnly={group.key !== "sem-data"} />)}
+            </ul>
+          </section>
+        ))}
+      </div>
+    );
+  }
   return (
     <ul className={styles.threadList}>
       {threads.map((thread, index) => <ThreadRow key={thread.id} thread={thread} now={now} index={index} active={thread.id === activeId} />)}

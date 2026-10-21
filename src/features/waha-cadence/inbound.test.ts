@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   classifyIgnoredBrokerContact,
+  isContentlessWahaMessage,
   shouldCreateSyntheticLead,
   shouldKeepTenantChannelMessage,
   shouldPersistBrokerConnectionMessage,
@@ -114,5 +115,19 @@ describe("classifyIgnoredBrokerContact", () => {
   it("tells a lead of another broker from a contact that is not a lead", () => {
     expect(classifyIgnoredBrokerContact({ isOwner: false, matchingLeadOwners: ["other-broker"] })).toBe("lead_de_outro_corretor");
     expect(classifyIgnoredBrokerContact({ isOwner: false, matchingLeadOwners: [] })).toBe("nao_e_lead");
+  });
+});
+
+describe("isContentlessWahaMessage (bug 2026-10-21: \"[text]\" bubble on the client side)", () => {
+  it("flags a message with no text and no file, which the normalizer fills with [text]", () => {
+    expect(isContentlessWahaMessage({ type: "text", body: "[text]" })).toBe(true);
+    expect(isContentlessWahaMessage({ type: "text", body: " [TEXT] " })).toBe(true);
+  });
+
+  it("keeps real text, media and placeholders of a media kind", () => {
+    expect(isContentlessWahaMessage({ type: "text", body: "Oi" })).toBe(false);
+    expect(isContentlessWahaMessage({ type: "image", body: "[image]" })).toBe(false);
+    expect(isContentlessWahaMessage({ type: "text", body: "[text]", media: { mimeType: "image/jpeg" } })).toBe(false);
+    expect(isContentlessWahaMessage({ type: "text", body: "[unsupported]" })).toBe(false);
   });
 });

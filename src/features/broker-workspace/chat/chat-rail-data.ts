@@ -81,11 +81,20 @@ export const getChatRailData = cache(async (): Promise<ChatRailData | null> => {
         },
       };
     }
-    const data = await getCachedBrokerWorkspaceData();
-    const dutyCalendar = (await getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false")) === "true";
+    // The workspace, the flags and the journey load together (the journey only needs the context).
+    const journeyPromise = getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false")
+      .then(async (flag) => flag === "true"
+        ? { enabled: true, data: await getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null) }
+        : { enabled: false, data: null });
+    const [data, dutyCalendarFlag, journeyResult] = await Promise.all([
+      getCachedBrokerWorkspaceData(),
+      getFeatureFlag(FEATURE_FLAGS.BROKER_DUTY_CALENDAR).catch(() => "false"),
+      journeyPromise,
+    ]);
+    const dutyCalendar = dutyCalendarFlag === "true";
     const now = new Date();
-    const journeyEnabled = (await getFeatureFlag(FEATURE_FLAGS.BROKER_JOURNEY).catch(() => "false")) === "true";
-    const journey = journeyEnabled ? await getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null) : null;
+    const journeyEnabled = journeyResult.enabled;
+    const journey = journeyResult.data;
     const capabilities = { quoteSimulator: true, dutyCalendar, journey: journeyEnabled };
     return {
       viewerName: data.viewer.name,

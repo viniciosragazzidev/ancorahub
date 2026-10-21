@@ -25,6 +25,7 @@ import {
 } from "./contract";
 import { brazilNinthDigitVariant, contactNumberShape, phoneSubscriberSuffix, samePhoneSubscriber } from "./phone-matching";
 import { storeWahaMessageMedia, wahaFilePath } from "./message-media";
+import { isContentlessMessage } from "@/features/conversations/media-kinds";
 import { captureWahaGroupMessage, findActiveWahaGroupSource } from "@/features/waha-group-capture/service";
 
 type SessionSource =
@@ -64,6 +65,17 @@ export function shouldPersistBrokerConnectionMessage(input: {
   hasClient: boolean;
 }) {
   return input.hasLead || input.hasClient;
+}
+
+/**
+ * A WAHA "message" with no text and no file is not something the contact
+ * wrote: it is a session/protocol event (deleted message, security-code
+ * notice, call log, reaction, undecrypted stub) that the normalizer fills
+ * with the "[text]" placeholder. Persisting it drew a "[text]" bubble on the
+ * client's side of the lead conversation. It is ignored instead.
+ */
+export function isContentlessWahaMessage(message: { type?: string; body: string; media?: unknown }) {
+  return (message.type ?? "text") === "text" && !message.media && isContentlessMessage(message.body);
 }
 
 
@@ -294,6 +306,12 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   if (event.message.contactLidUnresolved) {
     await markIgnored(db, registered.id, "unresolved_lid");
     return { processed: 0, ignored: "unresolved_lid" as const };
+  }
+
+  // Protocol events without text or file never become a chat bubble.
+  if (isContentlessWahaMessage(event.message)) {
+    await markIgnored(db, registered.id, `contentless_message:${event.message.fromMe ? "from_me" : "from_contact"}`);
+    return { processed: 0, ignored: "contentless_message" as const };
   }
 
   // Determine direction based on fromMe flag

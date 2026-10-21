@@ -11,6 +11,7 @@ import { isAiPotentialSale } from "@/features/leads/ai-potential-sale";
 import { LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
 import { confirmDocumentUploadAction } from "@/features/documents/actions";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
+import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
 import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
 import { STEP_OPTIONS, type ConfirmationDocument, type LightLeadDetailData, type LiteRequirement } from "./types";
@@ -115,22 +116,23 @@ export function useLeadDetail({
     }
 
 
-    // Handle Accept Lead
+    // Handle Accept Lead: one tap accepts and opens the client's WhatsApp (the tab opens inside the click).
     function handleAccept() {
       if (accepting || accepted) return;
       const formData = new FormData();
       formData.append("leadId", lead.id);
+      const whatsapp = prepareWhatsAppWindow();
 
       startAcceptTransition(async () => {
         let res;
         try {
           res = await startLeadServiceAction({}, formData);
         } catch {
-          toast.error("Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
-          return;
+          res = null;
         }
 
-        if (!res.success) {
+        if (!res?.success) {
+          whatsapp.cancel();
           toast.error("Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
           return;
         }
@@ -141,15 +143,14 @@ export function useLeadDetail({
         // The phone is not in the payload before acceptance: reload so WhatsApp and Ligar get it.
         router.refresh();
 
-        const firstName = lead.nome.split(" ")[0] || lead.nome;
-        toast.success(`Lead aceito! Agora inicie o atendimento com ${firstName}.`, {
-          action: {
-            label: "Ver insights",
-            onClick: () => {
-              router.push(`/conversas/broker?leadId=${lead.id}`);
-            },
-          },
-        });
+        const url = res.whatsappUrl;
+        if (url && whatsapp.go(url)) {
+          setWhatsappOpenedAt(new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }));
+          toast.success("Lead aceito. Abrindo o WhatsApp do cliente.", { action: { label: "Abrir de novo", onClick: () => openWhatsApp(url) } });
+        } else {
+          whatsapp.cancel();
+          toast.success("Lead aceito. Ele não tem WhatsApp no cadastro: use o telefone da ficha.");
+        }
       });
     }
 

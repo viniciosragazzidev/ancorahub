@@ -20,6 +20,7 @@ import {
   type Region,
 } from "@/features/broker-workspace/quote-simulator/mock-data";
 import { calculatePlanPricing, type PlanPricing } from "@/features/broker-workspace/quote-simulator/pricing";
+import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
 
 /**
  * The guided quote (assistant Cotação, route /cotacao): one question at a
@@ -179,7 +180,7 @@ export function quoteSummaryText(answers: QuoteAnswers, result: QuoteResult) {
 }
 
 export function quoteWhatsAppHref(answers: QuoteAnswers, result: QuoteResult) {
-  return `https://wa.me/?text=${encodeURIComponent(quoteSummaryText(answers, result))}`;
+  return buildWhatsAppWebUrl(null, quoteSummaryText(answers, result));
 }
 
 /** The chosen plan as a facts card and what to do with it. */

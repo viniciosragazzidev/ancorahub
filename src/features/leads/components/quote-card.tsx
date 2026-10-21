@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { shareQuoteAction, deleteQuoteAction, type QuoteActionState } from "@/features/quotes/actions";
 import { formatCurrency, buildQuoteWhatsAppMessage } from "@/features/quotes/utils";
+import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
+import { openWhatsApp } from "@/lib/whatsapp-open";
 
 type Quote = {
   id: string;
@@ -68,8 +70,7 @@ export function QuoteCard({ quote, leadName, leadPhone, baseUrl }: QuoteCardProp
       publicToken: quote.publicToken,
       baseUrl,
     });
-    const url = `https://wa.me/${(leadPhone ?? "").replace(/\D/g, "")}?text=${encodeURIComponent(message)}`;
-    window.open(url, "_blank", "noreferrer");
+    openWhatsApp(buildWhatsAppWebUrl(leadPhone, message));
   }
 
   return (

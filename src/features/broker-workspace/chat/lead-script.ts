@@ -2,7 +2,7 @@ import type { ChatBlock, ChatChoice, ChatFactRow, ChatScript } from "@/component
 import { DECLINE_REASONS } from "@/features/broker-workspace/components/light-lead-detail/types";
 import { LEAD_STATUS_LABELS, MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
 
-import { conversationMediaUrl, mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
+import { conversationMediaUrl, isContentlessMessage, mediaPlaceholderLabel } from "@/features/conversations/media-kinds";
 
 import { isOutboundMessage, nextStepText } from "./intelligence";
 
@@ -326,13 +326,14 @@ export function buildLeadConversationScript({
   type Entry = { at: Date; block: ChatBlock; id: string };
   const history: Entry[] = [
     ...withLatestAiFeedback([...events]).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT).map((event) => ({ at: event.createdAt, id: event.id, block: eventBlock(event, viewerId, hideArrival) })),
-    ...[...messages].sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-MESSAGES_LIMIT).map((message) => ({
+    // Rows with no text and no file are WhatsApp protocol events (stored as "[text]"), never the client writing.
+    ...[...messages].filter((message) => !isContentlessMessage(message.body, message.mediaKind)).sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-MESSAGES_LIMIT).map((message) => ({
       at: message.sentAt,
       id: `wa-${message.id}`,
       block: {
         type: "whatsapp" as const,
         id: `wa-${message.id}`,
-        text: message.body,
+        text: mediaPlaceholderLabel(message.body) ?? message.body,
         at: hideArrival ? undefined : time(message.sentAt),
         // Outbound with senderRole "assistant" is the AI qualification; other outbound is the broker.
         from: !isOutboundMessage(message.direction) ? "client" as const : message.senderRole === "assistant" ? "qualification" as const : "broker" as const,

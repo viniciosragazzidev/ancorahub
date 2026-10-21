@@ -38,7 +38,7 @@ describe("LightClientsList", () => {
 
     expect(screen.getByText("2 clientes conquistados")).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "Clientes" }).className).toContain("sr-only");
-    expect(screen.getByRole("link", { name: "WhatsApp" }).getAttribute("href")).toContain("wa.me/");
+    expect(screen.getByRole("link", { name: "WhatsApp" }).getAttribute("href")).toContain("web.whatsapp.com/send?phone=");
     expect(screen.getAllByRole("link").filter((link) => link.getAttribute("href")?.startsWith("/clientes/"))).toHaveLength(2);
   });
 

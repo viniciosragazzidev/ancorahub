@@ -24,7 +24,7 @@ export function buildBrokerNowItems(input: {
       id: `accept-${pending.leadId}`,
       title: pending.name,
       detail: [`Recebido ${arrival}`, pending.scheduleName ? `Plantão ${pending.scheduleName}` : "Plantão de origem"].join(" · "),
-      actionLabel: "Aceitar",
+      actionLabel: "Aceitar e chamar",
       href: `/leads/${pending.leadId}`,
       acceptLeadId: pending.leadId,
       expiresAt: pending.expiresAt.toISOString(),

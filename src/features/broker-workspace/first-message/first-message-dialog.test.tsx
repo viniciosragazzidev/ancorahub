@@ -21,7 +21,7 @@ describe("first message text", () => {
     expect(text.startsWith("Olá, Maria! Aqui é Carlos, da Âncora Saúde.")).toBe(true);
     expect(text).not.toContain("—");
     expect(buildFirstMessage({ leadName: null, brokerName: null, companyName: null }).startsWith("Olá! Recebi")).toBe(true);
-    expect(buildWhatsAppWebUrl("5521999998888", "Oi tudo bem")).toBe("https://web.whatsapp.com/send?phone=5521999998888&text=Oi+tudo+bem");
+    expect(buildWhatsAppWebUrl("5521999998888", "Oi tudo bem")).toBe("https://web.whatsapp.com/send?phone=5521999998888&text=Oi%20tudo%20bem");
   });
 });
 

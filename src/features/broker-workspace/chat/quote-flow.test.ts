@@ -67,7 +67,7 @@ describe("quote flow", () => {
     expect(blocks[0]).toMatchObject({ type: "facts", id: "f-plan-3" });
     expect(question(blocks).choices.map((choice) => choice.id)).toEqual(["whatsapp", "copy", "other", "restart"]);
     // A link reply: opened in the tap itself, so phones do not block it as a popup.
-    expect(question(blocks).choices[0]?.action).toEqual({ kind: "href", href: `https://wa.me/?text=${encodeURIComponent(quoteSummaryText(complete, first!))}` });
+    expect(question(blocks).choices[0]?.action).toEqual({ kind: "href", href: `https://web.whatsapp.com/send?text=${encodeURIComponent(quoteSummaryText(complete, first!))}` });
     const text = quoteSummaryText(complete, first!);
     expect(text).toContain("3 vidas");
     expect(text).not.toContain("(exemplo)");

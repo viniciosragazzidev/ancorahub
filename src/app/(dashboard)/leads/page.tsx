@@ -112,6 +112,17 @@ async function LeadsPageContent({
   }));
   const experienceModePromise =
     context.role === "broker" ? getExperienceMode(context) : Promise.resolve("NORMAL" as const);
+  // The Lite list needs the tenant SLA first: read it while access is checked.
+  const lightSlaPromise = context.role === "broker"
+    ? experienceModePromise.then((mode) => mode === "LIGHT"
+      ? withPerfSpan("leads.light.sla_settings", () => getDatabase()
+        .select({ minutes: schema.tenants.slaFirstContactMinutes })
+        .from(schema.tenants)
+        .where(eq(schema.tenants.id, context.tenantId))
+        .limit(1))
+      : [])
+    : Promise.resolve([]);
+  lightSlaPromise.catch(() => undefined);
   if (
     !(await capabilityPromise)
   )
@@ -131,11 +142,7 @@ async function LeadsPageContent({
   // filtros de situação e acesso direto ao atendimento. As ações de aceitar,
   // abrir e atualizar continuam funcionando no detalhe do lead.
   if (context.role === "broker" && (await experienceModePromise) === "LIGHT") {
-    const [slaRow] = await withPerfSpan("leads.light.sla_settings", () => getDatabase()
-      .select({ minutes: schema.tenants.slaFirstContactMinutes })
-      .from(schema.tenants)
-      .where(eq(schema.tenants.id, context.tenantId))
-      .limit(1));
+    const [slaRow] = await lightSlaPromise;
     const lightSlaMinutes = Math.max(1, Number(slaRow?.minutes ?? 15));
 
     const lightLeads = await withPerfSpan("leads.light.list", () => getDatabase()
@@ -145,7 +152,10 @@ async function LeadsPageContent({
         telefone: schema.leads.telefone,
         status: schema.leads.status,
         qualificationStatus: schema.leads.qualificationStatus,
-        qualificationDetails: schema.leads.qualificationDetails,
+        // Only the four keys the list reads, not the whole AI record of 500 leads.
+        qualificationDetails: sql<unknown>`jsonb_build_object('qtdVidas', ${schema.leads.qualificationDetails}->'qtdVidas', 'cidade', ${schema.leads.qualificationDetails}->'cidade', 'resumoAtendimento', ${schema.leads.qualificationDetails}->'resumoAtendimento', 'resumoNecessidade', ${schema.leads.qualificationDetails}->'resumoNecessidade')`.mapWith(schema.leads.qualificationDetails),
+        // Earliest open task with a due date, in the same round trip.
+        earliestTaskDueAt: sql<Date | null>`(select min(${schema.leadTasks.dueAt}) from ${schema.leadTasks} where ${schema.leadTasks.tenantId} = ${schema.leads.tenantId} and ${schema.leadTasks.leadId} = ${schema.leads.id} and ${schema.leadTasks.completedAt} is null and ${schema.leadTasks.dueAt} is not null)`.mapWith(schema.leadTasks.dueAt),
         planName: schema.carrierPlans.name,
         createdAt: schema.leads.createdAt,
         stageEnteredAt: schema.leads.stageEnteredAt,
@@ -176,29 +186,8 @@ async function LeadsPageContent({
       .orderBy(desc(schema.leads.createdAt))
       .limit(500));
 
-    const lightPendingTasks = lightLeads.length
-      ? await withPerfSpan("leads.light.pending_tasks", () => getDatabase()
-          .select({ leadId: schema.leadTasks.leadId, dueAt: schema.leadTasks.dueAt })
-          .from(schema.leadTasks)
-          .where(
-            and(
-              eq(schema.leadTasks.tenantId, context.tenantId),
-              inArray(schema.leadTasks.leadId, lightLeads.map((l) => l.id)),
-              isNull(schema.leadTasks.completedAt),
-              isNotNull(schema.leadTasks.dueAt)
-            )
-          ))
-      : [];
-
     const earliestTaskDue = new Map<string, Date>();
-    for (const task of lightPendingTasks) {
-      if (task.leadId && task.dueAt) {
-        const existing = earliestTaskDue.get(task.leadId);
-        if (!existing || task.dueAt.getTime() < existing.getTime()) {
-          earliestTaskDue.set(task.leadId, task.dueAt);
-        }
-      }
-    }
+    for (const lead of lightLeads) if (lead.earliestTaskDueAt) earliestTaskDue.set(lead.id, lead.earliestTaskDueAt);
 
     const lightItems: LightLeadItem[] = lightLeads.map((lead) => {
       const details =

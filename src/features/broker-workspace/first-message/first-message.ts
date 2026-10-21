@@ -21,8 +21,4 @@ export function buildFirstMessage(input: { leadName: string | null; brokerName: 
 }
 
 /** WhatsApp Web with the number and the text already written (the broker only presses Enter). */
-export function buildWhatsAppWebUrl(phoneDigits: string, text?: string) {
-  const query = new URLSearchParams({ phone: phoneDigits });
-  if (text) query.set("text", text);
-  return `https://web.whatsapp.com/send?${query.toString()}`;
-}
+export { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";

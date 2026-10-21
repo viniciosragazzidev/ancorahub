@@ -187,7 +187,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       now={new Date().toISOString()}
     />;
   }
-  const [metaCampaign, metaAd, metaForm] = await Promise.all([
+  // Lite broker: resolved once per request (cached); the Meta names below only feed the full screen.
+  const isLightBroker = context.role === "broker" && (await getExperienceMode(context)) === "LIGHT";
+  const [metaCampaign, metaAd, metaForm] = isLightBroker ? [[], [], []] : await Promise.all([
     lead.metaCampaignId
       ? db.select({ name: schema.metaCampaigns.name }).from(schema.metaCampaigns)
         .where(and(eq(schema.metaCampaigns.tenantId, context.tenantId), eq(schema.metaCampaigns.campaignId, lead.metaCampaignId))).limit(1)
@@ -207,8 +209,9 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
   const metaLeadDetails = readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
   const qualificationDetails = readQualificationDetails(lead.qualificationDetails);
 
-  const [redistributionNotice] = context.role === "broker"
-    ? await db
+  // Only the Lite screen shows the redistribution notice: it loads with the rest of that screen.
+  const redistributionNoticePromise = isLightBroker
+    ? db
       .select({ reason: schema.leadDistributionEvents.reason, createdAt: schema.leadDistributionEvents.createdAt })
       .from(schema.leadDistributionEvents)
       .where(and(
@@ -219,16 +222,22 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       ))
       .orderBy(desc(schema.leadDistributionEvents.createdAt))
       .limit(1)
-    : [];
+    : Promise.resolve([]);
 
-  if (context.role === "broker" && (await getExperienceMode(context)) === "LIGHT") {
-    const [brokerUser] = await db
-      .select({ name: schema.user.name })
-      .from(schema.user)
-      .where(eq(schema.user.id, context.userId))
-      .limit(1);
-
-    const [lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers] = await Promise.all([
+  if (isLightBroker) {
+    // Phone and e-mail leave the server only after this broker accepted the lead.
+    const lightContact = lightContactFields(lead, { status: lead.status, isCurrentBroker: lead.corretorId === context.userId });
+    // One wave for the whole Lite screen: the record (?ficha=1) needs the broker's
+    // name; the conversation needs the timeline and the WhatsApp mirror.
+    const [[redistributionNotice], brokerUserRows, lightBeneficiaries, lightRequirements, lightLeadDocs, lightCarriers, timelineRows, waMessages] = await Promise.all([
+      redistributionNoticePromise,
+      ficha
+        ? db
+          .select({ name: schema.user.name })
+          .from(schema.user)
+          .where(eq(schema.user.id, context.userId))
+          .limit(1)
+        : Promise.resolve([] as { name: string }[]),
       getLeadBeneficiaries(id),
       getRequirementsForLead(id),
       getLeadDocuments(id),
@@ -236,11 +245,19 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
         .from(schema.carriers)
         .where(and(eq(schema.carriers.tenantId, context.tenantId), eq(schema.carriers.status, "active")))
         .orderBy(schema.carriers.name),
+      ficha ? Promise.resolve(null) : getLeadTimeline(id),
+      // WhatsApp mirror only for the lead's own broker, after accepting it (same rule as the phone).
+      !ficha && lightContact.reveal
+        ? db.select({ id: schema.whatsappMessages.id, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole, mediaKind: schema.whatsappMessages.mediaKind })
+          .from(schema.whatsappMessages)
+          .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id)))
+          .orderBy(desc(schema.whatsappMessages.sentAt))
+          .limit(100)
+        : Promise.resolve([]),
     ]);
+    const [brokerUser] = brokerUserRows;
 
     const lightFormData = readFormData(lead.formData);
-    // Phone and e-mail leave the server only after this broker accepted the lead.
-    const lightContact = lightContactFields(lead, { status: lead.status, isCurrentBroker: lead.corretorId === context.userId });
 
     const lightLead: LightLeadDetailData = {
       id: lead.id,
@@ -297,17 +314,6 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
 
     // Broker app (2026-10-09 chat redesign): the lead is a conversation; ?ficha=1 keeps the full record.
     if (!ficha) {
-      // WhatsApp mirror only for the lead's own broker, after accepting it (same rule as the phone).
-      const [timelineRows, waMessages] = await Promise.all([
-        getLeadTimeline(id),
-        lightContact.reveal
-          ? db.select({ id: schema.whatsappMessages.id, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole, mediaKind: schema.whatsappMessages.mediaKind })
-            .from(schema.whatsappMessages)
-            .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id)))
-            .orderBy(desc(schema.whatsappMessages.sentAt))
-            .limit(100)
-          : Promise.resolve([]),
-      ]);
       const timeline = timelineRows ?? [];
       const intelligence = readLeadIntelligence(lead.qualificationDetails);
       const now = new Date();

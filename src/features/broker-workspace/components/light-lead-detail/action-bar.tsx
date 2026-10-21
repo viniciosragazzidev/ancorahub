@@ -13,7 +13,7 @@ const linkSecondary = `${linkBase} bg-(--surface-muted) text-(--foreground)`;
 
 /**
  * Fixed action pill at the bottom of the lead screen, where the thumb is.
- * New lead: Recusar and Aceitar lead. After accepting: WhatsApp (the one primary
+ * New lead: Recusar and Aceitar e chamar no WhatsApp (one tap). After accepting: WhatsApp (the one primary
  * action), Ligar and Etapa. The phone only exists after acceptance.
  */
 export function LeadActionBar({ lead, c, inline = false }: { lead: LightLeadDetailData; c: LeadDetailController; inline?: boolean }) {
@@ -43,7 +43,7 @@ export function LeadActionBar({ lead, c, inline = false }: { lead: LightLeadDeta
               Recusar
             </Button>
             <Button className="flex-1" loading={accepting} disabled={accepting} onClick={handleAccept}>
-              Aceitar lead
+              Aceitar e chamar no WhatsApp
             </Button>
           </>
         ) : (

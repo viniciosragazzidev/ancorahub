@@ -177,6 +177,28 @@ describe("WhatsApp in the lead conversation", () => {
     expect(script.blocks.find((block) => block.id === "wa-m-caption")).toMatchObject({ text: "Ouve isso", audio: { url: "/api/conversations/media/m-caption" } });
   });
 
+  it("does not draw a \"[text]\" bubble on the client side for a WhatsApp protocol event (bug 2026-10-21)", () => {
+    const script = buildLeadConversationScript({
+      lead: lead(),
+      events: [],
+      viewerId: "me",
+      now,
+      whatsappUrl: null,
+      messages: [
+        { id: "m-real", body: "Oi, tudo bem?", direction: "incoming", sentAt: new Date("2026-10-09T14:55:00.000Z") },
+        { id: "m-empty", body: "[text]", direction: "incoming", sentAt: new Date("2026-10-09T14:56:00.000Z"), mediaKind: null },
+        { id: "m-blank", body: "  ", direction: "incoming", sentAt: new Date("2026-10-09T14:57:00.000Z") },
+        { id: "m-image", body: "[image]", direction: "incoming", sentAt: new Date("2026-10-09T14:58:00.000Z") },
+      ],
+    });
+
+    expect(script.blocks.find((block) => block.id === "wa-m-real")).toMatchObject({ from: "client", text: "Oi, tudo bem?" });
+    expect(script.blocks.find((block) => block.id === "wa-m-empty")).toBeUndefined();
+    expect(script.blocks.find((block) => block.id === "wa-m-blank")).toBeUndefined();
+    expect(script.blocks.find((block) => block.id === "wa-m-image")).toMatchObject({ text: "Imagem indisponível" });
+    expect(JSON.stringify(script.blocks)).not.toContain("[text]");
+  });
+
   it("hides the time of a voice note from the broker when the arrival is hidden", () => {
     const script = buildLeadConversationScript({
       lead: lead(),

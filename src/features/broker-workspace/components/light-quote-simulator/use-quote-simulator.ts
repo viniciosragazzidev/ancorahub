@@ -27,6 +27,8 @@ import {
   type SortMode,
   type Step,
 } from "./constants";
+import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
+import { openWhatsApp as openWhatsAppLink } from "@/lib/whatsapp-open";
 
 /** All state, pricing and handlers of the quote simulator. Prices come from the unchanged pricing module. */
 export function useQuoteSimulator() {
@@ -184,11 +186,7 @@ export function useQuoteSimulator() {
     const summary = "Olá! Segue uma simulação demonstrativa de plano de saúde: "
       + chosenResult.plan.carrier + ", " + chosenResult.plan.name + ", " + beneficiaries.length
       + " vidas, total estimado de " + money(finalMonthly) + " por mês. Valores sujeitos à análise da operadora.";
-    const digits = phone.replace(/\D/g, "");
-    const destination = digits
-      ? "https://wa.me/" + digits + "?text=" + encodeURIComponent(summary)
-      : "https://wa.me/?text=" + encodeURIComponent(summary);
-    window.open(destination, "_blank", "noopener,noreferrer");
+    openWhatsAppLink(buildWhatsAppWebUrl(phone, summary));
   }
 
   function previewLeadLink() {

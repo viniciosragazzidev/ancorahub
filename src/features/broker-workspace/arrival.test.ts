@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatBrokerArrival, isBrokerArrivalToday } from "./arrival";
+import { arrivalDayLabel, formatBrokerArrival, groupByArrivalDay, isBrokerArrivalToday } from "./arrival";
 
 describe("broker lead arrival", () => {
   const now = new Date("2026-10-17T16:00:00-03:00");
@@ -16,5 +16,41 @@ describe("broker lead arrival", () => {
     expect(isBrokerArrivalToday("2026-10-17T23:50:00Z", now)).toBe(true);
     expect(isBrokerArrivalToday("2026-10-16T23:50:00-03:00", now)).toBe(false);
     expect(isBrokerArrivalToday(null, now)).toBe(false);
+  });
+});
+
+describe("broker list by arrival day", () => {
+  const now = new Date("2026-10-21T10:00:00-03:00");
+
+  it("labels the day separators as Hoje, Ontem and dd/mm (weekday) in São Paulo time", () => {
+    expect(arrivalDayLabel("2026-10-21T00:30:00-03:00", now)).toBe("Hoje");
+    // 01:30 UTC on the 21st is still the 20th in São Paulo.
+    expect(arrivalDayLabel("2026-10-21T01:30:00Z", now)).toBe("Ontem");
+    expect(arrivalDayLabel("2026-10-18T15:00:00-03:00", now)).toBe("18/10 (dom)");
+    expect(arrivalDayLabel("2026-10-17T15:00:00-03:00", now)).toBe("17/10 (sáb)");
+    expect(arrivalDayLabel(null, now)).toBe("Sem data");
+  });
+
+  it("orders by arrival, newest first, and groups by day without any priority", () => {
+    const items = [
+      { name: "Velho urgente", at: "2026-10-17T09:00:00-03:00" },
+      { name: "Sem horário", at: null },
+      { name: "Ontem tarde", at: "2026-10-20T18:00:00-03:00" },
+      { name: "Hoje cedo", at: "2026-10-21T08:00:00-03:00" },
+      { name: "Hoje agora", at: "2026-10-21T09:59:00-03:00" },
+      { name: "Ontem cedo", at: "2026-10-20T07:00:00-03:00" },
+    ];
+    const groups = groupByArrivalDay(items, (item) => item.at, now, (item) => item.name);
+    expect(groups.map((group) => group.label)).toEqual(["Hoje", "Ontem", "17/10 (sáb)", "Sem data"]);
+    expect(groups.map((group) => group.items.map((item) => item.name))).toEqual([
+      ["Hoje agora", "Hoje cedo"],
+      ["Ontem tarde", "Ontem cedo"],
+      ["Velho urgente"],
+      ["Sem horário"],
+    ]);
+  });
+
+  it("returns no groups for an empty list", () => {
+    expect(groupByArrivalDay([], () => null, now)).toEqual([]);
   });
 });

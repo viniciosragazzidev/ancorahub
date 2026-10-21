@@ -1,5 +1,6 @@
 "use server";
 
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { and, eq } from "drizzle-orm";
 
@@ -10,6 +11,23 @@ import type { TenantContext } from "@/shared/auth/types";
 export type ExperienceMode = "LIGHT" | "NORMAL";
 
 const COOKIE_NAME = "ancora_experience_mode";
+
+/**
+ * The stored preference, read once per request: the layout, the page and the
+ * rail all ask for the mode, and without a cookie each call was a round trip
+ * through the small database pool.
+ */
+const readPreferredExperienceMode = cache(async (tenantId: string, userId: string) => {
+  const [membership] = await getDatabase()
+    .select({ preferredExperienceMode: schema.tenantMemberships.preferredExperienceMode })
+    .from(schema.tenantMemberships)
+    .where(and(
+      eq(schema.tenantMemberships.tenantId, tenantId),
+      eq(schema.tenantMemberships.userId, userId)
+    ))
+    .limit(1);
+  return membership?.preferredExperienceMode ?? null;
+});
 
 /**
  * Resolves the active experience mode for the current request.
@@ -47,18 +65,9 @@ export async function getExperienceMode(customContext?: TenantContext): Promise<
   if (!context) return "LIGHT";
 
   try {
-    const db = getDatabase();
-    const [membership] = await db
-      .select({ preferredExperienceMode: schema.tenantMemberships.preferredExperienceMode })
-      .from(schema.tenantMemberships)
-      .where(and(
-        eq(schema.tenantMemberships.tenantId, context.tenantId),
-        eq(schema.tenantMemberships.userId, context.userId)
-      ))
-      .limit(1);
-
-    if (membership?.preferredExperienceMode === "LIGHT" || membership?.preferredExperienceMode === "NORMAL") {
-      return membership.preferredExperienceMode as ExperienceMode;
+    const preferred = await readPreferredExperienceMode(context.tenantId, context.userId);
+    if (preferred === "LIGHT" || preferred === "NORMAL") {
+      return preferred as ExperienceMode;
     }
   } catch {
     // Fallback if db column read fails

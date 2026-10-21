@@ -114,6 +114,19 @@ export type WahaWebhookEvent = z.infer<typeof wahaWebhookSchema>;
  * Suporta tanto o payload nativo do motor WAHA ({ event: "message", session: "...", payload: { ... } })
  * quanto payloads já pré-formatados pelo relay.
  */
+/** WAHA message types that are session/protocol events, never something the contact wrote. */
+const WAHA_PROTOCOL_TYPES = new Set([
+  "revoked",
+  "protocol",
+  "e2e_notification",
+  "notification",
+  "notification_template",
+  "call_log",
+  "gp2",
+  "reaction",
+  "broadcast_notification",
+]);
+
 export function normalizeWahaWebhookPayload(payload: unknown): unknown {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
   const raw = payload as Record<string, unknown>;
@@ -207,7 +220,14 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
           ? (innerPayload.media as Record<string, unknown>)
           : null;
 
-      const bodyText = String(innerPayload.body ?? innerPayload.caption ?? "").trim() || `[${mappedType}]`;
+      // Without text, "[text]" marks a session/protocol event (deleted message,
+      // security-code notice, call log, reaction) that ingest ignores. Any other
+      // textless type (button/list reply, poll vote, undecrypted stub) may be the
+      // contact writing, so it is kept as "[unsupported]" and shown as such.
+      const textless = mappedType === "text" && rawType !== "chat" && !WAHA_PROTOCOL_TYPES.has(rawType)
+        ? "[unsupported]"
+        : `[${mappedType}]`;
+      const bodyText = String(innerPayload.body ?? innerPayload.caption ?? "").trim() || textless;
       const source = typeof innerPayload.source === "string" && innerPayload.source.trim()
         ? innerPayload.source.trim().slice(0, 64)
         : undefined;
@@ -223,14 +243,16 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
                   eventId,
               )
             : eventId;
+      // WEBJS serializes the id as "true_<chat>_<id>" for the session owner's
+      // own messages; without this an echo of the broker's message would be
+      // read as the contact writing.
       const fromMe =
         typeof innerPayload.fromMe === "boolean"
           ? innerPayload.fromMe
-          : Boolean(
-              rawMessageId &&
-                typeof rawMessageId === "object" &&
-                (rawMessageId as Record<string, unknown>).fromMe === true,
-            );
+          : rawMessageId && typeof rawMessageId === "object"
+            ? (rawMessageId as Record<string, unknown>).fromMe === true ||
+              String((rawMessageId as Record<string, unknown>)._serialized ?? "").startsWith("true_")
+            : typeof rawMessageId === "string" && rawMessageId.startsWith("true_");
 
       const attached = innerPayload._ancora && typeof innerPayload._ancora === "object"
         ? innerPayload._ancora as Record<string, unknown>

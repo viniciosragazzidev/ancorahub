@@ -6,6 +6,7 @@
 import { z } from "zod";
 
 import type { ChatBlock, ChatChoice } from "@/components/chat/types";
+import { buildWhatsAppWebUrl, parseWhatsAppUrl } from "@/lib/whatsapp-url";
 
 import type { AiProfile } from "./profiles";
 
@@ -105,7 +106,8 @@ export function replyToBlocks(agent: AgentDefinition, reply: AssistantReply, tar
   if (reply.draftMessage) {
     blocks.push({ type: "assistant", id: `ai-draft-${stamp}`, text: `Sugestão de mensagem:\n"${reply.draftMessage}"` });
     if (targets.whatsappUrl) {
-      const href = `${targets.whatsappUrl.split("?")[0]}?text=${encodeURIComponent(reply.draftMessage)}`;
+      // Same chat, the AI draft as the text (the phone stays in the query of the WhatsApp Web link).
+      const href = buildWhatsAppWebUrl(parseWhatsAppUrl(targets.whatsappUrl)?.phone ?? null, reply.draftMessage);
       blocks.push({ type: "button", id: `ai-send-${stamp}`, label: "Abrir no WhatsApp com esse texto", href, tone: "whatsapp" });
     }
   }

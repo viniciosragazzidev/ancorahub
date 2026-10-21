@@ -46,7 +46,7 @@ describe("buildInsightsScript", () => {
     // Insights never copies the transcript: no client message quoted.
     expect(JSON.stringify(script.blocks)).not.toContain("quanto fica o plano");
     const choices = question(script.blocks).choices;
-    expect(choices[0]).toMatchObject({ id: "reply", action: { kind: "href", href: "https://wa.me/5521999998888" } });
+    expect(choices[0]).toMatchObject({ id: "reply", action: { kind: "href", href: "https://web.whatsapp.com/send?phone=5521999998888" } });
     expect(choices[1]?.action).toEqual({ kind: "href", href: "/conversas/broker?insight=a" });
     expect(choices[2]?.action).toEqual({ kind: "href", href: "/leads/a" });
     expect(script.blocks.find((block) => block.id === "i-others")).toMatchObject({ items: [{ id: "b", trailing: "10 min" }] });

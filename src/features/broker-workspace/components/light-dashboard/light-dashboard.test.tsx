@@ -150,7 +150,7 @@ describe("LightDashboard", () => {
     const { unmount } = render(<LightDashboard data={makeData({ nextAction })} greeting="Bom dia" />);
     const now = screen.getByRole("region", { name: "Faça agora" });
     expect(within(now).getByText("Maria Lima")).toBeTruthy();
-    expect(within(now).getByRole("button", { name: "Aceitar lead" })).toBeTruthy();
+    expect(within(now).getByRole("button", { name: "Aceitar e chamar no WhatsApp" })).toBeTruthy();
     unmount();
 
     render(<LightDashboard data={makeData()} greeting="Bom dia" />);

@@ -2,15 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
 import { ChatScreen } from "@/components/chat/chat-screen";
 import styles from "@/components/chat/chat.module.css";
 import type { Mention } from "@/components/chat/composer";
 import type { ChatBlock, ChatScript } from "@/components/chat/types";
 import { recordWhatsAppOpenedAction } from "@/features/leads/whatsapp-open-action";
-import { FirstMessageDialog } from "@/features/broker-workspace/first-message/first-message-dialog";
-import { useMediaQuery } from "@/hooks/use-media-query";
+import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
 
 import { runChatServerAction } from "./chat-actions";
 import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
@@ -35,9 +33,7 @@ export function LeadConversation({
   script: ChatScript;
 }) {
   const router = useRouter();
-  // On a computer "WhatsApp" opens the first-message dialog (send from the system or connect); phones open the app.
-  const desktop = useMediaQuery("(min-width: 1024px) and (pointer: fine)");
-  const [firstMessageOpen, setFirstMessageOpen] = useState(false);
+  // "WhatsApp" goes straight to the client's chat (Vinicios, 2026-10-21): WhatsApp Web on the computer, the app on the phone.
   return (
     <div className="arc-venancor h-full min-h-0">
       <ChatScreen
@@ -54,11 +50,8 @@ export function LeadConversation({
         onButtonOpen={(block, event) => {
           if (block.tone !== "whatsapp") return;
           void recordWhatsAppOpenedAction(leadId);
-          // An AI draft keeps its own text: only the plain "Abrir WhatsApp" goes to the dialog.
-          if (desktop && !block.id.startsWith("ai-send")) {
-            event.preventDefault();
-            setFirstMessageOpen(true);
-          }
+          // The app-wide WhatsApp link handler opens it (Web tab or app); nothing in between.
+          void event;
         }}
         headerAction={
           <Link href={`/leads/${leadId}?ficha=1`} className={styles.iconButton} data-tour="micro-conv-ficha" aria-label="Ver ficha completa">
@@ -69,14 +62,13 @@ export function LeadConversation({
           const stamp = Date.now();
           if (value === "wa-later") return [{ type: "assistant", id: `wa-later-${stamp}`, text: "Sem problema. Quando falar, me conta aqui que eu registro." }];
           if (!value.startsWith(WHATSAPP_LOCAL_PREFIX)) return [];
-          // Same tap as the reply: the phone opens WhatsApp (never a blocked popup); the computer opens the dialog.
+          // Same tap as the reply: WhatsApp opens right away (Web tab on the computer, the app on the phone).
           void recordWhatsAppOpenedAction(leadId);
-          if (desktop) setFirstMessageOpen(true);
-          else window.open(value.slice(WHATSAPP_LOCAL_PREFIX.length), "_blank", "noopener");
+          openWhatsApp(value.slice(WHATSAPP_LOCAL_PREFIX.length));
           // Back from WhatsApp: one tap confirms the contact (kept in the lead's history).
           const first = name.split(/\s+/)[0] || name;
           return [
-            { type: "assistant", id: `wa-open-${stamp}`, text: desktop ? "Abrindo a mensagem…" : "Abrindo o WhatsApp…" },
+            { type: "assistant", id: `wa-open-${stamp}`, text: "Abrindo o WhatsApp…" },
             {
               type: "question",
               id: `wa-confirm-${stamp}`,
@@ -90,11 +82,21 @@ export function LeadConversation({
           ];
         }}
         runAction={async (action) => {
-          const result = await runChatServerAction(action.name, action.payload);
+          // "Aceitar e chamar no WhatsApp": the WhatsApp tab opens inside the tap (before the await), then goes to the chat.
+          const whatsapp = action.name === "lead.registerContact" ? prepareWhatsAppWindow() : null;
+          let result: Awaited<ReturnType<typeof runChatServerAction>>;
+          try {
+            result = await runChatServerAction(action.name, action.payload);
+          } catch (error) {
+            whatsapp?.cancel();
+            throw error;
+          }
           if (result.ok && action.name === "lead.decline") router.push("/minha-fila");
-          // Registering the first contact returns the WhatsApp link: a button right below opens it.
+          const opened = Boolean(whatsapp && result.ok && result.href?.startsWith("http") && whatsapp.go(result.href));
+          if (!opened) whatsapp?.cancel();
+          if (opened) void recordWhatsAppOpenedAction(leadId);
+          // The link stays as a button right below, to open the chat again.
           const followUp: ChatBlock[] = result.ok && result.href?.startsWith("http") ? [whatsappButton(`b-whatsapp-${Date.now()}`, result.href)] : [];
-          if (desktop && action.name === "lead.registerContact" && result.ok) setFirstMessageOpen(true);
           return { ok: result.ok, message: result.message, warning: result.warning, followUp };
         }}
         onFreeText={async (text): Promise<ChatBlock[]> => {
@@ -113,7 +115,6 @@ export function LeadConversation({
           return [];
         }}
       />
-      {desktop ? <FirstMessageDialog leadId={leadId} open={firstMessageOpen} onOpenChange={setFirstMessageOpen} onSent={() => router.refresh()} /> : null}
     </div>
   );
 }

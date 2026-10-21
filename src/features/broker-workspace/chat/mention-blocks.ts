@@ -11,6 +11,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
 import { actionPreview, initials } from "./assistant-scripts";
+import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 
 /**
  * The "@" of the broker chat: shortcuts that bring live blocks into the
@@ -152,7 +153,7 @@ function readDetail(details: unknown, key: string): string | null {
 function whatsappHref(phone: string | null) {
   const digits = (phone ?? "").replace(/\D/g, "");
   if (digits.length < 10) return null;
-  return `https://wa.me/${digits.startsWith("55") ? digits : `55${digits}`}`;
+  return buildWhatsAppUrl(phone);
 }
 
 /** The lead's quick card. Brokers only see their own leads. */

@@ -230,7 +230,7 @@ describe("broker chat assistant scripts", () => {
     const questions = questionBlocks(script);
     expect(script.blocks[0]).toMatchObject({ type: "date", label: "Hoje, 12:00" });
     expect(script.blocks[1]).toMatchObject({ type: "assistant", text: expect.stringMatching(/^Boa tarde, Ana! /) });
-    expect(questions[0]?.choices.map(({ label }) => label)).toEqual(["Aceitar", "Ver a ficha", "Recusar"]);
+    expect(questions[0]?.choices.map(({ label }) => label)).toEqual(["Aceitar e chamar no WhatsApp", "Ver a ficha", "Recusar"]);
     expect(questions[0]?.choices[0]?.action).toEqual({ kind: "server", name: "lead.accept", payload: { leadId: "lead-1" } });
     expect(questions[0]?.choices[1]?.action).toEqual({ kind: "href", href: "/leads/lead-1" });
     expect(questions[0]?.choices[2]?.action).toEqual({ kind: "next", questionId: "decline-lead-1" });

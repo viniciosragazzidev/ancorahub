@@ -35,7 +35,7 @@ describe("buildBrokerNowItems", () => {
     });
 
     expect(items.map((item) => item.id)).toEqual(["accept-accept-first", "reply-reply-new", "return-return-1"]);
-    expect(items[0]).toMatchObject({ actionLabel: "Aceitar", href: "/leads/accept-first", expiresAt: "2026-10-17T18:04:00.000Z" });
+    expect(items[0]).toMatchObject({ actionLabel: "Aceitar e chamar", href: "/leads/accept-first", expiresAt: "2026-10-17T18:04:00.000Z" });
     expect(items[0]?.detail).toContain("Plantão PRESENCIAL TARDE");
   });
 

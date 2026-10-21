@@ -2,6 +2,8 @@
  * Utilitários consolidados para manipulação de telefones.
  */
 
+import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
+
 // ─── Limpeza de dígitos ─────────────────────────────────────────────────────
 
 /**
@@ -66,6 +68,5 @@ export function maskPhone(value?: string | null): string {
  * Constrói link direto para WhatsApp com mensagem pré-preenchida.
  */
 export function buildWhatsAppLink(phone: string, message: string): string {
-  const encoded = encodeURIComponent(message);
-  return `https://wa.me/${ensureBrazilPhone(phone)}?text=${encoded}`;
+  return buildWhatsAppWebUrl(ensureBrazilPhone(phone), message);
 }

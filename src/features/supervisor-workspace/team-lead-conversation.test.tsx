@@ -30,6 +30,16 @@ describe("TeamLeadConversation", () => {
     expect(blocks[2]).toMatchObject({ type: "whatsapp", text: "Imagem" });
   });
 
+  it("hides contentless \"[text]\" rows instead of showing them as the client writing (bug 2026-10-21)", () => {
+    const blocks = readOnlyWhatsAppBlocks([
+      ...messages,
+      { id: "4", body: "[text]", at: "2026-10-15T12:03:00.000Z", fromClient: true, byAi: false, mediaKind: null },
+      { id: "5", body: "[sticker]", at: "2026-10-15T12:04:00.000Z", fromClient: true, byAi: false, mediaKind: null },
+    ]);
+    expect(blocks.map((block) => block.id)).toEqual(["team-wa-1", "team-wa-2", "team-wa-3", "team-wa-5"]);
+    expect(blocks[3]).toMatchObject({ text: "Figurinha" });
+  });
+
   it("renders the team conversation read only", () => {
     render(<TeamLeadConversation brokerWhatsAppConnected conversation={{ leadId: "lead-1", leadName: "Marina Alves", brokerName: "Paulo Dias", messages }} />);
     expect(screen.getByRole("heading", { name: "Conversa do WhatsApp" })).toBeTruthy();

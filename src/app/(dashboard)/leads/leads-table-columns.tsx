@@ -32,6 +32,8 @@ import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/featu
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { WhatsappLogo } from "@/components/huge-icons";
 import Link from "next/link";
+import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
+import { openWhatsApp } from "@/lib/whatsapp-open";
 
 const STATUS_CONFIG: Record<
   string,
@@ -532,7 +534,7 @@ export const getLeadsColumns = (
               {phoneDigits && (
                 <DropdownMenuItem
                   onClick={() => {
-                    window.open(`https://wa.me/55${phoneDigits}`, "_blank");
+                    openWhatsApp(buildWhatsAppWebUrl(phoneDigits));
                   }}
                   className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold"
                 >

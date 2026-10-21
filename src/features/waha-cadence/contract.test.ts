@@ -297,4 +297,32 @@ describe("WAHA group messages from a privacy id", () => {
     expect(event.message?.isGroup).toBe(true);
     expect(event.message?.from).toBe("567890123456789");
   });
+  it("maps a WAHA protocol event without text or file to the [text] placeholder (ignored by the inbound)", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: "message.any",
+      session: "broker-session",
+      payload: { id: "false_5521999990000@c.us_ABC", from: "5521999990000@c.us", to: "5521988887777@c.us", body: "", type: "e2e_notification", fromMe: false, timestamp: 1_760_000_000 },
+    }));
+    expect(event.message).toMatchObject({ type: "text", body: "[text]", fromMe: false });
+  });
+
+  it("keeps a textless reply the contact may have written (poll vote, button reply, undecrypted) as unsupported", () => {
+    for (const type of ["poll_vote", "buttons_response", "ciphertext"]) {
+      const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+        event: "message.any",
+        session: "broker-session",
+        payload: { id: `false_5521999990000@c.us_${type}`, from: "5521999990000@c.us", to: "5521988887777@c.us", body: "", type, fromMe: false, timestamp: 1_760_000_000 },
+      }));
+      expect(event.message).toMatchObject({ type: "text", body: "[unsupported]" });
+    }
+  });
+
+  it("reads the broker's own message as fromMe from a WEBJS serialized id when fromMe is absent", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: "message.any",
+      session: "broker-session",
+      payload: { id: "true_5521999990000@c.us_ABC", from: "5521988887777@c.us", to: "5521999990000@c.us", body: "Bom dia", timestamp: 1_760_000_000 },
+    }));
+    expect(event.message).toMatchObject({ fromMe: true, to: "5521999990000" });
+  });
 });

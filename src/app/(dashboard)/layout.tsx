@@ -28,6 +28,7 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
 import { WhatsAppPlantaoNotice } from "@/components/whatsapp/whatsapp-plantao-notice";
+import { WhatsAppLinkHandler } from "@/components/whatsapp/whatsapp-link-handler";
 import { hasPermission } from "@/shared/auth/permissions";
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRouteDefinition } from "@/features/custom-roles/routes";
@@ -72,46 +73,70 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const managerLitePromise = isManagerLiteAvailable(context);
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
   const headersPromise = headers();
-  const tenantPromise = getDatabase()
+  // Tenant branding, the signed-in user and their membership in one round trip:
+  // the layout renders on every navigation and every realtime refresh, and the
+  // production pool has only a handful of sockets for the whole team.
+  const shellPromise = getDatabase()
     .select({
-      name: schema.tenants.name,
+      tenantName: schema.tenants.name,
       brandColor: schema.tenants.brandColor,
       logoUrl: schema.tenants.logoUrl,
-    })
-    .from(schema.tenants)
-    .where(eq(schema.tenants.id, context.tenantId))
-    .limit(1);
-
-  const userPromise = getDatabase()
-    .select({
-      name: schema.user.name,
-      email: schema.user.email,
+      userName: schema.user.name,
+      userEmail: schema.user.email,
       isPlatformAdmin: schema.user.isPlatformAdmin,
-    })
-    .from(schema.user)
-    .where(eq(schema.user.id, context.userId))
-    .limit(1);
-
-  const membershipPromise = getDatabase()
-    .select({
       availabilityStatus: schema.tenantMemberships.availabilityStatus,
       leadToastEnabled: schema.tenantMemberships.leadToastEnabled,
     })
-    .from(schema.tenantMemberships)
-    .where(
+    .from(schema.tenants)
+    .leftJoin(schema.user, eq(schema.user.id, context.userId))
+    .leftJoin(
+      schema.tenantMemberships,
       and(
-        eq(schema.tenantMemberships.tenantId, context.tenantId),
+        eq(schema.tenantMemberships.tenantId, schema.tenants.id),
         eq(schema.tenantMemberships.userId, context.userId),
       ),
     )
+    .where(eq(schema.tenants.id, context.tenantId))
     .limit(1);
+  // Started now, not after the redirects below: each one is independent of the others.
+  const pathnamePromise = headersPromise.then((list) => list.get("x-pathname") || "");
+  const routeAccessPromise = pathnamePromise.then((pathname) => {
+    const definition = getRouteDefinition(pathname.split("?")[0]);
+    if (!definition || pathname === "") return true;
+    return hasEffectiveRouteAccess({
+      tenantId: context.tenantId,
+      role: context.role,
+      jobTitle: context.jobTitle,
+      customRoleId: context.customRoleId ?? null,
+      routeKey: definition.key,
+      fallbackPermission: definition.fallbackPermission,
+    });
+  });
+  // Leads waiting for this broker to accept: badge on the Fila tab of the app shell.
+  const queueBadgeCountPromise = context.role === "broker"
+    ? experienceModePromise.then(async (mode) => mode !== "LIGHT" ? 0 : Number((await getDatabase()
+      .select({ total: count() })
+      .from(schema.leads)
+      .where(and(
+        eq(schema.leads.tenantId, context.tenantId),
+        eq(schema.leads.corretorId, context.userId),
+        inArray(schema.leads.status, ["distributed", "new"]),
+        isNull(schema.leads.archivedAt),
+        isNull(schema.leads.deletedAt),
+      )))[0]?.total ?? 0))
+    : Promise.resolve(0);
+  const realtimeSyncPromise = isRealtimeSyncEnabled();
+  const teamManagementPromise = context.role === "manager" ? isTeamManagementEnabled() : Promise.resolve(false);
+  // Keep a rejected early start from surfacing as unhandled when a redirect ends the render first.
+  routeAccessPromise.catch(() => undefined);
+  queueBadgeCountPromise.catch(() => undefined);
+  realtimeSyncPromise.catch(() => undefined);
+  teamManagementPromise.catch(() => undefined);
 
   const [
     experienceMode,
     headersList,
-    tenantRows,
-    userRows,
-    membershipRows,
+    shellRows,
     cleanUiEnabled,
     brokerDutyCalendarFlag,
     brokerJourneyFlag,
@@ -125,9 +150,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
-    tenantPromise,
-    userPromise,
-    membershipPromise,
+    shellPromise,
     cleanUiPromise,
     brokerDutyCalendarFlagPromise,
     brokerJourneyFlagPromise,
@@ -141,7 +164,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
-  const teamManagementFlag = context.role === "manager" ? await isTeamManagementEnabled() : false;
+  const teamManagementFlag = await teamManagementPromise;
   const isLightBroker = context.role === "broker" && experienceMode === "LIGHT";
   // Supervisor Lite (S2): same chrome, team screens only.
   const isLightSupervisor = supervisorLiteAvailable && experienceMode === "LIGHT";
@@ -172,44 +195,22 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     }
   }
 
-  const routeDefinition = getRouteDefinition(pathname.split("?")[0]);
-  if (routeDefinition && pathname !== "") {
-    const canAccessRoute = await hasEffectiveRouteAccess({
-      tenantId: context.tenantId,
-      role: context.role,
-      jobTitle: context.jobTitle,
-      customRoleId: context.customRoleId ?? null,
-      routeKey: routeDefinition.key,
-      fallbackPermission: routeDefinition.fallbackPermission,
-    });
-    if (!canAccessRoute) redirect("/access-denied");
-  }
+  if (!(await routeAccessPromise)) redirect("/access-denied");
 
-  // Leads waiting for this broker to accept: badge on the Fila tab of the app shell.
-  const queueBadgeCount = isLightBroker
-    ? Number((await getDatabase()
-      .select({ total: count() })
-      .from(schema.leads)
-      .where(and(
-        eq(schema.leads.tenantId, context.tenantId),
-        eq(schema.leads.corretorId, context.userId),
-        inArray(schema.leads.status, ["distributed", "new"]),
-        isNull(schema.leads.archivedAt),
-        isNull(schema.leads.deletedAt),
-      )))[0]?.total ?? 0)
-    : 0;
+  const [queueBadgeCount, realtimeSyncEnabled] = await Promise.all([queueBadgeCountPromise, realtimeSyncPromise]);
 
-  const [tenant] = tenantRows;
-  const [currentUser] = userRows;
+  const [shell] = shellRows;
+  const tenant = shell ? { name: shell.tenantName, brandColor: shell.brandColor, logoUrl: shell.logoUrl } : undefined;
+  const currentUser = shell && shell.userName !== null ? { name: shell.userName, email: shell.userEmail, isPlatformAdmin: shell.isPlatformAdmin } : undefined;
   // "Ver como": the real signed-in user is a platform admin (while viewing, context.viewAs says so).
   const viewAsState = {
     canViewAs: Boolean(context.viewAs) || Boolean(currentUser?.isPlatformAdmin),
     viewingAs: context.viewAs ? { name: currentUser?.name ?? "usuário", role: context.role } : null,
   };
-  const [membership] = membershipRows;
+  const membership = shell && shell.availabilityStatus !== null ? { availabilityStatus: shell.availabilityStatus, leadToastEnabled: shell.leadToastEnabled } : undefined;
   // With realtime switched off the server sends no signals; a null topic makes
   // the client fall back to periodic reconciliation instead of trusting a silent channel.
-  const syncTopic = (await isRealtimeSyncEnabled())
+  const syncTopic = realtimeSyncEnabled
     ? getRealtimeSyncTopic({ tenantId: context.tenantId, userId: context.userId })
     : null;
 
@@ -258,6 +259,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           <NotificationCountProvider userId={context.userId}>
             <FeedbackToastHandler userId={context.userId} />
             <PasskeyToastHandler userId={context.userId} />
+            <WhatsAppLinkHandler />
             {context.role === "broker" && whatsappPlantaoNoticeFlag === "true" && whatsappConnection && whatsappConnection.status !== "ready" ? (
               <WhatsAppPlantaoNotice userId={context.userId} mode="daily" />
             ) : null}

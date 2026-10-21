@@ -182,32 +182,65 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
       .limit(20),
   ]);
 
-  const duty = await buildDutySummary({
-    tenantId: context.tenantId,
-    rows: dutyInputs.rows,
-    publishedRows: dutyInputs.publishedRows,
-    now,
-    monthlySchedulingEnabled: todayCountRows[0]?.monthlySchedulingEnabled === "true",
-    presenceRequired: todayCountRows[0]?.presenceConfirmationEnabled === "true",
-    availabilityStatus: profile[0]?.availabilityStatus ?? "available",
-  });
-
   const leadIds = leads.map((lead) => lead.id);
-  const latestMessagesSubquery = leadIds.length
-    ? db
-      .select({
-        leadId: schema.whatsappMessages.leadId,
-        direction: schema.whatsappMessages.direction,
-        sentAt: schema.whatsappMessages.sentAt,
-        rowNumber: sql<number>`row_number() over (partition by ${schema.whatsappMessages.leadId} order by ${schema.whatsappMessages.sentAt} desc)`.as("row_number"),
-      })
-      .from(schema.whatsappMessages)
-      .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), inArray(schema.whatsappMessages.leadId, leadIds)))
-      .as("workspace_latest_messages")
-    : null;
-  const latestMessages = latestMessagesSubquery
-    ? await db.select({ leadId: latestMessagesSubquery.leadId, direction: latestMessagesSubquery.direction, sentAt: latestMessagesSubquery.sentAt }).from(latestMessagesSubquery).where(eq(latestMessagesSubquery.rowNumber, 1))
-    : [];
+  // The latest message of each active lead, one index probe per lead (lateral
+  // + limit 1): the old row_number() window read the whole history of up to
+  // 200 conversations on every Início render and realtime refresh.
+  const latestMessage = db
+    .select({ direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt })
+    .from(schema.whatsappMessages)
+    .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, schema.leads.id)))
+    .orderBy(desc(schema.whatsappMessages.sentAt))
+    .limit(1)
+    .as("workspace_latest_message");
+
+  // Duty summary, latest messages and the per-lead supplements are independent:
+  // one wave of queries instead of three sequential ones.
+  const [duty, latestMessages, [tasks, documents, quotes, goals, notifications]] = await Promise.all([
+    buildDutySummary({
+      tenantId: context.tenantId,
+      rows: dutyInputs.rows,
+      publishedRows: dutyInputs.publishedRows,
+      now,
+      monthlySchedulingEnabled: todayCountRows[0]?.monthlySchedulingEnabled === "true",
+      presenceRequired: todayCountRows[0]?.presenceConfirmationEnabled === "true",
+      availabilityStatus: profile[0]?.availabilityStatus ?? "available",
+    }),
+    leadIds.length
+      ? db
+        .select({ leadId: schema.leads.id, direction: latestMessage.direction, sentAt: latestMessage.sentAt })
+        .from(schema.leads)
+        .innerJoinLateral(latestMessage, sql`true`)
+        .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, leadIds)))
+      : Promise.resolve([] as { leadId: string; direction: string; sentAt: Date }[]),
+    Promise.all([
+      db
+        .select({ id: schema.leadTasks.id, leadId: schema.leadTasks.leadId, title: schema.leadTasks.title, dueAt: schema.leadTasks.dueAt, priority: schema.leadTasks.priority, createdAt: schema.leadTasks.createdAt })
+        .from(schema.leadTasks)
+        .where(and(eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leadTasks.assignedTo, context.userId), isNull(schema.leadTasks.completedAt)))
+        .orderBy(asc(schema.leadTasks.dueAt), desc(schema.leadTasks.createdAt))
+        .limit(30),
+      leadIds.length
+        ? db.select({ leadId: schema.leadDocuments.leadId }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.tenantId, context.tenantId), inArray(schema.leadDocuments.leadId, leadIds), eq(schema.leadDocuments.status, "pending"), isNull(schema.leadDocuments.deletedAt)))
+        : Promise.resolve([] as { leadId: string }[]),
+      leadIds.length
+        ? db.select({ leadId: schema.quotes.leadId }).from(schema.quotes).where(and(eq(schema.quotes.tenantId, context.tenantId), inArray(schema.quotes.leadId, leadIds), inArray(schema.quotes.status, ["shared", "sent"])))
+        : Promise.resolve([] as { leadId: string }[]),
+      db
+        .select({ name: schema.goals.name, targetValue: schema.goals.targetValue, currentValue: schema.goalProgress.currentValue, percentage: schema.goalProgress.percentage })
+        .from(schema.goals)
+        .leftJoin(schema.goalProgress, eq(schema.goals.id, schema.goalProgress.goalId))
+        .where(and(eq(schema.goals.tenantId, context.tenantId), eq(schema.goals.scope, "broker"), eq(schema.goals.scopeId, context.userId), eq(schema.goals.active, true), lte(schema.goals.startDate, now), gte(schema.goals.endDate, now)))
+        .orderBy(asc(schema.goals.endDate))
+        .limit(1),
+      db
+        .select({ id: schema.notifications.id, title: schema.notifications.title, message: schema.notifications.message, leadId: schema.notifications.leadId, readAt: schema.notifications.readAt, createdAt: schema.notifications.createdAt })
+        .from(schema.notifications)
+        .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId)))
+        .orderBy(desc(schema.notifications.createdAt))
+        .limit(8),
+    ]),
+  ]);
 
   const latestMessageByLead = new Map<string, { direction: string; sentAt: Date }>();
   for (const message of latestMessages) {
@@ -216,33 +249,6 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
     }
   }
 
-  const [tasks, documents, quotes, goals, notifications] = await Promise.all([
-    db
-      .select({ id: schema.leadTasks.id, leadId: schema.leadTasks.leadId, title: schema.leadTasks.title, dueAt: schema.leadTasks.dueAt, priority: schema.leadTasks.priority, createdAt: schema.leadTasks.createdAt })
-      .from(schema.leadTasks)
-      .where(and(eq(schema.leadTasks.tenantId, context.tenantId), eq(schema.leadTasks.assignedTo, context.userId), isNull(schema.leadTasks.completedAt)))
-      .orderBy(asc(schema.leadTasks.dueAt), desc(schema.leadTasks.createdAt))
-      .limit(30),
-    leadIds.length
-      ? db.select({ leadId: schema.leadDocuments.leadId }).from(schema.leadDocuments).where(and(eq(schema.leadDocuments.tenantId, context.tenantId), inArray(schema.leadDocuments.leadId, leadIds), eq(schema.leadDocuments.status, "pending"), isNull(schema.leadDocuments.deletedAt)))
-      : Promise.resolve([] as { leadId: string }[]),
-    leadIds.length
-      ? db.select({ leadId: schema.quotes.leadId }).from(schema.quotes).where(and(eq(schema.quotes.tenantId, context.tenantId), inArray(schema.quotes.leadId, leadIds), inArray(schema.quotes.status, ["shared", "sent"])))
-      : Promise.resolve([] as { leadId: string }[]),
-    db
-      .select({ name: schema.goals.name, targetValue: schema.goals.targetValue, currentValue: schema.goalProgress.currentValue, percentage: schema.goalProgress.percentage })
-      .from(schema.goals)
-      .leftJoin(schema.goalProgress, eq(schema.goals.id, schema.goalProgress.goalId))
-      .where(and(eq(schema.goals.tenantId, context.tenantId), eq(schema.goals.scope, "broker"), eq(schema.goals.scopeId, context.userId), eq(schema.goals.active, true), lte(schema.goals.startDate, now), gte(schema.goals.endDate, now)))
-      .orderBy(asc(schema.goals.endDate))
-      .limit(1),
-    db
-      .select({ id: schema.notifications.id, title: schema.notifications.title, message: schema.notifications.message, leadId: schema.notifications.leadId, readAt: schema.notifications.readAt, createdAt: schema.notifications.createdAt })
-      .from(schema.notifications)
-      .where(and(eq(schema.notifications.tenantId, context.tenantId), eq(schema.notifications.recipientUserId, context.userId)))
-      .orderBy(desc(schema.notifications.createdAt))
-      .limit(8),
-  ]);
 
   const pendingDocumentsByLead = new Map<string, number>();
   for (const document of documents) pendingDocumentsByLead.set(document.leadId, (pendingDocumentsByLead.get(document.leadId) ?? 0) + 1);
@@ -260,13 +266,7 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
   const priorityTasks: BrokerWorkspacePriorityTask[] = tasks.map((task) => ({ ...task, priority: task.priority as BrokerWorkspacePriorityTask["priority"] }));
   const priorities = prioritizeBrokerWorkspace({ leads: priorityLeads, tasks: priorityTasks, slaFirstContactMinutes: parseSlaMinutes(profile[0]?.slaFirstContactMinutes) });
   const priorityByLead = new Map<string, BrokerWorkspacePriority>();
-  const priorityRankByLead = new Map<string, number>();
-  for (const [index, priority] of priorities.entries()) {
-    if (!priorityByLead.has(priority.leadId)) {
-      priorityByLead.set(priority.leadId, priority);
-      priorityRankByLead.set(priority.leadId, index);
-    }
-  }
+  for (const priority of priorities) if (!priorityByLead.has(priority.leadId)) priorityByLead.set(priority.leadId, priority);
   const unreadNotifications = notifications.filter((notification) => !notification.readAt);
 
   const inbox = [
@@ -298,8 +298,9 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
   const pendingOfferByLead = new Map<string, (typeof pendingOffers)[number]>();
   for (const offer of pendingOffers) if (!pendingOfferByLead.has(offer.leadId)) pendingOfferByLead.set(offer.leadId, offer);
   const leadNameById = new Map(leads.map((lead) => [lead.id, lead.name]));
-  // Leads that reached the broker today come first, newest first: older leads
-  // with a pending reply were taking the top and brokers lost today's arrivals.
+  // Order of arrival to this broker (offer time while pending, then the
+  // acceptance/assignment), newest first. No priority or score: brokers asked
+  // to read the list as the leads came (21/10); the screen splits it by day.
   const arrivalOf = (lead: (typeof leads)[number]) => pendingOfferByLead.get(lead.id)?.offeredAt ?? lead.assignedAt ?? null;
   const arrivedToday = (lead: (typeof leads)[number]) => {
     const arrivedAt = arrivalOf(lead);
@@ -308,18 +309,12 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
   const todayLeadIds = new Set(leads.filter(arrivedToday).map((lead) => lead.id));
   const queue = [...leads]
     .sort((left, right) => {
-      const todayLeft = arrivedToday(left);
-      const todayRight = arrivedToday(right);
-      if (todayLeft !== todayRight) return todayLeft ? -1 : 1;
       const arrivedLeft = arrivalOf(left)?.getTime() ?? Number.NEGATIVE_INFINITY;
       const arrivedRight = arrivalOf(right)?.getTime() ?? Number.NEGATIVE_INFINITY;
       if (arrivedLeft !== arrivedRight) return arrivedRight - arrivedLeft;
-      if (todayLeft) return 0;
-      const normalizedLeft = priorityRankByLead.get(left.id) ?? Number.MAX_SAFE_INTEGER;
-      const normalizedRight = priorityRankByLead.get(right.id) ?? Number.MAX_SAFE_INTEGER;
-      return normalizedLeft !== normalizedRight ? normalizedLeft - normalizedRight : left.name.localeCompare(right.name);
+      return left.name.localeCompare(right.name, "pt-BR");
     })
-    .slice(0, 8)
+    .slice(0, 50)
     .map((lead) => ({ id: lead.id, name: lead.name, status: lead.status, source: lead.source, arrivedAt: arrivalOf(lead), nextAction: priorityByLead.get(lead.id) ?? null }));
 
   return {

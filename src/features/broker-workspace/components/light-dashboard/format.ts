@@ -54,7 +54,7 @@ export const ACTION_PRESENTATION: Record<ActionKind, ActionPresentation> = {
   awaiting_response: { chip: "Respondeu", tone: "success", button: "Ver conversa", href: (id) => `/conversas/broker?leadId=${id}` },
   sla_overdue: { chip: "Prazo vencido", tone: "warning", button: "Atender agora", href: leadHref },
   sla_risk: { chip: "Prazo em risco", tone: "warning", button: "Atender agora", href: leadHref },
-  new_lead: { chip: "Novo lead", tone: "info", button: "Aceitar lead", href: leadHref },
+  new_lead: { chip: "Novo lead", tone: "info", button: "Aceitar e chamar no WhatsApp", href: leadHref },
   task_overdue: { chip: "Tarefa atrasada", tone: "warning", button: "Ver tarefa", href: leadHref },
   return_due: { chip: "Retorno hoje", tone: "info", button: "Ver retorno", href: leadHref },
   proposal_pending: { chip: "Cotação", tone: "neutral", button: "Retomar cotação", href: leadHref },

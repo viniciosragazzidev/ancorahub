@@ -19,8 +19,8 @@ describe("nextActionOf", () => {
     expect(nextActionOf(priority({ kind: "sla_overdue", severity: "critical" }), null, now)).toMatchObject({ label: "Atender Carla", urgent: true });
   });
 
-  it("a new lead becomes 'Aceitar Atendimento', urgent, accepting it right there", () => {
-    expect(nextActionOf(priority({ kind: "new_lead", title: "Amilton Damasceno" }), null, now)).toMatchObject({ label: "Aceitar Atendimento", urgent: true, acceptLeadId: "l1" });
+  it("a new lead becomes 'Aceitar e chamar no WhatsApp', urgent, accepting it right there", () => {
+    expect(nextActionOf(priority({ kind: "new_lead", title: "Amilton Damasceno" }), null, now)).toMatchObject({ label: "Aceitar e chamar no WhatsApp", urgent: true, acceptLeadId: "l1" });
   });
 
   it("falls back to a mission one step from done, the richest first", () => {

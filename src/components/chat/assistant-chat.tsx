@@ -10,6 +10,8 @@ import { askAssistantAction } from "@/features/ai-gateway/ask-assistant";
 import type { AgentId } from "@/features/ai-gateway/agents";
 import { ASSISTANTS, JACK_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 
+import { prepareWhatsAppWindow } from "@/lib/whatsapp-open";
+
 import { ChatScreen } from "./chat-screen";
 import type { Mention } from "./composer";
 import type { ChatBlock, ChatScript, MascotShape } from "./types";
@@ -34,10 +36,21 @@ export function AssistantChat({ identity, script, instant = false, headerAction,
       headerAction={headerAction}
       topNotice={topNotice}
       runAction={async (action) => {
-        const result = await runChatServerAction(action.name, action.payload);
+        // Accepting opens the client's WhatsApp in the same tap: the tab opens before the await (popup blockers).
+        const whatsapp = action.name === "lead.accept" || action.name === "lead.registerContact" ? prepareWhatsAppWindow() : null;
+        let result: Awaited<ReturnType<typeof runChatServerAction>>;
+        try {
+          result = await runChatServerAction(action.name, action.payload);
+        } catch (error) {
+          whatsapp?.cancel();
+          throw error;
+        }
+        const whatsappHref = action.name === "lead.accept" ? result.whatsapp : result.href?.startsWith("https://") ? result.href : undefined;
+        const opened = Boolean(whatsapp && result.ok && whatsappHref && whatsapp.go(whatsappHref));
+        if (!opened) whatsapp?.cancel();
         if (action.name === "lead.accept" && result.ok && result.href?.startsWith("/") && !result.href.startsWith("//")) {
           router.push(result.href);
-          return { ok: true, message: "Aceito. Abrindo o lead agora.", warning: result.warning, followUp: [] };
+          return { ok: true, message: opened ? "Aceito. Abrindo o WhatsApp do cliente." : "Aceito. Abrindo o lead agora.", warning: result.warning, followUp: [] };
         }
         // Other local actions keep their destination available as the next reply.
         const followUp: ChatBlock[] = result.ok && result.href?.startsWith("/") && !result.href.startsWith("//")

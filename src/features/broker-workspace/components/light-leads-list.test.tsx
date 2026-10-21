@@ -67,21 +67,25 @@ describe("LightLeadsList", () => {
   it("opens on Novos with the new lead as a large card with the accept action", () => {
     render(<LightLeadsList leads={leads} />);
 
-    const group = screen.getByRole("region", { name: /Precisa de você agora/ });
+    const group = screen.getByRole("region", { name: /Sem data/ });
     expect(within(group).getByText("Ana Novo")).toBeTruthy();
-    expect(within(group).getByRole("button", { name: "Aceitar lead" })).toBeTruthy();
+    expect(within(group).getByRole("button", { name: /^Aceitar/ })).toBeTruthy();
     expect(screen.queryByText("Carla Tranquila")).toBeNull();
   });
 
-  it("splits Atendendo into the group that needs the broker and the compact rest", () => {
-    render(<LightLeadsList leads={leads} />);
-    fireEvent.click(screen.getByRole("button", { name: /^Atendendo/ }));
+  it("never pulls the leads that need the broker above the order of arrival", () => {
+    const now = Date.now();
+    render(<LightLeadsList initialFilter="active" leads={[
+      { ...base, id: "a2", name: "Carla Tranquila", status: "negotiation", arrivedAt: new Date(now - 60_000) },
+      { ...base, id: "a1", name: "Bruno Respondeu", status: "in_contact", isAwaitingResponse: true, arrivedAt: new Date(now - 3_600_000) },
+    ]} />);
 
-    const group = screen.getByRole("region", { name: /Precisa de você agora/ });
-    expect(within(group).getByText("Bruno Respondeu")).toBeTruthy();
-    expect(within(group).queryByText("Carla Tranquila")).toBeNull();
-    const rest = screen.getByRole("region", { name: "Demais atendimentos" });
-    expect(within(rest).getByText("Carla Tranquila")).toBeTruthy();
+    expect(screen.queryByRole("region", { name: /Precisa de você agora/ })).toBeNull();
+    const names = screen.getAllByRole("link").map((link) => link.textContent ?? "");
+    const carla = names.findIndex((text) => text.includes("Carla Tranquila"));
+    const bruno = names.findIndex((text) => text.includes("Bruno Respondeu"));
+    expect(carla).toBeGreaterThanOrEqual(0);
+    expect(carla).toBeLessThan(bruno);
   });
 
   it("lists overdue leads in Retornos and won and lost leads in Fechados", () => {
@@ -108,7 +112,7 @@ describe("LightLeadsList", () => {
 
     expect(screen.getByRole("heading", { name: /Não encontramos nenhum lead com "zzz"/ })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Limpar busca" }));
-    expect(within(screen.getByRole("list", { name: "Precisa de você agora" })).getByText("Ana Novo")).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: "Sem data" })).getByText("Ana Novo")).toBeTruthy();
   });
 
   it("adds an Em risco tab with every lead at SLA risk, accepted ones included", () => {
@@ -119,7 +123,7 @@ describe("LightLeadsList", () => {
     render(<LightLeadsList leads={withRisk} />);
 
     fireEvent.click(screen.getByRole("button", { name: /^Em risco/ }));
-    const group = screen.getByRole("region", { name: /Precisa de você agora/ });
+    const group = screen.getByRole("region", { name: /Sem data/ });
     expect(within(group).getByText("Gabi Sem Contato")).toBeTruthy();
     expect(within(group).getByText("Prazo em risco")).toBeTruthy();
     expect(screen.queryByText("Carla Tranquila")).toBeNull();
@@ -139,15 +143,18 @@ describe("LightLeadsList", () => {
     expect(arrivalLabel(lead(null), now)).toBeNull();
   });
 
-  it("separates today's leads from older ones", () => {
+  it("splits the list by arrival day: Hoje, Ontem and the date", () => {
     const today = new Date().toISOString();
     const old = new Date(Date.now() - 4 * 86_400_000).toISOString();
     render(<LightLeadsList initialFilter="active" leads={[
       { ...base, id: "t1", name: "Hoje Lead", status: "negotiation", arrivedAt: today },
       { ...base, id: "o1", name: "Antigo Lead", status: "negotiation", arrivedAt: old },
     ]} />);
-    expect(within(screen.getByRole("region", { name: /Recebidos hoje/ })).getByText("Hoje Lead")).toBeTruthy();
-    expect(within(screen.getByRole("region", { name: /Dias anteriores/ })).getByText("Antigo Lead")).toBeTruthy();
+    expect(within(screen.getByRole("region", { name: /^Hoje/ })).getByText("Hoje Lead")).toBeTruthy();
+    const regions = screen.getAllByRole("region").map((region) => region.getAttribute("aria-labelledby") ? document.getElementById(region.getAttribute("aria-labelledby")!)?.textContent ?? "" : "");
+    expect(regions[0]).toMatch(/^Hoje/);
+    expect(regions[1]).toMatch(/^\d{2}\/\d{2} \(\p{L}{3}\)/u);
+    expect(within(screen.getAllByRole("region")[1]!).getByText("Antigo Lead")).toBeTruthy();
   });
 
   it("shows arrival from distribution and takes acceptance straight to the lead", async () => {
@@ -156,12 +163,12 @@ describe("LightLeadsList", () => {
     mocks.accept.mockResolvedValue({ success: true });
     render(<LightLeadsList leads={[lead]} />);
 
-    const row = screen.getByRole("list", { name: "Precisa de você agora" });
+    const row = screen.getByRole("list", { name: "Hoje" });
     expect(within(row).getByText(/^Hoje \d{2}:\d{2}$/)).toBeTruthy();
     expect(row.textContent).not.toContain("2020");
     expect(within(row).getByText(/PRESENCIAL TARDE/)).toBeTruthy();
-    expect(within(row).getByRole("button", { name: "Aceitar lead" })).toBeTruthy();
-    fireEvent.click(within(row).getByRole("button", { name: "Aceitar lead" }));
+    expect(within(row).getByRole("button", { name: /^Aceitar/ })).toBeTruthy();
+    fireEvent.click(within(row).getByRole("button", { name: /^Aceitar/ }));
     await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/leads/today"));
   });
 

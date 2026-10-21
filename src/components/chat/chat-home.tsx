@@ -213,7 +213,7 @@ export function ChatHome({
           </Link>
         </div>
       ) : null}
-      <ThreadList threads={visible} now={now} activeId={activeId} emptyText={tab === "leads" ? (query ? `Não encontramos nenhum lead com "${query}". Confira a grafia ou limpe a busca.` : "Você não tem lead no momento. Assim que uma oferta chegar, ela aparece aqui.") : "Nada por aqui ainda."} />
+      <ThreadList threads={visible} now={now} activeId={activeId} groupByDay={tab === "leads" && !isSupervisor && !isManager} emptyText={tab === "leads" ? (query ? `Não encontramos nenhum lead com "${query}". Confira a grafia ou limpe a busca.` : "Você não tem lead no momento. Assim que uma oferta chegar, ela aparece aqui.") : "Nada por aqui ainda."} />
       {!visible.length ? (
         <div className={home.emptyAction}>
           {query ? <button type="button" className={styles.headerPill} onClick={() => setQuery("")}>Limpar busca</button>

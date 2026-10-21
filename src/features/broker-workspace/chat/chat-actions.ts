@@ -17,7 +17,8 @@ import { acknowledgeAction } from "@/features/relationship/actions";
 import { addBrokerToMyTeamAction } from "@/features/supervisor-workspace/actions";
 
 /** warning: it worked, but part of it did not (shown as an alert, not as success). */
-export type ChatServerActionResult = { ok: boolean; message: string; href?: string; warning?: boolean; undo?: { label: string; action: { kind: "server"; name: ChatServerActionName; payload: Record<string, string> } } };
+/** whatsapp: the client's WhatsApp link after an accept, opened in the same tap by the chat. */
+export type ChatServerActionResult = { ok: boolean; message: string; href?: string; whatsapp?: string; warning?: boolean; undo?: { label: string; action: { kind: "server"; name: ChatServerActionName; payload: Record<string, string> } } };
 
 const leadPayload = z.object({ leadId: z.string().min(1) });
 const taskPayload = z.object({ taskId: z.string().uuid(), leadName: z.string().max(120).optional() });
@@ -53,7 +54,7 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
         const { leadId } = leadPayload.parse(payload);
         const result = await acceptLeadOfferAction(leadId);
         return result.success
-          ? { ok: true, message: "Aceito. O lead agora é seu: abra a conversa dele para fazer o primeiro contato.", href: `/leads/${leadId}` }
+          ? { ok: true, message: result.whatsappUrl ? "Aceito. Abrindo o WhatsApp do cliente com a mensagem pronta." : "Aceito. O lead agora é seu: o contato está na ficha.", href: `/leads/${leadId}`, whatsapp: result.whatsappUrl }
           : { ok: false, message: "O aceite não foi registrado. Toque de novo em alguns segundos." };
       }
       case "lead.decline": {
@@ -67,7 +68,7 @@ export async function runChatServerAction(name: ChatServerActionName, payload: R
         form.set("leadId", leadId);
         const result = await startLeadServiceAction({}, form);
         return result.success
-          ? { ok: true, message: "Contato registrado. O atendimento começou.", href: result.whatsappUrl }
+          ? { ok: true, message: result.whatsappUrl ? "Lead aceito. O WhatsApp do cliente abre com a mensagem pronta: é só enviar." : "Lead aceito. Ele não tem WhatsApp no cadastro: veja o contato na ficha.", href: result.whatsappUrl }
           : { ok: false, message: "O contato não foi registrado. Toque de novo em alguns segundos." };
       }
       case "lead.changeStep": {

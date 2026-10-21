@@ -10,6 +10,7 @@ import { presenceAskOf } from "@/features/broker-workspace/chat/assistant-script
 import { buildBrokerNowItems } from "@/features/broker-workspace/now-items";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
+import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 
 const TIME_ZONE = "America/Sao_Paulo";
 const time = (date: Date) => new Intl.DateTimeFormat("pt-BR", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
@@ -99,13 +100,19 @@ function highlightsOf(data: BrokerHighlights | null, journey: BrokerJourneyData 
  * conversations, plus the day at a glance shown at the center on computers.
  */
 export async function ChatHomeContent() {
-  const [rail, data] = await Promise.all([getChatRailData(), getCachedBrokerWorkspaceData().catch(() => null)]);
-  if (!rail || !data) return <LightDashboardUnavailable />;
-  const [highlights, journey, firstSteps] = await Promise.all([
-    getBrokerHighlights(data.viewer.tenantId, data.viewer.userId).catch(() => null),
-    getCachedBrokerJourneyData(data.viewer.tenantId, data.viewer.userId).catch(() => null),
-    getFirstSteps(data.viewer.tenantId, data.viewer.userId).catch(() => null),
+  // Everything starts at once: the highlights, the journey and the first steps
+  // only need the signed-in broker, not the workspace (the workspace keeps the
+  // same tenant and user, both come from the authenticated context).
+  const context = await getRequiredTenantContext().catch(() => null);
+  if (!context) return <LightDashboardUnavailable />;
+  const [rail, data, highlights, journey, firstSteps] = await Promise.all([
+    getChatRailData(),
+    getCachedBrokerWorkspaceData().catch(() => null),
+    getBrokerHighlights(context.tenantId, context.userId).catch(() => null),
+    getCachedBrokerJourneyData(context.tenantId, context.userId).catch(() => null),
+    getFirstSteps(context.tenantId, context.userId).catch(() => null),
   ]);
+  if (!rail || !data) return <LightDashboardUnavailable />;
   return (
     <ChatHome
       viewerName={rail.viewerName}

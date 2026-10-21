@@ -7,11 +7,14 @@ import { motionTokens } from "@/components/arc/motion-tokens";
 import { toast } from "@/components/ui/sonner";
 
 import { acceptLeadOfferAction } from "@/features/leads/accept-offer-action";
+import { openWhatsApp, prepareWhatsAppWindow } from "@/lib/whatsapp-open";
 
 /**
- * "ACEITAR LEAD" in the Lite workspace: records the acceptance first, then
- * opens the lead. Keeps the caller's visual classes so each surface looks the
- * same as its former link.
+ * "Aceitar e chamar no WhatsApp" in the Lite workspace: one tap accepts the
+ * lead (which already starts the service) and opens the client's WhatsApp
+ * (WhatsApp Web on the computer, the app on the phone); the CRM tab goes to
+ * the lead. The WhatsApp Web tab is opened inside the click, before the
+ * await, so popup blockers let it through; a failed accept closes it.
  */
 export function AcceptLeadButton({ leadId, className, children, style, "data-tour": dataTour }: { leadId: string; className?: string; children: ReactNode; style?: CSSProperties; "data-tour"?: string }) {
   const router = useRouter();
@@ -20,14 +23,27 @@ export function AcceptLeadButton({ leadId, className, children, style, "data-tou
 
   function handleClick() {
     if (pending) return;
+    const whatsapp = prepareWhatsAppWindow();
     startTransition(async () => {
-      const result = await acceptLeadOfferAction(leadId);
+      let result: Awaited<ReturnType<typeof acceptLeadOfferAction>>;
+      try {
+        result = await acceptLeadOfferAction(leadId);
+      } catch {
+        result = { success: false };
+      }
       if (!result.success) {
-        toast.error("Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
+        whatsapp.cancel();
+        toast.error(result.error ? `${result.error} Atualizei a sua lista.` : "Não deu para aceitar agora. Tente de novo; se o lead sumir, outro corretor já pegou.");
         router.refresh();
         return;
       }
-      toast.success("Lead aceito. Ele agora é seu.");
+      const url = result.whatsappUrl;
+      if (url && whatsapp.go(url)) {
+        toast.success("Lead aceito. Abrindo o WhatsApp do cliente.", { action: { label: "Abrir de novo", onClick: () => openWhatsApp(url) } });
+      } else {
+        whatsapp.cancel();
+        toast.success("Lead aceito. Ele não tem WhatsApp no cadastro: veja o contato na ficha.");
+      }
       router.push(`/leads/${leadId}`);
     });
   }

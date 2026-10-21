@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getUserDisplayInfo } from "@/shared/auth/actions";
+import { openWhatsApp } from "@/lib/whatsapp-open";
 
 export function OnboardingHelpButton() {
   const { startNextStep } = useNextStep();
@@ -105,7 +106,7 @@ export function OnboardingHelpButton() {
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            onClick={() => window.open("https://wa.me/5511999999999", "_blank")}
+            onClick={() => openWhatsApp("https://wa.me/5511999999999")}
             className="flex items-center gap-2 text-xs"
           >
             <MessageSquare className="size-3.5 text-emerald-500" />

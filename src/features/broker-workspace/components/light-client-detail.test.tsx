@@ -42,7 +42,7 @@ describe("LightClientDetail", () => {
 
     expect(screen.getByRole("heading", { level: 1, name: "Marina Alves" })).toBeTruthy();
     expect(screen.getByText("Cliente ativo")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "WhatsApp" }).getAttribute("href")).toContain("wa.me/");
+    expect(screen.getByRole("link", { name: "WhatsApp" }).getAttribute("href")).toContain("web.whatsapp.com/send?phone=");
     expect(screen.getByRole("group", { name: "Seções do cliente" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Renovação" })).toBeTruthy();
     expect(screen.getByText("Acompanhar no prazo")).toBeTruthy();

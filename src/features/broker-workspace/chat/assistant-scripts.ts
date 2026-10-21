@@ -370,7 +370,7 @@ function leadScript(data: BrokerWorkspaceData, now: Date): ChatScript {
     const leadId = action.leadId;
     blocks.push(assistantMessage("leads-new-lead", `Chegou ${action.title}. ${action.description}`));
     blocks.push(question("leads-new-lead-choice", "O que você quer fazer?", [
-      { id: "accept", label: "Aceitar", action: { kind: "server", name: "lead.accept", payload: { leadId } } },
+      { id: "accept", label: "Aceitar e chamar no WhatsApp", action: { kind: "server", name: "lead.accept", payload: { leadId } } },
       { id: "view", label: "Ver a ficha", action: { kind: "href", href: `/leads/${leadId}` } },
       { id: "decline", label: "Recusar", action: { kind: "next", questionId: `decline-${leadId}` } },
     ]));

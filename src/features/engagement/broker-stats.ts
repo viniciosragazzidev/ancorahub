@@ -52,11 +52,8 @@ const teamStatsCache = new TtlCache<BrokerOfferStats[]>(60_000, 200);
 /** Offers and services of every active broker: offers only cover the plantão; services also count direct assignments. */
 export async function getTeamOfferStats(tenantId: string, window = statsWindow(), brokerIds?: readonly string[]): Promise<BrokerOfferStats[]> {
   if (brokerIds) return loadTeamStats(tenantId, window, brokerIds);
-  const cached = teamStatsCache.get(tenantId);
-  if (cached) return cached;
-  const stats = await loadTeamStats(tenantId, window);
-  teamStatsCache.set(tenantId, stats);
-  return stats;
+  // Shared load: when the cache expires, the brokers opening the Início at the same moment wait for one query.
+  return teamStatsCache.getOrLoad(tenantId, () => loadTeamStats(tenantId, window));
 }
 
 async function loadTeamStats(tenantId: string, window: { since: Date; until: Date }, brokerIds?: readonly string[]): Promise<BrokerOfferStats[]> {

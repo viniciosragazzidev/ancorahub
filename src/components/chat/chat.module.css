@@ -62,6 +62,10 @@
 
 /* ---------- thread list ---------- */
 .threadList { list-style: none; margin: 0; padding: 0; display: grid; }
+/* Leads split by arrival day ("Hoje", "Ontem", "18/10 (sáb)"), like the day chip of a conversation. */
+.threadDays { display: grid; gap: 4px; }
+.threadDay { display: flex; justify-content: center; margin: 8px 0 4px; font-size: var(--text-xs); font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.threadDay span { padding: 2px 10px; border-radius: 999px; background: var(--surface-muted); }
 .thread {
   display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px;
   padding: 10px var(--chat-gutter); text-decoration: none; color: inherit; border-radius: var(--radius-control);
