@@ -1,7 +1,7 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, inArray, isNotNull, isNull, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, eq, gt, gte, inArray, isNotNull, isNull, ne, notInArray, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -13,6 +13,9 @@ import {
   buildDutySwapWhatsAppMessage,
   canManageSwaps,
   dutySwapProblem,
+  effectiveSwapDate,
+  NOT_SWAPPABLE_WEEKLY,
+  rowCoversDate,
   selectSwapCandidates,
   slotStarted,
   swapPlanAssignments,
@@ -22,13 +25,14 @@ import {
   type SwapSlot,
   type WhatsAppSwapStatus,
 } from "./duty-swap";
-import { dayOfWeekOf, zonedMidnight } from "./monthly-duty-plan";
+import { dayOfWeekOf } from "./monthly-duty-plan";
 import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 
 type Database = ReturnType<typeof getDatabase>;
 type Executor = Database | Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 const SWAP_CANDIDATE_LIMIT = 1500;
+const SWAP_WEEKLY_LIMIT = 4000;
 
 function slotColumns() {
   return {
@@ -40,11 +44,33 @@ function slotColumns() {
     scheduleBranchId: schema.unitDutySchedules.branchId,
     brokerId: schema.dutyRosterAssignments.brokerId,
     dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`,
+    dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
     startsAt: schema.dutyRosterAssignments.startsAt,
     endsAt: schema.dutyRosterAssignments.endsAt,
     timezone: schema.unitDutySchedules.timezone,
+    scheduleValidFrom: schema.unitDutySchedules.validFrom,
+    scheduleValidUntil: schema.unitDutySchedules.validUntil,
     monthlyPlanId: schema.dutyRosterAssignments.monthlyPlanId,
   };
+}
+
+type SlotColumnsRow = {
+  dutyDate: string | null;
+  dayOfWeek: number;
+  startsAt: string;
+  timezone: string | null;
+  scheduleValidFrom: Date;
+  scheduleValidUntil: Date | null;
+};
+
+/**
+ * Row as the swap sees it: `rowDutyDate` is the column (null on weekly rows) and `dutyDate`
+ * the date the swap works with (published date, or the single date of a one-time weekly row).
+ */
+function toSwapSlot<T extends SlotColumnsRow>(row: T) {
+  const timezone = row.timezone ?? "America/Sao_Paulo";
+  const weekly = row.dutyDate ? null : { dayOfWeek: row.dayOfWeek, validFrom: row.scheduleValidFrom, validUntil: row.scheduleValidUntil };
+  return { ...row, timezone, weekly, rowDutyDate: row.dutyDate, dutyDate: effectiveSwapDate({ dutyDate: row.dutyDate, startsAt: row.startsAt, timezone, weekly }) };
 }
 
 async function loadSlots(db: Executor, tenantId: string, ids: string[]) {
@@ -52,7 +78,7 @@ async function loadSlots(db: Executor, tenantId: string, ids: string[]) {
     .from(schema.dutyRosterAssignments)
     .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
     .where(and(eq(schema.dutyRosterAssignments.tenantId, tenantId), inArray(schema.dutyRosterAssignments.id, ids)));
-  return rows.map((row) => ({ ...row, timezone: row.timezone ?? "America/Sao_Paulo" }));
+  return rows.map(toSwapSlot);
 }
 
 /** Name, unit and whether each broker is still a planning broker (active broker, active unit). */
@@ -79,12 +105,12 @@ async function loadSwapBrokers(db: Executor, tenantId: string, brokerIds: string
   return new Map(people.map((row) => [row.id, { id: row.id, name: row.name, branchId: row.branchId ?? null, eligible: eligibleIds.has(row.id) }]));
 }
 
-/** The broker is already on this plantão and day: another active published row, or the weekly roster covering the date. */
+/** The broker is already on this plantão and day: another active published row, or a weekly row in force on the date. */
 async function brokerAlreadyOn(db: Executor, tenantId: string, brokerId: string, slot: SwapSlot, excludedIds: string[]) {
   const dutyDate = slot.dutyDate!;
-  const dayMidnight = zonedMidnight(dutyDate, slot.timezone).getTime();
-  const rows = await db.select({ dutyDate: sql<string | null>`${schema.dutyRosterAssignments.dutyDate}::text`, validFrom: schema.dutyRosterAssignments.validFrom, validUntil: schema.dutyRosterAssignments.validUntil })
+  const rows = await db.select({ ...slotColumns() })
     .from(schema.dutyRosterAssignments)
+    .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
     .where(and(
       eq(schema.dutyRosterAssignments.tenantId, tenantId),
       eq(schema.dutyRosterAssignments.scheduleId, slot.scheduleId),
@@ -96,13 +122,12 @@ async function brokerAlreadyOn(db: Executor, tenantId: string, brokerId: string,
         and(isNull(schema.dutyRosterAssignments.dutyDate), eq(schema.dutyRosterAssignments.dayOfWeek, dayOfWeekOf(dutyDate))),
       ),
     ));
-  return rows.some((row) => row.dutyDate === dutyDate
-    || (row.dutyDate === null && row.validFrom.getTime() <= dayMidnight && (!row.validUntil || row.validUntil.getTime() > dayMidnight)));
+  return rows.map(toSwapSlot).some((row) => rowCoversDate(row, slot.scheduleId, dutyDate));
 }
 
 export type DutySwapSourceView = { brokerName: string; scheduleName: string; dutyDate: string; startsAt: string; endsAt: string };
 
-/** Future published slots the broker of `assignmentId` can swap with (picker of "Efetuar troca"). */
+/** Future slots (published, or one-time weekly) the broker of `assignmentId` can swap with (picker of "Efetuar troca"). */
 export async function listDutySwapCandidatesAction(assignmentId: string): Promise<
   { ok: true; source: DutySwapSourceView; candidates: SwapCandidate[] } | { ok: false; reason: string }
 > {
@@ -115,24 +140,39 @@ export async function listDutySwapCandidatesAction(assignmentId: string): Promis
     const now = new Date();
     const [source] = await loadSlots(db, context.tenantId, [id]);
     if (!source || source.status !== "active") return { ok: false, reason: "Esta escalação não existe mais. Atualize a página." };
-    if (!source.dutyDate) return { ok: false, reason: "A troca vale só para plantões da escala publicada (com data). A escala semanal não troca por aqui." };
+    if (!source.dutyDate) return { ok: false, reason: NOT_SWAPPABLE_WEEKLY };
     if (slotStarted(source, now)) return { ok: false, reason: "Este plantão já começou. Só dá para trocar plantões que ainda não começaram." };
 
-    const rows = await db.select({ ...slotColumns(), brokerName: schema.user.name, brokerBranchId: schema.tenantMemberships.branchId })
+    const candidateColumns = { ...slotColumns(), brokerName: schema.user.name, brokerBranchId: schema.tenantMemberships.branchId, brokerCode: schema.brokerProfiles.internalCode };
+    const candidateQuery = () => db.select(candidateColumns)
       .from(schema.dutyRosterAssignments)
       .innerJoin(schema.unitDutySchedules, eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId))
       .innerJoin(schema.user, eq(schema.user.id, schema.dutyRosterAssignments.brokerId))
       .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.userId, schema.dutyRosterAssignments.brokerId), eq(schema.tenantMemberships.tenantId, context.tenantId)))
-      .where(and(
-        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
-        eq(schema.dutyRosterAssignments.status, "active"),
-        isNotNull(schema.dutyRosterAssignments.dutyDate),
-        gte(schema.dutyRosterAssignments.dutyDate, getSaoPauloDateKey(now)),
-        eq(schema.unitDutySchedules.status, "active"),
-      ))
-      .orderBy(schema.dutyRosterAssignments.dutyDate, schema.dutyRosterAssignments.startsAt)
-      .limit(SWAP_CANDIDATE_LIMIT);
-    const all: SwapCandidateRow[] = rows.map((row) => ({ ...row, timezone: row.timezone ?? "America/Sao_Paulo", brokerBranchId: row.brokerBranchId ?? null }));
+      .leftJoin(schema.brokerProfiles, and(eq(schema.brokerProfiles.userId, schema.dutyRosterAssignments.brokerId), eq(schema.brokerProfiles.tenantId, context.tenantId)));
+    const [datedRows, weeklyRows] = await Promise.all([
+      candidateQuery()
+        .where(and(
+          eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+          eq(schema.dutyRosterAssignments.status, "active"),
+          isNotNull(schema.dutyRosterAssignments.dutyDate),
+          gte(schema.dutyRosterAssignments.dutyDate, getSaoPauloDateKey(now)),
+          eq(schema.unitDutySchedules.status, "active"),
+        ))
+        .orderBy(schema.dutyRosterAssignments.dutyDate, schema.dutyRosterAssignments.startsAt)
+        .limit(SWAP_CANDIDATE_LIMIT),
+      // Weekly rows of plantões still in force: the one-time ones are candidates, all of them count as "already on".
+      candidateQuery()
+        .where(and(
+          eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+          eq(schema.dutyRosterAssignments.status, "active"),
+          isNull(schema.dutyRosterAssignments.dutyDate),
+          eq(schema.unitDutySchedules.status, "active"),
+          or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
+        ))
+        .limit(SWAP_WEEKLY_LIMIT),
+    ]);
+    const all: SwapCandidateRow[] = [...datedRows, ...weeklyRows].map((row) => ({ ...toSwapSlot(row), brokerBranchId: row.brokerBranchId ?? null, brokerCode: row.brokerCode ?? null }));
     const sourceRow = all.find((row) => row.id === source.id);
     if (!sourceRow) return { ok: false, reason: "Esta escalação não existe mais. Atualize a página." };
     // Only brokers still on the escala (active account and unit) are offered.
@@ -155,7 +195,7 @@ export type DutySwapResult =
 const swapInput = z.object({ sourceAssignmentId: z.string().min(1).max(120), targetAssignmentId: z.string().min(1).max(120) }).strict();
 
 /**
- * Swaps the brokers of two published slots in one transaction: the broker of the source goes to
+ * Swaps the brokers of two slots (published, or one-time weekly rows) in one transaction: the broker of the source goes to
  * the target and the other way round. Each slot keeps its plantão, date, time and mode; the
  * row's unit follows the broker now on it. Then both brokers get a WhatsApp (never fails the swap).
  */
@@ -199,6 +239,7 @@ export async function swapDutyAssignmentsAction(input: unknown): Promise<DutySwa
       const brokerB = targetBroker!;
 
       // Each slot keeps its plantão, date, time and attendance mode; the broker (and his unit) changes.
+      // A one-time weekly row stays weekly (duty_date NULL): its plantão happens on that single date.
       // A pause belonged to the broker who was there: the newcomer starts unpaused.
       for (const [slot, broker] of [[a, brokerB], [b, brokerA]] as const) {
         await tx.update(schema.dutyRosterAssignments).set({
@@ -219,22 +260,25 @@ export async function swapDutyAssignmentsAction(input: unknown): Promise<DutySwa
         ),
       ));
 
-      // The escala (published plan and a newer draft) lists the same people as the roster.
+      // The escala (published plan and a newer draft) lists the same people as the published rows.
+      // A one-time weekly row is not in the escala: only the dated side moves there.
       const moves = [
-        { occurrenceId: `${a.scheduleId}:${a.dutyDate}`, fromBrokerId: brokerA.id, toBrokerId: brokerB.id },
-        { occurrenceId: `${b.scheduleId}:${b.dutyDate}`, fromBrokerId: brokerB.id, toBrokerId: brokerA.id },
+        ...(a.rowDutyDate ? [{ occurrenceId: `${a.scheduleId}:${a.dutyDate}`, fromBrokerId: brokerA.id, toBrokerId: brokerB.id }] : []),
+        ...(b.rowDutyDate ? [{ occurrenceId: `${b.scheduleId}:${b.dutyDate}`, fromBrokerId: brokerB.id, toBrokerId: brokerA.id }] : []),
       ];
-      const monthKeys = [...new Set([a.dutyDate!, b.dutyDate!].flatMap((dutyDate) => {
+      const monthKeys = [...new Set([a.rowDutyDate, b.rowDutyDate].filter((dutyDate): dutyDate is string => Boolean(dutyDate)).flatMap((dutyDate) => {
         const [year, month] = dutyDate.split("-").map(Number);
         return [dutyDate.slice(0, 7), new Date(Date.UTC(year, month - 2, 1)).toISOString().slice(0, 7)];
       }))];
-      const plans = await tx.select({ id: schema.dutyScheduleMonthlyPlans.id, assignments: schema.dutyScheduleMonthlyPlans.assignments, occurrences: schema.dutyScheduleMonthlyPlans.occurrences })
-        .from(schema.dutyScheduleMonthlyPlans)
-        .where(and(
-          eq(schema.dutyScheduleMonthlyPlans.tenantId, context.tenantId),
-          inArray(schema.dutyScheduleMonthlyPlans.monthKey, monthKeys),
-          inArray(schema.dutyScheduleMonthlyPlans.status, ["published", "draft"]),
-        ));
+      const plans = monthKeys.length
+        ? await tx.select({ id: schema.dutyScheduleMonthlyPlans.id, assignments: schema.dutyScheduleMonthlyPlans.assignments, occurrences: schema.dutyScheduleMonthlyPlans.occurrences })
+          .from(schema.dutyScheduleMonthlyPlans)
+          .where(and(
+            eq(schema.dutyScheduleMonthlyPlans.tenantId, context.tenantId),
+            inArray(schema.dutyScheduleMonthlyPlans.monthKey, monthKeys),
+            inArray(schema.dutyScheduleMonthlyPlans.status, ["published", "draft"]),
+          ))
+        : [];
       for (const plan of plans) {
         const swapped = swapPlanAssignments(plan, moves);
         if (!swapped.changed) continue;

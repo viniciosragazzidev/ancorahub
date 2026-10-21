@@ -14,6 +14,7 @@ import { assignmentShift } from "./duty-shifts";
 import { classifyBrokerLiveOfferStatus, combineLiveStatusAcrossQueues } from "./duty-roster-live-status";
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
 import { inferLegacyLeadDutyScheduleId, selectLeadsForDutySchedule } from "./shared-duty-roster";
+import { effectiveSwapDate } from "./duty-swap";
 
 // Upper bound on how far back a lead can show even when the schedule has no
 // completed occurrence yet (brand-new schedule) — keeps the query sane.
@@ -523,8 +524,16 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
       notificationStatus: presence?.notificationStatus ?? null,
       notificationErrorCode: presence?.notificationErrorCode ?? null,
       dutyDate: occurrence?.dutyDate ?? null,
-      /** The row's own date: set on the published escala, null on the weekly roster (only dated rows can be swapped). */
-      publishedDutyDate: entry.dutyDate,
+      /**
+       * Date the swap works with: the row's published date, or the single date of a weekly row whose
+       * plantão happens once (validity with one day of its weekday). Null = repeating weekly row, not swappable.
+       */
+      publishedDutyDate: effectiveSwapDate({
+        dutyDate: entry.dutyDate,
+        startsAt,
+        timezone: schedule.timezone,
+        weekly: { dayOfWeek: entry.dayOfWeek, validFrom: schedule.validFrom, validUntil: schedule.validUntil },
+      }),
       liveStatus: liveStatus.status,
       nextEventAt: liveStatus.nextEventAt,
       activeLeads: leadsPerBroker.get(entry.brokerId) ?? 0,

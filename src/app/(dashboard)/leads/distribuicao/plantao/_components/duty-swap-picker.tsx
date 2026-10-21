@@ -6,7 +6,7 @@ import { MagnifyingGlass } from "@/components/huge-icons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { longDutyDate, shortDutyDate, whatsappStatusLabel, type SwapCandidate } from "@/features/lead-distribution/duty-swap";
+import { longDutyDate, shortDutyDate, swapCandidateMatches, whatsappStatusLabel, type SwapCandidate } from "@/features/lead-distribution/duty-swap";
 import { listDutySwapCandidatesAction, swapDutyAssignmentsAction, type DutySwapResult, type DutySwapSourceView } from "@/features/lead-distribution/duty-swap-actions";
 import { cn } from "@/lib/utils";
 
@@ -42,10 +42,8 @@ export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
   }, [assignmentId]);
 
   const filtered = useMemo(() => {
-    const needle = query.trim().toLocaleLowerCase("pt-BR");
     if (!candidates) return [];
-    if (!needle) return candidates;
-    return candidates.filter((item) => `${item.brokerName} ${item.scheduleName} ${shortDutyDate(item.dutyDate)} ${longDutyDate(item.dutyDate)}`.toLocaleLowerCase("pt-BR").includes(needle));
+    return candidates.filter((item) => swapCandidateMatches(item, query));
   }, [candidates, query]);
 
   function confirm() {
@@ -66,7 +64,7 @@ export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
           <p className="text-xs text-muted-foreground">
             {source
               ? `${source.brokerName} está em ${source.scheduleName}, ${longDutyDate(source.dutyDate)}, das ${time(source.startsAt)} às ${time(source.endsAt)}. Escolha com quem trocar.`
-              : "Escolha um corretor de um plantão futuro da escala publicada."}
+              : "Escolha um corretor de um plantão futuro (escala publicada ou plantão de um dia só)."}
           </p>
         </div>
         <Button type="button" size="sm" variant="ghost" disabled={saving} onClick={onCancel}>Fechar</Button>
@@ -95,9 +93,9 @@ export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
       {candidates && !chosen ? (
         <>
           <label className="relative block">
-            <span className="sr-only">Buscar por corretor, plantão ou data</span>
+            <span className="sr-only">Buscar por corretor, código, plantão ou data</span>
             <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por corretor, plantão ou data" className="pl-8" />
+            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por corretor, código, plantão ou data" className="pl-8" />
           </label>
           {filtered.length ? (
             <ul className="max-h-72 divide-y divide-border/60 overflow-y-auto rounded-lg border border-border/70 bg-card">
@@ -110,7 +108,7 @@ export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
                     aria-label={`Trocar com ${item.brokerName}, ${item.scheduleName}, ${longDutyDate(item.dutyDate)}`}
                   >
                     <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium">{item.brokerName}</span>
+                      <span className="block truncate text-sm font-medium">{item.brokerName}{item.brokerCode ? <span className="ml-1 text-xs font-normal text-muted-foreground">({item.brokerCode})</span> : null}</span>
                       <span className="block truncate text-xs text-muted-foreground">{item.scheduleName} · {time(item.startsAt)} às {time(item.endsAt)}</span>
                     </span>
                     <Badge variant="outline" className="shrink-0 tabular-nums">{shortDutyDate(item.dutyDate)}</Badge>
@@ -120,7 +118,7 @@ export function DutySwapPicker({ assignmentId, onCancel, onSwapped }: {
             </ul>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {candidates.length ? "Nenhum plantão encontrado para essa busca." : "Não há plantões futuros na escala publicada para trocar com este corretor."}
+              {candidates.length ? "Nenhum plantão encontrado para essa busca." : "Não há plantões futuros com data para trocar com este corretor."}
             </p>
           )}
         </>

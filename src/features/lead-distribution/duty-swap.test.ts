@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildDutySwapWhatsAppMessage,
   dutySwapProblem,
+  effectiveSwapDate,
   longDutyDate,
+  rowCoversDate,
   selectSwapCandidates,
+  singleWeeklyOccurrenceDate,
+  swapCandidateMatches,
   swapNoticeFor,
   swapNoticeText,
   swapPlanAssignments,
@@ -227,5 +231,95 @@ describe("buildDutySwapWhatsAppMessage", () => {
 
   it("formats the weekday in pt-BR", () => {
     expect(longDutyDate("2026-10-24")).toBe("sábado, 24/10");
+  });
+});
+
+// 2026-10-30 is a Friday (5); 2026-10-26 a Monday (1). São Paulo is UTC-3 (no DST in 2026).
+const spMidnight = (date: string) => new Date(`${date}T03:00:00Z`);
+
+describe("singleWeeklyOccurrenceDate", () => {
+  it("a one-day plantão (valid 30/10 to 31/10) has one date", () => {
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 5, validFrom: spMidnight("2026-10-30"), validUntil: spMidnight("2026-10-31") }, "08:00")).toBe("2026-10-30");
+  });
+
+  it("open-ended and multi-week plantões repeat (null)", () => {
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 5, validFrom: spMidnight("2026-10-30"), validUntil: null }, "08:00")).toBeNull();
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 5, validFrom: spMidnight("2026-10-30"), validUntil: spMidnight("2026-11-07") }, "08:00")).toBeNull();
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 5, validFrom: spMidnight("2026-10-01"), validUntil: spMidnight("2026-12-01") }, "08:00")).toBeNull();
+  });
+
+  it("a one-week window holds each weekday once", () => {
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 1, validFrom: spMidnight("2026-10-30"), validUntil: spMidnight("2026-11-06") }, "08:00")).toBe("2026-11-02");
+  });
+
+  it("a window with no day of that weekday has no date", () => {
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 1, validFrom: spMidnight("2026-10-30"), validUntil: spMidnight("2026-10-31") }, "08:00")).toBeNull();
+  });
+
+  it("counts dates in São Paulo, not UTC", () => {
+    // Night shift 22:00 of Fri 30/10 in SP is 01:00Z of the 31st: the date is still the 30th.
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 5, validFrom: spMidnight("2026-10-30"), validUntil: spMidnight("2026-10-31") }, "22:00")).toBe("2026-10-30");
+    // Window stored at UTC midnight (29/10 21:00 to 30/10 21:00 in SP): a 22:00 shift on the 30th falls out.
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 5, validFrom: new Date("2026-10-30T00:00:00Z"), validUntil: new Date("2026-10-31T00:00:00Z") }, "22:00")).toBeNull();
+    expect(singleWeeklyOccurrenceDate({ dayOfWeek: 5, validFrom: new Date("2026-10-30T00:00:00Z"), validUntil: new Date("2026-10-31T00:00:00Z") }, "08:00")).toBe("2026-10-30");
+  });
+
+  it("effectiveSwapDate keeps the published date and resolves one-time weekly rows", () => {
+    const weekly = { dayOfWeek: 5, validFrom: spMidnight("2026-10-30"), validUntil: spMidnight("2026-10-31") };
+    expect(effectiveSwapDate({ dutyDate: "2026-10-24", startsAt: "08:00", timezone: "America/Sao_Paulo", weekly: null })).toBe("2026-10-24");
+    expect(effectiveSwapDate({ dutyDate: null, startsAt: "08:00", timezone: "America/Sao_Paulo", weekly })).toBe("2026-10-30");
+    expect(effectiveSwapDate({ dutyDate: null, startsAt: "08:00", timezone: "America/Sao_Paulo", weekly: { ...weekly, validUntil: null } })).toBeNull();
+  });
+});
+
+describe("one-time weekly rows in the swap", () => {
+  const oneDay = { dayOfWeek: 5, validFrom: spMidnight("2026-10-30"), validUntil: spMidnight("2026-10-31") };
+  const weeklyOpen = { dayOfWeek: 5, validFrom: spMidnight("2026-01-01"), validUntil: null };
+  const row = (overrides: Partial<SwapCandidateRow>): SwapCandidateRow => ({ ...slot(), brokerName: "Ana Souza", brokerBranchId: "centro", ...overrides });
+  // Vanessa has a published row on Mon 26/10; Rosane is on the one-day plantão of 30/10 by a weekly row.
+  const vanessa = row({ id: "v", brokerId: "vanessa", brokerName: "Vanessa", scheduleId: "pme", scheduleName: "PME Manhã", dutyDate: "2026-10-26" });
+  const rosane = row({ id: "r", brokerId: "rosane", brokerName: "Rosane Santana", brokerCode: "RS12", scheduleId: "pres", scheduleName: "PRESENCIAL MANHÃ", dutyDate: "2026-10-30", weekly: oneDay });
+  const director = { role: "director", branchId: null };
+
+  it("a one-time weekly row is a candidate, and can be the source", () => {
+    expect(selectSwapCandidates(vanessa, [vanessa, rosane], director, NOW).map((item) => item.brokerName)).toEqual(["Rosane Santana"]);
+    expect(selectSwapCandidates(rosane, [vanessa, rosane], director, NOW).map((item) => item.brokerName)).toEqual(["Vanessa"]);
+  });
+
+  it("a repeating weekly row is never a candidate", () => {
+    const repeating = row({ id: "w", brokerId: "walter", brokerName: "Walter", scheduleId: "pf", dutyDate: null, weekly: weeklyOpen });
+    expect(selectSwapCandidates(vanessa, [vanessa, repeating], director, NOW)).toEqual([]);
+  });
+
+  it("no duplicates: weekly rows count as being on the plantão that day", () => {
+    // Vanessa is already on the one-day plantão through another weekly row.
+    const vanessaWeekly = row({ id: "v2", brokerId: "vanessa", scheduleId: "pres", dutyDate: "2026-10-30", weekly: oneDay });
+    expect(selectSwapCandidates(vanessa, [vanessa, rosane, vanessaWeekly], director, NOW)).toEqual([]);
+    // Rosane is on Vanessa's plantão every Monday (repeating weekly row).
+    const rosaneMondays = row({ id: "r2", brokerId: "rosane", scheduleId: "pme", dutyDate: null, weekly: { ...weeklyOpen, dayOfWeek: 1 } });
+    expect(selectSwapCandidates(vanessa, [vanessa, rosane, rosaneMondays], director, NOW)).toEqual([]);
+  });
+
+  it("rowCoversDate: dated row, one-time weekly and repeating weekly", () => {
+    expect(rowCoversDate(rosane, "pres", "2026-10-30")).toBe(true);
+    expect(rowCoversDate(rosane, "pres", "2026-11-06")).toBe(false);
+    expect(rowCoversDate(row({ scheduleId: "pf", dutyDate: null, weekly: weeklyOpen }), "pf", "2026-11-06")).toBe(true);
+    expect(rowCoversDate(row({ scheduleId: "pf", dutyDate: null, weekly: weeklyOpen }), "pf", "2026-11-05")).toBe(false);
+  });
+
+  it("the swap accepts a one-time weekly row and refuses a repeating one", () => {
+    expect(dutySwapProblem(input({ target: rosane, targetBroker: broker({ id: "rosane", name: "Rosane Santana" }) }))).toBeNull();
+    expect(dutySwapProblem(input({ target: row({ id: "w", brokerId: "bruno", scheduleId: "pf", dutyDate: null, weekly: weeklyOpen }) }))).toMatch(/se repete/);
+  });
+
+  it("the search matches part of the name or the code", () => {
+    const [candidate] = selectSwapCandidates(vanessa, [vanessa, rosane], director, NOW);
+    expect(swapCandidateMatches(candidate, "Rosane")).toBe(true);
+    expect(swapCandidateMatches(candidate, "ros")).toBe(true);
+    expect(swapCandidateMatches(candidate, "rosane santana")).toBe(true);
+    expect(swapCandidateMatches(candidate, "rs12")).toBe(true);
+    expect(swapCandidateMatches(candidate, "presencial 30/10")).toBe(true);
+    expect(swapCandidateMatches(candidate, "manha")).toBe(true);
+    expect(swapCandidateMatches(candidate, "bruno")).toBe(false);
   });
 });
