@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ChatBlock } from "@/components/chat/types";
 
-import { buildLeadConversationScript, dateLabel, type LeadConversationLead } from "./lead-script";
+import { buildLeadConversationScript, dateLabel, isInternalNote, type LeadConversationLead } from "./lead-script";
 
 const now = new Date("2026-10-09T15:00:00.000Z"); // 12:00 in São Paulo
 
@@ -274,5 +274,12 @@ describe("hideArrival", () => {
   it("shows the date of the first contact by default", () => {
     const script = buildLeadConversationScript({ lead: lead(), events: [], viewerId: "me", now, whatsappUrl: null });
     expect(script.blocks.some((block) => block.id === "d-created")).toBe(true);
+  });
+});
+
+describe("internal notes", () => {
+  it("hides the qualification timeout note from the broker", () => {
+    expect(isInternalNote({ conteudo: "Tempo limite da qualificação excedido (15 min). Lead não informou dado válido em resposta à qualificação, foi classificado como Frio e permaneceu com qualificação parcial na fila configurada." })).toBe(true);
+    expect(isInternalNote({ conteudo: "[IA Feedback] Próxima Ação: ligar" })).toBe(false);
   });
 });
