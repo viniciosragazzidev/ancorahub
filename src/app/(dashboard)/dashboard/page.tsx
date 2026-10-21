@@ -17,7 +17,6 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { getQualificationFunnel, parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
 import { QualificationFunnelView } from "@/features/qualification-turbo/components/qualification-funnel-view";
-import { cachedDashboardData } from "@/features/dashboard/tab-cache";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -71,8 +70,7 @@ export default async function DashboardPage({
     const canReadQuality = await canAccessLeadQualityCenter(context);
     // Funil de qualificação (qualificação turbo): director and manager with the quality center.
     if (activeTab === "funnel" && canReadQuality && (context.role === "director" || (context.role === "manager" && context.branchId))) {
-      const funnelPeriod = parseFunnelPeriod(singleParam(resolvedSearchParams.period));
-      const funnel = await cachedDashboardData("funnel", context, { funnelPeriod }, () => getQualificationFunnel(context, funnelPeriod));
+      const funnel = await getQualificationFunnel(context, parseFunnelPeriod(singleParam(resolvedSearchParams.period)));
       return <QualificationFunnelView data={funnel} showQualityTab />;
     }
     if (activeTab === "quality" && canReadQuality) {
@@ -84,18 +82,15 @@ export default async function DashboardPage({
       const queues = await listLeadQualityQueues(context.tenantId);
       const rawQueue = singleParam(resolvedSearchParams.queue);
       const queueId = rawQueue && queues.some((queue) => queue.id === rawQueue) ? rawQueue : null;
-      // Cached for a minute per user and filters: switching tabs no longer re-runs the report
-      // (the access audit is written on each fresh load).
-      const report = await cachedDashboardData("quality", context, { qualityPeriod, focus, queueId }, () => getLeadQualityReport(context, qualityPeriod, focus, { queueId, origin: null }));
+      const report = await getLeadQualityReport(context, qualityPeriod, focus, { queueId, origin: null });
       // The simple, explained report by default; the detailed analysis on request (or when drilling down).
       const detailed = singleParam(resolvedSearchParams.vista) === "detalhada" || Boolean(focus);
-      const simple = report.enabled && !detailed ? await cachedDashboardData("quality-simple", context, { qualityPeriod, queueId }, () => getSimpleLeadQualityReport(context, qualityPeriod, { queueId, origin: null })) : null;
+      const simple = report.enabled && !detailed ? await getSimpleLeadQualityReport(context, qualityPeriod, { queueId, origin: null }) : null;
       return <LeadQualityCenter report={report} showQualityTab={report.enabled} queues={queues} simple={simple} />;
     }
 
     const [data, reportingEnabled] = await Promise.all([
-      // The day's numbers: 30 seconds of cache, enough for instant tab switches.
-      cachedDashboardData("overview", context, null, () => getCommandCenterData(context), 30),
+      getCommandCenterData(context),
       canReadQuality ? getFeatureFlag(FEATURE_FLAGS.REPORTING_CENTER) : Promise.resolve("false"),
     ]);
     const showQualityTab = canReadQuality && reportingEnabled !== "false";
