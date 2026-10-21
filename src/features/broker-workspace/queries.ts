@@ -15,6 +15,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { buildBrokerWorkspaceTodayMetrics, getSaoPauloDayBounds } from "./workspace-data-domain";
 import { buildDutySummary, loadBrokerDutyRows } from "./duty-summary";
+import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 
 const activeLeadStatuses = [
   "new",
@@ -192,6 +193,8 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
     .where(and(
       eq(schema.whatsappMessages.tenantId, context.tenantId),
       eq(schema.whatsappMessages.leadId, schema.leads.id),
+      // A story the client posted (status@broadcast) is not the client waiting.
+      notStatusBroadcastSql(schema.whatsappMessages.messageId),
       // Contentless WhatsApp events ("[text]", hidden in the conversation) are not the client waiting.
       sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
     ))

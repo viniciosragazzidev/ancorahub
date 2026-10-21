@@ -326,3 +326,69 @@ describe("WAHA group messages from a privacy id", () => {
     expect(event.message).toMatchObject({ fromMe: true, to: "5521999990000" });
   });
 });
+
+describe("WAHA status/stories (status@broadcast)", () => {
+  // 21/10: a broker's story video "Cantinho que amo!" was stored as her message.
+  const statusPayload = (extra: Record<string, unknown> = {}) => ({
+    event: "message",
+    session: "waha_test",
+    payload: {
+      id: "false_status@broadcast_A564FF922F6FD_206066@lid",
+      from: "status@broadcast",
+      participant: "206066@lid",
+      _ancora: { fromPn: "5521998765651@c.us" },
+      body: "Cantinho que amo!",
+      type: "video",
+      hasMedia: true,
+      media: { mimetype: "video/mp4" },
+      fromMe: false,
+      ...extra,
+    },
+  });
+
+  it("flags a story and keeps the poster as the sender so the event can be marked ignored", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload(statusPayload()));
+    expect(event.message?.isStatusBroadcast).toBe(true);
+    expect(event.message?.from).toBe("5521998765651");
+    expect(event.message?.to).toBeUndefined();
+  });
+
+  it("recognises the story from WAHA's flags even when the chat is not in from", () => {
+    for (const extra of [
+      { from: "5521998765651@c.us", id: "false_5521998765651@c.us_X", participant: undefined, isStatus: true },
+      { from: "5521998765651@c.us", id: "false_5521998765651@c.us_Y", participant: undefined, _data: { isStatusV3: true } },
+      { from: "5521998765651@c.us", id: "false_5521998765651@c.us_Z", participant: undefined, _data: { id: { remote: "status@broadcast" } } },
+    ]) {
+      const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload(statusPayload(extra)));
+      expect(event.message?.isStatusBroadcast).toBe(true);
+    }
+  });
+
+  it("flags the company's own posted status (fromMe)", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload(statusPayload({
+      id: "true_status@broadcast_AC251E_5521911116063@c.us", fromMe: true, participant: "5521911116063@c.us", _ancora: {},
+    })));
+    expect(event.message?.isStatusBroadcast).toBe(true);
+    expect(event.message?.from).toBe("5521911116063");
+  });
+
+  it("does not flag a direct message", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      event: "message",
+      session: "waha_test",
+      payload: { id: "false_5521998765651@c.us_3EB0", from: "5521998765651@c.us", body: "Oi", type: "chat", fromMe: false },
+    }));
+    expect(event.message?.isStatusBroadcast).toBeUndefined();
+  });
+
+  it("flags a story pre-formatted by the relay", () => {
+    const event = wahaWebhookSchema.parse(normalizeWahaWebhookPayload({
+      eventId: "evt-status-1",
+      type: "message.inbound",
+      sessionId: "waha_test",
+      occurredAt: "2026-10-21T11:43:21.000Z",
+      message: { id: "false_status@broadcast_A564_206066@lid", from: "5521998765651", body: "Cantinho que amo!", type: "video" },
+    }));
+    expect(event.message?.isStatusBroadcast).toBe(true);
+  });
+});

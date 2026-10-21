@@ -55,6 +55,7 @@ import { maskPhone, maskName } from "@/features/quotes/utils";
 import Link from "next/link";
 import { Phone, Clock, Share, Buildings, UserPlus, LockKey, ChatCircleText } from "@/components/huge-icons";
 import { PersonRecordDetails } from "@/features/customer-record/components/person-record-details";
+import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 import {
   resolveLeadNextBestAction,
   NextBestActionCard,
@@ -250,7 +251,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       !ficha && lightContact.reveal
         ? db.select({ id: schema.whatsappMessages.id, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole, mediaKind: schema.whatsappMessages.mediaKind })
           .from(schema.whatsappMessages)
-          .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id)))
+          .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id), notStatusBroadcastSql(schema.whatsappMessages.messageId)))
           .orderBy(desc(schema.whatsappMessages.sentAt))
           .limit(100)
         : Promise.resolve([]),

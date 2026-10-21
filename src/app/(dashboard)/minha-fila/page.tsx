@@ -21,6 +21,7 @@ import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadsList, type LightLeadItem } from "@/features/broker-workspace/components/light-leads-list";
 import { stripLeadOriginForRole } from "@/features/leads/broker-visibility";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
+import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 
 const activeLeadStatuses = [
   "new",
@@ -239,6 +240,7 @@ async function MinhaFilaContent() {
         and(
           eq(schema.whatsappMessages.tenantId, context.tenantId),
           inArray(schema.whatsappMessages.leadId, leads.map((l) => l.id)),
+          notStatusBroadcastSql(schema.whatsappMessages.messageId),
         ),
       )
       .orderBy(desc(schema.whatsappMessages.sentAt))

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   classifyIgnoredBrokerContact,
   isContentlessWahaMessage,
+  isWahaStatusBroadcast,
   shouldCreateSyntheticLead,
   shouldKeepTenantChannelMessage,
   shouldPersistBrokerConnectionMessage,
@@ -129,5 +130,13 @@ describe("isContentlessWahaMessage (bug 2026-10-21: \"[text]\" bubble on the cli
     expect(isContentlessWahaMessage({ type: "image", body: "[image]" })).toBe(false);
     expect(isContentlessWahaMessage({ type: "text", body: "[text]", media: { mimeType: "image/jpeg" } })).toBe(false);
     expect(isContentlessWahaMessage({ type: "text", body: "[unsupported]" })).toBe(false);
+  });
+});
+
+describe("isWahaStatusBroadcast (bug 2026-10-21: broker stories shown as her messages)", () => {
+  it("ignores a story flagged by the normalizer or carrying the status chat in its id", () => {
+    expect(isWahaStatusBroadcast({ id: "x", isStatusBroadcast: true })).toBe(true);
+    expect(isWahaStatusBroadcast({ id: "false_status@broadcast_A564FF922F6FD_206066@lid" })).toBe(true);
+    expect(isWahaStatusBroadcast({ id: "false_5521998765651@c.us_3EB0" })).toBe(false);
   });
 });

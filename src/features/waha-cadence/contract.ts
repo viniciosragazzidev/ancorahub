@@ -82,6 +82,11 @@ export const wahaWebhookSchema = z.object({
     isGroup: z.boolean().optional(),
     /** The group id (the part before `@g.us`), only for group messages. */
     groupId: z.string().min(1).max(100).optional(),
+    /**
+     * A WhatsApp Status/story (chat `status@broadcast`): what a contact posted
+     * for all their contacts, never a message to the company. Ingest ignores it.
+     */
+    isStatusBroadcast: z.boolean().optional(),
     /** Provider-origin metadata used only for observability and outgoing reconciliation. */
     source: z.string().trim().min(1).max(64).optional(),
     /** Caption for media messages */
@@ -154,6 +159,21 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
     typeof value === "string" && value.endsWith("@lid") && typeof phone === "string" && phone.trim()
       ? normalizeJid(phone)
       : normalizeJid(value);
+  // WhatsApp Status/stories live on the chat `status@broadcast`; the poster is the participant.
+  const isStatusJid = (value: unknown) => typeof value === "string" && value.toLowerCase().includes("status@broadcast");
+  const isStatusMessage = (message: Record<string, unknown>, messageId: unknown) => {
+    const data = message._data && typeof message._data === "object" ? message._data as Record<string, unknown> : {};
+    const dataId = data.id && typeof data.id === "object" ? data.id as Record<string, unknown> : {};
+    return isStatusJid(message.from) || isStatusJid(message.to) || isStatusJid(message.chatId)
+      || isStatusJid(messageId) || isStatusJid(dataId.remote) || isStatusJid(dataId._serialized)
+      || message.isStatus === true || data.isStatusV3 === true;
+  };
+  // The poster of a status, so the event still validates and can be marked ignored.
+  const statusAuthor = (message: Record<string, unknown>, phone: unknown) => {
+    const participant = message.participant ?? message.author;
+    const digits = String(contactJid(typeof participant === "string" ? participant : "", phone) ?? "");
+    return digits ? (digits.length > 15 ? digits.slice(-15) : digits) : undefined;
+  };
   const isUnresolvedLid = (value: unknown, phone: unknown) =>
     typeof value === "string" && value.endsWith("@lid") && !(typeof phone === "string" && phone.trim());
 
@@ -260,6 +280,7 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
       const contactLidUnresolved = fromMe
         ? isUnresolvedLid(innerPayload.to, attached.toPn)
         : isUnresolvedLid(innerPayload.from, attached.fromPn);
+      const isStatusBroadcast = isStatusMessage(innerPayload, messageId);
 
       return {
         eventId,
@@ -269,10 +290,12 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
         message: {
           id: messageId,
           from:
+            (isStatusBroadcast && isStatusJid(innerPayload.from) ? statusAuthor(innerPayload, attached.fromPn) : undefined) ??
             groupAuthorJid(innerPayload.from, innerPayload.participant ?? innerPayload.author) ??
             contactJid(innerPayload.from, attached.fromPn),
-          to: isGroupJid(innerPayload.to) ? undefined : contactJid(innerPayload.to, attached.toPn) || undefined,
+          to: isGroupJid(innerPayload.to) || isStatusJid(innerPayload.to) ? undefined : contactJid(innerPayload.to, attached.toPn) || undefined,
           ...(contactLidUnresolved ? { contactLidUnresolved: true } : {}),
+          ...(isStatusBroadcast ? { isStatusBroadcast: true } : {}),
           ...groupFields(innerPayload.from, innerPayload.to),
           body: bodyText,
           type: mappedType,
@@ -348,17 +371,21 @@ export function normalizeWahaWebhookPayload(payload: unknown): unknown {
 
   const message = raw.message;
   if (!message || typeof message !== "object" || Array.isArray(message)) return raw;
+  const preformatted = message as Record<string, unknown>;
+  const preformattedStatus = isStatusMessage(preformatted, preformatted.id);
 
   return {
     ...raw,
     message: {
-      ...(message as Record<string, unknown>),
+      ...preformatted,
+      ...(preformattedStatus ? { isStatusBroadcast: true } : {}),
       from:
+        (preformattedStatus && isStatusJid(preformatted.from) ? statusAuthor(preformatted, undefined) : undefined) ??
         groupAuthorJid(
           (message as Record<string, unknown>).from,
           (message as Record<string, unknown>).participant ?? (message as Record<string, unknown>).author,
         ) ?? normalizeJid((message as Record<string, unknown>).from),
-      to: isGroupJid((message as Record<string, unknown>).to)
+      to: isGroupJid((message as Record<string, unknown>).to) || isStatusJid((message as Record<string, unknown>).to)
         ? undefined
         : normalizeJid((message as Record<string, unknown>).to),
       ...groupFields((message as Record<string, unknown>).from, (message as Record<string, unknown>).to),

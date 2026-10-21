@@ -29,6 +29,9 @@ import { renderTemplatePreview } from "@/features/communication-channels/templat
 import { describeOwnerTransition } from "@/features/conversations/owner-transitions";
 import { handleLeadOfferWebhookResponse } from "@/features/lead-distribution/offers";
 import { META_CLOUD_PROVIDER } from "@/features/communication-channels/types";
+import { companyPhoneList, isOfficialBrokerChannelInbound, officialBrokerPhoneSuffix } from "@/features/conversations/official-broker-channel";
+import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
+import { samePhoneSubscriber } from "@/features/waha-cadence/phone-matching";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -199,6 +202,8 @@ export default async function ConversationsPage({
             .from(schema.whatsappMessages)
             .where(and(
               eq(schema.whatsappMessages.tenantId, context.tenantId),
+              // WhatsApp Status/stories (status@broadcast) are nobody writing to the company.
+              notStatusBroadcastSql(schema.whatsappMessages.messageId),
               // The WhatsApp Business app history imported when a number was
               // connected in coexistence (sent before the connection) belongs
               // to the team's old chats: it only shows for a lead or a client,
@@ -707,7 +712,7 @@ export default async function ConversationsPage({
         return phone ? [phone] : [];
       });
 
-      const [invitations, outboundMessages, inboundMessages] = brokerProfileIds.length > 0
+      const [invitations, outboundMessages, inboundMessages, companyNumbers] = brokerProfileIds.length > 0
         ? await Promise.all([
             db
               .select({
@@ -770,6 +775,7 @@ export default async function ConversationsPage({
             db
               .select({
                 id: schema.whatsappMessages.id,
+                messageId: schema.whatsappMessages.messageId,
                 phone: schema.whatsappMessages.phone,
                 body: schema.whatsappMessages.body,
                 providerStatus: schema.whatsappMessages.providerStatus,
@@ -785,19 +791,29 @@ export default async function ConversationsPage({
                 and(
                   eq(schema.whatsappMessages.tenantId, context.tenantId),
                   eq(schema.whatsappMessages.direction, "incoming"),
+                  // A broker's WhatsApp Status/story is not a message to the company.
+                  notStatusBroadcastSql(schema.whatsappMessages.messageId),
                   sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
                   or(
                     inArray(schema.whatsappMessages.phone, brokerPhones),
-                    ...brokerPhones.map((phone) =>
-                      like(schema.whatsappMessages.phone, `%${phone.slice(-4)}`),
-                    ),
+                    ...brokerPhones.flatMap((phone) => {
+                      const suffix = officialBrokerPhoneSuffix(phone);
+                      return suffix ? [like(schema.whatsappMessages.phone, `%${suffix}`)] : [];
+                    }),
                   ),
                 ),
               )
               .orderBy(desc(schema.whatsappMessages.sentAt))
               .limit(500),
+            // The tenant's own WAHA numbers (diretoria, materiais...): what one of
+            // them sent to another is company chatter, not a broker writing.
+            db
+              .select({ phone: schema.wahaNumbers.displayPhoneNumber })
+              .from(schema.wahaNumbers)
+              .where(eq(schema.wahaNumbers.tenantId, context.tenantId)),
           ])
-        : [[], [], []] as const;
+        : [[], [], [], []] as const;
+      const companyPhones = companyPhoneList(companyNumbers.map((number) => number.phone));
 
       // The approved templates as synchronized from Meta, so each sent
       // template renders with its real header/body/buttons instead of a
@@ -852,7 +868,9 @@ export default async function ConversationsPage({
         return (
           brokerByPhone.get(digits) ??
           (digits.length >= 11 ? brokerByPhone.get(digits.slice(-11)) : undefined) ??
-          (digits.length >= 10 ? brokerByPhone.get(digits.slice(-10)) : undefined)
+          (digits.length >= 10 ? brokerByPhone.get(digits.slice(-10)) : undefined) ??
+          // WhatsApp still addresses many numbers without the 9th digit.
+          brokers.find((broker) => samePhoneSubscriber(broker.phone, digits))
         );
       };
 
@@ -900,6 +918,7 @@ export default async function ConversationsPage({
       }
 
       for (const message of inboundMessages) {
+        if (!isOfficialBrokerChannelInbound(message, companyPhones)) continue;
         const broker = findBroker(null, message.phone);
         if (!broker) continue;
         const cleanBody = message.body?.trim();

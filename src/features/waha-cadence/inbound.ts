@@ -67,6 +67,11 @@ export function shouldPersistBrokerConnectionMessage(input: {
   return input.hasLead || input.hasClient;
 }
 
+/** A WhatsApp Status/story: flagged by the normalizer, or the id still carries the chat. */
+export function isWahaStatusBroadcast(message: { id: string; isStatusBroadcast?: boolean }) {
+  return message.isStatusBroadcast === true || /status@broadcast/i.test(message.id);
+}
+
 /**
  * A WAHA "message" with no text and no file is not something the contact
  * wrote: it is a session/protocol event (deleted message, security-code
@@ -263,6 +268,14 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   if (!tenantId) {
     await markIgnored(db, registered.id, "unknown_session");
     return { processed: 0, ignored: "unknown_session" as const };
+  }
+
+  // WhatsApp Status/stories (`status@broadcast`) are what a contact posted for
+  // everyone, not a message to the company: never stored (21/10: a broker's
+  // story videos showed as her messages in "Número oficial · corretores").
+  if (isWahaStatusBroadcast(event.message)) {
+    await markIgnored(db, registered.id, "status_broadcast");
+    return { processed: 0, ignored: "status_broadcast" as const };
   }
 
   // Group chats (`@g.us`) are operator material, not contacts: they never

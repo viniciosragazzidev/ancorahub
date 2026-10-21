@@ -12,6 +12,7 @@ export { canReadTeamConversations, isOutgoingDirection };
 
 export type { TeamConversationDetail, TeamConversationMessage, TeamConversationSummary } from "./types";
 import type { TeamConversationDetail, TeamConversationSummary } from "./types";
+import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 
 /**
  * Conversations of the brokers the viewer manages, newest first: one row per lead with its last
@@ -77,7 +78,7 @@ export async function getTeamConversation(context: TenantContext, leadId: string
       mediaKind: schema.whatsappMessages.mediaKind,
     })
     .from(schema.whatsappMessages)
-    .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id)))
+    .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id), notStatusBroadcastSql(schema.whatsappMessages.messageId)))
     .orderBy(asc(schema.whatsappMessages.sentAt))
     .limit(limit);
 
