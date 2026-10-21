@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, inArray, isNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
 import type { TenantContext } from "@/shared/auth/types";
@@ -51,7 +51,7 @@ async function realMetaCost(tenantId: string, since: Date) {
   try {
     const result = await getDatabase().execute(sql`select upper(pricing_category) as category, count(*)::int as count
       from whatsapp_outbound_messages
-      where tenant_id = ${tenantId} and recipient_type = 'lead' and pricing_billable = true and sent_at >= ${since}
+      where tenant_id = ${tenantId} and created_at >= ${since} and recipient_type = 'lead' and pricing_billable = true and sent_at >= ${since}
       group by 1`);
     const rows = (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as Array<{ category: string | null; count: number }>;
     if (!rows.length) return null;
@@ -83,118 +83,169 @@ const VARIANT_LABEL = new Map<string, string>([
   ["padrao", "Template atual (configurado)"],
 ]);
 
-function scopeFilter(context: TenantContext): SQL | undefined {
-  // Director: the whole company. Anyone else: their unit (the page refuses a manager without one).
-  if (context.role === "director") return undefined;
+/** Director: the whole company. Anyone else: their unit (the page refuses a manager without one). */
+function scopeBranch(context: TenantContext): string | null {
+  if (context.role === "director") return null;
   if (!context.branchId) throw new Error("Funil disponível só para a unidade do gestor.");
-  return eq(schema.leads.branchId, context.branchId);
+  return context.branchId;
+}
+
+type CohortRow = {
+  id: string;
+  status: string;
+  qualification_status: string | null;
+  qualification_state: string | null;
+  corretor_id: string | null;
+  motivo_perda: string | null;
+  turbo: TurboState | null;
+  first_out: string | Date | null;
+  delivered: boolean | null;
+  read: boolean | null;
+  first_in: string | Date | null;
+  first_in_after_out: string | Date | null;
+  first_in_after_turbo: string | Date | null;
+};
+
+function rowsOf<T>(result: unknown): T[] {
+  return (Array.isArray(result) ? result : (result as { rows?: unknown[] }).rows ?? []) as T[];
+}
+
+function time(value: string | Date | null) {
+  return value ? new Date(value).getTime() : null;
+}
+
+/**
+ * One pass per table (21/10, the first version was slow): the leads of the period, their
+ * first-contact sends (outbound read by its tenant + created_at index, there is no index by
+ * recipient) and their inbound messages (by the tenant + lead index). Counts are made here.
+ */
+async function loadCohort(tenantId: string, since: Date, branchId: string | null) {
+  const result = await getDatabase().execute(sql`
+    with cohort as (
+      select l.id, l.status, l.qualification_status, l.qualification_state, l.corretor_id, l.motivo_perda,
+        l.qualification_details->'turbo' as turbo,
+        (l.qualification_details->'turbo'->>'firstContactAt')::timestamptz as turbo_at
+      from leads l
+      where l.tenant_id = ${tenantId} and l.created_at >= ${since} and l.deleted_at is null
+        ${branchId ? sql`and l.branch_id = ${branchId}` : sql``}
+    ),
+    fc as (
+      select o.recipient_id as lead_id, min(o.sent_at) as first_out,
+        bool_or(o.delivered_at is not null or o.read_at is not null or o.status in ('delivered','read')) as delivered,
+        bool_or(o.read_at is not null or o.status = 'read') as read
+      from whatsapp_outbound_messages o
+      where o.tenant_id = ${tenantId} and o.created_at >= ${since}
+        and o.recipient_type = 'lead' and o.purpose = 'leadQualification' and o.status in ('sent','delivered','read')
+      group by o.recipient_id
+    ),
+    inb as (
+      select c.id as lead_id,
+        min(m.sent_at) as first_in,
+        min(m.sent_at) filter (where fc.first_out is not null and m.sent_at > fc.first_out) as first_in_after_out,
+        min(m.sent_at) filter (where c.turbo_at is not null and m.sent_at > c.turbo_at) as first_in_after_turbo
+      from cohort c
+      join whatsapp_messages m on m.tenant_id = ${tenantId} and m.lead_id = c.id and m.direction in ('incoming','inbound')
+      left join fc on fc.lead_id = c.id
+      group by c.id
+    )
+    select c.id, c.status, c.qualification_status, c.qualification_state, c.corretor_id, c.motivo_perda, c.turbo,
+      fc.first_out, fc.delivered, fc.read, inb.first_in, inb.first_in_after_out, inb.first_in_after_turbo
+    from cohort c
+    left join fc on fc.lead_id = c.id
+    left join inb on inb.lead_id = c.id
+  `);
+  return rowsOf<CohortRow>(result);
 }
 
 export async function getQualificationFunnel(context: TenantContext, period: FunnelPeriod): Promise<QualificationFunnel> {
   const db = getDatabase();
   const since = new Date(Date.now() - period * 24 * 60 * 60_000);
-  const cohort = and(
-    eq(schema.leads.tenantId, context.tenantId),
-    gte(schema.leads.createdAt, since),
-    isNull(schema.leads.deletedAt),
-    scopeFilter(context),
-  );
+  const isDirector = context.role === "director";
 
-  const firstContact = sql`exists (select 1 from ${schema.whatsappOutboundMessages} o
-    where o.tenant_id = ${schema.leads.tenantId} and o.recipient_id = ${schema.leads.id}
-      and o.recipient_type = 'lead' and o.purpose = 'leadQualification'
-      and o.status in ('sent','delivered','read')`;
-  const anyInbound = sql`exists (select 1 from ${schema.whatsappMessages} m
-    where m.tenant_id = ${schema.leads.tenantId} and m.lead_id = ${schema.leads.id}
-      and m.direction in ('incoming','inbound'))`;
-
-  const [totals] = await db.select({
-    arrived: sql<number>`count(*)::int`,
-    sent: sql<number>`count(*) filter (where ${firstContact}))::int`,
-    delivered: sql<number>`count(*) filter (where ${firstContact} and (o.delivered_at is not null or o.read_at is not null or o.status in ('delivered','read'))))::int`,
-    read: sql<number>`count(*) filter (where ${firstContact} and (o.read_at is not null or o.status = 'read')))::int`,
-    replied: sql<number>`count(*) filter (where ${anyInbound})::int`,
-    qualified: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} in ('qualified','hot','warm') or ${schema.leads.qualificationState} = 'QUALIFIED')::int`,
-    hot: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} = 'hot')::int`,
-    assigned: sql<number>`count(*) filter (where ${schema.leads.corretorId} is not null)::int`,
-    converted: sql<number>`count(*) filter (where ${schema.leads.status} = 'converted')::int`,
-    qualifying: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} = 'qualifying')::int`,
-    waitingBroker: sql<number>`count(*) filter (where ${schema.leads.corretorId} is null and ${schema.leads.qualificationStatus} in ('qualified','hot','warm','waiting_human') and ${schema.leads.status} not in ('converted','lost'))::int`,
-    withBroker: sql<number>`count(*) filter (where ${schema.leads.corretorId} is not null and ${schema.leads.status} not in ('converted','lost'))::int`,
-    coldNoReply: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} = 'cold' and ${schema.leads.corretorId} is null and ${schema.leads.status} not in ('converted','lost'))::int`,
-    outOfReach: sql<number>`count(*) filter (where ${schema.leads.qualificationStatus} in ('disqualified','no_whatsapp_contact','meta_blocked') and ${schema.leads.status} not in ('converted','lost'))::int`,
-    lost: sql<number>`count(*) filter (where ${schema.leads.status} = 'lost')::int`,
-  }).from(schema.leads).where(cohort);
-
-  const n = (value: number | undefined) => Number(value ?? 0);
-  const stages: FunnelStage[] = [
-    { key: "arrived", label: "Chegaram", count: n(totals?.arrived) },
-    { key: "sent", label: "1ª mensagem enviada", count: n(totals?.sent) },
-    { key: "delivered", label: "Entregue", count: n(totals?.delivered) },
-    { key: "read", label: "Lida", count: n(totals?.read) },
-    { key: "replied", label: "Respondeu", count: n(totals?.replied) },
-    { key: "qualified", label: "Qualificado", count: n(totals?.qualified) },
-    { key: "assigned", label: "Com corretor", count: n(totals?.assigned) },
-    { key: "converted", label: "Venda", count: n(totals?.converted) },
-  ];
-
-  const [losses, replyTimes, turboLeads, costRows] = await Promise.all([
-    db.select({ reason: schema.leads.motivoPerda, count: sql<number>`count(*)::int` })
-      .from(schema.leads).where(and(cohort, eq(schema.leads.status, "lost")))
-      .groupBy(schema.leads.motivoPerda).orderBy(sql`2 desc`).limit(6),
-    db.select({
-      median: sql<number | null>`percentile_cont(0.5) within group (order by extract(epoch from (r.first_in - f.first_out)) / 60)`,
-    }).from(schema.leads)
-      .innerJoin(sql`lateral (select min(o.sent_at) as first_out from ${schema.whatsappOutboundMessages} o where o.tenant_id = ${schema.leads.tenantId} and o.recipient_id = ${schema.leads.id} and o.purpose = 'leadQualification' and o.sent_at is not null) f`, sql`true`)
-      .innerJoin(sql`lateral (select min(m.sent_at) as first_in from ${schema.whatsappMessages} m where m.tenant_id = ${schema.leads.tenantId} and m.lead_id = ${schema.leads.id} and m.direction in ('incoming','inbound') and m.sent_at > f.first_out) r`, sql`true`)
-      .where(and(cohort, sql`f.first_out is not null and r.first_in is not null`)),
-    db.select({
-      id: schema.leads.id,
-      qualificationStatus: schema.leads.qualificationStatus,
-      turbo: sql<TurboState | null>`${schema.leads.qualificationDetails}->'turbo'`,
-      // Qualified outer columns: see loadVariantStats in service.ts.
-      firstReplyAt: sql<string | null>`(select min(m.sent_at) from whatsapp_messages m where m.tenant_id = "leads"."tenant_id" and m.lead_id = "leads"."id" and m.direction in ('incoming','inbound') and m.sent_at > ("leads"."qualification_details"->'turbo'->>'firstContactAt')::timestamptz)`,
-    }).from(schema.leads).where(and(cohort, sql`${schema.leads.qualificationDetails}->'turbo'->>'firstContactAt' is not null`)).limit(5000),
-    db.select({
-      templateName: schema.whatsappOutboundMessages.templateName,
-      category: schema.metaWhatsAppTemplates.category,
-      count: sql<number>`count(*)::int`,
-    }).from(schema.whatsappOutboundMessages)
-      .leftJoin(schema.metaWhatsAppTemplates, and(
-        eq(schema.metaWhatsAppTemplates.tenantId, schema.whatsappOutboundMessages.tenantId),
-        eq(schema.metaWhatsAppTemplates.name, schema.whatsappOutboundMessages.templateName),
-        isNull(schema.metaWhatsAppTemplates.deletedAt),
-      ))
-      .where(and(
-        eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
-        eq(schema.whatsappOutboundMessages.recipientType, "lead"),
-        eq(schema.whatsappOutboundMessages.messageType, "template"),
-        inArray(schema.whatsappOutboundMessages.status, ["delivered", "read"]),
-        gte(schema.whatsappOutboundMessages.sentAt, since),
-      ))
-      .groupBy(schema.whatsappOutboundMessages.templateName, schema.metaWhatsAppTemplates.category),
+  const [rows, costRows, real] = await Promise.all([
+    loadCohort(context.tenantId, since, scopeBranch(context)),
+    isDirector
+      ? db.select({
+        templateName: schema.whatsappOutboundMessages.templateName,
+        category: schema.metaWhatsAppTemplates.category,
+        count: sql<number>`count(*)::int`,
+      }).from(schema.whatsappOutboundMessages)
+        .leftJoin(schema.metaWhatsAppTemplates, and(
+          eq(schema.metaWhatsAppTemplates.tenantId, schema.whatsappOutboundMessages.tenantId),
+          eq(schema.metaWhatsAppTemplates.name, schema.whatsappOutboundMessages.templateName),
+          isNull(schema.metaWhatsAppTemplates.deletedAt),
+        ))
+        .where(and(
+          eq(schema.whatsappOutboundMessages.tenantId, context.tenantId),
+          // created_at uses the tenant index; sent_at keeps the period exact.
+          gte(schema.whatsappOutboundMessages.createdAt, since),
+          gte(schema.whatsappOutboundMessages.sentAt, since),
+          eq(schema.whatsappOutboundMessages.recipientType, "lead"),
+          eq(schema.whatsappOutboundMessages.messageType, "template"),
+          inArray(schema.whatsappOutboundMessages.status, ["delivered", "read"]),
+        ))
+        .groupBy(schema.whatsappOutboundMessages.templateName, schema.metaWhatsAppTemplates.category)
+      : Promise.resolve([]),
+    isDirector ? realMetaCost(context.tenantId, since) : Promise.resolve(null),
   ]);
 
-  // A/B: per approach and first-contact variant.
+  const count = (predicate: (row: CohortRow) => boolean) => rows.reduce((total, row) => total + (predicate(row) ? 1 : 0), 0);
+  const open = (row: CohortRow) => row.status !== "converted" && row.status !== "lost";
+  const isQualified = (row: CohortRow) => ["qualified", "hot", "warm"].includes(row.qualification_status ?? "") || row.qualification_state === "QUALIFIED";
+  const qualified = count(isQualified);
+
+  const stages: FunnelStage[] = [
+    { key: "arrived", label: "Chegaram", count: rows.length },
+    { key: "sent", label: "1ª mensagem enviada", count: count((row) => row.first_out !== null) },
+    { key: "delivered", label: "Entregue", count: count((row) => row.delivered === true) },
+    { key: "read", label: "Lida", count: count((row) => row.read === true) },
+    { key: "replied", label: "Respondeu", count: count((row) => row.first_in !== null) },
+    { key: "qualified", label: "Qualificado", count: qualified },
+    { key: "assigned", label: "Com corretor", count: count((row) => row.corretor_id !== null) },
+    { key: "converted", label: "Venda", count: count((row) => row.status === "converted") },
+  ];
+
+  // Median minutes from the first contact to the first reply after it.
+  const replyMinutes = rows
+    .map((row) => {
+      const out = time(row.first_out);
+      const reply = time(row.first_in_after_out);
+      return out !== null && reply !== null ? (reply - out) / 60_000 : null;
+    })
+    .filter((value): value is number => value !== null)
+    .sort((a, b) => a - b);
+  const median = replyMinutes.length
+    ? replyMinutes.length % 2
+      ? replyMinutes[(replyMinutes.length - 1) / 2]
+      : (replyMinutes[replyMinutes.length / 2 - 1] + replyMinutes[replyMinutes.length / 2]) / 2
+    : null;
+
+  const lossCounts = new Map<string, number>();
+  for (const row of rows) if (row.status === "lost") lossCounts.set(row.motivo_perda ?? "", (lossCounts.get(row.motivo_perda ?? "") ?? 0) + 1);
+  const lossReasons = [...lossCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([reason, total]) => ({ label: reason ? MOTIVO_PERDA_LABELS[reason as MotivoPerda] ?? reason : "Sem motivo informado", count: total }));
+
+  // A/B per approach and first-contact variant; which touch came right before the first reply.
   const variantMap = new Map<string, { approach: string; variant: string; sent: number; replied: number; qualified: number }>();
   const touchMap = new Map<string, { sent: number; repliesAfter: number }>();
-  for (const lead of turboLeads) {
-    const state = lead.turbo;
+  for (const row of rows) {
+    const state = row.turbo;
     if (!state?.firstContactAt) continue;
     const key = `${state.approach}|${state.variant ?? "padrao"}`;
-    const row = variantMap.get(key) ?? { approach: state.approach, variant: state.variant ?? "padrao", sent: 0, replied: 0, qualified: 0 };
-    row.sent += 1;
-    if (lead.firstReplyAt) row.replied += 1;
-    if (["qualified", "hot", "warm"].includes(lead.qualificationStatus ?? "")) row.qualified += 1;
-    variantMap.set(key, row);
-    // Which touch was the last one before the first reply.
-    const replyAt = lead.firstReplyAt ? new Date(lead.firstReplyAt).getTime() : null;
+    const entry = variantMap.get(key) ?? { approach: state.approach, variant: state.variant ?? "padrao", sent: 0, replied: 0, qualified: 0 };
+    entry.sent += 1;
+    if (row.first_in_after_turbo) entry.replied += 1;
+    if (isQualified(row)) entry.qualified += 1;
+    variantMap.set(key, entry);
+    const replyAt = time(row.first_in_after_turbo);
     let lastBeforeReply: string | null = null;
     for (const touch of state.touches ?? []) {
       if (touch.status !== "sent") continue;
-      const entry = touchMap.get(touch.touch) ?? { sent: 0, repliesAfter: 0 };
-      entry.sent += 1;
-      touchMap.set(touch.touch, entry);
+      const touchEntry = touchMap.get(touch.touch) ?? { sent: 0, repliesAfter: 0 };
+      touchEntry.sent += 1;
+      touchMap.set(touch.touch, touchEntry);
       if (replyAt !== null && new Date(touch.at).getTime() <= replyAt) lastBeforeReply = touch.touch;
     }
     if (lastBeforeReply) touchMap.get(lastBeforeReply)!.repliesAfter += 1;
@@ -214,48 +265,43 @@ export async function getQualificationFunnel(context: TenantContext, period: Fun
     repliesAfter: touchMap.get(touch)?.repliesAfter ?? 0,
   }));
 
-  const packCategory = new Map(RECOMMENDED_TEMPLATES.map((template) => [template.name, template.category]));
   let marketing = 0;
   let utility = 0;
   let templatesDelivered = 0;
-  for (const row of costRows) {
-    const category = (row.category ?? packCategory.get(row.templateName) ?? "MARKETING").toUpperCase();
-    const count = Number(row.count);
-    templatesDelivered += count;
-    if (category === "MARKETING") marketing += count * META_RATE_BRL.MARKETING;
-    else utility += count * META_RATE_BRL.UTILITY;
-  }
-  // Meta's own pricing (billable messages, including service replies) when recorded; else the estimate.
-  const real = await realMetaCost(context.tenantId, since);
   if (real) {
-    marketing = real.marketing;
-    utility = real.utility;
+    // Meta's own pricing (billable messages, including service replies) when recorded.
+    ({ marketing, utility } = real);
     templatesDelivered = real.delivered;
+  } else {
+    const packCategory = new Map(RECOMMENDED_TEMPLATES.map((template) => [template.name, template.category]));
+    for (const row of costRows) {
+      const category = (row.category ?? packCategory.get(row.templateName) ?? "MARKETING").toUpperCase();
+      const total = Number(row.count);
+      templatesDelivered += total;
+      if (category === "MARKETING") marketing += total * META_RATE_BRL.MARKETING;
+      else utility += total * META_RATE_BRL.UTILITY;
+    }
   }
   const total = marketing + utility;
-  const qualified = n(totals?.qualified);
 
   return {
     period,
     since: since.toISOString(),
     stages,
-    medianMinutesToReply: replyTimes[0]?.median === null || replyTimes[0]?.median === undefined ? null : Math.round(Number(replyTimes[0].median)),
+    medianMinutesToReply: median === null ? null : Math.round(median),
     now: [
-      { key: "qualifying", label: "Em qualificação", count: n(totals?.qualifying), hint: "Conversando com a assistente agora" },
-      { key: "waiting", label: "Prontos, esperando corretor", count: n(totals?.waitingBroker), hint: "Qualificados sem corretor ainda" },
-      { key: "broker", label: "Em atendimento com corretor", count: n(totals?.withBroker), hint: "Com corretor, sem venda ou perda" },
-      { key: "cold", label: "Sem resposta (frios)", count: n(totals?.coldNoReply), hint: "Recebem os lembretes automáticos" },
-      { key: "out", label: "Fora de alcance", count: n(totals?.outOfReach), hint: "Sem WhatsApp, bloqueados ou sem interesse" },
-      { key: "lost", label: "Perdidos", count: n(totals?.lost), hint: "Marcados como perdidos" },
-      { key: "converted", label: "Vendas", count: n(totals?.converted), hint: "Convertidos" },
+      { key: "qualifying", label: "Em qualificação", count: count((row) => row.qualification_status === "qualifying"), hint: "Conversando com a assistente agora" },
+      { key: "waiting", label: "Prontos, esperando corretor", count: count((row) => row.corretor_id === null && ["qualified", "hot", "warm", "waiting_human"].includes(row.qualification_status ?? "") && open(row)), hint: "Qualificados sem corretor ainda" },
+      { key: "broker", label: "Em atendimento com corretor", count: count((row) => row.corretor_id !== null && open(row)), hint: "Com corretor, sem venda ou perda" },
+      { key: "cold", label: "Sem resposta (frios)", count: count((row) => row.qualification_status === "cold" && row.corretor_id === null && open(row)), hint: "Recebem os lembretes automáticos" },
+      { key: "out", label: "Fora de alcance", count: count((row) => ["disqualified", "no_whatsapp_contact", "meta_blocked"].includes(row.qualification_status ?? "") && open(row)), hint: "Sem WhatsApp, bloqueados ou sem interesse" },
+      { key: "lost", label: "Perdidos", count: count((row) => row.status === "lost"), hint: "Marcados como perdidos" },
+      { key: "converted", label: "Vendas", count: count((row) => row.status === "converted"), hint: "Convertidos" },
     ],
-    lossReasons: losses.map((row) => ({
-      label: row.reason ? MOTIVO_PERDA_LABELS[row.reason as MotivoPerda] ?? row.reason : "Sem motivo informado",
-      count: Number(row.count),
-    })),
+    lossReasons,
     variants,
     touches,
-    cost: context.role !== "director" ? null : {
+    cost: !isDirector ? null : {
       total,
       marketing,
       utility,
