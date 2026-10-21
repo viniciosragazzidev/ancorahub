@@ -19,7 +19,7 @@ import { resolvePmeQueueFor } from "./pme-queue-routing";
 import { isCompanyLeadType } from "@/features/leads/company-lead-detection";
 import { selectMatchingDutyScheduleIds } from "./duty-roster-matching";
 import { normalizeQueueSource } from "./routing-catalog";
-import { getActiveQueueDutyRoster } from "./active-queue-duty-roster";
+import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "./active-queue-duty-roster";
 import { countReceivedInDuty, type DutyReceipt } from "./duty-attribution";
 import { resolveEffectiveDutyAssignments } from "./dated-duty-roster";
 import { getPresenceEligibleAssignments } from "./duty-presence";
@@ -539,7 +539,12 @@ export async function assignLeadToBroker(context: TenantContext, leadId: string,
     if (!linkedQueue && roster.legacyQueueId !== lead.queueId) return { status: "conflict", leadId, reason: "A fila não está vinculada ao plantão." };
   }
   const activeDutyRoster = !options?.manualTransferOverride && !postSaleExempt && assignmentQueueId ? await getActiveQueueDutyRoster({ tenantId: context.tenantId, queueId: assignmentQueueId, webhookCredentialId: lead.webhookCredentialId, respectDutyCap: false, includePaused: true }) : null;
-  const dutyScheduleId = options?.manualTransferOverride ? null : options?.dutyScheduleId ?? activeDutyRoster?.brokers.find((candidate) => candidate.id === brokerId)?.scheduleId ?? null;
+  // Todo lead enviado manualmente conta em "leads recebidos no plantão" do
+  // corretor (regra do Vinicios, 21/10), inclusive Pós Venda e transferência
+  // em lote; só a transferência de lead já encerrado (Pós Venda) não é recebimento.
+  const dutyScheduleId = options?.dutyScheduleId
+    ?? (options?.manualTransferOverride ? null : activeDutyRoster?.brokers.find((candidate) => candidate.id === brokerId)?.scheduleId)
+    ?? (keepsClosedStatus ? null : await findBrokerRunningDutyScheduleId({ tenantId: context.tenantId, brokerId }));
   if (excludeBrokerId && brokerId === excludeBrokerId) return { status: "conflict", leadId, reason: "O corretor que perdeu o SLA não pode receber este lead novamente." };
   const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
   const assignedAt = new Date();
@@ -1463,6 +1468,9 @@ export async function offerLeadToBrokerManually(
   const [tenant] = await db.select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes })
     .from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
   const now = new Date();
+  // Envio manual conta no plantão do corretor mesmo quando a fila do lead não
+  // tem plantão ativo (Pós Venda e afins): regra do Vinicios, 21/10.
+  const attributedDutyScheduleId = dutyBroker?.scheduleId ?? await findBrokerRunningDutyScheduleId({ tenantId: context.tenantId, brokerId, now });
   const result = await createLeadOffersForBrokers({
     tenantId: context.tenantId,
     leadId,
@@ -1476,9 +1484,9 @@ export async function offerLeadToBrokerManually(
     capacityPerBroker: null,
     assignmentSource: "manual_offer",
     ...(postSaleQueueName ? { postSaleExemptionQueueName: postSaleQueueName } : {}),
-    ...(dutyBroker ? {
-      dutyScheduleIds: [dutyBroker.scheduleId],
-      dutyScheduleIdByBroker: { [brokerId]: dutyBroker.scheduleId },
+    ...(attributedDutyScheduleId ? {
+      dutyScheduleIds: [attributedDutyScheduleId],
+      dutyScheduleIdByBroker: { [brokerId]: attributedDutyScheduleId },
     } : {}),
   });
   if (!result.created) {

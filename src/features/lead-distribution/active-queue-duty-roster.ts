@@ -200,3 +200,54 @@ export async function getActiveQueueDutyRoster(input: {
     brokers: brokers.filter((broker) => effectiveAssignmentIds.has(broker.assignmentId) && presence.eligibleAssignmentIds.has(broker.assignmentId) && scheduleIdByBroker.get(broker.id) === broker.scheduleId).map((broker) => ({ id: broker.id, scheduleId: broker.scheduleId, name: broker.name, branchId: broker.branchId, branchName: broker.branchName })),
   };
 }
+
+/**
+ * Regra do Vinicios (21/10): todo lead enviado livremente/manualmente a um
+ * corretor conta em "leads recebidos no plantão" do corretor, qualquer que seja
+ * a fila de origem (Pós Venda ou outra fila sem plantão vinculado). Quando a
+ * fila do lead não resolve o plantão, vale o plantão em que o corretor está
+ * escalado agora. Mais de um plantão ao mesmo tempo: o que começou primeiro
+ * (desempate pelo id), para a atribuição ser determinística.
+ */
+export function pickBrokerRunningDutyScheduleId(rows: readonly { scheduleId: string; startsAt: string }[]): string | null {
+  const [first] = [...rows].sort((left, right) => left.startsAt.localeCompare(right.startsAt) || left.scheduleId.localeCompare(right.scheduleId));
+  return first?.scheduleId ?? null;
+}
+
+/** Plantão em andamento do corretor agora (qualquer fila), ou null se ele não está escalado. */
+export async function findBrokerRunningDutyScheduleId(input: { tenantId: string; brokerId: string; now?: Date }): Promise<string | null> {
+  const db = getDatabase();
+  const now = input.now ?? new Date();
+  const local = getLocalDutyParts(now);
+  const rows = await db
+    .select({
+      id: schema.dutyRosterAssignments.id,
+      brokerId: schema.dutyRosterAssignments.brokerId,
+      scheduleId: schema.dutyRosterAssignments.scheduleId,
+      dutyDate: schema.dutyRosterAssignments.dutyDate,
+      startsAt: schema.unitDutySchedules.startsAt,
+    })
+    .from(schema.dutyRosterAssignments)
+    .innerJoin(schema.unitDutySchedules, and(
+      eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId),
+      eq(schema.unitDutySchedules.tenantId, schema.dutyRosterAssignments.tenantId),
+    ))
+    .where(and(
+      eq(schema.dutyRosterAssignments.tenantId, input.tenantId),
+      eq(schema.dutyRosterAssignments.brokerId, input.brokerId),
+      eq(schema.dutyRosterAssignments.status, "active"),
+      eq(schema.dutyRosterAssignments.dayOfWeek, local.weekday),
+      lte(schema.dutyRosterAssignments.startsAt, local.time),
+      gt(schema.dutyRosterAssignments.endsAt, local.time),
+      lte(schema.dutyRosterAssignments.validFrom, now),
+      or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now)),
+      eq(schema.unitDutySchedules.status, "active"),
+      eq(schema.unitDutySchedules.dayOfWeek, local.weekday),
+      lte(schema.unitDutySchedules.startsAt, local.time),
+      gt(schema.unitDutySchedules.endsAt, local.time),
+      lte(schema.unitDutySchedules.validFrom, now),
+      or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
+    ));
+  if (!rows.length) return null;
+  return pickBrokerRunningDutyScheduleId(await resolveEffectiveDutyAssignments(input.tenantId, rows, now));
+}

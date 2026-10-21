@@ -31,7 +31,7 @@ const state = vi.hoisted(() => {
     archivedAt: null as Date | null,
     deletedAt: null as Date | null,
   };
-  const controls = { enabled: true, conflict: false, postSale: false, dutyRoster: false, brokerBranchId: "00000000-0000-4000-8000-000000000004", teamMembers: [] as string[] };
+  const controls = { enabled: true, conflict: false, postSale: false, dutyRoster: false, runningDutyScheduleId: null as string | null, brokerBranchId: "00000000-0000-4000-8000-000000000004", teamMembers: [] as string[] };
   const db = {
     select: vi.fn(() => ({
       from: vi.fn((table: unknown) => ({
@@ -97,7 +97,7 @@ vi.mock("drizzle-orm", () => ({
 }));
 
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: vi.fn(async () => state.controls.enabled ? "true" : "false") }));
-vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ getActiveQueueDutyRoster: vi.fn(async () => state.controls.dutyRoster ? ({ hasActiveDuty: true, brokers: [{ id: "00000000-0000-4000-8000-000000000003", scheduleId: "00000000-0000-4000-8000-000000000009", branchId: "00000000-0000-4000-8000-000000000004" }] }) : ({ hasActiveDuty: false, brokers: [] })) }));
+vi.mock("@/features/lead-distribution/active-queue-duty-roster", () => ({ findBrokerRunningDutyScheduleId: vi.fn(async () => state.controls.runningDutyScheduleId), getActiveQueueDutyRoster: vi.fn(async () => state.controls.dutyRoster ? ({ hasActiveDuty: true, brokers: [{ id: "00000000-0000-4000-8000-000000000003", scheduleId: "00000000-0000-4000-8000-000000000009", branchId: "00000000-0000-4000-8000-000000000004" }] }) : ({ hasActiveDuty: false, brokers: [] })) }));
 vi.mock("@/features/lead-distribution/service", () => ({ ensureDefaultQueue: vi.fn(async (_tenantId: string, branchId: string) => `queue-${branchId}`), offerLeadToBrokerManually: vi.fn(), routeLeadToBranch: vi.fn() }));
 vi.mock("@/features/lead-distribution/post-sale-transfer", () => ({
   findPostSaleExemptionQueueName: vi.fn(async () => state.controls.postSale ? "Pós Venda" : null),
@@ -166,7 +166,7 @@ describe("manual service reassignment", () => {
     vi.clearAllMocks();
     state.updates.length = 0;
     state.inserts.length = 0;
-    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, brokerBranchId: "00000000-0000-4000-8000-000000000004" });
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, runningDutyScheduleId: null, brokerBranchId: "00000000-0000-4000-8000-000000000004" });
     Object.assign(state.lead, { corretorId: "00000000-0000-4000-8000-000000000002", status: "in_contact", distributionStatus: "assigned", firstContactAt: new Date("2026-09-25T10:00:00Z"), serviceStartedAt: new Date("2026-09-25T10:00:00Z"), archivedAt: null, deletedAt: null });
   });
   function reassignmentForm() {
@@ -217,6 +217,27 @@ describe("manual service reassignment", () => {
     expect(state.inserts.some(i => i.table === state.schema.leadAssignmentAttempts)).toBe(false);
     expect(state.inserts.find(i => i.table === state.schema.auditLogs)?.values).toMatchObject({ acao: "lead.post_sale_transfer:Pós Venda" });
   });
+  it("counts a manual Pós Venda assignment in the broker's running plantão (regra 21/10)", async () => {
+    state.controls.postSale = true;
+    state.controls.runningDutyScheduleId = "00000000-0000-4000-8000-000000000077";
+    const data = reassignmentForm();
+    data.delete("branchId");
+    expect(await reassignLeadAction({}, data)).toMatchObject({ success: true });
+    expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ dutyScheduleId: "00000000-0000-4000-8000-000000000077" });
+    expect(state.inserts.find(i => i.table === state.schema.leadAssignmentAttempts)?.values).toMatchObject({ dutyScheduleId: "00000000-0000-4000-8000-000000000077" });
+  });
+  it("counts a manual assignment from a queue without plantão in the broker's running plantão", async () => {
+    state.controls.runningDutyScheduleId = "00000000-0000-4000-8000-000000000077";
+    expect(await reassignLeadAction({}, reassignmentForm())).toMatchObject({ success: true });
+    expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ dutyScheduleId: "00000000-0000-4000-8000-000000000077" });
+  });
+  it("does not count a closed Pós Venda lead transfer as a plantão receipt", async () => {
+    state.controls.postSale = true;
+    state.controls.runningDutyScheduleId = "00000000-0000-4000-8000-000000000077";
+    state.lead.status = "converted";
+    expect(await reassignLeadAction({}, reassignmentForm())).toMatchObject({ success: true });
+    expect(state.updates.find(u => u.table === state.schema.leads)?.values).toMatchObject({ dutyScheduleId: null });
+  });
   it("keeps a Pós Venda lead in its queue when only the broker changes", async () => {
     state.controls.postSale = true;
     const data = reassignmentForm();
@@ -242,7 +263,7 @@ describe("manager reassignment stays within the authenticated unit", () => {
     vi.clearAllMocks();
     state.updates.length = 0;
     state.inserts.length = 0;
-    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, brokerBranchId: "branch-test" });
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, runningDutyScheduleId: null, brokerBranchId: "branch-test" });
     Object.assign(state.lead, { branchId: "branch-test", corretorId: "00000000-0000-4000-8000-000000000002", status: "distributed", distributionStatus: "assigned", firstContactAt: null, serviceStartedAt: null, archivedAt: null, deletedAt: null });
     Object.assign(state.mockTenantContext, { userId: "manager-test", role: "manager", branchId: "branch-test" });
   });
@@ -311,7 +332,7 @@ describe("supervisor hand-off within the team (supervisor Lite P4)", () => {
     vi.clearAllMocks();
     state.updates.length = 0;
     state.inserts.length = 0;
-    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, teamMembers: [owner, target] });
+    Object.assign(state.controls, { enabled: true, conflict: false, postSale: false, dutyRoster: false, runningDutyScheduleId: null, teamMembers: [owner, target] });
     Object.assign(state.lead, { corretorId: owner, status: "distributed", distributionStatus: "assigned", firstContactAt: null, serviceStartedAt: null, archivedAt: null, deletedAt: null, branchId: "00000000-0000-4000-8000-000000000004" });
     Object.assign(state.mockTenantContext, { userId: "supervisor-test", role: "supervisor", supervisorTeamScope: true });
   });

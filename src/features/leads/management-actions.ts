@@ -14,7 +14,7 @@ import { enqueueLeadEffectTx, runLeadEffectOutboxProcessor } from "@/features/le
 import { scheduleAfterResponse } from "@/shared/async/after-response";
 import { withServerActionTiming } from "@/shared/observability/request-timing";
 import { canRemoveLeadAssignment, getLeadAssignmentBlockedReason } from "./assignment-domain";
-import { getActiveQueueDutyRoster } from "@/features/lead-distribution/active-queue-duty-roster";
+import { findBrokerRunningDutyScheduleId, getActiveQueueDutyRoster } from "@/features/lead-distribution/active-queue-duty-roster";
 import { findPostSaleExemptionQueueName, postSaleTransferAuditAction } from "@/features/lead-distribution/post-sale-transfer";
 import { ensureDefaultQueue, offerLeadToBrokerManually, routeLeadToBranch } from "@/features/lead-distribution/service";
 import { enqueueAndProcessLeadDistribution, enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
@@ -477,13 +477,17 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
         return { success: true, message: "Oferta enviada ao corretor. Se não houver aceite no prazo configurado, o lead volta à distribuição normal.", mutationId, entity: { leadId: lead.id, branchId: targetBranchId, corretorId: brokerId, status: "distributed", distributionStatus: "assigned" } };
       }
       const now = new Date();
+      // Todo lead enviado manualmente conta em "leads recebidos no plantão" do
+      // corretor, qualquer que seja a fila (regra do Vinicios, 21/10); a
+      // transferência de lead encerrado da Pós Venda não é recebimento.
+      const attributedDutyScheduleId = dutyScheduleId ?? (keepsClosedStatus ? null : await findBrokerRunningDutyScheduleId({ tenantId: context.tenantId, brokerId, now }));
       const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
 
       await db.transaction(async (tx) => {
         const updated = await tx.update(schema.leads).set({
           branchId: targetBranchId,
           queueId: targetQueueId,
-          dutyScheduleId,
+          dutyScheduleId: attributedDutyScheduleId,
           corretorId: input.brokerId,
           distributionStatus: "assigned",
           assignmentSource: context.role === "director" ? "manual_director" : "manual_manager",
@@ -526,7 +530,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           eq(schema.leadAssignmentAttempts.leadId, lead.id),
           eq(schema.leadAssignmentAttempts.status, "open"),
         ));
-        if (tenantPolicy?.feedbackRequiredEnabled !== false && !keepsClosedStatus) await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: lead.tenantId, leadId: lead.id, brokerId, dutyScheduleId, sequence: 1, assignedAt: now, feedbackDueAt: new Date(now.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000), status: "open", createdAt: now });
+        if (tenantPolicy?.feedbackRequiredEnabled !== false && !keepsClosedStatus) await tx.insert(schema.leadAssignmentAttempts).values({ id: randomUUID(), tenantId: lead.tenantId, leadId: lead.id, brokerId, dutyScheduleId: attributedDutyScheduleId, sequence: 1, assignedAt: now, feedbackDueAt: new Date(now.getTime() + ((Number.parseInt(tenantPolicy?.slaFirstContactMinutes ?? "15", 10) || 15) + (Number.parseInt(tenantPolicy?.feedbackGraceMinutes ?? "5", 10) || 5)) * 60_000), status: "open", createdAt: now });
         const actorLabel = context.role === "director" ? "Diretor" : bySupervisor ? "Supervisor" : "Gestor";
         await tx.insert(schema.leadInteractions).values({ id: randomUUID(), leadId: lead.id, userId: context.userId, tipo: "system_alert", conteudo: keepsClosedStatus ? `Lead da Pós Venda transferido por ${actorLabel}; status e histórico preservados.` : `Lead reatribuído por ${actorLabel}; atendimento e SLA reiniciados, com histórico preservado.${supervisorReason ? ` Motivo: ${supervisorReason}` : ""}` });
         await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "lead", entidadeId: lead.id, acao: isPostSale ? postSaleTransferAuditAction(postSaleQueueName) : bySupervisor ? `supervisor_repassou_lead: ${supervisorReason}` : "reatribuiu_lead" });
@@ -550,7 +554,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
           metadata: {
             assignmentScope: isPostSale ? "post_sale_transfer_exemption" : isDutyReassignment ? "active_duty_roster" : "manual_cross_unit_override",
             ...(isPostSale ? { exemptionQueueName: postSaleQueueName } : {}),
-            ...(dutyScheduleId ? { dutyScheduleId } : {}),
+            ...(attributedDutyScheduleId ? { dutyScheduleId: attributedDutyScheduleId } : {}),
             assignedBrokerBranchId: broker.branchId,
             previousStatus: lead.status,
             previousFirstContactAt: lead.firstContactAt?.toISOString() ?? null,
