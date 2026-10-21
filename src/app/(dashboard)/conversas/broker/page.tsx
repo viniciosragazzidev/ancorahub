@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 
@@ -10,6 +10,7 @@ import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { hasPermission } from "@/shared/auth/permissions";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
+import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { AssistantChat } from "@/components/chat/assistant-chat";
 import { ASSISTANTS } from "@/features/broker-workspace/chat/assistant-scripts";
@@ -60,28 +61,87 @@ export default async function BrokerConversationsPage({ searchParams }: { search
 
   const leadIds = leads.map((lead) => lead.id);
   const clientIds = clients.map((client) => client.id);
-  const messageRows = leadIds.length || clientIds.length
-    ? await db.select({ id: schema.whatsappMessages.id, leadId: schema.whatsappMessages.leadId, clientId: schema.whatsappMessages.clientId, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, providerStatus: schema.whatsappMessages.providerStatus, sentAt: schema.whatsappMessages.sentAt })
+  const requestedConversationId = leadId && todas !== "1" && !insight ? leadId : null;
+  const selectedLeadId = requestedConversationId
+    ? leads.find((lead) => lead.id === requestedConversationId)?.id
+    : undefined;
+  const requestedClientId = requestedConversationId?.startsWith("client:")
+    ? requestedConversationId.slice("client:".length)
+    : null;
+  const selectedClientId = requestedClientId
+    ? clients.find((client) => client.id === requestedClientId)?.id
+    : undefined;
+  const messageFields = {
+    id: schema.whatsappMessages.id,
+    leadId: schema.whatsappMessages.leadId,
+    clientId: schema.whatsappMessages.clientId,
+    body: schema.whatsappMessages.body,
+    direction: schema.whatsappMessages.direction,
+    providerStatus: schema.whatsappMessages.providerStatus,
+    sentAt: schema.whatsappMessages.sentAt,
+  };
+  // Same guard as /conversas: stories and contentless "[text]" events are not messages.
+  const visibleMessage = and(
+    notStatusBroadcastSql(schema.whatsappMessages.messageId),
+    sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
+  );
+  const latestLeadMessagesPromise = leadIds.length
+    ? db.selectDistinctOn([schema.whatsappMessages.leadId], messageFields)
       .from(schema.whatsappMessages)
-      .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), or(...(leadIds.length ? [inArray(schema.whatsappMessages.leadId, leadIds)] : []), ...(clientIds.length ? [inArray(schema.whatsappMessages.clientId, clientIds)] : []))))
-      .orderBy(desc(schema.whatsappMessages.sentAt)).limit(1_000)
-    : [];
+      .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), inArray(schema.whatsappMessages.leadId, leadIds), visibleMessage))
+      .orderBy(schema.whatsappMessages.leadId, desc(schema.whatsappMessages.sentAt), desc(schema.whatsappMessages.id))
+    : Promise.resolve([]);
+  const latestClientMessagesPromise = clientIds.length
+    ? db.selectDistinctOn([schema.whatsappMessages.clientId], messageFields)
+      .from(schema.whatsappMessages)
+      .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), inArray(schema.whatsappMessages.clientId, clientIds), visibleMessage))
+      .orderBy(schema.whatsappMessages.clientId, desc(schema.whatsappMessages.sentAt), desc(schema.whatsappMessages.id))
+    : Promise.resolve([]);
+  const selectedMessagesPromise = selectedLeadId
+    ? db.select(messageFields)
+      .from(schema.whatsappMessages)
+      .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, selectedLeadId), visibleMessage))
+      .orderBy(desc(schema.whatsappMessages.sentAt), desc(schema.whatsappMessages.id))
+      .limit(30)
+    : selectedClientId
+      ? db.select(messageFields)
+        .from(schema.whatsappMessages)
+        .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.clientId, selectedClientId), visibleMessage))
+        .orderBy(desc(schema.whatsappMessages.sentAt), desc(schema.whatsappMessages.id))
+        .limit(30)
+      : Promise.resolve([]);
+  const [latestLeadMessages, latestClientMessages, selectedMessages] = await Promise.all([
+    latestLeadMessagesPromise,
+    latestClientMessagesPromise,
+    selectedMessagesPromise,
+  ]);
 
   const byLead = new Map<string, BrokerInsightMessage[]>();
   const byClient = new Map<string, BrokerInsightMessage[]>();
-  for (const message of messageRows) {
-    const mapped = { id: message.id, body: message.body, direction: message.direction, sentAt: toIso(message.sentAt) ?? new Date().toISOString(), providerStatus: message.providerStatus };
-    if (message.leadId) byLead.set(message.leadId, [...(byLead.get(message.leadId) ?? []), mapped]);
-    if (message.clientId) byClient.set(message.clientId, [...(byClient.get(message.clientId) ?? []), mapped]);
+  const mapMessage = (message: (typeof latestLeadMessages)[number]): BrokerInsightMessage => ({
+    id: message.id,
+    body: message.body,
+    direction: message.direction,
+    sentAt: toIso(message.sentAt) ?? new Date().toISOString(),
+    providerStatus: message.providerStatus,
+  });
+  for (const message of latestLeadMessages) {
+    if (message.leadId) byLead.set(message.leadId, [mapMessage(message)]);
   }
+  for (const message of latestClientMessages) {
+    if (message.clientId) byClient.set(message.clientId, [mapMessage(message)]);
+  }
+  const selectedHistory = selectedMessages.map(mapMessage).reverse();
+  if (selectedLeadId) byLead.set(selectedLeadId, selectedHistory);
+  if (selectedClientId) byClient.set(selectedClientId, selectedHistory);
 
   const insights: BrokerConversationInsight[] = [
     ...leads.map((lead) => {
-      const messages = (byLead.get(lead.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
+      const messages = byLead.get(lead.id) ?? [];
       return { id: lead.id, kind: "lead" as const, name: lead.nome, phone: canRevealLightContact({ status: lead.status, isCurrentBroker: true }) ? lead.telefone : null, status: lead.status, href: `/leads/${lead.id}`, firstContactAt: toIso(lead.firstContactAt), serviceStartedAt: toIso(lead.serviceStartedAt), latestMessage: messages.at(-1) ?? null, messages, intelligence: readIntelligence(lead.qualificationDetails) };
     }),
     ...clients.map((client) => {
-      const messages = (byClient.get(client.id) ?? []).sort((a, b) => Date.parse(a.sentAt) - Date.parse(b.sentAt)).slice(-100);
+      const messages = byClient.get(client.id) ?? [];
       return { id: `client:${client.id}`, kind: "client" as const, name: client.nome, phone: client.telefone, status: "Cliente", href: client.leadId ? `/leads/${client.leadId}` : "/clientes", latestMessage: messages.at(-1) ?? null, messages, intelligence: null };
     }),
   ]
@@ -114,7 +174,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
           script={buildLeadInsightScript({ item: insightItem, now: new Date(), analyzing })}
           agentId="insights"
         />
-        {analyzing ? <RefreshSoon /> : null}
+        {analyzing ? <RefreshSoon times={1} /> : null}
       </>
     );
   }
@@ -131,7 +191,7 @@ export default async function BrokerConversationsPage({ searchParams }: { search
           script={buildInsightsScript({ insights, whatsappConnected: connection?.status === "ready", now: new Date() })}
           agentId="insights"
         />
-        {analyzing ? <RefreshSoon times={2} afterMs={12_000} /> : null}
+        {analyzing ? <RefreshSoon times={1} afterMs={12_000} /> : null}
       </>
     );
   }

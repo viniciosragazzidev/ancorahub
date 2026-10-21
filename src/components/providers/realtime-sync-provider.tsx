@@ -43,12 +43,8 @@ type RecentNotification = {
 
 const LEADS_REVISION_KEY = "ancorahub:leads-revision";
 
-/**
- * Debounce coalescing: multiple events within this window produce a single refresh.
- * 500ms balances responsiveness (user sees updates within half a second) against
- * server load (a burst of 5 events produces 1 server render, not 5).
- */
-const REFRESH_COALESCE_MS = 500;
+/** Multiple realtime events inside this window produce one server refresh. */
+export const REFRESH_COALESCE_MS = 1_500;
 
 /**
  * Reconciliation interval: how often to check for missed notifications when the
@@ -62,18 +58,32 @@ const RECONCILIATION_MS = 60_000;
  */
 const REALTIME_FAILURE_GRACE_MS = 5_000;
 
+function isPathWithin(pathname: string, route: string) {
+  return pathname === route || pathname.startsWith(`${route}/`);
+}
+
+const CONVERSATION_DATA_ROUTES = ["/dashboard", "/leads", "/mensagens", "/minha-fila"];
+const WHATSAPP_CONNECTION_ROUTES = ["/integrations/whatsapp", "/settings"];
+
 /**
- * Conversation workspaces already own a focused, tenant-authorized refresh
- * listener. Letting the shell refresh as well causes two RSC renders for a
- * single inbound message (the immediate workspace refresh plus the shell's
- * 500ms refresh). Other surfaces still use the shell fallback.
+ * Conversation workspaces own their refresh listeners. Elsewhere, refresh only
+ * routes whose server data includes conversation history or the connection state.
+ * Other domain invalidations retain the existing shell fallback.
  */
 export function shouldScheduleShellRefresh(detail: RealtimeSyncBrowserDetail, pathname: string): boolean {
-  return !(
-    detail.kind === "domain.invalidated" &&
-    (detail.domain === "conversations" || detail.domain === "whatsapp_connection") &&
-    pathname.startsWith("/conversas")
-  );
+  if (detail.kind !== "domain.invalidated") return true;
+
+  if (detail.domain === "conversations") {
+    if (isPathWithin(pathname, "/conversas")) return false;
+    return CONVERSATION_DATA_ROUTES.some((route) => isPathWithin(pathname, route));
+  }
+
+  if (detail.domain === "whatsapp_connection") {
+    if (isPathWithin(pathname, "/conversas")) return false;
+    return WHATSAPP_CONNECTION_ROUTES.some((route) => isPathWithin(pathname, route));
+  }
+
+  return true;
 }
 
 /**

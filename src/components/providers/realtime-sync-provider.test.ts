@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { RESUME_REFRESH_AFTER_MS, shouldDelayRealtimeUnavailable, shouldRefreshOnResume, shouldScheduleShellRefresh } from "./realtime-sync-provider";
+import { REFRESH_COALESCE_MS, RESUME_REFRESH_AFTER_MS, shouldDelayRealtimeUnavailable, shouldRefreshOnResume, shouldScheduleShellRefresh } from "./realtime-sync-provider";
 import { logSupabaseRealtimeDiagnostic } from "@/utils/supabase/client";
 
 describe("shouldScheduleShellRefresh", () => {
@@ -20,6 +20,29 @@ describe("shouldScheduleShellRefresh", () => {
       { kind: "domain.invalidated", domain: "conversations" },
       "/dashboard",
     )).toBe(true);
+  });
+
+  it("refreshes only routes that display conversation data", () => {
+    const conversationEvent = { kind: "domain.invalidated", domain: "conversations" } as const;
+
+    expect(shouldScheduleShellRefresh(conversationEvent, "/dashboard")).toBe(true);
+    expect(shouldScheduleShellRefresh(conversationEvent, "/leads/lead-1")).toBe(true);
+    expect(shouldScheduleShellRefresh(conversationEvent, "/mensagens/lead-1")).toBe(true);
+    expect(shouldScheduleShellRefresh(conversationEvent, "/minha-fila")).toBe(true);
+    expect(shouldScheduleShellRefresh(conversationEvent, "/equipe/minha")).toBe(false);
+    expect(shouldScheduleShellRefresh(conversationEvent, "/settings")).toBe(false);
+  });
+
+  it("refreshes WhatsApp connection screens without refreshing unrelated pages", () => {
+    const connectionEvent = { kind: "domain.invalidated", domain: "whatsapp_connection" } as const;
+
+    expect(shouldScheduleShellRefresh(connectionEvent, "/settings")).toBe(true);
+    expect(shouldScheduleShellRefresh(connectionEvent, "/integrations/whatsapp")).toBe(true);
+    expect(shouldScheduleShellRefresh(connectionEvent, "/leads/lead-1")).toBe(false);
+  });
+
+  it("coalesces realtime refreshes within 1.5 seconds", () => {
+    expect(REFRESH_COALESCE_MS).toBe(1_500);
   });
 
   it("waits for a reconnect window before reporting the realtime channel unavailable", () => {
