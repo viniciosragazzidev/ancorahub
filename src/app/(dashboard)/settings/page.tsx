@@ -18,6 +18,8 @@ import { SecurityTab } from "./_components/security-tab";
 import { SettingsTabs, type TabId } from "./_components/settings-tabs";
 import { UnitTab } from "./_components/unit-tab";
 import { FeedbackTab } from "./_components/feedback-tab";
+import { AiStageModeCard } from "@/features/conversation-intelligence/components/ai-stage-mode-card";
+import { getAiStageMode } from "@/features/conversation-intelligence/stage-mode";
 import { getIntegrationsData } from "./integrations-actions";
 import { ExtensionTab } from "./extension/extension-tab";
 import { getBrokerAvailabilityProfile } from "@/features/broker-availability/service";
@@ -65,6 +67,7 @@ export default async function SettingsPage() {
   const tabIds: TabId[] = context.role === "director" ? ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca", "extensao"] : canViewIntegrations ? ["conta", "integracoes", "whatsapp", "seguranca", "extensao"] : context.role === "manager" ? ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"] : ["conta", "disponibilidade", "whatsapp", "seguranca", "extensao"];
 
   const canEditFeedback = context.role === "director" || context.role === "manager";
+  const aiStageMode = context.role === "director" ? await getAiStageMode(context.tenantId) : null;
   const atendimento = canEditFeedback ? (
     <div className="space-y-6">
       <FeedbackTab
@@ -76,6 +79,7 @@ export default async function SettingsPage() {
         maxActiveLeadsLimit={tenantData?.maxActiveLeadsLimit ?? 10}
         canEdit={context.role === "director"}
       />
+      {aiStageMode ? <AiStageModeCard initialMode={aiStageMode} /> : null}
     </div>
   ) : undefined;
 

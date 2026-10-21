@@ -1,7 +1,7 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { generateObject } from "ai";
 
 import { getAiEngineSettings } from "@/features/ai/engine";
@@ -19,7 +19,10 @@ import {
 } from "./context-builder";
 import { evaluateAssessmentPolicy, isUsableAssessment } from "./policy-executor";
 import { getTenantPlaybooks } from "@/features/ai-qualification/playbooks-storage";
-import { MOTIVOS_PERDA, MOTIVO_PERDA_LABELS, LEAD_STATUS_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
+import { MOTIVOS_PERDA, LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
+import { changeLeadStatus } from "@/features/leads/change-lead-status";
+import type { TenantContext } from "@/shared/auth/types";
+import { getAiStageMode } from "./stage-mode";
 import {
   ConversationAssessmentSchema,
   type ConversationAssessment,
@@ -61,6 +64,7 @@ export async function analyzeLeadConversation(
       nome: schema.leads.nome,
       telefone: schema.leads.telefone,
       status: schema.leads.status,
+      version: schema.leads.version,
       qualificationDetails: schema.leads.qualificationDetails,
       formData: schema.leads.formData,
     })
@@ -84,7 +88,7 @@ export async function analyzeLeadConversation(
     .from(schema.whatsappMessages)
     .where(and(eq(schema.whatsappMessages.tenantId, tenantId), eq(schema.whatsappMessages.leadId, leadId)))
     .orderBy(desc(schema.whatsappMessages.sentAt))
-    .limit(15);
+    .limit(conversationIntelligenceDomainRoot.defaults.maxRecentMessagesInContext);
 
   if (messages.length === 0) {
     return { analyzed: false, reason: "Nenhuma mensagem de WhatsApp registrada para o lead." };
@@ -92,12 +96,17 @@ export async function analyzeLeadConversation(
 
   // Ordenar cronologicamente para o contexto
   const chronological = [...messages].reverse();
+  // Bot and automatic messages ("assistant"/"system") are not the broker talking.
+  const senderOf = (m: (typeof messages)[number]): ContextBuilderMessage["sender"] =>
+    m.direction === "incoming" ? "customer" : m.senderRole === "assistant" || m.senderRole === "system" ? "system" : "broker";
   const contextMessages: ContextBuilderMessage[] = chronological.map((m) => ({
     id: m.id,
-    sender: m.direction === "incoming" ? "customer" : "broker",
+    sender: senderOf(m),
     content: m.body,
     timestamp: m.sentAt,
   }));
+  const customerMessageCount = contextMessages.filter((m) => m.sender === "customer").length;
+  const brokerMessageCount = contextMessages.filter((m) => m.sender === "broker").length;
 
   // 4. Extrair memória anterior se existir
   const qualDetails = (lead.qualificationDetails as Record<string, any>) || {};
@@ -223,12 +232,18 @@ Orientações:
   }
 
   // 6. Avaliar políticas determinísticas do Pipeline
-  const policyResult = evaluateAssessmentPolicy({
+  const mode = await getAiStageMode(lead.tenantId);
+  let policyResult: PolicyExecutionResult = evaluateAssessmentPolicy({
     assessment,
     currentLeadStatus: lead.status,
-    customerMessageCount: messages.filter((m) => m.direction === "incoming").length,
+    customerMessageCount,
+    brokerMessageCount,
+    mode: mode === "suggest" ? "suggest" : "auto",
     config: conversationIntelligenceDomainRoot.defaults,
   });
+  if (mode === "off" && policyResult.action !== "INSIGHT_ONLY") {
+    policyResult = { ...policyResult, action: "INSIGHT_ONLY", transitionAllowed: false, reason: "A empresa desligou a mudança de etapa pela IA." };
+  }
 
   const now = new Date();
   const state: LeadIntelligenceState = {
@@ -244,48 +259,47 @@ Orientações:
   // 7. Persistir o feedback e aplicar transição segura se autorizado
   const actorUserId = lead.corretorId || (await resolveSystemUserId(lead.tenantId));
 
-  await db.transaction(async (tx) => {
-    // 7.1 Se autorizado auto-transição segura, atualizar status do lead
-    if (policyResult.action === "AUTO_TRANSITION" && policyResult.transitionAllowed && policyResult.targetStatus) {
-      const isLost = policyResult.targetStatus === "lost";
-      // Guarded on the status the analysis saw, so a change made by the
-      // broker meanwhile wins over the IA.
-      const moved = await tx
-        .update(schema.leads)
-        .set({
-          status: policyResult.targetStatus as any,
-          stageEnteredAt: now,
-          ...(isLost ? { motivoPerda: assessment.lossReasonCode ?? "outro" } : {}),
-          version: sql`${schema.leads.version} + 1`,
-          updatedAt: now,
-        })
-        .where(and(eq(schema.leads.id, lead.id), eq(schema.leads.status, lead.status as any)))
-        .returning({ id: schema.leads.id });
-
-      if (moved.length) {
-        const statusLabel = LEAD_STATUS_LABELS[policyResult.targetStatus] ?? policyResult.targetStatus;
-        const lossLabel = isLost && assessment.lossReasonCode ? MOTIVO_PERDA_LABELS[assessment.lossReasonCode as MotivoPerda] : null;
-        const evidence = assessment.evidence.length ? `\nTrechos do cliente: ${assessment.evidence.map((quote) => `"${quote}"`).join(" · ")}` : "";
-        await tx.insert(schema.leadInteractions).values({
-          id: randomUUID(),
-          leadId: lead.id,
-          userId: actorUserId,
-          tipo: "status_change",
-          conteudo: `Status alterado automaticamente pela IA: ${LEAD_STATUS_LABELS[lead.status] ?? lead.status} → ${statusLabel} (${(assessment.statusConfidence * 100).toFixed(0)}% de confiança).${lossLabel ? `\nMotivo da perda: ${lossLabel}.` : ""}\nObservação: ${assessment.statusReason?.trim() || policyResult.reason}${evidence}`,
-          metadata: {
-            source: "AI",
-            fromStatus: policyResult.fromStatus,
-            toStatus: policyResult.targetStatus,
-            confidence: assessment.statusConfidence,
-            statusReason: assessment.statusReason ?? null,
-            lossReasonCode: assessment.lossReasonCode ?? null,
-            evidence: assessment.evidence,
-          },
-          createdAt: now,
-        });
-      }
+  // 7.1 Automatic move through the same service as a manual change (transition
+  // rules, qualification guard, audit, realtime refresh). Guarded on the status
+  // and version the analysis saw, so a change made by the broker meanwhile wins.
+  let autoMove: { fromStatus: string; toStatus: string; at: string; confidence: number } | null = null;
+  if (policyResult.action === "AUTO_TRANSITION" && policyResult.transitionAllowed && policyResult.targetStatus) {
+    const target = policyResult.targetStatus;
+    const statusLabel = LEAD_STATUS_LABELS[target] ?? target;
+    const evidence = assessment.evidence.length ? `\nTrechos do cliente: ${assessment.evidence.map((quote) => `"${quote}"`).join(" · ")}` : "";
+    const systemContext: TenantContext = { userId: actorUserId, tenantId: lead.tenantId, role: "director", jobTitle: "system", branchId: null };
+    try {
+      await changeLeadStatus({ leadId: lead.id, newStatus: target, expectedVersion: lead.version }, systemContext, {
+        actorUserId,
+        expectedStatus: lead.status,
+        auditAction: `ai_auto_move:${lead.status}->${target}`,
+        interactionContent: `Status alterado automaticamente pela IA: ${LEAD_STATUS_LABELS[lead.status] ?? lead.status} → ${statusLabel} (${(assessment.statusConfidence * 100).toFixed(0)}% de confiança).\nObservação: ${assessment.statusReason?.trim() || policyResult.reason}${evidence}`,
+        interactionMetadata: {
+          source: "AI",
+          fromStatus: lead.status,
+          toStatus: target,
+          confidence: assessment.statusConfidence,
+          statusReason: assessment.statusReason ?? null,
+          evidence: assessment.evidence,
+        },
+      });
+      autoMove = { fromStatus: lead.status, toStatus: target, at: now.toISOString(), confidence: assessment.statusConfidence };
+    } catch (error) {
+      // Conflict, invalid transition or missing qualification: the broker decides.
+      const message = error instanceof Error ? error.message : "erro";
+      const conflict = message.startsWith("CONFLICT");
+      policyResult = {
+        ...policyResult,
+        action: conflict ? "INSIGHT_ONLY" : "SUGGEST",
+        transitionAllowed: false,
+        reason: conflict
+          ? "O lead mudou de etapa durante a análise; a mudança do corretor vale."
+          : `Mudança automática bloqueada pelas regras do funil (${message.slice(0, 160)}); requer confirmação do corretor.`,
+      };
     }
+  }
 
+  await db.transaction(async (tx) => {
     // 7.2 Atualizar qualificationDetails com o estado mais recente de IA
     const updatedQualDetails = {
       ...qualDetails,
@@ -294,9 +308,12 @@ Orientações:
         action: policyResult.action,
         confidence: policyResult.confidence,
         targetStatus: policyResult.targetStatus,
+        fromStatus: policyResult.fromStatus,
         reason: policyResult.reason,
       },
       aiLastAnalyzedAt: now.toISOString(),
+      // What "Desfazer" reverts (24h, see actions.ts). An analysis without a move keeps the last one.
+      ...(autoMove ? { aiLastAutoMove: autoMove } : {}),
     };
 
     await tx
@@ -339,14 +356,17 @@ Orientações:
 
   // 8. Notificar o corretor responsável com push + toast
   if (lead.corretorId) {
-    const notifTitle = policyResult.action === "AUTO_TRANSITION"
-      ? `IA atualizou status de ${lead.nome}`
+    const targetLabel = policyResult.targetStatus ? LEAD_STATUS_LABELS[policyResult.targetStatus] ?? policyResult.targetStatus : "";
+    const notifTitle = autoMove
+      ? `IA moveu ${lead.nome} para ${targetLabel}`
       : policyResult.action === "SUGGEST"
-      ? `Sugestão de avanço para ${lead.nome}`
+      ? `Sugestão: mover ${lead.nome} para ${targetLabel}`
       : `Novo diagnóstico de IA: ${lead.nome}`;
 
-    const notifMsg = policyResult.action === "SUGGEST"
-      ? `A IA sugere mover para '${policyResult.targetStatus}'. Próxima ação: ${assessment.nextBestAction}`
+    const notifMsg = autoMove
+      ? `${(assessment.statusReason?.trim() || assessment.summary).slice(0, 120)} Não concorda? Abra o lead e toque em Desfazer (até 24h).`
+      : policyResult.action === "SUGGEST"
+      ? `Abra o lead para mover ou recusar. Próxima ação: ${assessment.nextBestAction}`
       : `${assessment.summary.slice(0, 140)}`;
 
     void publishNotification({

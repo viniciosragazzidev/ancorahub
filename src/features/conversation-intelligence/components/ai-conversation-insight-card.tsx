@@ -1,14 +1,21 @@
 "use client";
 
 import { useTransition } from "react";
-import { Sparkle, CheckCircle, Warning, ChatCircleText, ArrowRight, Lightbulb } from "@phosphor-icons/react";
+import { Sparkle, CheckCircle, Warning, Lightbulb, ArrowCounterClockwise } from "@phosphor-icons/react";
 import { toast } from "@/components/ui/sonner";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { acceptAiSuggestedTransitionAction, triggerManualConversationAnalysisAction } from "../actions";
-import type { ConversationAssessment, PolicyExecutionResult } from "../types";
+import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
+import {
+  acceptAiSuggestedTransitionAction,
+  rejectAiSuggestionAction,
+  triggerManualConversationAnalysisAction,
+  undoAiMoveAction,
+} from "../actions";
+import { canUndoAiMove, type AiAutoMove } from "../ai-move";
+import type { ConversationAssessment } from "../types";
 
 interface AiConversationInsightCardProps {
   leadId: string;
@@ -20,7 +27,14 @@ interface AiConversationInsightCardProps {
     reason?: string;
   } | null;
   lastAnalyzedAt?: string | null;
+  /** Last stage move the IA made by itself (Desfazer for 24h). */
+  autoMove?: AiAutoMove | null;
+  leadStatus?: string;
   canManage?: boolean;
+}
+
+function statusLabel(status: string | null | undefined) {
+  return status ? LEAD_STATUS_LABELS[status] ?? status : "";
 }
 
 const sentimentVariantMap: Record<string, "success" | "secondary" | "destructive"> = {
@@ -63,6 +77,8 @@ export function AiConversationInsightCard({
   assessment,
   policyResult,
   lastAnalyzedAt,
+  autoMove,
+  leadStatus,
   canManage = true,
 }: AiConversationInsightCardProps) {
   const [isPending, startTransition] = useTransition();
@@ -112,6 +128,9 @@ export function AiConversationInsightCard({
     policyResult?.action === "SUGGEST" &&
     Boolean(policyResult.targetStatus);
 
+  const targetLabel = statusLabel(policyResult?.targetStatus);
+  const undoable = Boolean(leadStatus) && canUndoAiMove(autoMove, leadStatus!);
+
   const handleAcceptSuggestion = () => {
     if (!policyResult?.targetStatus) return;
     startTransition(async () => {
@@ -120,10 +139,26 @@ export function AiConversationInsightCard({
         suggestedStatus: policyResult.targetStatus!,
       });
       if (res.success) {
-        toast.success(`Status atualizado para '${policyResult.targetStatus}'!`);
+        toast.success(`Lead movido para ${targetLabel}.`);
       } else {
         toast.error(res.error || "Erro ao atualizar status.");
       }
+    });
+  };
+
+  const handleRejectSuggestion = () => {
+    startTransition(async () => {
+      const res = await rejectAiSuggestionAction(leadId);
+      if (res.success) toast.success("Sugestão recusada.");
+      else toast.error(res.error || "Não foi possível recusar.");
+    });
+  };
+
+  const handleUndo = () => {
+    startTransition(async () => {
+      const res = await undoAiMoveAction(leadId);
+      if (res.success) toast.success(`Lead voltou para ${statusLabel(autoMove?.fromStatus)}.`);
+      else toast.error(res.error || "Não foi possível desfazer.");
     });
   };
 
@@ -199,28 +234,47 @@ export function AiConversationInsightCard({
           </div>
         </div>
 
-        {/* Banner de Sugestão de Transição de Status se houver */}
+        {/* Mudança feita pela IA, com Desfazer por 24h */}
+        {undoable && autoMove && (
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-md border border-primary/30 bg-primary/10 p-2.5">
+            <div className="space-y-0.5">
+              <p className="text-xs font-semibold text-primary">
+                A IA moveu de {statusLabel(autoMove.fromStatus)} para {statusLabel(autoMove.toStatus)}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Confiança: {(autoMove.confidence * 100).toFixed(0)}%{assessment.statusReason ? ` · ${assessment.statusReason}` : ""}
+              </p>
+            </div>
+            {canManage && (
+              <Button size="xs" variant="outline" disabled={isPending} onClick={handleUndo} className="shrink-0">
+                <ArrowCounterClockwise className="mr-1 size-3.5" />
+                {isPending ? "Desfazendo..." : "Desfazer"}
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Sugestão de etapa: o corretor move ou recusa */}
         {hasSuggestion && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 rounded-md border border-primary/30 bg-primary/10 p-2.5">
             <div className="space-y-0.5">
               <p className="text-xs font-semibold text-primary">
-                Sugestão da IA: Mover para &ldquo;{policyResult?.targetStatus}&rdquo;
+                Sugestão da IA: mover para {targetLabel}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Confiança: {(policyResult?.confidence ? policyResult.confidence * 100 : 0).toFixed(0)}% · {policyResult?.reason}
+                Confiança: {(policyResult?.confidence ? policyResult.confidence * 100 : 0).toFixed(0)}% · {assessment.statusReason || policyResult?.reason}
               </p>
             </div>
             {canManage && (
-              <Button
-                size="xs"
-                variant="default"
-                disabled={isPending}
-                onClick={handleAcceptSuggestion}
-                className="shrink-0"
-              >
-                <CheckCircle className="mr-1 size-3.5" />
-                {isPending ? "Atualizando..." : `Mover para ${policyResult?.targetStatus}`}
-              </Button>
+              <div className="flex shrink-0 items-center gap-1.5">
+                <Button size="xs" variant="ghost" disabled={isPending} onClick={handleRejectSuggestion}>
+                  Recusar
+                </Button>
+                <Button size="xs" variant="default" disabled={isPending} onClick={handleAcceptSuggestion}>
+                  <CheckCircle className="mr-1 size-3.5" />
+                  {isPending ? "Atualizando..." : `Mover para ${targetLabel}`}
+                </Button>
+              </div>
             )}
           </div>
         )}

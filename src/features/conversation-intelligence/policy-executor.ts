@@ -1,8 +1,10 @@
 import type { ConversationAssessment, PolicyExecutionResult } from "./types";
 import { LEAD_STATUS_ORDER } from "@/features/leads/lead-status-constants";
 
-/** Funnel stages the IA may advance through by itself ("forward" rule). */
-const FORWARD_STAGES = new Set(["distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+/** Funnel stages the IA may advance through by itself ("forward" rule). Never from or to converted/lost. */
+const FORWARD_STAGES = new Set(["new", "distributed", "in_contact", "quote_sent", "negotiation", "documentation_pending", "under_analysis"]);
+/** Stages before the attendance started: leaving them needs a real exchange between broker and customer. */
+const PRE_CONTACT_STAGES = new Set(["new", "distributed"]);
 
 function isForwardMove(from: string, to: string) {
   return FORWARD_STAGES.has(from) && FORWARD_STAGES.has(to)
@@ -19,6 +21,10 @@ export interface PolicyEvaluationInput {
    * customer's side) only ever produces a suggestion.
    */
   customerMessageCount?: number;
+  /** Messages the broker wrote (bot messages do not count). */
+  brokerMessageCount?: number;
+  /** Tenant choice: "suggest" turns every automatic move into a suggestion. */
+  mode?: "auto" | "suggest";
   config: Pick<
     ConversationIntelligenceConfig,
     | "confidenceThresholdAuto"
@@ -98,6 +104,36 @@ export function evaluateAssessmentPolicy(
       config.autoAllowedTransitions.includes(genericWildcardPair) ||
       (config.autoAllowedTransitions.includes("forward") && isForwardMove(currentLeadStatus, suggestedStatus))) &&
     !isExplicitSuggestOnly;
+
+  // An automatic move rests on what the customer said; leaving Novo/Distribuído
+  // also needs the broker to have answered (a bot exchange alone is not contact).
+  const customerSpoke = (input.customerMessageCount ?? 0) > 0;
+  const realExchange = customerSpoke && (input.brokerMessageCount ?? 0) > 0;
+  if (isAutoEligible && (!customerSpoke || (PRE_CONTACT_STAGES.has(currentLeadStatus) && !realExchange))) {
+    return {
+      action: "SUGGEST",
+      transitionAllowed: false,
+      fromStatus: currentLeadStatus,
+      targetStatus: suggestedStatus,
+      confidence,
+      reason: customerSpoke
+        ? "O corretor ainda não conversou com o cliente; requer confirmação do corretor."
+        : "Sem mensagem do cliente que comprove o avanço; requer confirmação do corretor.",
+      aiFeedbackPayload: buildAIFeedbackPayload(assessment),
+    };
+  }
+
+  if (isAutoEligible && input.mode === "suggest") {
+    return {
+      action: "SUGGEST",
+      transitionAllowed: false,
+      fromStatus: currentLeadStatus,
+      targetStatus: suggestedStatus,
+      confidence,
+      reason: "A empresa escolheu receber só sugestões da IA.",
+      aiFeedbackPayload: buildAIFeedbackPayload(assessment),
+    };
+  }
 
   // Every automatic change is recorded with its reason: without one written
   // by the IA, it is only a suggestion.

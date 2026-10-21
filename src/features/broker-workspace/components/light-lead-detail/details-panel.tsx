@@ -62,6 +62,8 @@ export function DetailsZone({ lead, c, showAiInsight = true }: { lead: LightLead
           leadId={lead.id}
           assessment={lead.aiIntelligence}
           policyResult={lead.aiPolicyResult}
+          autoMove={lead.aiLastAutoMove}
+          leadStatus={lead.status}
           canManage={lead.isCurrentBroker}
         />
       ) : null}

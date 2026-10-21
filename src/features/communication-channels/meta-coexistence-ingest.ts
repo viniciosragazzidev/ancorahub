@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
+import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
 import { publishConversationInvalidation } from "@/features/notifications/realtime-sync";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -58,6 +59,8 @@ async function storeMessages(channel: { id: string; tenantId: string }, messages
       sentAt: message.sentAt,
     }))).onConflictDoNothing({ target: [schema.whatsappMessages.tenantId, schema.whatsappMessages.messageId] }).returning({ id: schema.whatsappMessages.id });
     stored += rows.length;
+    // Lead stage from the conversation (debounced; the 10 min job covers a lost timer).
+    if (rows.length && leadId) scheduleLeadConversationAnalysis(leadId, channel.tenantId);
   }
   if (stored) void publishConversationInvalidation({ tenantId: channel.tenantId }).catch(() => undefined);
   return stored;

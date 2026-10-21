@@ -32,6 +32,7 @@ import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-wor
 import { lightContactFields, redactClientInfo } from "@/features/broker-workspace/lead-contact-privacy";
 import { StartQualificationButton } from "@/app/(dashboard)/leads/_components/qualifying-lead-actions";
 import { AiConversationInsightCard } from "@/features/conversation-intelligence";
+import type { AiAutoMove } from "@/features/conversation-intelligence/ai-move";
 import { buildLeadConversationScript } from "@/features/broker-workspace/chat/lead-script";
 import { isOutboundMessage } from "@/features/broker-workspace/chat/intelligence";
 import { LeadConversation } from "@/features/broker-workspace/chat/lead-conversation";
@@ -296,6 +297,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       consentimentoLgpd: lead.consentimentoLgpd,
       aiIntelligence: qualificationDetails?.aiIntelligence || null,
       aiPolicyResult: qualificationDetails?.aiPolicyResult || null,
+      aiLastAutoMove: (lead.qualificationDetails as { aiLastAutoMove?: AiAutoMove } | null)?.aiLastAutoMove ?? null,
       clientInfo: (() => {
         const info = buildLeadClientInfo({
           email: lightContact.email,
@@ -683,6 +685,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   assessment={(qualificationDetails as any).aiIntelligence}
                   policyResult={(qualificationDetails as any).aiPolicyResult}
                   lastAnalyzedAt={(qualificationDetails as any).aiLastAnalyzedAt}
+                  autoMove={(qualificationDetails as any).aiLastAutoMove}
+                  leadStatus={lead.status}
                   canManage={context.role !== "broker" || lead.corretorId === context.userId}
                 />
 

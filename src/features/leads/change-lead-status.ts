@@ -34,6 +34,25 @@ export type ChangeLeadStatusInput = {
   expectedVersion?: number;
 };
 
+/**
+ * A change made by the system on behalf of the IA (conversation analysis) or
+ * a revert of it. Skips the role checks (the caller already checked scope),
+ * keeps the transition, qualification and audit rules, and records its own
+ * timeline text and metadata.
+ */
+export type SystemStatusChange = {
+  /** Who signs the timeline and audit rows (the broker or the tenant system user). */
+  actorUserId: string;
+  /** Timeline text that replaces the default "Status alterado" line. */
+  interactionContent: string;
+  interactionMetadata?: Record<string, unknown>;
+  auditAction: string;
+  /** Reverting an IA move may go back to a stage VALID_TRANSITIONS does not list. */
+  skipTransitionCheck?: boolean;
+  /** Only applies when the lead is still in this status (a broker change meanwhile wins). */
+  expectedStatus?: string;
+};
+
 export type ChangeLeadStatusResult = {
   success: true;
   previousStatus: string;
@@ -148,6 +167,7 @@ async function assertCanReopen(context: TenantContext) {
 export async function changeLeadStatus(
   rawInput: ChangeLeadStatusInput,
   contextOverride?: TenantContext,
+  system?: SystemStatusChange,
 ): Promise<ChangeLeadStatusResult> {
   const input = changeStatusInput.parse(rawInput);
   const context = contextOverride ?? await getRequiredTenantContext();
@@ -180,10 +200,13 @@ export async function changeLeadStatus(
   if (input.expectedVersion !== undefined && input.expectedVersion !== lead.version) {
     throw new Error("CONFLICT_VERSION");
   }
+  if (system?.expectedStatus && system.expectedStatus !== previousStatus) {
+    throw new Error("CONFLICT_STATUS");
+  }
 
   // 1. validação de transição do pipeline
   const allowedNext = VALID_TRANSITIONS[previousStatus];
-  if (allowedNext && !allowedNext.includes(newStatus)) {
+  if (!system?.skipTransitionCheck && allowedNext && !allowedNext.includes(newStatus)) {
     throw new Error(
       `Transição inválida: ${LEAD_STATUS_LABELS[previousStatus] ?? previousStatus} → ${LEAD_STATUS_LABELS[newStatus] ?? newStatus}.`,
     );
@@ -205,7 +228,7 @@ export async function changeLeadStatus(
         "É obrigatório informar um motivo de perda válido para marcar o lead como perdido.",
       );
     }
-    await assertCanChangeStatus(context, lead);
+    if (!system) await assertCanChangeStatus(context, lead);
   }
 
   // 4.1. Proteção de Regressão da IA (bloqueia perda ou recuo de leads com alta intenção de compra sem justificativa)
@@ -216,7 +239,7 @@ export async function changeLeadStatus(
 
   const potentialSaleCheck = isAiPotentialSale(lead.qualificationDetails);
 
-  if (isRegression && potentialSaleCheck.isPotentialSale) {
+  if (isRegression && potentialSaleCheck.isPotentialSale && !system) {
     const justification = (input.justificativaRegressao ?? "").trim();
     if (justification.length < 15) {
       throw new Error(
@@ -228,11 +251,15 @@ export async function changeLeadStatus(
   // 5. Reabertura (saindo de lost)
   const isReopening = previousStatus === "lost" && newStatus !== "lost";
 
-  if (isReopening) {
+  if (system) {
+    // The caller checked scope; the IA never reopens a lost lead.
+    if (isReopening && !system.skipTransitionCheck) throw new Error("A IA não reabre lead perdido.");
+  } else if (isReopening) {
     await assertCanReopen(context);
   } else {
     await assertCanChangeStatus(context, lead);
   }
+  const actorUserId = system?.actorUserId ?? context.userId;
 
   // ─── Executar mudança ───────────────────────────────────────────────
   const now = new Date();
@@ -251,7 +278,11 @@ export async function changeLeadStatus(
           : {}),
         version: lead.version + 1,
       })
-      .where(and(eq(schema.leads.id, lead.id), ...(input.expectedVersion === undefined ? [] : [eq(schema.leads.version, input.expectedVersion)])))
+      .where(and(
+        eq(schema.leads.id, lead.id),
+        ...(input.expectedVersion === undefined ? [] : [eq(schema.leads.version, input.expectedVersion)]),
+        ...(system?.expectedStatus ? [eq(schema.leads.status, system.expectedStatus as LeadStatus)] : []),
+      ))
       .returning({ id: schema.leads.id });
     if (updated.length !== 1) throw new Error("CONFLICT_VERSION");
 
@@ -265,9 +296,11 @@ export async function changeLeadStatus(
     await tx.insert(schema.leadInteractions).values({
       id: randomUUID(),
       leadId: lead.id,
-      userId: context.userId,
+      userId: actorUserId,
       tipo: "status_change",
-      conteudo: interactionContent,
+      conteudo: system?.interactionContent ?? interactionContent,
+      ...(system?.interactionMetadata ? { metadata: system.interactionMetadata } : {}),
+      createdAt: now,
     });
 
     // Se houve regressão justificada em lead de alta intenção, registrar alerta e justificativa
@@ -299,15 +332,15 @@ export async function changeLeadStatus(
     }
 
     // Criar auditoria
-    const auditAction = isReopening
+    const auditAction = system?.auditAction ?? (isReopening
       ? "reabriu"
       : newStatus === "lost"
         ? "perdeu"
-        : "alterou";
+        : "alterou");
 
     await tx.insert(schema.auditLogs).values({
       id: randomUUID(),
-      userId: context.userId,
+      userId: actorUserId,
       entidade: "lead",
       entidadeId: lead.id,
       acao: auditAction,
@@ -332,7 +365,8 @@ export async function changeLeadStatus(
     const targets = watchers
       .map((watcher) => watcher.userId)
       .filter((userId) => userId !== context.userId);
-    if (lead.corretorId && lead.corretorId !== context.userId) targets.push(lead.corretorId);
+    // A system change has no author on screen: the broker sees it too.
+    if (lead.corretorId && (system || lead.corretorId !== context.userId)) targets.push(lead.corretorId);
     void publishDomainInvalidation(
       targets.map((userId) => ({ tenantId: lead.tenantId, userId })),
       "leads",

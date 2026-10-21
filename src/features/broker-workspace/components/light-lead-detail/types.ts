@@ -1,4 +1,4 @@
-
+import type { AiAutoMove } from "@/features/conversation-intelligence/ai-move";
 
 export type ConfirmationDocument = { id: string; filename: string; status: string };
 export type CarrierOption = { id: string; name: string };
@@ -49,6 +49,7 @@ export type LightLeadDetailData = {
   consentimentoLgpd?: boolean;
   aiIntelligence?: any;
   aiPolicyResult?: any;
+  aiLastAutoMove?: AiAutoMove | null;
   redistributionNotice?: { reason: string | null; createdAt: Date | string } | null;
   /** Everything the client told us (AI qualification + form), see buildLeadClientInfo. */
   clientInfo?: Array<{ key: string; label: string; value: string }>;

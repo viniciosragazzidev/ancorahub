@@ -24,15 +24,15 @@ export const conversationIntelligenceDomainRoot = createDomainRoot<ConversationI
     periodicReconciliationMinutes: 120,
     confidenceThresholdAuto: 0.90,
     confidenceThresholdSuggest: 0.70,
-    maxRecentMessagesInContext: 12,
+    maxRecentMessagesInContext: 30,
     // Decided 25/09: the IA moves the attendance by itself, always writing the
     // reason as an observation. "forward" = any advance along the funnel
-    // (em contato → cotação enviada → negociação → documentação → em análise);
+    // (novo → em contato → cotação enviada → negociação → documentação → em análise);
     // going back a stage stays a suggestion, and converted is never automatic.
-    // A lost lead also needs the loss code and a customer message (policy-executor).
+    // 21/10: only forward moves are automatic; a lost lead is always a
+    // suggestion the broker confirms (decision of Vinicios).
     autoAllowedTransitions: [
       "forward",
-      "any->lost",
     ],
     suggestOnlyTransitions: [],
     systemOnlyTransitions: [

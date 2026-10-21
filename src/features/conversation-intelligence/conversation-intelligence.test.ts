@@ -100,6 +100,8 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
 
   describe("Policy Executor & Safe Transitions", () => {
     const config = conversationIntelligenceDomainRoot.defaults;
+    /** A conversation where both sides spoke: the base of every automatic move. */
+    const talked = { customerMessageCount: 3, brokerMessageCount: 2 };
 
     it("executes AUTO_TRANSITION when confidence >= 0.90 and transition is auto-allowed", () => {
       const result = evaluateAssessmentPolicy({
@@ -109,6 +111,7 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
           statusConfidence: 0.94,
         },
         currentLeadStatus: "quote_sent",
+        ...talked,
         config,
       });
 
@@ -165,12 +168,33 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
       expect(result.reason).toContain("SYSTEM_ONLY");
     });
 
-    describe("automatic stage moves (decided 25/09)", () => {
-      it("advances along the funnel by itself — cotação enviada, negociação, documentação, análise", () => {
-        for (const [from, to] of [["in_contact", "quote_sent"], ["quote_sent", "negotiation"], ["negotiation", "documentation_pending"], ["documentation_pending", "under_analysis"], ["in_contact", "negotiation"]]) {
-          const result = evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: to }, currentLeadStatus: from, config });
+    describe("automatic stage moves (decided 25/09, forward only since 21/10)", () => {
+      it("advances along the funnel by itself — em contato, cotação enviada, negociação, documentação, análise", () => {
+        for (const [from, to] of [["new", "in_contact"], ["distributed", "in_contact"], ["in_contact", "quote_sent"], ["quote_sent", "negotiation"], ["negotiation", "documentation_pending"], ["documentation_pending", "under_analysis"], ["in_contact", "negotiation"]]) {
+          const result = evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: to }, currentLeadStatus: from, ...talked, config });
           expect(result.action, `${from}->${to}`).toBe("AUTO_TRANSITION");
         }
+      });
+
+      it("only suggests when the customer has not spoken in the window", () => {
+        const result = evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "negotiation" }, currentLeadStatus: "quote_sent", customerMessageCount: 0, brokerMessageCount: 4, config });
+        expect(result.action).toBe("SUGGEST");
+      });
+
+      it("only suggests leaving Novo/Distribuído before the broker answered (a bot exchange is not contact)", () => {
+        const result = evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "in_contact" }, currentLeadStatus: "distributed", customerMessageCount: 2, brokerMessageCount: 0, config });
+        expect(result.action).toBe("SUGGEST");
+        expect(result.reason).toContain("corretor ainda não conversou");
+      });
+
+      it("only suggests when the company chose suggestions", () => {
+        const result = evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "negotiation" }, currentLeadStatus: "quote_sent", ...talked, mode: "suggest", config });
+        expect(result.action).toBe("SUGGEST");
+      });
+
+      it("never moves a sold or lost lead by itself", () => {
+        expect(evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "under_analysis" }, currentLeadStatus: "converted", ...talked, config }).action).toBe("SUGGEST");
+        expect(evaluateAssessmentPolicy({ assessment: { ...sampleAssessment, suggestedLeadStatus: "in_contact" }, currentLeadStatus: "lost", ...talked, config }).action).toBe("SUGGEST");
       });
 
       it("only suggests going back a stage", () => {
@@ -184,7 +208,7 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
       });
     });
 
-    describe("automatic 'lost' (decided 25/09)", () => {
+    describe("'lost' is always a suggestion (decided 21/10)", () => {
       const gaveUp: ConversationAssessment = {
         ...sampleAssessment,
         suggestedLeadStatus: "lost",
@@ -194,25 +218,14 @@ describe("Conversation Intelligence Engine (Etapa IA.1)", () => {
         evidence: ["Obrigada, mas já fechei com outra corretora"],
       };
 
-      it("closes as lost when the customer said so, with code, reason and a customer message", () => {
-        const result = evaluateAssessmentPolicy({ assessment: gaveUp, currentLeadStatus: "in_contact", customerMessageCount: 2, config });
-        expect(result.action).toBe("AUTO_TRANSITION");
+      it("suggests lost even when the customer said so, with code, reason and high confidence", () => {
+        const result = evaluateAssessmentPolicy({ assessment: gaveUp, currentLeadStatus: "in_contact", ...talked, config });
+        expect(result.action).toBe("SUGGEST");
         expect(result.targetStatus).toBe("lost");
       });
 
-      it("only suggests when the transcript has no customer message (silence or missing side)", () => {
-        const result = evaluateAssessmentPolicy({ assessment: gaveUp, currentLeadStatus: "in_contact", customerMessageCount: 0, config });
-        expect(result.action).toBe("SUGGEST");
-        expect(result.reason).toContain("mensagem do cliente");
-      });
-
-      it("only suggests without a loss code or a written reason", () => {
-        expect(evaluateAssessmentPolicy({ assessment: { ...gaveUp, lossReasonCode: null }, currentLeadStatus: "in_contact", customerMessageCount: 2, config }).action).toBe("SUGGEST");
-        expect(evaluateAssessmentPolicy({ assessment: { ...gaveUp, statusReason: "  " }, currentLeadStatus: "in_contact", customerMessageCount: 2, config }).action).toBe("SUGGEST");
-      });
-
-      it("only suggests below the automation confidence", () => {
-        expect(evaluateAssessmentPolicy({ assessment: { ...gaveUp, statusConfidence: 0.8 }, currentLeadStatus: "in_contact", customerMessageCount: 2, config }).action).toBe("SUGGEST");
+      it("keeps the suggestion below the automation confidence", () => {
+        expect(evaluateAssessmentPolicy({ assessment: { ...gaveUp, statusConfidence: 0.8 }, currentLeadStatus: "in_contact", ...talked, config }).action).toBe("SUGGEST");
       });
     });
   });
