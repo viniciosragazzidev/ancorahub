@@ -480,7 +480,7 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       // Todo lead enviado manualmente conta em "leads recebidos no plantão" do
       // corretor, qualquer que seja a fila (regra do Vinicios, 21/10); a
       // transferência de lead encerrado da Pós Venda não é recebimento.
-      const attributedDutyScheduleId = dutyScheduleId ?? (keepsClosedStatus ? null : await findBrokerRunningDutyScheduleId({ tenantId: context.tenantId, brokerId, now }));
+      const attributedDutyScheduleId = dutyScheduleId ?? (keepsClosedStatus ? null : await findBrokerRunningDutyScheduleId({ tenantId: context.tenantId, brokerId, leadBranchId: targetBranchId, now }));
       const [tenantPolicy] = await db.select({ feedbackRequiredEnabled: schema.tenants.feedbackRequiredEnabled, feedbackGraceMinutes: schema.tenants.feedbackGraceMinutes, slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes }).from(schema.tenants).where(eq(schema.tenants.id, context.tenantId)).limit(1);
 
       await db.transaction(async (tx) => {

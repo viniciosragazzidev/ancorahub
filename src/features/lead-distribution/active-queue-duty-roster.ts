@@ -206,16 +206,27 @@ export async function getActiveQueueDutyRoster(input: {
  * corretor conta em "leads recebidos no plantão" do corretor, qualquer que seja
  * a fila de origem (Pós Venda ou outra fila sem plantão vinculado). Quando a
  * fila do lead não resolve o plantão, vale o plantão em que o corretor está
- * escalado agora. Mais de um plantão ao mesmo tempo: o que começou primeiro
- * (desempate pelo id), para a atribuição ser determinística.
+ * escalado agora. Mais de um plantão ao mesmo tempo: primeiro o da unidade do
+ * lead, depois o de unidade global, depois os demais; dentro disso, o que começou
+ * primeiro (desempate pelo id), para a atribuição ser determinística.
  */
-export function pickBrokerRunningDutyScheduleId(rows: readonly { scheduleId: string; startsAt: string }[]): string | null {
-  const [first] = [...rows].sort((left, right) => left.startsAt.localeCompare(right.startsAt) || left.scheduleId.localeCompare(right.scheduleId));
+export function pickBrokerRunningDutyScheduleId(
+  rows: readonly { scheduleId: string; startsAt: string; branchId?: string | null }[],
+  leadBranchId?: string | null,
+): string | null {
+  const rank = (row: { branchId?: string | null }) => {
+    if (!leadBranchId) return 0;
+    if (row.branchId === leadBranchId) return 0;
+    return row.branchId ? 2 : 1;
+  };
+  const [first] = [...rows].sort((left, right) => rank(left) - rank(right)
+    || left.startsAt.localeCompare(right.startsAt)
+    || left.scheduleId.localeCompare(right.scheduleId));
   return first?.scheduleId ?? null;
 }
 
-/** Plantão em andamento do corretor agora (qualquer fila), ou null se ele não está escalado. */
-export async function findBrokerRunningDutyScheduleId(input: { tenantId: string; brokerId: string; now?: Date }): Promise<string | null> {
+/** Plantão em andamento do corretor agora (qualquer fila), ou null se ele não está escalado. Com a unidade do lead, prefere o plantão dessa unidade. */
+export async function findBrokerRunningDutyScheduleId(input: { tenantId: string; brokerId: string; leadBranchId?: string | null; now?: Date }): Promise<string | null> {
   const db = getDatabase();
   const now = input.now ?? new Date();
   const local = getLocalDutyParts(now);
@@ -226,6 +237,7 @@ export async function findBrokerRunningDutyScheduleId(input: { tenantId: string;
       scheduleId: schema.dutyRosterAssignments.scheduleId,
       dutyDate: schema.dutyRosterAssignments.dutyDate,
       startsAt: schema.unitDutySchedules.startsAt,
+      branchId: schema.unitDutySchedules.branchId,
     })
     .from(schema.dutyRosterAssignments)
     .innerJoin(schema.unitDutySchedules, and(
@@ -249,5 +261,5 @@ export async function findBrokerRunningDutyScheduleId(input: { tenantId: string;
       or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
     ));
   if (!rows.length) return null;
-  return pickBrokerRunningDutyScheduleId(await resolveEffectiveDutyAssignments(input.tenantId, rows, now));
+  return pickBrokerRunningDutyScheduleId(await resolveEffectiveDutyAssignments(input.tenantId, rows, now), input.leadBranchId);
 }

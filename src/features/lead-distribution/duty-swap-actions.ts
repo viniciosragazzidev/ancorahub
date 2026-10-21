@@ -50,6 +50,8 @@ function slotColumns() {
     timezone: schema.unitDutySchedules.timezone,
     scheduleValidFrom: schema.unitDutySchedules.validFrom,
     scheduleValidUntil: schema.unitDutySchedules.validUntil,
+    rowValidFrom: schema.dutyRosterAssignments.validFrom,
+    rowValidUntil: schema.dutyRosterAssignments.validUntil,
     monthlyPlanId: schema.dutyRosterAssignments.monthlyPlanId,
   };
 }
@@ -61,15 +63,22 @@ type SlotColumnsRow = {
   timezone: string | null;
   scheduleValidFrom: Date;
   scheduleValidUntil: Date | null;
+  rowValidFrom: Date;
+  rowValidUntil: Date | null;
 };
 
 /**
  * Row as the swap sees it: `rowDutyDate` is the column (null on weekly rows) and `dutyDate`
  * the date the swap works with (published date, or the single date of a one-time weekly row).
+ * A weekly row uses its own validity when it has one, else the plantão's.
  */
 function toSwapSlot<T extends SlotColumnsRow>(row: T) {
   const timezone = row.timezone ?? "America/Sao_Paulo";
-  const weekly = row.dutyDate ? null : { dayOfWeek: row.dayOfWeek, validFrom: row.scheduleValidFrom, validUntil: row.scheduleValidUntil };
+  const weekly = row.dutyDate ? null : {
+    dayOfWeek: row.dayOfWeek,
+    validFrom: row.rowValidFrom ?? row.scheduleValidFrom,
+    validUntil: row.rowValidUntil ?? row.scheduleValidUntil,
+  };
   return { ...row, timezone, weekly, rowDutyDate: row.dutyDate, dutyDate: effectiveSwapDate({ dutyDate: row.dutyDate, startsAt: row.startsAt, timezone, weekly }) };
 }
 
@@ -169,7 +178,9 @@ export async function listDutySwapCandidatesAction(assignmentId: string): Promis
           isNull(schema.dutyRosterAssignments.dutyDate),
           eq(schema.unitDutySchedules.status, "active"),
           or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
+          or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now)),
         ))
+        .orderBy(schema.dutyRosterAssignments.dayOfWeek, schema.dutyRosterAssignments.startsAt, schema.dutyRosterAssignments.id)
         .limit(SWAP_WEEKLY_LIMIT),
     ]);
     const all: SwapCandidateRow[] = [...datedRows, ...weeklyRows].map((row) => ({ ...toSwapSlot(row), brokerBranchId: row.brokerBranchId ?? null, brokerCode: row.brokerCode ?? null }));
