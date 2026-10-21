@@ -224,3 +224,12 @@ describe("lembrete retido pela fila (revisão 21/10)", () => {
     expect(afterThree.action === "send" ? afterThree.step.touch : afterThree.action).not.toBe("t1");
   });
 });
+
+describe("regra da Meta para variáveis (21/10)", () => {
+  it("nenhum template começa ou termina com variável", () => {
+    for (const template of RECOMMENDED_TEMPLATES) {
+      expect(template.body.trim().startsWith("{{"), template.name).toBe(false);
+      expect(/\}\}[.!?]?$/.test(template.body.trim()), template.name).toBe(false);
+    }
+  });
+});

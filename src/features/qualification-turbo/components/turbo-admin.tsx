@@ -131,7 +131,7 @@ export function TurboAdmin({ data }: { data: TurboAdminData }) {
         return;
       }
       if (result.submitted.length) toast.success(`${result.submitted.length} templates enviados para aprovação da Meta.`);
-      if (result.failed.length) toast.error(`${result.failed.length} não foram aceitos: ${result.failed.map((item) => item.name).join(", ")}.`);
+      if (result.failed.length) toast.error(`${result.failed.length} não foram aceitos pela Meta. ${result.failed.map((item) => `${item.name}: ${item.error}`).join(" · ")}`);
       if (!result.submitted.length && !result.failed.length) toast.info("Todos os templates já estão na Meta.");
     });
   };
@@ -190,7 +190,7 @@ export function TurboAdmin({ data }: { data: TurboAdminData }) {
                     <td className="px-4 py-3">
                       <Badge variant={status.variant}>{status.label}</Badge>
                       {row.rejectedReason ? <span className="mt-1 block text-xs text-muted-foreground">{row.rejectedReason}</span> : null}
-                      {row.quality && row.quality.toUpperCase() !== "GREEN" && row.quality.toUpperCase() !== "UNKNOWN" ? <span className="mt-1 block text-xs text-destructive">Qualidade {row.quality.toLowerCase()}</span> : null}
+                      {row.quality && ["YELLOW", "RED"].includes(row.quality.toUpperCase()) ? <span className="mt-1 block text-xs text-destructive">Qualidade {row.quality.toLowerCase()}</span> : null}
                     </td>
                   </tr>
                 );

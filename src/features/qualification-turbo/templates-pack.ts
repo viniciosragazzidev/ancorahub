@@ -10,6 +10,8 @@ import type { MetaGraphTemplateComponent, MetaTemplateCategory } from "@/feature
  * MARKETING on purpose (Meta classifies "continue where you left off" as
  * marketing). Every button answers a qualification question or stops the
  * sequence, so a click already qualifies and opens the 24h window.
+ * Meta rejects a body that starts or ends with a variable: every text opens
+ * with a word ("Olá, {{nome}}" / "Oi, {{nome}}") and ends with plain text.
  */
 export type TurboTouch = "t0" | "t1" | "t2" | "t3" | "t4" | "reactivation";
 
@@ -87,7 +89,7 @@ export const RECOMMENDED_TEMPLATES: readonly RecommendedTemplate[] = [
     touch: "t1",
     category: "UTILITY",
     label: "Lembrete: pedido continua aberto",
-    body: "{{nome}}, seu pedido de cotação de plano de saúde continua aberto aqui na {{empresa}}. Falta só saber para quem é o plano.",
+    body: "Oi, {{nome}}. Seu pedido de cotação de plano de saúde continua aberto aqui na {{empresa}}. Falta só saber para quem é o plano.",
     buttons: ["Só para mim", "Para minha família", "Prefiro ligação"],
     examples: { nome: "Ana", empresa: "Âncora Saúde" },
   },
@@ -96,7 +98,7 @@ export const RECOMMENDED_TEMPLATES: readonly RecommendedTemplate[] = [
     touch: "t2",
     category: "MARKETING",
     label: "Reengajamento: comparar operadoras",
-    body: "{{nome}}, consigo comparar as principais operadoras para você e mostrar as opções que cabem no seu bolso, com a rede de hospitais de cada uma. Quer que eu prepare?",
+    body: "Oi, {{nome}}. Consigo comparar as principais operadoras para você e mostrar as opções que cabem no seu bolso, com a rede de hospitais de cada uma. Quer que eu prepare?",
     buttons: ["Quero ver as opções", "Prefiro ligação", "Agora não"],
     examples: { nome: "Ana" },
   },
@@ -105,7 +107,7 @@ export const RECOMMENDED_TEMPLATES: readonly RecommendedTemplate[] = [
     touch: "t3",
     category: "MARKETING",
     label: "Reengajamento: oferecer ligação",
-    body: "{{nome}}, se for mais fácil, um especialista da {{empresa}} pode te ligar e explicar as opções de plano de saúde em poucos minutos. Prefere assim?",
+    body: "Oi, {{nome}}. Se for mais fácil, um especialista da {{empresa}} pode te ligar e explicar as opções de plano de saúde em poucos minutos. Prefere assim?",
     buttons: ["Pode me ligar", "Prefiro por aqui", "Agora não"],
     examples: { nome: "Ana", empresa: "Âncora Saúde" },
   },
@@ -114,7 +116,7 @@ export const RECOMMENDED_TEMPLATES: readonly RecommendedTemplate[] = [
     touch: "t4",
     category: "MARKETING",
     label: "Despedida: encerrar ou continuar",
-    body: "{{nome}}, não quero te incomodar. Posso encerrar seu pedido de cotação de plano de saúde ou ainda quer receber as opções?",
+    body: "Oi, {{nome}}. Não quero te incomodar. Posso encerrar seu pedido de cotação de plano de saúde ou ainda quer receber as opções?",
     buttons: ["Quero receber", "Pode encerrar"],
     examples: { nome: "Ana" },
   },
@@ -123,7 +125,7 @@ export const RECOMMENDED_TEMPLATES: readonly RecommendedTemplate[] = [
     touch: "reactivation",
     category: "MARKETING",
     label: "Reativação: lead antigo",
-    body: "{{nome}}, há alguns dias você pediu uma cotação de plano de saúde na {{empresa}}. Ainda está procurando? Posso te mandar as opções atualizadas.",
+    body: "Oi, {{nome}}. Há alguns dias você pediu uma cotação de plano de saúde na {{empresa}}. Ainda está procurando? Posso te mandar as opções atualizadas.",
     buttons: ["Ainda procuro", "Já resolvi", "Agora não"],
     examples: { nome: "Ana", empresa: "Âncora Saúde" },
   },
