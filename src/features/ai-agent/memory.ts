@@ -109,9 +109,29 @@ const NUMBER_OF_LIVES_PATTERNS = [
  * 42 anos", "30 e 32 anos"): every number of the message except one that
  * counts people ("2 vidas"). Empty when the message does not mention "anos".
  */
+/**
+ * A message where the customer only talks about their own age ("tenho 63 anos ...
+ * tenho 63 anos") is one person, even when the age is repeated (case Edivaldo,
+ * 21/10: read as "2 pessoas, 63 e 63"). Null when anyone else is mentioned.
+ */
+export function readSelfOnlyAge(message: string): number | null {
+  const normalized = normalizeForMatching(message);
+  const selfAges = Array.from(normalized.matchAll(/\b(?:tenho|eu tenho|minha idade (?:e|eh|sao)|estou com|to com|tou com)\s*(\d{1,3})\s*a?nos?\b/g))
+    .map((match) => Number(match[1]))
+    .filter((age) => age > 0 && age <= 120);
+  if (!selfAges.length) return null;
+  const mentionsOthers = /\b(?:filh|espos|marid|mulher|mae|pai|irma|irmao|avo|net[ao]|sobrinh|sogr|entead|dependente|familia|pessoas|vidas|casal|socio|funcionari|colaborador)|\beu e\b|\bnos (?:dois|duas|tres)\b/.test(normalized);
+  if (mentionsOthers) return null;
+  // Every number next to "anos" must be the same self age (a second, different age is someone else).
+  const allAges = Array.from(normalized.matchAll(/\b(\d{1,3})\s*a?nos?\b/g)).map((match) => Number(match[1]));
+  return allAges.every((age) => age === selfAges[0]) ? selfAges[0] : null;
+}
+
 export function readAgeList(message: string): number[] {
   const normalized = normalizeForMatching(message);
   if (!/\d\s*a?nos?\b|\banos?\b/.test(normalized)) return [];
+  const selfAge = readSelfOnlyAge(message);
+  if (selfAge !== null) return [selfAge];
   const withoutPeople = normalized.replace(/\b\d{1,3}\s*(?:pessoas?|vidas?|familiares?|dependentes?|integrantes?|beneficiari[oa]s?)\b/g, " ");
   return Array.from(withoutPeople.matchAll(/(?<![\d@.])(\d{1,3})(?![\d@])/g))
     .map((match) => Number(match[1]))
@@ -543,7 +563,10 @@ export function extractFieldsFromMessage(
     const babyAge = /\b\d{1,2}\s*(?:dias?|semanas?|m[eê]s(?:es)?)\b|\brec[eé]m[- ]nascid/i.test(trimmed);
     const ageText = babyAge ? trimmed.replace(/\b\d{1,2}\s*(?:dias?|semanas?|m[eê]s(?:es)?)\b/gi, "0 anos") : trimmed;
     const listedAgeValues = readAgeList(ageText).filter((age) => age > 0 || babyAge);
-    const explicitAgeValues = listedAgeValues.length > 1
+    const selfOnlyAge = readSelfOnlyAge(ageText);
+    const explicitAgeValues = selfOnlyAge !== null
+      ? [selfOnlyAge]
+      : listedAgeValues.length > 1
       ? listedAgeValues
       : Array.from(ageText.matchAll(/\b(\d{1,3})\s*a?\s*nos?\b/gi))
         .map((match) => Number(match[1]))

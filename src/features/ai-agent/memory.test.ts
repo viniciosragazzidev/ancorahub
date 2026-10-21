@@ -250,3 +250,20 @@ describe("plano para outra pessoa da família (caso Adelair, 21/10)", () => {
     expect(extractFieldsFromMessage("Para minha empresa", createEmptyMemory(), "m1").planType?.value).toBe("empresarial");
   });
 });
+
+describe("idade repetida da mesma pessoa (caso Edivaldo, 21/10)", () => {
+  it("'tenho 63 anos ... tenho 63 anos' é uma pessoa de 63, não duas", () => {
+    const memory = extractFieldsFromMessage("Tenho 63 anos meu nome é Edivaldo tenho 63 anos estou sem ereção", createEmptyMemory(), "m1");
+    expect(memory.age?.value).toBe("63");
+    expect(memory.numberOfLives).toBeUndefined();
+  });
+
+  it("continua lendo duas pessoas quando há outra pessoa", () => {
+    const memory = extractFieldsFromMessage("Tenho 63 anos e minha esposa 60 anos", createEmptyMemory(), "m1");
+    expect(memory.numberOfLives?.value).toBe("2");
+  });
+
+  it("continua lendo 'para 12, 42 anos' como duas pessoas", () => {
+    expect(extractFieldsFromMessage("Para 12, 42 anos", createEmptyMemory(), "m1").numberOfLives?.value).toBe("2");
+  });
+});
