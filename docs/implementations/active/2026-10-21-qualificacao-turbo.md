@@ -472,7 +472,7 @@ dá para rodar 2 em paralelo em pontos diferentes (ex.: E1 no primeiro contato e
 | C. Entendimento | "Pra minha filha / pro meu pai" = plano individual para outra pessoa; "eu e minha filha" = familiar | `ai-agent/memory.ts` |
 | C. Botões | "Prefiro ligação" passa o lead para um corretor; botões de continuar seguem a qualificação | `quick-reply.ts` |
 | D. Experimentos | Sorteio estável por lead, Thompson sampling depois de 50 envios por variante, 10% explorando; liga/desliga "Aprender sozinho" | `experiments.ts` |
-| F. Custo | Preço por mensagem do webhook gravado (migration 0211, opcional); funil mostra custo real ou estimado | `communication-channels/service.ts`, `drizzle/0211_whatsapp_outbound_pricing.sql` |
+| F. Custo | Preço por mensagem do webhook gravado (migration 0212, opcional); funil mostra custo real ou estimado | `communication-channels/service.ts`, `drizzle/0212_whatsapp_outbound_pricing.sql` |
 | Painel | Aba "Funil de qualificação" no `/dashboard` | ver `2026-10-21-painel-diretor.md` |
 
 Ainda não feito: cadência para quem respondeu e parou no meio (abandono), cadência dos leads de

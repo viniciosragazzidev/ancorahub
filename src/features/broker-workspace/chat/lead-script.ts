@@ -119,6 +119,14 @@ function eventBlock(event: LeadConversationEvent, viewerId: string, hideTimes = 
 
 const isAiFeedback = (event: LeadConversationEvent) => event.conteudo.startsWith("[IA Feedback]");
 
+/**
+ * Internal routing notes that say nothing the broker can act on (21/10, Vinicios: the
+ * qualification timeout "Tempo limite da qualificação excedido..." is for the management only).
+ */
+const INTERNAL_NOTE_PREFIXES = ["Tempo limite da qualificação excedido"];
+export const isInternalNote = (event: Pick<LeadConversationEvent, "conteudo">) =>
+  INTERNAL_NOTE_PREFIXES.some((prefix) => event.conteudo.startsWith(prefix));
+
 /** Only the next action of an AI feedback, short: the full analysis filled the screen. */
 function aiNextAction(conteudo: string) {
   const next = conteudo.split("Próxima Ação:")[1]?.trim() || conteudo.replace("[IA Feedback]", "").trim();
@@ -325,7 +333,7 @@ export function buildLeadConversationScript({
   // History and WhatsApp in one timeline: the latest of each, in time order.
   type Entry = { at: Date; block: ChatBlock; id: string };
   const history: Entry[] = [
-    ...withLatestAiFeedback([...events]).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT).map((event) => ({ at: event.createdAt, id: event.id, block: eventBlock(event, viewerId, hideArrival) })),
+    ...withLatestAiFeedback(events.filter((event) => !isInternalNote(event))).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()).slice(-HISTORY_LIMIT).map((event) => ({ at: event.createdAt, id: event.id, block: eventBlock(event, viewerId, hideArrival) })),
     // Rows with no text and no file are WhatsApp protocol events (stored as "[text]"), never the client writing.
     ...[...messages].filter((message) => !isContentlessMessage(message.body, message.mediaKind)).sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime()).slice(-MESSAGES_LIMIT).map((message) => ({
       at: message.sentAt,

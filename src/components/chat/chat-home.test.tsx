@@ -55,6 +55,29 @@ describe("ChatHome", () => {
     expect(screen.getByText("De plantão: PME")).toBeTruthy();
   });
 
+  it("shows the scoped WhatsApp activity on Lite team home and links to filtered conversations", () => {
+    navigation.pathname = "/dashboard";
+    render(
+      <ChatHome
+        viewerName="Ana Lima"
+        assistants={assistants}
+        leads={[]}
+        nowIso="2026-10-10T12:00:00.000Z"
+        canQuote={false}
+        whatsappActivity={{
+          connectedBrokerCount: 1,
+          totalLeads: 3,
+          brokers: [{ id: "broker-1", name: "Carla Costa", leadCount: 3 }],
+        }}
+        summary={{ receivedToday: 0, acceptedToday: 0, inServiceNow: 0, slaAtRiskNow: 0, duty: null, goal: null }}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { level: 3, name: "3 leads responderam nos últimos 7 dias" })).toBeTruthy();
+    expect(screen.getByText("1 corretor conectado")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Carla Costa, 3 leads" }).getAttribute("href")).toBe("/conversas?tab=leads&brokerId=broker-1&respondeu=7d");
+  });
+
   it("shows the broker's positions and the step mission, but not in the rail", () => {
     navigation.pathname = "/dashboard";
     const highlights = {

@@ -156,7 +156,7 @@ export function getMetaDeliveryFailure(status: { errors?: Array<{ code?: number;
 
 /**
  * Meta's price of the message (per-message pricing): category, charged or not, price type.
- * Raw SQL on columns added by drizzle/0211 (not in the Drizzle schema), so it works before
+ * Raw SQL on columns added by drizzle/0212 (not in the Drizzle schema), so it works before
  * the migration: a missing column is ignored and the funnel falls back to the rate card.
  */
 async function recordOutboundPricing(outboundId: string, pricing: NonNullable<MetaWebhookStatus["pricing"]>) {

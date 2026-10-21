@@ -4,6 +4,7 @@ import {
   classifyIgnoredBrokerContact,
   isContentlessWahaMessage,
   isWahaStatusBroadcast,
+  getWhatsAppMessageSourceIds,
   shouldCreateSyntheticLead,
   shouldKeepTenantChannelMessage,
   shouldPersistBrokerConnectionMessage,
@@ -39,6 +40,22 @@ describe("outgoing lead message service start", () => {
       hasLead: false,
       brokerId: "broker-1",
     })).toBe(false);
+  });
+});
+
+describe("WAHA message source attribution", () => {
+  it("stores the originating personal connection id", () => {
+    expect(getWhatsAppMessageSourceIds({ kind: "connection", sourceId: "connection-1" })).toEqual({
+      whatsappConnectionId: "connection-1",
+      wahaNumberId: null,
+    });
+  });
+
+  it("stores the originating company number id", () => {
+    expect(getWhatsAppMessageSourceIds({ kind: "number", sourceId: "number-1" })).toEqual({
+      whatsappConnectionId: null,
+      wahaNumberId: "number-1",
+    });
   });
 });
 

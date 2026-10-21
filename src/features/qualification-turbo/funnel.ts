@@ -44,7 +44,7 @@ export type QualificationFunnel = {
 };
 
 /**
- * Real charge from Meta's per-message pricing (columns of drizzle/0211, read by raw SQL so the
+ * Real charge from Meta's per-message pricing (columns of drizzle/0212, read by raw SQL so the
  * page works before the migration). Null when the columns or the data are not there yet.
  */
 async function realMetaCost(tenantId: string, since: Date) {

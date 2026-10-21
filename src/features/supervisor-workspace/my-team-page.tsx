@@ -10,6 +10,7 @@ import { Avatar } from "@/components/arc/avatar/avatar";
 import { Badge } from "@/components/arc/badge/badge";
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { SearchField } from "@/components/arc/search-field/search-field";
 import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
 import { resendInviteAction, revokeInviteAction } from "@/app/(dashboard)/equipe/actions";
 import { TeamInviteLiteSheet } from "@/features/team/team-invite-lite-sheet";
@@ -32,9 +33,13 @@ export function teamAvatarHue(name: string) {
 export function MyTeamPage({ initialData, initialTab = "members" }: { initialData: SupervisorTeamPageData; initialTab?: "members" | "invites" | "unit" }) {
   const [data, setData] = useState(initialData);
   const [activeTab, setActiveTab] = useState<"members" | "invites" | "unit">(initialTab);
+  const [unitSearch, setUnitSearch] = useState("");
   const [feedback, setFeedback] = useState("");
   const [pending, startTransition] = useTransition();
   const reducedMotion = useReducedMotion() ?? false;
+  const normalizeName = (value: string) => value.normalize("NFD").replace(/\p{M}/gu, "").toLocaleLowerCase("pt-BR");
+  const unitQuery = normalizeName(unitSearch.trim());
+  const unitBrokers = data.brokers.filter((broker) => normalizeName(broker.name).includes(unitQuery));
 
   function runAction(action: () => Promise<{ ok: boolean; message: string }>, onSuccess?: () => void) {
     setFeedback("");
@@ -108,8 +113,10 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
         {data.invites.map((invite, index) => <PeopleRow key={invite.id} index={data.pendingAccessInvites.length + index} name={invite.brokerName} chip="Convite para a equipe" preview={shortDate.format(new Date(invite.createdAt))} action={<Button variant="outline" size="sm" disabled={pending} onClick={() => cancelInvite(invite.id)}>Cancelar convite</Button>} />)}
       </PeopleSection> : <EmptyState title="Nenhum convite pendente" description="Os convites enviados para corretores aparecem aqui." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />) : null}
 
-      {activeTab === "unit" ? (data.brokers.length ? <PeopleSection id="team-brokers-title" title="Corretores da sua unidade" count={data.brokers.length}>
-        {data.brokers.map((broker, index) => <PeopleRow
+      {activeTab === "unit" ? <>
+        <SearchField label="Buscar corretor da sua unidade" placeholder="Digite o nome do corretor" value={unitSearch} onValueChange={setUnitSearch} clearLabel="Limpar busca" />
+        {unitBrokers.length ? <PeopleSection id="team-brokers-title" title="Corretores da sua unidade" count={unitBrokers.length}>
+        {unitBrokers.map((broker, index) => <PeopleRow
           key={broker.id}
           index={index}
           name={broker.name}
@@ -117,7 +124,8 @@ export function MyTeamPage({ initialData, initialTab = "members" }: { initialDat
           preview={broker.supervisorName ? `Equipe de ${broker.supervisorName}` : "Livre para entrar na equipe"}
           action={broker.supervisorId ? <Link className={styles.textLink} href="/equipe/transferencia">Pedir transferência</Link> : broker.inviteId ? <Button variant="outline" size="sm" disabled>Convite pendente</Button> : <div className={styles.brokerActions}><Button size="sm" disabled={pending} onClick={() => addDirectly(broker.id)}>Adicionar</Button><Button variant="outline" size="sm" disabled={pending || !data.team} onClick={() => invite(broker.id)}>Convidar</Button></div>}
         />)}
-      </PeopleSection> : <EmptyState title="Não há outros corretores ativos" description="Quando houver corretores disponíveis na sua unidade, eles aparecerão aqui." icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />) : null}
+      </PeopleSection> : <EmptyState title={unitQuery ? "Nenhum corretor encontrado" : "Não há outros corretores ativos"} description={unitQuery ? "Tente outro nome ou limpe a busca para ver os corretores da sua unidade." : "Quando houver corretores disponíveis na sua unidade, eles aparecerão aqui."} icon={<AssistantAvatar shape="mochi" hue={150} size={72} state="working" />} />}
+      </> : null}
     </div>
   </motion.div>;
 }

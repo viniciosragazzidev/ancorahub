@@ -1,3 +1,16 @@
+## 2026-10-21: busca da unidade e enviados versus aceitos
+
+Refinamento funcional do Lite autorizado pelo Vinicios. Na aba Unidade de Minha
+equipe, a ação principal é encontrar o corretor pelo nome e usar Adicionar ou
+Convidar. SearchField Arc existente, com lupa, limpar, rótulo acessível, resultados
+e vazio de busca; somente dados já autorizados da própria unidade. No perfil
+compartilhado de gestor/supervisor, enviados e aceitos ficam lado a lado com taxa
+e escopo histórico explícito. Reutiliza tokens e composições existentes, sem
+primitive, variante ou animação nova. SearchField recebe apenas clearLabel opcional
+para localizar o rótulo de limpar. Preserva flags, auditoria, erro, loading e
+negação existentes. Não avança o gate global do redesign.
+Registro: `docs/implementations/active/2026-10-21-team-search-lead-acceptance.md`.
+
 ## 2026-10-17: Lite 2 D, Agora e menos passos
 
 Papeis: corretor na fila e no inicio; supervisor na equipe. O corretor ve no

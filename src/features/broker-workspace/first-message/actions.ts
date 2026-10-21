@@ -50,12 +50,12 @@ async function loadOwnLead(leadId: string) {
 }
 
 async function connectionOf(tenantId: string, userId: string) {
-  const [connection] = await getDatabase().select({ sessionName: schema.whatsappConnections.sessionName, status: schema.whatsappConnections.status })
+  const [connection] = await getDatabase().select({ id: schema.whatsappConnections.id, sessionName: schema.whatsappConnections.sessionName, status: schema.whatsappConnections.status })
     .from(schema.whatsappConnections)
     .where(and(eq(schema.whatsappConnections.tenantId, tenantId), eq(schema.whatsappConnections.userId, userId)))
     .limit(1);
   const ready = Boolean(connection?.sessionName) && normalizeWahaUiStatus(connection?.status ?? "") === "ready";
-  return { ready, sessionName: connection?.sessionName ?? null };
+  return { id: connection?.id ?? null, ready, sessionName: connection?.sessionName ?? null };
 }
 
 /**
@@ -145,6 +145,7 @@ export async function sendFirstMessageAction(raw: { leadId: string; text: string
       id: randomUUID(),
       tenantId: context.tenantId,
       leadId: lead.id,
+      whatsappConnectionId: connection.id,
       provider: "waha",
       providerStatus: "sent",
       messageId: sent.messageId,

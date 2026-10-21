@@ -41,7 +41,7 @@ Coorte por chegada: toda taxa divide números dos mesmos leads.
   confiança) e % qualificados.
 - **Qual mensagem trouxe a resposta**: 1ª mensagem, lembrete 20 min, 3h, ligação, despedida.
 - **Por que os leads foram perdidos**: motivos agregados (dado já gravado, nunca mostrado).
-- **Custo na Meta**: real (preço que a Meta informa por mensagem, depois da migration 0211) ou
+- **Custo na Meta**: real (preço que a Meta informa por mensagem, depois da migration 0212) ou
   estimado pela tabela de 1/10/2026; custo por lead qualificado.
 
 Arquivos: `src/features/qualification-turbo/funnel.ts`, `components/qualification-funnel-view.tsx`,

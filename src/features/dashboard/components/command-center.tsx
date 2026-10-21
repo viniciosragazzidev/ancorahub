@@ -24,6 +24,7 @@ import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { queueHueToDotColor } from "@/features/lead-distribution/queue-color";
 import { cn } from "@/lib/utils";
 import type { CommandCenterData } from "../today";
+import { WhatsAppActivityCard } from "./whatsapp-activity-card";
 import { AttentionGrid, RecentLeadsCard } from "./dashboard-widgets";
 import { DashboardSectionTabs } from "./dashboard-section-tabs";
 
@@ -144,49 +145,6 @@ function QueuesToday({ queues, received }: { queues: CommandCenterData["today"][
           <Link href="/leads/distribuicao" className="inline-flex items-center gap-1 text-sm font-medium text-ds-electric-blue">Ver as filas <ArrowRight aria-hidden="true" className="size-3.5" /></Link>
         </div>
       )}
-    </Card>
-  );
-}
-
-/** Brokers with WhatsApp connected x not connected (it is required for plantão leads from 20/10). */
-function WhatsAppActivity({ whatsapp }: { whatsapp: CommandCenterData["whatsapp"] }) {
-  const activity = whatsapp.activity;
-  return (
-    <Card variant="overview">
-      <SectionCardHeader
-        title="Respostas no WhatsApp"
-        description="Respostas no WhatsApp dos últimos 7 dias, leads com corretor conectado"
-      />
-      <div className="grid gap-3 px-5 pb-5 pt-1">
-        <h3 aria-label={`${activity.totalLeads} leads responderam nos últimos 7 dias`} className="text-base font-medium leading-snug">
-          <span className="mr-1 font-mono text-3xl font-semibold tabular-nums tracking-tight text-foreground">{activity.totalLeads}</span>
-          {" "}leads responderam nos últimos 7 dias
-        </h3>
-        <p className="text-xs text-muted-foreground">
-          {activity.connectedBrokerCount} {activity.connectedBrokerCount === 1 ? "corretor conectado" : "corretores conectados"}
-        </p>
-        {activity.brokers.length ? (
-          <ul className="max-h-64 divide-y divide-border overflow-y-auto" aria-label="Leads que responderam por corretor">
-            {activity.brokers.map((broker) => (
-              <li key={broker.id}>
-                <Link
-                  href={`/conversas?tab=leads&brokerId=${encodeURIComponent(broker.id)}`}
-                  aria-label={`${broker.name}, ${broker.leadCount} ${broker.leadCount === 1 ? "lead" : "leads"}`}
-                  className="flex min-h-11 items-center justify-between gap-3 py-2 text-sm transition-colors hover:text-ds-electric-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  title={`Ver conversas de ${broker.name}`}
-                >
-                  <span className="min-w-0 truncate">{broker.name}</span>
-                  <span className="shrink-0 font-mono font-medium tabular-nums">
-                    {broker.leadCount} {broker.leadCount === 1 ? "lead" : "leads"}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">Nenhum corretor conectado.</p>
-        )}
-      </div>
     </Card>
   );
 }
@@ -325,7 +283,7 @@ export function CommandCenter({ data, showQualityTab = false, canManage = true }
           </div>
           <aside className="grid min-w-0 content-start gap-6" aria-label="Plantões e pendências">
             <DutiesNow welcome={data.welcome} />
-            <WhatsAppActivity whatsapp={data.whatsapp} />
+            <WhatsAppActivityCard activity={data.whatsapp.activity} />
             <BrokersWhatsAppReadiness whatsapp={data.whatsapp} />
             {data.attention.length ? <AttentionGrid items={data.attention} /> : (
               <Card variant="overview" className="px-5 py-4">

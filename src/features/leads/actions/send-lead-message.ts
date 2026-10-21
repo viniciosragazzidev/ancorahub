@@ -91,6 +91,7 @@ export async function sendTenantOfficialNumberMessageAction(
     if (!number) return { success: false, error: "Número oficial não encontrado neste tenant." };
     const [connection] = await db
       .select({
+        id: schema.whatsappConnections.id,
         sessionName: schema.whatsappConnections.sessionName,
         status: schema.whatsappConnections.status,
         active: schema.whatsappConnections.chatInternoAtivo,
@@ -134,6 +135,7 @@ export async function sendTenantOfficialNumberMessageAction(
         .values({
           id,
           tenantId: context.tenantId,
+          whatsappConnectionId: connection.id,
           provider: "waha",
           providerStatus: "sent",
           messageId: result.messageId!,
@@ -201,6 +203,7 @@ export async function sendTenantOfficialChannelMessageAction(
       return { success: false, error: "Número oficial não encontrado neste tenant." };
     const [connection] = await db
       .select({
+        id: schema.whatsappConnections.id,
         sessionName: schema.whatsappConnections.sessionName,
         status: schema.whatsappConnections.status,
         active: schema.whatsappConnections.chatInternoAtivo,
@@ -245,6 +248,7 @@ export async function sendTenantOfficialChannelMessageAction(
           id,
           tenantId: context.tenantId,
           communicationChannelId: channel.id,
+          whatsappConnectionId: connection.id,
           provider: "waha",
           providerStatus: "sent",
           messageId: result.messageId!,
@@ -476,6 +480,7 @@ export async function sendLeadMessageAction(
         id,
         tenantId: context.tenantId,
         leadId: lead.id,
+        whatsappConnectionId: connection.id,
         provider: "waha",
         providerStatus: "sent",
         messageId: result.messageId,
