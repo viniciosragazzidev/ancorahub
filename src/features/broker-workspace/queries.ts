@@ -189,7 +189,12 @@ export async function getBrokerWorkspaceData(): Promise<BrokerWorkspaceData> {
   const latestMessage = db
     .select({ direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt })
     .from(schema.whatsappMessages)
-    .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, schema.leads.id)))
+    .where(and(
+      eq(schema.whatsappMessages.tenantId, context.tenantId),
+      eq(schema.whatsappMessages.leadId, schema.leads.id),
+      // Contentless WhatsApp events ("[text]", hidden in the conversation) are not the client waiting.
+      sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
+    ))
     .orderBy(desc(schema.whatsappMessages.sentAt))
     .limit(1)
     .as("workspace_latest_message");

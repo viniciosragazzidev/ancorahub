@@ -308,11 +308,11 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     return { processed: 0, ignored: "unresolved_lid" as const };
   }
 
-  // Protocol events without text or file never become a chat bubble.
-  if (isContentlessWahaMessage(event.message)) {
-    await markIgnored(db, registered.id, `contentless_message:${event.message.fromMe ? "from_me" : "from_contact"}`);
-    return { processed: 0, ignored: "contentless_message" as const };
-  }
+  // Contentless events are stored, never dropped: a real client message can arrive
+  // with no text (poll, button or list reply, undecrypted stub) and must not vanish.
+  // They are saved as "[text]", which the conversation hides, and they stay out of
+  // the AI, the cadence and the lead's activity below.
+  const contentless = isContentlessWahaMessage(event.message);
 
   // Determine direction based on fromMe flag
   const isOutgoing = event.message.fromMe === true;
@@ -396,7 +396,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
       });
 
     // Update cadence run if applicable
-    if (runId && !isOutgoing) {
+    if (runId && !isOutgoing && !contentless) {
       await tx
         .update(schema.wahaCadenceRuns)
         .set({ inboundAt: new Date(event.occurredAt), status: "active", updatedAt: new Date() })
@@ -404,7 +404,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     }
 
     // Update lastActivityAt on lead if exists
-    if (leadId && !isOutgoing) {
+    if (leadId && !isOutgoing && !contentless) {
       await tx
         .update(schema.leads)
         .set({ updatedAt: new Date() })
@@ -412,7 +412,7 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
     }
   });
 
-  if (shouldStartServiceFromOutgoingLeadMessage({
+  if (!contentless && shouldStartServiceFromOutgoingLeadMessage({
     isOutgoing,
     sourceKind: source.kind,
     hasLead: Boolean(leadId),
@@ -452,12 +452,12 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
   }
 
   // ── 7.1 Agendar análise de inteligência conversacional com debounce de 60s ──
-  if (leadId && tenantId) {
+  if (leadId && tenantId && !contentless) {
     scheduleLeadConversationAnalysis(leadId, tenantId);
   }
 
   // ── 8. AI processing (optional, background, only for inbound to relay numbers) ──────────
-  if (!isOutgoing && source.kind === "number" && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
+  if (!contentless && !isOutgoing && source.kind === "number" && leadId && (await getSystemSetting(WAHA_AI_FEATURE)) === "true") {
     const { processInboundAiResponse } =
       await import("@/features/ai-agent/conversation-state-machine");
     const aiPromise = processInboundAiResponse({

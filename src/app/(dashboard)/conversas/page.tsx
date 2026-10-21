@@ -785,6 +785,7 @@ export default async function ConversationsPage({
                 and(
                   eq(schema.whatsappMessages.tenantId, context.tenantId),
                   eq(schema.whatsappMessages.direction, "incoming"),
+                  sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
                   or(
                     inArray(schema.whatsappMessages.phone, brokerPhones),
                     ...brokerPhones.map((phone) =>
