@@ -32,6 +32,12 @@ type SessionSource =
   | { kind: "number"; number: typeof schema.wahaNumbers.$inferSelect }
   | { kind: "connection"; connection: typeof schema.whatsappConnections.$inferSelect };
 
+export function getWhatsAppMessageSourceIds(source: { kind: "connection"; sourceId: string } | { kind: "number"; sourceId: string }) {
+  return source.kind === "connection"
+    ? { whatsappConnectionId: source.sourceId, wahaNumberId: null }
+    : { whatsappConnectionId: null, wahaNumberId: source.sourceId };
+}
+
 export function shouldStartServiceFromOutgoingLeadMessage(input: {
   isOutgoing: boolean;
   sourceKind: SessionSource["kind"];
@@ -388,6 +394,9 @@ export async function ingestWahaWebhook(event: WahaWebhookEvent, rawPayload: str
         tenantId,
         leadId,
         clientId,
+        ...getWhatsAppMessageSourceIds(source.kind === "connection"
+          ? { kind: "connection", sourceId: source.connection.id }
+          : { kind: "number", sourceId: source.number.id }),
         provider: "waha",
         providerStatus: isOutgoing ? "sent" : "received",
         messageId: providerMessageId,

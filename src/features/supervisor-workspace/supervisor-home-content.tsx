@@ -3,6 +3,7 @@ import { LightDashboardUnavailable } from "@/features/broker-workspace/component
 import { getCachedSupervisorWorkspaceData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { loadNeedsYouIfEnabled, type NeedsYouSummary } from "@/features/team-management-extras/needs-you-summary";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getBrokerWhatsAppStatusForContext } from "@/features/dashboard/today";
 import { buildSupervisorNowItems } from "./now-items";
 
 import type { SupervisorWorkspaceData } from "./queries";
@@ -39,7 +40,12 @@ function withNeeds(summary: HomeSummary, needs: NeedsYouSummary | null): HomeSum
 /** Supervisor Lite home (S2): the team assistants as conversations, the team's day at the center. */
 export async function SupervisorHomeContent() {
   const context = await getRequiredTenantContext();
-  const [rail, data, needs] = await Promise.all([getChatRailData(), getCachedSupervisorWorkspaceData().catch(() => null), loadNeedsYouIfEnabled(context)]);
+  const [rail, data, needs, whatsapp] = await Promise.all([
+    getChatRailData(),
+    getCachedSupervisorWorkspaceData().catch(() => null),
+    loadNeedsYouIfEnabled(context),
+    getBrokerWhatsAppStatusForContext(context).catch(() => null),
+  ]);
   if (!rail || !data) return <LightDashboardUnavailable />;
   return (
     <ChatHome
@@ -48,6 +54,7 @@ export async function SupervisorHomeContent() {
       leads={rail.leads}
       nowIso={rail.nowIso}
       canQuote={false}
+      whatsappActivity={whatsapp?.activity}
       summary={withNeeds(summaryOf(data), needs)}
     />
   );

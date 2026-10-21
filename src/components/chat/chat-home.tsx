@@ -26,6 +26,8 @@ import { LiteTour } from "./tour/lite-tour";
 import { ThreadList } from "./thread-row";
 import { WeekRanking, type HomeHighlights } from "./week-ranking";
 import type { HomeNowItem, PresenceAskView, ThreadSummary } from "./types";
+import type { WhatsAppActivitySummary } from "@/features/dashboard/whatsapp-activity";
+import { WhatsAppActivityCard } from "@/features/dashboard/components/whatsapp-activity-card";
 
 type Tab = "assistentes" | "leads";
 
@@ -152,6 +154,7 @@ export function ChatHome({
   highlights = null,
   firstSteps = null,
   presence = null,
+  whatsappActivity = null,
 }: {
   viewerName: string;
   assistants: ThreadSummary[];
@@ -166,6 +169,8 @@ export function ChatHome({
   firstSteps?: FirstStep[] | null;
   /** Plantão to confirm now: highlighted at the top of the Início until confirmed. */
   presence?: PresenceAskView | null;
+  /** Scoped team metric, passed only to manager and supervisor homes. */
+  whatsappActivity?: WhatsAppActivitySummary | null;
 }) {
   const now = useMemo(() => new Date(nowIso), [nowIso]);
   const reduce = useReducedMotion();
@@ -237,6 +242,7 @@ export function ChatHome({
       </header>
       {mode === "page" && (presence?.status === "pending" || presence?.status === "awaiting_release") ? <PresenceCallout ask={presence} /> : null}
       {mode === "page" && summary?.now ? <NowSection data={summary.now} mobile /> : null}
+      {mode === "page" && whatsappActivity ? <div className="px-4 pb-4"><WhatsAppActivityCard activity={whatsappActivity} /></div> : null}
       {mode === "page" && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}
       {mode === "page" && highlights ? <WeekRanking data={highlights} /> : null}
       {list}

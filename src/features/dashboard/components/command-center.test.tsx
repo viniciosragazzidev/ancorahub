@@ -82,7 +82,7 @@ describe("CommandCenter", () => {
     expect(screen.getByRole("heading", { level: 3, name: "12 leads responderam nos últimos 7 dias" })).toBeTruthy();
     expect(screen.getByText("Respostas no WhatsApp dos últimos 7 dias, leads com corretor conectado")).toBeTruthy();
     expect(screen.getByText("7 corretores conectados")).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Carla Costa, 4 leads" }).getAttribute("href")).toBe("/conversas?tab=leads&brokerId=b3");
+    expect(screen.getByRole("link", { name: "Carla Costa, 4 leads" }).getAttribute("href")).toBe("/conversas?tab=leads&brokerId=b3&respondeu=7d");
   });
 
   it("searches a lead from the dashboard", () => {

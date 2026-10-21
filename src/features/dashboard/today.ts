@@ -10,6 +10,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 import { getDashboardWelcome } from "./welcome";
 import { summarizeWhatsAppActivity } from "./whatsapp-activity";
+import { brokerWhatsAppMembershipScope, brokerWhatsAppMessageSourceCondition } from "./whatsapp-activity-query";
 
 /** Distribution states of a lead that is waiting for a broker. */
 const WAITING_STATES = ["queued", "unassigned", "returned_to_queue"] as const;
@@ -90,13 +91,11 @@ export type BrokerWhatsAppStatus = {
  */
 export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awaited<ReturnType<typeof resolveReportDataScope>>): Promise<BrokerWhatsAppStatus> {
   const empty: BrokerWhatsAppStatus = { total: 0, connected: 0, notConnected: [], activity: summarizeWhatsAppActivity([]) };
-  const brokerScope = context.role === "director"
-    ? undefined
-    : context.role === "manager"
-      ? (context.branchId ? eq(schema.tenantMemberships.branchId, context.branchId) : null)
-      : context.role === "supervisor"
-        ? (scope.supervisedBrokerIds?.length ? inArray(schema.tenantMemberships.userId, scope.supervisedBrokerIds) : null)
-        : null;
+  const brokerScope = brokerWhatsAppMembershipScope({
+    role: context.role,
+    branchId: context.branchId,
+    supervisedBrokerIds: scope.supervisedBrokerIds,
+  });
   if (brokerScope === null) return empty;
 
   const now = new Date();
@@ -108,7 +107,7 @@ export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awa
       and ${schema.whatsappConnections.status} = 'ready'
   )`;
 
-  // whatsapp_messages ainda não guarda a sessão WAHA de origem. A métrica aproxima a origem pelo dono atual, pela conexão pessoal pronta e pela exclusão dos números conhecidos em waha_numbers.
+  // Explicit source IDs identify personal messages; legacy rows without either ID use the owner and phone approximation and age out of this seven-day window.
   const rows = await getDatabase()
     .select({
       id: schema.tenantMemberships.userId,
@@ -136,14 +135,11 @@ export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awa
       lte(schema.whatsappMessages.sentAt, now),
       notStatusBroadcastSql(schema.whatsappMessages.messageId),
       sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
-      sql`not exists (
-        select 1 from ${schema.wahaNumbers}
-        where ${schema.wahaNumbers.tenantId} = ${context.tenantId}
-          and length(regexp_replace(coalesce(${schema.wahaNumbers.displayPhoneNumber}, ''), '[^0-9]', '', 'g')) >= 9
-          and length(regexp_replace(coalesce(${schema.whatsappMessages.phone}, ''), '[^0-9]', '', 'g')) >= 9
-          and right(regexp_replace(coalesce(${schema.wahaNumbers.displayPhoneNumber}, ''), '[^0-9]', '', 'g'), 9)
-            = right(regexp_replace(coalesce(${schema.whatsappMessages.phone}, ''), '[^0-9]', '', 'g'), 9)
-      )`,
+      brokerWhatsAppMessageSourceCondition({
+        tenantId: context.tenantId,
+        brokerUserId: schema.tenantMemberships.userId,
+        message: schema.whatsappMessages,
+      }),
     ))
     .where(and(
       eq(schema.tenantMemberships.tenantId, context.tenantId),
@@ -161,6 +157,12 @@ export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awa
     notConnected: notConnected.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).slice(0, 6),
     activity: summarizeWhatsAppActivity(rows),
   };
+}
+
+/** Resolve report scope and load the metric for Lite Inicio pages that do not render CommandCenter. */
+export async function getBrokerWhatsAppStatusForContext(context: TenantContext): Promise<BrokerWhatsAppStatus> {
+  const scope = await resolveReportDataScope(context);
+  return getBrokerWhatsAppStatus(context, scope);
 }
 
 export type CommandCenterData = Awaited<ReturnType<typeof getCommandCenterData>>;

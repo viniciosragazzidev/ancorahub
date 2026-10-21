@@ -2177,6 +2177,8 @@ export const whatsappMessages = pgTable(
     leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
     clientId: text("client_id").references(() => clients.id, { onDelete: "cascade" }),
     communicationChannelId: text("communication_channel_id").references(() => communicationChannels.id, { onDelete: "set null" }),
+    whatsappConnectionId: text("whatsapp_connection_id").references(() => whatsappConnections.id, { onDelete: "set null" }),
+    wahaNumberId: text("waha_number_id").references(() => wahaNumbers.id, { onDelete: "set null" }),
     conversationId: text("conversation_id"),
     senderRole: text("sender_role").default("user"),
     provider: text("provider").notNull().default("openwa_legacy"),
@@ -2199,6 +2201,7 @@ export const whatsappMessages = pgTable(
   (table) => [
     index("whatsapp_messages_tenant_lead_idx").on(table.tenantId, table.leadId, table.createdAt),
     index("whatsapp_messages_tenant_sent_idx").on(table.tenantId, table.sentAt.desc()),
+    index("whatsapp_messages_tenant_connection_sent_idx").on(table.tenantId, table.whatsappConnectionId, table.sentAt.desc()).where(sql`${table.whatsappConnectionId} IS NOT NULL`),
     uniqueIndex("whatsapp_messages_message_unique").on(table.tenantId, table.messageId),
   ],
 );

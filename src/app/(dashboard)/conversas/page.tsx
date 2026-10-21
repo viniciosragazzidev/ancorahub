@@ -1,12 +1,8 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
-import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lt, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, exists, gte, inArray, isNotNull, isNull, like, lte, notInArray, or, sql } from "drizzle-orm";
 
-import { cn } from "@/lib/utils";
 import { DashboardHeader } from "@/components/dashboard-header";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   ConversationsWorkspace,
   type ConversationItem,
@@ -39,6 +35,8 @@ import { BulkQualificationDialog } from "@/features/ai-qualification/components/
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
+import { brokerWhatsAppMessageSourceCondition, isRecentWhatsAppReplyFilter } from "@/features/dashboard/whatsapp-activity-query";
+import { loadedLeadMessageScope } from "@/features/conversations/loaded-lead-message-scope";
 
 // Não gerar estaticamente — a página depende de sessão e executa queries pesadas de AI
 export const dynamic = "force-dynamic";
@@ -47,13 +45,15 @@ export const maxDuration = 300;
 export default async function ConversationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ leadId?: string; lead?: string; tab?: string; brokerId?: string }>;
+  searchParams: Promise<{ leadId?: string; lead?: string; tab?: string; brokerId?: string; respondeu?: string }>;
 }) {
-  const { leadId: leadIdParam, lead: leadAlias, tab, brokerId: brokerIdParam } = await searchParams;
+  const { leadId: leadIdParam, lead: leadAlias, tab, brokerId: brokerIdParam, respondeu: respondeuParam } = await searchParams;
   // WhatsApp offer/assignment messages link here with `?lead=`.
   const leadId = leadIdParam ?? leadAlias;
   const brokerId = typeof brokerIdParam === "string" && brokerIdParam.length <= 128 && brokerIdParam.trim() ? brokerIdParam : null;
   const invalidBrokerId = brokerIdParam !== undefined && !brokerId;
+  const repliedLast7Days = isRecentWhatsAppReplyFilter(respondeuParam);
+  const invalidReplyFilter = respondeuParam !== undefined && !repliedLast7Days;
   const context = await getRequiredTenantContext();
   if (!hasPermission(context.role, "acessar_conversas")) {
     redirect("/minha-fila");
@@ -83,6 +83,8 @@ export default async function ConversationsPage({
   }
 
   const db = getDatabase();
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   const isDirector = context.role === "director";
   const canSeeBrokerTab = isDirector || (context.role === "manager" && Boolean(context.branchId));
@@ -146,7 +148,21 @@ export default async function ConversationsPage({
             isNull(schema.leads.deletedAt),
             isNull(schema.leads.archivedAt),
             ...(scope ? [scope] : []),
-            ...(invalidBrokerId ? [sql`false`] : brokerId ? [eq(schema.leads.corretorId, brokerId)] : []),
+            ...(invalidBrokerId || invalidReplyFilter ? [sql`false`] : brokerId ? [eq(schema.leads.corretorId, brokerId)] : []),
+            ...(repliedLast7Days ? [exists(db.select({ value: sql`1` }).from(schema.whatsappMessages).where(and(
+              eq(schema.whatsappMessages.tenantId, context.tenantId),
+              eq(schema.whatsappMessages.leadId, schema.leads.id),
+              inArray(schema.whatsappMessages.direction, ["incoming", "inbound"]),
+              gte(schema.whatsappMessages.sentAt, sevenDaysAgo),
+              lte(schema.whatsappMessages.sentAt, now),
+              notStatusBroadcastSql(schema.whatsappMessages.messageId),
+              sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
+              brokerWhatsAppMessageSourceCondition({
+                tenantId: context.tenantId,
+                brokerUserId: schema.leads.corretorId,
+                message: schema.whatsappMessages,
+              }),
+            )))] : []),
           ),
         )
         .orderBy(desc(schema.leads.stageEnteredAt))
@@ -171,6 +187,7 @@ export default async function ConversationsPage({
 
     branches = branchRows;
     const leadIds = leads.map((lead) => lead.id);
+    const scopeMessagesToLoadedLeads = Boolean(brokerId || repliedLast7Days);
 
     // With more than one official number, every message says which number
     // received or sent it (the reply goes out on the number the customer wrote to).
@@ -182,7 +199,8 @@ export default async function ConversationsPage({
 
     const [messageRows, documentRows, aiConversationRows] = leadIds.length
       ? await Promise.all([
-          db
+          (() => {
+            const query = db
             .select({
               id: schema.whatsappMessages.id,
               leadId: schema.whatsappMessages.leadId,
@@ -205,6 +223,10 @@ export default async function ConversationsPage({
             .from(schema.whatsappMessages)
             .where(and(
               eq(schema.whatsappMessages.tenantId, context.tenantId),
+              ...(scopeMessagesToLoadedLeads ? [loadedLeadMessageScope({
+                message: schema.whatsappMessages,
+                leads: leads.map((lead) => ({ id: lead.id, phone: lead.telefone })),
+              })] : []),
               // WhatsApp Status/stories (status@broadcast) are nobody writing to the company.
               notStatusBroadcastSql(schema.whatsappMessages.messageId),
               // The WhatsApp Business app history imported when a number was
@@ -219,8 +241,10 @@ export default async function ConversationsPage({
                   and ${schema.whatsappMessages.sentAt} < history_channel.activated_at
               ))`,
             ))
-            .orderBy(desc(schema.whatsappMessages.sentAt))
-            .limit(2000),
+            .orderBy(desc(schema.whatsappMessages.sentAt));
+            // Filtered (one broker / replied): the newest 2000 of the visible leads only, still bounded.
+            return query.limit(2000);
+          })(),
           db
             .select({
               id: schema.leadDocuments.id,
