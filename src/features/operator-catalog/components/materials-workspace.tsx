@@ -14,6 +14,7 @@ import { Sheet, SheetBody, SheetContent, SheetDescription, SheetFooter, SheetHea
 import { cn } from "@/lib/utils";
 
 import type { CarrierOverview, MaterialRow, ReviewQueue } from "../queries";
+import { BrokerQuotesSheet } from "./broker-quotes-sheet";
 import { AreasList, CatalogPanel } from "./catalog-panel";
 import type { AreaInfo } from "./labels";
 import { MaterialsPanel } from "./materials-panel";
@@ -116,6 +117,7 @@ export function MaterialsWorkspace({ materials, queue, carriers, areas, carrierO
   const [tab, setTab] = useState<Tab>(reviewCount ? "review" : "materials");
   const [uploadOpen, setUploadOpen] = useState(false);
   const [areasOpen, setAreasOpen] = useState(false);
+  const [quotesOpen, setQuotesOpen] = useState(false);
   const waiting = materials.filter((material) => material.status === "pending" || material.status === "processing").length;
 
   return (
@@ -134,6 +136,7 @@ export function MaterialsWorkspace({ materials, queue, carriers, areas, carrierO
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuItem onClick={() => setAreasOpen(true)}>Áreas e campos do catálogo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setQuotesOpen(true)}>Importar cotações enviadas aos leads</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => router.refresh()}>Atualizar status</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -160,6 +163,8 @@ export function MaterialsWorkspace({ materials, queue, carriers, areas, carrierO
         {tab === "review" ? <ReviewPanel queue={queue} areas={areas} /> : null}
         {tab === "catalog" ? <CatalogPanel carriers={carriers} areas={areas} /> : null}
       </div>
+
+      <BrokerQuotesSheet open={quotesOpen} onOpenChange={setQuotesOpen} />
 
       <UploadSheet open={uploadOpen} onOpenChange={setUploadOpen} onFinished={() => router.refresh()} />
 

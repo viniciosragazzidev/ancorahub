@@ -40,7 +40,13 @@ export async function listOperatorMaterials(tenantId: string): Promise<MaterialR
     })
     .from(schema.knowledgeSources)
     .leftJoin(schema.tenantPrivateCarriers, eq(schema.tenantPrivateCarriers.id, schema.knowledgeSources.carrierId))
-    .where(and(eq(schema.knowledgeSources.tenantId, tenantId), eq(schema.knowledgeSources.category, OPERATOR_MATERIAL_CATEGORY), eq(schema.knowledgeSources.status, "parsed")))
+    .where(and(
+      eq(schema.knowledgeSources.tenantId, tenantId),
+      eq(schema.knowledgeSources.category, OPERATOR_MATERIAL_CATEGORY),
+      eq(schema.knowledgeSources.status, "parsed"),
+      // The brokers' quotes (hundreds, named after clients) live in their own panel.
+      sql`(${schema.knowledgeSources.catalogSummary}->>'origin') is distinct from 'broker_quote'`,
+    ))
     .orderBy(desc(schema.knowledgeSources.createdAt))
     .limit(1000);
   return rows.map((row) => ({

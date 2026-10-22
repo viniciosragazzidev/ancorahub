@@ -81,6 +81,12 @@ export async function ingestOperatorFile(input: {
   uploadedBy?: string | null;
   /** Group images below 20 KB are icons; a director's upload is always read. */
   skipTinyImages?: boolean;
+  /**
+   * A PDF a broker sent to a lead (22/10): it may carry the client's data, so it is
+   * never searchable by the assistant; only the prices of a quote reach the catalog.
+   * An old quote still counts as a price observed on its date.
+   */
+  brokerQuote?: { messageId: string; leadId: string | null; sentAt: string };
 }): Promise<IngestResult> {
   try {
     const pdf = isPdfFile(input.mimeType, input.fileName);
@@ -117,7 +123,7 @@ export async function ingestOperatorFile(input: {
 
     // A table already past its validity must not reach the quote assistant.
     const validity = await materialValidity(text);
-    if (isExpired(validity, new Date())) return { status: "expired" };
+    if (!input.brokerQuote && isExpired(validity, new Date())) return { status: "expired" };
 
     const published = await publishOperatorMaterial({
       tenantId: input.tenantId,
@@ -132,6 +138,7 @@ export async function ingestOperatorFile(input: {
       validFrom: validity.validFrom,
       validUntil: validity.validUntil,
       chunkNotice: fromImage ? IMAGE_MATERIAL_NOTICE : undefined,
+      privateQuote: input.brokerQuote,
     });
     if (!published) return { status: "duplicate_material" };
     return { status: "captured", ...published };
@@ -162,6 +169,7 @@ async function publishOperatorMaterial(input: {
   validUntil: Date | null;
   /** Prepended to every chunk, e.g. the warning on text read from an image. */
   chunkNotice?: string;
+  privateQuote?: { messageId: string; leadId: string | null; sentAt: string };
 }): Promise<{ documentId: string; sourceId: string } | null> {
   const db = getDatabase();
   const sourceId = randomUUID();
@@ -182,6 +190,7 @@ async function publishOperatorMaterial(input: {
       status: "parsing",
       uploadedBy: input.uploadedBy,
       extractedText: input.text,
+      ...(input.privateQuote ? { catalogSummary: { origin: "broker_quote", ...input.privateQuote } } : {}),
     })
     .onConflictDoNothing()
     .returning({ id: schema.knowledgeSources.id });
@@ -206,13 +215,14 @@ async function publishOperatorMaterial(input: {
       canonicalContent: input.chunkNotice ? `${input.chunkNotice}\n\n${input.text}` : input.text,
       category: OPERATOR_MATERIAL_CATEGORY,
       authorityLevel: input.authorityLevel,
-      status: "published",
+      // A broker's quote is never searchable: it has the client's name and ages.
+      status: input.privateQuote ? "review" : "published",
       version: 1,
       validFrom: input.validFrom,
       validUntil: input.validUntil,
     });
 
-    const chunks = chunkOperatorText(input.text);
+    const chunks = input.privateQuote ? [] : chunkOperatorText(input.text);
     if (chunks.length > 0) {
       await db.insert(schema.knowledgeChunks).values(
         chunks.map((chunkText, chunkIndex) => {

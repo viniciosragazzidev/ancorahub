@@ -504,7 +504,7 @@ export async function catalogOperatorSource(tenantId: string, sourceId: string) 
       eq(schema.knowledgeSources.category, OPERATOR_MATERIAL_CATEGORY),
       or(isNull(schema.knowledgeSources.catalogStatus), inArray(schema.knowledgeSources.catalogStatus, ["pending", "failed"])),
     ))
-    .returning({ id: schema.knowledgeSources.id, extractedText: schema.knowledgeSources.extractedText, carrierId: schema.knowledgeSources.carrierId, attempts: schema.knowledgeSources.catalogAttempts });
+    .returning({ id: schema.knowledgeSources.id, extractedText: schema.knowledgeSources.extractedText, carrierId: schema.knowledgeSources.carrierId, attempts: schema.knowledgeSources.catalogAttempts, summary: schema.knowledgeSources.catalogSummary });
   if (!source) return { status: "skipped" as const };
 
   try {
@@ -518,6 +518,16 @@ export async function catalogOperatorSource(tenantId: string, sourceId: string) 
     const [areas, carriers] = await Promise.all([loadCatalogAreas(tenantId), loadCarriers(tenantId)]);
     const forcedCarrier = source.carrierId ? carriers.find((carrier) => carrier.id === source.carrierId) ?? null : null;
     const { extraction, windows, truncated } = await extractDocument(tenantId, text, areas, carriers, forcedCarrier);
+
+    // A PDF a broker sent to a lead only stays when it is a quote: a boleto, a proposal or an ID
+    // is dropped, and the text read from it is erased (it carries the client's data).
+    const brokerQuote = (source.summary as { origin?: string } | null)?.origin === "broker_quote";
+    if (brokerQuote && extraction.documentType !== "cotacao") {
+      await db.update(schema.knowledgeSources).set({ extractedText: null, updatedAt: new Date() }).where(eq(schema.knowledgeSources.id, sourceId));
+      await db.update(schema.knowledgeDocuments).set({ canonicalContent: "", status: "archived", updatedAt: new Date() }).where(eq(schema.knowledgeDocuments.sourceId, sourceId));
+      await finish(sourceId, "skipped", { ...(source.summary as object), reason: "Enviado ao lead, mas não é cotação: descartado." }, { documentType: extraction.documentType });
+      return { status: "skipped" as const };
+    }
 
     const carrierName = forcedCarrier?.name ?? extraction.carrier?.name ?? null;
     if (!carrierName) {
@@ -542,6 +552,7 @@ export async function catalogOperatorSource(tenantId: string, sourceId: string) 
     const removed = await retireMissingFacts({ tenantId, replacedDocumentIds: knowledge.replacedIds, areas, startedAt });
 
     const summary: CatalogSummary = {
+      ...(brokerQuote ? (source.summary as object) : {}),
       title: extraction.title,
       subject: extraction.subject,
       carrierName: carrier.name,
@@ -579,7 +590,12 @@ export async function catalogOperatorSource(tenantId: string, sourceId: string) 
  */
 export async function runOperatorCatalogJob(options: { limit?: number; timeBudgetMs?: number } = {}) {
   const startedAt = Date.now();
-  const limit = options.limit ?? 4;
+  const limit = options.limit ?? 8;
+  const { importBrokerQuotesBatch } = await import("./broker-quotes");
+  const imported = await importBrokerQuotesBatch().catch((error) => {
+    console.error("[operator-catalog] broker_quotes_failed", { error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+    return null;
+  });
   const timeBudget = options.timeBudgetMs ?? 240_000;
   const db = getDatabase();
   const waiting = await db.select({ id: schema.knowledgeSources.id, tenantId: schema.knowledgeSources.tenantId })
@@ -611,5 +627,5 @@ export async function runOperatorCatalogJob(options: { limit?: number; timeBudge
     else if (outcome.status === "retry_later") { result.retryLater += 1; break; }
     else result.skipped += 1;
   }
-  return result;
+  return { ...result, brokerQuotes: imported };
 }

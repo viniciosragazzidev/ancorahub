@@ -11,6 +11,7 @@ import { getDatabase, schema } from "@/shared/db";
 
 import { listCarrierFacts, listSourceFacts } from "./queries";
 import { approveFacts, approvePlan, approveSuggestion, rejectFacts, rejectPlan, rejectSuggestion, resolveMissingFacts } from "./review";
+import { brokerQuotesImportStatus, pauseBrokerQuotesImport, startBrokerQuotesImport } from "./broker-quotes";
 import { catalogOperatorSource } from "./service";
 
 const PATH = "/ferramentas/materiais-operadoras";
@@ -136,4 +137,29 @@ export async function loadSourceFactsAction(sourceId: string) {
 export async function loadCarrierFactsAction(carrierId: string, areaSlug?: string | null) {
   const context = await director();
   return listCarrierFacts(context.tenantId, z.string().min(1).parse(carrierId), areaSlug ?? null);
+}
+
+export async function getBrokerQuotesImportAction() {
+  const context = await director();
+  return brokerQuotesImportStatus(context.tenantId);
+}
+
+export async function startBrokerQuotesImportAction(): Promise<Result> {
+  try {
+    const context = await director();
+    await startBrokerQuotesImport(context.tenantId);
+    return { success: true, message: "Importação iniciada. Os PDFs entram em lotes a cada 5 minutos." };
+  } catch (error) {
+    return failure(error, "Não foi possível iniciar agora.");
+  }
+}
+
+export async function pauseBrokerQuotesImportAction(): Promise<Result> {
+  try {
+    const context = await director();
+    await pauseBrokerQuotesImport(context.tenantId);
+    return { success: true, message: "Importação pausada." };
+  } catch (error) {
+    return failure(error, "Não foi possível pausar agora.");
+  }
 }
