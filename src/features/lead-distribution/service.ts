@@ -892,7 +892,15 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   let brokersStoppedByDutyCap = 0;
 
   const loadEligibleBrokers = async (branchIds: string[]) => {
-    const allBrokers = await db
+    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"), dutyLeadCaps)] as const));
+    // A broker on the plantão receives its leads whatever unit their membership
+    // is in (22/10, case Kelven: escalado e confirmado no PRESENCIAL TARDE de
+    // outra unidade, never offered a lead). The plantão's unit is theirs here.
+    const plantaoBranchOf = new Map<string, string>();
+    for (const [branchId, result] of rosterResults) {
+      for (const brokerId of result.brokerIds ?? []) if (!plantaoBranchOf.has(brokerId)) plantaoBranchOf.set(brokerId, branchId);
+    }
+    const membershipBrokers = await db
       .select({
         id: schema.user.id,
         branchId: schema.tenantMemberships.branchId,
@@ -910,7 +918,9 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
       )
       .where(and(
         eq(schema.tenantMemberships.tenantId, context.tenantId),
-        inArray(schema.tenantMemberships.branchId, branchIds),
+        plantaoBranchOf.size
+          ? or(inArray(schema.tenantMemberships.branchId, branchIds), inArray(schema.user.id, [...plantaoBranchOf.keys()]))
+          : inArray(schema.tenantMemberships.branchId, branchIds),
         eq(schema.tenantMemberships.role, "broker"),
         eq(schema.tenantMemberships.status, "active"),
         eq(schema.tenantMemberships.availabilityStatus, "available"),
@@ -918,7 +928,7 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
         eq(schema.user.status, "active"),
       ))
       .orderBy(asc(schema.user.createdAt));
-    const rosterResults = await Promise.all(branchIds.map(async (branchId) => [branchId, await getRosterBrokerIds(context.tenantId, branchId, new Date(), lead.webhookCredentialId, exclusiveScheduleIds, (queue?.dutyFallbackPolicy as DutyFallbackPolicy | undefined) ?? (exclusiveScheduleIds?.length ? "wait_next_duty" : "unit_roster"), dutyLeadCaps)] as const));
+    const allBrokers = membershipBrokers.map((broker) => ({ ...broker, branchId: plantaoBranchOf.get(broker.id) ?? broker.branchId }));
     const rosterByBranch = new Map(rosterResults.map(([branchId, result]) => [branchId, result.brokerIds] as const));
     const scheduleIdByBroker = new Map(rosterResults.flatMap(([, result]) => [...result.scheduleIdByBroker]));
     const hasActiveSelectedSchedule = rosterResults.some(([, result]) => result.hasActiveSelectedSchedule);
