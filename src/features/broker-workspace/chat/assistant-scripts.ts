@@ -449,14 +449,43 @@ function dutyFacts(active: NonNullable<NonNullable<BrokerWorkspaceData["duty"]>[
 }
 
 /** The plantão to confirm as the client sees it (null when nothing to confirm now). */
+export function presenceAsksOf(data: BrokerWorkspaceData, preferredAssignmentId?: string): PresenceAskView[] {
+  const presences = data.duty?.presences ?? (data.duty?.presence ? [data.duty.presence] : []);
+  const ordered = [...presences];
+  const preferredIndex = preferredAssignmentId ? ordered.findIndex((presence) => presence.assignmentId === preferredAssignmentId) : -1;
+  if (preferredIndex > 0) ordered.unshift(...ordered.splice(preferredIndex, 1));
+  return ordered.map((presence) => ({ ...presence, startsAt: presence.startsAt.toISOString(), endsAt: presence.endsAt.toISOString() }));
+}
+
+/** Resolves a requested assignment only against the broker's server-loaded occurrences. */
+export function presenceScheduleIdFor(data: BrokerWorkspaceData, assignmentId: string | undefined) {
+  if (!assignmentId) return null;
+  const presences = data.duty?.presences ?? (data.duty?.presence ? [data.duty.presence] : []);
+  return presences.find((presence) => presence.assignmentId === assignmentId)?.scheduleId ?? null;
+}
+
 export function presenceAskOf(data: BrokerWorkspaceData): PresenceAskView | null {
-  const presence = data.duty?.presence;
-  return presence ? { ...presence, startsAt: presence.startsAt.toISOString(), endsAt: presence.endsAt.toISOString() } : null;
+  return presenceAsksOf(data)[0] ?? null;
 }
 
 function dutyScript(data: BrokerWorkspaceData): ChatScript {
   const active = data.duty?.active;
   const ask = presenceAskOf(data);
+  const pendingAsks = presenceAsksOf(data).filter((presence) => presence.status !== "confirmed");
+  if (pendingAsks.length > 1) {
+    const blocks: ChatBlock[] = [];
+    for (const presence of pendingAsks) {
+      if (presence.status === "awaiting_release") {
+        blocks.push(assistantMessage(`duty-presence-wait-${presence.assignmentId}`, `Sua foto do plantão ${presence.scheduleName} chegou para o diretor. Assim que ele validar e liberar, os leads começam a chegar. Até lá você fica pausado.`));
+      } else {
+        blocks.push(assistantMessage(`duty-presence-hint-${presence.assignmentId}`, presence.mode === "presencial"
+          ? `O ${presence.scheduleName} é presencial: quando chegar à unidade, tire uma foto do local. O diretor valida a foto e libera você para receber leads.`
+          : `Confirme sua presença no ${presence.scheduleName} para começar a receber leads.`));
+      }
+      blocks.push({ type: "presence", id: `duty-presence-${presence.assignmentId}-${presence.startsAt}`, ask: presence });
+    }
+    return { blocks, status: { label: "Confirme seus plantões", tone: "waiting" } };
+  }
   // Confirm first (also 30 min before the start): online with one tap, presencial with a photo of the place.
   if (ask?.status === "awaiting_release") {
     const blocks: ChatBlock[] = active ? [dutyFacts(active)] : [];

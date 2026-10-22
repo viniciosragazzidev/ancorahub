@@ -38,6 +38,19 @@ describe("team notice text rotation", () => {
     }
   });
 
+  it("keeps the schedule visible in the company-number presence reminder", () => {
+    const [text] = builtInNoticeVariants({
+      purpose: "dutyPresenceConfirmation",
+      broker: "Ana",
+      hour: "08:00 · Plantão PME Online",
+      link: "https://crm.example/confirm_presence?id=assignment-1",
+    }, 9);
+
+    expect(text).toContain("08:00 · Plantão PME Online");
+    expect(text).toContain("https://crm.example/confirm_presence?id=assignment-1");
+    expect(text).not.toContain("undefined");
+  });
+
   it("first-access invite: the secret link is only put in at send time, also in a library message without a place for it", () => {
     const versions = builtInNoticeVariants({ purpose: "brokerInvitation", name: "Ana", company: "Âncora", link: INVITE_LINK_PLACEHOLDER }, 9);
     expect(new Set(versions).size).toBe(4);

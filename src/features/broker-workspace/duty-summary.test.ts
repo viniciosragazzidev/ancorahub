@@ -104,4 +104,34 @@ describe("corretor online dentro de um plantão presencial", () => {
     expect(summary?.active?.presenceStatus).toBe("confirmed");
     expect(summary?.presence).toMatchObject({ mode: "online", status: "confirmed" });
   });
+
+  it("keeps simultaneous active and imminent duties, pending first", async () => {
+    const summary = await checkedAt(new Date("2026-10-16T05:00:00.000Z"), [
+      row({ assignmentId: "confirmed-online", scheduleId: "sch-online", scheduleName: "PME Online", confirmationStatus: "confirmed" }),
+      row({
+        assignmentId: "pending-presencial",
+        scheduleId: "sch-presencial",
+        scheduleName: "Presencial Tarde",
+        attendanceMode: "presencial",
+        dayOfWeek: weekdayForDate("2026-10-16"),
+        startsAt: "02:15",
+        endsAt: "06:00",
+      }),
+    ]);
+
+    expect(summary?.presences).toMatchObject([
+      { assignmentId: "pending-presencial", scheduleId: "sch-presencial", status: "pending", scheduleName: "Presencial Tarde" },
+      { assignmentId: "confirmed-online", scheduleId: "sch-online", status: "confirmed", scheduleName: "PME Online" },
+    ]);
+    expect(summary?.presence?.assignmentId).toBe("pending-presencial");
+  });
+
+  it("keeps two unconfirmed duties in deterministic start order", async () => {
+    const summary = await checkedAt(new Date("2026-10-16T05:00:00.000Z"), [
+      row({ assignmentId: "later", scheduleId: "sch-later", startsAt: "19:30" }),
+      row({ assignmentId: "earlier", scheduleId: "sch-earlier", startsAt: "19:00" }),
+    ]);
+
+    expect(summary?.presences.map((presence) => presence.assignmentId)).toEqual(["earlier", "later"]);
+  });
 });

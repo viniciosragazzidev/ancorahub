@@ -115,6 +115,7 @@ describe("message event catalog", () => {
     const event = getMessageEventByPurpose("dutyPresenceConfirmation");
     expect(event?.key).toBe("DUTY_PRESENCE_CONFIRMATION");
     expect(event?.templateOnly).toBe(true);
+    expect(event?.variables[1]).toMatchObject({ key: "hora", label: "Hora e plantão" });
     expect(event?.variables.filter((variable) => variable.urlOnly).map((variable) => variable.key)).toEqual(["id"]);
     expect(getFreeMessageUnknownVariables(event!, ["nome", "hora", "id"])).toEqual([]);
   });

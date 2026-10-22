@@ -26,6 +26,7 @@ describe("PresenceCallout", () => {
   it("online: one tap confirms", async () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => ({ ok: true }) });
     render(<PresenceCallout ask={base} />);
+    expect(screen.getByText("PME Manhã · Centro")).toBeTruthy();
     expect(screen.getByText("Confirme sua presença")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Confirmar presença" }));
     expect(await screen.findByText("Presença confirmada")).toBeTruthy();

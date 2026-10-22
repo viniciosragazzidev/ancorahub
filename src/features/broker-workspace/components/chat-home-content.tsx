@@ -6,7 +6,7 @@ import { formatDuration, RANK_LABEL } from "@/features/engagement/ranking";
 import { shortName } from "@/features/ai-gateway/privacy";
 import { LightDashboardUnavailable } from "@/features/broker-workspace/components/light-dashboard";
 import { getCachedBrokerWorkspaceData, getCachedBrokerJourneyData, getChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
-import { presenceAskOf } from "@/features/broker-workspace/chat/assistant-scripts";
+import { presenceAskOf, presenceAsksOf } from "@/features/broker-workspace/chat/assistant-scripts";
 import { buildBrokerNowItems } from "@/features/broker-workspace/now-items";
 import type { BrokerWorkspaceData } from "@/features/broker-workspace/queries";
 import type { BrokerJourneyData } from "@/features/engagement/journey-types";
@@ -122,6 +122,7 @@ export async function ChatHomeContent() {
       canQuote={rail.canQuote}
       summary={{ ...summaryOf(data), next: presenceNext(data) ?? nextActionOf(data.nextAction, journey) }}
       presence={presenceAskOf(data)}
+      presenceAsks={presenceAsksOf(data)}
       firstSteps={firstSteps}
       highlights={highlightsOf(highlights, journey)}
     />

@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDutyNowLeads } from "./duty-now-domain";
+import { buildDutyNowLeads, selectDutyNowOccurrence } from "./duty-now-domain";
+
+describe("selectDutyNowOccurrence", () => {
+  it("uses the requested plantão and does not fall back to another one", () => {
+    const running = [{ scheduleId: "pme" }, { scheduleId: "presencial" }];
+    expect(selectDutyNowOccurrence(running, "presencial")).toBe(running[1]);
+    expect(selectDutyNowOccurrence(running, "upcoming")).toBeNull();
+    expect(selectDutyNowOccurrence(running)).toBe(running[0]);
+  });
+});
 
 describe("buildDutyNowLeads", () => {
   it("keeps only leads distributed during the selected plantão window", () => {

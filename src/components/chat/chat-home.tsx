@@ -16,7 +16,7 @@ import { useLightAvailabilityContext } from "@/components/light/light-availabili
 const AcceptLeadButton = dynamic(() => import("@/features/broker-workspace/components/accept-lead-button").then((mod) => mod.AcceptLeadButton), { ssr: false });
 const WhatsAppStatusButton = dynamic(() => import("@/components/whatsapp/whatsapp-status-button").then((mod) => mod.WhatsAppStatusButton), { ssr: false });
 import { AssistantAvatar } from "./assistant-avatar";
-import { PresenceCallout } from "./presence-callout";
+import { PresenceCalloutList } from "./presence-callout";
 import styles from "./chat.module.css";
 import { FirstStepsCard } from "@/features/assist/components/first-steps-card";
 import type { FirstStep } from "@/features/assist/first-steps";
@@ -154,6 +154,7 @@ export function ChatHome({
   highlights = null,
   firstSteps = null,
   presence = null,
+  presenceAsks = null,
   whatsappActivity = null,
 }: {
   viewerName: string;
@@ -169,6 +170,8 @@ export function ChatHome({
   firstSteps?: FirstStep[] | null;
   /** Plantão to confirm now: highlighted at the top of the Início until confirmed. */
   presence?: PresenceAskView | null;
+  /** All active and imminent occurrences. `presence` remains as a compatibility fallback. */
+  presenceAsks?: PresenceAskView[] | null;
   /** Scoped team metric, passed only to manager and supervisor homes. */
   whatsappActivity?: WhatsAppActivitySummary | null;
 }) {
@@ -191,6 +194,7 @@ export function ChatHome({
   const showNext = Boolean(next && !hasNowItems);
   const activeId = mode === "rail" ? [...assistants, ...leads].find((thread) => isActive(thread, pathname))?.id ?? null : null;
   const waitingAssistants = assistants.filter((thread) => thread.waitingYou);
+  const currentPresenceAsks = presenceAsks ?? (presence ? [presence] : []);
 
   const list = (
     <>
@@ -240,7 +244,7 @@ export function ChatHome({
           <button type="button" className={styles.iconButton} aria-label="Novo" onClick={() => setNewOpen(true)}><PlusIcon /></button>
         </div>
       </header>
-      {mode === "page" && (presence?.status === "pending" || presence?.status === "awaiting_release") ? <PresenceCallout ask={presence} /> : null}
+      {mode === "page" ? <PresenceCalloutList asks={currentPresenceAsks} /> : null}
       {mode === "page" && summary?.now ? <NowSection data={summary.now} mobile /> : null}
       {mode === "page" && whatsappActivity ? <div className="px-4 pb-4"><WhatsAppActivityCard activity={whatsappActivity} /></div> : null}
       {mode === "page" && firstSteps ? <FirstStepsCard steps={firstSteps} className={home.firstSteps} /> : null}

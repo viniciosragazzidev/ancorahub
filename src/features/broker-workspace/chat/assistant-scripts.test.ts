@@ -297,7 +297,7 @@ describe("broker chat assistant scripts", () => {
   });
 
   it("plantão: asks to confirm presence, with a photo when the plantão is presencial", () => {
-    const presence = { assignmentId: "as-1", scheduleName: "PME Centro", branchName: "Centro", mode: "presencial" as const, startsAt: new Date("2026-10-09T09:00:00-03:00"), endsAt: new Date("2026-10-09T18:00:00-03:00"), status: "pending" as const, photoId: null };
+    const presence = { assignmentId: "as-1", scheduleId: "schedule-1", scheduleName: "PME Centro", branchName: "Centro", mode: "presencial" as const, startsAt: new Date("2026-10-09T09:00:00-03:00"), endsAt: new Date("2026-10-09T18:00:00-03:00"), status: "pending" as const, photoId: null };
     const data = workspace({ duty: { active: activeDuty({ presenceStatus: "pending" }), next: null, readyToReceive: false, presence } });
     const script = buildAssistantScript("plantao", { data, now });
     expect(script.blocks).toContainEqual(expect.objectContaining({ type: "presence", ask: expect.objectContaining({ assignmentId: "as-1", mode: "presencial", startsAt: "2026-10-09T12:00:00.000Z" }) }));
@@ -309,6 +309,19 @@ describe("broker chat assistant scripts", () => {
     const waiting = buildAssistantScript("plantao", { data: workspace({ duty: { active: activeDuty({ presenceStatus: "pending" }), next: null, readyToReceive: false, presence: { ...presence, status: "awaiting_release", photoId: "c1" } } }), now });
     expect(waiting.status?.label).toBe("Aguardando liberação");
     expect(waiting.blocks).toContainEqual(expect.objectContaining({ type: "presence" }));
+  });
+
+  it("shows every pending plantão with a unique assignment id and can prioritize the linked occurrence", async () => {
+    const { presenceAsksOf, presenceScheduleIdFor } = await import("./assistant-scripts");
+    const first = { assignmentId: "as-1", scheduleId: "schedule-1", scheduleName: "PME Centro", branchName: "Centro", mode: "online" as const, startsAt: new Date("2026-10-09T09:00:00-03:00"), endsAt: new Date("2026-10-09T18:00:00-03:00"), status: "pending" as const, photoId: null };
+    const second = { ...first, assignmentId: "as-2", scheduleId: "schedule-2", scheduleName: "Presencial Tarde", mode: "presencial" as const };
+    const data = workspace({ duty: { active: activeDuty({ presenceStatus: "pending" }), next: null, readyToReceive: false, presence: first, presences: [first, second] } });
+
+    const script = buildAssistantScript("plantao", { data, now });
+    expect(script.blocks.filter((block) => block.type === "presence").map((block) => block.id)).toEqual([expect.stringMatching(/^duty-presence-as-1-/), expect.stringMatching(/^duty-presence-as-2-/)]);
+    expect(presenceAsksOf(data, "as-2").map((ask) => ask.assignmentId)).toEqual(["as-2", "as-1"]);
+    expect(presenceScheduleIdFor(data, "as-2")).toBe("schedule-2");
+    expect(presenceScheduleIdFor(data, "unknown")).toBeNull();
   });
 
   it("lists agenda items in São Paulo time and gives the requested next steps", () => {

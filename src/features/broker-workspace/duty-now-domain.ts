@@ -38,6 +38,11 @@ export function isWithinDutyWindow(at: Date | null, startsAt: Date, endsAt: Date
   return Boolean(at && at.getTime() >= startsAt.getTime() && at.getTime() < endsAt.getTime());
 }
 
+/** An explicit schedule selection never silently falls back to another active plantão. */
+export function selectDutyNowOccurrence<T extends { scheduleId: string }>(running: readonly T[], scheduleId?: string | null): T | null {
+  return scheduleId ? running.find((duty) => duty.scheduleId === scheduleId) ?? null : running[0] ?? null;
+}
+
 /** Defence in depth: the plantão view cannot display old leads even if a query is widened later. */
 export function buildDutyNowLeads(input: {
   offers: DutyOfferRow[];

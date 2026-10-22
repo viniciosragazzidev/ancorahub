@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 
 import { AssistantAvatar } from "./assistant-avatar";
 import { CameraCapture, canUseInPageCamera } from "./camera-capture";
+import { LiteList, LiteListItem } from "@/components/light/light-motion";
 import styles from "./chat.module.css";
 import type { PresenceAskView } from "./types";
 
@@ -133,6 +134,7 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
             ) : <span className={styles.presenceLive} aria-hidden="true" />}
             {presencial ? "Plantão presencial" : "Plantão online"} · {started ? `até ${hhmm(ask.endsAt)}` : `começa ${hhmm(ask.startsAt)}`}
           </span>
+          <span className={styles.presenceSchedule}>{ask.scheduleName}{ask.branchName ? ` · ${ask.branchName}` : ""}</span>
           <span className={styles.presenceTitle}>{done ? "Presença confirmada" : waiting ? "Foto enviada" : "Confirme sua presença"}</span>
           <span className={styles.presenceDetail}>
             {done
@@ -223,5 +225,26 @@ export function PresenceCallout({ ask, variant = "home" }: { ask: PresenceAskVie
         />
       ) : null}
     </motion.section>
+  );
+}
+
+/** Keeps one confirmation visually unchanged and groups overlapping duties when context matters. */
+export function PresenceCalloutList({ asks, variant = "home" }: { asks: PresenceAskView[]; variant?: "home" | "chat" }) {
+  // Two or more at once: the confirmed one stays as context while another still waits; all confirmed, nothing shows.
+  const visibleAsks = asks.some((ask) => ask.status !== "confirmed") ? (asks.length > 1 ? asks : asks.filter((ask) => ask.status !== "confirmed")) : [];
+  if (!visibleAsks.length) return null;
+  if (visibleAsks.length === 1) return <PresenceCallout ask={visibleAsks[0]!} variant={variant} />;
+
+  return (
+    <section className={styles.presenceGroup} data-variant={variant} aria-label={`${visibleAsks.length} plantões agora`}>
+      <h2 className={styles.presenceGroupTitle}>{visibleAsks.length} plantões agora</h2>
+      <LiteList className={styles.presenceList} label="Presenças nos plantões">
+        {visibleAsks.map((ask) => (
+          <LiteListItem key={`${ask.assignmentId}:${ask.startsAt}`} className={styles.presenceItem}>
+            <PresenceCallout ask={ask} variant="chat" />
+          </LiteListItem>
+        ))}
+      </LiteList>
+    </section>
   );
 }

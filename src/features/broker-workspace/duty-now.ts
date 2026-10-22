@@ -6,7 +6,7 @@ import { getCachedBrokerWorkspaceData } from "@/features/broker-workspace/chat/c
 import type { BrokerActiveDuty } from "@/features/broker-workspace/queries";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { buildDutyNowLeads, isWithinDutyWindow } from "./duty-now-domain";
+import { buildDutyNowLeads, isWithinDutyWindow, selectDutyNowOccurrence } from "./duty-now-domain";
 
 export type DutyNowLead = {
   leadId: string;
@@ -54,8 +54,7 @@ const median = (values: number[]) => {
 export async function getDutyNow(now = new Date(), scheduleId?: string | null): Promise<DutyNow | null> {
   const [context, data] = await Promise.all([getRequiredTenantContext(), getCachedBrokerWorkspaceData()]);
   const running = data.duty?.activeAll?.length ? data.duty.activeAll : data.duty?.active ? [data.duty.active] : [];
-  // The plantão asked for (?plantao=), else the first one running.
-  const active = running.find((duty) => duty.scheduleId === scheduleId) ?? running[0];
+  const active = selectDutyNowOccurrence(running, scheduleId);
   if (!active || context.role !== "broker") return null;
   return loadDutyNow({ tenantId: context.tenantId, brokerId: context.userId, now, running, active });
 }

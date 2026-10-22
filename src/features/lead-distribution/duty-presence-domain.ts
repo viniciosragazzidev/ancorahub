@@ -363,6 +363,21 @@ export function formatDutyStartHour(date: Date, timezone: string) {
   return new Intl.DateTimeFormat("pt-BR", { timeZone: timezone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(date);
 }
 
+/** The approved reminder template keeps its hour variable, so include the schedule there. */
+export function formatDutyPresenceHourLabel(date: Date, timezone: string, scheduleName?: string | null) {
+  const name = scheduleName
+    ?.replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!name) return formatDutyStartHour(date, timezone);
+
+  const characters = Array.from(name);
+  const conciseName = characters.length > 40 ? `${characters.slice(0, 39).join("").trimEnd()}…` : name;
+  // Schedules named "Plantão PME" must not read "Plantão Plantão PME".
+  const label = /^plant[aã]o(?=\s|$)/i.test(conciseName) ? conciseName : `Plantão ${conciseName}`;
+  return `${formatDutyStartHour(date, timezone)} · ${label}`;
+}
+
 /** Hard lookback cap on the plantão lead window, so a schedule with no completed occurrence yet can't reach back forever. */
 export const DUTY_LEAD_WINDOW_SAFETY_DAYS = 7;
 

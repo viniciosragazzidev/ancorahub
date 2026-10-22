@@ -183,22 +183,29 @@ export function buildDutySummary(input: {
     const startingSoon = allOccurrences.filter((occurrence) => occurrence.startsAt > input.now && occurrence.startsAt.getTime() - input.now.getTime() <= 30 * 60_000)
       .sort((left, right) => left.startsAt.getTime() - right.startsAt.getTime());
     const presenceCandidates = [...activeOccurrences, ...startingSoon];
-    const presenceOccurrence = presenceCandidates.find((occurrence) => presenceStatusOf(occurrence) === "pending") ?? presenceCandidates[0];
-    const presenceMode = presenceOccurrence?.row.attendanceMode === "presencial" ? "presencial" as const : "online" as const;
-    const presence: DutyPresenceAsk | null = presenceOccurrence && (presenceMode === "presencial" || input.presenceRequired)
-      ? {
-        assignmentId: presenceOccurrence.row.assignmentId,
-        scheduleName: presenceOccurrence.row.scheduleName,
-        branchName: presenceOccurrence.row.branchName,
-        mode: presenceMode,
-        startsAt: presenceOccurrence.startsAt,
-        endsAt: presenceOccurrence.endsAt,
-        status: presenceOccurrence.row.confirmationStatus === "confirmed" && (presenceMode === "online" || Boolean(presenceOccurrence.row.confirmedBy))
-          ? "confirmed"
-          : presenceMode === "presencial" && presenceOccurrence.row.hasPhoto ? "awaiting_release" : "pending",
-        photoId: presenceOccurrence.row.hasPhoto ? presenceOccurrence.row.confirmationId ?? null : null,
-      }
-      : null;
+    const presences = presenceCandidates
+      .filter((occurrence) => occurrence.row.attendanceMode === "presencial" || input.presenceRequired)
+      .map((occurrence): DutyPresenceAsk => {
+        const mode = occurrence.row.attendanceMode === "presencial" ? "presencial" : "online";
+        return {
+          assignmentId: occurrence.row.assignmentId,
+          scheduleId: occurrence.row.scheduleId,
+          scheduleName: occurrence.row.scheduleName,
+          branchName: occurrence.row.branchName,
+          mode,
+          startsAt: occurrence.startsAt,
+          endsAt: occurrence.endsAt,
+          status: occurrence.row.confirmationStatus === "confirmed" && (mode === "online" || Boolean(occurrence.row.confirmedBy))
+            ? "confirmed"
+            : mode === "presencial" && occurrence.row.hasPhoto ? "awaiting_release" : "pending",
+          photoId: occurrence.row.hasPhoto ? occurrence.row.confirmationId ?? null : null,
+        };
+      })
+      .sort((left, right) => Number(left.status !== "pending") - Number(right.status !== "pending")
+        || left.startsAt.getTime() - right.startsAt.getTime()
+        || left.scheduleId.localeCompare(right.scheduleId)
+        || left.assignmentId.localeCompare(right.assignmentId));
+    const presence: DutyPresenceAsk | null = presences[0] ?? null;
     const paused = activeOccurrence ? Boolean(activeOccurrence.row.pausedAt) : false;
     const toActive = (occurrence: Occurrence): BrokerActiveDuty => ({
       scheduleId: occurrence.row.scheduleId,
@@ -228,6 +235,7 @@ export function buildDutySummary(input: {
       next,
       readyToReceive: active ? isBrokerReadyToReceive({ availabilityStatus: input.availabilityStatus, paused, presenceStatus: active.presenceStatus }) : false,
       presence,
+      presences,
     };
   });
 }

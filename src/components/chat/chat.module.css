@@ -370,14 +370,21 @@ button.leadCardAction:disabled { opacity: 0.6; cursor: default; }
 .presenceHead { display: flex; gap: 12px; align-items: flex-start; }
 .presenceMascot { flex: none; display: grid; }
 .presenceText { display: grid; gap: 3px; min-width: 0; }
+.presenceSchedule { color: var(--foreground); font-size: var(--text-sm); font-weight: 600; line-height: 1.35; overflow-wrap: anywhere; }
 .presencePill { justify-self: start; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 500; color: oklch(45% 0.13 var(--presence-hue)); background: oklch(95% 0.04 var(--presence-hue)); }
 .presencePill[data-mode="online"] { color: var(--chat-action-text, var(--chat-action)); background: var(--chat-action-soft); }
 .presenceLive { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pausedPulse 2s ease-in-out infinite; --paused-hue: 255; }
 .presenceTitle { font-size: var(--text-base); font-weight: 500; color: var(--foreground); }
 .presenceDetail { font-size: var(--text-sm); line-height: 1.45; color: var(--text-secondary); }
-.presenceButton { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 999px; font: inherit; font-size: var(--text-sm); font-weight: 500; color: white; background: linear-gradient(135deg, oklch(66% 0.17 var(--presence-hue)), oklch(60% 0.19 calc(var(--presence-hue) + 12))); box-shadow: 0 6px 16px -8px oklch(55% 0.18 var(--presence-hue) / 0.8); cursor: pointer; }
-.presence:has(.presencePill[data-mode="online"]) .presenceButton { background: var(--chat-action); box-shadow: 0 6px 16px -8px color-mix(in oklab, var(--chat-action) 80%, transparent); }
+.presenceButton { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 999px; font: inherit; font-size: var(--text-sm); font-weight: 500; color: white; background: oklch(60% 0.18 var(--presence-hue)); cursor: pointer; }
+.presence:has(.presencePill[data-mode="online"]) .presenceButton { background: var(--chat-action); }
 .presenceButton:disabled { opacity: 0.85; cursor: progress; }
+.presenceButton:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; }
+.presenceGroup { display: grid; gap: var(--space-2, 8px); min-width: 0; }
+.presenceGroup[data-variant="home"] { margin: 4px var(--chat-gutter, 20px) 10px; }
+.presenceGroupTitle { margin: 0; color: var(--foreground); font-size: var(--text-sm); font-weight: 600; }
+.presenceList { display: grid; gap: var(--space-3, 12px); min-width: 0; margin: 0; padding: 0; list-style: none; }
+.presenceItem { min-width: 0; }
 .presencePhoto { position: relative; justify-self: center; width: min(220px, 70%); aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; border: 4px solid var(--surface); box-shadow: var(--shadow-raised); }
 .presencePhoto img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .presenceScan { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 0%, oklch(100% 0 0 / 0.55) 48%, transparent 52%); background-size: 100% 220%; animation: presenceScan 1.3s linear infinite; }

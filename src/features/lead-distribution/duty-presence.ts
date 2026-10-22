@@ -5,7 +5,7 @@ import { and, eq, gt, inArray, isNull, lte, lt, ne, or, sql } from "drizzle-orm"
 import { getFeatureFlag, FEATURE_FLAGS } from "@/features/system-settings/queries";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
-import { effectiveAttendanceMode, findDutyOccurrenceConfirmation, formatDutyStartHour, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
+import { effectiveAttendanceMode, findDutyOccurrenceConfirmation, formatDutyPresenceHourLabel, getRelevantDutyWindow, getSelfDutyConfirmationWindowState, isConfirmationForActiveOccurrence, isDutyBrokerEligible, isDutyWindowActive, type DutyWindow } from "./duty-presence-domain";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "./dated-duty-roster";
 
 export { SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "./duty-presence-domain";
@@ -91,6 +91,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
 
   const schedules = await db.select({
     id: schema.unitDutySchedules.id,
+    name: schema.unitDutySchedules.name,
     dayOfWeek: schema.unitDutySchedules.dayOfWeek,
     startsAt: schema.unitDutySchedules.startsAt,
     endsAt: schema.unitDutySchedules.endsAt,
@@ -205,7 +206,7 @@ export async function processDutyPresenceReminders(now = new Date()) {
         recipientId: assignment.brokerId,
         destinationPhone: assignment.phone,
         purpose: "dutyPresenceConfirmation",
-        variables: [assignment.brokerName, formatDutyStartHour(window.startsAt, schedule.timezone), record.id],
+        variables: [assignment.brokerName, formatDutyPresenceHourLabel(window.startsAt, schedule.timezone, schedule.name), record.id],
         requestedBy: null,
         idempotencyKey: `duty-presence:${record.id}`,
       });
@@ -311,6 +312,7 @@ export async function sendDutyPresenceInviteManually(input: { tenantId: string; 
     scheduleId: schema.dutyRosterAssignments.scheduleId,
     brokerId: schema.dutyRosterAssignments.brokerId,
     brokerName: schema.user.name,
+    scheduleName: schema.unitDutySchedules.name,
     phone: schema.brokerProfiles.phone,
     dayOfWeek: schema.dutyRosterAssignments.dayOfWeek,
     startsAt: schema.dutyRosterAssignments.startsAt,
@@ -367,7 +369,7 @@ export async function sendDutyPresenceInviteManually(input: { tenantId: string; 
       recipientId: assignment.brokerId,
       destinationPhone: assignment.phone,
       purpose: "dutyPresenceConfirmation",
-      variables: [assignment.brokerName, formatDutyStartHour(window.startsAt, assignment.scheduleTimezone), record.id],
+      variables: [assignment.brokerName, formatDutyPresenceHourLabel(window.startsAt, assignment.scheduleTimezone, assignment.scheduleName), record.id],
       requestedBy: input.requestedBy,
       // A fresh key per manual click — the idempotency key from the sweep
       // (`duty-presence:${record.id}`) may already have been consumed for

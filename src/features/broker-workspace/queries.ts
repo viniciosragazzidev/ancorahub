@@ -29,6 +29,7 @@ const activeLeadStatuses = [
 
 export type DutyPresenceAsk = {
   assignmentId: string;
+  scheduleId: string;
   scheduleName: string;
   branchName: string | null;
   mode: "online" | "presencial";
@@ -54,6 +55,8 @@ export type BrokerWorkspaceData = {
     readyToReceive: boolean;
     /** The plantão the broker must confirm now (from 30 min before until the end); null when nothing to confirm. */
     presence?: DutyPresenceAsk | null;
+    /** Every active or imminent occurrence in the same confirmation window, pending first. */
+    presences?: DutyPresenceAsk[];
   } | null;
   today: { awaitingResponse: number; overdueTasks: number; returnsDue: number; newLeads: number; pendingDocuments: number; pendingProposals: number; unreadNotifications: number; receivedToday: number; acceptedToday: number; inServiceNow: number; slaAtRiskNow: number };
   inbox: Array<{ id: string; source: "message" | "task" | "lead" | "document" | "proposal" | "notification"; title: string; description: string; href: string; severity: "critical" | "warning" | "normal" }>;

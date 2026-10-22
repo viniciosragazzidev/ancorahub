@@ -8,6 +8,7 @@ import {
   isDutyBrokerEligible,
   parseDutyLeadsSince,
   formatDutyStartHour,
+  formatDutyPresenceHourLabel,
   getDutyOccurrenceLeadWindow,
   getDutyWindowOnDate,
   getRelevantDutyWindow,
@@ -72,6 +73,18 @@ describe("duty presence occurrence windows", () => {
     expect(window?.startsAt.toISOString()).toBe("2026-09-23T13:00:00.000Z");
     expect(formatDutyStartHour(window!.startsAt, shift.timezone)).toBe("10:00");
     expect(isDutyWindowActive(window, now)).toBe(false);
+  });
+
+  it("labels the approved reminder hour with a concise schedule name", () => {
+    const startsAt = new Date("2026-09-23T11:00:00.000Z");
+    expect(formatDutyPresenceHourLabel(startsAt, shift.timezone, "PME Online")).toBe("08:00 · Plantão PME Online");
+    expect(formatDutyPresenceHourLabel(startsAt, shift.timezone, "  PME\t\nOnline    Central  ")).toBe("08:00 · Plantão PME Online Central");
+    expect(formatDutyPresenceHourLabel(startsAt, shift.timezone, "Plantão PME")).toBe("08:00 · Plantão PME");
+    expect(formatDutyPresenceHourLabel(startsAt, shift.timezone)).toBe("08:00");
+
+    const longNameLabel = formatDutyPresenceHourLabel(startsAt, shift.timezone, "Escala " + "PME ".repeat(20));
+    expect(longNameLabel).toBe(`08:00 · Plantão ${Array.from("Escala " + "PME ".repeat(20)).join("").replace(/\s+/g, " ").trim().slice(0, 39).trimEnd()}…`);
+    expect(longNameLabel).not.toMatch(/[\r\n\t]| {4,}/);
   });
 
   it("keeps a late confirmation associated with the same active occurrence", () => {

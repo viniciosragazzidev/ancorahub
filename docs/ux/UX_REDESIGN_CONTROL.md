@@ -1,3 +1,16 @@
+## 2026-10-22: identificação de plantões simultâneos
+
+Papel: corretor em Início, conversa Plantão, link público de confirmação e
+`/plantoes/agora`. Ação principal: saber a qual escala pertence cada lembrete,
+confirmar a escala certa e enviar a foto do plantão presencial correspondente.
+Estados: nenhum pedido, uma escala, múltiplas escalas, confirmação pendente,
+foto aguardando liberação e presença confirmada. Com várias escalas, cada item
+mostra nome e unidade e mantém o próprio `assignmentId`; o link presencial abre
+a ocorrência solicitada. Reutiliza `PresenceCallout`, `LiteList`, `LiteListItem`,
+tokens Arc e movimento/redução de movimento existentes. Sem novo token, primitive,
+variante ou regra visual de domínio. Não avança a etapa global do redesign.
+Registro: `docs/implementations/active/2026-10-22-duty-presence-multi-shift.md`.
+
 ## 2026-10-21: dados completos do lead e painel no celular
 
 Papel: corretor em `/leads/[id]`, inclusive na visualização do super-admin.

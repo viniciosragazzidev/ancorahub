@@ -10,7 +10,7 @@ vi.mock("motion/react", async () => {
 });
 
 import { ChatHome } from "./chat-home";
-import type { ThreadSummary } from "./types";
+import type { PresenceAskView, ThreadSummary } from "./types";
 
 afterEach(() => cleanup());
 
@@ -19,8 +19,26 @@ const thread = (id: string, name: string, href: string, extra: Partial<ThreadSum
 });
 const assistants = [thread("assistant:leads", "Leads", "/minha-fila", { assistant: "leads" }), thread("assistant:plantao", "Plantão", "/plantoes/agora", { assistant: "plantao" })];
 const leads = [thread("lead:1", "Maria Souza", "/leads/1", { kind: "lead", leadId: "1", waitingYou: true, initials: "MS" })];
+const presenceAsk = (assignmentId: string, scheduleName: string, status: PresenceAskView["status"] = "pending"): PresenceAskView => ({
+  assignmentId, scheduleName, branchName: "Centro", mode: "online", startsAt: "2026-10-10T09:00:00.000Z", endsAt: "2026-10-10T18:00:00.000Z", status, photoId: null,
+});
 
 describe("ChatHome", () => {
+  it("groups simultaneous duties with a heading and names, but keeps one ask ungrouped", () => {
+    const { rerender } = render(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote presenceAsks={[presenceAsk("as-1", "PME Manhã"), presenceAsk("as-2", "Presencial Tarde", "awaiting_release")]}/>);
+    expect(screen.getByRole("heading", { level: 2, name: "2 plantões agora" })).toBeTruthy();
+    expect(screen.getByText("PME Manhã · Centro")).toBeTruthy();
+    expect(screen.getByText("Presencial Tarde · Centro")).toBeTruthy();
+
+    rerender(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote presenceAsks={[presenceAsk("as-1", "PME Manhã")]}/>);
+    expect(screen.queryByRole("heading", { level: 2, name: "1 plantão agora" })).toBeNull();
+    expect(screen.getByText("Confirme sua presença")).toBeTruthy();
+
+    rerender(<ChatHome viewerName="Ana Lima" assistants={assistants} leads={[]} nowIso="2026-10-10T12:00:00.000Z" canQuote presenceAsks={[presenceAsk("as-1", "PME Manhã", "confirmed"), presenceAsk("as-2", "Presencial Tarde", "confirmed")]}/>);
+    expect(screen.queryByText("PME Manhã · Centro")).toBeNull();
+    expect(screen.queryByRole("heading", { level: 2, name: "2 plantões agora" })).toBeNull();
+  });
+
   it("rail: keeps the list and marks the conversation open at the center", () => {
     render(<ChatHome mode="rail" viewerName="Ana Lima" assistants={assistants} leads={leads} nowIso="2026-10-10T12:00:00.000Z" canQuote />);
     expect(screen.getByRole("link", { name: /Plantão/ }).getAttribute("aria-current")).toBe("page");

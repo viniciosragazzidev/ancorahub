@@ -179,7 +179,7 @@ export const MESSAGE_EVENT_CATALOG = [
     templateOnly: true,
     variables: [
       { key: "nome", label: "Nome do corretor", fallback: "Corretor(a)" },
-      { key: "hora", label: "Hora de início", fallback: "—" },
+      { key: "hora", label: "Hora e plantão", fallback: "—" },
       { key: "id", label: "Código de confirmação", fallback: "", urlOnly: true },
     ],
   },
