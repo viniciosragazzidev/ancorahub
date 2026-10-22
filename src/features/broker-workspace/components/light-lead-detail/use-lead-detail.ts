@@ -16,6 +16,24 @@ import { quickReminderAction } from "@/features/leads/reminder-actions";
 import { buildFollowUpWhen, type FollowUpOptionValue } from "@/features/broker-workspace/follow-up-options";
 import { STEP_OPTIONS, type ConfirmationDocument, type LightLeadDetailData, type LiteRequirement } from "./types";
 
+const STEP_ERROR_GENERIC = "Não deu para mudar a etapa agora. Tente de novo em instantes.";
+/** Server reasons the broker can act on; anything else (internal or IA diagnosis) stays generic. */
+const STEP_ERROR_REASONS = [
+  "Inicie o atendimento antes",
+  "Apenas o corretor responsável",
+  "Este lead não está atribuído a você",
+  "Transição inválida",
+  "É obrigatório informar um motivo de perda",
+  "A IA de Qualificação está ATIVADA",
+  "Apenas gestores e diretores podem reabrir",
+];
+
+export function stepErrorMessage(error?: string) {
+  if (error?.startsWith("PROTECAO_REGRESSAO_IA")) return "Esse lead parecia perto de fechar. Conte em poucas palavras por que ele voltou de etapa, com pelo menos 15 caracteres.";
+  if (error && STEP_ERROR_REASONS.some((reason) => error.startsWith(reason))) return error;
+  return STEP_ERROR_GENERIC;
+}
+
 /** All state and server-action handlers of the Light lead detail. Behavior is unchanged from the single-file version. */
 export function useLeadDetail({
   lead,
@@ -235,7 +253,7 @@ export function useLeadDetail({
           resetStepDialog();
 
           if (!res.success) {
-            toast.error("Não deu para mudar a etapa agora. Tente de novo em instantes.");
+            toast.error(stepErrorMessage(res.error));
             return;
           }
 
@@ -256,7 +274,7 @@ export function useLeadDetail({
           toast.success(followupWhen ? "Etapa e acompanhamento registrados." : "Etapa atualizada.");
         } catch {
           resetStepDialog();
-          toast.error("Não deu para mudar a etapa agora. Tente de novo em instantes.");
+          toast.error(STEP_ERROR_GENERIC);
         }
       });
     }

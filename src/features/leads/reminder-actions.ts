@@ -11,6 +11,9 @@ import { getDatabase, schema } from "@/shared/db";
 
 export type ReminderState = { success?: boolean; error?: string };
 
+const spDayFormat = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit", day: "2-digit" });
+const spDay = (date: Date) => spDayFormat.format(date);
+
 const reminderInput = z.object({
   leadId: z.string().min(1),
   /** Preset key or an ISO date string */
@@ -76,12 +79,16 @@ export async function quickReminderAction(
         // Custom ISO date
         const parsedDate = new Date(parsed.data.when);
         if (Number.isNaN(parsedDate.getTime())) return { error: "Data invalida." };
+        if (spDay(parsedDate) < spDay(now)) return { error: "Essa data já passou. Escolha outra." };
         dueAt = parsedDate;
         break;
       }
     }
+    // A return marked for a time of today that already passed (e.g. today picked in the
+    // afternoon, which means 09:00) would be born overdue: it moves to 1h from now.
+    if (dueAt.getTime() <= now.getTime()) dueAt = new Date(now.getTime() + 60 * 60_000);
 
-    const title = parsed.data.when === "today" ? "Retornar contato hoje" : "Retornar contato";
+    const title = spDay(dueAt) === spDay(now) ? "Retornar contato hoje" : "Retornar contato";
     const taskId = randomUUID();
 
     await db.transaction(async (tx) => {
@@ -108,6 +115,7 @@ export async function quickReminderAction(
         description: `Lembrete de retorno agendado para ${new Intl.DateTimeFormat("pt-BR", {
           dateStyle: "full",
           timeStyle: "short",
+          timeZone: "America/Sao_Paulo",
         }).format(dueAt)}.`,
         priority: "normal",
         dueAt,
