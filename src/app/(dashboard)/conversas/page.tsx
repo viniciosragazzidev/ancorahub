@@ -197,10 +197,7 @@ export default async function ConversationsPage({
       .where(and(eq(schema.communicationChannels.tenantId, context.tenantId), eq(schema.communicationChannels.provider, META_CLOUD_PROVIDER)));
     const channelLabelOf = describeMessageChannel(officialChannels);
 
-    const [messageRows, documentRows, aiConversationRows] = leadIds.length
-      ? await Promise.all([
-          (() => {
-            const query = db
+    const loadMessages = (scopedToLoadedLeads: boolean, limit: number) => db
             .select({
               id: schema.whatsappMessages.id,
               leadId: schema.whatsappMessages.leadId,
@@ -223,7 +220,7 @@ export default async function ConversationsPage({
             .from(schema.whatsappMessages)
             .where(and(
               eq(schema.whatsappMessages.tenantId, context.tenantId),
-              ...(scopeMessagesToLoadedLeads ? [loadedLeadMessageScope({
+              ...(scopedToLoadedLeads ? [loadedLeadMessageScope({
                 message: schema.whatsappMessages,
                 leads: leads.map((lead) => ({ id: lead.id, phone: lead.telefone })),
               })] : []),
@@ -244,10 +241,21 @@ export default async function ConversationsPage({
                   and ${schema.whatsappMessages.sentAt} < history_channel.activated_at
               ))`,
             ))
-            .orderBy(desc(schema.whatsappMessages.sentAt));
-            // Filtered (one broker / replied): the newest 2000 of the visible leads only, still bounded.
-            return query.limit(2000);
-          })(),
+            .orderBy(desc(schema.whatsappMessages.sentAt))
+            .limit(limit);
+
+    const [messageRows, documentRows, aiConversationRows] = leadIds.length
+      ? await Promise.all([
+          // Filtered (one broker / replied): the newest 2000 of the visible leads only, still bounded.
+          // Unfiltered, the newest 2000 of the company alone left out every lead whose last message
+          // was older than them (22/10: qualified leads of the day before missing from the list), so
+          // the loaded leads' own messages are read too and both are merged.
+          scopeMessagesToLoadedLeads
+            ? loadMessages(true, 2000)
+            : Promise.all([loadMessages(false, 2000), loadMessages(true, 4000)]).then(([recent, ofLoadedLeads]) => {
+              const seen = new Set(recent.map((message) => message.id));
+              return [...recent, ...ofLoadedLeads.filter((message) => !seen.has(message.id))];
+            }),
           db
             .select({
               id: schema.leadDocuments.id,
