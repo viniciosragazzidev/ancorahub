@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
 import { buildLeadClientInfo } from "@/features/leads/client-info";
 import { notFound } from "next/navigation";
@@ -252,7 +252,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
       !ficha && lightContact.reveal
         ? db.select({ id: schema.whatsappMessages.id, body: schema.whatsappMessages.body, direction: schema.whatsappMessages.direction, sentAt: schema.whatsappMessages.sentAt, senderRole: schema.whatsappMessages.senderRole, mediaKind: schema.whatsappMessages.mediaKind })
           .from(schema.whatsappMessages)
-          .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id), notStatusBroadcastSql(schema.whatsappMessages.messageId)))
+          .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id), notStatusBroadcastSql(schema.whatsappMessages.messageId), sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`))
           .orderBy(desc(schema.whatsappMessages.sentAt))
           .limit(100)
         : Promise.resolve([]),

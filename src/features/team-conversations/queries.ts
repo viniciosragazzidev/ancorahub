@@ -78,7 +78,7 @@ export async function getTeamConversation(context: TenantContext, leadId: string
       mediaKind: schema.whatsappMessages.mediaKind,
     })
     .from(schema.whatsappMessages)
-    .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id), notStatusBroadcastSql(schema.whatsappMessages.messageId)))
+    .where(and(eq(schema.whatsappMessages.tenantId, context.tenantId), eq(schema.whatsappMessages.leadId, lead.id), notStatusBroadcastSql(schema.whatsappMessages.messageId), sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`))
     .orderBy(asc(schema.whatsappMessages.sentAt))
     .limit(limit);
 

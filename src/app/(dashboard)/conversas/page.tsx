@@ -229,6 +229,9 @@ export default async function ConversationsPage({
               })] : []),
               // WhatsApp Status/stories (status@broadcast) are nobody writing to the company.
               notStatusBroadcastSql(schema.whatsappMessages.messageId),
+              // Contentless "[text]" rows are WhatsApp protocol events (deleted message, reaction,
+              // call log): no "Mensagem sem texto" bubble and no "[text]" preview in the list.
+              sql`not (${schema.whatsappMessages.mediaKind} is null and lower(trim(coalesce(${schema.whatsappMessages.body}, ''))) in ('', '[text]'))`,
               // The WhatsApp Business app history imported when a number was
               // connected in coexistence (sent before the connection) belongs
               // to the team's old chats: it only shows for a lead or a client,
