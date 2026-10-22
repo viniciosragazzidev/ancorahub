@@ -2,14 +2,15 @@
 
 import { useActionState, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CheckCircle, LockKey, Warning } from "@/components/huge-icons";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import { Button } from "@/components/arc/button/button";
+import { PasswordField } from "@/components/arc/password-field/password-field";
+import { LightAuthTitle } from "@/components/light/light-auth-shell";
 import { completePasswordResetAction } from "./actions";
 
+const PASSWORD_MESSAGES = { showPassword: "Mostrar senha", hidePassword: "Ocultar senha" };
+
+/** The page the reset link opens (usually on the phone, from WhatsApp), in the Lite look (22/10). */
 export default function PasswordResetPage() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
@@ -20,39 +21,26 @@ export default function PasswordResetPage() {
 
   if (!token) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><Warning size={20} className="text-destructive" /> Link inválido</CardTitle>
-            <CardDescription>O link de recuperação não contém um token válido. Solicite um novo reset com seu diretor.</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
+      <>
+        <LightAuthTitle title="Link inválido" description="Este link de recuperação não tem um código válido. Peça um novo em Esqueceu a senha, na tela de login." />
+        <Button className="w-full" onClick={() => window.location.assign("/login")}>Ir para o login</Button>
+      </>
     );
   }
 
   if (state.success) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md border-border bg-card shadow-none">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2"><CheckCircle size={20} className="text-emerald-500" /> Senha alterada com sucesso!</CardTitle>
-            <CardDescription>
-              {state.authenticated
-                ? "Sua senha foi redefinida e seu login foi realizado automaticamente no sistema."
-                : "Sua senha foi redefinida. Entre com a nova senha para continuar."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              className="w-full"
-              render={<a href={state.authenticated ? "/dashboard" : "/login"} />}
-            >
-              {state.authenticated ? "Acessar o sistema" : "Ir para o login"}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <>
+        <LightAuthTitle
+          title="Senha alterada"
+          description={state.authenticated
+            ? "Sua nova senha está valendo e você já entrou no sistema."
+            : "Sua nova senha está valendo. Entre com ela para continuar."}
+        />
+        <Button className="w-full" onClick={() => window.location.assign(state.authenticated ? "/dashboard" : "/login")}>
+          {state.authenticated ? "Acessar o sistema" : "Ir para o login"}
+        </Button>
+      </>
     );
   }
 
@@ -71,56 +59,45 @@ export default function PasswordResetPage() {
     action(formData);
   }
 
+  const message = validationError || state.error;
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md border-border bg-card shadow-none">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><LockKey size={20} /> Redefinir senha</CardTitle>
-          <CardDescription>Seu diretor aprovou a solicitação. Crie uma nova senha para acessar o sistema.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form action={handleSubmit} className="grid gap-4">
-            <input type="hidden" name="token" value={token} />
-            <Field>
-              <FieldLabel htmlFor="password">Nova senha</FieldLabel>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={pending}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="confirmPassword">Confirmar senha</FieldLabel>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={pending}
-              />
-            </Field>
-            {validationError && (
-              <p className="text-xs text-destructive">{validationError}</p>
-            )}
-            {state.error && (
-              <p className="text-xs text-destructive">{state.error}</p>
-            )}
-            <Button type="submit" disabled={pending}>
-              {pending ? "Redefinindo..." : "Redefinir senha"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <>
+      <LightAuthTitle title="Criar nova senha" description="Escolha uma senha com pelo menos 8 caracteres. Ao salvar, os acessos abertos em outros aparelhos são encerrados." />
+      <form action={handleSubmit} className="flex flex-col gap-4">
+        <input type="hidden" name="token" value={token} />
+        <PasswordField
+          label="Nova senha"
+          name="password"
+          autoComplete="new-password"
+          minLength={8}
+          maxLength={128}
+          required
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+          disabled={pending}
+          messages={PASSWORD_MESSAGES}
+        />
+        <PasswordField
+          label="Confirme a nova senha"
+          name="confirmPassword"
+          autoComplete="new-password"
+          minLength={8}
+          maxLength={128}
+          required
+          value={confirmPassword}
+          onChange={(event) => setConfirmPassword(event.target.value)}
+          disabled={pending}
+          messages={PASSWORD_MESSAGES}
+        />
+        {message ? (
+          <p role="alert" className="rounded-2xl px-4 py-3 text-sm" style={{ background: "color-mix(in oklab, var(--danger) 8%, transparent)", color: "var(--danger)" }}>
+            {message}
+          </p>
+        ) : null}
+        <Button type="submit" className="w-full" loading={pending} disabled={pending}>
+          Salvar nova senha
+        </Button>
+      </form>
+    </>
   );
 }

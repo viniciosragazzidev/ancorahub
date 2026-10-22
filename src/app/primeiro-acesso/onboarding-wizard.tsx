@@ -4,11 +4,11 @@ import { useEffect, useState, useTransition } from "react";
 import { toast } from "@/components/ui/sonner";
 import { useRouter } from "next/navigation";
 
-import "@/components/arc/venancor-scope.css";
 import { Button } from "@/components/arc/button/button";
 import { Input } from "@/components/arc/input/input";
 import { PasswordField } from "@/components/arc/password-field/password-field";
 import { Stepper } from "@/components/arc/stepper/stepper";
+import { LightAuthShell, LightAuthTitle } from "@/components/light/light-auth-shell";
 import { authClient } from "@/shared/auth/client";
 import { recordSecurityAuditAction } from "@/app/(dashboard)/settings/security-actions";
 import { completeOnboardingAction } from "./onboarding-actions";
@@ -53,9 +53,9 @@ function todayKey() {
 }
 
 /**
- * First access of a broker invited by the manager. It runs without the app chrome, so it brings its
- * own canvas, a stepper and one fixed action bar. Token, activation, auto-login and passkey are the
- * same as before.
+ * First access of a broker invited by the manager, in the same Lite frame as the login (22/10):
+ * logo, one column that fits any phone (fields at 16px, so phones do not zoom), a stepper and one
+ * fixed action bar. Token, activation, auto-login and passkey are the same as before.
  */
 export function OnboardingWizard({ invitation, profile }: Props) {
   const [step, setStep] = useState(1);
@@ -207,20 +207,17 @@ export function OnboardingWizard({ invitation, profile }: Props) {
   };
 
   return (
-    <div className="arc-venancor light-canvas flex min-h-dvh w-full flex-col" style={{ color: "var(--foreground)" }}>
+    <LightAuthShell footer={`${invitation.tenantName} · Unidade ${invitation.branchName}`}>
       <form
         id="onboarding-form"
         onSubmit={handleSubmit}
-        className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pb-[calc(112px+var(--mobile-safe-bottom))] pt-[calc(24px+var(--mobile-safe-top))]"
+        className="flex w-full flex-1 flex-col gap-5 pb-[calc(96px+var(--mobile-safe-bottom,0px))]"
       >
         <Stepper steps={STEPS} current={step - 1} label="Etapas do primeiro acesso" />
 
-        <header>
-          <h1 className="text-2xl font-bold tracking-tight text-(--foreground)">{titles[step]}</h1>
-          <p className="mt-1 text-sm text-(--text-secondary)">{descriptions[step]}</p>
-        </header>
+        <LightAuthTitle title={titles[step]} description={descriptions[step]} />
 
-        <section aria-label={titles[step]} className="flex flex-col gap-4 rounded-3xl bg-(--surface) p-5 shadow-(--shadow-resting)">
+        <section aria-label={titles[step]} className="flex flex-col gap-4">
           {step === 1 && (
             <>
               <Input label="Nome profissional" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -319,9 +316,9 @@ export function OnboardingWizard({ invitation, profile }: Props) {
 
       <nav
         aria-label="Ações do primeiro acesso"
-        className="fixed inset-x-4 bottom-[calc(22px+var(--mobile-safe-bottom))] z-40"
+        className="fixed inset-x-4 bottom-[calc(16px+var(--mobile-safe-bottom,0px))] z-40"
       >
-        <div className="mx-auto flex max-w-md items-center gap-2 rounded-full bg-(--surface)/86 p-2 shadow-(--shadow-floating) backdrop-blur-xl backdrop-saturate-150">
+        <div className="mx-auto flex max-w-[380px] items-center gap-2 rounded-full bg-(--surface)/90 p-2 shadow-(--shadow-floating) backdrop-blur-xl backdrop-saturate-150">
           {step > 1 && step < 5 ? (
             <Button variant="secondary" onClick={prevStep} disabled={pending}>Voltar</Button>
           ) : null}
@@ -347,6 +344,6 @@ export function OnboardingWizard({ invitation, profile }: Props) {
           ) : null}
         </div>
       </nav>
-    </div>
+    </LightAuthShell>
   );
 }
