@@ -43,6 +43,23 @@ Branch `feat/rag-catalogo-operadoras`. Pedido do Vinicios: deixar o RAG pronto p
    - A busca usa termo e significado ao mesmo tempo.
    - A IA responde só com o que recebeu, citando [F] para fato e [T] para trecho, com a vigência.
 
+## Proteções: o material é a única fonte (22/10)
+
+Pedido do Vinicios: se a informação não estiver no material importado, o sistema avisa em vez de responder. Implementado em `answer-guard.ts` e `answer.ts`.
+
+1. **Operadora sem material:** a pergunta cita uma operadora do mercado que não está no catálogo. A resposta é "Ainda não há material da X importado", e a IA nem é chamada. Nomes que são palavra comum ("assim", "leve") ou nome de pessoa ("Alice") só contam com o nome completo.
+2. **Só o que é relevante vai para a IA:** só entram fatos e trechos da operadora perguntada (trecho ainda não catalogado só entra se citar a operadora). O trecho também precisa estar perto da pergunta, por palavras ou por significado (distância até 0,55).
+3. **Nada relevante:** o sistema responde "não encontrei no material importado; importe em Ferramentas" e não chama a IA.
+4. **Na IA:** o prompt proíbe conhecimento próprio. A resposta vem como `found`/`missing`, com citação [F]/[T] em cada dado, e a IA não pode calcular valores que não estejam escritos. Com `found` falso, o corretor recebe a mensagem de não encontrado e o que faltou.
+5. **Conferência da resposta:**
+   - Resposta sem citação é bloqueada.
+   - Citação de item que não foi enviado é bloqueada.
+   - Qualquer número que não exista no material nem na pergunta é bloqueado. Isso pega valor inventado, conta feita pela IA e prazo trocado.
+   - No lugar, o corretor recebe "Não consegui confirmar essa resposta no material importado".
+6. **Todos os assistentes:** uma pergunta sobre operadora ou conteúdo de plano (operadora citada, carência, coparticipação, rede credenciada, reajuste, tabela de preço, mensalidade, reembolso, CPT, cobertura) feita ao Jack, aos outros assistentes do corretor, ao chat lateral ou ao chat geral é respondida só por esse fluxo, nunca pelo modelo livre. O chat geral (`/api/chat`) passou a exigir login.
+
+Cada bloqueio fica no log como `[cotacao-express] blocked`, com o motivo.
+
 ## Áreas padrão
 
 As áreas ficam no código (`taxonomy.ts`); as criadas a partir de sugestões ficam em `operator_catalog_areas`.

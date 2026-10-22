@@ -13,6 +13,8 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
+import { answerIfOperatorQuestion } from "@/features/operator-catalog/answer";
+
 import { AGENT_IDS, AGENT_REGISTRY, assistantReplySchema, buildMessages, replyToBlocks, type ActionTargets, type AgentId } from "./agents";
 import { runGateway } from "./gateway";
 import { readAiConsent } from "./consent";
@@ -102,6 +104,9 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
   // LGPD: nothing goes to a model before the broker allows it (current terms version).
   const consent = await readAiConsent(context.tenantId, context.userId).catch(() => ({ granted: false }));
   if (!consent.granted) return { ok: false, blocks: [{ type: "consent", id: `ai-consent-${stamp}`, question: input.data.question }] };
+  // Operators, plans, prices, carências: only the imported material answers, never the agent's model.
+  const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: input.data.question }).catch(() => null);
+  if (operatorAnswer) return { ok: true, blocks: [{ type: "assistant", id: `ai-operator-${stamp}`, text: operatorAnswer }] };
   const agent = AGENT_REGISTRY[input.data.agentId];
   const built = input.data.agentId === "lead" && input.data.leadId
     ? await leadContext(input.data.leadId).catch(() => null)

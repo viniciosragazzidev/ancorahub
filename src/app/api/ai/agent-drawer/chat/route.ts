@@ -6,11 +6,16 @@ import { getAiModelInstance } from "@/features/ai/providers";
 import { getMcpToolsForRole } from "@/features/agent-drawer/mcp-tools";
 import { buildAgentSystemPrompt } from "@/features/agent-drawer/prompt-builder";
 import { getUserDisplayInfo } from "@/shared/auth/actions";
+import { answerIfOperatorQuestion, lastUserText } from "@/features/operator-catalog/answer";
 
 export async function POST(req: Request) {
   try {
     const context = await getRequiredTenantContext();
     const { messages } = await req.json();
+
+    // Operators, plans, prices, carências: only the imported material answers, never the free model.
+    const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: lastUserText(messages) }).catch(() => null);
+    if (operatorAnswer) return new Response(operatorAnswer, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
 
     const userInfo = await getUserDisplayInfo();
     const settings = await getAiEngineSettings();

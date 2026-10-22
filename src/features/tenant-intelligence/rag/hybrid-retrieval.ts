@@ -15,6 +15,12 @@ export type HybridSearchResult = {
   text: string;
   score: number;
   validUntil: Date | null;
+  /** Question words found in the text (relevance guard of the operator answers). */
+  keywordHits: number;
+  /** Cosine distance when the meaning search ran (0 = same meaning), otherwise null. */
+  semanticDistance: number | null;
+  /** Operator the catalog tagged this chunk with, when catalogued. */
+  carrierId: string | null;
 };
 
 /**
@@ -62,6 +68,7 @@ export async function executeHybridKnowledgeSearch(params: {
       category: schema.knowledgeDocuments.category,
       validUntil: schema.knowledgeDocuments.validUntil,
       semanticDistance: semanticDistance ?? sql<number>`null`,
+      carrierId: sql<string | null>`${schema.knowledgeChunks.metadata}->>'carrierId'`,
     })
     .from(schema.knowledgeChunks)
     .innerJoin(
@@ -119,6 +126,9 @@ export async function executeHybridKnowledgeSearch(params: {
       text: c.text,
       score,
       validUntil: c.validUntil,
+      keywordHits: hits,
+      semanticDistance: typeof c.semanticDistance === "number" ? c.semanticDistance : c.semanticDistance === null ? null : Number(c.semanticDistance),
+      carrierId: c.carrierId ?? null,
     };
   });
 
