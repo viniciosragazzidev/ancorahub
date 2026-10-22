@@ -23,6 +23,7 @@ export default async function ConfirmPresencePage({ searchParams }: { searchPara
     assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode,
     shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt,
     shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt,
+    joinedAt: schema.dutyRosterAssignments.createdAt,
   }).from(schema.dutyPresenceConfirmations)
     .innerJoin(schema.user, eq(schema.user.id, schema.dutyPresenceConfirmations.brokerId))
     .innerJoin(schema.unitDutySchedules, and(
@@ -40,7 +41,7 @@ export default async function ConfirmPresencePage({ searchParams }: { searchPara
     .where(eq(schema.dutyPresenceConfirmations.id, confirmationId)).limit(1) : [];
 
   const now = new Date();
-  const windowState = record?.status === "pending" ? getSelfDutyConfirmationWindowState({ startsAt: record.shiftStartsAt, endsAt: record.shiftEndsAt, now }) : null;
+  const windowState = record?.status === "pending" ? getSelfDutyConfirmationWindowState({ startsAt: record.shiftStartsAt, endsAt: record.shiftEndsAt, now, joinedAt: record.joinedAt }) : null;
   const active = windowState === "available";
   const late = windowState === "late";
   const confirmed = record?.status === "confirmed";

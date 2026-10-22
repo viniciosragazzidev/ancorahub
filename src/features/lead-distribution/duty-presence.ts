@@ -396,11 +396,12 @@ export async function sendDutyPresenceInviteManually(input: { tenantId: string; 
   }
 }
 
-export type OwnDutyOccurrence = { assignmentId: string; scheduleId: string; mode: "online" | "presencial"; window: DutyWindow };
+export type OwnDutyOccurrence = { assignmentId: string; scheduleId: string; mode: "online" | "presencial"; window: DutyWindow; joinedAt: Date | null };
 
 /**
  * The broker's own occurrence of an assignment that can be confirmed now
- * (30 min before the start until 20 min after it). Scope: tenant + the broker himself.
+ * (30 min before the start until 20 min after it, or after he was put on a plantão
+ * that had already started). Scope: tenant + the broker himself.
  */
 export async function resolveOwnDutyOccurrence(input: { tenantId: string; brokerId: string; assignmentId: string; now?: Date }): Promise<{ ok: true; occurrence: OwnDutyOccurrence } | { ok: false; reason: "not_found" | "outside_window" | "late" | "absent" }> {
   const now = input.now ?? new Date();
@@ -415,6 +416,7 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
     timezone: schema.unitDutySchedules.timezone,
     attendanceMode: schema.unitDutySchedules.attendanceMode,
     assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode,
+    joinedAt: schema.dutyRosterAssignments.createdAt,
   }).from(schema.dutyRosterAssignments)
     .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyRosterAssignments.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyRosterAssignments.tenantId)))
     .where(and(
@@ -427,7 +429,7 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
   if (!row) return { ok: false, reason: "not_found" };
   const window = getWindow({ id: row.scheduleId, dayOfWeek: row.dayOfWeek, startsAt: row.startsAt, endsAt: row.endsAt, timezone: row.timezone, validFrom: row.validFrom, validUntil: row.validUntil }, now);
   if (!window) return { ok: false, reason: "outside_window" };
-  const windowState = getSelfDutyConfirmationWindowState({ startsAt: window.startsAt, endsAt: window.endsAt, now });
+  const windowState = getSelfDutyConfirmationWindowState({ startsAt: window.startsAt, endsAt: window.endsAt, now, joinedAt: row.joinedAt });
   if (windowState === "late") return { ok: false, reason: "late" };
   if (windowState !== "available") return { ok: false, reason: "outside_window" };
   // An absence marked by the manager blocks before any photo is uploaded.
@@ -437,7 +439,7 @@ export async function resolveOwnDutyOccurrence(input: { tenantId: string; broker
     eq(schema.dutyPresenceConfirmations.shiftEndsAt, window.endsAt), eq(schema.dutyPresenceConfirmations.status, "absent"),
   )).limit(1);
   if (absence) return { ok: false, reason: "absent" };
-  return { ok: true, occurrence: { assignmentId: row.id, scheduleId: row.scheduleId, mode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode), window } };
+  return { ok: true, occurrence: { assignmentId: row.id, scheduleId: row.scheduleId, mode: effectiveAttendanceMode(row.assignmentAttendanceMode, row.attendanceMode), window, joinedAt: row.joinedAt } };
 }
 
 /**
@@ -462,7 +464,7 @@ export async function confirmOwnDutyPresence(input: { tenantId: string; brokerId
     .from(schema.dutyPresenceConfirmations).where(occurrenceWhere).limit(1);
   if (existing?.status === "absent") return { ok: false, reason: "absent" };
   if (existing?.status === "confirmed" && (!presencial || existing.confirmedBy)) return { ok: true, confirmationId: existing.id, awaitingRelease: false };
-  const windowState = getSelfDutyConfirmationWindowState({ startsAt: occurrence.window.startsAt, endsAt: occurrence.window.endsAt, now });
+  const windowState = getSelfDutyConfirmationWindowState({ startsAt: occurrence.window.startsAt, endsAt: occurrence.window.endsAt, now, joinedAt: occurrence.joinedAt });
   if (windowState === "late") return { ok: false, reason: "late" };
   if (windowState !== "available") return { ok: false, reason: "outside_window" };
   if (presencial && !input.photoStorageKey) return { ok: false, reason: "photo_required" };

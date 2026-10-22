@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { and, eq, exists, gt, gte, lte, or, isNull } from "drizzle-orm";
+import { and, eq, exists, gt, lte, or, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 import { getDatabase, schema } from "@/shared/db";
 import { effectiveAttendanceMode, getSelfDutyConfirmationWindowState, SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES, SELF_CONFIRM_TOLERANCE_MINUTES } from "@/features/lead-distribution/duty-presence-domain";
@@ -18,13 +18,13 @@ export async function POST(request: NextRequest) {
   const db = getDatabase();
   // Presencial is confirmed only in the app, with the photo of the place (the link page sends the broker there).
   // A broker marked online inside a presencial plantão confirms here with one tap.
-  const [mode] = await db.select({ status: schema.dutyPresenceConfirmations.status, attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt })
+  const [mode] = await db.select({ status: schema.dutyPresenceConfirmations.status, attendanceMode: schema.unitDutySchedules.attendanceMode, assignmentAttendanceMode: schema.dutyRosterAssignments.attendanceMode, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt, joinedAt: schema.dutyRosterAssignments.createdAt })
     .from(schema.dutyPresenceConfirmations)
     .innerJoin(schema.unitDutySchedules, and(eq(schema.unitDutySchedules.id, schema.dutyPresenceConfirmations.scheduleId), eq(schema.unitDutySchedules.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .leftJoin(schema.dutyRosterAssignments, and(eq(schema.dutyRosterAssignments.id, schema.dutyPresenceConfirmations.assignmentId), eq(schema.dutyRosterAssignments.tenantId, schema.dutyPresenceConfirmations.tenantId)))
     .where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
   const now = new Date();
-  const windowState = mode ? getSelfDutyConfirmationWindowState({ startsAt: mode.shiftStartsAt, endsAt: mode.shiftEndsAt, now }) : null;
+  const windowState = mode ? getSelfDutyConfirmationWindowState({ startsAt: mode.shiftStartsAt, endsAt: mode.shiftEndsAt, now, joinedAt: mode.joinedAt }) : null;
   if (mode?.status === "pending" && windowState === "late") return NextResponse.json({ success: false, error: SELF_CONFIRM_LATE_MESSAGE }, { status: 409 });
   if (mode?.status === "pending" && windowState === "not_open") return NextResponse.json({ success: false, error: `A confirmação abre ${SELF_CONFIRM_OPENS_MINUTES} minutos antes do plantão.` }, { status: 409 });
   if (mode && effectiveAttendanceMode(mode.assignmentAttendanceMode, mode.attendanceMode) === "presencial") return NextResponse.json({ success: false, error: "Este plantão é presencial: confirme pelo app, tirando uma foto do local." }, { status: 409 });
@@ -33,7 +33,6 @@ export async function POST(request: NextRequest) {
       .where(and(
         eq(schema.dutyPresenceConfirmations.id, parsed.data.id),
         eq(schema.dutyPresenceConfirmations.status, "pending"),
-        gte(schema.dutyPresenceConfirmations.shiftStartsAt, new Date(now.getTime() - SELF_CONFIRM_TOLERANCE_MINUTES * 60_000)),
         lte(schema.dutyPresenceConfirmations.shiftStartsAt, new Date(now.getTime() + SELF_CONFIRM_OPENS_MINUTES * 60_000)),
         gt(schema.dutyPresenceConfirmations.shiftEndsAt, now),
         exists(tx.select({ id: schema.dutyRosterAssignments.id })
@@ -51,6 +50,8 @@ export async function POST(request: NextRequest) {
             eq(schema.unitDutySchedules.status, "active"),
             lte(schema.dutyRosterAssignments.validFrom, now),
             or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now)),
+            // Tolerance counts from the start, or from when the broker joined a plantão already running.
+            sql`greatest(${schema.dutyPresenceConfirmations.shiftStartsAt}, ${schema.dutyRosterAssignments.createdAt}) >= ${new Date(now.getTime() - SELF_CONFIRM_TOLERANCE_MINUTES * 60_000)}`,
           ))),
       ))
       .returning({ id: schema.dutyPresenceConfirmations.id, brokerId: schema.dutyPresenceConfirmations.brokerId, tenantId: schema.dutyPresenceConfirmations.tenantId });
@@ -62,11 +63,13 @@ export async function POST(request: NextRequest) {
       return { state: "confirmed" as const, tenantId: confirmed.tenantId };
     }
 
-    const [existing] = await tx.select({ status: schema.dutyPresenceConfirmations.status, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt })
-      .from(schema.dutyPresenceConfirmations).where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
+    const [existing] = await tx.select({ status: schema.dutyPresenceConfirmations.status, shiftStartsAt: schema.dutyPresenceConfirmations.shiftStartsAt, shiftEndsAt: schema.dutyPresenceConfirmations.shiftEndsAt, joinedAt: schema.dutyRosterAssignments.createdAt })
+      .from(schema.dutyPresenceConfirmations)
+      .leftJoin(schema.dutyRosterAssignments, and(eq(schema.dutyRosterAssignments.id, schema.dutyPresenceConfirmations.assignmentId), eq(schema.dutyRosterAssignments.tenantId, schema.dutyPresenceConfirmations.tenantId)))
+      .where(eq(schema.dutyPresenceConfirmations.id, parsed.data.id)).limit(1);
     if (existing?.status === "confirmed") return { state: "already_confirmed" as const };
     if (existing?.status === "pending") {
-      const existingWindowState = getSelfDutyConfirmationWindowState({ startsAt: existing.shiftStartsAt, endsAt: existing.shiftEndsAt, now });
+      const existingWindowState = getSelfDutyConfirmationWindowState({ startsAt: existing.shiftStartsAt, endsAt: existing.shiftEndsAt, now, joinedAt: existing.joinedAt });
       if (existingWindowState === "late") return { state: "late" as const };
       if (existingWindowState === "not_open") return { state: "not_open" as const };
     }

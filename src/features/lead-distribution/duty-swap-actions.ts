@@ -258,6 +258,8 @@ export async function swapDutyAssignmentsAction(input: unknown): Promise<DutySwa
           branchId: broker.branchId!,
           pausedAt: null,
           pausedBy: null,
+          // The newcomer joins now (tolerance of a plantão already running counts from here).
+          createdAt: now,
           updatedBy: context.userId,
           updatedAt: now,
         }).where(and(eq(schema.dutyRosterAssignments.id, slot.id), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.brokerId, slot.brokerId)));

@@ -56,6 +56,22 @@ describe("duty presence occurrence windows", () => {
     expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(21) })).toBe("late");
   });
 
+  it("counts the tolerance from when the broker joined a plantão that had already started", () => {
+    const startsAt = new Date("2026-10-21T12:00:00.000Z");
+    const endsAt = new Date("2026-10-21T21:00:00.000Z");
+    const atMinute = (minute: number) => new Date(startsAt.getTime() + minute * 60_000);
+
+    // Added 2h into the shift: 20 minutes from then.
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(130), joinedAt: atMinute(120) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(140), joinedAt: atMinute(120) })).toBe("available");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(141), joinedAt: atMinute(120) })).toBe("late");
+    // Added before the start: the normal rule.
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(21), joinedAt: atMinute(-600) })).toBe("late");
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(21), joinedAt: null })).toBe("late");
+    // Added close to the end: still ends with the shift.
+    expect(getSelfDutyConfirmationWindowState({ startsAt, endsAt, now: atMinute(541), joinedAt: atMinute(535) })).toBe("ended");
+  });
+
   it("keeps the 30-minute opening window before the shift unchanged", () => {
     const startsAt = new Date("2026-10-21T12:00:00.000Z");
     const endsAt = new Date("2026-10-21T21:00:00.000Z");

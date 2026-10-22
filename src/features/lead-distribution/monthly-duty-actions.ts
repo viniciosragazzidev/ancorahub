@@ -876,7 +876,8 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
     let rosterId: string;
     if (row) {
       rosterId = row.id;
-      await tx.update(schema.dutyRosterAssignments).set({ status: "active", monthlyPlanId: plan.id, updatedBy: context.userId, updatedAt: now })
+      // A broker who comes back joins now: createdAt is when the tolerance of a running plantão starts counting.
+      await tx.update(schema.dutyRosterAssignments).set({ status: "active", monthlyPlanId: plan.id, updatedBy: context.userId, updatedAt: now, ...(row.status === "inactive" ? { createdAt: now } : {}) })
         .where(eq(schema.dutyRosterAssignments.id, row.id));
     } else {
       rosterId = randomUUID();

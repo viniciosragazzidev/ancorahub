@@ -11,9 +11,18 @@ export const SELF_CONFIRM_LATE_MESSAGE = "Seu plantão já passou do tempo de to
 
 export type SelfDutyConfirmationWindowState = "not_open" | "available" | "late" | "ended";
 
-export function getSelfDutyConfirmationWindowState(input: { startsAt: Date; endsAt: Date; now: Date }): SelfDutyConfirmationWindowState {
+/**
+ * When the 20-minute tolerance starts counting: the shift start, or the moment the
+ * broker was put on the plantão when that happened after it had already started
+ * (decision of 2026-10-22). `joinedAt` is the roster row's `createdAt`.
+ */
+export function selfConfirmToleranceStartsAt(startsAt: Date, joinedAt?: Date | null) {
+  return joinedAt && joinedAt.getTime() > startsAt.getTime() ? joinedAt : startsAt;
+}
+
+export function getSelfDutyConfirmationWindowState(input: { startsAt: Date; endsAt: Date; now: Date; joinedAt?: Date | null }): SelfDutyConfirmationWindowState {
   if (input.now.getTime() < input.startsAt.getTime() - SELF_CONFIRM_OPENS_MINUTES * 60_000) return "not_open";
-  if (input.now.getTime() > input.startsAt.getTime() + SELF_CONFIRM_TOLERANCE_MINUTES * 60_000) return "late";
+  if (input.now.getTime() > selfConfirmToleranceStartsAt(input.startsAt, input.joinedAt).getTime() + SELF_CONFIRM_TOLERANCE_MINUTES * 60_000) return "late";
   if (input.now >= input.endsAt) return "ended";
   return "available";
 }

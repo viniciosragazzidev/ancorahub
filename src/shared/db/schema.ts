@@ -1454,6 +1454,8 @@ export const dutyRosterAssignments = pgTable(
     attendanceMode: text("attendance_mode"),
     createdBy: text("created_by").notNull().references(() => user.id),
     updatedBy: text("updated_by").notNull().references(() => user.id),
+    // When the broker joined this slot (reset when he comes back or takes it in a
+    // swap): the presence tolerance of a plantão already running counts from here.
     createdAt,
     updatedAt,
   },
