@@ -6,7 +6,8 @@ import { Eye, EyeSlash, LockKey } from "@/components/huge-icons";
 import { toast } from "@/components/ui/sonner";
 
 import { authClient, signIn } from "@/shared/auth/client";
-import { requestPasswordResetDirectAction } from "@/shared/auth/password-recovery-client";
+import { requestPasswordResetWhatsAppAction } from "@/shared/auth/password-recovery-client";
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,6 +23,28 @@ export default function LoginPage() {
   const [passkeyLoading, setPasskeyLoading] = useState(false);
   const [showTransition, setShowTransition] = useState(false);
   const [conditionalReady, setConditionalReady] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSending, setResetSending] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
+
+  async function sendResetLink(event: FormEvent) {
+    event.preventDefault();
+    if (resetSending) return;
+    if (!resetEmail.trim().includes("@")) {
+      toast.info("Digite o e-mail da sua conta.");
+      return;
+    }
+    setResetSending(true);
+    try {
+      await requestPasswordResetWhatsAppAction({ email: resetEmail });
+      setResetSent(true);
+    } catch {
+      toast.error("Não foi possível enviar agora. Tente de novo em instantes.");
+    } finally {
+      setResetSending(false);
+    }
+  }
 
   // Conditional UI: preload passkey autofill on mount if browser supports it
   useEffect(() => {
@@ -156,22 +179,12 @@ export default function LoginPage() {
           </div>
           <a
             href="#"
-            onClick={async (e) => {
+            onClick={(e) => {
               e.preventDefault();
               if (loading) return;
-              if (!email) {
-                toast.info("Digite seu e-mail primeiro para solicitar a recuperação.");
-                return;
-              }
-              setLoading(true);
-              try {
-                await requestPasswordResetDirectAction({ email });
-                toast.success("Solicitação enviada! Seu diretor será notificado para aprovação.");
-              } catch {
-                toast.error("Erro ao solicitar recuperação.");
-              } finally {
-                setLoading(false);
-              }
+              setResetEmail(email);
+              setResetSent(false);
+              setResetOpen(true);
             }}
             className="text-xs font-medium text-primary hover:underline"
           >
@@ -240,6 +253,44 @@ export default function LoginPage() {
         {" "}e{" "}
         <Link href="/termos#privacidade" className="underline hover:text-zinc-600 dark:hover:text-zinc-300">Política de Privacidade</Link>.
       </p>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogPopup className="max-w-sm">
+          <form onSubmit={sendResetLink}>
+            <DialogHeader>
+              <DialogTitle>Recuperar senha</DialogTitle>
+              <DialogDescription>
+                {resetSent
+                  ? "Se o e-mail estiver cadastrado, o link para criar uma nova senha chegou no WhatsApp cadastrado na sua conta. Ele vale por 1 hora."
+                  : "Digite o e-mail da sua conta. Enviamos o link para criar uma nova senha direto no seu WhatsApp."}
+              </DialogDescription>
+            </DialogHeader>
+            {!resetSent ? (
+              <DialogPanel className="grid gap-2">
+                <Label htmlFor="reset-email">E-mail</Label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoFocus
+                  value={resetEmail}
+                  onChange={(event) => setResetEmail(event.target.value)}
+                  placeholder="voce@email.com"
+                  className="text-base sm:text-sm"
+                />
+              </DialogPanel>
+            ) : null}
+            <DialogFooter>
+              {resetSent ? (
+                <Button type="button" onClick={() => setResetOpen(false)}>Entendi</Button>
+              ) : (
+                <Button type="submit" disabled={resetSending}>{resetSending ? "Enviando..." : "Enviar link no WhatsApp"}</Button>
+              )}
+            </DialogFooter>
+          </form>
+        </DialogPopup>
+      </Dialog>
 
       <LoginTransition active={showTransition} onComplete={handleTransitionComplete} />
     </div>

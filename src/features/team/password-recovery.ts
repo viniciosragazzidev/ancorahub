@@ -2,7 +2,7 @@ import "server-only";
 
 import { randomBytes, randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, gte, or } from "drizzle-orm";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
@@ -13,6 +13,73 @@ import {
   buildCredentialAccountPasswordUpdate,
   CREDENTIAL_PROVIDER_ID,
 } from "@/shared/auth/credential-account";
+
+/** One self-service link per person every 2 minutes: a repeated click does not flood their WhatsApp. */
+const SELF_SERVICE_INTERVAL_MS = 2 * 60_000;
+const SELF_SERVICE_LINK_TTL_MS = 60 * 60_000;
+
+/**
+ * "Esqueceu a senha?" on the login (Vinicios, 22/10): the person types their e-mail
+ * and the reset link goes straight to their own WhatsApp, with no director in the
+ * middle. The answer never says whether the e-mail exists. Open sessions only end
+ * when the new password is saved, so asking for a link cannot log anyone out.
+ * Without a phone, or when WhatsApp fails, it falls back to the director approval.
+ */
+export async function requestPasswordResetByWhatsApp(email: string) {
+  const db = getDatabase();
+  const [user] = await db
+    .select({ id: schema.user.id, email: schema.user.email })
+    .from(schema.user)
+    .where(eq(schema.user.email, email.trim().toLowerCase()))
+    .limit(1);
+  if (!user) return { success: true };
+
+  const [membership] = await db
+    .select({ tenantId: schema.tenantMemberships.tenantId })
+    .from(schema.tenantMemberships)
+    .where(and(eq(schema.tenantMemberships.userId, user.id), eq(schema.tenantMemberships.status, "active")))
+    .limit(1);
+  if (!membership) return { success: true };
+
+  const [recent] = await db
+    .select({ id: schema.passwordResetRequests.id })
+    .from(schema.passwordResetRequests)
+    .where(and(
+      eq(schema.passwordResetRequests.userId, user.id),
+      eq(schema.passwordResetRequests.status, "approved"),
+      gte(schema.passwordResetRequests.createdAt, new Date(Date.now() - SELF_SERVICE_INTERVAL_MS)),
+    ))
+    .limit(1);
+  if (recent) return { success: true };
+
+  const id = randomUUID();
+  const token = randomBytes(32).toString("hex");
+  const now = new Date();
+  await db.insert(schema.passwordResetRequests).values({
+    id,
+    tenantId: membership.tenantId,
+    userId: user.id,
+    userEmail: user.email,
+    status: "approved",
+    token,
+    tokenExpiresAt: new Date(now.getTime() + SELF_SERVICE_LINK_TTL_MS),
+    reviewedAt: now,
+    directorNotes: "Pedido pela própria pessoa na tela de login; link enviado no WhatsApp cadastrado.",
+    createdAt: now,
+    updatedAt: now,
+  });
+  await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: user.id, entidade: "password_reset", entidadeId: id, acao: "password_reset.self_service_whatsapp" });
+
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.BETTER_AUTH_URL || "").replace(/\/$/, "");
+  const resetUrl = `${baseUrl}/recuperar-senha?token=${encodeURIComponent(token)}`;
+  const status = await sendPasswordResetWhatsApp({ tenantId: membership.tenantId, userId: user.id, requestedBy: user.id, resetUrl, requestId: id, selfService: true });
+  if (status === "sent") return { success: true };
+
+  // No phone or WhatsApp down: the unused link is closed and the director approves instead.
+  await db.update(schema.passwordResetRequests).set({ status: "rejected", token: null, directorNotes: status === "no_phone" ? "Sem telefone cadastrado." : "Falha no envio pelo WhatsApp.", updatedAt: new Date() })
+    .where(eq(schema.passwordResetRequests.id, id));
+  return requestPasswordReset(user.email);
+}
 
 /**
  * Cria uma solicitação de recuperação de senha.
@@ -240,6 +307,9 @@ export async function completePasswordReset(token: string, newPassword: string) 
       }));
     }
 
+    // The new password ends every open session (the self-service request does not).
+    await tx.delete(schema.session).where(eq(schema.session.userId, request.userId));
+
     // Marcar solicitação como concluída
     await tx
       .update(schema.passwordResetRequests)
@@ -269,7 +339,7 @@ export type PasswordResetWhatsAppStatus = "sent" | "failed" | "no_phone";
  * paste), as free text on the same route as the chat messages to brokers (no Meta template).
  * When it fails the screen keeps the link to copy.
  */
-async function sendPasswordResetWhatsApp(input: { tenantId: string; userId: string; requestedBy: string; resetUrl: string; requestId: string }): Promise<PasswordResetWhatsAppStatus> {
+async function sendPasswordResetWhatsApp(input: { tenantId: string; userId: string; requestedBy: string; resetUrl: string; requestId: string; selfService?: boolean }): Promise<PasswordResetWhatsAppStatus> {
   // A WhatsApp problem never stops the reset: the screen still shows the link to copy.
   try {
     const db = getDatabase();
@@ -288,7 +358,9 @@ async function sendPasswordResetWhatsApp(input: { tenantId: string; userId: stri
       recipientId: input.userId,
       destinationPhone: member.phone,
       purpose: "passwordReset",
-      body: `Olá${firstName ? `, ${firstName}` : ""}! A gestão da ${member.tenantName ?? "Âncora Saúde"} gerou um link para você criar uma nova senha no CRM:\n\n${input.resetUrl}\n\nO link vale por 24 horas. Se não foi você quem pediu, avise a sua gestão.`,
+      body: input.selfService
+        ? `Olá${firstName ? `, ${firstName}` : ""}! Recebemos um pedido para trocar a sua senha do CRM da ${member.tenantName ?? "Âncora Saúde"}. Para criar uma nova senha, abra o link:\n\n${input.resetUrl}\n\nO link vale por 1 hora. Se não foi você quem pediu, ignore esta mensagem: a sua senha continua a mesma.`
+        : `Olá${firstName ? `, ${firstName}` : ""}! A gestão da ${member.tenantName ?? "Âncora Saúde"} gerou um link para você criar uma nova senha no CRM:\n\n${input.resetUrl}\n\nO link vale por 24 horas. Se não foi você quem pediu, avise a sua gestão.`,
       requestedBy: input.requestedBy,
       idempotencyKey: `password-reset:${input.requestId}`,
     });
