@@ -13,7 +13,7 @@ export default async function FerramentasPage() {
     <>
       <DashboardHeader breadcrumb="Ferramentas" title="Ferramentas" />
       <main className="flex flex-1 flex-col p-(--mobile-page-padding) lg:p-6">
-        <ToolsCatalog />
+        <ToolsCatalog isDirector={context.role === "director"} />
       </main>
     </>
   );

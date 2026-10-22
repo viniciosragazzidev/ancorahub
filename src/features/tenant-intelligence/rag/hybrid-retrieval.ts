@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, desc, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, desc, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { extractSearchKeywords, stripAccents } from "./search-terms";
 import { isUndefinedFunctionError } from "@/shared/db/postgres-errors";
@@ -27,6 +27,8 @@ export async function executeHybridKnowledgeSearch(params: {
   /** Obtained server-side from the configured embedding provider. Never accept this from the browser. */
   queryEmbedding?: number[];
   category?: string;
+  /** Only chunks tagged with these operators by the catalog (operator-catalog/service.ts). */
+  carrierIds?: string[];
   minAuthorityLevel?: number;
   limit?: number;
 }): Promise<HybridSearchResult[]> {
@@ -74,7 +76,10 @@ export async function executeHybridKnowledgeSearch(params: {
         or(isNull(schema.knowledgeDocuments.validFrom), lte(schema.knowledgeDocuments.validFrom, now)),
         or(isNull(schema.knowledgeDocuments.validUntil), gte(schema.knowledgeDocuments.validUntil, now)),
         ...(termSearch ? [termSearch.anyMatch] : []),
-        ...(params.category ? [eq(schema.knowledgeDocuments.category, params.category)] : [])
+        ...(params.category ? [eq(schema.knowledgeDocuments.category, params.category)] : []),
+        ...(params.carrierIds?.length ? [inArray(sql`${schema.knowledgeChunks.metadata}->>'carrierId'`, params.carrierIds)] : []),
+        // Meaning search only ranks chunks that have a vector; the term search covers the rest.
+        ...(queryEmbedding ? [isNotNull(schema.knowledgeChunks.embedding)] : []),
       )
     )
     .orderBy(

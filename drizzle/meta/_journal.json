@@ -1114,6 +1114,13 @@
                         "when":  1791748411000,
                         "tag":  "0212_whatsapp_outbound_pricing",
                         "breakpoints":  true
+                    },
+                    {
+                        "idx":  159,
+                        "version":  "7",
+                        "when":  1791834811000,
+                        "tag":  "0213_operator_catalog",
+                        "breakpoints":  true
                     }
                 ]
 }

@@ -11,6 +11,7 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   unique,
@@ -4835,6 +4836,13 @@ export const knowledgeSources = pgTable(
     status: text("status").notNull().default("uploaded"), // uploaded | parsing | parsed | error
     errorMessage: text("error_message"),
     uploadedBy: text("uploaded_by"),
+    // Operator catalog (migration 0213): the read text and where the cataloguing stands.
+    extractedText: text("extracted_text"),
+    catalogStatus: text("catalog_status"), // pending | processing | cataloged | needs_review | failed | skipped
+    catalogSummary: jsonb("catalog_summary").notNull().default({}),
+    catalogAttempts: integer("catalog_attempts").notNull().default(0),
+    documentType: text("document_type"),
+    carrierId: text("carrier_id").references(() => tenantPrivateCarriers.id, { onDelete: "set null" }),
     createdAt,
     updatedAt,
   },
@@ -4863,6 +4871,9 @@ export const knowledgeDocuments = pgTable(
     status: text("status").notNull().default("published"), // draft | review | published | archived
     validFrom: timestamp("valid_from", { withTimezone: true }),
     validUntil: timestamp("valid_until", { withTimezone: true }),
+    /** Same operator + type + subject across versions (migration 0213). */
+    documentKey: text("document_key"),
+    supersededBy: text("superseded_by"),
     createdAt,
     updatedAt,
   },
@@ -4883,6 +4894,8 @@ export const knowledgeChunks = pgTable(
     authorityLevel: integer("authority_level").notNull().default(3),
     metadata: jsonb("metadata").notNull().default({}),
     version: integer("version").notNull().default(1),
+    /** Same text across versions keeps its embedding (migration 0213). */
+    contentHash: text("content_hash"),
     createdAt,
     updatedAt,
   },
@@ -4984,6 +4997,86 @@ export const wahaGroupSources = pgTable(
     uniqueIndex("waha_group_sources_unique").on(table.tenantId, table.wahaNumberId, table.groupId),
     index("waha_group_sources_number_group_idx").on(table.wahaNumberId, table.groupId),
   ]
+);
+
+/** Operator catalog areas created beyond the system ones, which live in code (migration 0213). */
+export const operatorCatalogAreas = pgTable(
+  "operator_catalog_areas",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    slug: text("slug").notNull(),
+    label: text("label").notNull(),
+    description: text("description"),
+    fields: jsonb("fields").notNull().default([]),
+    createdBy: text("created_by").references(() => user.id),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [uniqueIndex("operator_catalog_areas_tenant_slug_unique").on(table.tenantId, table.slug)],
+);
+
+/** A new area or field the AI found in a material; it joins the catalog once approved. */
+export const operatorCatalogSuggestions = pgTable(
+  "operator_catalog_suggestions",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // area | field
+    areaSlug: text("area_slug").notNull(),
+    fieldKey: text("field_key").notNull().default(""),
+    label: text("label").notNull(),
+    description: text("description"),
+    example: text("example"),
+    occurrences: integer("occurrences").notNull().default(1),
+    status: text("status").notNull().default("pending"), // pending | approved | rejected
+    sourceId: text("source_id").references(() => knowledgeSources.id, { onDelete: "set null" }),
+    reviewedBy: text("reviewed_by").references(() => user.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [uniqueIndex("operator_catalog_suggestions_unique").on(table.tenantId, table.kind, table.areaSlug, table.fieldKey)],
+);
+
+/** One catalogued piece of information: operator + plan + area + field + value, with validity and source. */
+export const operatorCatalogFacts = pgTable(
+  "operator_catalog_facts",
+  {
+    id: text("id").primaryKey(),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    carrierId: text("carrier_id").notNull().references(() => tenantPrivateCarriers.id, { onDelete: "cascade" }),
+    planId: text("plan_id").references(() => tenantPrivatePlans.id, { onDelete: "set null" }),
+    areaSlug: text("area_slug").notNull(),
+    fieldKey: text("field_key").notNull(),
+    valueText: text("value_text").notNull(),
+    valueNumber: numeric("value_number", { precision: 14, scale: 2 }),
+    unit: text("unit"),
+    qualifiers: jsonb("qualifiers").notNull().default({}),
+    factKey: text("fact_key").notNull(),
+    origin: text("origin").notNull().default("material"), // material | quote
+    status: text("status").notNull(), // current | pending_review | superseded | rejected
+    replacesFactId: text("replaces_fact_id"),
+    divergesFromFactId: text("diverges_from_fact_id"),
+    validFrom: timestamp("valid_from", { withTimezone: true }),
+    validUntil: timestamp("valid_until", { withTimezone: true }),
+    sourceId: text("source_id").references(() => knowledgeSources.id, { onDelete: "set null" }),
+    documentId: text("document_id").references(() => knowledgeDocuments.id, { onDelete: "set null" }),
+    page: integer("page"),
+    excerpt: text("excerpt"),
+    confidence: real("confidence"),
+    reviewedBy: text("reviewed_by").references(() => user.id),
+    reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt,
+    updatedAt,
+  },
+  (table) => [
+    index("operator_catalog_facts_key_idx").on(table.tenantId, table.factKey, table.status),
+    index("operator_catalog_facts_browse_idx").on(table.tenantId, table.carrierId, table.areaSlug, table.status),
+    index("operator_catalog_facts_status_idx").on(table.tenantId, table.status),
+    index("operator_catalog_facts_source_idx").on(table.sourceId),
+  ],
 );
 
 /** Agent definitions created in Agent Builder. */

@@ -23,7 +23,7 @@ const SETTING_KEY: Record<AiProvider, string> = {
   anthropic: "ai_anthropic_api_key",
 };
 
-async function providerKey(provider: AiProvider) {
+export async function providerKey(provider: AiProvider) {
   const fromEnv = process.env[PROVIDER_KEY_ENV[provider]]?.trim();
   if (fromEnv) return fromEnv;
   return (await getSystemSetting(SETTING_KEY[provider]).catch(() => null))?.trim() || null;
