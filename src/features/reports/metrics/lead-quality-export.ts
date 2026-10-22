@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
@@ -8,6 +8,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { resolveReportDataScope } from "./metric-scope";
 import {
   getLeadQualityReport,
+  leadEntryQueueExpression,
   leadOriginExpression,
   leadQualityCohortWhere,
   leadShiftExpression,
@@ -75,7 +76,7 @@ export async function getLeadQualityExport(context: TenantContext, period: LeadQ
     sourceCampaign: schema.leads.sourceCampaign,
     qualificationDetails: schema.leads.qualificationDetails,
   }).from(schema.leads)
-    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, schema.leads.queueId)))
+    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), sql`${schema.leadQueues.id} = ${leadEntryQueueExpression()}`))
     .leftJoin(schema.user, eq(schema.user.id, schema.leads.corretorId))
     .where(and(
       eq(schema.leads.tenantId, scope.tenantId),

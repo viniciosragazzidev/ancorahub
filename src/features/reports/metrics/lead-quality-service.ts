@@ -153,12 +153,26 @@ export function leadShiftEndExpression(window?: Pick<LeadQualityWindow, "shiftSp
   END)`;
 }
 
+/**
+ * The queue the lead ENTERED (its first queue in the distribution events), not
+ * the one it is in now: leads moved later to Leads Frios, Pós Venda or another
+ * queue keep counting where they arrived (22/10: FILA PF - RENAN showed 43 of
+ * the 77 leads its campaign brought). Falls back to the current queue.
+ */
+export function leadEntryQueueExpression() {
+  return sql<string | null>`coalesce((
+    select e.to_queue_id from lead_distribution_events e
+    where e.tenant_id = "leads"."tenant_id" and e.lead_id = "leads"."id" and e.to_queue_id is not null
+    order by e.created_at asc limit 1
+  ), "leads"."queue_id")`;
+}
+
 /** Window + queue + origin conditions shared by every query of the report. */
 export function leadQualityCohortWhere(window: LeadQualityWindow, filters: LeadQualityFilters): SQL | undefined {
   return and(
     gte(schema.leads.createdAt, window.since),
     window.until ? lt(schema.leads.createdAt, window.until) : undefined,
-    filters.queueId ? eq(schema.leads.queueId, filters.queueId) : undefined,
+    filters.queueId ? sql`${leadEntryQueueExpression()} = ${filters.queueId}` : undefined,
     filters.origin ? sql`${leadOriginExpression()} = ${filters.origin}` : undefined,
   );
 }
@@ -199,7 +213,7 @@ function focusWhere(focus: LeadQualityFocus | null, window?: LeadQualityWindow):
     case "form":
       return unknown ? unknownText(schema.leads.metaFormId) : eq(schema.leads.metaFormId, focus.key);
     case "queue":
-      return unknown ? unknownText(schema.leads.queueId) : eq(schema.leads.queueId, focus.key);
+      return unknown ? unknownText(leadEntryQueueExpression()) : sql`${leadEntryQueueExpression()} = ${focus.key}`;
     case "broker":
       return unknown ? unknownText(schema.leads.corretorId) : eq(schema.leads.corretorId, focus.key);
     case "lead_type":
@@ -300,7 +314,7 @@ export async function getLeadQualityReport(
       adName: sql<string | null>`${schema.metaAds.name}`.as("adName"),
       formId: schema.leads.metaFormId,
       formName: sql<string | null>`${schema.metaLeadForms.name}`.as("formName"),
-      queueId: schema.leads.queueId,
+      queueId: leadEntryQueueExpression().as("queueId"),
       queueName: sql<string | null>`${schema.leadQueues.name}`.as("queueName"),
       brokerId: schema.leads.corretorId,
       brokerName: sql<string | null>`${schema.user.name}`.as("brokerName"),
@@ -324,7 +338,7 @@ export async function getLeadQualityReport(
       .leftJoin(schema.metaAdSets, and(eq(schema.metaAdSets.tenantId, context.tenantId), eq(schema.metaAdSets.adSetId, schema.leads.metaAdSetId)))
       .leftJoin(schema.metaAds, and(eq(schema.metaAds.tenantId, context.tenantId), eq(schema.metaAds.adId, schema.leads.metaAdId)))
       .leftJoin(schema.metaLeadForms, and(eq(schema.metaLeadForms.tenantId, context.tenantId), eq(schema.metaLeadForms.formId, schema.leads.metaFormId)))
-      .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, schema.leads.queueId)))
+      .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), sql`${schema.leadQueues.id} = ${leadEntryQueueExpression()}`))
       .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, schema.leads.corretorId), eq(schema.tenantMemberships.status, "active")))
       .leftJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
       .where(and(
@@ -510,7 +524,7 @@ export async function getLeadQualityReport(
         queueName: schema.leadQueues.name,
         brokerName: schema.user.name,
       }).from(schema.leads)
-        .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, schema.leads.queueId)))
+        .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), sql`${schema.leadQueues.id} = ${leadEntryQueueExpression()}`))
         .leftJoin(schema.tenantMemberships, and(eq(schema.tenantMemberships.tenantId, context.tenantId), eq(schema.tenantMemberships.userId, schema.leads.corretorId), eq(schema.tenantMemberships.status, "active")))
         .leftJoin(schema.user, eq(schema.user.id, schema.tenantMemberships.userId))
         .where(and(
@@ -594,7 +608,7 @@ export async function getSimpleLeadQualityReport(context: TenantContext, period:
       converted: sql<boolean>`${schema.leads.status} = 'converted'`,
     })
     .from(schema.leads)
-    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.id, schema.leads.queueId)))
+    .leftJoin(schema.leadQueues, and(eq(schema.leadQueues.tenantId, context.tenantId), sql`${schema.leadQueues.id} = ${leadEntryQueueExpression()}`))
     .where(and(
       eq(schema.leads.tenantId, scope.tenantId),
       isNull(schema.leads.deletedAt),

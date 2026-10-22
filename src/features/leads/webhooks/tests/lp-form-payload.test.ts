@@ -23,8 +23,10 @@ describe("lpFormPayloadSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects a missing name, a short phone, and an invalid email", () => {
-    expect(lpFormPayloadSchema.safeParse({ telefone: validPayload.telefone }).success).toBe(false);
+  it("keeps a lead without name, and rejects a short phone and an invalid email", () => {
+    const withoutName = lpFormPayloadSchema.safeParse({ telefone: validPayload.telefone });
+    expect(withoutName.success && withoutName.data.nome).toBe("Lead sem nome");
+    expect(lpFormPayloadSchema.safeParse({ ...validPayload, nome: "h" }).success && lpFormPayloadSchema.safeParse({ ...validPayload, nome: "h" }).data?.nome).toBe("Lead sem nome");
     expect(lpFormPayloadSchema.safeParse({ nome: validPayload.nome, telefone: "123" }).success).toBe(false);
     expect(lpFormPayloadSchema.safeParse({ ...validPayload, email: "not-an-email" }).success).toBe(false);
   });
@@ -49,7 +51,8 @@ describe("lpFormPayloadSchema", () => {
   });
 
   it("rejects oversized customer-controlled text", () => {
-    expect(lpFormPayloadSchema.safeParse({ ...validPayload, nome: "a".repeat(161) }).success).toBe(false);
+    // An oversized name is cut, not rejected: the lead still gets in.
+    expect(lpFormPayloadSchema.safeParse({ ...validPayload, nome: "a".repeat(161) }).data?.nome).toHaveLength(160);
     expect(lpFormPayloadSchema.safeParse({ ...validPayload, plano_interesse: "a".repeat(161) }).success).toBe(false);
   });
 });

@@ -38,7 +38,7 @@ export function LeadQualitySimple({ report, queueName }: { report: SimpleLeadQua
         <h2 id="q1" className="text-lg font-semibold">1. Quantos leads entraram e quantos são bons</h2>
         <p className="text-sm text-muted-foreground">Bom = quente ou morno validado. Lead de WhatsApp só conta como bom se o cliente respondeu a qualificação.</p>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Stat label="Entraram" value={n(report.arrived.total)} detail={queueName ? `Fila ${queueName}` : "Todas as filas"} />
+          <Stat label="Entraram" value={n(report.arrived.total)} detail={queueName ? `Entraram pela fila ${queueName}` : "Todas as filas"} />
           <Stat label="Bons (quentes + mornos)" value={n(report.arrived.good)} detail={`${pct(report.arrived.good, report.arrived.total)} do que entrou`} tone="good" />
           <Stat label="Frios" value={n(arrivedWeak)} detail={`${n(report.arrived.cold)} frios + ${n(report.arrived.noReply)} de WhatsApp que não responderam · ${pct(arrivedWeak, report.arrived.total)}`} tone="weak" />
           <Stat label="Descartados ou em qualificação" value={n(report.arrived.other)} detail={pct(report.arrived.other, report.arrived.total)} />
@@ -52,7 +52,7 @@ export function LeadQualitySimple({ report, queueName }: { report: SimpleLeadQua
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Fila</TableHead>
+                  <TableHead>Fila de entrada</TableHead>
                   <TableHead>Reter frios</TableHead>
                   <TableHead className="text-right">Entraram</TableHead>
                   <TableHead className="text-right">Bons</TableHead>

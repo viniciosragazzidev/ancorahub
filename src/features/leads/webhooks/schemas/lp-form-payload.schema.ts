@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** Name used when the form brings none or a single letter. */
+export const LEAD_WITHOUT_NAME = "Lead sem nome";
+
 /**
  * Schema for landing page form submissions.
  * Accepts Portuguese field names (nome, telefone, plano_interesse)
@@ -7,11 +10,14 @@ import { z } from "zod";
  */
 export const lpFormPayloadSchema = z
   .object({
-    nome: z
-      .string()
-      .trim()
-      .min(2, "O nome deve ter pelo menos 2 caracteres.")
-      .max(160, "O nome deve ter no máximo 160 caracteres."),
+    // A lead with a phone always gets in (22/10: a Meta lead named "h" was rejected and lost).
+    nome: z.preprocess(
+      (value) => {
+        const name = typeof value === "string" ? value.trim() : "";
+        return name.length >= 2 ? name.slice(0, 160) : LEAD_WITHOUT_NAME;
+      },
+      z.string(),
+    ),
 
     telefone: z
       .string()

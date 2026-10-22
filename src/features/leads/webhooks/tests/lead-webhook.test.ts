@@ -209,12 +209,13 @@ describe("leadWebhookPayloadSchema", () => {
     expect(result.success).toBe(true);
   });
 
-  it("rejects payload without name", () => {
+  it("accepts a payload without name as \"Lead sem nome\" (a lead with a phone is never lost)", () => {
     const result = leadWebhookPayloadSchema.safeParse({
       phone: "+5521999999999",
       source: "site",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.name).toBe("Lead sem nome");
   });
 
   it("rejects invalid email", () => {
@@ -247,13 +248,14 @@ describe("leadWebhookPayloadSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects short name (< 2 chars)", () => {
+  it("names a one-letter name \"Lead sem nome\" instead of rejecting the lead", () => {
     const result = leadWebhookPayloadSchema.safeParse({
       name: "A",
       phone: "+5521999999999",
       source: "site",
     });
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.name).toBe("Lead sem nome");
   });
 
   it("accepts empty email as valid", () => {

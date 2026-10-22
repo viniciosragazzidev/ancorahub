@@ -372,7 +372,8 @@ export async function ingestMetaLeadAdsWebhook(payload: MetaLeadAdsWebhookPayloa
         const campaignId = attribution.campaignId;
         const adSetId = lead.adSetId ?? attribution.adSetId;
         console.log("[ingestMetaLeadAdsWebhook] Normalized lead:", { nome: lead.nome, telefone: lead.telefone, externalId: lead.externalId });
-        if (!lead.nome || !lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe nome e telefone utilizáveis.");
+        // No name is fine (the intake names it "Lead sem nome"); without a phone there is no lead.
+        if (!lead.telefone || !lead.externalId) throw new Error("O formulário não trouxe telefone utilizável.");
         const campaignRoute = campaignId
           ? await resolveMetaCampaignQueueRoute(source.tenantId, campaignId)
           : undefined;
