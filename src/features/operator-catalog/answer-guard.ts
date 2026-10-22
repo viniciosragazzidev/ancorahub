@@ -108,10 +108,34 @@ export function validateGroundedAnswer(input: { answer: string; validIds: Set<st
     .replace(/\[[FT]\d{1,3}\]/g, " ")
     // List markers ("1." or "2)") at the start of a line are not data.
     .replace(/^\s*\d{1,2}[.)]\s/gm, " ");
-  for (const number of numbersIn(body)) {
-    if (!allowed.has(number)) return { ok: false, reason: "number_without_source", detail: number };
+  const inAnswer = [...numbersIn(body)];
+  const sourced = inAnswer.filter((number) => allowed.has(number));
+  for (const number of inAnswer) {
+    if (allowed.has(number)) continue;
+    // A total for several lives: the sum of values from the material shown in the answer.
+    if (isSumOfSome(Number(number), sourced.map(Number))) continue;
+    return { ok: false, reason: "number_without_source", detail: number };
   }
   return { ok: true };
+}
+
+/** True when `target` is the sum of two or more of `values` (to the cent). Small lists only. */
+export function isSumOfSome(target: number, values: number[]) {
+  const cents = values.slice(0, 20).map((value) => Math.round(value * 100)).filter((value) => value > 0);
+  const goal = Math.round(target * 100);
+  if (goal <= 0 || cents.length < 2) return false;
+  // Subset sums with the count of parts (needs at least two).
+  let sums = new Map<number, number>([[0, 0]]);
+  for (const value of cents) {
+    const next = new Map(sums);
+    for (const [sum, parts] of sums) {
+      const total = sum + value;
+      if (total > goal) continue;
+      next.set(total, Math.max(next.get(total) ?? 0, parts + 1));
+    }
+    sums = next;
+  }
+  return (sums.get(goal) ?? 0) >= 2;
 }
 
 export const NOT_FOUND_MESSAGE = "Não encontrei essa informação no material importado das operadoras. Ela ainda não foi importada ou não está catalogada. Peça para importar o material em Ferramentas › Materiais das operadoras.";

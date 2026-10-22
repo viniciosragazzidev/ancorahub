@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import { planFactChanges, quoteFactKey, sameValue, summarizeActions } from "./diff";
-import { expandPriceTables, extractionSchema, mergeExtractions, splitIntoWindows } from "./extraction";
+import { expandPriceTables, extractionSchema, mergeExtractions, plausibleValidUntil, splitIntoWindows } from "./extraction";
 import { matchCarrier, matchPlan } from "./matching";
-import { ageBandsInQuestion, carriersInQuestion, plansInQuestion } from "./question-scope";
+import { ageBandsInQuestion, agesInQuestion, carriersInQuestion, plansInQuestion } from "./question-scope";
 import { buildFactKey, canonicalQualifiers, mergeAreas, normalizeAgeBand, parseNumericValue, SYSTEM_AREAS } from "./taxonomy";
 
 describe("taxonomy", () => {
@@ -197,5 +197,29 @@ describe("question scope", () => {
   it("turns ages into ANS bands", () => {
     expect(ageBandsInQuestion("titular 35 anos e filho de 8 anos, mãe 60 anos")).toEqual(["34-38", "0-18", "59+"]);
     expect(ageBandsInQuestion("plano para a empresa")).toEqual([]);
+  });
+});
+
+describe("plausibleValidUntil", () => {
+  const importedAt = new Date("2026-10-22T18:00:00-03:00");
+  it("drops an end on the import day (the print date read as validity)", () => {
+    expect(plausibleValidUntil(new Date("2026-10-22T12:00:00-03:00"), importedAt)).toBeNull();
+  });
+  it("keeps a real end of validity", () => {
+    const end = new Date("2026-12-31T12:00:00-03:00");
+    expect(plausibleValidUntil(end, importedAt)).toBe(end);
+  });
+});
+
+describe("ages in the question", () => {
+  it("reads bare numbers after vidas as ages, not money", () => {
+    expect(agesInQuestion("Planos PME - Porte I - Total de 2 vidas valor 33,24")).toEqual([33, 24]);
+    expect(agesInQuestion("titular 42 e dependente 8")).toEqual([42, 8]);
+  });
+  it("keeps money, dates and the number of lives out", () => {
+    expect(agesInQuestion("3 vidas, orçamento de R$ 900,00 até 10/11")).toEqual([]);
+  });
+  it("needs a word about people to read bare numbers", () => {
+    expect(agesInQuestion("tabela PME porte I 33")).toEqual([]);
   });
 });

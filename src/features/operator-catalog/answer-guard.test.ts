@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isOperatorKnowledgeQuestion, marketOperatorsInQuestion, numbersIn, operatorNotImportedMessage, relevantChunks, validateGroundedAnswer } from "./answer-guard";
+import { isOperatorKnowledgeQuestion, isSumOfSome, marketOperatorsInQuestion, numbersIn, operatorNotImportedMessage, relevantChunks, validateGroundedAnswer } from "./answer-guard";
 
 describe("operator questions", () => {
   it("names market operators without mistaking common words or person names", () => {
@@ -80,5 +80,24 @@ describe("relevantChunks", () => {
       chunk("uma palavra", { keywordHits: 1 }),
     ], { carrierIds: [], carrierNames: [], keywordCount: 4 });
     expect(result.map((item) => item.text)).toEqual(["parecido"]);
+  });
+});
+
+describe("totals for several lives", () => {
+  it("accepts a total that is the sum of sourced values in the answer", () => {
+    const context = "[T1] Amil S380 QC 24-28 326,25 29-33 391,50";
+    const answer = "33 anos: R$ 391,50 [T1]; 24 anos: R$ 326,25 [T1]. Total: R$ 717,75.";
+    expect(validateGroundedAnswer({ answer, validIds: new Set(["T1"]), context, question: "2 vidas 33,24" })).toEqual({ ok: true });
+  });
+
+  it("still blocks a total that does not add up", () => {
+    const context = "[T1] Amil S380 QC 24-28 326,25 29-33 391,50";
+    const answer = "33 anos: R$ 391,50 [T1]; 24 anos: R$ 326,25 [T1]. Total: R$ 720,00.";
+    expect(validateGroundedAnswer({ answer, validIds: new Set(["T1"]), context, question: "2 vidas 33,24" })).toMatchObject({ ok: false, reason: "number_without_source" });
+  });
+
+  it("finds sums of two or more values only", () => {
+    expect(isSumOfSome(717.75, [391.5, 326.25, 10])).toBe(true);
+    expect(isSumOfSome(391.5, [391.5, 326.25])).toBe(false);
   });
 });

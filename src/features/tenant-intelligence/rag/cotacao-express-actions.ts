@@ -16,7 +16,7 @@ const querySchema = z.string().trim().min(3).max(500);
  * server session, never from the browser.
  */
 export async function consultarCotacaoExpress(rawQuery: string): Promise<CotacaoExpressResult> {
-  const parsed = querySchema.safeParse(rawQuery);
+  const parsed = querySchema.safeParse(rawQuery.replace(/^\s*\/?cota[cç][aã]o[-\s]?express\b\s*/i, ""));
   if (!parsed.success) {
     return { status: "error", message: "Descreva a cotação com pelo menos 3 caracteres." };
   }

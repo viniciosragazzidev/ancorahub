@@ -96,6 +96,17 @@ export function splitIntoWindows(text: string, maxChars = EXTRACTION_WINDOW_CHAR
   return windows;
 }
 
+/**
+ * The end of validity the AI read, when it is believable. An end on the import
+ * day or before is almost always the print date ("Data da impressão: 22/10/2026"
+ * made a coparticipation table expire the day it arrived): it is dropped and the
+ * material keeps the validity found at import.
+ */
+export function plausibleValidUntil(validUntil: Date | null, importedAt: Date) {
+  if (!validUntil) return null;
+  return validUntil.getTime() > importedAt.getTime() + 2 * 24 * 60 * 60_000 ? validUntil : null;
+}
+
 /** A price table becomes one "precos/mensalidade" fact per age band. */
 export function expandPriceTables(tables: WindowExtraction["priceTables"]): ExtractedFact[] {
   return tables.flatMap((table) => table.bands.map((band) => ({
@@ -180,7 +191,7 @@ export function buildExtractionSystemPrompt(input: {
     '  "title": título curto do material,',
     '  "subject": assunto estável para reconhecer uma nova versão do mesmo material, sem datas (ex.: "tabela pme rj 2 a 29 vidas"),',
     '  "carrier": {"name": nome da operadora, "ansCode": registro ANS ou null} ou null,',
-    '  "validFrom" e "validUntil": datas AAAA-MM-DD da vigência escrita no material, ou null,',
+    '  "validFrom" e "validUntil": datas AAAA-MM-DD da vigência escrita no material, ou null. Data de impressão, emissão ou geração do PDF NÃO é vigência,',
     '  "plans": [{"name": nome do plano como no material, "code": código ou null, "aliases": outros nomes do mesmo plano}],',
     '  "priceTables": [{"plan": nome do plano, "qualifiers": {"acomodacao": ..., "coparticipacao": ..., "vidas": ..., "regiao": ..., "contratacao": ...}, "bands": [{"band": "0-18", "value": "123,45"}], "page": número ou null}],',
     '  "facts": [{"plan": nome do plano ou null quando vale para a operadora toda, "area": slug da área, "field": chave do campo, "value": valor como escrito, "unit": unidade ou null, "qualifiers": {...}, "page": número ou null, "excerpt": frase curta de onde veio}],',

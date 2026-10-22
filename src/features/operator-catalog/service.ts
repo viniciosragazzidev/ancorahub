@@ -14,6 +14,7 @@ import {
   extractionSchema,
   MAX_EXTRACTION_WINDOWS,
   mergeExtractions,
+  plausibleValidUntil,
   splitIntoWindows,
   type DocumentExtraction,
   type WindowExtraction,
@@ -527,7 +528,7 @@ export async function catalogOperatorSource(tenantId: string, sourceId: string) 
     const { planOf, created } = await resolvePlans(tenantId, carrier, extraction, sourceId);
     const facts = resolveFacts(extraction, carrier.id, areas, planOf);
     const validFrom = parseDate(extraction.validFrom);
-    const validUntil = parseDate(extraction.validUntil);
+    const validUntil = plausibleValidUntil(parseDate(extraction.validUntil), startedAt);
 
     const planIds = [...new Set(facts.flatMap((fact) => (fact.planId ? [fact.planId] : [])))];
     const areaSlugs = [...new Set(facts.map((fact) => fact.areaSlug))];

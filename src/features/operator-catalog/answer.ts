@@ -12,11 +12,13 @@ import { getDatabase, schema } from "@/shared/db";
 import { isOperatorKnowledgeQuestion, marketOperatorsInQuestion, NOT_FOUND_MESSAGE, operatorNotImportedMessage, relevantChunks, validateGroundedAnswer } from "./answer-guard";
 import { embedQuery } from "./embeddings";
 import { toNamedEntity } from "./matching";
-import { ageBandsInQuestion, carriersInQuestion, plansInQuestion } from "./question-scope";
+import { ageBandsInQuestion, agesInQuestion, carriersInQuestion, plansInQuestion } from "./question-scope";
 import { loadCatalogAreas } from "./service";
 
 const MAX_FACTS = 120;
 const MAX_CHUNKS = 6;
+/** Up to this many operators in the catalog, a question that names none searches all of them. */
+const MAX_CARRIERS_WITHOUT_NAME = 3;
 
 const SYSTEM_PROMPT = [
   "Você é o assistente de cotação de planos de saúde da corretora.",
@@ -27,6 +29,9 @@ const SYSTEM_PROMPT = [
   "Copie números, valores e prazos exatamente como estão no material. Não calcule totais, médias ou descontos que não estejam escritos.",
   "Se o material não responder a pergunta (ou responder só em parte), devolva found false e diga em missing o que faltou. Não complete com suposições.",
   "Diga a vigência junto do valor quando ela for informada.",
+  "Números listados junto de vidas, titular ou dependentes são IDADES (ex.: \"2 vidas 33,24\" = duas pessoas de 33 e 24 anos), não valores em reais. Encontre a faixa etária de cada idade na tabela.",
+  "Para várias vidas, mostre o valor de cada pessoa pela faixa (com a citação) e o total somado. Se houver mais de um plano ou acomodação, mostre uma linha por plano.",
+  "As tabelas dos trechos [T] podem vir com as colunas desalinhadas pela leitura do PDF: leia com cuidado qual valor é de qual plano e faixa.",
   "Trechos marcados como leitura automática de imagem podem ter erros: avise para confirmar no material original.",
   'Devolva somente um JSON: {"found": true ou false, "answer": "resposta com citações", "missing": "o que não está no material, ou vazio"}.',
 ].join(" ");
@@ -60,16 +65,25 @@ async function loadScope(tenantId: string, question: string) {
   // Market operators named in the question with no material in the catalog.
   const entities = carrierRows.map(toNamedEntity);
   const missingOperators = marketOperatorsInQuestion(question).filter((name) => carriersInQuestion(name, entities).length === 0);
-  return { carrierIds, carrierNames, planIds: plans.map((plan) => plan.id), bands: ageBandsInQuestion(question), missingOperators };
+  // No operator named and only a few in the catalog: the facts of all of them are searched
+  // (22/10: "Planos PME Porte I 2 vidas" never reached the Amil prices). Excerpts keep the
+  // operator filter only when one was named.
+  const factCarrierIds = carrierIds.length || missingOperators.length || carrierRows.length > MAX_CARRIERS_WITHOUT_NAME
+    ? carrierIds
+    : carrierRows.map((row) => row.id);
+  const ages = agesInQuestion(question);
+  const asksPrice = /\b(valor|valores|preco|precos|quanto|mensalidade|tabela|custa|custo)\b/.test(question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
+  return { carrierIds, factCarrierIds, carrierNames, planIds: plans.map((plan) => plan.id), bands: ageBandsInQuestion(question), ages, asksPrice, missingOperators };
 }
 
-async function loadFacts(tenantId: string, scope: { carrierIds: string[]; planIds: string[]; bands: string[] }) {
-  if (!scope.carrierIds.length) return [];
+async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; planIds: string[]; bands: string[]; asksPrice: boolean }) {
+  if (!scope.factCarrierIds.length) return [];
   const now = new Date();
   // Prices only for the ages asked: a full table would crowd out the rules.
+  // A price question with no age brings the table; anything else leaves prices out.
   const priceFilter = scope.bands.length
     ? or(sql`${schema.operatorCatalogFacts.areaSlug} <> 'precos'`, inArray(sql`${schema.operatorCatalogFacts.qualifiers}->>'faixa_etaria'`, scope.bands))
-    : sql`${schema.operatorCatalogFacts.areaSlug} <> 'precos'`;
+    : scope.asksPrice ? undefined : sql`${schema.operatorCatalogFacts.areaSlug} <> 'precos'`;
   return getDatabase()
     .select({
       carrierName: schema.tenantPrivateCarriers.name,
@@ -90,7 +104,7 @@ async function loadFacts(tenantId: string, scope: { carrierIds: string[]; planId
       eq(schema.operatorCatalogFacts.tenantId, tenantId),
       eq(schema.operatorCatalogFacts.status, "current"),
       eq(schema.operatorCatalogFacts.origin, "material"),
-      inArray(schema.operatorCatalogFacts.carrierId, scope.carrierIds),
+      inArray(schema.operatorCatalogFacts.carrierId, scope.factCarrierIds),
       // A plan still waiting for the director is not offered to brokers.
       or(isNull(schema.operatorCatalogFacts.planId), eq(schema.tenantPrivatePlans.active, true)),
       or(sql`${schema.operatorCatalogFacts.validUntil} is null`, sql`${schema.operatorCatalogFacts.validUntil} >= ${now.toISOString()}::timestamptz`),
@@ -166,6 +180,7 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
   });
   const context = `Informações catalogadas:\n${factLines.join("\n") || "(nenhuma)"}\n\nTrechos de material:\n${chunkLines.join("\n\n") || "(nenhum)"}`;
 
+  const people = scope.ages.length ? `\nIdades das pessoas: ${scope.ages.join(", ")} anos.` : "";
   const result = await runGateway({
     profile: "chat-smart",
     purpose: "cotacao_express",
@@ -173,8 +188,8 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
     userId: input.userId,
     sensitive: true,
     temperature: 0,
-    maxTokens: 1_500,
-    timeoutMs: 45_000,
+    maxTokens: 2_500,
+    timeoutMs: 60_000,
     schema: z.object({
       found: z.boolean().catch(false),
       answer: z.string().trim().max(6000).catch(""),
@@ -182,7 +197,7 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
     }),
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Pergunta: ${input.question}\n\n${context}` },
+      { role: "user", content: `Pergunta: ${input.question}${people}\n\n${context}` },
     ],
   });
   if (!result.ok) {

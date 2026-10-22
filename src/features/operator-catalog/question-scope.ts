@@ -40,8 +40,32 @@ export function plansInQuestion(question: string, plans: Array<NamedEntity & { c
 }
 
 /** Ages in the question ("35 anos", "titular 42 e filho 8"), turned into the ANS band each one falls in. */
+/**
+ * Ages of the people in the question. "35 anos" always counts; when the question
+ * talks about people (vidas, idades, titular, dependente...), bare numbers count
+ * too: "2 vidas 33,24" is two people of 33 and 24 (22/10, read before as R$ 33,24).
+ * The number of lives itself ("2 vidas") and money ("R$ 33,24") are not ages.
+ */
+export function agesInQuestion(question: string) {
+  const ages = [...question.matchAll(/\b(\d{1,3})\s*(?:anos?|a\b)/gi)].map((match) => Number(match[1]));
+  const text = question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  if (/\b(vidas?|idades?|titular|dependentes?|pessoas?|beneficiarios?|filhos?|esposa|marido|conjuge)\b/.test(text)) {
+    const cleaned = text
+      .replace(/r\$\s*\d[\d.,]*/g, " ")
+      .replace(/\b\d{1,3}\s*(?:vidas?|pessoas?|beneficiarios?|dependentes?|filhos?)\b/g, " ")
+      .replace(/\b\d{1,3}\s*(?:anos?)\b/g, " ")
+      .replace(/\b\d{1,2}[\/-]\d{1,2}([\/-]\d{2,4})?\b/g, " ")
+      .replace(/\b\d+\s*%/g, " ");
+    for (const match of cleaned.matchAll(/\d+/g)) {
+      const value = Number(match[0]);
+      if (match[0].length <= 3 && value <= 120) ages.push(value);
+    }
+  }
+  return [...new Set(ages.filter((age) => age >= 0 && age <= 120))];
+}
+
 export function ageBandsInQuestion(question: string) {
-  const ages = [...question.matchAll(/\b(\d{1,3})\s*(?:anos?|a\b)/gi)].map((match) => Number(match[1])).filter((age) => age >= 0 && age <= 120);
+  const ages = agesInQuestion(question);
   const bands = ["0-18", "19-23", "24-28", "29-33", "34-38", "39-43", "44-48", "49-53", "54-58", "59+"];
   return [...new Set(ages.map((age) => bands.find((band) => {
     const [min, max] = band.endsWith("+") ? [Number(band.slice(0, -1)), 200] : band.split("-").map(Number);
