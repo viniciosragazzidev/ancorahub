@@ -712,7 +712,8 @@ export async function startQualificationConversationForLead(
       recipientId: input.leadId,
       destinationPhone: lead.telefone,
       purpose: "leadQualification",
-      variables: turboChoice?.variables ?? [lead.nome || "Cliente", botName, "Âncora Saúde"],
+      // The configured template keeps its own three variables, never the turbo ones.
+      variables: [lead.nome || "Cliente", botName, "Âncora Saúde"],
       requestedBy: input.actorUserId,
       idempotencyKey: `qualification-engine:${input.leadId}:start:${conversation.id}`,
     });

@@ -55,6 +55,17 @@ export function requestedOperator(input: ApproachInput): string | null {
   return found ? titleCase(found === "sulamerica" ? "SulAmérica" : found) : null;
 }
 
+/**
+ * Variables of the qualification templates, in the outbox order: nome, nome_bot, empresa and,
+ * only when known, operadora. The outbox refuses an empty variable, so an unknown operator
+ * is left out instead of sent as "" (22/10: every lead without an operator in the campaign,
+ * like the PME ones, failed the first message and was disqualified).
+ */
+export function qualificationTemplateVariables(nome: string, botName: string, empresa: string, operadora: string | null) {
+  const values = [nome.trim() || "Cliente", botName.trim() || "Assistente", empresa.trim() || "Âncora Saúde"];
+  return operadora?.trim() ? [...values, operadora.trim()] : values;
+}
+
 /** Company lead: PJ type, CNPJ answer in the form, or a [PME]/empresarial/MEI campaign. */
 export function isCompanyLead(input: ApproachInput) {
   const metadata = input.sourceMetadata ?? {};

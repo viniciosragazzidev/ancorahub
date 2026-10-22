@@ -150,9 +150,10 @@ export function parseSoftDecline(value: string | null | undefined) {
 
 export function parseOptOut(value: string | null | undefined) {
   const text = normalizeQuickReplyText(value);
+  // "Já tenho CNPJ" answers the PME question, it is not "já tenho plano" (22/10).
   // "Agora não" and "Pode encerrar" are the stop buttons of the qualification templates (turbo, 21/10).
   return /^(sair|parar|stop|nao quero mais|nao me mande|remover|descadastrar|cancelar mensagens|pare de enviar|pare de enviar mensagens|nao tenho interesse|sem interesse|agora nao|pode encerrar)$/.test(text)
-    || /(nao tenho interesse|sem interesse|nao quero|nao tenho mais interesse|ja contratei|ja tenho|nao solicitei|nao pedi|(fechei|contratei) com outr)/.test(text)
+    || /(nao tenho interesse|sem interesse|nao quero|nao tenho mais interesse|ja contratei|ja tenho(?! (o |um |uma )?(cnpj|mei|empresa))|nao solicitei|nao pedi|(fechei|contratei) com outr)/.test(text)
     // "Already solved" only as the whole answer: "já consegui os documentos" mid-conversation is not a no (18/10).
     || /^ja (consegui|fechei|fiz|resolvi)( (o|um) plano)?( obrigad[oa])?$/.test(text);
 }

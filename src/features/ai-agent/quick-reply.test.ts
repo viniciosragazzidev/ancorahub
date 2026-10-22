@@ -134,3 +134,13 @@ describe("pedido de ligação só quando o lead pede (revisão 21/10)", () => {
     expect(resolveQuickReply({ ...base, body: "pode me chamar por aqui" }).intent).not.toBe("REQUEST_CALLBACK");
   });
 });
+
+describe("parseOptOut and the PME CNPJ answer", () => {
+  it("does not read 'já tenho CNPJ' or 'já tenho MEI' as a refusal", () => {
+    expect(parseOptOut("Já tenho CNPJ")).toBe(false);
+    expect(parseOptOut("sim, ja tenho um cnpj ativo")).toBe(false);
+    expect(parseOptOut("já tenho mei")).toBe(false);
+    expect(parseOptOut("já tenho plano")).toBe(true);
+    expect(parseOptOut("ja tenho")).toBe(true);
+  });
+});

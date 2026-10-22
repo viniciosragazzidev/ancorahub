@@ -6,7 +6,7 @@ import { getQualificationTenantSettings } from "@/features/ai-qualification/tena
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
 
-import { requestedOperator } from "./approaches";
+import { qualificationTemplateVariables, requestedOperator } from "./approaches";
 import { decideNextTouch, type TurboState, type TurboTouchRecord } from "./cadence";
 import { companyNameFor, getTurboSettings, listApprovedTemplateNames, readTurboState, writeTurboState } from "./service";
 
@@ -162,7 +162,7 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
     }
 
     const attempt = state.touches.filter((touch) => touch.touch === decision.step.touch).length + 1;
-    const operadora = requestedOperator({ tipo: lead.tipo, sourceCampaign: lead.sourceCampaign, sourceMetadata: lead.sourceMetadata as Record<string, unknown> | null }) ?? "";
+    const operadora = requestedOperator({ tipo: lead.tipo, sourceCampaign: lead.sourceCampaign, sourceMetadata: lead.sourceMetadata as Record<string, unknown> | null });
     let record: TurboTouchRecord = { touch: decision.step.touch, template: decision.step.template, at: now.toISOString(), status: "failed" };
     try {
       const queued = await enqueueMetaTemplateMessage({
@@ -171,7 +171,7 @@ async function runCadence(now: Date): Promise<CadenceRunResult> {
         recipientId: lead.id,
         destinationPhone: lead.telefone,
         purpose: "leadQualification",
-        variables: [lead.nome || "Cliente", tenant.botName, tenant.empresa, operadora],
+        variables: qualificationTemplateVariables(lead.nome || "Cliente", tenant.botName, tenant.empresa, operadora),
         idempotencyKey: `qualification-turbo:${lead.id}:${decision.step.touch}:${attempt}`,
         requireApprovedMetaTemplate: true,
         templateName: decision.step.template,

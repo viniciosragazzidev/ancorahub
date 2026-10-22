@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { APPROACHES, isNightInSaoPaulo, requestedOperator, resolveApproach } from "./approaches";
+import { APPROACHES, isNightInSaoPaulo, qualificationTemplateVariables, requestedOperator, resolveApproach } from "./approaches";
 import { CADENCE, decideNextTouch, type CadenceInput, type TurboState } from "./cadence";
 import { assignVariant, MIN_SENDS_BEFORE_LEARNING, replyRate, stableHash } from "./experiments";
 import { RECOMMENDED_TEMPLATES, templateVariableOrder, toMetaTemplatePayload } from "./templates-pack";
@@ -231,5 +231,20 @@ describe("regra da Meta para variáveis (21/10)", () => {
       expect(template.body.trim().startsWith("{{"), template.name).toBe(false);
       expect(/\}\}[.!?]?$/.test(template.body.trim()), template.name).toBe(false);
     }
+  });
+});
+
+describe("qualificationTemplateVariables", () => {
+  it("never sends an empty variable: an unknown operator is left out (PME campaign, 22/10)", () => {
+    const pme = { sourceCampaign: "Plantão PME - [CBO] [GNDIPME_03] [1-1-10] - 15/09/2025", sourceMetadata: null };
+    expect(resolveApproach(pme).id).toBe("pme");
+    const variables = qualificationTemplateVariables("Ana", "Assistente", "Âncora Saúde", requestedOperator(pme));
+    expect(variables).toEqual(["Ana", "Assistente", "Âncora Saúde"]);
+    expect(variables.every((value) => value.trim().length > 0)).toBe(true);
+  });
+
+  it("keeps the operator when the campaign names one", () => {
+    expect(qualificationTemplateVariables("Ana", "Assistente", "Âncora Saúde", "Amil")).toEqual(["Ana", "Assistente", "Âncora Saúde", "Amil"]);
+    expect(qualificationTemplateVariables("", "", "", "  ")).toEqual(["Cliente", "Assistente", "Âncora Saúde"]);
   });
 });

@@ -6,7 +6,7 @@ import { getSystemSetting, setSystemSetting } from "@/features/system-settings/q
 import { getActiveWabaId } from "@/features/communication-channels/message-policy-service";
 import { getDatabase, schema } from "@/shared/db";
 
-import { APPROACHES, isNightInSaoPaulo, NIGHT_TEMPLATE, requestedOperator, resolveApproach, type ApproachInput, type ApproachId } from "./approaches";
+import { APPROACHES, isNightInSaoPaulo, NIGHT_TEMPLATE, qualificationTemplateVariables, requestedOperator, resolveApproach, type ApproachInput, type ApproachId } from "./approaches";
 import type { TurboState } from "./cadence";
 import { assignVariant, type VariantStats } from "./experiments";
 
@@ -130,8 +130,7 @@ export async function chooseFirstContact(input: {
   const settings = await getTurboSettings(input.tenantId);
   const approach = resolveApproach(input.lead);
   const empresa = await companyNameFor(input.tenantId, settings);
-  const operadora = requestedOperator(input.lead) ?? "";
-  const variables = [input.leadName || "Cliente", input.botName, empresa, operadora];
+  const variables = qualificationTemplateVariables(input.leadName, input.botName, empresa, requestedOperator(input.lead));
   const none: FirstContactChoice = { approach: approach.id, templateName: null, variant: null, variables };
   if (!settings.enabled || !approach.firstContactTemplates.length) return none;
 
