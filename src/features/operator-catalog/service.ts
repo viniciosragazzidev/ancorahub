@@ -7,6 +7,8 @@ import { runGateway } from "@/features/ai-gateway/gateway";
 import { OPERATOR_MATERIAL_CATEGORY } from "@/features/tenant-intelligence/rag/constants";
 import { getDatabase, schema } from "@/shared/db";
 
+import { chunkOperatorText } from "@/features/waha-group-capture/chunk";
+
 import { planFactChanges, quoteFactKey, summarizeActions, type IncomingFact } from "./diff";
 import { embedTexts } from "./embeddings";
 import {
@@ -29,6 +31,37 @@ import {
   slugify,
   type ResolvedArea,
 } from "./taxonomy";
+
+/** Operator material a broker forwarded to a lead: generic, no client data, worth searching. */
+const SHARED_OPERATOR_MATERIAL: ReadonlySet<string> = new Set(["rede_credenciada", "tabela_precos", "manual_regras", "material_venda", "promocao"]);
+
+/** Turns a private broker file into regular, searchable operator material (chunks + listed). */
+async function publishBrokerSharedMaterial(tenantId: string, sourceId: string, text: string) {
+  const db = getDatabase();
+  const [document] = await db.select({ id: schema.knowledgeDocuments.id, authorityLevel: schema.knowledgeDocuments.authorityLevel, fileName: schema.knowledgeSources.fileName })
+    .from(schema.knowledgeDocuments)
+    .innerJoin(schema.knowledgeSources, eq(schema.knowledgeSources.id, schema.knowledgeDocuments.sourceId))
+    .where(and(eq(schema.knowledgeDocuments.tenantId, tenantId), eq(schema.knowledgeDocuments.sourceId, sourceId)))
+    .limit(1);
+  if (!document) return;
+  const chunks = chunkOperatorText(text);
+  if (chunks.length) {
+    await db.insert(schema.knowledgeChunks).values(chunks.map((chunkText, chunkIndex) => ({
+      id: randomUUID(),
+      tenantId,
+      documentId: document.id,
+      chunkIndex,
+      text: chunkText,
+      tokenCount: Math.ceil(chunkText.length / 4),
+      authorityLevel: document.authorityLevel,
+      metadata: { category: OPERATOR_MATERIAL_CATEGORY, sourceId, fileName: document.fileName, sharedByBroker: true },
+    })));
+  }
+  // Listed with the other materials from now on.
+  await db.update(schema.knowledgeSources)
+    .set({ catalogSummary: sql`${schema.knowledgeSources.catalogSummary} || '{"origin":"broker_shared_material"}'::jsonb`, updatedAt: new Date() })
+    .where(eq(schema.knowledgeSources.id, sourceId));
+}
 
 /** A file is retried this many times before it stays "failed" for the director to see. */
 const MAX_ATTEMPTS = 3;
@@ -519,9 +552,14 @@ export async function catalogOperatorSource(tenantId: string, sourceId: string) 
     const forcedCarrier = source.carrierId ? carriers.find((carrier) => carrier.id === source.carrierId) ?? null : null;
     const { extraction, windows, truncated } = await extractDocument(tenantId, text, areas, carriers, forcedCarrier);
 
-    // A PDF a broker sent to a lead only stays when it is a quote: a boleto, a proposal or an ID
-    // is dropped, and the text read from it is erased (it carries the client's data).
-    const brokerQuote = (source.summary as { origin?: string } | null)?.origin === "broker_quote";
+    // A PDF a broker sent to a lead (22/10): a quote gives observed prices and stays private;
+    // operator material with no client in it (network, guide, table, manual) joins the catalog
+    // like any upload; anything else (CNPJ, signed proposal, form) is dropped with its text.
+    let brokerQuote = (source.summary as { origin?: string } | null)?.origin === "broker_quote";
+    if (brokerQuote && SHARED_OPERATOR_MATERIAL.has(extraction.documentType)) {
+      await publishBrokerSharedMaterial(tenantId, sourceId, text);
+      brokerQuote = false;
+    }
     if (brokerQuote && extraction.documentType !== "cotacao") {
       await db.update(schema.knowledgeSources).set({ extractedText: null, updatedAt: new Date() }).where(eq(schema.knowledgeSources.id, sourceId));
       await db.update(schema.knowledgeDocuments).set({ canonicalContent: "", status: "archived", updatedAt: new Date() }).where(eq(schema.knowledgeDocuments.sourceId, sourceId));
@@ -543,16 +581,23 @@ export async function catalogOperatorSource(tenantId: string, sourceId: string) 
     const planIds = [...new Set(facts.flatMap((fact) => (fact.planId ? [fact.planId] : [])))];
     const areaSlugs = [...new Set(facts.map((fact) => fact.areaSlug))];
     const knowledge = await updateKnowledgeDocument({ tenantId, sourceId, carrier, extraction, planIds, areas: areaSlugs, validFrom, validUntil });
-    const changes = await applyFactChanges({
-      tenantId, sourceId, documentId: knowledge.documentId,
-      origin: extraction.documentType === "cotacao" ? "quote" : "material",
-      carrierId: carrier.id, facts, areas, validFrom, validUntil,
-    });
+    // A quote: its prices are observations (never the table), but what the quoting system
+    // sends along (carências, network, coparticipation, rules) is operator content (22/10).
+    const isQuote = extraction.documentType === "cotacao";
+    const priceFacts = isQuote ? facts.filter((fact) => fact.areaSlug === "precos") : [];
+    const contentFacts = isQuote ? facts.filter((fact) => fact.areaSlug !== "precos") : facts;
+    const base = { tenantId, sourceId, documentId: knowledge.documentId, carrierId: carrier.id, areas, validFrom, validUntil };
+    const [fromContent, fromPrices] = await Promise.all([
+      contentFacts.length ? applyFactChanges({ ...base, origin: "material", facts: contentFacts }) : null,
+      priceFacts.length ? applyFactChanges({ ...base, origin: "quote", facts: priceFacts }) : null,
+    ]);
+    const sum = (key: keyof NonNullable<typeof fromContent>) => (fromContent?.[key] ?? 0) + (fromPrices?.[key] ?? 0);
+    const changes = { unchanged: sum("unchanged"), added: sum("added"), updated: sum("updated"), pendingReview: sum("pendingReview"), divergent: sum("divergent") };
     const suggestions = await storeSuggestions(tenantId, sourceId, collectSuggestions(extraction, facts, areas));
     const removed = await retireMissingFacts({ tenantId, replacedDocumentIds: knowledge.replacedIds, areas, startedAt });
 
     const summary: CatalogSummary = {
-      ...(brokerQuote ? (source.summary as object) : {}),
+      ...((source.summary as { origin?: string } | null)?.origin === "broker_quote" ? { ...(source.summary as object), origin: brokerQuote ? "broker_quote" : "broker_shared_material" } : {}),
       title: extraction.title,
       subject: extraction.subject,
       carrierName: carrier.name,
