@@ -12,6 +12,7 @@ import { applyForcedBrokers, generateTypedAssignments } from "./duty-plan-genera
 import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 import { decideLeftoverRows } from "./monthly-duty-preservation";
 import { publishedAddProblem, publishedRemoveProblem } from "./monthly-duty-published-edit";
+import { lockMonthlyDutyPlans, persistMonthlyPlanAssignmentRemoval, upsertMonthlyPlanAssignment } from "./monthly-duty-plan-assignments";
 import {
   buildRangeOccurrences,
   DATE_KEY_PATTERN,
@@ -89,10 +90,6 @@ async function writeScope() {
  * Serialises every escala write of a tenant (generate, edit, publish). One
  * lock per tenant, not per month: an escala may run into the next month.
  */
-async function lockPlans(tx: Transaction, tenantId: string) {
-  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${tenantId}), hashtext('duty-plan'))`);
-}
-
 async function loadPlanningBrokers(db: Executor, tenantId: string) {
   const rows = await db.select({ id: schema.user.id, name: schema.user.name, branchId: schema.tenantMemberships.branchId })
     .from(schema.tenantMemberships)
@@ -140,6 +137,25 @@ async function loadLatestPlan(db: Executor, tenantId: string, monthKey: string) 
 
 const asArray = <T,>(value: unknown) => (Array.isArray(value) ? (value as T[]) : []);
 
+/**
+ * JSON entries without a row id are legacy/manual; linked entries live only while their dated row is active.
+ * Entries of an occurrence that already ended are history and always stay (archiving a plantão or removing
+ * someone after the shift inactivates the row, but they did work that plantão).
+ */
+async function livePlanAssignments(db: Executor, tenantId: string, assignments: StoredAssignment[], history?: { occurrences: readonly MonthlyPlanOccurrence[]; now: Date }) {
+  const rosterAssignmentIds = [...new Set(assignments.flatMap((item) => item.rosterAssignmentId ? [item.rosterAssignmentId] : []))];
+  if (!rosterAssignmentIds.length) return assignments;
+  const activeRows = await db.select({ id: schema.dutyRosterAssignments.id }).from(schema.dutyRosterAssignments)
+    .where(and(
+      eq(schema.dutyRosterAssignments.tenantId, tenantId),
+      inArray(schema.dutyRosterAssignments.id, rosterAssignmentIds),
+      eq(schema.dutyRosterAssignments.status, "active"),
+    ));
+  const activeIds = new Set(activeRows.map((row) => row.id));
+  const endedIds = new Set((history?.occurrences ?? []).filter((occurrence) => occurrenceEnded(occurrence, history!.now)).map((occurrence) => occurrence.id));
+  return assignments.filter((item) => !item.rosterAssignmentId || activeIds.has(item.rosterAssignmentId) || endedIds.has(item.occurrenceId));
+}
+
 /** A shift that already started (running or over): its brokers are never re-drawn. */
 function occurrenceStarted(occurrence: Pick<MonthlyPlanOccurrence, "dutyDate" | "startsAt">, now: Date) {
   const [hours, minutes] = occurrence.startsAt.split(":").map(Number);
@@ -173,7 +189,9 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
   const plan = await loadLatestPlan(db, context.tenantId, monthKey);
   if (!plan) return null;
   const occurrences = asArray<MonthlyPlanOccurrence>(plan.occurrences);
-  const allAssignments = asArray<StoredAssignment>(plan.assignments);
+  const storedAssignments = asArray<StoredAssignment>(plan.assignments);
+  // JSON entries linked to missing or inactive dated rows are stale, not live assignments.
+  const allAssignments = await livePlanAssignments(db, context.tenantId, storedAssignments, { occurrences, now: new Date() });
   const quotas = asArray<StoredQuota>(plan.quotas);
   const settings = parsePlanSettings(plan.settings);
   const brokerIds = [...new Set([...allAssignments.map((item) => item.brokerId), ...quotas.map((item) => item.brokerId), ...(settings?.brokers.map((item) => item.brokerId) ?? [])])];
@@ -267,16 +285,18 @@ async function buildPlanView(db: Executor, context: TenantContext, monthKey: str
     /** Publishing this draft replaces a published escala on the dates that have not ended. */
     replacesPublished: Boolean(publishedBefore),
     /** Occurrences of this draft that the published revision already staffed: live, not pending. */
-    publishedOccurrenceIds: publishedBefore ? liveOccurrenceIds(publishedBefore, occurrences) : [],
+    publishedOccurrenceIds: publishedBefore ? await liveOccurrenceIds(db, context.tenantId, publishedBefore, occurrences) : [],
   };
 }
 
 /** Ids of the draft's occurrences that the published revision already staffed. */
-function liveOccurrenceIds(
+async function liveOccurrenceIds(
+  db: Executor,
+  tenantId: string,
   published: { occurrences: unknown; assignments: unknown },
   occurrences: readonly MonthlyPlanOccurrence[],
-): string[] {
-  const assignments = asArray<StoredAssignment>(published.assignments);
+): Promise<string[]> {
+  const assignments = await livePlanAssignments(db, tenantId, asArray<StoredAssignment>(published.assignments), { occurrences: asArray<MonthlyPlanOccurrence>(published.occurrences), now: new Date() });
   const live = new Set(asArray<MonthlyPlanOccurrence>(published.occurrences)
     .filter((item) => assignments.some((assignment) => assignment.occurrenceId === item.id))
     .map((item) => item.id));
@@ -338,7 +358,7 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
   const db = getDatabase();
 
   const planId = await db.transaction(async (tx) => {
-    await lockPlans(tx, context.tenantId);
+    await lockMonthlyDutyPlans(tx, context.tenantId);
     const latest = await loadLatestPlan(tx, context.tenantId, monthKey);
 
     const [brokers, schedules, windows] = await Promise.all([
@@ -380,9 +400,7 @@ export async function generateMonthlyDutyPlanAction(rawInput: unknown): Promise<
       !running.has(occurrence.id) && (freshIds.has(occurrence.id) || (chosenKeys.has(typeKeyOf(occurrence.typeId)) && occurrence.dutyDate >= rangeFrom && occurrence.dutyDate <= rangeUntil));
     const keptOccurrences = previousOccurrences.filter((occurrence) => !regenerated(occurrence) && !occurrenceEnded(occurrence, now));
     const keptIds = new Set(keptOccurrences.map((occurrence) => occurrence.id));
-    const keptAssignments: StoredAssignment[] = previousAssignments
-      .filter((item) => keptIds.has(item.occurrenceId))
-      .map((item) => ({ occurrenceId: item.occurrenceId, brokerId: item.brokerId, ...(item.origin ? { origin: item.origin } : {}) }));
+    const keptAssignments = await livePlanAssignments(tx, context.tenantId, previousAssignments.filter((item) => keptIds.has(item.occurrenceId)));
     const keptById = new Map(keptOccurrences.map((occurrence) => [occurrence.id, occurrence]));
 
     // Who is already on the real roster of each plantão being drawn: the
@@ -468,7 +486,7 @@ export async function updateMonthlyDutyDraftAction(input: unknown): Promise<Mont
   const db = getDatabase();
 
   const monthKey = await db.transaction(async (tx) => {
-    await lockPlans(tx, context.tenantId);
+    await lockMonthlyDutyPlans(tx, context.tenantId);
     const [plan] = await tx.select().from(schema.dutyScheduleMonthlyPlans)
       .where(and(eq(schema.dutyScheduleMonthlyPlans.id, planId), eq(schema.dutyScheduleMonthlyPlans.tenantId, context.tenantId)))
       .limit(1);
@@ -528,7 +546,7 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
   const db = getDatabase();
 
   const monthKey = await db.transaction(async (tx) => {
-    await lockPlans(tx, context.tenantId);
+    await lockMonthlyDutyPlans(tx, context.tenantId);
     const [plan] = await tx.select().from(schema.dutyScheduleMonthlyPlans)
       .where(and(eq(schema.dutyScheduleMonthlyPlans.id, planId), eq(schema.dutyScheduleMonthlyPlans.tenantId, context.tenantId)))
       .limit(1);
@@ -540,7 +558,8 @@ export async function publishMonthlyDutyPlanAction(planIdInput: string): Promise
       .where(and(eq(schema.dutyScheduleMonthlyPlans.tenantId, context.tenantId), eq(schema.dutyScheduleMonthlyPlans.monthKey, plan.monthKey), eq(schema.dutyScheduleMonthlyPlans.status, "published")))
       .limit(1);
 
-    const storedAssignments = asArray<StoredAssignment>(plan.assignments);
+    // Drop stale row references before revalidation, so publication cannot recreate a removed broker.
+    const storedAssignments = await livePlanAssignments(tx, context.tenantId, asArray<StoredAssignment>(plan.assignments), { occurrences: asArray<MonthlyPlanOccurrence>(plan.occurrences), now: new Date() });
     if (!storedAssignments.length) throw new Error("Não há corretores na proposta para publicar.");
 
     // Revalidate against today's data: the draft may be days old.
@@ -813,7 +832,7 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
   const db = getDatabase();
 
   const monthKey = await db.transaction(async (tx) => {
-    await lockPlans(tx, context.tenantId);
+    await lockMonthlyDutyPlans(tx, context.tenantId);
     const { plan, occurrence, assignments, draft } = await loadPublishedOccurrence(tx, context.tenantId, targetId);
     const now = new Date();
     const schedule = (await loadActiveSchedules(tx, context.tenantId)).find((item) => item.id === occurrence.scheduleId) ?? null;
@@ -831,11 +850,19 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
         eq(schema.dutyRosterAssignments.dayOfWeek, dayOfWeekOf(occurrence.dutyDate)),
       ));
     const onWeeklyRoster = weeklyRows.some((row) => row.validFrom.getTime() <= dayMidnight && (!row.validUntil || row.validUntil.getTime() > dayMidnight));
+    const datedRows = await tx.select({ id: schema.dutyRosterAssignments.id, status: schema.dutyRosterAssignments.status })
+      .from(schema.dutyRosterAssignments)
+      .where(and(
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+        eq(schema.dutyRosterAssignments.scheduleId, occurrence.scheduleId),
+        eq(schema.dutyRosterAssignments.brokerId, brokerId),
+        eq(schema.dutyRosterAssignments.dutyDate, occurrence.dutyDate),
+      ));
     const allowed = occurrence.allowedBrokerIds.includes(brokerId);
     const problem = publishedAddProblem({
       ended: occurrenceEnded(occurrence, now),
       brokerIsPlanningBroker: Boolean(broker),
-      alreadyOnPlantao: assignments.some((item) => item.occurrenceId === targetId && item.brokerId === brokerId),
+      alreadyOnPlantao: datedRows.some((row) => row.status === "active"),
       allowedInType: allowed,
       force: Boolean(force),
       scheduleActive: Boolean(schedule),
@@ -845,16 +872,7 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
     if (!broker || !schedule) throw new Error("Este plantão ou corretor não está disponível para a escala.");
 
     // The broker's dated row for this plantão: an active one is adopted by this plan, an inactive one comes back, otherwise a row is created.
-    const [row] = await tx.select({ id: schema.dutyRosterAssignments.id })
-      .from(schema.dutyRosterAssignments)
-      .where(and(
-        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
-        eq(schema.dutyRosterAssignments.scheduleId, occurrence.scheduleId),
-        eq(schema.dutyRosterAssignments.brokerId, brokerId),
-        eq(schema.dutyRosterAssignments.dutyDate, occurrence.dutyDate),
-      ))
-      .orderBy(desc(schema.dutyRosterAssignments.status))
-      .limit(1);
+    const row = datedRows.find((item) => item.status === "active") ?? datedRows.find((item) => item.status === "inactive") ?? datedRows[0];
     let rosterId: string;
     if (row) {
       rosterId = row.id;
@@ -889,7 +907,7 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
       ? { ...item, allowedBrokerIds: [...item.allowedBrokerIds, brokerId], forcedBrokerIds: [...new Set([...(item.forcedBrokerIds ?? []), brokerId])] }
       : item);
     await tx.update(schema.dutyScheduleMonthlyPlans).set({
-      assignments: [...assignments, entry],
+      assignments: upsertMonthlyPlanAssignment(assignments, entry),
       occurrences: asArray<MonthlyPlanOccurrence>(plan.occurrences).map(withBroker),
       updatedAt: now,
     }).where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
@@ -898,9 +916,9 @@ export async function addBrokerToPublishedOccurrenceAction(input: unknown): Prom
     if (draft) {
       const draftOccurrence = asArray<MonthlyPlanOccurrence>(draft.occurrences).find((item) => item.id === targetId);
       const draftAssignments = asArray<StoredAssignment>(draft.assignments);
-      if (draftOccurrence && !occurrenceEnded(draftOccurrence, now) && !draftAssignments.some((item) => item.occurrenceId === targetId && item.brokerId === brokerId)) {
+      if (draftOccurrence && !occurrenceEnded(draftOccurrence, now)) {
         await tx.update(schema.dutyScheduleMonthlyPlans).set({
-          assignments: [...draftAssignments, entry],
+          assignments: upsertMonthlyPlanAssignment(draftAssignments, entry),
           occurrences: asArray<MonthlyPlanOccurrence>(draft.occurrences).map(withBroker),
           updatedAt: now,
         }).where(eq(schema.dutyScheduleMonthlyPlans.id, draft.id));
@@ -925,7 +943,7 @@ export async function removeBrokerFromPublishedOccurrenceAction(input: unknown):
   const db = getDatabase();
 
   const monthKey = await db.transaction(async (tx) => {
-    await lockPlans(tx, context.tenantId);
+    await lockMonthlyDutyPlans(tx, context.tenantId);
     const { plan, occurrence, assignments, draft } = await loadPublishedOccurrence(tx, context.tenantId, targetId);
     const now = new Date();
     const entry = assignments.find((item) => item.occurrenceId === targetId && item.brokerId === brokerId);
@@ -948,19 +966,15 @@ export async function removeBrokerFromPublishedOccurrenceAction(input: unknown):
         eq(schema.dutyRosterAssignments.status, "active"),
         eq(schema.dutyRosterAssignments.monthlyPlanId, plan.id),
       ));
-    await tx.update(schema.dutyScheduleMonthlyPlans).set({
-      assignments: assignments.filter((item) => item !== entry),
-      updatedAt: now,
-    }).where(eq(schema.dutyScheduleMonthlyPlans.id, plan.id));
-    if (draft) {
-      const draftAssignments = asArray<StoredAssignment>(draft.assignments);
-      if (draftAssignments.some((item) => item.occurrenceId === targetId && item.brokerId === brokerId)) {
-        await tx.update(schema.dutyScheduleMonthlyPlans).set({
-          assignments: draftAssignments.filter((item) => !(item.occurrenceId === targetId && item.brokerId === brokerId)),
-          updatedAt: now,
-        }).where(eq(schema.dutyScheduleMonthlyPlans.id, draft.id));
-      }
-    }
+    await persistMonthlyPlanAssignmentRemoval(tx, {
+      planId: plan.id,
+      planAssignments: assignments,
+      draft,
+      occurrenceId: targetId,
+      brokerId,
+      rosterAssignmentId: entry?.rosterAssignmentId,
+      now,
+    });
     await audit(tx, context.userId, plan.id, "duty_schedule_monthly_plan.published_broker_removed");
     await notifyPlantaoChange(tx, { tenantId: context.tenantId, brokerId, kind: "removed", occurrence, scheduleName, rosterId: entry?.rosterAssignmentId ?? "sem-linha", now });
     return plan.monthKey;

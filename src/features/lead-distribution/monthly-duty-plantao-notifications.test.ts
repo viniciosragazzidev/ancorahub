@@ -80,7 +80,7 @@ describe("uma notificação por transição real do plantão", () => {
     expect(notices()).toHaveLength(1);
 
     // Second click: the broker is already on the plantão.
-    state.queue = [[planWith], [planWith], [schedule], [bruno], [], []];
+    state.queue = [[planWith], [planWith], [schedule], [bruno], [], [{ id: "row-1", status: "active" }]];
     await add();
     expect(notices()).toHaveLength(1);
   });

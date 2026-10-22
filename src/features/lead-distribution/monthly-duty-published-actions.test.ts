@@ -5,6 +5,9 @@ const state = vi.hoisted(() => ({
   queue: [] as unknown[][],
   inserts: [] as Array<{ table: unknown; values: Record<string, unknown> }>,
   updates: [] as Array<{ table: unknown; set: Record<string, unknown> }>,
+  transactions: 0,
+  lockCalls: 0,
+  events: [] as string[],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -22,26 +25,40 @@ vi.mock("@/shared/db", async (importOriginal) => {
   const selectChain = () => {
     const chain: Record<string, unknown> = {};
     for (const method of ["from", "innerJoin", "leftJoin", "where", "orderBy", "limit"]) chain[method] = () => chain;
-    chain.then = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve(state.queue.shift() ?? []).then(resolve, reject);
+    chain.then = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
+      state.events.push("select");
+      return Promise.resolve(state.queue.shift() ?? []).then(resolve, reject);
+    };
     return chain;
   };
   const tx = {
-    execute: async () => [],
+    execute: async () => { state.lockCalls += 1; state.events.push("lock"); return []; },
     select: selectChain,
-    insert: (table: unknown) => ({ values: (values: Record<string, unknown>) => { state.inserts.push({ table, values }); return { onConflictDoNothing: async () => []  }; } }),
+    insert: (table: unknown) => ({ values: (values: unknown) => {
+      state.inserts.push({ table, values: (Array.isArray(values) ? { rows: values } : values) as Record<string, unknown> });
+      return { onConflictDoNothing: async () => []  };
+    } }),
     update: (table: unknown) => ({
-      set: (set: Record<string, unknown>) => ({ where: async () => { state.updates.push({ table, set }); return []; } }),
+      set: (set: Record<string, unknown>) => ({ where: () => {
+        state.updates.push({ table, set });
+        return {
+          returning: async () => [{ id: "published-plan" }],
+          then: (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => Promise.resolve([]).then(resolve, reject),
+        };
+      } }),
     }),
   };
-  const db = { ...tx, transaction: async (callback: (value: typeof tx) => unknown) => callback(tx) };
+  const db = { ...tx, transaction: async (callback: (value: typeof tx) => unknown) => { state.transactions += 1; return callback(tx); } };
   return { ...actual, getDatabase: () => db };
 });
 
 import * as schema from "@/shared/db/schema";
-import { addBrokerToPublishedOccurrenceAction } from "./monthly-duty-actions";
+import { addBrokerToPublishedOccurrenceAction, generateMonthlyDutyPlanAction, getMonthlyDutyPlanAction, publishMonthlyDutyPlanAction } from "./monthly-duty-actions";
+import { removeRosterAssignmentAction } from "./roster-actions";
 
 const FUTURE_DAY = "2099-10-20";
 const OCCURRENCE_ID = `sch-1:${FUTURE_DAY}`;
+const DATED_ASSIGNMENT_ID = "d8180a70-455a-4c9c-8a50-2363c9a81651";
 
 const occurrence = {
   id: OCCURRENCE_ID, scheduleId: "sch-1", scheduleName: "Manhã", dutyDate: FUTURE_DAY, startsAt: "08:00", endsAt: "12:00",
@@ -69,6 +86,9 @@ beforeEach(() => {
   state.queue = [];
   state.inserts = [];
   state.updates = [];
+  state.transactions = 0;
+  state.lockCalls = 0;
+  state.events = [];
 });
 
 describe("adicionar corretor a um plantão publicado (ação de servidor)", () => {
@@ -101,6 +121,136 @@ describe("adicionar corretor a um plantão publicado (ação de servidor)", () =
     await expect(addBrokerToPublishedOccurrenceAction({ occurrenceId: OCCURRENCE_ID, brokerId: "bruno" })).rejects.toThrow(/Proposta não encontrada/);
     const planUpdates = state.updates.filter((item) => item.table === schema.dutyScheduleMonthlyPlans);
     expect(planUpdates).toHaveLength(1);
+  });
+
+  it("reativa a linha datada inativa e reaproveita a entrada JSON sem duplicar", async () => {
+    const staleEntry = { occurrenceId: OCCURRENCE_ID, brokerId: "bruno", origin: "manual", rosterAssignmentId: DATED_ASSIGNMENT_ID };
+    const stalePlan = { ...publishedPlan, assignments: [staleEntry] };
+    const reactivatedPlan = { ...stalePlan, assignments: [{ ...staleEntry, origin: "manual" }] };
+    state.queue = [
+      [stalePlan], [stalePlan], [schedule], [bruno], [], [{ id: DATED_ASSIGNMENT_ID, status: "inactive" }],
+      [reactivatedPlan], [{ id: DATED_ASSIGNMENT_ID }], [bruno],
+    ];
+
+    const view = await addBrokerToPublishedOccurrenceAction({ occurrenceId: OCCURRENCE_ID, brokerId: "bruno" });
+
+    const datedUpdate = state.updates.find((item) => item.table === schema.dutyRosterAssignments);
+    expect(datedUpdate?.set).toMatchObject({ status: "active", monthlyPlanId: "plan-9" });
+    expect(state.inserts.some((item) => item.table === schema.dutyRosterAssignments)).toBe(false);
+    const planUpdate = state.updates.find((item) => item.table === schema.dutyScheduleMonthlyPlans);
+    expect(planUpdate?.set.assignments).toEqual([staleEntry]);
+    expect(view.occurrences[0]?.brokers.map((broker) => broker.id)).toEqual(["bruno"]);
+  });
+
+  it("remove pela escala semanal limpa o plano publicado e o rascunho mais novo na mesma transação", async () => {
+    const staleEntry = { occurrenceId: OCCURRENCE_ID, brokerId: "bruno", origin: "manual", rosterAssignmentId: DATED_ASSIGNMENT_ID };
+    const stalePlan = { ...publishedPlan, assignments: [staleEntry] };
+    const newerDraft = { ...draftPlan, assignments: [staleEntry, ...draftPlan.assignments] };
+    const formData = new FormData();
+    formData.set("assignmentId", DATED_ASSIGNMENT_ID);
+    state.queue = [[{
+      id: DATED_ASSIGNMENT_ID,
+      branchId: "b1",
+      scheduleId: "sch-1",
+      brokerId: "bruno",
+      dutyDate: FUTURE_DAY,
+      startsAt: "08:00",
+      endsAt: "12:00",
+      monthlyPlanId: "plan-9",
+    }], [stalePlan], [newerDraft]];
+
+    await expect(removeRosterAssignmentAction({}, formData)).resolves.toMatchObject({ success: true });
+
+    expect(state.transactions).toBe(1);
+    expect(state.lockCalls).toBe(1);
+    expect(state.events.slice(0, 2)).toEqual(["lock", "select"]);
+    const planUpdates = state.updates.filter((item) => item.table === schema.dutyScheduleMonthlyPlans);
+    expect(planUpdates.map((item) => item.set.assignments)).toEqual([[], draftPlan.assignments]);
+  });
+
+  it("remove uma ocorrência encerrada sem alterar o JSON histórico", async () => {
+    const formData = new FormData();
+    formData.set("assignmentId", DATED_ASSIGNMENT_ID);
+    state.queue = [[{
+      id: DATED_ASSIGNMENT_ID,
+      branchId: "b1",
+      scheduleId: "sch-1",
+      brokerId: "bruno",
+      dutyDate: "2020-01-05",
+      startsAt: "08:00",
+      endsAt: "12:00",
+    }]];
+
+    await expect(removeRosterAssignmentAction({}, formData)).resolves.toMatchObject({ success: true });
+
+    expect(state.lockCalls).toBe(1);
+    expect(state.events.slice(0, 2)).toEqual(["lock", "select"]);
+    expect(state.updates.some((item) => item.table === schema.dutyScheduleMonthlyPlans)).toBe(false);
+    expect(state.updates.find((item) => item.table === schema.dutyRosterAssignments)?.set).toMatchObject({ status: "inactive" });
+  });
+
+  it("não leva ao rascunho novo uma entrada obsoleta ligada a uma linha inativa", async () => {
+    const typeId = "7ee1c683-5440-4eb8-b36e-0905c1f95e00";
+    const staleOccurrence = { ...occurrence, id: "sch-old:2099-10-10", scheduleId: "sch-old", dutyDate: "2099-10-10", typeId: "t2" };
+    const generationSchedule = { ...schedule, typeId };
+    const latest = {
+      ...draftPlan,
+      occurrences: [staleOccurrence],
+      assignments: [{ occurrenceId: staleOccurrence.id, brokerId: "bruno", origin: "manual", rosterAssignmentId: DATED_ASSIGNMENT_ID }],
+      revision: 10,
+      settings: null,
+    };
+    state.queue = [[latest], [generationSchedule], [], [bruno], [], []];
+
+    await expect(generateMonthlyDutyPlanAction({
+      monthKey: "2099-10",
+      rangeFrom: "2099-10-19",
+      rangeUntil: "2099-10-19",
+      typeKeys: [typeId],
+      brokers: [{ brokerId: "bruno", modality: "any", seats: { [typeId]: 1 }, forcedTypeKeys: [] }],
+    })).rejects.toThrow(/proposta foi gerada|não pôde ser carregada/i);
+
+    const createdDraft = state.inserts.find((item) => item.table === schema.dutyScheduleMonthlyPlans)?.values as { assignments?: unknown[] } | undefined;
+    expect(createdDraft?.assignments).not.toContainEqual(expect.objectContaining({ occurrenceId: staleOccurrence.id, brokerId: "bruno" }));
+  });
+
+  it("publica sem recriar quem só aparece numa entrada obsoleta", async () => {
+    const liveRowId = "4b64da33-01da-4ef7-a204-0023fb93d116";
+    const carla = { id: "carla", name: "Carla", branchId: "b1" };
+    const publishable = {
+      ...draftPlan,
+      id: "4e957089-39c7-4d9e-9d0b-5401fbfbc33a",
+      assignments: [
+        { occurrenceId: OCCURRENCE_ID, brokerId: "bruno", origin: "manual", rosterAssignmentId: DATED_ASSIGNMENT_ID },
+        { occurrenceId: OCCURRENCE_ID, brokerId: "carla", origin: "manual", rosterAssignmentId: liveRowId },
+      ],
+      settings: null,
+    };
+    const eligibleSchedule = { ...schedule, dayOfWeek: 2, typeBranchIds: ["b1"] };
+    state.queue = [[publishable], [publishable], [], [{ id: liveRowId }], [eligibleSchedule], [bruno, carla], [], []];
+
+    const outcome = await publishMonthlyDutyPlanAction(publishable.id).then(() => "resolved", (error: unknown) => String(error));
+    expect(outcome).toMatch(/escala publicada, mas não pôde ser carregada/i);
+
+    const datedRows = state.inserts.find((item) => item.table === schema.dutyRosterAssignments)?.values.rows as Array<{ brokerId: string }> | undefined;
+    expect(datedRows?.map((row) => row.brokerId)).toEqual(["carla"]);
+    const planUpdate = state.updates.find((item) => item.table === schema.dutyScheduleMonthlyPlans);
+    expect(planUpdate?.set.assignments).toEqual([expect.objectContaining({
+      occurrenceId: OCCURRENCE_ID,
+      brokerId: "carla",
+      origin: "manual",
+    })]);
+  });
+
+  it("não mostra como escalada a entrada ligada a uma linha datada inativa", async () => {
+    const staleEntry = { occurrenceId: OCCURRENCE_ID, brokerId: "bruno", origin: "manual", rosterAssignmentId: DATED_ASSIGNMENT_ID };
+    const stalePlan = { ...publishedPlan, assignments: [staleEntry] };
+    state.queue = [[stalePlan], [], [bruno]];
+
+    const view = await getMonthlyDutyPlanAction("2099-10");
+
+    expect(view?.occurrences[0]?.brokers).toEqual([]);
+    expect(view?.totalAssigned).toBe(0);
   });
 
   it("refuses a broker who is not an active broker of the tenant", async () => {

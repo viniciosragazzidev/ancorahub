@@ -9,6 +9,8 @@ import { isValidDutyWindow } from "./domain";
 import { wakeLeadsAwaitingEligibleBroker } from "./jobs";
 import { getRosterBrokerAccountFilter } from "./roster-broker-account-filter";
 import { publishNotification } from "@/features/notifications/send-push-helper";
+import { lockMonthlyDutyPlans, removeDatedRosterAssignmentFromMonthlyPlans } from "./monthly-duty-plan-assignments";
+import { shiftEnd } from "./monthly-duty-plan";
 
 export type RosterActionState = { success?: boolean; error?: string; message?: string };
 
@@ -221,11 +223,48 @@ export async function removeRosterAssignmentAction(_previous: RosterActionState,
     const context = await getRequiredTenantContext();
     if (context.role !== "director" && context.role !== "manager") throw new Error("Sem permissão.");
     const db = getDatabase();
-    const [assignment] = await db.select({ id: schema.dutyRosterAssignments.id, branchId: schema.dutyRosterAssignments.branchId, scheduleId: schema.dutyRosterAssignments.scheduleId, brokerId: schema.dutyRosterAssignments.brokerId, dutyDate: schema.dutyRosterAssignments.dutyDate }).from(schema.dutyRosterAssignments).where(and(eq(schema.dutyRosterAssignments.id, assignmentId.data), eq(schema.dutyRosterAssignments.tenantId, context.tenantId), eq(schema.dutyRosterAssignments.status, "active"))).limit(1);
-    if (!assignment || (context.role === "manager" && context.branchId !== assignment.branchId)) throw new Error("Escala fora do seu escopo.");
-    await db.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: new Date() }).where(eq(schema.dutyRosterAssignments.id, assignment.id));
-    await db.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.removed" });
-    return { success: true };
+    return await db.transaction(async (tx) => {
+      await lockMonthlyDutyPlans(tx, context.tenantId);
+      const [assignment] = await tx.select({
+        id: schema.dutyRosterAssignments.id,
+        branchId: schema.dutyRosterAssignments.branchId,
+        scheduleId: schema.dutyRosterAssignments.scheduleId,
+        brokerId: schema.dutyRosterAssignments.brokerId,
+        dutyDate: schema.dutyRosterAssignments.dutyDate,
+        startsAt: schema.dutyRosterAssignments.startsAt,
+        endsAt: schema.dutyRosterAssignments.endsAt,
+      }).from(schema.dutyRosterAssignments).where(and(
+        eq(schema.dutyRosterAssignments.id, assignmentId.data),
+        eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+        eq(schema.dutyRosterAssignments.status, "active"),
+      )).limit(1);
+      if (!assignment || (context.role === "manager" && context.branchId !== assignment.branchId)) throw new Error("Escala fora do seu escopo.");
+      const now = new Date();
+      // Dated monthly rows and their JSON plan entries are one write under the same tenant lock.
+      const ended = assignment.dutyDate !== null && shiftEnd({
+        startsAt: assignment.startsAt,
+        endsAt: assignment.endsAt,
+        timezone: "America/Sao_Paulo",
+      }, assignment.dutyDate).getTime() <= now.getTime();
+      if (assignment.dutyDate && !ended) {
+        await removeDatedRosterAssignmentFromMonthlyPlans(tx, {
+          tenantId: context.tenantId,
+          scheduleId: assignment.scheduleId,
+          brokerId: assignment.brokerId,
+          dutyDate: assignment.dutyDate,
+          rosterAssignmentId: assignment.id,
+          now,
+        });
+      }
+      await tx.update(schema.dutyRosterAssignments).set({ status: "inactive", updatedBy: context.userId, updatedAt: now })
+        .where(and(
+          eq(schema.dutyRosterAssignments.id, assignment.id),
+          eq(schema.dutyRosterAssignments.tenantId, context.tenantId),
+          eq(schema.dutyRosterAssignments.status, "active"),
+        ));
+      await tx.insert(schema.auditLogs).values({ id: randomUUID(), userId: context.userId, entidade: "duty_roster_assignment", entidadeId: assignment.id, acao: "duty_roster_assignment.removed" });
+      return { success: true };
+    });
   } catch (error) {
     return { error: error instanceof Error ? error.message : "Não foi possível remover a escala." };
   }
