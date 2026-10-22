@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Receipt } from "@phosphor-icons/react/ssr";
+import { Books, Receipt } from "@phosphor-icons/react/ssr";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,6 +9,8 @@ type ToolEntry = {
   description: string;
   href: string;
   icon: typeof Receipt;
+  /** Shown only to the director. */
+  directorOnly?: boolean;
 };
 
 export const toolEntries: ToolEntry[] = [
@@ -18,6 +20,14 @@ export const toolEntries: ToolEntry[] = [
       "Confere o comprovante de pagamento contra a proposta e o boleto antes de liberar adiantamento ao corretor.",
     href: "/ferramentas/validador-comprovante",
     icon: Receipt,
+  },
+  {
+    name: "Materiais das operadoras",
+    description:
+      "Importa tabelas, manuais, redes e cotações das operadoras e cataloga cada informação por operadora, plano e área para a Cotação Express.",
+    href: "/ferramentas/materiais-operadoras",
+    icon: Books,
+    directorOnly: true,
   },
 ];
 
@@ -50,11 +60,11 @@ function ToolTile({ tool }: { tool: ToolEntry }) {
   );
 }
 
-export function ToolsCatalog() {
+export function ToolsCatalog({ isDirector = false }: { isDirector?: boolean }) {
   return (
     <section aria-label="Ferramentas disponíveis" className="mx-auto w-full max-w-6xl">
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {toolEntries.map((tool) => (
+        {toolEntries.filter((tool) => isDirector || !tool.directorOnly).map((tool) => (
           <ToolTile key={tool.href} tool={tool} />
         ))}
       </div>

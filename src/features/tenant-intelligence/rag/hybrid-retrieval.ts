@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, gte, desc, isNull, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, desc, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { extractSearchKeywords, stripAccents } from "./search-terms";
 import { isUndefinedFunctionError } from "@/shared/db/postgres-errors";
@@ -15,6 +15,12 @@ export type HybridSearchResult = {
   text: string;
   score: number;
   validUntil: Date | null;
+  /** Question words found in the text (relevance guard of the operator answers). */
+  keywordHits: number;
+  /** Cosine distance when the meaning search ran (0 = same meaning), otherwise null. */
+  semanticDistance: number | null;
+  /** Operator the catalog tagged this chunk with, when catalogued. */
+  carrierId: string | null;
 };
 
 /**
@@ -27,6 +33,8 @@ export async function executeHybridKnowledgeSearch(params: {
   /** Obtained server-side from the configured embedding provider. Never accept this from the browser. */
   queryEmbedding?: number[];
   category?: string;
+  /** Only chunks tagged with these operators by the catalog (operator-catalog/service.ts). */
+  carrierIds?: string[];
   minAuthorityLevel?: number;
   limit?: number;
 }): Promise<HybridSearchResult[]> {
@@ -60,6 +68,7 @@ export async function executeHybridKnowledgeSearch(params: {
       category: schema.knowledgeDocuments.category,
       validUntil: schema.knowledgeDocuments.validUntil,
       semanticDistance: semanticDistance ?? sql<number>`null`,
+      carrierId: sql<string | null>`${schema.knowledgeChunks.metadata}->>'carrierId'`,
     })
     .from(schema.knowledgeChunks)
     .innerJoin(
@@ -74,7 +83,10 @@ export async function executeHybridKnowledgeSearch(params: {
         or(isNull(schema.knowledgeDocuments.validFrom), lte(schema.knowledgeDocuments.validFrom, now)),
         or(isNull(schema.knowledgeDocuments.validUntil), gte(schema.knowledgeDocuments.validUntil, now)),
         ...(termSearch ? [termSearch.anyMatch] : []),
-        ...(params.category ? [eq(schema.knowledgeDocuments.category, params.category)] : [])
+        ...(params.category ? [eq(schema.knowledgeDocuments.category, params.category)] : []),
+        ...(params.carrierIds?.length ? [inArray(sql`${schema.knowledgeChunks.metadata}->>'carrierId'`, params.carrierIds)] : []),
+        // Meaning search only ranks chunks that have a vector; the term search covers the rest.
+        ...(queryEmbedding ? [isNotNull(schema.knowledgeChunks.embedding)] : []),
       )
     )
     .orderBy(
@@ -114,6 +126,9 @@ export async function executeHybridKnowledgeSearch(params: {
       text: c.text,
       score,
       validUntil: c.validUntil,
+      keywordHits: hits,
+      semanticDistance: typeof c.semanticDistance === "number" ? c.semanticDistance : c.semanticDistance === null ? null : Number(c.semanticDistance),
+      carrierId: c.carrierId ?? null,
     };
   });
 

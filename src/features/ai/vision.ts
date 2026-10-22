@@ -111,3 +111,29 @@ export async function aiExtractImageText(params: {
 
   return { text: result.text, provider: target.provider, model: target.model };
 }
+
+/**
+ * Reads a scanned PDF (pages that are images, no text layer) with a vision
+ * model that accepts PDF files (Gemini, GPT-4o). Same transcription rules as
+ * an image: faithful text, tables as columns, nothing interpreted.
+ */
+export async function aiExtractPdfText(params: { pdf: Uint8Array; instruction: string; maxTokens?: number }) {
+  const settings = await getAiEngineSettings();
+  if (!settings.enabled) {
+    throw new VisionNotConfiguredError("O motor de Inteligência Artificial está desativado pelo administrador.");
+  }
+  const rows = await getSystemSettings(["ai_vision_provider", "ai_vision_model"]);
+  const values = new Map(rows.map((row) => [row.key, row.value ?? undefined]));
+  const target = resolveVisionTarget(settings, { provider: values.get("ai_vision_provider"), model: values.get("ai_vision_model") });
+  if (!target) {
+    throw new VisionNotConfiguredError("Nenhum provedor com leitura de imagem está configurado (Google ou OpenAI).");
+  }
+  const model = getAiModelInstance(target.provider, target.model, { googleKey: settings.googleApiKey, openaiKey: settings.openaiApiKey });
+  const result = await generateText({
+    model,
+    messages: [{ role: "user", content: [{ type: "text", text: params.instruction }, { type: "file", data: params.pdf, mediaType: "application/pdf" }] }],
+    temperature: 0,
+    maxOutputTokens: params.maxTokens ?? 16_000,
+  });
+  return { text: result.text, provider: target.provider, model: target.model };
+}
