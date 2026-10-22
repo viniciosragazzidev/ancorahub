@@ -457,7 +457,8 @@ export async function reassignLeadAction(_prev: ManagementActionState, formData:
       if (context.role === "manager" && broker?.branchId !== context.branchId) {
         throw new AuthorizationError("Gestores só podem repassar leads a corretores da própria unidade.");
       }
-      if (!broker || (selectedDutyBroker && broker.branchId !== selectedDutyBroker.branchId)) throw new Error(isPostSale ? "O corretor selecionado não está ativo neste tenant." : isDutyReassignment ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor selecionado não está ativo nesta unidade.");
+      // On the active plantão is enough: the broker's own unit may differ (22/10, case Kelven).
+      if (!broker) throw new Error(isPostSale ? "O corretor selecionado não está ativo neste tenant." : isDutyReassignment ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor selecionado não está ativo nesta unidade.");
       // Pós Venda na mesma unidade continua na fila Pós Venda; mudando de unidade, vai para a fila padrão do destino.
       const targetQueueId = isDutyReassignment || (isPostSale && targetBranchId === lead.branchId) ? lead.queueId : await ensureDefaultQueue(context.tenantId, targetBranchId, context.userId);
       if (!targetQueueId) throw new Error("A fila do lead não está mais disponível.");

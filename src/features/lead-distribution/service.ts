@@ -1472,7 +1472,8 @@ export async function offerLeadToBrokerManually(
       eq(schema.user.active, true),
       eq(schema.user.status, "active"),
     )).limit(1);
-  if (!broker || (!postSaleQueueName && (dutyBroker ? broker.branchId !== dutyBroker.branchId : broker.branchId !== targetBranchId))) return { status: "conflict" as const, reason: postSaleQueueName ? "O corretor não está ativo neste tenant." : dutyBroker ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor não está ativo na unidade escolhida." };
+  // On the active plantão is enough: the broker's own unit may differ (22/10, case Kelven).
+  if (!broker || (!postSaleQueueName && !dutyBroker && broker.branchId !== targetBranchId)) return { status: "conflict" as const, reason: postSaleQueueName ? "O corretor não está ativo neste tenant." : dutyBroker ? "O corretor não pertence mais ao plantão ativo desta fila." : "O corretor não está ativo na unidade escolhida." };
   if (!broker.phone) return { status: "fallback" as const, reason: "O corretor não possui telefone para receber a oferta. O lead voltará à distribuição normal." };
 
   const [tenant] = await db.select({ slaFirstContactMinutes: schema.tenants.slaFirstContactMinutes })
