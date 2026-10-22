@@ -119,6 +119,7 @@ export function BulkQualificationDialog({ trigger, onSuccess }: BulkQualificatio
                 <SelectItem value="all_unqualified">Todos os Leads Não Qualificados (Novos / Em Contato)</SelectItem>
                 <SelectItem value="new_leads">Apenas Leads Novos Sem Atendimento</SelectItem>
                 <SelectItem value="unresponsive_24h">Leads Sem Resposta Há Mais de 24 Horas</SelectItem>
+                <SelectItem value="first_message_failed">1ª mensagem não enviada por erro do sistema</SelectItem>
               </SelectContent>
             </Select>
           </div>

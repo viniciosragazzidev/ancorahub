@@ -1,20 +1,23 @@
 "use server";
 
 import { randomUUID } from "node:crypto";
-import { and, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull, notInArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
+import { INITIAL_MESSAGE_FAILURE_NOTE_PREFIX } from "@/features/communication-channels/meta-delivery-failure";
 import { startAiQualificationForLead } from "./service";
 
 const bulkFilterSchema = z.object({
-  filterType: z.enum(["all_unqualified", "new_leads", "unresponsive_24h", "custom_selection"]).default("all_unqualified"),
+  filterType: z.enum(["all_unqualified", "new_leads", "unresponsive_24h", "first_message_failed", "custom_selection"]).default("all_unqualified"),
   leadIds: z.array(z.string().uuid()).optional(),
 });
 
 export type BulkQualificationFilter = z.infer<typeof bulkFilterSchema>;
+
+const FIRST_MESSAGE_FAILED_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
 
 export async function getCandidateLeadsForBulkQualification(filterType: string = "all_unqualified") {
   const context = await getRequiredTenantContext();
@@ -30,7 +33,21 @@ export async function getCandidateLeadsForBulkQualification(filterType: string =
     isNull(schema.leads.deletedAt),
   ];
 
-  if (filterType === "new_leads") {
+  if (filterType === "first_message_failed") {
+    // The first message never left because of a system error (no Meta code in the note) and
+    // the lead has no message at all, so it has no chat to resume (22/10: empty operator variable).
+    whereConditions.push(
+      isNull(schema.leads.corretorId),
+      notInArray(schema.leads.status, ["lost", "converted"]),
+      gte(schema.leads.createdAt, new Date(now.getTime() - FIRST_MESSAGE_FAILED_LOOKBACK_MS)),
+      sql`exists (select 1 from lead_interactions i where i.lead_id = "leads"."id" and i.conteudo like ${`${INITIAL_MESSAGE_FAILURE_NOTE_PREFIX}%`} and i.conteudo not like '%Motivo (%')`,
+      sql`not exists (select 1 from whatsapp_messages m where m.tenant_id = "leads"."tenant_id" and m.lead_id = "leads"."id")`,
+    );
+    if (context.role !== "director") {
+      if (!context.branchId) throw new AuthorizationError("Disparo disponível só para a unidade do gestor.");
+      whereConditions.push(eq(schema.leads.branchId, context.branchId));
+    }
+  } else if (filterType === "new_leads") {
     whereConditions.push(eq(schema.leads.status, "new"));
   } else if (filterType === "unresponsive_24h") {
     whereConditions.push(
@@ -92,6 +109,12 @@ export async function triggerBulkQualificationAction(input: BulkQualificationFil
 
     if (targetLeadIds.length === 0) {
       return { success: false, error: "Nenhum lead encontrado para os critérios selecionados." };
+    }
+
+    if (parsed.filterType === "first_message_failed") {
+      // Out of "aguardando ação manual", or the lead would never reach a broker after qualifying.
+      await db.update(schema.leads).set({ distributionStatus: "unassigned", qualificationStatus: "qualifying", qualificationState: "IN_PROGRESS", updatedAt: new Date() })
+        .where(and(eq(schema.leads.tenantId, context.tenantId), inArray(schema.leads.id, targetLeadIds), isNull(schema.leads.corretorId)));
     }
 
     let successCount = 0;
