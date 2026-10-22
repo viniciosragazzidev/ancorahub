@@ -15,7 +15,7 @@ import { toNamedEntity } from "./matching";
 import { ageBandsInQuestion, agesInQuestion, carriersInQuestion, plansInQuestion } from "./question-scope";
 import { loadCatalogAreas } from "./service";
 
-const MAX_FACTS = 120;
+const MAX_FACTS = 220;
 const MAX_CHUNKS = 6;
 /** Up to this many operators in the catalog, a question that names none searches all of them. */
 const MAX_CARRIERS_WITHOUT_NAME = 3;
@@ -32,6 +32,8 @@ const SYSTEM_PROMPT = [
   "Números listados junto de vidas, titular ou dependentes são IDADES (ex.: \"2 vidas 33,24\" = duas pessoas de 33 e 24 anos), não valores em reais. Encontre a faixa etária de cada idade na tabela.",
   "Para várias vidas, mostre o valor de cada pessoa pela faixa (com a citação) e o total somado. Se houver mais de um plano ou acomodação, mostre uma linha por plano.",
   "As tabelas dos trechos [T] podem vir com as colunas desalinhadas pela leitura do PDF: leia com cuidado qual valor é de qual plano e faixa.",
+  "Se a pergunta não disser o plano, mostre TODOS os planos da tabela pedida (uma linha por plano e acomodação), em vez de perguntar qual é.",
+  "Informações marcadas [preço aguardando aprovação do diretor] podem ser usadas, mas avise na resposta que o preço ainda não foi conferido pelo diretor.",
   "Trechos marcados como leitura automática de imagem podem ter erros: avise para confirmar no material original.",
   'Devolva somente um JSON: {"found": true ou false, "answer": "resposta com citações", "missing": "o que não está no material, ou vazio"}.',
 ].join(" ");
@@ -95,6 +97,7 @@ async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; pl
       qualifiers: schema.operatorCatalogFacts.qualifiers,
       validUntil: schema.operatorCatalogFacts.validUntil,
       sourceName: schema.knowledgeSources.fileName,
+      pending: sql<boolean>`${schema.operatorCatalogFacts.status} = 'pending_review'`,
     })
     .from(schema.operatorCatalogFacts)
     .innerJoin(schema.tenantPrivateCarriers, eq(schema.tenantPrivateCarriers.id, schema.operatorCatalogFacts.carrierId))
@@ -102,11 +105,19 @@ async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; pl
     .leftJoin(schema.knowledgeSources, eq(schema.knowledgeSources.id, schema.operatorCatalogFacts.sourceId))
     .where(and(
       eq(schema.operatorCatalogFacts.tenantId, tenantId),
-      eq(schema.operatorCatalogFacts.status, "current"),
       eq(schema.operatorCatalogFacts.origin, "material"),
       inArray(schema.operatorCatalogFacts.carrierId, scope.factCarrierIds),
-      // A plan still waiting for the director is not offered to brokers.
-      or(isNull(schema.operatorCatalogFacts.planId), eq(schema.tenantPrivatePlans.active, true)),
+      or(
+        // Approved: only for plans already in the catalog.
+        and(eq(schema.operatorCatalogFacts.status, "current"), or(isNull(schema.operatorCatalogFacts.planId), eq(schema.tenantPrivatePlans.active, true))),
+        // A price still waiting for the director answers only while no approved price exists
+        // for the same plan and conditions (22/10: the first import had every price pending).
+        and(
+          eq(schema.operatorCatalogFacts.status, "pending_review"),
+          eq(schema.operatorCatalogFacts.areaSlug, "precos"),
+          sql`not exists (select 1 from operator_catalog_facts approved where approved.tenant_id = ${tenantId} and approved.fact_key = "operator_catalog_facts"."fact_key" and approved.status = 'current')`,
+        ),
+      ),
       or(sql`${schema.operatorCatalogFacts.validUntil} is null`, sql`${schema.operatorCatalogFacts.validUntil} >= ${now.toISOString()}::timestamptz`),
       scope.planIds.length ? or(inArray(schema.operatorCatalogFacts.planId, scope.planIds), isNull(schema.operatorCatalogFacts.planId)) : undefined,
       priceFilter,
@@ -131,7 +142,27 @@ async function loadChunks(tenantId: string, question: string, carrierIds: string
   const ranked = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, MAX_CHUNKS);
   // Material not catalogued yet has no operator tag: without results, search it all.
   if (!ranked.length && carrierIds.length) return loadChunks(tenantId, question, []);
-  return ranked;
+  return withFollowingText(tenantId, ranked);
+}
+
+/**
+ * A price table is cut across chunks: its title ("Porte I - 2 vidas") matches the
+ * question and its rows sit in the next chunk. Each excerpt carries the next
+ * chunk of the same document so the model sees the rows (22/10).
+ */
+async function withFollowingText(tenantId: string, chunks: HybridSearchResult[]) {
+  if (!chunks.length) return chunks;
+  const rows = await getDatabase().execute(sql`
+    select current_chunk.id as chunk_id, next_chunk.text as next_text
+    from knowledge_chunks current_chunk
+    join knowledge_chunks next_chunk
+      on next_chunk.document_id = current_chunk.document_id and next_chunk.chunk_index = current_chunk.chunk_index + 1
+    where current_chunk.tenant_id = ${tenantId}
+      and current_chunk.id in (${sql.join(chunks.map((chunk) => sql`${chunk.chunkId}`), sql`, `)})
+  `);
+  const list = (Array.isArray(rows) ? rows : (rows as { rows?: unknown[] }).rows ?? []) as Array<{ chunk_id: string; next_text: string }>;
+  const nextById = new Map(list.map((row) => [row.chunk_id, row.next_text]));
+  return chunks.map((chunk) => (nextById.has(chunk.chunkId) ? { ...chunk, text: `${chunk.text}\n${nextById.get(chunk.chunkId)}` } : chunk));
 }
 
 function blocked(message: string, log: Record<string, unknown>): OperatorAnswer {
@@ -172,7 +203,8 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
   const factLines = facts.map((fact, index) => {
     const qualifiers = Object.entries((fact.qualifiers ?? {}) as Record<string, string>).map(([key, value]) => `${key}: ${value}`).join(", ");
     const until = formatDate(fact.validUntil);
-    return `[F${index + 1}] ${fact.carrierName}${fact.planName ? ` · ${fact.planName}` : ""} · ${label(fact.areaSlug, fact.fieldKey)}${qualifiers ? ` (${qualifiers})` : ""} = ${fact.valueText}${until ? ` · válido até ${until}` : ""}${fact.sourceName ? ` · fonte: ${fact.sourceName}` : ""}`;
+    const flag = fact.pending ? " [preço aguardando aprovação do diretor]" : "";
+    return `[F${index + 1}]${flag} ${fact.carrierName}${fact.planName ? ` · ${fact.planName}` : ""} · ${label(fact.areaSlug, fact.fieldKey)}${qualifiers ? ` (${qualifiers})` : ""} = ${fact.valueText}${until ? ` · válido até ${until}` : ""}${fact.sourceName ? ` · fonte: ${fact.sourceName}` : ""}`;
   });
   const chunkLines = chunks.map((chunk, index) => {
     const until = formatDate(chunk.validUntil);
