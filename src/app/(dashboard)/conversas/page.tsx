@@ -42,6 +42,8 @@ import { loadedLeadMessageScope } from "@/features/conversations/loaded-lead-mes
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
 
+const RECENT_CONVERSATION_LOOKBACK_MS = 30 * 24 * 60 * 60 * 1000;
+
 export default async function ConversationsPage({
   searchParams,
 }: {
@@ -107,6 +109,21 @@ export default async function ConversationsPage({
   let branches: { id: string; name: string }[] = [];
 
   if (!officialBrokerTab) {
+    // The leads that talked most recently come first in the list: ordered by stage alone, a
+    // lead that answered today but changed stage weeks ago was left out of it (22/10).
+    const recentConversationLeadIds = (await db
+      .select({ leadId: schema.whatsappMessages.leadId })
+      .from(schema.whatsappMessages)
+      .where(and(
+        eq(schema.whatsappMessages.tenantId, context.tenantId),
+        isNotNull(schema.whatsappMessages.leadId),
+        gte(schema.whatsappMessages.sentAt, new Date(now.getTime() - RECENT_CONVERSATION_LOOKBACK_MS)),
+      ))
+      .groupBy(schema.whatsappMessages.leadId)
+      .orderBy(desc(sql`max(${schema.whatsappMessages.sentAt})`))
+      .limit(isDirector ? 600 : 200))
+      .map((row) => row.leadId!)
+      .filter(Boolean);
     const [leads, branchRows, brokerPhoneRows] = await Promise.all([
       db
         .select({
@@ -165,8 +182,11 @@ export default async function ConversationsPage({
             )))] : []),
           ),
         )
-        .orderBy(desc(schema.leads.stageEnteredAt))
-        .limit(isDirector ? 500 : 150),
+        .orderBy(
+          ...(recentConversationLeadIds.length ? [sql`case when ${inArray(schema.leads.id, recentConversationLeadIds)} then 0 else 1 end`] : []),
+          desc(schema.leads.stageEnteredAt),
+        )
+        .limit(isDirector ? 800 : 250),
       isDirector
         ? db
             .select({ id: schema.branches.id, name: schema.branches.name })
@@ -346,9 +366,27 @@ export default async function ConversationsPage({
       }),
     );
 
+    // Indexed once by lead and by the last 8 digits of the phone: the list matches
+    // hundreds of leads against thousands of messages.
+    type MessageRow = (typeof messageRows)[number];
+    const rowsByLeadId = new Map<string, MessageRow[]>();
+    const rowsByPhoneSuffix = new Map<string, MessageRow[]>();
+    const addTo = (map: Map<string, MessageRow[]>, key: string, message: MessageRow) => {
+      const list = map.get(key);
+      if (list) list.push(message);
+      else map.set(key, [message]);
+    };
+    for (const message of messageRows) {
+      if (message.leadId) addTo(rowsByLeadId, message.leadId, message);
+      const suffix = normalizePhone(message.phone ?? "").slice(-8);
+      if (suffix.length === 8) addTo(rowsByPhoneSuffix, suffix, message);
+    }
+
     const messagesByLead = new Map<string, ConversationMessage[]>();
     for (const lead of leads) {
-      const rawMatched = messageRows
+      const leadSuffix = normalizePhone(lead.telefone ?? "").slice(-8);
+      const candidates = new Set([...(rowsByLeadId.get(lead.id) ?? []), ...(leadSuffix.length === 8 ? rowsByPhoneSuffix.get(leadSuffix) ?? [] : [])]);
+      const rawMatched = [...candidates]
         .filter(
           (msg) =>
             msg.leadId === lead.id ||
