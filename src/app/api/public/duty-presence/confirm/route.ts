@@ -51,7 +51,9 @@ export async function POST(request: NextRequest) {
             lte(schema.dutyRosterAssignments.validFrom, now),
             or(isNull(schema.dutyRosterAssignments.validUntil), gt(schema.dutyRosterAssignments.validUntil, now)),
             // Tolerance counts from the start, or from when the broker joined a plantão already running.
-            sql`greatest(${schema.dutyPresenceConfirmations.shiftStartsAt}, ${schema.dutyRosterAssignments.createdAt}) >= ${new Date(now.getTime() - SELF_CONFIRM_TOLERANCE_MINUTES * 60_000)}`,
+            // ISO string + cast: a Date in a raw `sql` reaches Postgres as Date.toString() and the
+            // whole confirmation failed (23/10, every broker at 08:50 saw "Não foi possível confirmar agora").
+            sql`greatest(${schema.dutyPresenceConfirmations.shiftStartsAt}, ${schema.dutyRosterAssignments.createdAt}) >= ${new Date(now.getTime() - SELF_CONFIRM_TOLERANCE_MINUTES * 60_000).toISOString()}::timestamptz`,
           ))),
       ))
       .returning({ id: schema.dutyPresenceConfirmations.id, brokerId: schema.dutyPresenceConfirmations.brokerId, tenantId: schema.dutyPresenceConfirmations.tenantId });
