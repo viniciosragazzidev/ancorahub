@@ -14,7 +14,7 @@ import { assignmentShift } from "./duty-shifts";
 import { classifyBrokerLiveOfferStatus, combineLiveStatusAcrossQueues } from "./duty-roster-live-status";
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
 import { inferLegacyLeadDutyScheduleId, selectLeadsForDutySchedule } from "./shared-duty-roster";
-import { isColdLeadsQueueName } from "./cold-age-release-rules";
+import { readColdAgeRelease } from "./cold-age-release";
 import { effectiveSwapDate } from "./duty-swap";
 
 // Upper bound on how far back a lead can show even when the schedule has no
@@ -178,9 +178,11 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // every lead since that moment counts, with no end.
   const leadsSinceOverride = dutyLeadsSinceStart(options.leadsSince ?? "plantao", now, schedule.timezone ?? undefined);
   const windowBounds = leadsSinceOverride ? { since: leadsSinceOverride, until: null } : resolveDutyLeadWindowBounds(occurrenceWindow, now);
-  // A plantão fed only by the Leads Frios queue has no time window (23/10): its cold leads
-  // are released at 2 days old, always before the occurrence, so the window hid all of them.
-  const coldQueueWithoutWindow = linkedQueues.length > 0 && linkedQueues.every((queue) => isColdLeadsQueueName(queue.name));
+  // A plantão fed only by queues with "Liberação dos leads frios" switched on has no time
+  // window (23/10): those leads go out at 2 days old, always before the occurrence, so the
+  // window hid all of them. The switch decides, not the queue name.
+  const coldReleaseConfigs = await Promise.all(linkedQueues.map((queue) => readColdAgeRelease(queue.id, queue.name)));
+  const coldQueueWithoutWindow = linkedQueues.length > 0 && coldReleaseConfigs.every((config) => config.enabled);
   const { since, until } = coldQueueWithoutWindow ? { since: new Date(0), until: null } : windowBounds;
   const upcomingStartsAt = occurrenceWindow.upcomingStartsAt ?? null;
 
