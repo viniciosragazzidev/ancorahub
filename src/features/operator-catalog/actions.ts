@@ -10,7 +10,7 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
 import { listCarrierFacts, listSourceFacts } from "./queries";
-import { approveFacts, approvePlan, approveSuggestion, rejectFacts, rejectPlan, rejectSuggestion, resolveMissingFacts } from "./review";
+import { approveEverything, approveFacts, approvePlan, approveSuggestion, rejectFacts, rejectPlan, rejectSuggestion, resolveMissingFacts } from "./review";
 import { brokerQuotesImportStatus, pauseBrokerQuotesImport, startBrokerQuotesImport } from "./broker-quotes";
 import { catalogOperatorSource } from "./service";
 
@@ -39,6 +39,18 @@ export async function approveFactsAction(factIds: string[]): Promise<Result> {
     return { success: true, message: `${result.approved} informação(ões) aprovada(s).${prices}` };
   } catch (error) {
     return failure(error, "Não foi possível aprovar agora.");
+  }
+}
+
+export async function approveEverythingAction(): Promise<Result> {
+  try {
+    const context = await director();
+    const result = await approveEverything(context.tenantId, context.userId);
+    revalidatePath(PATH);
+    const prices = result.priceVersions ? ` ${result.priceVersions} tabela(s) de preço atualizada(s).` : "";
+    return { success: true, message: `${result.plans} plano(s), ${result.approved} informação(ões) e ${result.suggestions} área(s) ou campo(s) aprovados.${prices}` };
+  } catch (error) {
+    return failure(error, "Não foi possível aprovar tudo agora.");
   }
 }
 

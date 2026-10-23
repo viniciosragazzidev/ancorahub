@@ -1,8 +1,9 @@
 import "server-only";
 
 import { createHash, randomUUID } from "node:crypto";
-import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 
+import { OPERATOR_MATERIAL_CATEGORY } from "@/features/tenant-intelligence/rag/constants";
 import { getDatabase, schema } from "@/shared/db";
 
 import { slugify } from "./taxonomy";
@@ -195,6 +196,76 @@ export async function approveSuggestion(tenantId: string, suggestionId: string, 
   }
   await db.update(schema.operatorCatalogSuggestions).set({ status: "approved", label: finalLabel, reviewedBy: userId, reviewedAt: new Date(), updatedAt: new Date() }).where(eq(schema.operatorCatalogSuggestions.id, suggestion.id));
   return true;
+}
+
+/**
+ * "Aprovar tudo" of the review (decision of 2026-10-23): every new plan with its facts, every other
+ * pending fact and every area/field suggestion, through the same rules as the one-by-one buttons
+ * (price tables included). When the same information is pending twice, the newest one wins.
+ * Materials left with nothing to decide become "Catalogado"; the ones without an operator stay.
+ */
+export async function approveEverything(tenantId: string, userId: string) {
+  const db = getDatabase();
+  const now = new Date();
+  const pendingFacts = await db.select({ id: schema.operatorCatalogFacts.id, factKey: schema.operatorCatalogFacts.factKey })
+    .from(schema.operatorCatalogFacts)
+    .where(and(eq(schema.operatorCatalogFacts.tenantId, tenantId), eq(schema.operatorCatalogFacts.status, "pending_review")))
+    .orderBy(desc(schema.operatorCatalogFacts.createdAt), desc(schema.operatorCatalogFacts.id));
+  const seen = new Set<string>();
+  const olderDuplicates = pendingFacts.filter((fact) => (seen.has(fact.factKey) ? true : (seen.add(fact.factKey), false))).map((fact) => fact.id);
+  if (olderDuplicates.length) {
+    await db.update(schema.operatorCatalogFacts).set({ status: "superseded", reviewedBy: userId, reviewedAt: now, updatedAt: now })
+      .where(and(eq(schema.operatorCatalogFacts.tenantId, tenantId), inArray(schema.operatorCatalogFacts.id, olderDuplicates), eq(schema.operatorCatalogFacts.status, "pending_review")));
+  }
+
+  const plans = await db.select({ id: schema.tenantPrivatePlans.id }).from(schema.tenantPrivatePlans).where(and(
+    eq(schema.tenantPrivatePlans.tenantId, tenantId),
+    eq(schema.tenantPrivatePlans.active, false),
+    isNull(schema.tenantPrivatePlans.archivedAt),
+    sql`${schema.tenantPrivatePlans.metadata}->>'catalogPending' = 'true'`,
+  ));
+  let approved = 0;
+  let priceVersions = 0;
+  for (const plan of plans) {
+    const result = await approvePlan(tenantId, plan.id, userId);
+    approved += result?.approved ?? 0;
+    priceVersions += result?.priceVersions ?? 0;
+  }
+
+  // Facts of a plan still out of the catalog (inactive or archived) keep waiting.
+  const rest = await db.select({ id: schema.operatorCatalogFacts.id }).from(schema.operatorCatalogFacts)
+    .leftJoin(schema.tenantPrivatePlans, eq(schema.tenantPrivatePlans.id, schema.operatorCatalogFacts.planId))
+    .where(and(
+      eq(schema.operatorCatalogFacts.tenantId, tenantId),
+      eq(schema.operatorCatalogFacts.status, "pending_review"),
+      sql`(${schema.operatorCatalogFacts.planId} is null or (${schema.tenantPrivatePlans.active} and ${schema.tenantPrivatePlans.archivedAt} is null))`,
+    ));
+  for (let index = 0; index < rest.length; index += 500) {
+    const result = await approveFacts(tenantId, rest.slice(index, index + 500).map((fact) => fact.id), userId);
+    approved += result.approved;
+    priceVersions += result.priceVersions;
+  }
+
+  const suggestions = await db.select({ id: schema.operatorCatalogSuggestions.id }).from(schema.operatorCatalogSuggestions)
+    .where(and(eq(schema.operatorCatalogSuggestions.tenantId, tenantId), eq(schema.operatorCatalogSuggestions.status, "pending")))
+    // Areas first: a field approved before its area would create the area with a placeholder name.
+    .orderBy(sql`case when ${schema.operatorCatalogSuggestions.kind} = 'area' then 0 else 1 end`, schema.operatorCatalogSuggestions.createdAt);
+  let includedSuggestions = 0;
+  for (const suggestion of suggestions) if (await approveSuggestion(tenantId, suggestion.id, userId)) includedSuggestions += 1;
+
+  const materials = await db.update(schema.knowledgeSources).set({ catalogStatus: "cataloged", updatedAt: new Date() })
+    .where(and(
+      eq(schema.knowledgeSources.tenantId, tenantId),
+      eq(schema.knowledgeSources.category, OPERATOR_MATERIAL_CATEGORY),
+      eq(schema.knowledgeSources.catalogStatus, "needs_review"),
+      sql`(${schema.knowledgeSources.catalogSummary}->>'origin') is distinct from 'broker_quote'`,
+      // No operator to choose and nothing that left the new version waiting for a decision.
+      sql`coalesce(${schema.knowledgeSources.catalogSummary}->>'reason', '') = ''`,
+      sql`coalesce(${schema.knowledgeSources.catalogSummary}->>'missingForReview', '0') in ('0', '')`,
+    ))
+    .returning({ id: schema.knowledgeSources.id });
+
+  return { plans: plans.length, approved, priceVersions, suggestions: includedSuggestions, materials: materials.length };
 }
 
 export async function rejectSuggestion(tenantId: string, suggestionId: string, userId: string) {

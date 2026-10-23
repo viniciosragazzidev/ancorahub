@@ -11,7 +11,7 @@ import { DsSegmentedControl } from "@/components/ui/ds-segmented-control";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/components/ui/sonner";
 
-import { approveFactsAction, approvePlanAction, rejectFactsAction, rejectPlanAction, resolveMissingFactsAction, reviewSuggestionAction } from "../actions";
+import { approveEverythingAction, approveFactsAction, approvePlanAction, rejectFactsAction, rejectPlanAction, resolveMissingFactsAction, reviewSuggestionAction } from "../actions";
 import type { FactRow, ReviewQueue } from "../queries";
 import { areaLabel, fieldLabel, qualifiersText, validityText, type AreaInfo } from "./labels";
 
@@ -159,8 +159,24 @@ export function ReviewPanel({ queue, areas }: { queue: ReviewQueue; areas: AreaI
 
   const empty = <p className="p-6 text-center text-sm text-muted-foreground">Nada esperando por aqui.</p>;
 
+  const waiting = queue.pendingFacts.length + queue.draftPlans.length + queue.suggestions.length;
+
   return (
     <div className="grid gap-3">
+      {waiting ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs leading-5 text-muted-foreground">Aprova os planos novos, os preços e regras e as áreas e campos de uma vez. Pode levar alguns minutos.</p>
+          <Button
+            size="sm"
+            disabled={pending}
+            onClick={() => {
+              if (window.confirm(`Aprovar tudo o que está em revisão (${queue.draftPlans.length} plano(s), ${queue.pendingFacts.length} informação(ões) e ${queue.suggestions.length} área(s) ou campo(s))?`)) run(approveEverythingAction);
+            }}
+          >
+            <Check className="size-3.5" /> Aprovar tudo
+          </Button>
+        </div>
+      ) : null}
       <DsSegmentedControl<View>
         aria-label="O que revisar"
         value={view}
