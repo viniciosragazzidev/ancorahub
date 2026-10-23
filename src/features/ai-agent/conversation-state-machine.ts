@@ -144,6 +144,14 @@ export async function handleInitialMessageFailure({
       })
       .where(and(eq(schema.leads.id, leadId), eq(schema.leads.tenantId, tenantId)));
 
+    // No WhatsApp on this number (Meta 131026): a broker calls it from the CALLEX queue (23/10).
+    if (initialMessageFailureLeadDisposition(failureCode).qualificationStatus === "no_whatsapp_contact") {
+      const { routeLeadToCallex } = await import("@/features/lead-distribution/callex");
+      await routeLeadToCallex({ tenantId, leadId, actorId: systemUserId }).catch((error) => {
+        console.error("[handleInitialMessageFailure] callex_route_failed", { tenantId, leadId, error: error instanceof Error ? error.message.slice(0, 160) : "unknown" });
+      });
+    }
+
     await db.insert(schema.leadDistributionEvents).values({
       id: randomUUID(),
       tenantId,

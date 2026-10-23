@@ -18,20 +18,25 @@ describe("falha da primeira mensagem do atendimento virtual", () => {
     expect(getDirectorFacingMetaDeliveryFailure("131049")?.title).toBe("Meta limitou mensagens para este contato");
   });
 
-  it("mensagem não entregue: registra o motivo e desqualifica o lead", () => {
-    expect(initialMessageFailureStatus("131026")).toBe("disqualified");
+  it("número sem WhatsApp (131026): vai para a fila CALLEX para atendimento por ligação", () => {
+    expect(initialMessageFailureStatus("131026")).toBe("no_whatsapp_contact");
+    expect(initialMessageFailureLeadDisposition("131026")).toMatchObject({ qualificationStatus: "no_whatsapp_contact" });
+    const note = initialMessageFailureNote("131026");
+    expect(note).toContain("Motivo (131026): Mensagem não pôde ser entregue.");
+    expect(note).toContain("fila CALLEX");
+  });
+
+  it("outra falha sem código: registra e desqualifica o lead", () => {
     expect(initialMessageFailureStatus(null)).toBe("disqualified");
-    expect(initialMessageFailureLeadDisposition("131026")).toEqual({
+    expect(initialMessageFailureLeadDisposition(null)).toEqual({
       status: "new",
       distributionStatus: "manual_hold",
       qualificationStatus: "disqualified",
       qualificationState: "COMPLETED",
     });
-    const note = initialMessageFailureNote("131026");
-    expect(note).toContain("Motivo (131026): Mensagem não pôde ser entregue.");
+    const note = initialMessageFailureNote(null);
     expect(note).toContain("o lead foi desqualificado");
-    expect(note).toContain("fora da distribuição automática, aguardando ação manual");
-    expect(initialMessageFailureNote(null)).not.toContain("Motivo");
+    expect(note).not.toContain("Motivo");
   });
 
   it("130472/131049: o lead tem WhatsApp, a Meta é que bloqueou — não é desqualificado", () => {

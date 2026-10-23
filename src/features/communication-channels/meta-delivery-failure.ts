@@ -60,6 +60,9 @@ export function getDirectorFacingMetaDeliveryFailure(
  */
 const META_BLOCKED_CODES = new Set(["130472", "131049"]);
 
+/** The number does not take WhatsApp (a landline, or not on WhatsApp): it goes to CALLEX to be called (23/10). */
+const NO_WHATSAPP_CODES = new Set(["131026"]);
+
 /**
  * Start of the note written when the first message cannot be delivered (see
  * initialMessageFailureNote). It is for the team that distributes leads, so the
@@ -69,11 +72,15 @@ export const INITIAL_MESSAGE_FAILURE_NOTE_PREFIX =
   "⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.";
 
 /**
- * How a failed first message classifies the lead: undelivered (e.g. 131026,
- * the number has no WhatsApp) is disqualified; blocked by Meta is told apart.
+ * How a failed first message classifies the lead: blocked by Meta is told apart; a
+ * number without WhatsApp (131026) is "sem contato no WhatsApp" and goes to CALLEX
+ * to be called; any other failure is disqualified.
  */
-export function initialMessageFailureStatus(failureCode?: string | null): "meta_blocked" | "disqualified" {
-  return META_BLOCKED_CODES.has(failureCode?.trim() ?? "") ? "meta_blocked" : "disqualified";
+export function initialMessageFailureStatus(failureCode?: string | null): "meta_blocked" | "no_whatsapp_contact" | "disqualified" {
+  const code = failureCode?.trim() ?? "";
+  if (META_BLOCKED_CODES.has(code)) return "meta_blocked";
+  if (NO_WHATSAPP_CODES.has(code)) return "no_whatsapp_contact";
+  return "disqualified";
 }
 
 export function initialMessageFailureLeadDisposition(failureCode?: string | null) {
@@ -89,6 +96,9 @@ export function initialMessageFailureLeadDisposition(failureCode?: string | null
 export function initialMessageFailureNote(failureCode?: string | null) {
   const failure = getDirectorFacingMetaDeliveryFailure(failureCode);
   const why = failure ? ` Motivo (${failure.code}): ${failure.title}. ${failure.message}` : "";
+  if (initialMessageFailureStatus(failureCode) === "no_whatsapp_contact") {
+    return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} O número não recebe WhatsApp: a IA foi encerrada e o lead foi para a fila CALLEX, para um corretor atender por ligação.`;
+  }
   if (initialMessageFailureStatus(failureCode) === "meta_blocked") {
     return `⚠️ A primeira mensagem do atendimento virtual não chegou ao WhatsApp do lead.${why} A IA foi encerrada e o lead ficou fora da distribuição automática como "Envio bloqueado pela Meta", aguardando ação manual.`;
   }
