@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/sheet";
 import { QUEUE_SOURCE_OPTIONS } from "@/features/lead-distribution/routing-catalog";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
+import { isColdLeadsQueueName } from "@/features/lead-distribution/cold-age-release-rules";
+import { ColdAgeReleaseSection } from "./cold-age-release-section";
 import { MetaEntries, type MetaEntriesData } from "./meta-entries";
 import { assignmentLabel, queueDutyScheduleIds, type DutySchedule, type Queue } from "./types";
 
@@ -128,6 +130,8 @@ export function QueueDetailSheet({
                   <Detail label="Corretores">{specificBrokers.length ? specificBrokers.join(", ") : "Todos os elegíveis das unidades"}</Detail>
                 </dl>
               </SheetSection>
+
+              {isColdLeadsQueueName(queue.name) ? <ColdAgeReleaseSection key={queue.id} queueId={queue.id} canEdit={canEdit} /> : null}
 
               {canEdit ? (
                 <div className="flex justify-end">

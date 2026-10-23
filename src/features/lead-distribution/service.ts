@@ -748,6 +748,12 @@ export async function processQueuedLead(context: TenantContext, leadId: string, 
   if (lead.queueId && lead.queueId !== sourceQueueId && shouldHoldColdLead(lead.qualificationStatus, (await loadDistributionPolicy(context.tenantId, lead.queueId, null)).value.holdColdLeads)) {
     return { status: "queued", leadId, reason: COLD_HELD_BY_QUEUE_REASON };
   }
+  // Leads Frios: a lead goes to a broker only from 9h of the day it turns 2 days old (23/10).
+  if (lead.queueId) {
+    const { coldAgeReleaseHold } = await import("./cold-age-release");
+    const coldHold = await coldAgeReleaseHold(context.tenantId, lead.queueId, lead.createdAt);
+    if (coldHold) return { status: "queued", leadId, reason: coldHold.reason, retryAt: coldHold.retryAt };
+  }
   const [queue] = lead.queueId ? await db.select({ branchId: schema.leadQueues.branchId, strategy: schema.leadQueues.assignmentStrategy, mode: schema.leadQueues.assignmentMode, capacityEnabled: schema.leadQueues.capacityEnabled, capacity: schema.leadQueues.capacityPerBroker, offerIntervalMinutes: schema.leadQueues.offerIntervalMinutes, maxPendingOffers: schema.leadQueues.maxPendingOffersPerBroker, exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId, exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds, dutyFallbackPolicy: schema.leadQueues.dutyFallbackPolicy, dutyFallbackQueueId: schema.leadQueues.dutyFallbackQueueId }).from(schema.leadQueues).where(and(eq(schema.leadQueues.id, lead.queueId), eq(schema.leadQueues.tenantId, context.tenantId), eq(schema.leadQueues.status, "active"))).limit(1) : [];
   if (lead.queueId && !queue) {
     const staleQueueId = lead.queueId;

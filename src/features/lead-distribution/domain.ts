@@ -297,6 +297,7 @@ export function isDeferredDistributionReason(reason: string) {
     normalized.includes("desativada") ||
     normalized.includes("pausada") ||
     normalized.includes("fila configurada pertence") ||
+    normalized.includes("aguardando liberação") ||
     normalized.includes("nenhuma unidade elegível") ||
     normalized.includes("fila geral não possui unidades") ||
     normalized.includes("próximo ciclo automático") ||
