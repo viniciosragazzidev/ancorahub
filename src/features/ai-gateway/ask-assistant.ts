@@ -118,7 +118,7 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
       blocks.push({
         type: "question",
         id: `ai-operator-next-${stamp}`,
-        prompt: operatorAnswer.card ? "Quer ver mais?" : "Posso responder estas:",
+        prompt: operatorAnswer.otherOperators ? "Do material que já temos, posso responder:" : operatorAnswer.card ? "Quer ver mais?" : "Posso responder estas:",
         choices: operatorAnswer.followUps.map((ask) => ({ id: ask.id, label: ask.label, reply: ask.question, action: { kind: "local" as const, value: `${JACK_ASK_PREFIX}${ask.question}` } })),
       });
     }

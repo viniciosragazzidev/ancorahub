@@ -36,3 +36,10 @@ describe("questionAreas", () => {
     expect(questionAreas("Quais hospitais da amil?")).toEqual(["rede_credenciada"]);
   });
 });
+
+describe("questionAreas, plans", () => {
+  it("reads a question about the list of plans", () => {
+    expect(questionAreas("Quais os planos da bradesco")).toEqual(["planos"]);
+    expect(questionAreas("Qual o valor do plano S380?")).toEqual(["precos"]);
+  });
+});

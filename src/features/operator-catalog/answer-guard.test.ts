@@ -110,3 +110,9 @@ describe("readableMissing", () => {
     expect(readableMissing(undefined)).toBeUndefined();
   });
 });
+
+describe("readableMissing, internal codes", () => {
+  it("drops [F] and [T] codes", () => {
+    expect(readableMissing("Nenhuma informação catalogada [F] e nenhum trecho [T] com os planos da Bradesco")).toBe("Nenhuma informação catalogada e nenhum trecho com os planos da Bradesco");
+  });
+});

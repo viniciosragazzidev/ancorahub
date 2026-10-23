@@ -177,7 +177,8 @@ export function relevantChunks<T extends { text: string; keywordHits: number; se
  * (23/10: a fallback model answered "Precisa the the.", shown as is to the broker).
  */
 export function readableMissing(text: string | undefined) {
-  const clean = text?.replace(/\s+/g, " ").trim().slice(0, 400);
+  // Internal codes ([F], [T3]) mean nothing to the broker.
+  const clean = text?.replace(/\s*\[(?:[FT]\d*(?:\s*,\s*)?)+\]/g, "").replace(/\s+/g, " ").trim().slice(0, 400);
   if (!clean) return undefined;
   const words = clean.match(/[a-zà-ú]{3,}/gi) ?? [];
   const english = clean.match(/\b(the|and|of|to|is|not|for|with)\b/gi) ?? [];

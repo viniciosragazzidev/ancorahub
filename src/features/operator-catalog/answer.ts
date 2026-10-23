@@ -52,6 +52,7 @@ const SYSTEM_PROMPT = [
   "Informações marcadas [preço aguardando aprovação do diretor] podem ser usadas, mas avise na resposta que o preço ainda não foi conferido pelo diretor.",
   "Trechos marcados como leitura automática de imagem podem ter erros: avise para confirmar no material original.",
   "Organize a resposta em seções curtas: uma seção por plano ou tabela (no título, as condições: acomodação, vidas, contratação, coparticipação) ou por grupo (ex.: hospitais por plano). Cada linha tem um rótulo curto (faixa, idade, hospital, regra) e o valor; a citação vai no campo cite da linha, nunca dentro do texto.",
+  "Em missing, escreva para o corretor em palavras simples, sem códigos como [F] ou [T] e sem falar em informações catalogadas ou trechos (ex.: tabela de preços da Bradesco).",
   "Em intro, uma frase simples dizendo o que foi encontrado. Em notes, os avisos (preço não conferido, leitura de imagem, condições escolhidas). Sem markdown, sem asteriscos.",
   'Devolva somente um JSON: {"found": true ou false, "intro": "frase", "sections": [{"title": "Amil S380 · QC · 2 vidas · coparticipação 30%", "rows": [{"label": "33 anos (29-33)", "value": "R$ 391,50", "cite": "F2"}, {"label": "Total", "value": "R$ 717,75", "cite": "F1, F2"}]}], "notes": ["aviso"], "missing": "o que não está no material, ou vazio"}.',
 ].join(" ");
@@ -94,6 +95,37 @@ async function loadScope(tenantId: string, question: string) {
   const ages = agesInQuestion(question);
   const asksPrice = /\b(valor|valores|preco|precos|quanto|mensalidade|tabela|custa|custo)\b/.test(question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
   return { carrierIds, factCarrierIds, carrierNames, planIds: plans.map((plan) => plan.id), bands: ageBandsInQuestion(question), ages, lives: livesInQuestion(question), areas: questionAreas(question), asksPrice, missingOperators };
+}
+
+/** The active plans of each operator in the catalog, as one fact per operator (same shape as loadFacts). */
+async function loadPlanListFacts(tenantId: string, carrierIds: string[]) {
+  if (!carrierIds.length) return [];
+  const rows = await getDatabase()
+    .select({ carrierName: schema.tenantPrivateCarriers.name, planName: schema.tenantPrivatePlans.name })
+    .from(schema.tenantPrivatePlans)
+    .innerJoin(schema.tenantPrivateCarriers, eq(schema.tenantPrivateCarriers.id, schema.tenantPrivatePlans.carrierId))
+    .where(and(
+      eq(schema.tenantPrivatePlans.tenantId, tenantId),
+      inArray(schema.tenantPrivatePlans.carrierId, carrierIds),
+      eq(schema.tenantPrivatePlans.active, true),
+      isNull(schema.tenantPrivatePlans.archivedAt),
+    ))
+    .orderBy(asc(schema.tenantPrivatePlans.name))
+    .limit(200);
+  const byCarrier = new Map<string, string[]>();
+  for (const row of rows) byCarrier.set(row.carrierName, [...(byCarrier.get(row.carrierName) ?? []), row.planName]);
+  return [...byCarrier.entries()].map(([carrierName, plans]) => ({
+    carrierName,
+    planName: null as string | null,
+    areaSlug: "planos",
+    fieldKey: "planos_cadastrados",
+    valueText: plans.join(", "),
+    unit: null as string | null,
+    qualifiers: {} as unknown,
+    validUntil: null as Date | null,
+    sourceName: null as string | null,
+    pending: false,
+  }));
 }
 
 /** Price facts of the tables that cover this many lives; other facts stay. No table covers it: all stay. */
@@ -319,6 +351,8 @@ async function computeOperatorAnswer(input: { tenantId: string; userId: string; 
   // Facts first (one fast query): when they cover the subject asked, the excerpt search is light.
   let allFacts = await loadFacts(input.tenantId, scope);
   if (!allFacts.length && scope.areas.length) allFacts = await loadFacts(input.tenantId, { ...scope, areas: [] });
+  // "Quais os planos da X": the plans the catalog has for the operator are an answer too.
+  if (scope.areas.includes("planos")) allFacts = [...(await loadPlanListFacts(input.tenantId, scope.factCarrierIds)), ...allFacts];
   const covered = scope.areas.length > 0 && allFacts.some((fact) => scope.areas.includes(fact.areaSlug));
   const [rawChunks, areas] = await Promise.all([
     loadChunks({ tenantId: input.tenantId, userId: input.userId, question: input.question, carrierIds: scope.carrierIds, light: covered }),
@@ -453,7 +487,7 @@ export async function materialAsksOfTheDay(tenantId: string, limit = 3) {
 }
 
 /** Same as answerIfOperatorQuestion, with the answer as a card and what to ask next (the Jack draws them). */
-export async function operatorQuestionReply(input: { tenantId: string; userId: string; question: string; ragEnabled?: boolean }): Promise<{ text: string; card?: OperatorCard; followUps?: MaterialAsk[] } | null> {
+export async function operatorQuestionReply(input: { tenantId: string; userId: string; question: string; ragEnabled?: boolean }): Promise<{ text: string; card?: OperatorCard; followUps?: MaterialAsk[]; otherOperators?: boolean } | null> {
   const question = input.question.trim().slice(0, 500);
   if (question.length < 3) return null;
   const carriers = await getDatabase().select({ id: schema.tenantPrivateCarriers.id, name: schema.tenantPrivateCarriers.name, metadata: schema.tenantPrivateCarriers.metadata })
@@ -466,7 +500,10 @@ export async function operatorQuestionReply(input: { tenantId: string; userId: s
   const followUpsPromise = loadMaterialAsks(input.tenantId, { seed: daySeed(), limit: 3, focusCarrier, excludeAreas: questionAreas(question) }).catch(() => [] as MaterialAsk[]);
   const result = await answerOperatorQuestion({ ...input, question }).catch((): OperatorAnswer => ({ status: "error", message: "Não foi possível consultar o material das operadoras agora. Tente novamente em instantes." }));
   // Next questions: the same operator, other subjects with material (or any operator when none was named).
-  const followUps = await followUpsPromise;
-  if (result.status !== "answered") return { text: result.message, followUps };
-  return { text: result.answer, card: result.card, followUps };
+  let followUps = await followUpsPromise;
+  // The operator asked has nothing else in the material: what the material has, from any operator.
+  const otherOperators = Boolean(focusCarrier) && !followUps.length;
+  if (otherOperators) followUps = await loadMaterialAsks(input.tenantId, { seed: daySeed(), limit: 3 }).catch(() => [] as MaterialAsk[]);
+  if (result.status !== "answered") return { text: result.message, followUps, otherOperators };
+  return { text: result.answer, card: result.card, followUps, otherOperators };
 }

@@ -88,6 +88,8 @@ export function buildMaterialAsks(rows: MaterialCoverage[], options: { seed: num
 export function questionAreas(question: string) {
   const text = question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const areas: string[] = [];
+  // "Quais os planos da Bradesco", "lista de planos": the list of plans, not one plan's price.
+  if (/\b(quais|lista|listar|que planos)\b.*\bplanos\b|\bplanos (da|do|de)\b/.test(text)) areas.push("planos");
   if (/\b(valor|valores|preco|precos|quanto|mensalidade|tabela|custa|custo)\b/.test(text)) areas.push("precos");
   if (/hospita|rede|credenciad|laboratori|clinica/.test(text)) areas.push("rede_credenciada");
   if (/carencia/.test(text)) areas.push("carencias");
