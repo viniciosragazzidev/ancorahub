@@ -171,3 +171,15 @@ export function relevantChunks<T extends { text: string; keywordHits: number; se
     return closeInMeaning || enoughWords;
   });
 }
+
+/**
+ * What the model said was missing, only when it reads as a sentence in Portuguese
+ * (23/10: a fallback model answered "Precisa the the.", shown as is to the broker).
+ */
+export function readableMissing(text: string | undefined) {
+  const clean = text?.replace(/\s+/g, " ").trim().slice(0, 400);
+  if (!clean) return undefined;
+  const words = clean.match(/[a-zà-ú]{3,}/gi) ?? [];
+  const english = clean.match(/\b(the|and|of|to|is|not|for|with)\b/gi) ?? [];
+  return words.length >= 3 && english.length * 4 < words.length ? clean : undefined;
+}

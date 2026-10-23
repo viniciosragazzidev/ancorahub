@@ -9,7 +9,7 @@ import { executeHybridKnowledgeSearch, type HybridSearchResult } from "@/feature
 import { extractSearchKeywords } from "@/features/tenant-intelligence/rag/search-terms";
 import { getDatabase, schema } from "@/shared/db";
 
-import { isOperatorKnowledgeQuestion, marketOperatorsInQuestion, NOT_FOUND_MESSAGE, operatorNotImportedMessage, relevantChunks, validateGroundedAnswer } from "./answer-guard";
+import { isOperatorKnowledgeQuestion, marketOperatorsInQuestion, NOT_FOUND_MESSAGE, operatorNotImportedMessage, readableMissing, relevantChunks, validateGroundedAnswer } from "./answer-guard";
 import { embedQuery } from "./embeddings";
 import { toNamedEntity } from "./matching";
 import { ageBandsInQuestion, agesInQuestion, carriersInQuestion, livesInQuestion, livesQualifierCovers, plansInQuestion } from "./question-scope";
@@ -210,7 +210,7 @@ async function rerankChunks(input: { tenantId: string; userId: string; question:
     userId: input.userId,
     sensitive: true,
     temperature: 0,
-    maxTokens: 120,
+    maxTokens: 500,
     timeoutMs: 12_000,
     schema: z.object({ order: z.array(z.coerce.number()).max(MAX_CANDIDATES).catch([]) }),
     messages: [
@@ -325,12 +325,12 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
     userId: input.userId,
     sensitive: true,
     temperature: 0,
-    maxTokens: 2_500,
+    maxTokens: 5_000,
     timeoutMs: 60_000,
     schema: z.object({
       found: z.boolean().catch(false),
-      answer: z.string().trim().max(6000).catch(""),
-      missing: z.string().trim().max(500).optional().catch(undefined),
+      answer: z.string().trim().catch("").transform((text) => text.slice(0, 9000)),
+      missing: z.string().trim().optional().catch(undefined).transform((text) => readableMissing(text)),
     }),
     messages: [
       { role: "system", content: SYSTEM_PROMPT },

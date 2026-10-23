@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isOperatorKnowledgeQuestion, isSumOfSome, marketOperatorsInQuestion, numbersIn, operatorNotImportedMessage, relevantChunks, validateGroundedAnswer } from "./answer-guard";
+import { isOperatorKnowledgeQuestion, isSumOfSome, marketOperatorsInQuestion, numbersIn, operatorNotImportedMessage, readableMissing, relevantChunks, validateGroundedAnswer } from "./answer-guard";
 
 describe("operator questions", () => {
   it("names market operators without mistaking common words or person names", () => {
@@ -99,5 +99,14 @@ describe("totals for several lives", () => {
   it("finds sums of two or more values only", () => {
     expect(isSumOfSome(717.75, [391.5, 326.25, 10])).toBe(true);
     expect(isSumOfSome(391.5, [391.5, 326.25])).toBe(false);
+  });
+});
+
+describe("readableMissing", () => {
+  it("keeps a sentence and drops broken model text", () => {
+    expect(readableMissing("Valor da faixa 59+ para o plano S450")).toBe("Valor da faixa 59+ para o plano S450");
+    expect(readableMissing("Precisa the            the.")).toBeUndefined();
+    expect(readableMissing("")).toBeUndefined();
+    expect(readableMissing(undefined)).toBeUndefined();
   });
 });
