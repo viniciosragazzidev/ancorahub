@@ -13,6 +13,7 @@ import { ConsentCard } from "./consent-card";
 import { PausedHero } from "./paused-hero";
 import { ChatAudioPlayer } from "./chat-audio";
 import { PresenceCallout } from "./presence-callout";
+import { OperatorAnswerCard } from "./operator-answer-card";
 
 const LETTERS = "ABCDEFGHIJ";
 const enter = { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const };
@@ -243,6 +244,8 @@ export function ChatBlockView({ block, onSystemAction, onButtonOpen, onItemSwipe
       );
     case "assistant":
       return <AssistantText block={block} />;
+    case "operator":
+      return <OperatorAnswerCard card={block.card} at={block.at} />;
     case "notice": {
       const link = noticeLink({ type: block.noticeType, leadId: block.leadId });
       const body = <NoticeCardBody type={block.noticeType} leadId={block.leadId} title={block.title} message={block.message} time={block.at} timeIso={block.atIso} unread={block.unread} linkLabel={link?.label} />;

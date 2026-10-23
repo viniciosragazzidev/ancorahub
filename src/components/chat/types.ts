@@ -63,6 +63,8 @@ export type ChatBlock =
   | { type: "system"; id: string; text: string; strong?: string; action?: { label: string; choiceAction: ChatAction } }
   /** variant "tip": a tip bubble (lamp + "Dica"), used by Dicas de Atendimento. */
   | { type: "assistant"; id: string; text: string; at?: string; variant?: "tip" }
+  /** An answer from the operator material (Jack, 23/10): sections of rows with their source, copy for the client. */
+  | { type: "operator"; id: string; card: OperatorAnswerView; at?: string }
   /** The client in focus: name in highlight and a few facts as chips. */
   | { type: "client"; id: string; name: string; initials: string; chips: Array<{ label: string; tone?: ChatTone }> }
   /** A notification shown as in Notificações (Âncora conversation): icon by category, tag, link, unread dot. */
@@ -103,6 +105,15 @@ export type PresenceAskView = {
   endsAt: string;
   status: "pending" | "awaiting_release" | "confirmed";
   photoId: string | null;
+};
+
+/** The operator answer card (same shape as OperatorCard in features/operator-catalog/operator-card.ts). */
+export type OperatorAnswerView = {
+  intro: string;
+  sections: Array<{ title: string; rows: Array<{ label: string; value: string; source: string | null }> }>;
+  notes: string[];
+  missing: string | null;
+  sources: string[];
 };
 
 export type ChatTone = "info" | "success" | "warning" | "danger" | "neutral";

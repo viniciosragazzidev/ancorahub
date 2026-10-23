@@ -12,6 +12,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { getWhatsAppConnection } from "@/app/(dashboard)/settings/whatsapp-actions";
 import { WhatsAppPlantaoNotice } from "@/components/whatsapp/whatsapp-plantao-notice";
+import { brokerAiAccess } from "@/features/ai-gateway/broker-ai-pilot";
+import { materialAsksOfTheDay } from "@/features/operator-catalog/answer";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +34,7 @@ export default async function AssistantConversationPage({ params }: { params: Pr
   if (assistant !== "ancora") redirect(definition.href);
   const identity = { name: definition.name, shape: definition.shape, hue: definition.hue };
 
-  const [notifications, noticeFlag, whatsappConnection] = await Promise.all([
+  const [notifications, noticeFlag, whatsappConnection, materialAsks] = await Promise.all([
     getDatabase()
       .select({
         id: schema.notifications.id,
@@ -49,6 +51,10 @@ export default async function AssistantConversationPage({ params }: { params: Pr
       .limit(ANCORA_HISTORY),
     audience === "broker" ? getFeatureFlag(FEATURE_FLAGS.WHATSAPP_PLANTAO_NOTICE).catch(() => "false") : Promise.resolve("false"),
     audience === "broker" ? getWhatsAppConnection().catch(() => null) : Promise.resolve(null),
+    // Pilot of the operator RAG: questions made from the material this company has.
+    audience === "broker"
+      ? brokerAiAccess(context.userId).then((access) => (access.operatorRag ? materialAsksOfTheDay(context.tenantId) : [])).catch(() => [])
+      : Promise.resolve([]),
   ]);
   const hasUnread = notifications.some((item) => !item.readAt);
   const topNotice = audience === "broker"
@@ -59,7 +65,7 @@ export default async function AssistantConversationPage({ params }: { params: Pr
     : undefined;
   return (
     <>
-      <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ notifications, now: new Date() })} instant agentId={audience === "broker" ? "ancora" : undefined} canWrite={audience === "broker"} topNotice={topNotice} />
+      <AssistantChat key="ancora" identity={identity} script={buildAncoraScript({ notifications, now: new Date(), materialAsks })} instant agentId={audience === "broker" ? "ancora" : undefined} canWrite={audience === "broker"} topNotice={topNotice} />
       {hasUnread ? <MarkSeenOnView kind="ancora" /> : null}
     </>
   );

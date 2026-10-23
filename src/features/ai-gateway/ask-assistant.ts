@@ -12,7 +12,8 @@ import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
-import { answerIfOperatorQuestion } from "@/features/operator-catalog/answer";
+import { operatorQuestionReply } from "@/features/operator-catalog/answer";
+import { JACK_ASK_PREFIX } from "@/features/broker-workspace/chat/assistant-scripts";
 
 import { brokerAiAccess } from "./broker-ai-pilot";
 
@@ -107,8 +108,22 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
   const consent = await readAiConsent(context.tenantId, context.userId).catch(() => ({ granted: false }));
   if (!consent.granted) return { ok: false, blocks: [{ type: "consent", id: `ai-consent-${stamp}`, question: input.data.question }] };
   // Operators, plans, prices, carências: only the imported material answers, never the agent's model.
-  const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: input.data.question, ragEnabled: access.operatorRag }).catch(() => null);
-  if (operatorAnswer) return { ok: true, blocks: [{ type: "assistant", id: `ai-operator-${stamp}`, text: operatorAnswer }] };
+  const operatorAnswer = await operatorQuestionReply({ tenantId: context.tenantId, userId: context.userId, question: input.data.question, ragEnabled: access.operatorRag }).catch(() => null);
+  if (operatorAnswer) {
+    const blocks: ChatBlock[] = [operatorAnswer.card?.sections.length
+      ? { type: "operator", id: `ai-operator-${stamp}`, card: operatorAnswer.card }
+      : { type: "assistant", id: `ai-operator-${stamp}`, text: operatorAnswer.text }];
+    // What to ask next, from the material of the same operator (one tap asks it).
+    if (operatorAnswer.followUps?.length) {
+      blocks.push({
+        type: "question",
+        id: `ai-operator-next-${stamp}`,
+        prompt: operatorAnswer.card ? "Quer ver mais?" : "Posso responder estas:",
+        choices: operatorAnswer.followUps.map((ask) => ({ id: ask.id, label: ask.label, reply: ask.question, action: { kind: "local" as const, value: `${JACK_ASK_PREFIX}${ask.question}` } })),
+      });
+    }
+    return { ok: true, blocks };
+  }
   const agent = AGENT_REGISTRY[input.data.agentId];
   const built = input.data.agentId === "lead" && input.data.leadId
     ? await leadContext(input.data.leadId).catch(() => null)

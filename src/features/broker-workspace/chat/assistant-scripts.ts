@@ -777,14 +777,22 @@ const JACK_ASKS: ChatChoice[] = [
   { id: "jack-day", label: "Como está meu dia?", action: { kind: "local", value: `${JACK_ASK_PREFIX}Como está o meu dia até agora?` } },
 ];
 
-export function buildAncoraScript(input: { notifications: AncoraNotification[]; now: Date }): ChatScript {
+/** Questions about the operator material, ready to tap (pilot of the Jack with the RAG, 23/10). */
+export type JackMaterialAsk = { id: string; label: string; question: string };
+
+function materialChoices(asks: JackMaterialAsk[] | undefined): ChatChoice[] {
+  return (asks ?? []).slice(0, 3).map((ask) => ({ id: ask.id, label: ask.label, hint: "Material das operadoras", reply: ask.question, action: { kind: "local", value: `${JACK_ASK_PREFIX}${ask.question}` } }));
+}
+
+export function buildAncoraScript(input: { notifications: AncoraNotification[]; now: Date; materialAsks?: JackMaterialAsk[] }): ChatScript {
   const { now } = input;
+  const materials = materialChoices(input.materialAsks);
   const items = [...input.notifications].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
   if (!items.length) {
     return {
       blocks: [
         assistantMessage("ancora-empty", "Oi, eu sou o Jack! Aqui chegam os avisos da Âncora e você pode me perguntar o que quiser sobre o seu dia: quem atender primeiro, seu plantão, seus retornos, sua meta. É só escrever aqui embaixo."),
-        question("ancora-choice", "Quer começar por uma destas?", [...JACK_ASKS]),
+        question("ancora-choice", "Quer começar por uma destas?", [...JACK_ASKS, ...materials]),
       ],
       composerPlaceholder: "Pergunte ao Jack",
       status: { label: "Sem avisos novos", tone: "idle" },
@@ -817,7 +825,7 @@ export function buildAncoraScript(input: { notifications: AncoraNotification[]; 
   if (unread.length) choices.push({ id: "mark-all", label: "Marcar tudo como lido", reply: "Já vi, pode marcar como lido", action: { kind: "server", name: "notifications.markRead", payload: {} } });
   // Jack answers in this same conversation: two questions ready to tap (the AI answers them).
   blocks.push(assistantMessage("ancora-jack-hint", vary(["Precisa de algo? É só me perguntar aqui embaixo.", "Me pergunte o que quiser sobre o seu dia.", "Quer saber quem atender primeiro? Toque abaixo ou escreva.", "Estou por aqui para o que precisar."], now, 3)));
-  choices.push(...JACK_ASKS);
+  choices.push(...JACK_ASKS, ...materials);
   choices.push({ id: "settings", label: "Configurar avisos", hint: "Notificações no celular e pop-up de lead", action: { kind: "href", href: "/notificacoes" } });
   blocks.push(question("ancora-choice", unread.length ? "O que você quer fazer?" : "Tudo lido. Quer me perguntar algo?", choices));
 

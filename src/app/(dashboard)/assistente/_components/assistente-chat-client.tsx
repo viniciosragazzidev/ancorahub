@@ -218,8 +218,7 @@ export function AssistenteChatClient({ tenantId, userId, userName, userRole }: A
       consultarCotacaoExpress(textToSend)
         .then((result) => {
           if (result.status === "answered") {
-            const sources = result.sources.map((source) => source.title).join(", ");
-            appendAssistant(`${result.answer}\n\nFontes: ${sources}`);
+            appendAssistant(result.answer);
           } else {
             appendAssistant(result.message);
           }

@@ -12,6 +12,8 @@ import { getDatabase, schema } from "@/shared/db";
 import { isOperatorKnowledgeQuestion, marketOperatorsInQuestion, NOT_FOUND_MESSAGE, operatorNotImportedMessage, readableMissing, relevantChunks, validateGroundedAnswer } from "./answer-guard";
 import { embedQuery } from "./embeddings";
 import { toNamedEntity } from "./matching";
+import { buildMaterialAsks, questionAreas, type MaterialAsk } from "./material-asks";
+import { buildOperatorCard, flattenAnswer, operatorAnswerSchema, stripCitations, type OperatorCard } from "./operator-card";
 import { ageBandsInQuestion, agesInQuestion, carriersInQuestion, livesInQuestion, livesQualifierCovers, plansInQuestion } from "./question-scope";
 import { applyRerank, fuseRankings } from "./rank-fusion";
 import { loadCatalogAreas } from "./service";
@@ -31,8 +33,8 @@ const SYSTEM_PROMPT = [
   "É proibido usar o que você sabe sobre operadoras, planos, preços, carências, redes ou regras da ANS de fora deste material, mesmo que pareça certo ou óbvio.",
   "Prefira as informações catalogadas [F]: são os dados conferidos do catálogo. Use os trechos [T] para completar.",
   "Cite a origem de cada valor, regra ou prazo entre colchetes, por exemplo [F3] ou [T1]. Toda frase com dado precisa de citação.",
-  "Copie números, valores e prazos exatamente como estão no material. Não calcule totais, médias ou descontos que não estejam escritos.",
-  "Se o material não responder a pergunta (ou responder só em parte), devolva found false e diga em missing o que faltou. Não complete com suposições.",
+  "Copie números, valores e prazos exatamente como estão no material. A única conta permitida é somar os valores das pessoas de uma cotação; médias e descontos que não estejam escritos são proibidos.",
+  "Se o material não responder nada da pergunta, devolva found false e diga em missing o que faltou. Se responder uma parte, devolva found true com essa parte e diga em missing só o que faltou. Não complete com suposições.",
   "Diga a vigência junto do valor quando ela for informada.",
   "Números listados junto de vidas, titular ou dependentes são IDADES (ex.: \"2 vidas 33,24\" = duas pessoas de 33 e 24 anos), não valores em reais. Encontre a faixa etária de cada idade na tabela.",
   "Para várias vidas, mostre o valor de cada pessoa pela faixa (com a citação) e o total somado. Se houver mais de um plano ou acomodação, mostre uma linha por plano.",
@@ -42,13 +44,15 @@ const SYSTEM_PROMPT = [
   "Se houver mais de uma tabela que serve (ex.: demais empresas e MEI, ou coparticipação 30% e parcial), mostre cada uma separada, em vez de dizer que não encontrou.",
   "Informações marcadas [preço aguardando aprovação do diretor] podem ser usadas, mas avise na resposta que o preço ainda não foi conferido pelo diretor.",
   "Trechos marcados como leitura automática de imagem podem ter erros: avise para confirmar no material original.",
-  'Devolva somente um JSON: {"found": true ou false, "answer": "resposta com citações", "missing": "o que não está no material, ou vazio"}.',
+  "Organize a resposta em seções curtas: uma seção por plano ou tabela (no título, as condições: acomodação, vidas, contratação, coparticipação) ou por grupo (ex.: hospitais por plano). Cada linha tem um rótulo curto (faixa, idade, hospital, regra) e o valor; a citação vai no campo cite da linha, nunca dentro do texto.",
+  "Em intro, uma frase simples dizendo o que foi encontrado. Em notes, os avisos (preço não conferido, leitura de imagem, condições escolhidas). Sem markdown, sem asteriscos.",
+  'Devolva somente um JSON: {"found": true ou false, "intro": "frase", "sections": [{"title": "Amil S380 · QC · 2 vidas · coparticipação 30%", "rows": [{"label": "33 anos (29-33)", "value": "R$ 391,50", "cite": "F2"}, {"label": "Total", "value": "R$ 717,75", "cite": "F1, F2"}]}], "notes": ["aviso"], "missing": "o que não está no material, ou vazio"}.',
 ].join(" ");
 
 export type OperatorAnswer =
   /** Not imported, not found or not confirmed: the broker is told so, nothing is guessed. */
   | { status: "no_material"; message: string }
-  | { status: "answered"; answer: string; sources: Array<{ title: string }> }
+  | { status: "answered"; answer: string; sources: Array<{ title: string }>; card: OperatorCard }
   | { status: "error"; message: string };
 
 function formatDate(value: Date | null) {
@@ -327,11 +331,7 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
     temperature: 0,
     maxTokens: 5_000,
     timeoutMs: 60_000,
-    schema: z.object({
-      found: z.boolean().catch(false),
-      answer: z.string().trim().catch("").transform((text) => text.slice(0, 9000)),
-      missing: z.string().trim().optional().catch(undefined).transform((text) => readableMissing(text)),
-    }),
+    schema: operatorAnswerSchema,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: `Pergunta: ${input.question}${people}\n\n${context}` },
@@ -340,23 +340,28 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
   if (!result.ok) {
     return { status: "error", message: result.reason === "rate_limited" ? "Muitas consultas seguidas. Tente de novo em um minuto." : "Não foi possível consultar a IA agora. Tente novamente em instantes." };
   }
-  if (!result.value.found || !result.value.answer) {
-    const missing = result.value.missing ? ` Faltou no material: ${result.value.missing}.` : "";
+  const missingText = readableMissing(result.value.missing);
+  const answerText = flattenAnswer(result.value);
+  if (!result.value.found || !answerText) {
+    const missing = missingText ? ` Faltou no material: ${missingText}.` : "";
     return blocked(`${NOT_FOUND_MESSAGE}${missing}`, { reason: "model_not_found" });
   }
   const validIds = new Set([...factLines.map((_, index) => `F${index + 1}`), ...chunkLines.map((_, index) => `T${index + 1}`)]);
-  const verdict = validateGroundedAnswer({ answer: result.value.answer, validIds, context, question: input.question });
+  const verdict = validateGroundedAnswer({ answer: answerText, validIds, context, question: input.question });
   if (!verdict.ok) {
     return blocked(
       "Não consegui confirmar essa resposta no material importado, então não vou responder para não passar informação errada. Confira o material em Ferramentas › Materiais das operadoras ou pergunte de outro jeito.",
       { reason: verdict.reason, detail: verdict.detail, model: result.model.model },
     );
   }
-  const partial = result.value.missing ? `\n\nNão está no material importado: ${result.value.missing}.` : "";
-  const titles = new Set<string>();
-  for (const fact of facts) if (fact.sourceName) titles.add(fact.sourceName);
-  for (const chunk of chunks) titles.add(chunk.title);
-  return { status: "answered", answer: `${result.value.answer}${partial}`, sources: [...titles].slice(0, 12).map((title) => ({ title })) };
+  const sourceById = new Map<string, string>([
+    ...facts.map((fact, index) => [`F${index + 1}`, fact.sourceName ?? `Catálogo ${fact.carrierName}`] as [string, string]),
+    ...chunks.map((chunk, index) => [`T${index + 1}`, chunk.title] as [string, string]),
+  ]);
+  const card = buildOperatorCard(result.value, sourceById, missingText ?? null);
+  const partial = missingText ? `\n\nNão está no material importado: ${missingText}.` : "";
+  // The broker sees no [F1]/[T2] nor file names (Vinicios, 23/10); the guard above already checked them.
+  return { status: "answered", answer: `${stripCitations(answerText)}${partial}`, sources: card.sources.map((title) => ({ title })), card };
 }
 
 /** Last user text of a chat request (AI SDK UI messages carry "parts", older ones "content"). */
@@ -378,15 +383,61 @@ export function lastUserText(messages: unknown): string {
  * model. Returns null when the question is about something else.
  */
 export async function answerIfOperatorQuestion(input: { tenantId: string; userId: string; question: string; ragEnabled?: boolean }): Promise<string | null> {
+  const reply = await operatorQuestionReply(input);
+  return reply ? reply.text : null;
+}
+
+/**
+ * What the material of this company covers, for questions ready to tap (Jack, 23/10):
+ * current facts per operator, plan and area.
+ */
+export async function loadMaterialAsks(tenantId: string, options: { seed: number; limit: number; focusCarrier?: string | null; excludeAreas?: string[] }): Promise<MaterialAsk[]> {
+  const rows = await getDatabase()
+    .select({
+      carrierName: schema.tenantPrivateCarriers.name,
+      planName: schema.tenantPrivatePlans.name,
+      areaSlug: schema.operatorCatalogFacts.areaSlug,
+      facts: sql<number>`count(*)::int`,
+    })
+    .from(schema.operatorCatalogFacts)
+    .innerJoin(schema.tenantPrivateCarriers, eq(schema.tenantPrivateCarriers.id, schema.operatorCatalogFacts.carrierId))
+    .leftJoin(schema.tenantPrivatePlans, eq(schema.tenantPrivatePlans.id, schema.operatorCatalogFacts.planId))
+    .where(and(
+      eq(schema.operatorCatalogFacts.tenantId, tenantId),
+      eq(schema.operatorCatalogFacts.origin, "material"),
+      eq(schema.operatorCatalogFacts.status, "current"),
+      isNull(schema.tenantPrivateCarriers.archivedAt),
+      or(isNull(schema.operatorCatalogFacts.planId), eq(schema.tenantPrivatePlans.active, true)),
+      or(sql`${schema.operatorCatalogFacts.validUntil} is null`, sql`${schema.operatorCatalogFacts.validUntil} >= ${new Date().toISOString()}::timestamptz`),
+    ))
+    .groupBy(schema.tenantPrivateCarriers.name, schema.tenantPrivatePlans.name, schema.operatorCatalogFacts.areaSlug)
+    .limit(300);
+  return buildMaterialAsks(rows.map((row) => ({ ...row, facts: Number(row.facts) })), options);
+}
+
+function daySeed(now = new Date()) {
+  return Math.floor(now.getTime() / 86_400_000);
+}
+
+/** Questions of the day for the Jack's first screen. */
+export async function materialAsksOfTheDay(tenantId: string, limit = 3) {
+  return loadMaterialAsks(tenantId, { seed: daySeed(), limit }).catch(() => [] as MaterialAsk[]);
+}
+
+/** Same as answerIfOperatorQuestion, with the answer as a card and what to ask next (the Jack draws them). */
+export async function operatorQuestionReply(input: { tenantId: string; userId: string; question: string; ragEnabled?: boolean }): Promise<{ text: string; card?: OperatorCard; followUps?: MaterialAsk[] } | null> {
   const question = input.question.trim().slice(0, 500);
   if (question.length < 3) return null;
-  const carriers = await getDatabase().select({ name: schema.tenantPrivateCarriers.name })
+  const carriers = await getDatabase().select({ id: schema.tenantPrivateCarriers.id, name: schema.tenantPrivateCarriers.name, metadata: schema.tenantPrivateCarriers.metadata })
     .from(schema.tenantPrivateCarriers)
     .where(and(eq(schema.tenantPrivateCarriers.tenantId, input.tenantId), isNull(schema.tenantPrivateCarriers.archivedAt)));
   if (!isOperatorKnowledgeQuestion(question, carriers.map((carrier) => carrier.name))) return null;
   // Outside the pilot the assistant still never answers about operators from its own memory.
-  if (input.ragEnabled === false) return "A consulta de operadoras, planos e preços aqui no assistente ainda está em teste. Por enquanto, use a Cotação Express ou fale com a sua gestão.";
+  if (input.ragEnabled === false) return { text: "A consulta de operadoras, planos e preços aqui no assistente ainda está em teste. Por enquanto, use a Cotação Express ou fale com a sua gestão." };
   const result = await answerOperatorQuestion({ ...input, question }).catch((): OperatorAnswer => ({ status: "error", message: "Não foi possível consultar o material das operadoras agora. Tente novamente em instantes." }));
-  if (result.status !== "answered") return result.message;
-  return `${result.answer}\n\nFontes: ${result.sources.map((source) => source.title).join(", ")}`;
+  // Next questions: the same operator, other subjects with material (or any operator when none was named).
+  const focusCarrier = carriersInQuestion(question, carriers.map(toNamedEntity))[0]?.name ?? null;
+  const followUps = await loadMaterialAsks(input.tenantId, { seed: daySeed(), limit: 3, focusCarrier, excludeAreas: questionAreas(question) }).catch(() => [] as MaterialAsk[]);
+  if (result.status !== "answered") return { text: result.message, followUps };
+  return { text: result.answer, card: result.card, followUps };
 }
