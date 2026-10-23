@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
@@ -15,6 +15,7 @@ import { classifyBrokerLiveOfferStatus, combineLiveStatusAcrossQueues } from "./
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
 import { inferLegacyLeadDutyScheduleId, selectLeadsForDutySchedule } from "./shared-duty-roster";
 import { readColdAgeRelease } from "./cold-age-release";
+import { coldReleaseCutoff, todayKeyInSaoPaulo } from "./cold-age-release-rules";
 import { effectiveSwapDate } from "./duty-swap";
 
 // Upper bound on how far back a lead can show even when the schedule has no
@@ -183,6 +184,8 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // window hid all of them. The switch decides, not the queue name.
   const coldReleaseConfigs = await Promise.all(linkedQueues.map((queue) => readColdAgeRelease(queue.id, queue.name)));
   const coldQueueWithoutWindow = linkedQueues.length > 0 && coldReleaseConfigs.every((config) => config.enabled);
+  // Only the cold leads the 2-day rule already lets out (same cut as the distribution).
+  const coldReleaseCut = coldReleaseCutoff(now, coldReleaseConfigs.some((config) => config.releasedEarlyOn === todayKeyInSaoPaulo(now)));
   const { since, until } = coldQueueWithoutWindow ? { since: new Date(0), until: null } : windowBounds;
   const upcomingStartsAt = occurrenceWindow.upcomingStartsAt ?? null;
 
@@ -327,7 +330,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
           // Leads Frios: every lead still without a broker, from any date; handed-out ones
           // stay limited to this occurrence (old assigned leads would fill the 200 rows).
           ? or(
-            isNull(schema.leads.corretorId),
+            and(isNull(schema.leads.corretorId), lt(schema.leads.createdAt, coldReleaseCut)),
             and(gte(schema.leads.assignedAt, windowBounds.since), windowBounds.until ? lte(schema.leads.assignedAt, windowBounds.until) : undefined),
           )
           : or(
