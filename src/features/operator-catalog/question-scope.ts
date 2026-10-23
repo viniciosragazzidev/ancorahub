@@ -25,10 +25,25 @@ function names(entity: NamedEntity) {
   return [entity.name, entity.code ?? "", ...(entity.aliases ?? [])].map(normalizeName).filter((name) => name.length >= 3);
 }
 
-/** Operators the question names (by name or alias). */
+/** Words that only say what kind of company it is ("Bradesco Saúde" is asked as "Bradesco"). */
+const CARRIER_GENERIC_WORDS = new Set(["saude", "seguros", "seguro", "sa", "ltda", "planos", "plano", "de", "do", "da", "assistencia", "medica", "medical", "life"]);
+/** Short names that are also common words: "assim" alone does not mean ASSIM SAÚDE. */
+const CARRIER_CORE_STOPWORDS = new Set(["assim", "vida", "nossa", "sao", "santa", "uniao", "porto"]);
+
+/** The distinctive part of an operator name: "Bradesco Saúde" -> "bradesco", "SulAmérica Saúde" -> "sulamerica". */
+export function carrierCoreName(name: string) {
+  const words = name.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const core = words.filter((word) => !CARRIER_GENERIC_WORDS.has(word)).join("");
+  return core.length >= 4 && core !== words.join("") && !CARRIER_CORE_STOPWORDS.has(core) ? core : null;
+}
+
+/** Operators the question names (by name, alias or the distinctive part of the name). */
 export function carriersInQuestion(question: string, carriers: NamedEntity[]) {
   const forms = questionForms(question);
-  return carriers.filter((carrier) => names(carrier).some((name) => forms.has(name)));
+  return carriers.filter((carrier) => {
+    const core = carrierCoreName(carrier.name);
+    return names(carrier).some((name) => forms.has(name)) || Boolean(core && forms.has(core));
+  });
 }
 
 /** Plans the question names, with or without the operator name in front. */
