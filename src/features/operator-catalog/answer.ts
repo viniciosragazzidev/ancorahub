@@ -13,10 +13,15 @@ import { isOperatorKnowledgeQuestion, marketOperatorsInQuestion, NOT_FOUND_MESSA
 import { embedQuery } from "./embeddings";
 import { toNamedEntity } from "./matching";
 import { ageBandsInQuestion, agesInQuestion, carriersInQuestion, plansInQuestion } from "./question-scope";
+import { applyRerank, fuseRankings } from "./rank-fusion";
 import { loadCatalogAreas } from "./service";
 
 const MAX_FACTS = 220;
 const MAX_CHUNKS = 6;
+/** Candidates the fusion hands to the reranker. */
+const MAX_CANDIDATES = 20;
+/** The reranker keeps at least this many (completed with the fusion order). */
+const MIN_RERANKED = 3;
 /** Up to this many operators in the catalog, a question that names none searches all of them. */
 const MAX_CARRIERS_WITHOUT_NAME = 3;
 
@@ -126,23 +131,106 @@ async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; pl
     .limit(MAX_FACTS);
 }
 
-/** Term search and meaning search, merged: a chunk found by both keeps the better score. */
-async function loadChunks(tenantId: string, question: string, carrierIds: string[]): Promise<HybridSearchResult[]> {
-  const embedding = await embedQuery(question).catch(() => null);
-  const base = { tenantId, query: question, category: OPERATOR_MATERIAL_CATEGORY, carrierIds, limit: MAX_CHUNKS };
-  const [byTerm, byMeaning] = await Promise.all([
+const REWRITE_PROMPT = [
+  "Você reescreve a pergunta de um corretor de planos de saúde em até 3 buscas curtas para achar o trecho certo no material das operadoras (tabelas de preço, carências, rede, reembolso, regras de contratação).",
+  "Use as palavras que esses materiais usam (ex.: faixa etária, Porte I, coparticipação, enfermaria, apartamento, carência, PME, adesão).",
+  "Idades citadas viram a faixa etária da tabela (ex.: 33 anos = faixa 29-33).",
+  "Não invente operadora, plano ou valor que não estejam na pergunta.",
+  'Devolva somente um JSON: {"queries": ["busca 1", "busca 2"]}.',
+].join(" ");
+
+const RERANK_PROMPT = [
+  "Você ordena trechos de material de operadoras de saúde pela utilidade para responder a pergunta de um corretor.",
+  "Devolva os números dos trechos que ajudam a responder, do mais útil para o menos útil, no máximo 6. Deixe de fora os que não ajudam.",
+  "Um trecho com as linhas da tabela pedida vale mais do que um trecho só com o título da tabela.",
+  'Devolva somente um JSON: {"order": [3, 1, 5]}.',
+].join(" ");
+
+/**
+ * Other ways to search the same question, in the words of the material (Fase 1, 23/10):
+ * "quanto fica pra 2 pessoas de 33 e 24" also searches "tabela PME faixa etária 29-33".
+ * Failure or slowness only means searching with the question alone.
+ */
+async function rewriteQuestion(input: { tenantId: string; userId: string; question: string }) {
+  const result = await runGateway({
+    profile: "json-structured",
+    purpose: "cotacao_express_busca",
+    tenantId: input.tenantId,
+    userId: input.userId,
+    sensitive: true,
+    temperature: 0,
+    maxTokens: 300,
+    timeoutMs: 8_000,
+    schema: z.object({ queries: z.array(z.string().trim().max(200)).max(3).catch([]) }),
+    messages: [
+      { role: "system", content: REWRITE_PROMPT },
+      { role: "user", content: input.question },
+    ],
+  }).catch(() => null);
+  if (!result?.ok) return [];
+  const own = input.question.trim().toLowerCase();
+  return result.value.queries.filter((query) => query.length >= 3 && query.toLowerCase() !== own);
+}
+
+/** One query, searched by term and by meaning: two rankings for the fusion. */
+async function searchQuery(tenantId: string, query: string, carrierIds: string[]) {
+  const embedding = await embedQuery(query).catch(() => null);
+  const base = { tenantId, query, category: OPERATOR_MATERIAL_CATEGORY, carrierIds, limit: MAX_CANDIDATES };
+  return Promise.all([
     executeHybridKnowledgeSearch(base),
     embedding ? executeHybridKnowledgeSearch({ ...base, queryEmbedding: embedding }) : Promise.resolve([] as HybridSearchResult[]),
   ]);
-  const merged = new Map<string, HybridSearchResult>();
-  for (const chunk of [...byTerm, ...byMeaning]) {
-    const known = merged.get(chunk.chunkId);
-    if (!known || chunk.score > known.score) merged.set(chunk.chunkId, chunk);
+}
+
+/**
+ * The model reads the best candidates and keeps the ones that answer the question, in order.
+ * Failure keeps the fusion order.
+ */
+async function rerankChunks(input: { tenantId: string; userId: string; question: string; candidates: HybridSearchResult[] }) {
+  if (input.candidates.length <= MAX_CHUNKS) return input.candidates;
+  const excerpts = input.candidates.map((chunk, index) => `[${index + 1}] ${chunk.title}\n${chunk.text.slice(0, 700)}`).join("\n\n");
+  const result = await runGateway({
+    profile: "json-structured",
+    purpose: "cotacao_express_ordem",
+    tenantId: input.tenantId,
+    userId: input.userId,
+    sensitive: true,
+    temperature: 0,
+    maxTokens: 120,
+    timeoutMs: 12_000,
+    schema: z.object({ order: z.array(z.coerce.number()).max(MAX_CANDIDATES).catch([]) }),
+    messages: [
+      { role: "system", content: RERANK_PROMPT },
+      { role: "user", content: `Pergunta: ${input.question}\n\nTrechos:\n${excerpts}` },
+    ],
+  }).catch(() => null);
+  const fallback = input.candidates.slice(0, MAX_CHUNKS);
+  if (!result?.ok) return fallback;
+  const picked = applyRerank(input.candidates, result.value.order, MAX_CHUNKS);
+  // Too few kept: complete with the fusion order, the guards still filter afterwards.
+  for (const chunk of fallback) {
+    if (picked.length >= MIN_RERANKED) break;
+    if (!picked.includes(chunk)) picked.push(chunk);
   }
-  const ranked = [...merged.values()].sort((a, b) => b.score - a.score).slice(0, MAX_CHUNKS);
+  return picked;
+}
+
+/**
+ * Fase 1 (23/10): the question and its rewrites, each searched by term and by meaning,
+ * merged by reciprocal rank fusion; the best candidates are reranked by the model.
+ */
+async function loadChunks(input: { tenantId: string; userId: string; question: string; carrierIds: string[] }): Promise<HybridSearchResult[]> {
+  const [own, rewrites] = await Promise.all([
+    searchQuery(input.tenantId, input.question, input.carrierIds),
+    rewriteQuestion(input),
+  ]);
+  const others = await Promise.all(rewrites.map((query) => searchQuery(input.tenantId, query, input.carrierIds).catch(() => [] as HybridSearchResult[][])));
+  // The question itself counts twice: a rewrite should add, never drown it.
+  const candidates = fuseRankings([...own, ...own, ...others.flat()], MAX_CANDIDATES);
   // Material not catalogued yet has no operator tag: without results, search it all.
-  if (!ranked.length && carrierIds.length) return loadChunks(tenantId, question, []);
-  return withFollowingText(tenantId, ranked);
+  if (!candidates.length && input.carrierIds.length) return loadChunks({ ...input, carrierIds: [] });
+  const ranked = await rerankChunks({ ...input, candidates });
+  return withFollowingText(input.tenantId, ranked);
 }
 
 /**
@@ -187,7 +275,7 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
   }
   const [facts, rawChunks, areas] = await Promise.all([
     loadFacts(input.tenantId, scope),
-    loadChunks(input.tenantId, input.question, scope.carrierIds),
+    loadChunks({ tenantId: input.tenantId, userId: input.userId, question: input.question, carrierIds: scope.carrierIds }),
     loadCatalogAreas(input.tenantId),
   ]);
   const chunks = relevantChunks(rawChunks, { carrierIds: scope.carrierIds, carrierNames: scope.carrierNames, keywordCount: extractSearchKeywords(input.question).length });

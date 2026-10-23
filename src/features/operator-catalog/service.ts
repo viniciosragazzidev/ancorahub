@@ -8,7 +8,9 @@ import { OPERATOR_MATERIAL_CATEGORY } from "@/features/tenant-intelligence/rag/c
 import { getDatabase, schema } from "@/shared/db";
 
 import { chunkOperatorText } from "@/features/waha-group-capture/chunk";
+import { IMAGE_MATERIAL_NOTICE } from "@/features/waha-group-capture/image-text";
 
+import { chunkContextHeader, CHUNK_VERSION, structuredChunks } from "./chunking";
 import { planFactChanges, quoteFactKey, summarizeActions, type IncomingFact } from "./diff";
 import { embedTexts } from "./embeddings";
 import {
@@ -25,6 +27,7 @@ import { matchCarrier, matchPlan, toNamedEntity, type NamedEntity } from "./matc
 import {
   buildFactKey,
   canonicalQualifiers,
+  documentTypeLabel,
   mergeAreas,
   normalizeName,
   parseNumericValue,
@@ -403,6 +406,8 @@ async function updateKnowledgeDocument(input: {
   areas: string[];
   validFrom: Date | null;
   validUntil: Date | null;
+  /** The material's text, rebuilt into structured chunks. */
+  text: string;
 }) {
   const db = getDatabase();
   const [document] = await db.select({ id: schema.knowledgeDocuments.id, title: schema.knowledgeDocuments.title, validFrom: schema.knowledgeDocuments.validFrom, validUntil: schema.knowledgeDocuments.validUntil })
@@ -439,34 +444,86 @@ async function updateKnowledgeDocument(input: {
     replacedIds = older.map((row) => row.id);
   }
 
-  const chunks = await db.select({ id: schema.knowledgeChunks.id, text: schema.knowledgeChunks.text, metadata: schema.knowledgeChunks.metadata, hasEmbedding: sql<boolean>`${schema.knowledgeChunks.embedding} is not null` })
-    .from(schema.knowledgeChunks)
-    .where(and(eq(schema.knowledgeChunks.tenantId, input.tenantId), eq(schema.knowledgeChunks.documentId, document.id)));
   const tags = { carrierId: input.carrier.id, carrierName: input.carrier.name, documentType: input.extraction.documentType, planIds: input.planIds, areas: input.areas };
   let embedded = 0;
   let reused = 0;
+  // A quote keeps no chunks (client data); everything else is rebuilt with the structured chunker.
+  if (!isQuote && input.text.trim()) {
+    const result = await rebuildDocumentChunks({
+      tenantId: input.tenantId,
+      documentId: document.id,
+      text: input.text,
+      header: chunkContextHeader({ carrierName: input.carrier.name, documentLabel: documentTypeLabel(input.extraction.documentType), title: input.extraction.title || document.title, plans: input.extraction.plans.map((plan) => plan.name) }),
+      tags,
+    });
+    embedded = result.embedded;
+    reused = result.reused;
+  }
+  return { documentId: document.id, replacedIds, embedded, reused };
+}
+
+/**
+ * Rebuilds a document's chunks with the structured chunker (Fase 1, 23/10): tables kept
+ * with their title and header, a context header on every chunk, a little overlap. A
+ * chunk whose text did not change keeps its embedding (copied by content hash before
+ * the old chunks go away); only new text is embedded.
+ */
+async function rebuildDocumentChunks(input: {
+  tenantId: string;
+  documentId: string;
+  text: string;
+  header: string;
+  tags: Record<string, unknown>;
+}) {
+  const db = getDatabase();
+  const old = await db.select({ id: schema.knowledgeChunks.id, metadata: schema.knowledgeChunks.metadata, authorityLevel: schema.knowledgeChunks.authorityLevel })
+    .from(schema.knowledgeChunks)
+    .where(and(eq(schema.knowledgeChunks.tenantId, input.tenantId), eq(schema.knowledgeChunks.documentId, input.documentId)));
+  const oldMetadata = (old[0]?.metadata ?? {}) as Record<string, unknown>;
+  const fromImage = oldMetadata.readFrom === "image";
+  const authorityLevel = old[0]?.authorityLevel ?? 2;
+  const pieces = structuredChunks(input.text);
+  if (!pieces.length) return { embedded: 0, reused: 0 };
+
+  const rows = pieces.map((piece, chunkIndex) => {
+    const text = [input.header, fromImage ? IMAGE_MATERIAL_NOTICE : null, piece].filter(Boolean).join("\n");
+    return {
+      id: randomUUID(),
+      tenantId: input.tenantId,
+      documentId: input.documentId,
+      chunkIndex,
+      text,
+      tokenCount: Math.ceil(text.length / 4),
+      authorityLevel,
+      contentHash: chunkHash(text),
+      metadata: { ...oldMetadata, ...input.tags, chunker: CHUNK_VERSION },
+    };
+  });
+  await db.insert(schema.knowledgeChunks).values(rows);
+
+  let reused = 0;
   const missing: Array<{ id: string; text: string }> = [];
-  for (const chunk of chunks) {
-    const hash = chunkHash(chunk.text);
-    await db.update(schema.knowledgeChunks).set({ contentHash: hash, metadata: { ...(chunk.metadata as Record<string, unknown>), ...tags }, updatedAt: now }).where(eq(schema.knowledgeChunks.id, chunk.id));
-    if (chunk.hasEmbedding || isQuote) continue;
-    // Same text already embedded (an older version of this material): copy the vector, no new cost.
+  for (const row of rows) {
     const copied = await db.execute(sql`
       update knowledge_chunks target set embedding = donor.embedding
       from (
         select embedding from knowledge_chunks
-        where tenant_id = ${input.tenantId} and content_hash = ${hash} and embedding is not null and id <> ${chunk.id}
+        where tenant_id = ${input.tenantId} and content_hash = ${row.contentHash} and embedding is not null and id <> ${row.id}
         limit 1
       ) donor
-      where target.id = ${chunk.id}
+      where target.id = ${row.id}
       returning target.id
     `);
     const copiedRows = Array.isArray(copied) ? copied : (copied as { rows?: unknown[] }).rows ?? [];
     if (copiedRows.length) reused += 1;
-    else missing.push({ id: chunk.id, text: chunk.text });
+    else missing.push({ id: row.id, text: row.text });
   }
+  if (old.length) {
+    await db.delete(schema.knowledgeChunks).where(and(eq(schema.knowledgeChunks.tenantId, input.tenantId), inArray(schema.knowledgeChunks.id, old.map((chunk) => chunk.id))));
+  }
+  let embedded = 0;
   if (missing.length) {
-    const vectors = await embedTexts(missing.map((chunk) => `${input.carrier.name}. ${chunk.text}`));
+    const vectors = await embedTexts(missing.map((chunk) => chunk.text));
     for (const [index, chunk] of missing.entries()) {
       const vector = vectors[index];
       if (!vector) continue;
@@ -474,7 +531,61 @@ async function updateKnowledgeDocument(input: {
       embedded += 1;
     }
   }
-  return { documentId: document.id, replacedIds, embedded, reused };
+  return { embedded, reused };
+}
+
+/**
+ * Material catalogued before the structured chunker (23/10) gets its chunks rebuilt a
+ * few documents per catalog round, without calling the extraction AI again.
+ */
+export async function rechunkLegacyDocuments(limit = 5) {
+  const db = getDatabase();
+  const documents = await db.select({
+    id: schema.knowledgeDocuments.id,
+    tenantId: schema.knowledgeDocuments.tenantId,
+    title: schema.knowledgeDocuments.title,
+    content: schema.knowledgeDocuments.canonicalContent,
+    extractedText: schema.knowledgeSources.extractedText,
+    documentType: schema.knowledgeSources.documentType,
+    carrierName: schema.tenantPrivateCarriers.name,
+    carrierId: schema.knowledgeSources.carrierId,
+  })
+    .from(schema.knowledgeDocuments)
+    .innerJoin(schema.knowledgeSources, eq(schema.knowledgeSources.id, schema.knowledgeDocuments.sourceId))
+    .leftJoin(schema.tenantPrivateCarriers, eq(schema.tenantPrivateCarriers.id, schema.knowledgeSources.carrierId))
+    .where(and(
+      eq(schema.knowledgeDocuments.category, OPERATOR_MATERIAL_CATEGORY),
+      eq(schema.knowledgeDocuments.status, "published"),
+      inArray(schema.knowledgeSources.catalogStatus, ["cataloged", "needs_review"]),
+      // Only documents that have chunks: a quote has none on purpose (client data).
+      sql`exists (select 1 from knowledge_chunks c where c.document_id = "knowledge_documents"."id")`,
+      sql`not exists (select 1 from knowledge_chunks c where c.document_id = "knowledge_documents"."id" and c.metadata->>'chunker' = ${CHUNK_VERSION})`,
+    ))
+    .limit(limit);
+  let rebuilt = 0;
+  for (const document of documents) {
+    const text = (document.extractedText ?? document.content ?? "").replace(/^\[Leitura automática de imagem[^\n]*\n+/, "").trim();
+    if (text.length < 80) {
+      // Too short to rebuild: marked so the next rounds move on to other documents.
+      await db.update(schema.knowledgeChunks)
+        .set({ metadata: sql`coalesce(${schema.knowledgeChunks.metadata}, '{}'::jsonb) || jsonb_build_object('chunker', ${CHUNK_VERSION}::text)` })
+        .where(and(eq(schema.knowledgeChunks.tenantId, document.tenantId), eq(schema.knowledgeChunks.documentId, document.id)));
+      continue;
+    }
+    try {
+      await rebuildDocumentChunks({
+        tenantId: document.tenantId,
+        documentId: document.id,
+        text,
+        header: chunkContextHeader({ carrierName: document.carrierName, documentLabel: documentTypeLabel(document.documentType), title: document.title }),
+        tags: document.carrierId ? { carrierId: document.carrierId, carrierName: document.carrierName, documentType: document.documentType } : {},
+      });
+      rebuilt += 1;
+    } catch (error) {
+      console.warn("[operator-catalog] rechunk_failed", { documentId: document.id, error: error instanceof Error ? error.message.slice(0, 120) : "unknown" });
+    }
+  }
+  return rebuilt;
 }
 
 /**
@@ -580,7 +691,7 @@ export async function catalogOperatorSource(tenantId: string, sourceId: string) 
 
     const planIds = [...new Set(facts.flatMap((fact) => (fact.planId ? [fact.planId] : [])))];
     const areaSlugs = [...new Set(facts.map((fact) => fact.areaSlug))];
-    const knowledge = await updateKnowledgeDocument({ tenantId, sourceId, carrier, extraction, planIds, areas: areaSlugs, validFrom, validUntil });
+    const knowledge = await updateKnowledgeDocument({ tenantId, sourceId, carrier, extraction, planIds, areas: areaSlugs, validFrom, validUntil, text });
     // A quote: its prices are observations (never the table), but what the quoting system
     // sends along (carências, network, coparticipation, rules) is operator content (22/10).
     const isQuote = extraction.documentType === "cotacao";
@@ -672,5 +783,6 @@ export async function runOperatorCatalogJob(options: { limit?: number; timeBudge
     else if (outcome.status === "retry_later") { result.retryLater += 1; break; }
     else result.skipped += 1;
   }
-  return { ...result, brokerQuotes: imported };
+  const rechunked = Date.now() - startedAt < timeBudget ? await rechunkLegacyDocuments(20).catch(() => 0) : 0;
+  return { ...result, brokerQuotes: imported, rechunked };
 }
