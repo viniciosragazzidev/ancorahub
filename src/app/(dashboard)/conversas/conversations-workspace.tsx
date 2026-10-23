@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
+import { motion, useReducedMotion } from "motion/react";
 
 import {
   REALTIME_SYNC_BROWSER_EVENT,
@@ -243,6 +244,7 @@ export function ConversationsWorkspace({
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [profileOpen, setProfileOpen] = useState(true);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const selected = conversations.find((conversation) => conversation.id === selectedId) ?? null;
   const messagesWithHistory = useMemo(
@@ -316,9 +318,11 @@ export function ConversationsWorkspace({
     <section
       aria-label="Central de conversas"
       data-mobile-conversation-active={mobileView === "chat" && selected ? "true" : undefined}
+      data-lite="workspace"
       className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
       <FilterToolbar
+        data-lite="toolbar"
         aria-label="Filtros dos atendimentos"
         className="shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2.5 sm:px-5"
         filters={
@@ -378,6 +382,7 @@ export function ConversationsWorkspace({
       />
 
       <div
+          data-lite="panes"
           className={cn(
             "grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
             profileOpen && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
@@ -385,10 +390,11 @@ export function ConversationsWorkspace({
       >
         <section
           aria-label="Lista de atendimentos"
+          data-lite="pane"
           className={cn("flex min-h-0 flex-col border-r border-border bg-card", mobileView === "chat" && selected && "max-lg:hidden")}
         >
           <div className="border-b border-border px-3 py-2.5">
-            <div className="relative">
+            <div className="relative" data-lite="search">
               <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label="Buscar atendimento por nome, telefone ou e-mail"
@@ -402,20 +408,27 @@ export function ConversationsWorkspace({
 
           <ScrollArea className="min-h-0 flex-1">
             <div className="p-2">
-              {filtered.map((conversation) => (
-                <ConversationRow
-                  active={conversation.id === selected?.id}
-                  conversation={conversation}
+              {filtered.map((conversation, index) => (
+                <motion.div
                   key={conversation.id}
-                  onClick={() => selectConversation(conversation.id)}
-                />
+                  // The first rows come in one after the other; the rest just appear.
+                  initial={reduceMotion || index > 14 ? false : { opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.24, delay: index * 0.02, ease: LITE_EASE }}
+                >
+                  <ConversationRow
+                    active={conversation.id === selected?.id}
+                    conversation={conversation}
+                    onClick={() => selectConversation(conversation.id)}
+                  />
+                </motion.div>
               ))}
               {!filtered.length ? <EmptyConversationList hasQuery={Boolean(query || filter !== "all" || branchFilter !== "all" || tagFilter !== "all")} /> : null}
             </div>
           </ScrollArea>
         </section>
 
-        <section aria-live="polite" className={cn("flex min-h-0 flex-col bg-muted/15", (mobileView !== "chat" || !selected) && "max-lg:hidden")}>
+        <section aria-live="polite" data-lite="pane" className={cn("flex min-h-0 flex-col bg-muted/15", (mobileView !== "chat" || !selected) && "max-lg:hidden")}>
           {selected ? (
             <>
               <ConversationHeader
@@ -486,9 +499,19 @@ export function ConversationsWorkspace({
 
         <aside
           aria-label="Perfil do cliente"
+          data-lite="pane"
           className={cn("hidden min-h-0 overflow-y-auto border-l border-border bg-card lg:flex lg:flex-col", !profileOpen && "lg:hidden")}
         >
-          {selected ? <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} /> : null}
+          {selected && profileOpen ? (
+            <motion.div
+              key={selected.id}
+              initial={reduceMotion ? false : { opacity: 0, x: 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.28, ease: LITE_EASE }}
+            >
+              <ClientProfile client={selected} onUpdateConversation={handleUpdateConversation} hideOrigin={role === "broker"} />
+            </motion.div>
+          ) : null}
         </aside>
       </div>
 
@@ -857,18 +880,32 @@ function ConversationHeader({
   );
 }
 
+/** Lite motion curve (--ease-enter of venancor-scope.css). */
+const LITE_EASE = [0.16, 1, 0.3, 1] as const;
+
+/** A filter tab: the white pill slides to the chosen one (Lite), with the count beside the label. */
 function FilterChip({ active, count, label, onClick }: { active: boolean; count: number; label: string; onClick: () => void }) {
+  const reduceMotion = useReducedMotion();
   return (
     <button
       aria-pressed={active}
       className={cn(
-        "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-2 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-        active ? "border-primary/20 bg-primary/[0.08] text-primary" : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+        "relative inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50",
+        active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
       )}
       onClick={onClick}
       type="button"
     >
-      <span>{label}</span>
+      {active ? (
+        <motion.span
+          aria-hidden="true"
+          layoutId="conversas-filter-pill"
+          className="absolute inset-0 rounded-full bg-card shadow-[var(--shadow-resting)]"
+          transition={reduceMotion ? { duration: 0 } : { type: "spring", bounce: 0.15, duration: 0.45 }}
+        />
+      ) : null}
+      <span className="relative">{label}</span>
+      <span className="relative" data-lite="chip-count">{count}</span>
     </button>
   );
 }
@@ -899,6 +936,9 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
     const viewport = viewportRef.current;
     if (viewport) viewport.scrollTop = viewport.scrollHeight;
   }, [sortedMessages.length, client.id]);
+
+  const reduceMotion = useReducedMotion();
+  const recentIds = useMemo(() => new Set(sortedMessages.slice(-3).map((message) => message.id)), [sortedMessages]);
 
   if (!sortedMessages.some((message) => !message.transition)) {
     return <HistoryEmptyState client={client} />;
@@ -949,13 +989,20 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
               ) : (
                 <MessageGroup key={gi}>
                   {group.messages.map((message, mi) => (
-                    <MessageRow
-                      clientName={client.nome}
+                    <motion.div
                       key={message.id}
-                      message={message}
-                      showAvatar={mi === group.messages.length - 1}
-                      showHeader={mi === 0}
-                    />
+                      // Only the newest messages slide in; opening a long history stays still.
+                      initial={reduceMotion || !recentIds.has(message.id) ? false : { opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ duration: 0.26, ease: LITE_EASE }}
+                    >
+                      <MessageRow
+                        clientName={client.nome}
+                        message={message}
+                        showAvatar={mi === group.messages.length - 1}
+                        showHeader={mi === 0}
+                      />
+                    </motion.div>
                   ))}
                 </MessageGroup>
               ))}
@@ -1562,6 +1609,7 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
   return (
     <button
       aria-current={active ? "page" : undefined}
+      data-lite="row"
       className={cn(
         "group flex w-full items-start gap-3 rounded-full px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active ? "bg-muted/80" : "hover:bg-muted/65",

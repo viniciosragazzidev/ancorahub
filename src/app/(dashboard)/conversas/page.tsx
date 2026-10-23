@@ -2,7 +2,10 @@ import { redirect } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, exists, gte, inArray, isNotNull, isNull, like, lte, notInArray, or, sql } from "drizzle-orm";
 
+import "@/components/arc/venancor-scope.css";
 import { DashboardHeader } from "@/components/dashboard-header";
+
+import liteStyles from "./conversas-lite.module.css";
 import {
   ConversationsWorkspace,
   type ConversationItem,
@@ -1065,7 +1068,7 @@ export default async function ConversationsPage({
   }
 
   return (
-    <div className="flex h-app min-h-0 w-full flex-1 flex-col overflow-hidden">
+    <div className={`arc-venancor ${liteStyles.root} flex h-app min-h-0 w-full flex-1 flex-col overflow-hidden`}>
       <DashboardHeader
         breadcrumb="Atendimento"
         title="Conversas"
@@ -1083,7 +1086,7 @@ export default async function ConversationsPage({
         }
       />
       <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background p-0">
-        <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card">
+        <div data-lite="frame" className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card">
           {officialBrokerTab ? (
             <OfficialBrokerConversations
               enabled={officialBrokerMessagesEnabled}
