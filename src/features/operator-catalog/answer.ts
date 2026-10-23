@@ -272,13 +272,15 @@ export function lastUserText(messages: unknown): string {
  * content is answered only by the guarded catalog answer, never by a free
  * model. Returns null when the question is about something else.
  */
-export async function answerIfOperatorQuestion(input: { tenantId: string; userId: string; question: string }): Promise<string | null> {
+export async function answerIfOperatorQuestion(input: { tenantId: string; userId: string; question: string; ragEnabled?: boolean }): Promise<string | null> {
   const question = input.question.trim().slice(0, 500);
   if (question.length < 3) return null;
   const carriers = await getDatabase().select({ name: schema.tenantPrivateCarriers.name })
     .from(schema.tenantPrivateCarriers)
     .where(and(eq(schema.tenantPrivateCarriers.tenantId, input.tenantId), isNull(schema.tenantPrivateCarriers.archivedAt)));
   if (!isOperatorKnowledgeQuestion(question, carriers.map((carrier) => carrier.name))) return null;
+  // Outside the pilot the assistant still never answers about operators from its own memory.
+  if (input.ragEnabled === false) return "A consulta de operadoras, planos e preços aqui no assistente ainda está em teste. Por enquanto, use a Cotação Express ou fale com a sua gestão.";
   const result = await answerOperatorQuestion({ ...input, question }).catch((): OperatorAnswer => ({ status: "error", message: "Não foi possível consultar o material das operadoras agora. Tente novamente em instantes." }));
   if (result.status !== "answered") return result.message;
   return `${result.answer}\n\nFontes: ${result.sources.map((source) => source.title).join(", ")}`;

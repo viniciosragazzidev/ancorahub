@@ -8,12 +8,13 @@ import { getCachedBrokerWorkspaceData } from "@/features/broker-workspace/chat/c
 import { nextStepText, readLeadIntelligence } from "@/features/broker-workspace/chat/intelligence";
 import { canRevealLightContact } from "@/features/broker-workspace/lead-contact-privacy";
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
-import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 
 import { answerIfOperatorQuestion } from "@/features/operator-catalog/answer";
+
+import { brokerAiAccess } from "./broker-ai-pilot";
 
 import { AGENT_IDS, AGENT_REGISTRY, assistantReplySchema, buildMessages, replyToBlocks, type ActionTargets, type AgentId } from "./agents";
 import { runGateway } from "./gateway";
@@ -97,15 +98,16 @@ export async function askAssistantAction(raw: { agentId: AgentId; question: stri
   const fallback = (text = FALLBACK_TEXT) => ({ ok: false, blocks: [{ type: "assistant" as const, id: `ai-fallback-${stamp}`, text }] });
   const input = inputSchema.safeParse(raw);
   if (!input.success) return fallback();
-  if ((await getFeatureFlag(FEATURE_FLAGS.BROKER_AI_ASSISTANTS).catch(() => "false")) !== "true") return fallback();
-
   const context = await getRequiredTenantContext();
   if (context.role !== "broker") return fallback();
+  // The company flag, or this broker is in the pilot of the Jack with the operator RAG (23/10).
+  const access = await brokerAiAccess(context.userId);
+  if (!access.enabled) return fallback();
   // LGPD: nothing goes to a model before the broker allows it (current terms version).
   const consent = await readAiConsent(context.tenantId, context.userId).catch(() => ({ granted: false }));
   if (!consent.granted) return { ok: false, blocks: [{ type: "consent", id: `ai-consent-${stamp}`, question: input.data.question }] };
   // Operators, plans, prices, carências: only the imported material answers, never the agent's model.
-  const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: input.data.question }).catch(() => null);
+  const operatorAnswer = await answerIfOperatorQuestion({ tenantId: context.tenantId, userId: context.userId, question: input.data.question, ragEnabled: access.operatorRag }).catch(() => null);
   if (operatorAnswer) return { ok: true, blocks: [{ type: "assistant", id: `ai-operator-${stamp}`, text: operatorAnswer }] };
   const agent = AGENT_REGISTRY[input.data.agentId];
   const built = input.data.agentId === "lead" && input.data.leadId
