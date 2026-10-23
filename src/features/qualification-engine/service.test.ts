@@ -12,9 +12,9 @@ const policy = {
 describe("scripted reply acknowledgement", () => {
   const memory = { ...createEmptyMemory(), customerName: { value: "Teste Lead", confidence: 1 as const }, customerFirstName: { value: "Teste", confidence: 1 as const }, collectedFields: ["customerName"] };
   it("confirms only what the customer's last message answered", () => {
-    expect(resolveDeterministicQualificationTurn({ memory, policy, answered: ["customerName"] }).reply).toMatch(/^(Prazer|Obrigado), Teste! /);
-    expect(resolveDeterministicQualificationTurn({ memory, policy }).reply).toMatch(/^(Em qual|Qual a) cidade/);
-    expect(resolveDeterministicQualificationTurn({ memory, policy, answered: ["customerName"], answeredNow: false }).reply).toMatch(/^(Em qual|Qual a) cidade/);
+    expect(resolveDeterministicQualificationTurn({ memory, policy, answered: ["customerName"] }).reply).toMatch(/^(Prazer, Teste!|Que bom falar com você, Teste!) /);
+    expect(resolveDeterministicQualificationTurn({ memory, policy }).reply).toMatch(/^(Em qual cidade|Me conta sua cidade)/);
+    expect(resolveDeterministicQualificationTurn({ memory, policy, answered: ["customerName"], answeredNow: false }).reply).toMatch(/^(Em qual cidade|Me conta sua cidade)/);
   });
 
   it("renders the name and the summary in the handoff text", () => {

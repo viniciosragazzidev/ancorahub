@@ -1850,7 +1850,9 @@ export async function processInboundAiResponse({
   // offering a concrete path; a second refusal closes politely (qualification turbo, 21/10).
   const softDecline = !inboundIsAutomated && parseSoftDecline(userMessageBody);
   const interpreterIntent = aiFallbackResult?.ok ? aiFallbackResult.intent : undefined;
-  const isObjection = interpreterIntent === "objection" || interpreterIntent === "decline" || (softDecline && !aiFallbackResult?.ok);
+  // "Já tenho Amil" answering "vocês já têm plano hoje?" is information, never a decline (23/10).
+  const answeredCurrentPlan = !currentMemory.currentPlan?.value && Boolean(updatedMemory.currentPlan?.value);
+  const isObjection = !answeredCurrentPlan && (interpreterIntent === "objection" || interpreterIntent === "decline" || (softDecline && !aiFallbackResult?.ok));
   if (isObjection && fieldsExtractedFromCurrentMessage.length === 0 && fallbackAppliedCount === 0) {
     const attempts = updatedMemory.objectionAttempts ?? 0;
     const leadFirstName = lead?.nome && !/^lead\b/i.test(lead.nome.trim()) ? lead.nome.trim().split(/\s+/)[0] : "";
@@ -1893,7 +1895,7 @@ export async function processInboundAiResponse({
     return { status: recovering ? "objection_recovery" : "declined_after_objection", deliveryStatus, reply: text };
   }
 
-  const answeredNow = fieldsExtractedFromCurrentMessage.length > 0 || fallbackAppliedCount > 0;
+  const answeredNow = fieldsExtractedFromCurrentMessage.length > 0 || fallbackAppliedCount > 0 || answeredCurrentPlan;
   // What this message filled, for the confirmation ("Itaboraí, ótimo."). The
   // lives implied by an individual plan were not said, so they are not echoed.
   const answeredFields = Array.from(new Set([...fieldsExtractedFromCurrentMessage, ...fallbackAppliedFields]))

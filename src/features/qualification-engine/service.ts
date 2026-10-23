@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
-import type { ConversationMemory } from "@/features/ai-agent/memory";
+import { asksCurrentPlan, hasCoreQuoteData, type ConversationMemory } from "@/features/ai-agent/memory";
 import { deriveLeadQualificationStatus } from "@/features/leads/qualification-status";
 import { enqueueMetaQualificationConversion } from "@/features/meta-ads/meta-conversion-service";
 import { getDatabase, schema } from "@/shared/db";
@@ -223,6 +223,10 @@ export function resolveDeterministicQualificationTurn(input: {
       repeated,
       last: evaluation.missingFields.length === 1 && (input.policy.requiredFields?.length ?? 0) >= 3,
       customText: input.policy.questionTexts?.[key],
+      // "Já têm plano hoje?" rides along with the last question, once, and is never required.
+      askCurrentPlan: evaluation.missingFields.length === 1
+        && !input.memory.currentPlan?.value
+        && ![...(input.pastOutboundTexts ?? [])].some((text) => asksCurrentPlan(text)),
     }),
     evaluation,
     nextQuestion,
@@ -296,9 +300,21 @@ export function evaluateQualification(
       reasons.push("Score baixo (< 50) ou pesquisa sem prazo definido");
     }
   } else if (reason === "human_requested") {
-    qualificationStatus = "warm";
-    classification = "warm";
+    qualificationStatus = hasCoreQuoteData(memory) ? "hot" : "warm";
+    classification = qualificationStatus;
     reasons.push("Transferência solicitada pelo cliente antes de concluir todas as perguntas");
+  } else if (hasCoreQuoteData(memory)) {
+    // Tipo, vidas e idades já dão a cotação: quente desde aqui, mesmo antes do fim (Vinicios, 23/10).
+    // The state stays IN_PROGRESS, so distribution still waits for the end of the conversation.
+    qualificationStatus = "hot";
+    classification = "hot";
+    reasons.push("Já informou tipo de plano, vidas e idades: dá para cotar");
+  }
+  // The same point also makes a finished qualification hot, whatever the score.
+  if (state === "QUALIFIED" && hasCoreQuoteData(memory) && qualificationStatus !== "hot") {
+    qualificationStatus = "hot";
+    classification = "hot";
+    reasons.push("Tipo de plano, vidas e idades informados");
   }
 
   return {
@@ -338,6 +354,8 @@ export function buildPrivateQualificationContext(memory: ConversationMemory, upd
     isSingleLifeBusinessPlan(memory) ? PME_SINGLE_LIFE_NOTE : null,
     memory.averageAge?.value ? `média de idade: ${memory.averageAge.value}` : memory.age?.value ? `idades: ${memory.age.value}` : null,
     memory.city?.value ? `cidade: ${memory.city.value}` : null,
+    memory.neighborhood?.value ? `bairro: ${memory.neighborhood.value}` : null,
+    memory.currentPlan?.value ? `plano atual: ${memory.currentPlan.value}` : null,
     memory.email?.value ? `e-mail: ${memory.email.value}` : null,
     memory.intent?.value ? `interesse: ${memory.intent.value}` : null,
     memory.companyHasCnpj?.value ? `empresa com CNPJ: ${memory.companyHasCnpj.value}` : null,
@@ -412,6 +430,8 @@ export async function persistQualificationEvaluation(input: {
         individualAges: input.memory.planType?.value === "empresarial" ? null : input.memory.age?.value ?? null,
         averageAge: input.memory.planType?.value === "empresarial" ? input.memory.averageAge?.value ?? null : null,
         city: input.memory.city?.value ?? null,
+        neighborhood: input.memory.neighborhood?.value ?? null,
+        currentPlan: input.memory.currentPlan?.value ?? null,
         email: input.memory.email?.value ?? null,
         // Private, tenant-scoped context used by the broker and by the next
         // qualification turn. Keeping it nested avoids clobbering AI

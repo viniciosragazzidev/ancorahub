@@ -27,9 +27,9 @@ const firstWord = (text: string) => text.normalize("NFD").replace(/[̀-ͯ]/g, ""
 describe("reply composer", () => {
   it("asks the age according to who enters the plan", () => {
     const base = createEmptyMemory();
-    expect(questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } })).toContain("Qual a idade de quem vai usar o plano?");
-    expect(questionVariants("age", { ...base, planType: { value: "familiar", confidence: 1 }, numberOfLives: { value: "3", confidence: 1 } })).toContain("Quais as idades das 3 pessoas?");
-    expect(questionVariants("age", { ...base, planType: { value: "empresarial", confidence: 1 } })).toContain("Qual a média de idade das pessoas do plano?");
+    expect(questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } })).toContain("E qual a idade de quem vai usar o plano?");
+    expect(questionVariants("age", { ...base, planType: { value: "familiar", confidence: 1 }, numberOfLives: { value: "3", confidence: 1 } })).toContain("Me passa a idade de cada uma das 3 pessoas?");
+    expect(questionVariants("age", { ...base, planType: { value: "empresarial", confidence: 1 } })).toContain("E qual é mais ou menos a média de idade do pessoal?");
     for (const text of [...questionVariants("age", base), ...questionVariants("age", { ...base, planType: { value: "individual", confidence: 1 } })]) {
       expect(text).not.toMatch(/benefici/i);
     }
@@ -51,7 +51,7 @@ describe("reply composer", () => {
     const memory = { ...withName("Ana Souza"), city: { value: "Niterói", confidence: 1 as const } };
     const reply = composeQuestionReply({ key: "email", memory, answered: ["city"], seed: "c1:4", last: true });
     expect(reply).toMatch(/Niterói|Perfeito, Ana\./);
-    expect(reply).toContain("Última pergunta: ");
+    expect(reply).toContain("Pra fechar: ");
     expect(composeQuestionReply({ key: "email", memory, answered: ["city"], seed: "c1:4", last: true })).toBe(reply);
   });
 
@@ -73,7 +73,7 @@ describe("reply composer", () => {
 
   it("rephrases an unanswered question without a confirmation", () => {
     const reply = composeQuestionReply({ key: "city", memory: withName("Ana Souza"), answered: [], seed: "r", repeated: true });
-    expect(reply).toMatch(/^(Só para eu registrar certinho|Para eu seguir com a cotação|Me ajuda com uma informação): /);
+    expect(reply).toMatch(/^(Só pra eu anotar certinho|Pra eu seguir com a cotação|Me ajuda só com uma coisa): /);
     expect(reply).toContain("cidade");
   });
 
@@ -154,7 +154,7 @@ describe("the reported conversation (Torquato), end to end", () => {
 
     const age = answer("Individual", 2);
     expect(age.nextQuestion?.key).toBe("age");
-    expect(age.reply).toMatch(/^(Individual, anotado!|Plano individual, perfeito\.|Certo, Torquato, só para você\.) (Qual a idade de quem vai usar o plano\?|Quantos anos tem quem vai usar o plano\?)$/);
+    expect(age.reply).toMatch(/^(Só pra você, entendi!|Plano individual, combinado\.|Beleza, Torquato, só pra você\.) (E qual a idade de quem vai usar o plano\?|Quantos anos tem quem vai usar o plano\?)$/);
 
     const city = answer("40", 3);
     expect(memory.age?.value).toBe("40");
@@ -163,7 +163,7 @@ describe("the reported conversation (Torquato), end to end", () => {
     const email = answer("Itaboraí", 4);
     expect(memory.city?.value).toBe("Itaboraí");
     expect(email.nextQuestion?.key).toBe("email");
-    expect(email.reply).toContain("Última pergunta: ");
+    expect(email.reply).toContain("Pra fechar: ");
 
     // No question about the number of people, no "beneficiários", no repeated opener or name.
     const questions = sent.slice(1);

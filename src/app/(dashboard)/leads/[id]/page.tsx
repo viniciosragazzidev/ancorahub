@@ -721,6 +721,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                         <div><p className="text-xs text-muted-foreground">Idades informadas</p><p className="mt-1 font-medium">{qualificationDetails.individualAges ?? "Não informadas"}</p></div>
                       )}
                       <div><p className="text-xs text-muted-foreground">Tipo de atendimento</p><p className="mt-1 font-medium">{metaLeadDetails.tipoPlanoStatus === "not_provided" ? "Não informado" : lead.tipo === "PME" ? "Empresa / PME" : lead.tipo === "PJ" ? "Pessoa jurídica" : "Pessoa física"}</p></div>
+                      {qualificationDetails.neighborhood ? <div><p className="text-xs text-muted-foreground">Bairro</p><p className="mt-1 font-medium">{qualificationDetails.neighborhood}</p></div> : null}
+                      {qualificationDetails.currentPlan ? <div><p className="text-xs text-muted-foreground">Plano atual</p><p className="mt-1 font-medium">{qualificationDetails.currentPlan}</p></div> : null}
                     </CardContent>
                   </Card>
                 )}
@@ -931,6 +933,8 @@ function readQualificationDetails(value: unknown) {
     averageAge: read("averageAge") ?? read("mediaIdades"),
     individualAges: read("individualAges"),
     cidade: read("cidade") ?? read("city"),
+    neighborhood: read("neighborhood"),
+    currentPlan: read("currentPlan"),
     resumoAtendimento: read("resumoAtendimento"),
     resumoNecessidade: read("resumoNecessidade"),
     urgenciaContratacao: read("urgenciaContratacao") ?? read("urgency"),

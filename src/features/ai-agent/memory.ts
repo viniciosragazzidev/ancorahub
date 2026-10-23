@@ -1,4 +1,5 @@
 import { companyEvidence } from "@/features/leads/company-lead-detection";
+import { marketOperatorsInQuestion } from "@/features/operator-catalog/answer-guard";
 
 /**
  * Phase 2 — Structured Conversation Memory
@@ -40,6 +41,10 @@ export type ConversationMemory = {
   averageAge?: MemoryField;
   intent?: MemoryField;
   objections?: MemoryField;
+  /** Asked together with the city ("Em qual cidade e bairro..."); never required. */
+  neighborhood?: MemoryField;
+  /** Whether the customer already has a health plan, and which ("Tem plano: Amil"); never required, never a decline. */
+  currentPlan?: MemoryField;
   /** Ordered list of field keys that have been collected */
   collectedFields: string[];
   /** The last question the AI asked, verbatim */
@@ -125,6 +130,63 @@ export function readSelfOnlyAge(message: string): number | null {
   // Every number next to "anos" must be the same self age (a second, different age is someone else).
   const allAges = Array.from(normalized.matchAll(/\b(\d{1,3})\s*a?nos?\b/g)).map((match) => Number(match[1]));
   return allAges.every((age) => age === selfAges[0]) ? selfAges[0] : null;
+}
+
+/** Words every wording of the "already has a plan" question carries (reply-composer.ts). */
+export const CURRENT_PLAN_MARKER = "plano de saude hoje";
+
+export function asksCurrentPlan(question: string | null | undefined) {
+  return normalizeForMatching(question ?? "").includes(CURRENT_PLAN_MARKER);
+}
+
+/**
+ * The answer to "vocês já têm plano de saúde hoje?": "Não tem plano", "Tem plano: Amil" or
+ * "Tem plano". Null when the message does not say (an e-mail alone, for instance).
+ * It is information for the broker: "já tenho Amil" here is never a decline.
+ */
+export function readCurrentPlan(message: string): string | null {
+  const text = normalizeForMatching(message).replace(/[^a-z0-9@.\s]+/g, " ").replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  const operators = marketOperatorsInQuestion(message);
+  if (operators.length) return `Tem plano: ${operators.join(", ")}`;
+  if (/e-?mail|@/.test(text) && !/\bplano\b/.test(text)) return null;
+  if (/^(nao|n|nenhum|nenhuma)( (tenho|temos|possuo|nenhum|nenhuma|ainda))*( nao)?$|\bnao (tenho|temos|tem|possuo|possuimos|uso|usamos)( plano| nenhum| convenio)?$|\bnao (tenho|temos|possuo|possuimos) (plano|nenhum|convenio)\b|\bnenhum plano\b|\bsem plano\b|\bnao temos nenhum\b/.test(text)) return "Não tem plano";
+  if (/^(sim|s|tenho|temos|tem|possuo|uso|usamos)\b|\b(tenho|temos|possuo|usamos|uso) (plano|o plano|um plano|convenio)\b/.test(text)) return "Tem plano";
+  return null;
+}
+
+/** The neighbourhood in an answer to "cidade e bairro": "Niterói, Icaraí", "Icaraí - Niterói", "bairro Icaraí". */
+export function readNeighborhood(message: string, city: string): string | null {
+  const cityKey = normalizeForMatching(city).trim();
+  const clean = (value: string) => value
+    .replace(/^(?:(?:eu )?(?:moro|fico|sou|resido)\s+)?(?:no bairro|bairro|no|na|em|de|do|da)\s+/i, "")
+    .replace(/\s*[-/]?\s*\b(?:rj|sp|mg|es|ba|pr|sc|rs|df|go)\b\.?$/i, "")
+    .trim();
+  const valid = (value: string) => value.length >= 2 && value.length <= 40 && /\p{L}/u.test(value) && !/\d/.test(value)
+    && value.split(/\s+/).length <= 4 && !/^(sim|nao|não|ok|centro da cidade)$/i.test(value)
+    && normalizeForMatching(value).trim() !== cityKey;
+  const named = message.match(/bairro\s+(?:d[aeo]\s+)?([^\n,.;!?]{2,40})/i)?.[1];
+  if (named) {
+    const value = clean(named);
+    return valid(value) ? value : null;
+  }
+  const parts = message.split(/[,;\n]|\s[-–/]\s/).map((part) => clean(part.trim())).filter(Boolean);
+  if (parts.length < 2) return null;
+  const other = parts.find((part) => !normalizeForMatching(part).includes(cityKey) && !cityKey.includes(normalizeForMatching(part).trim()));
+  return other && valid(other) ? other : null;
+}
+
+/**
+ * Enough to quote: the plan type, the lives and the ages (the average age for a company).
+ * From here the lead is hot even if the rest (city, e-mail) never comes (Vinicios, 23/10).
+ */
+export function hasCoreQuoteData(memory: ConversationMemory | null | undefined) {
+  const plan = memory?.planType?.value;
+  if (!plan) return false;
+  const lives = Number.parseInt(memory?.numberOfLives?.value ?? "", 10);
+  const hasLives = (Number.isInteger(lives) && lives > 0) || plan === "individual";
+  const hasAges = plan === "empresarial" ? Boolean(memory?.averageAge?.value?.trim()) : Boolean(memory?.age?.value?.trim());
+  return hasLives && hasAges;
 }
 
 export function readAgeList(message: string): number[] {
@@ -389,6 +451,18 @@ export function extractFieldsFromMessage(
       memory.city = { value: bareCity, confidence: 1, sourceMessageId };
       addCollectedField(memory, "city");
     }
+  }
+
+  // The city question also asks the neighbourhood (23/10): "Niterói, Icaraí" or "bairro Icaraí".
+  if (!memory.neighborhood && memory.city?.value && normalizeForMatching(memory.lastQuestionAsked ?? "").includes("bairro")) {
+    const neighborhood = readNeighborhood(trimmed, memory.city.value);
+    if (neighborhood) memory.neighborhood = { value: neighborhood, confidence: 1, sourceMessageId };
+  }
+
+  // The last question also asks whether the customer already has a plan: any clear answer is kept.
+  if (!memory.currentPlan && asksCurrentPlan(memory.lastQuestionAsked)) {
+    const currentPlan = readCurrentPlan(trimmed);
+    if (currentPlan) memory.currentPlan = { value: currentPlan, confidence: 1, sourceMessageId };
   }
 
   // Positive company evidence overrides a previously stated individual/family

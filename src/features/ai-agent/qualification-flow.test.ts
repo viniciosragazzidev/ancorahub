@@ -207,7 +207,7 @@ describe("Qualification Flow Unit Tests", () => {
 
       expect(turn.kind).toBe("collecting");
       expect(turn.nextQuestion?.key).toBe("city");
-      expect(turn.reply).toMatch(/^(Só para eu registrar certinho|Para eu seguir com a cotação|Me ajuda com uma informação): /);
+      expect(turn.reply).toMatch(/^(Só pra eu anotar certinho|Pra eu seguir com a cotação|Me ajuda só com uma coisa): /);
       expect(turn.reply).toContain("cidade");
       expect(turn.reply).not.toBe(`Perfeito, Zuleika. ${cityQuestion}`);
     });

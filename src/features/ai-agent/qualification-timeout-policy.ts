@@ -1,4 +1,4 @@
-import type { ConversationMemory, MemoryField } from "./memory";
+import { hasCoreQuoteData, type ConversationMemory, type MemoryField } from "./memory";
 
 export type QualificationTimeoutMessage = {
   id: string;
@@ -10,7 +10,7 @@ export type QualificationTimeoutMessage = {
 };
 
 export type QualificationTimeoutOutcome = {
-  qualificationStatus: "warm" | "cold";
+  qualificationStatus: "hot" | "warm" | "cold";
   qualificationState: "PARTIAL";
 };
 
@@ -123,13 +123,15 @@ export function qualificationTimeoutOutcome(
     return hasValidFieldValue(key, field) && hasQuestionBeforeSource(field?.sourceMessageId, messages);
   });
 
+  // Stopped answering after giving plan type, lives and ages: still hot, never held (23/10).
+  if (hasCoreQuoteData(memory)) return { qualificationStatus: "hot", qualificationState: "PARTIAL" };
   return {
     qualificationStatus: hasValidReply ? "warm" : "cold",
     qualificationState: "PARTIAL",
   };
 }
 
-export function qualificationTimeoutDistributionStatus(qualificationStatus: "warm" | "cold") {
+export function qualificationTimeoutDistributionStatus(qualificationStatus: "hot" | "warm" | "cold") {
   return qualificationStatus === "cold" ? "manual_hold" as const : "queued" as const;
 }
 

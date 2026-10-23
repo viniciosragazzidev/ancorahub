@@ -32,6 +32,8 @@ export type ComposeQuestionInput = {
   last?: boolean;
   /** The director's own wording for this question (Atendimento > Fluxo); replaces the built-in ones. */
   customText?: string | null;
+  /** Also ask whether the customer already has a plan (last question, asked once). */
+  askCurrentPlan?: boolean;
 };
 
 function stableHash(value: string) {
@@ -77,29 +79,47 @@ export function questionVariants(key: QualificationFieldKey, memory: Conversatio
   const plan = memory.planType?.value;
   const count = lives(memory);
   switch (key) {
+    // WhatsApp tone (Vinicios, 23/10): short, warm, "pra" and "tá", like a person writes.
     case "customerName":
-      return ["Qual é o seu nome completo?", "Como é o seu nome completo?"];
+      return ["Pra eu te atender direitinho, qual é o seu nome completo?", "Me diz seu nome completo, por favor?"];
     case "planType":
       return [
-        "Você busca um plano só para você, para a família ou para uma empresa (CNPJ)?",
-        "O plano seria individual, familiar ou empresarial (CNPJ)?",
-        "Me conta: o plano é só para você, para a sua família ou para uma empresa (CNPJ)?",
+        "Me conta: o plano seria só pra você, pra sua família ou pra sua empresa (CNPJ)?",
+        "Você tá pensando num plano só seu, pra família ou pela empresa (CNPJ)?",
+        "O plano seria pra você, pra família ou pra empresa (CNPJ)?",
       ];
     case "numberOfLives":
-      if (plan === "empresarial") return ["Quantas vidas vão entrar no plano, entre sócios, funcionários e dependentes?", "Quantas vidas a empresa quer incluir no plano, contando dependentes?"];
-      if (plan === "familiar") return ["Quantas pessoas vão entrar no plano, contando com você?", "Contando com você, quantas pessoas vão entrar no plano?"];
-      return ["Quantas pessoas vão entrar no plano?", "Quantas pessoas o plano vai incluir?"];
+      if (plan === "empresarial") return ["Quantas vidas a empresa quer colocar no plano, contando sócios, funcionários e dependentes?", "E quantas vidas entram no plano da empresa, contando os dependentes?"];
+      if (plan === "familiar") return ["Contando com você, quantas pessoas vão entrar no plano?", "E quantas pessoas da família vão entrar, contando com você?"];
+      return ["Quantas pessoas vão entrar no plano?", "E o plano seria pra quantas pessoas?"];
     case "age":
-      if (plan === "empresarial") return ["Qual a média de idade das pessoas do plano?", "Qual a idade média do grupo que vai entrar no plano?"];
+      if (plan === "empresarial") return ["E qual é mais ou menos a média de idade do pessoal?", "Qual seria a idade média do grupo que vai entrar no plano?"];
       // The plan may be for someone else (a grandchild, a parent): ask about who uses it.
-      if (plan === "individual" || count === 1) return ["Qual a idade de quem vai usar o plano?", "Quantos anos tem quem vai usar o plano?"];
-      if (count) return [`Quais as idades das ${count} pessoas?`, `Qual a idade de cada uma das ${count} pessoas?`];
-      return ["Quais as idades das pessoas que vão entrar no plano?", "Qual a idade de cada pessoa que vai entrar no plano?"];
+      if (plan === "individual" || count === 1) return ["E qual a idade de quem vai usar o plano?", "Quantos anos tem quem vai usar o plano?"];
+      if (count) return [`E quais as idades das ${count} pessoas? Pode mandar só os números, tipo 35 e 32.`, `Me passa a idade de cada uma das ${count} pessoas?`];
+      return ["E quais as idades de quem vai entrar no plano?", "Me passa a idade de cada pessoa que vai entrar no plano?"];
     case "city":
-      return ["Em qual cidade você vai usar o plano?", "Qual a cidade onde você vai usar o plano?"];
+      return [
+        "Em qual cidade e bairro você mora? Assim já busco opções com hospitais pertinho de você.",
+        "Me conta sua cidade e bairro, que eu procuro opções com rede perto de você.",
+      ];
     case "email":
-      return ["Qual o seu melhor e-mail para eu enviar a cotação?", "Para qual e-mail posso mandar a cotação?"];
+      return ["Qual o seu melhor e-mail pra eu te mandar a cotação?", "Pra qual e-mail posso te mandar a cotação?"];
   }
+}
+
+/**
+ * "Já têm plano de saúde hoje?", asked once in the same message as the last question
+ * (23/10). A separate final question the customer never answers would leave a qualified
+ * lead without a broker, so the answer is optional and the flow never waits for it.
+ * Every wording carries CURRENT_PLAN_MARKER ("plano de saúde hoje", ai-agent/memory.ts).
+ */
+export function currentPlanQuestion(memory: ConversationMemory, seed: string) {
+  const count = lives(memory);
+  const plural = (count ?? 1) > 1 || memory.planType?.value === "familiar" || memory.planType?.value === "empresarial";
+  return pick(plural
+    ? ["E vocês já têm plano de saúde hoje? Se tiver, me conta qual, que eu comparo pra vocês.", "Ah, e vocês já têm algum plano de saúde hoje? Se sim, qual?"]
+    : ["E você já tem plano de saúde hoje? Se tiver, me conta qual, que eu comparo pra você.", "Ah, e você já tem algum plano de saúde hoje? Se sim, qual?"], `${seed}:current-plan`);
 }
 
 /**
@@ -132,32 +152,33 @@ function fieldAcks(key: QualificationFieldKey, memory: ConversationMemory, name:
   const named = (text: string): Ack[] => (name ? [{ text, usesName: true }] : []);
   switch (key) {
     case "customerName":
-      return name ? [{ text: `Prazer, ${name}!`, usesName: true }, { text: `Obrigado, ${name}!`, usesName: true }] : [{ text: "Obrigado!" }];
+      return name ? [{ text: `Prazer, ${name}!`, usesName: true }, { text: `Que bom falar com você, ${name}!`, usesName: true }] : [{ text: "Obrigado!" }];
     case "planType": {
       const plan = memory.planType?.value;
-      if (plan === "individual") return [{ text: "Individual, anotado!" }, { text: "Plano individual, perfeito." }, ...named(`Certo, ${name}, só para você.`)];
-      if (plan === "familiar") return [{ text: "Familiar, anotado!" }, { text: "Plano para a família, perfeito." }, ...named(`Perfeito, ${name}, plano familiar.`)];
-      return [{ text: "Plano empresarial, anotado!" }, { text: "Para a empresa, perfeito." }, ...named(`Certo, ${name}, plano empresarial.`)];
+      if (plan === "individual") return [{ text: "Só pra você, entendi!" }, { text: "Plano individual, combinado." }, ...named(`Beleza, ${name}, só pra você.`)];
+      if (plan === "familiar") return [{ text: "Pra família, que ótimo!" }, { text: "Plano familiar, combinado." }, ...named(`Perfeito, ${name}, pra família.`)];
+      return [{ text: "Pela empresa, ótimo!" }, { text: "Plano empresarial, combinado." }, ...named(`Beleza, ${name}, pela empresa.`)];
     }
     case "numberOfLives": {
       const count = lives(memory);
-      if (count === 1 && memory.planType?.value === "empresarial") return [{ text: "1 vida, anotado." }, { text: "Certo, 1 vida." }];
-      if (count === 1) return [{ text: "Só você, anotado." }, { text: "Uma pessoa, certo." }];
+      if (count === 1 && memory.planType?.value === "empresarial") return [{ text: "1 vida, anotado!" }, { text: "Beleza, 1 vida." }];
+      if (count === 1) return [{ text: "Só você, beleza!" }, { text: "Uma pessoa, entendi." }];
       const unit = memory.planType?.value === "empresarial" ? "vidas" : "pessoas";
-      return [{ text: `${count} ${unit}, anotado.` }, { text: `Certo, ${count} ${unit}.` }, ...named(`Perfeito, ${name}, ${count} ${unit}.`)];
+      return [{ text: `${count} ${unit}, anotado!` }, { text: `Beleza, ${count} ${unit}.` }, ...named(`Perfeito, ${name}, ${count} ${unit}.`)];
     }
     case "age": {
-      if (memory.planType?.value === "empresarial" && memory.averageAge?.value) return [{ text: `Média de ${memory.averageAge.value} anos, anotado.` }, { text: "Idade média anotada." }];
+      if (memory.planType?.value === "empresarial" && memory.averageAge?.value) return [{ text: `Média de ${memory.averageAge.value} anos, anotado!` }, { text: "Beleza, anotei a idade média." }];
       const list = ages(memory);
-      if (list.length === 1) return [{ text: `${list[0]} anos, ok.` }, { text: `Anotado: ${list[0]} anos.` }, ...named(`Perfeito, ${name}.`)];
-      return [{ text: "Idades anotadas." }, { text: "Perfeito, anotei as idades." }];
+      if (list.length === 1) return [{ text: `${list[0]} anos, anotado!` }, { text: `Beleza, ${list[0]} anos.` }, ...named(`Perfeito, ${name}.`)];
+      return [{ text: "Perfeito, anotei as idades!" }, { text: "Ótimo, idades anotadas." }];
     }
     case "city": {
       const city = memory.city?.value?.trim() ?? "";
-      return [{ text: `${city}, ótimo.` }, { text: `Anotado: ${city}.` }, ...named(`Perfeito, ${name}.`)];
+      const place = memory.neighborhood?.value ? `${memory.neighborhood.value.trim()}, ${city}` : city;
+      return [{ text: `${place}, ótimo!` }, { text: `Anotado: ${place}.` }, ...named(`Perfeito, ${name}.`)];
     }
     case "email":
-      return [{ text: "E-mail anotado." }, { text: "Anotei seu e-mail." }];
+      return [{ text: "E-mail anotado!" }, { text: "Anotei seu e-mail, obrigado!" }];
   }
 }
 
@@ -168,7 +189,7 @@ function acknowledgement(input: ComposeQuestionInput, name: string | null): stri
   if (input.answered.length > 1) {
     const summary = summarizeQualification(input.memory, input.answered);
     if (summary) {
-      const options = [`Anotei: ${summary}.`, `Perfeito, anotei: ${summary}.`];
+      const options = [`Anotei aqui: ${summary}.`, `Perfeito, anotei: ${summary}.`];
       const fresh = options.filter((text) => firstWord(text) !== previousOpener);
       return pick(fresh.length ? fresh : options, `${input.seed}:ack`);
     }
@@ -187,11 +208,13 @@ export function composeQuestionReply(input: ComposeQuestionInput): string {
   const variants = custom ? [custom] : questionVariants(input.key, input.memory);
   const question = pick(variants, `${input.seed}:q`);
   if (input.repeated) {
-    const lead = pick(["Só para eu registrar certinho:", "Para eu seguir com a cotação:", "Me ajuda com uma informação:"], `${input.seed}:r`);
+    const lead = pick(["Só pra eu anotar certinho:", "Pra eu seguir com a cotação:", "Me ajuda só com uma coisa:"], `${input.seed}:r`);
     return `${lead} ${lowerFirst(question)}`;
   }
   const ack = acknowledgement(input, name);
-  const body = input.last ? `Última pergunta: ${lowerFirst(question)}` : question;
+  const asked = input.last ? `Pra fechar: ${lowerFirst(question)}` : question;
+  // Same paragraph as the last question, so the next answer is read against both.
+  const body = input.askCurrentPlan ? `${asked} ${currentPlanQuestion(input.memory, input.seed)}` : asked;
   return ack ? `${ack} ${body}` : body;
 }
 
