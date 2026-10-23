@@ -100,7 +100,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     redirect("/leads/distribuicao?view=plantao");
   }
 
-  const { schedule, roster, linkedQueues, leads: allLeads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled } = profile;
+  const { schedule, roster, linkedQueues, leads: allLeads, leadsSince, leadsUntil, leadsUpcomingStartsAt, presenceEnabled, liveStatusEnabled, coldQueueWithoutWindow } = profile;
   // Invited brokers without an account yet: on the plantão as "Convite pendente".
   const [pendingRoster, invitedBrokers] = await Promise.all([
     listPendingRosterEntries(context.tenantId, schedule.id),
@@ -302,7 +302,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     { key: "distribuidos", label: "Distribuídos", count: distributedCount },
   ] as const;
   const totalWaitingCount = allWaitingLeads.length;
-  const sinceLabel = leadsSinceOption !== "plantao"
+  const sinceLabel = coldQueueWithoutWindow
+    ? "sem janela de horário (fila de leads frios: aparecem todos os que aguardam)"
+    : leadsSinceOption !== "plantao"
     ? `desde ${dateTime.format(leadsSince)} (escolhido acima)`
     : leadsSince.getTime() === 0
     ? "desde a criação deste plantão"
@@ -375,7 +377,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             badge={<Badge variant="secondary">{waitingCount + distributedCount}</Badge>}
             description={`Leads das filas vinculadas ${sinceLabel}.`}
             actions={<div className="flex flex-col items-end gap-2">
-            <nav aria-label="Considerar leads sem distribuição a partir de" className="flex flex-wrap items-center justify-end gap-2">
+            {coldQueueWithoutWindow ? null : <nav aria-label="Considerar leads sem distribuição a partir de" className="flex flex-wrap items-center justify-end gap-2">
               <span className="text-xs text-muted-foreground" title="Muda só o que você vê aqui e o que atribui à mão. A distribuição automática segue a janela do plantão.">Considerar leads a partir de (só para ver e atribuir à mão)</span>
               {LEADS_SINCE_CHOICES.map((choice) => (
                 <Button
@@ -388,7 +390,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   {choice.label}
                 </Button>
               ))}
-            </nav>
+            </nav>}
             <nav aria-label="Filtrar leads por situação" className="flex flex-wrap gap-2">
               {filters.map((item) => (
                 <Button

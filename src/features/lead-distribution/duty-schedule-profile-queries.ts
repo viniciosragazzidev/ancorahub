@@ -14,6 +14,7 @@ import { assignmentShift } from "./duty-shifts";
 import { classifyBrokerLiveOfferStatus, combineLiveStatusAcrossQueues } from "./duty-roster-live-status";
 import { countBrokerLeadsByShift, isManagementInvestigation } from "./duty-leads-shift-groups";
 import { inferLegacyLeadDutyScheduleId, selectLeadsForDutySchedule } from "./shared-duty-roster";
+import { isColdLeadsQueueName } from "./cold-age-release-rules";
 import { effectiveSwapDate } from "./duty-swap";
 
 // Upper bound on how far back a lead can show even when the schedule has no
@@ -176,7 +177,11 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
   // The manager may widen or narrow it ("considerar leads a partir de"): then
   // every lead since that moment counts, with no end.
   const leadsSinceOverride = dutyLeadsSinceStart(options.leadsSince ?? "plantao", now, schedule.timezone ?? undefined);
-  const { since, until } = leadsSinceOverride ? { since: leadsSinceOverride, until: null } : resolveDutyLeadWindowBounds(occurrenceWindow, now);
+  const windowBounds = leadsSinceOverride ? { since: leadsSinceOverride, until: null } : resolveDutyLeadWindowBounds(occurrenceWindow, now);
+  // A plantão fed only by the Leads Frios queue has no time window (23/10): its cold leads
+  // are released at 2 days old, always before the occurrence, so the window hid all of them.
+  const coldQueueWithoutWindow = linkedQueues.length > 0 && linkedQueues.every((queue) => isColdLeadsQueueName(queue.name));
+  const { since, until } = coldQueueWithoutWindow ? { since: new Date(0), until: null } : windowBounds;
   const upcomingStartsAt = occurrenceWindow.upcomingStartsAt ?? null;
 
   // Same rule as the distribution (2026-10-09, weekly and published ADD UP): on a
@@ -316,10 +321,17 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
           ),
           eq(schema.leads.dutyScheduleId, scheduleId),
         ),
-        or(
-          and(gte(schema.leads.createdAt, since), until ? lte(schema.leads.createdAt, until) : undefined),
-          and(gte(schema.leads.assignedAt, since), until ? lte(schema.leads.assignedAt, until) : undefined),
-        ),
+        coldQueueWithoutWindow
+          // Leads Frios: every lead still without a broker, from any date; handed-out ones
+          // stay limited to this occurrence (old assigned leads would fill the 200 rows).
+          ? or(
+            isNull(schema.leads.corretorId),
+            and(gte(schema.leads.assignedAt, windowBounds.since), windowBounds.until ? lte(schema.leads.assignedAt, windowBounds.until) : undefined),
+          )
+          : or(
+            and(gte(schema.leads.createdAt, since), until ? lte(schema.leads.createdAt, until) : undefined),
+            and(gte(schema.leads.assignedAt, since), until ? lte(schema.leads.assignedAt, until) : undefined),
+          ),
         isNull(schema.leads.deletedAt),
         isNull(schema.leads.archivedAt),
         // Removed from distribution without a broker: out of the plantão.
@@ -542,6 +554,7 @@ export async function getDutyScheduleProfile(context: TenantContext, scheduleId:
     }),
     linkedQueues,
     leads,
+    coldQueueWithoutWindow,
     leadsSince: since,
     leadsUntil: until,
     leadsUpcomingStartsAt: upcomingStartsAt,
