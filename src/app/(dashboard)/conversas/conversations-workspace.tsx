@@ -326,6 +326,7 @@ export function ConversationsWorkspace({
             <h2 className="sr-only">Filtros dos atendimentos</h2>
             {role === "director" && branches.length > 0 ? (
               <Select
+                className="w-auto shrink-0"
                 labels={{ all: "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
                 onValueChange={(value) => setBranchFilter(value ?? "all")}
                 value={branchFilter}
@@ -346,6 +347,7 @@ export function ConversationsWorkspace({
 
             {allTags.length > 0 ? (
               <Select
+                className="w-auto shrink-0"
                 labels={{ all: "Todas as tags", ...Object.fromEntries(allTags.map((tag) => [tag.id, tag.name])) }}
                 onValueChange={(value) => setTagFilter(value ?? "all")}
                 value={tagFilter}
