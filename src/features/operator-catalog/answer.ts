@@ -12,7 +12,7 @@ import { getDatabase, schema } from "@/shared/db";
 import { isOperatorKnowledgeQuestion, marketOperatorsInQuestion, NOT_FOUND_MESSAGE, operatorNotImportedMessage, relevantChunks, validateGroundedAnswer } from "./answer-guard";
 import { embedQuery } from "./embeddings";
 import { toNamedEntity } from "./matching";
-import { ageBandsInQuestion, agesInQuestion, carriersInQuestion, plansInQuestion } from "./question-scope";
+import { ageBandsInQuestion, agesInQuestion, carriersInQuestion, livesInQuestion, livesQualifierCovers, plansInQuestion } from "./question-scope";
 import { applyRerank, fuseRankings } from "./rank-fusion";
 import { loadCatalogAreas } from "./service";
 
@@ -38,6 +38,8 @@ const SYSTEM_PROMPT = [
   "Para várias vidas, mostre o valor de cada pessoa pela faixa (com a citação) e o total somado. Se houver mais de um plano ou acomodação, mostre uma linha por plano.",
   "As tabelas dos trechos [T] podem vir com as colunas desalinhadas pela leitura do PDF: leia com cuidado qual valor é de qual plano e faixa.",
   "Se a pergunta não disser o plano, mostre TODOS os planos da tabela pedida (uma linha por plano e acomodação), em vez de perguntar qual é.",
+  "Escolha a tabela pelas condições entre parênteses de cada informação (vidas, contratação, coparticipação, acomodação). Um nome de tabela da pergunta (ex.: Porte I) que não aparece nas condições não impede a resposta: use a quantidade de vidas e as idades, e diga quais condições usou.",
+  "Se houver mais de uma tabela que serve (ex.: demais empresas e MEI, ou coparticipação 30% e parcial), mostre cada uma separada, em vez de dizer que não encontrou.",
   "Informações marcadas [preço aguardando aprovação do diretor] podem ser usadas, mas avise na resposta que o preço ainda não foi conferido pelo diretor.",
   "Trechos marcados como leitura automática de imagem podem ter erros: avise para confirmar no material original.",
   'Devolva somente um JSON: {"found": true ou false, "answer": "resposta com citações", "missing": "o que não está no material, ou vazio"}.',
@@ -80,7 +82,14 @@ async function loadScope(tenantId: string, question: string) {
     : carrierRows.map((row) => row.id);
   const ages = agesInQuestion(question);
   const asksPrice = /\b(valor|valores|preco|precos|quanto|mensalidade|tabela|custa|custo)\b/.test(question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
-  return { carrierIds, factCarrierIds, carrierNames, planIds: plans.map((plan) => plan.id), bands: ageBandsInQuestion(question), ages, asksPrice, missingOperators };
+  return { carrierIds, factCarrierIds, carrierNames, planIds: plans.map((plan) => plan.id), bands: ageBandsInQuestion(question), ages, lives: livesInQuestion(question), asksPrice, missingOperators };
+}
+
+/** Price facts of the tables that cover this many lives; other facts stay. No table covers it: all stay. */
+function pricesForLives<T extends { areaSlug: string; qualifiers: unknown }>(facts: T[], lives: number) {
+  const covers = (fact: T) => fact.areaSlug !== "precos" || livesQualifierCovers((fact.qualifiers as Record<string, string> | null)?.vidas, lives);
+  const kept = facts.filter(covers);
+  return kept.some((fact) => fact.areaSlug === "precos") ? kept : facts;
 }
 
 async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; planIds: string[]; bands: string[]; asksPrice: boolean }) {
@@ -127,7 +136,12 @@ async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; pl
       scope.planIds.length ? or(inArray(schema.operatorCatalogFacts.planId, scope.planIds), isNull(schema.operatorCatalogFacts.planId)) : undefined,
       priceFilter,
     ))
-    .orderBy(asc(schema.tenantPrivatePlans.name), asc(schema.operatorCatalogFacts.areaSlug))
+    // A price question: the prices come first, so the fact limit never cuts them for rules.
+    .orderBy(
+      ...(scope.asksPrice || scope.bands.length ? [sql`case when ${schema.operatorCatalogFacts.areaSlug} = 'precos' then 0 else 1 end`] : []),
+      asc(schema.tenantPrivatePlans.name),
+      asc(schema.operatorCatalogFacts.areaSlug),
+    )
     .limit(MAX_FACTS);
 }
 
@@ -273,11 +287,14 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
   if (scope.missingOperators.length && !scope.carrierIds.length) {
     return blocked(operatorNotImportedMessage(scope.missingOperators), { reason: "operator_not_imported", operators: scope.missingOperators });
   }
-  const [facts, rawChunks, areas] = await Promise.all([
+  const [allFacts, rawChunks, areas] = await Promise.all([
     loadFacts(input.tenantId, scope),
     loadChunks({ tenantId: input.tenantId, userId: input.userId, question: input.question, carrierIds: scope.carrierIds }),
     loadCatalogAreas(input.tenantId),
   ]);
+  // "2 vidas" keeps only the price tables for 2 lives (23/10: the 3 a 4 and 30 a 99 vidas
+  // tables sat next to the 2 vidas one and the model refused to pick).
+  const facts = scope.lives ? pricesForLives(allFacts, scope.lives) : allFacts;
   const chunks = relevantChunks(rawChunks, { carrierIds: scope.carrierIds, carrierNames: scope.carrierNames, keywordCount: extractSearchKeywords(input.question).length });
   if (!facts.length && !chunks.length) {
     const extra = scope.missingOperators.length ? ` ${operatorNotImportedMessage(scope.missingOperators)}` : "";
@@ -300,7 +317,7 @@ export async function answerOperatorQuestion(input: { tenantId: string; userId: 
   });
   const context = `Informações catalogadas:\n${factLines.join("\n") || "(nenhuma)"}\n\nTrechos de material:\n${chunkLines.join("\n\n") || "(nenhum)"}`;
 
-  const people = scope.ages.length ? `\nIdades das pessoas: ${scope.ages.join(", ")} anos.` : "";
+  const people = `${scope.lives ? `\nQuantidade de vidas: ${scope.lives}.` : ""}${scope.ages.length ? `\nIdades das pessoas: ${scope.ages.join(", ")} anos.` : ""}`;
   const result = await runGateway({
     profile: "chat-smart",
     purpose: "cotacao_express",

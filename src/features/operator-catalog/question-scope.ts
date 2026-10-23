@@ -72,3 +72,23 @@ export function ageBandsInQuestion(question: string) {
     return age >= (min ?? 0) && age <= (max ?? 200);
   }) ?? normalizeAgeBand(String(age))))];
 }
+
+/** "2 vidas", "para 3 pessoas": how many lives the quote is for, when the question says it. */
+export function livesInQuestion(question: string) {
+  const text = question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const match = text.match(/\b(\d{1,3})\s*(?:vidas?|pessoas?|beneficiarios?)\b/);
+  const lives = match ? Number(match[1]) : null;
+  return lives && lives > 0 ? lives : null;
+}
+
+/**
+ * Whether a table's "vidas" qualifier ("2", "3_a_4", "3_4", "30_a_99", "2_a_29", "30+")
+ * covers this many lives. A qualifier it cannot read counts as covering.
+ */
+export function livesQualifierCovers(qualifier: string | null | undefined, lives: number) {
+  if (!qualifier) return true;
+  const numbers = qualifier.match(/\d+/g)?.map(Number) ?? [];
+  if (!numbers.length) return true;
+  if (numbers.length === 1) return /\+|mais|acima/.test(qualifier) ? lives >= numbers[0]! : lives === numbers[0];
+  return lives >= Math.min(...numbers) && lives <= Math.max(...numbers);
+}
