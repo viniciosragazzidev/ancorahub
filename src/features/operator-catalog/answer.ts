@@ -7,6 +7,7 @@ import { runGateway } from "@/features/ai-gateway/gateway";
 import { OPERATOR_MATERIAL_CATEGORY } from "@/features/tenant-intelligence/rag/constants";
 import { executeHybridKnowledgeSearch, type HybridSearchResult } from "@/features/tenant-intelligence/rag/hybrid-retrieval";
 import { extractSearchKeywords } from "@/features/tenant-intelligence/rag/search-terms";
+import { TtlCache } from "@/shared/cache/ttl-cache";
 import { getDatabase, schema } from "@/shared/db";
 
 import { isOperatorKnowledgeQuestion, marketOperatorsInQuestion, NOT_FOUND_MESSAGE, operatorNotImportedMessage, readableMissing, relevantChunks, validateGroundedAnswer } from "./answer-guard";
@@ -24,6 +25,12 @@ const MAX_CHUNKS = 6;
 const MAX_CANDIDATES = 20;
 /** The reranker keeps at least this many (completed with the fusion order). */
 const MIN_RERANKED = 3;
+/** Rewrites of the question searched besides it. */
+const MAX_REWRITES = 2;
+/** Excerpts when the catalog already covers the subject. */
+const LIGHT_CHUNKS = 3;
+/** A question asked again within this time is answered from memory (the material rarely changes). */
+const answerCache = new TtlCache<OperatorAnswer>(10 * 60_000, 300);
 /** Up to this many operators in the catalog, a question that names none searches all of them. */
 const MAX_CARRIERS_WITHOUT_NAME = 3;
 
@@ -86,7 +93,7 @@ async function loadScope(tenantId: string, question: string) {
     : carrierRows.map((row) => row.id);
   const ages = agesInQuestion(question);
   const asksPrice = /\b(valor|valores|preco|precos|quanto|mensalidade|tabela|custa|custo)\b/.test(question.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase());
-  return { carrierIds, factCarrierIds, carrierNames, planIds: plans.map((plan) => plan.id), bands: ageBandsInQuestion(question), ages, lives: livesInQuestion(question), asksPrice, missingOperators };
+  return { carrierIds, factCarrierIds, carrierNames, planIds: plans.map((plan) => plan.id), bands: ageBandsInQuestion(question), ages, lives: livesInQuestion(question), areas: questionAreas(question), asksPrice, missingOperators };
 }
 
 /** Price facts of the tables that cover this many lives; other facts stay. No table covers it: all stay. */
@@ -96,7 +103,7 @@ function pricesForLives<T extends { areaSlug: string; qualifiers: unknown }>(fac
   return kept.some((fact) => fact.areaSlug === "precos") ? kept : facts;
 }
 
-async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; planIds: string[]; bands: string[]; asksPrice: boolean }) {
+async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; planIds: string[]; bands: string[]; asksPrice: boolean; areas: string[] }) {
   if (!scope.factCarrierIds.length) return [];
   const now = new Date();
   // Prices only for the ages asked: a full table would crowd out the rules.
@@ -138,6 +145,8 @@ async function loadFacts(tenantId: string, scope: { factCarrierIds: string[]; pl
       ),
       or(sql`${schema.operatorCatalogFacts.validUntil} is null`, sql`${schema.operatorCatalogFacts.validUntil} >= ${now.toISOString()}::timestamptz`),
       scope.planIds.length ? or(inArray(schema.operatorCatalogFacts.planId, scope.planIds), isNull(schema.operatorCatalogFacts.planId)) : undefined,
+      // Only the subjects asked (prices, hospitals...): the rest of the catalog made the prompt 15k tokens.
+      scope.areas.length ? inArray(schema.operatorCatalogFacts.areaSlug, scope.areas) : undefined,
       priceFilter,
     ))
     // A price question: the prices come first, so the fact limit never cuts them for rules.
@@ -178,7 +187,8 @@ async function rewriteQuestion(input: { tenantId: string; userId: string; questi
     sensitive: true,
     temperature: 0,
     maxTokens: 300,
-    timeoutMs: 8_000,
+    timeoutMs: 3_000,
+    maxAttempts: 1,
     schema: z.object({ queries: z.array(z.string().trim().max(200)).max(3).catch([]) }),
     messages: [
       { role: "system", content: REWRITE_PROMPT },
@@ -187,7 +197,7 @@ async function rewriteQuestion(input: { tenantId: string; userId: string; questi
   }).catch(() => null);
   if (!result?.ok) return [];
   const own = input.question.trim().toLowerCase();
-  return result.value.queries.filter((query) => query.length >= 3 && query.toLowerCase() !== own);
+  return result.value.queries.filter((query) => query.length >= 3 && query.toLowerCase() !== own).slice(0, MAX_REWRITES);
 }
 
 /** One query, searched by term and by meaning: two rankings for the fusion. */
@@ -215,7 +225,8 @@ async function rerankChunks(input: { tenantId: string; userId: string; question:
     sensitive: true,
     temperature: 0,
     maxTokens: 500,
-    timeoutMs: 12_000,
+    timeoutMs: 5_000,
+    maxAttempts: 1,
     schema: z.object({ order: z.array(z.coerce.number()).max(MAX_CANDIDATES).catch([]) }),
     messages: [
       { role: "system", content: RERANK_PROMPT },
@@ -237,7 +248,15 @@ async function rerankChunks(input: { tenantId: string; userId: string; question:
  * Fase 1 (23/10): the question and its rewrites, each searched by term and by meaning,
  * merged by reciprocal rank fusion; the best candidates are reranked by the model.
  */
-async function loadChunks(input: { tenantId: string; userId: string; question: string; carrierIds: string[] }): Promise<HybridSearchResult[]> {
+async function loadChunks(input: { tenantId: string; userId: string; question: string; carrierIds: string[]; light?: boolean }): Promise<HybridSearchResult[]> {
+  // The catalog already has the subject (prices, hospitals...): the excerpts only complete
+  // it, so no rewrites and no rerank (23/10: ~8 s of the 30 s were spent here).
+  if (input.light) {
+    const own = await searchQuery(input.tenantId, input.question, input.carrierIds);
+    const top = fuseRankings(own, LIGHT_CHUNKS);
+    if (!top.length && input.carrierIds.length) return loadChunks({ ...input, carrierIds: [] });
+    return withFollowingText(input.tenantId, top);
+  }
   const [own, rewrites] = await Promise.all([
     searchQuery(input.tenantId, input.question, input.carrierIds),
     rewriteQuestion(input),
@@ -287,14 +306,23 @@ function blocked(message: string, log: Record<string, unknown>): OperatorAnswer 
  *    material or in the question, is blocked instead of shown.
  */
 export async function answerOperatorQuestion(input: { tenantId: string; userId: string; question: string }): Promise<OperatorAnswer> {
+  const key = `${input.tenantId}|${input.question.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()}`;
+  return answerCache.getOrLoad(key, () => computeOperatorAnswer(input), (answer) => answer.status === "answered");
+}
+
+async function computeOperatorAnswer(input: { tenantId: string; userId: string; question: string }): Promise<OperatorAnswer> {
   const scope = await loadScope(input.tenantId, input.question);
   if (scope.missingOperators.length && !scope.carrierIds.length) {
     return blocked(operatorNotImportedMessage(scope.missingOperators), { reason: "operator_not_imported", operators: scope.missingOperators });
   }
-  const [allFacts, rawChunks, areas] = await Promise.all([
-    loadFacts(input.tenantId, scope),
-    loadChunks({ tenantId: input.tenantId, userId: input.userId, question: input.question, carrierIds: scope.carrierIds }),
-    loadCatalogAreas(input.tenantId),
+  const areasPromise = loadCatalogAreas(input.tenantId);
+  // Facts first (one fast query): when they cover the subject asked, the excerpt search is light.
+  let allFacts = await loadFacts(input.tenantId, scope);
+  if (!allFacts.length && scope.areas.length) allFacts = await loadFacts(input.tenantId, { ...scope, areas: [] });
+  const covered = scope.areas.length > 0 && allFacts.some((fact) => scope.areas.includes(fact.areaSlug));
+  const [rawChunks, areas] = await Promise.all([
+    loadChunks({ tenantId: input.tenantId, userId: input.userId, question: input.question, carrierIds: scope.carrierIds, light: covered }),
+    areasPromise,
   ]);
   // "2 vidas" keeps only the price tables for 2 lives (23/10: the 3 a 4 and 30 a 99 vidas
   // tables sat next to the 2 vidas one and the model refused to pick).
@@ -434,10 +462,11 @@ export async function operatorQuestionReply(input: { tenantId: string; userId: s
   if (!isOperatorKnowledgeQuestion(question, carriers.map((carrier) => carrier.name))) return null;
   // Outside the pilot the assistant still never answers about operators from its own memory.
   if (input.ragEnabled === false) return { text: "A consulta de operadoras, planos e preços aqui no assistente ainda está em teste. Por enquanto, use a Cotação Express ou fale com a sua gestão." };
+  const focusCarrier = carriersInQuestion(question, carriers.map(toNamedEntity))[0]?.name ?? null;
+  const followUpsPromise = loadMaterialAsks(input.tenantId, { seed: daySeed(), limit: 3, focusCarrier, excludeAreas: questionAreas(question) }).catch(() => [] as MaterialAsk[]);
   const result = await answerOperatorQuestion({ ...input, question }).catch((): OperatorAnswer => ({ status: "error", message: "Não foi possível consultar o material das operadoras agora. Tente novamente em instantes." }));
   // Next questions: the same operator, other subjects with material (or any operator when none was named).
-  const focusCarrier = carriersInQuestion(question, carriers.map(toNamedEntity))[0]?.name ?? null;
-  const followUps = await loadMaterialAsks(input.tenantId, { seed: daySeed(), limit: 3, focusCarrier, excludeAreas: questionAreas(question) }).catch(() => [] as MaterialAsk[]);
+  const followUps = await followUpsPromise;
   if (result.status !== "answered") return { text: result.message, followUps };
   return { text: result.answer, card: result.card, followUps };
 }
