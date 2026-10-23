@@ -283,3 +283,21 @@ export function effectiveHandoffText(configured: string | null | undefined, fall
   const text = configured?.trim();
   return text && !RETIRED_HANDOFF_TEXTS.has(text) ? text : fallback;
 }
+
+/**
+ * The customer says the current plan costs too much ("o preço está alto demais", "quero
+ * reduzir"): one line that shows it was heard before the next question (case Maria Tereza,
+ * 23/10: the reply skipped straight to "individual ou empresa?"). Null otherwise.
+ */
+export function priceConcernLine(message: string, input: { lives: number | null; seed: string }) {
+  const text = normalize(message);
+  const concern = /\b(reducao|reduzir|baixar|diminuir|economi\w*|mais barat\w*|mais em conta|caro|cara|alto demais|muito alto|muito alta|pesad\w*|nao (?:consigo|da) (?:mais )?pagar|nao cabe)\b/.test(text);
+  const aboutPrice = /\b(preco|valor|mensalidade|pago|pagando|plano|boleto|custo)\b/.test(text);
+  if (!concern || !aboutPrice) return null;
+  const you = (input.lives ?? 1) > 1 ? "vocês" : "você";
+  return pick([
+    `Entendi, o valor de hoje está pesando. Vou te ajudar a encontrar uma opção que caiba melhor no orçamento de ${you}.`,
+    `Entendi, a ideia é pagar menos sem perder um bom atendimento. Vamos buscar as melhores opções para ${you}.`,
+    `Faz sentido querer reduzir esse valor. Vou montar opções mais em conta para ${you}.`,
+  ], `${input.seed}:price`);
+}

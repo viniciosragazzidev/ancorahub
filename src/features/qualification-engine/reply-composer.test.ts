@@ -6,7 +6,7 @@ vi.mock("@/shared/db", () => ({ getDatabase: () => { throw new Error("no databas
 import { createEmptyMemory, EMAIL_DECLINED, extractFieldsFromMessage, type ConversationMemory } from "@/features/ai-agent/memory";
 import { getDefaultQuickReplyTemplates, isRetiredDefaultBody, matchFaqSituation, parseHumanRequest, resolveQuickReply } from "@/features/ai-agent/quick-reply";
 import type { AgentBehaviorPolicy } from "@/features/agent-training/service";
-import { composeQuestionReply, questionVariants, renderConversationVariables, summarizeQualification } from "./reply-composer";
+import { composeQuestionReply, priceConcernLine, questionVariants, renderConversationVariables, summarizeQualification } from "./reply-composer";
 import { resolveDeterministicQualificationTurn } from "./service";
 
 const policy = {
@@ -177,5 +177,14 @@ describe("the reported conversation (Torquato), end to end", () => {
     const handoff = renderConversationVariables(getDefaultQuickReplyTemplates()["human.requested"]!.body, memory);
     expect(handoff).toBe("Claro, Torquato! Já passei seu atendimento para um corretor especialista com o que você me contou (individual, 40 anos e Itaboraí). Ele continua a conversa por aqui em instantes.");
     expect(handoff).not.toMatch(/nome|quantas pessoas/i);
+  });
+});
+
+describe("priceConcernLine", () => {
+  it("hears a price complaint and stays quiet otherwise", () => {
+    const line = priceConcernLine("Estou buscando uma redução do preço que hoje pago na Amil. Mas o preco está alto demais.", { lives: 2, seed: "s" });
+    expect(line).toMatch(/vocês/);
+    expect(priceConcernLine("Moro em Niterói", { lives: 1, seed: "s" })).toBeNull();
+    expect(priceConcernLine("o carro está caro", { lives: 1, seed: "s" })).toBeNull();
   });
 });

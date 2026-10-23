@@ -267,3 +267,19 @@ describe("idade repetida da mesma pessoa (caso Edivaldo, 21/10)", () => {
     expect(extractFieldsFromMessage("Para 12, 42 anos", createEmptyMemory(), "m1").numberOfLives?.value).toBe("2");
   });
 });
+
+describe("ages in a long message (case Maria Tereza, 23/10)", () => {
+  const message = "Estou buscando uma redução do preço que hoje pago na Amil, Opções 22. Tenho um ótimo servico prestado pela Amil . Mas o preco está alto demais. Pago por duas vidas ( 75 e 71 anos ) 4.500, 00 o que representa 50% da minha aposentadoria.";
+
+  it("reads only the ages next to anos, not money, percentages or plan codes", () => {
+    expect(readAgeList(message)).toEqual([75, 71]);
+    expect(readAgeList("pago R$ 1.200,00 para eu de 40 anos e minha esposa 38")).toEqual([40, 38]);
+    expect(readAgeList("Para 12 , 42 anos")).toEqual([12, 42]);
+  });
+
+  it("fills two lives and the two ages", () => {
+    const memory = extractFieldsFromMessage(message, createEmptyMemory(), "m1");
+    expect(memory.numberOfLives?.value).toBe("2");
+    expect(memory.age?.value).toBe("75, 71");
+  });
+});

@@ -133,7 +133,20 @@ export function readAgeList(message: string): number[] {
   const selfAge = readSelfOnlyAge(message);
   if (selfAge !== null) return [selfAge];
   const withoutPeople = normalized.replace(/\b\d{1,3}\s*(?:pessoas?|vidas?|familiares?|dependentes?|integrantes?|beneficiari[oa]s?)\b/g, " ");
-  return Array.from(withoutPeople.matchAll(/(?<![\d@.])(\d{1,3})(?![\d@])/g))
+  // Numbers that are not ages (case Maria Tereza, 23/10: "Amil Opções 22 ... 4.500, 00 ... 50% da
+  // aposentadoria" became the ages 22, 4 and 50): money, percentages, plan codes, addresses.
+  const withoutNoise = withoutPeople
+    .replace(/r\$\s*[\d.,\s]*\d/g, " ")
+    .replace(/\b\d{1,3}(?:\.\d{3})+(?:\s*,\s*\d{1,2})?/g, " ")
+    .replace(/\b\d+\s*,\s*\d{2}\s*(?:reais|por mes|mensais|mensal)\b/g, " ")
+    .replace(/\b\d+(?:[.,]\d+)?\s*(?:%|por ?cento)/g, " ")
+    .replace(/\b(?:opcoes|opcao|plano|tabela|codigo|cod|numero|apto|apartamento|rua|casa|lote|bloco|quadra|sala)\s*\d+/g, " ");
+  // A list right before "anos" ("( 75 e 71 anos )", "12, 42 anos") is the ages: the other
+  // numbers of a long message are left out.
+  const anchored = Array.from(withoutNoise.matchAll(/((?:\b\d{1,3}\s*(?:,|;|\/|\be\b|\s)\s*)*\b\d{1,3})\s*a?nos?\b/g))
+    .flatMap((match) => Array.from(match[1]!.matchAll(/\d{1,3}/g)).map((item) => Number(item[0])));
+  if (anchored.length >= 2) return anchored.filter((age) => age >= 0 && age <= 120);
+  return Array.from(withoutNoise.matchAll(/(?<![\d@.])(\d{1,3})(?![\d@])/g))
     .map((match) => Number(match[1]))
     .filter((age) => age >= 0 && age <= 120);
 }

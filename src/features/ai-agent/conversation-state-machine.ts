@@ -26,7 +26,7 @@ import { detectLateralSituation, quickReplyTuning } from "@/features/attendance-
 import { loadTenantSituations } from "@/features/attendance-situations/service";
 import { recordLearningEvent } from "@/features/situation-learning/service";
 import { loadQuickReplyTemplates, parseExplicitStop, parseOptOut, parseSoftDecline, resolveQuickReply, shouldContinueQualificationAfterMedia, type ConversationAutomationState, type QuickReplyMessageKind } from "./quick-reply";
-import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
+import { AFTER_HOURS_HUMAN_REQUEST_TEXT, AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, composeGreeting, DEFAULT_HUMAN_REQUEST_TEXT, effectiveHandoffText, isAfterHoursInSaoPaulo, priceConcernLine, renderConversationVariables } from "@/features/qualification-engine/reply-composer";
 import { isAutomatedInboundMessage } from "./automated-inbound";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -1955,6 +1955,11 @@ export async function processInboundAiResponse({
   // At night no broker answers "em instantes": the first available one gets in touch.
   if (deterministicTurn.kind === "handoff" && afterHours) {
     deterministicTurn = { ...deterministicTurn, reply: renderConversationVariables(AFTER_HOURS_QUALIFIED_HANDOFF_TEXT, updatedMemory, lead?.nome) };
+  }
+  // The customer said the current plan costs too much: show it was heard before the question.
+  if (deterministicTurn.kind === "collecting" && !inboundIsAutomated) {
+    const concern = priceConcernLine(normalizedInboundMessage, { lives: Number.parseInt(updatedMemory.numberOfLives?.value ?? "", 10) || null, seed: conversation.id });
+    if (concern) deterministicTurn = { ...deterministicTurn, reply: `${concern}\n\n${deterministicTurn.reply}` };
   }
   if (deterministicTurn.kind === "collecting" && greeting) {
     deterministicTurn = { ...deterministicTurn, reply: `${greeting}\n\n${deterministicTurn.reply}` };
