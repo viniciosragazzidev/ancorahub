@@ -5,8 +5,8 @@
  * o `LiteNumber` do kit (`@/components/lite/motion`). Os demais são locais porque o kit não tem
  * a forma exata (pílula de texto, barra de cor de série, `li` e `section` com atraso).
  */
-import { useSyncExternalStore, type ReactNode } from "react";
-import { motion, useReducedMotion, type Transition } from "motion/react";
+import { useRef, useSyncExternalStore, type ReactNode } from "react";
+import { motion, useInView, useReducedMotion, type Transition } from "motion/react";
 
 import { motionTokens as m } from "@/components/arc/motion-tokens";
 import { LiteNumber as KitLiteNumber } from "@/components/lite/motion";
@@ -117,6 +117,25 @@ export function LiteItem({ children, index, className, as = "div" }: { children:
     >
       {children}
     </Tag>
+  );
+}
+
+/** Coluna de barra vertical (0 a 1) que sobe ao entrar na vista, com `label` para leitor de tela e dica. */
+export function LiteColumn({ value, delay = 0, tone = "primary", label }: { value: number; delay?: number; tone?: string; label?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.3 });
+  const reduce = useReduce();
+  return (
+    <span ref={ref} className={styles.column} title={label}>
+      <motion.span
+        className={styles.columnFill}
+        data-tone={tone}
+        style={{ height: `${Math.max(2, Math.min(100, value * 100))}%` }}
+        initial={reduce ? { opacity: 0 } : { scaleY: 0 }}
+        animate={inView ? { opacity: 1, scaleY: 1 } : undefined}
+        transition={reduce ? fadeT : { duration: m.duration.considered, ease: [...m.ease.standard], delay }}
+      />
+    </span>
   );
 }
 

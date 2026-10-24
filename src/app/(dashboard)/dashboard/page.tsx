@@ -23,6 +23,7 @@ import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag"
 import { getDashboardUnitFilter, resolveRequestedUnit } from "@/features/dashboard/director-lite-branches";
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 import { getEssentialDashboard } from "@/features/dashboard/essential/essential-data";
+import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-quality-page";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -80,6 +81,16 @@ export default async function DashboardPage({
       return <QualificationFunnelView data={funnel} showQualityTab />;
     }
     if (activeTab === "quality" && canReadQuality) {
+      // Qualidade no visual Lite (chave ligada), vista Simples. Detalhada e recortes seguem na tela antiga.
+      const liteQuality = !singleParam(resolvedSearchParams.dimension)
+        && singleParam(resolvedSearchParams.vista) !== "detalhada"
+        && (await shouldUseDirectorLiteStyle(context.role, context.tenantId));
+      if (liteQuality) {
+        return renderDirectorLiteQuality(context, {
+          periodo: singleParam(resolvedSearchParams.periodo),
+          unidade: singleParam(resolvedSearchParams.unidade),
+        });
+      }
       const focus = parseLeadQualityFocus(
         singleParam(resolvedSearchParams.dimension),
         singleParam(resolvedSearchParams.key),

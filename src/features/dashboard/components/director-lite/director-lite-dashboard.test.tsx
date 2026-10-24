@@ -33,7 +33,7 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Olá" })).toBeInTheDocument();
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("aria-current", "page");
-    expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality");
+    expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=hoje");
     expect(screen.getByText("O período muda só os leads por fila. Plantões e WhatsApp mostram agora.")).toBeInTheDocument();
   });
 
