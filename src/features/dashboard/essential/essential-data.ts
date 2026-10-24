@@ -218,8 +218,9 @@ async function loadBrokerWhatsApp(
       .groupBy(schema.leads.corretorId),
     db.select({
       brokerId: schema.leads.corretorId,
-      responding: sql<number>`(count(distinct ${schema.leads.id}) filter (where ${schema.leads.assignedAt} >= ${since} and ${schema.whatsappMessages.sentAt} >= ${since}))::int`,
-      active: sql<number>`(count(distinct ${schema.leads.id}) filter (where ${schema.leads.status} not in ('converted', 'lost') and ${schema.whatsappMessages.sentAt} >= ${dayAgo}))::int`,
+      // postgres.js does not encode a raw Date inside sql``: send ISO text and cast.
+      responding: sql<number>`(count(distinct ${schema.leads.id}) filter (where ${schema.leads.assignedAt} >= ${since.toISOString()}::timestamptz and ${schema.whatsappMessages.sentAt} >= ${since.toISOString()}::timestamptz))::int`,
+      active: sql<number>`(count(distinct ${schema.leads.id}) filter (where ${schema.leads.status} not in ('converted', 'lost') and ${schema.whatsappMessages.sentAt} >= ${dayAgo.toISOString()}::timestamptz))::int`,
     })
       .from(schema.leads)
       .innerJoin(schema.whatsappMessages, and(
