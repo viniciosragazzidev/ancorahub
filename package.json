@@ -31,7 +31,8 @@
     "build:extension": "node scripts/build-browser-extension.mjs",
     "ui:audit": "tsx scripts/ui/audit-ui-components.ts",
     "ui:audit:strict": "tsx scripts/ui/audit-ui-components.ts --strict",
-    "ui:catalog": "tsx scripts/ui/build-route-component-catalog.ts --write"
+    "ui:catalog": "tsx scripts/ui/build-route-component-catalog.ts --write",
+    "check:lite-skin": "node scripts/check-lite-skin.mjs"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.17",
