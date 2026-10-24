@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import { Plus_Jakarta_Sans, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -8,8 +8,7 @@ import { SplashScreen } from "@/components/splash-screen";
 import { InterfaceMotionProvider } from "@/components/motion/interface-motion-provider";
 import { RouteViewTransition } from "@/components/motion/route-view-transition";
 import { SkipToContent } from "@/components/skip-to-content";
-import { isDirectorLiteDashboardRoute } from "@/components/arc/director-lite-routes";
-import { isDirectorLiteStyleEnabled } from "@/features/director-lite/style-flag";
+import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import "./globals.css";
 import "@/components/arc/venancor-scope.css";
@@ -107,17 +106,14 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [cookieStore, requestHeaders] = await Promise.all([cookies(), headers()]);
-  const pathname = requestHeaders.get("x-pathname") ?? "";
+  const cookieStore = await cookies();
   let directorLiteEnabled = false;
 
-  if (isDirectorLiteDashboardRoute(pathname)) {
-    try {
-      const context = await getRequiredTenantContext();
-      directorLiteEnabled = context.role === "director" && await isDirectorLiteStyleEnabled(context.tenantId);
-    } catch {
-      directorLiteEnabled = false;
-    }
+  try {
+    const context = await getRequiredTenantContext();
+    directorLiteEnabled = await shouldUseDirectorLiteStyle(context.role, context.tenantId);
+  } catch {
+    directorLiteEnabled = false;
   }
 
   const theme = !directorLiteEnabled && cookieStore.get("corretop-theme")?.value === "dark" ? "dark" : "light";

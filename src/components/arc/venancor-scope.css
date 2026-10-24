@@ -164,8 +164,9 @@
 @media (prefers-reduced-motion: reduce) { .lite-rail-skeleton > span { animation: none; } }
 
 /* Accessibility preferences of the Lite (features/assist/a11y-prefs.tsx), applied on <html>. */
-html[data-text-scale="115"] { font-size: 115%; }
-html[data-text-scale="130"] { font-size: 130%; }
+/* Lite preference belongs to Arc screens; normal CRM roots stay unchanged. */
+html[data-text-scale="115"]:has(.arc-venancor) { font-size: 115%; }
+html[data-text-scale="130"]:has(.arc-venancor) { font-size: 130%; }
 html[data-reduce-motion="1"] .arc-venancor *,
 html[data-reduce-motion="1"] .arc-venancor *::before,
 html[data-reduce-motion="1"] .arc-venancor *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }

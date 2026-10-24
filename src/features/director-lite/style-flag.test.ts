@@ -5,6 +5,7 @@ const { getSystemSetting } = vi.hoisted(() => ({ getSystemSetting: vi.fn() }));
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting }));
 
 import { directorLiteStyleSettingKey, isDirectorLiteStyleEnabled, shouldUseDirectorLiteStyle } from "./style-flag";
+import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
 
 describe("director Lite style flag", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -24,6 +25,14 @@ describe("director Lite style flag", () => {
     await expect(shouldUseDirectorLiteStyle("manager", "tenant-1")).resolves.toBe(false);
     await expect(shouldUseDirectorLiteStyle("supervisor", "tenant-1")).resolves.toBe(false);
     expect(getSystemSetting).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the director's light theme active on routes whose page skin is opted out", async () => {
+    getSystemSetting.mockResolvedValue("true");
+    const route = "/dashboard";
+
+    expect(isDirectorLiteRouteOptedOut(route)).toBe(true);
+    await expect(shouldUseDirectorLiteStyle("director", "tenant-1")).resolves.toBe(true);
   });
 
   it("fails closed when the setting cannot be read", async () => {
