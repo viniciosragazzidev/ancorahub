@@ -4,6 +4,8 @@ import * as React from "react";
 import { Switch as SwitchPrimitive } from "@base-ui/react/switch";
 
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import ArcSwitch from "@/components/arc/switch/switch";
 
 function Switch({
   className,
@@ -12,6 +14,11 @@ function Switch({
   disabled,
   ...props
 }: SwitchPrimitive.Root.Props) {
+  const directorLite = useArcScopeEnabled();
+  if (directorLite) {
+    const arcProps = { ...props, className, checked, onCheckedChange, disabled } as React.ComponentProps<typeof ArcSwitch>;
+    return <ArcSwitch {...arcProps} />;
+  }
   return (
     <SwitchPrimitive.Root
       data-slot="switch"

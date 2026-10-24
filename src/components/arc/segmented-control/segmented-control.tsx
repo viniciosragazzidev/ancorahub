@@ -5,7 +5,7 @@ import { LayoutGroup, motion, useReducedMotion } from "motion/react";
 import { motionTokens } from "../lib/motion-tokens";
 import styles from "./segmented-control.module.css";
 
-export interface Segment { value: string; label: string; /** Optional content after the label, such as a badge. */ accessory?: ReactNode; }
+export interface Segment { value: string; label: ReactNode; /** Optional content after the label, such as a badge. */ accessory?: ReactNode; disabled?: boolean; }
 export interface SegmentedControlProps {
   options: Segment[];
   value: string;
@@ -52,19 +52,20 @@ export default function SegmentedControl({ options, value, onValueChange, label,
   // Arrow keys, Home and End move the selection like a tab list; only the selected option is a tab stop.
   const selectedIndex = Math.max(0, options.findIndex(option => option.value === value));
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    const last = options.length - 1;
-    const target = event.key === "ArrowRight" || event.key === "ArrowDown" ? (selectedIndex === last ? 0 : selectedIndex + 1)
-      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? (selectedIndex === 0 ? last : selectedIndex - 1)
-        : event.key === "Home" ? 0 : event.key === "End" ? last : -1;
+    const available = options.map((option, index) => option.disabled ? -1 : index).filter(index => index >= 0);
+    const current = available.indexOf(selectedIndex);
+    const target = event.key === "ArrowRight" || event.key === "ArrowDown" ? available[(current + 1 + available.length) % available.length]
+      : event.key === "ArrowLeft" || event.key === "ArrowUp" ? available[(current - 1 + available.length) % available.length]
+        : event.key === "Home" ? available[0] : event.key === "End" ? available[available.length - 1] : -1;
     if (target < 0 || !options[target]) return;
     event.preventDefault();
     onValueChange(options[target].value);
     track.current?.querySelector<HTMLElement>(`[data-value="${CSS.escape(options[target].value)}"]`)?.focus({ preventScroll: true });
   };
 
-  return <div className={`${styles.root} ${className ?? ""}`} role="group" aria-label={label}>
+  return <div data-slot="segmented-control" className={`${styles.root} ${className ?? ""}`} role="group" aria-label={label}>
     <LayoutGroup id={id}><motion.div ref={track} layoutScroll className={styles.track}>
-      {options.map((option, index) => <button key={option.value} id={`${id}-${option.value}`} className={styles.button} type="button" data-value={option.value} aria-pressed={value === option.value} tabIndex={index === selectedIndex ? 0 : -1} onClick={() => onValueChange(option.value)} onKeyDown={onKeyDown} onPointerEnter={onOptionIntent ? () => onOptionIntent(option.value) : undefined} onFocus={onOptionIntent ? () => onOptionIntent(option.value) : undefined}>
+      {options.map((option, index) => <button key={option.value} id={`${id}-${option.value}`} data-slot="segmented-control-item" className={styles.button} type="button" data-value={option.value} aria-pressed={value === option.value} tabIndex={index === selectedIndex ? 0 : -1} disabled={option.disabled} onClick={() => onValueChange(option.value)} onKeyDown={onKeyDown} onPointerEnter={onOptionIntent && !option.disabled ? () => onOptionIntent(option.value) : undefined} onFocus={onOptionIntent && !option.disabled ? () => onOptionIntent(option.value) : undefined}>
         {value === option.value && <motion.span className={styles.selection} layoutId="selection" layoutDependency={value} transition={reduced ? { duration: 0 } : motionTokens.spring.morph} aria-hidden="true" />}
         <span className={styles.label}>{option.label}{option.accessory}</span>
       </button>)}

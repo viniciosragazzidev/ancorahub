@@ -125,6 +125,8 @@ export function AppCombobox({
                 return (
                   <button
                     key={opt.value}
+                    data-slot="combobox-option"
+                    data-selected={isSelected ? "true" : undefined}
                     type="button"
                     disabled={opt.disabled}
                     onClick={() => handleSelect(opt.value)}

@@ -4,9 +4,11 @@ import { Toaster as Sonner, toast as sonnerToast, type ToasterProps } from "sonn
 import { AnimatedToast } from "@/components/motion/animated-toast";
 import React from "react";
 import { cn } from "@/lib/utils";
+import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 
 const Toaster = ({ directorLiteEnabled = false, className, ...props }: ToasterProps & { directorLiteEnabled?: boolean }) => {
   return (
+    <ArcScopeProvider enabled={directorLiteEnabled}>
     <Sonner
       position="bottom-right"
       closeButton={false}
@@ -14,6 +16,7 @@ const Toaster = ({ directorLiteEnabled = false, className, ...props }: ToasterPr
       gap={10}
       visibleToasts={4}
       className={cn("ct-toaster", directorLiteEnabled && "arc-venancor", className)}
+      data-slot="sonner"
       data-skin={directorLiteEnabled ? "diretor" : undefined}
       toastOptions={{
         className: "ct-toast group font-sans pointer-events-auto",
@@ -27,6 +30,7 @@ const Toaster = ({ directorLiteEnabled = false, className, ...props }: ToasterPr
       }}
       {...props}
     />
+    </ArcScopeProvider>
   );
 };
 

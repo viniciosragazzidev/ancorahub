@@ -2,8 +2,11 @@
 
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
+import { motion, useReducedMotion } from "motion/react";
 
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { motionTokens } from "@/components/arc/motion-tokens";
 import { buttonVariants, type ButtonVariants } from "./button-variants";
 
 // ---------------------------------------------------------------------------
@@ -46,6 +49,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) {
+    const directorLite = useArcScopeEnabled();
+    const reduceMotion = useReducedMotion() ?? false;
     const mergedClass = cn(buttonVariants({ variant, size }), loading && "pointer-events-none", className);
     const loadingContent = (label: React.ReactNode) => {
       const parts = React.Children.toArray(label);
@@ -97,6 +102,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <Slot
           ref={ref as React.Ref<HTMLElement>}
           data-slot="button"
+          data-variant={variant}
+          data-size={size}
           className={mergedClass}
           {...safeRestProps}
           aria-busy={loading || restProps["aria-busy"]}
@@ -121,6 +128,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <Slot
           ref={ref as React.Ref<HTMLElement>}
           data-slot="button"
+          data-variant={variant}
+          data-size={size}
           className={mergedClass}
           {...safeRestProps}
           aria-busy={loading || restProps["aria-busy"]}
@@ -137,14 +146,40 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // -------------------------------------------------------------------------
     // Native button (default path)
     // -------------------------------------------------------------------------
+    const nativeDisabled = loading || restProps.disabled;
+    const nativeType =
+      (restProps as React.ButtonHTMLAttributes<HTMLButtonElement>).type ??
+      "button";
+    const { onDrag, onDragEnd, onDragStart, onAnimationStart, ...motionRestProps } = restProps;
+
+    if (directorLite && !onDrag && !onDragEnd && !onDragStart && !onAnimationStart) {
+      return (
+        <motion.button
+          ref={ref}
+          data-slot="button"
+          data-variant={variant}
+          data-size={size}
+          data-motion-press=""
+          type={nativeType}
+          className={mergedClass}
+          {...motionRestProps}
+          disabled={nativeDisabled}
+          aria-busy={loading || restProps["aria-busy"]}
+          whileTap={reduceMotion || nativeDisabled ? undefined : { scale: motionTokens.scale.pressButton }}
+          transition={motionTokens.spring.snappy}
+        >
+          {content}
+        </motion.button>
+      );
+    }
+
     return (
       <button
         ref={ref}
         data-slot="button"
-        type={
-          (restProps as React.ButtonHTMLAttributes<HTMLButtonElement>).type ??
-          "button"
-        }
+        data-variant={variant}
+        data-size={size}
+        type={nativeType}
         className={mergedClass}
         {...restProps}
         disabled={loading || restProps.disabled}

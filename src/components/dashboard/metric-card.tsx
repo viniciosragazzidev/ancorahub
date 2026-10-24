@@ -91,6 +91,7 @@ export function StatCard({
 
   const card = (
     <Card
+      data-slot="stat-card"
       variant={variant === "overview" ? "overview" : "compact"}
       className={cn(
         "ui-metric-card group/card h-full min-w-0",

@@ -46,6 +46,7 @@ export const Switch = forwardRef<ElementRef<typeof SwitchPrimitive.Root>, Switch
 
   return (
     <SwitchPrimitive.Root
+      data-slot="switch"
       {...props}
       ref={ref}
       checked={on}

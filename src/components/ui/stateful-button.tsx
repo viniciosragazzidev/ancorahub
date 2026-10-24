@@ -109,6 +109,8 @@ export function StatefulButton({
     <motion.button
       data-slot="button"
       data-motion="static"
+      data-variant={variant}
+      data-size={size}
       data-state={state}
       type="button"
       disabled={disabled || isPendingOrComplete}

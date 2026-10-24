@@ -10,6 +10,8 @@ import {
   type AnimatedBadgeStatus,
 } from "@/components/motion/animated-badge";
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { motionTokens as directorMotionTokens } from "@/components/arc/motion-tokens";
 
 export interface AnimatedToastProps {
   id?: string | number;
@@ -50,6 +52,9 @@ export function AnimatedToast({
 }: AnimatedToastProps) {
   const reduce = useReducedMotion();
   const motionEnabled = useInterfaceMotionEnabled() && !reduce;
+  const directorLite = useArcScopeEnabled();
+  const directorEnter = directorLite && motionEnabled ? { opacity: 0, y: directorMotionTokens.distance.lg } : { opacity: 0 };
+  const directorExit = directorLite && motionEnabled ? { opacity: 0, y: -directorMotionTokens.distance.sm, transition: { duration: directorMotionTokens.duration.exit, ease: [...directorMotionTokens.ease.exit] as [number, number, number, number] } } : { opacity: 0 };
 
   const label =
     badgeLabel ??
@@ -69,10 +74,11 @@ export function AnimatedToast({
     <motion.div
       data-slot="animated-toast"
       data-status={status}
-      initial={motionEnabled ? { opacity: 0 } : false}
-      animate={{ opacity: 1 }}
-      exit={motionEnabled ? { opacity: 0, transition: transitions.fast } : undefined}
-      transition={motionEnabled ? transitions.normal : { duration: 0 }}
+      layout={directorLite && motionEnabled ? "position" : false}
+      initial={motionEnabled ? (directorLite ? directorEnter : { opacity: 0 }) : false}
+      animate={directorLite ? { opacity: 1, y: 0 } : { opacity: 1 }}
+      exit={motionEnabled ? (directorLite ? directorExit : { opacity: 0, transition: transitions.fast }) : undefined}
+      transition={motionEnabled ? (directorLite ? directorMotionTokens.spring.smooth : transitions.normal) : { duration: 0 }}
       className={cn(
         "group pointer-events-auto relative flex w-[380px] sm:w-[420px] max-w-[calc(100vw-2rem)] flex-col gap-2.5 rounded-2xl border bg-popover/95 p-4 text-popover-foreground shadow-2xl backdrop-blur-xl select-none",
         motionEnabled && "transition-colors",
@@ -96,6 +102,7 @@ export function AnimatedToast({
               onClose();
             }}
             className="flex size-6 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pointer-events-auto"
+            data-slot="toast-close"
             aria-label="Fechar notificação"
           >
             <X className="size-3.5" />
@@ -121,6 +128,7 @@ export function AnimatedToast({
           {action ? (
             <button
               type="button"
+              data-slot="toast-action"
               onClick={action.onClick}
               className="inline-flex items-center justify-center rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 ct-press focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
             >
@@ -130,6 +138,7 @@ export function AnimatedToast({
           {cancel ? (
             <button
               type="button"
+              data-slot="toast-cancel"
               onClick={cancel.onClick}
               className="inline-flex items-center justify-center rounded-lg border border-border/80 bg-muted/40 px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted hover:text-foreground ct-press focus-visible:outline-none cursor-pointer pointer-events-auto whitespace-nowrap shrink-0"
             >

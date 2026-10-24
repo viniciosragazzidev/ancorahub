@@ -1,6 +1,6 @@
 "use client";
 
-import { isValidElement, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { forwardRef, isValidElement, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { AnimatePresence, animate, motion, useIsPresent, useMotionValue, useReducedMotion, type AnimationPlaybackControls, type HTMLMotionProps, type MotionProps, type TargetAndTransition, type Transition } from "motion/react";
 import { Folder } from "lucide-react";
 import { motionTokens } from "../lib/motion-tokens";
@@ -69,13 +69,13 @@ function HeightFrame({ reduce, morphKey, children }: { reduce: boolean | null; m
   </motion.div>;
 }
 
-export function EmptyState({ title, description, action, icon, className, label }: EmptyStateProps) {
+export const EmptyState = forwardRef<HTMLElement, EmptyStateProps>(function EmptyState({ title, description, action, icon, className, label }, ref) {
   const reduce = useReducedMotion();
   const glyph = icon ?? <Folder width={24} height={24} strokeWidth={1.5} />;
   const enter: Transition = reduce ? { duration: motionTokens.duration.instant } : { duration: motionTokens.duration.standard, ease: [...motionTokens.ease.enter] };
   const swap: MotionProps = { initial: reduce ? { opacity: 0 } : textIn, animate: shown, exit: reduce ? fadeOut : textOut, transition: enter };
   // The result of an action morphs in place: the icon crossfades and the copy rises in while the old copy leaves.
-  return <section className={[styles.root, className].filter(Boolean).join(" ")} aria-label={label}>
+  return <section ref={ref} className={[styles.root, className].filter(Boolean).join(" ")} aria-label={label}>
     <div className={styles.icon} aria-hidden="true"><AnimatePresence mode="popLayout" initial={false}><Swap key={iconKey(glyph)} className={styles.glyph} initial={reduce ? { opacity: 0 } : iconIn} animate={shown} exit={reduce ? fadeOut : { ...iconIn, transition: exitFast }} transition={reduce ? enter : motionTokens.spring.snappy}>{glyph}</Swap></AnimatePresence></div>
     <HeightFrame reduce={reduce} morphKey={`${title}\n${description}`}>
       <h3><AnimatePresence mode="popLayout" initial={false}><Swap key={title} className={styles.line} {...swap}>{title}</Swap></AnimatePresence></h3>
@@ -83,6 +83,6 @@ export function EmptyState({ title, description, action, icon, className, label 
     </HeightFrame>
     {action && <div className={styles.action}>{action}</div>}
   </section>;
-}
+});
 
 export default EmptyState;

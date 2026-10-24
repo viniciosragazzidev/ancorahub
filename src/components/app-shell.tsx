@@ -14,6 +14,7 @@ import { ViewAsBanner, type ViewAsState } from "@/features/super-admin/component
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
 import { ArcScopeProvider, DIRECTOR_LITE_PORTAL_ROOT_ID } from "@/components/arc/arc-scope-context";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
 import { DirectorLiteStyleGate } from "@/components/arc/director-lite-style-gate";
 
@@ -208,6 +209,7 @@ export function AppShell({
   return (
     <ArcScopeProvider enabled={directorLiteEnabled}>
     <DirectorLiteStyleGate enabled={directorLiteEnabled} />
+    <TooltipProvider delay={directorLiteEnabled ? 400 : 300} timeout={directorLiteEnabled ? 600 : 400}>
     <OnboardingProvider>
       <SidebarProvider
         data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
@@ -257,6 +259,7 @@ export function AppShell({
         <OnboardingWelcomeDialog />
       </SidebarProvider>
     </OnboardingProvider>
+    </TooltipProvider>
     </ArcScopeProvider>
   );
 }

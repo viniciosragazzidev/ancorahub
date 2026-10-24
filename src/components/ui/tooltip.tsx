@@ -8,12 +8,14 @@ import { useArcScopeProps } from "@/components/arc/arc-scope-context"
 
 function TooltipProvider({
   delay = 300,
+  timeout = 400,
   ...props
 }: TooltipPrimitive.Provider.Props) {
   return (
     <TooltipPrimitive.Provider
       data-slot="tooltip-provider"
       delay={delay}
+      timeout={timeout}
       {...props}
     />
   )

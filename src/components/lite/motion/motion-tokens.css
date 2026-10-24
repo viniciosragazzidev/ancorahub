@@ -1,7 +1,4 @@
-/*
- * Par CSS dos tokens novos de src/components/arc/motion-tokens.ts (distance, scale, stagger.max).
- * Escopo do Lite, sem :root. Ainda não importado: entra na F0b, com o escopo do diretor.
- */
+/* Pares CSS aditivos dos tokens Arc de movimento, importados apenas junto ao escopo do Diretor. */
 .arc-venancor {
   --motion-distance-xs: 4px;
   --motion-distance-sm: 6px;
@@ -13,4 +10,11 @@
   --motion-scale-press-card: 0.985;
   --motion-scale-pop-in: 0.96;
   --motion-stagger-max: 8;
+  --motion-duration-instant: 120ms;
+  --motion-duration-fast: 160ms;
+  --motion-duration-exit: 180ms;
+  --motion-duration-standard: 240ms;
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
 }

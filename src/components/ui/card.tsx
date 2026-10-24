@@ -27,11 +27,13 @@ function Card({
   size = "default",
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof cardVariants> & { size?: "default" | "sm" }) {
+  const interactive = Boolean(props.onClick || props.onKeyDown || props.role === "button" || props.tabIndex != null);
   return (
     <div
       data-slot="card"
       data-variant={variant}
       data-size={size}
+      data-interactive={interactive ? "true" : undefined}
       className={cn(
         cardVariants({ variant }),
         size === "sm" && variant === "default" && "gap-[var(--size-spacing-03)] p-[var(--size-spacing-04)]",

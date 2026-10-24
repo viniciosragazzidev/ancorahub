@@ -20,6 +20,8 @@ import type { ReactNode } from "react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { motionTokens, transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { LEGACY_ANIMATED_STATUS_CLASS } from "@/components/ui/legacy-badge-classes";
 
 const EASE_OUT = motionTokens.easings.smoothOut;
 
@@ -45,15 +47,6 @@ export interface AnimatedBadgeProps extends Omit<
   pulse?: boolean;
   contentKey?: string | number;
 }
-
-const STATUS_CLASS: Record<AnimatedBadgeStatus, string> = {
-  neutral: "border-border bg-card text-muted-foreground",
-  info: "border-primary/30 bg-primary/10 text-primary",
-  success: "border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-  warning: "border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-  danger: "border-destructive/30 bg-destructive/10 text-destructive",
-  loading: "border-primary/30 bg-primary/10 text-primary",
-};
 
 const SIZE_CLASS: Record<AnimatedBadgeSize, string> = {
   sm: "h-6 gap-1.5 px-2 text-[11px]",
@@ -111,6 +104,7 @@ export function AnimatedBadge({
   className,
   ...rest
 }: AnimatedBadgeProps) {
+  const directorLite = useArcScopeEnabled();
   const reduce = useReducedMotion();
   const motionEnabled = useInterfaceMotionEnabled() && !reduce;
   const Icon = ICONS[status];
@@ -122,12 +116,14 @@ export function AnimatedBadge({
 
   return (
     <motion.span
+      data-slot="animated-badge"
+      data-status={status}
       layout={motionEnabled}
       transition={motionEnabled ? transitions.normal : { duration: 0 }}
       className={cn(
         "relative inline-flex shrink-0 items-center justify-center overflow-hidden whitespace-nowrap rounded-full border font-medium tabular-nums select-none",
         motionEnabled && "transition-colors duration-[var(--duration-fast)]",
-        STATUS_CLASS[status],
+        !directorLite && LEGACY_ANIMATED_STATUS_CLASS[status],
         SIZE_CLASS[size],
         className,
       )}
