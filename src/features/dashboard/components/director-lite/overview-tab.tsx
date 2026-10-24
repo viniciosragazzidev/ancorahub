@@ -194,7 +194,7 @@ function RecentLeads({ rows, now, freshId }: { rows: CommandCenterData["recentLe
                     <span className={styles.muted}>{time.sub}</span>
                   </span>
                   <span role="cell" className={styles.leadName}>
-                    <Link href={`/leads/${row.id}`} className={styles.truncate} title={row.name}>{row.name}</Link>
+                    <Link href={`/leads/${row.id}`} className={`${styles.truncate} ${styles.leadLink}`} title={row.name}>{row.name}</Link>
                   </span>
                   <span role="cell"><span className={styles.badge} data-tone={status.tone}>{status.label}</span></span>
                   <span role="cell" className={`${styles.muted} ${styles.hideMd} ${styles.truncate}`}>{row.branchName ?? "Sem unidade"}</span>

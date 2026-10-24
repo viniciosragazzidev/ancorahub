@@ -83,3 +83,31 @@ describe("DirectorLiteDashboard", () => {
     expect(moving.length).toBeGreaterThan(0);
   });
 });
+
+describe("painel do diretor: cabeçalho, abas e lead novo", () => {
+  it("mostra a saudação, a data e as três abas", () => {
+    const data = buildCommandCenter("today", "all", NOW);
+    render(<DirectorLiteDashboard data={data} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(screen.getByRole("heading", { name: "Olá" })).toBeInTheDocument();
+    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
+    expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("aria-current", "page");
+    expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality");
+    expect(tabs.getByRole("link", { name: "Funil de qualificação" })).toHaveAttribute("href", "/dashboard?tab=funnel");
+  });
+
+  it("anuncia e destaca só o lead que chegou numa atualização nova", () => {
+    const first = buildCommandCenter("today", "all", NOW);
+    const { rerender } = render(<DirectorLiteDashboard data={first} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    const second = { ...first, recentLeads: [{ id: "lead-novo", name: "Maria Nova", status: "new", branchName: "Centro", createdAt: NOW.toISOString() }, ...first.recentLeads] };
+    rerender(<DirectorLiteDashboard data={second} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(screen.getByText("Novo lead: Maria Nova")).toBeInTheDocument();
+    expect(screen.getByText("Novo lead: Maria Nova").closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
+  });
+
+  it("não anuncia nada na primeira carga nem quando a lista não muda", () => {
+    const data = buildCommandCenter("today", "all", NOW);
+    const { rerender } = render(<DirectorLiteDashboard data={data} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    rerender(<DirectorLiteDashboard data={{ ...data }} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(screen.queryByText(/Novo lead:/)).not.toBeInTheDocument();
+  });
+});

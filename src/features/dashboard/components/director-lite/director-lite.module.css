@@ -515,3 +515,10 @@ button.heatCell:hover { transform: scale(1.12); }
   flex-wrap: wrap;
   gap: 8px;
 }
+
+/* Link do lead na lista recente: área de toque de 44px. */
+.leadLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
