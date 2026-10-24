@@ -14,12 +14,12 @@ import type { OverviewPeriod } from "../overview-filter";
 import { resolveOverviewFilter } from "../today";
 import { businessDaysBack, businessTurnStart, windowLabel } from "./business-window";
 import {
+  dutyStartsAt,
   summarizeDuties,
   summarizeQueues,
   summarizeWhatsApp,
   type EssentialDuty,
   type EssentialWhatsApp,
-  type QueueWaitingRow,
   type ColdLeadRow,
   type EssentialQueue,
 } from "./essential-summary";
@@ -59,17 +59,17 @@ export async function getEssentialDashboard(context: TenantContext, filter: { pe
     unit ? eq(schema.leads.branchId, unit) : undefined,
   );
   const today = getSaoPauloDateKey(now);
-  const dayStart = new Date(`${today}T03:00:00Z`);
 
   // Bloco 1: plantões rodando agora, com leads da fila de cada plantão e corretores confirmados hoje.
   const welcome = await getDashboardWelcome(context, now, { branchId: unit });
   const running = welcome.runningDuties ?? [];
   const runningIds = running.map((duty) => duty.scheduleId);
   const dutyQueueIds = new Map<string, string | null>();
-  let waitingRows: QueueWaitingRow[] = [];
+  const waitingByQueue = new Map<string, number>();
+  const distributedBySchedule = new Map<string, number>();
   const confirmedBySchedule = new Map<string, number>();
   if (runningIds.length) {
-    const [schedules, queues, waiting, distributed, confirmed] = await Promise.all([
+    const [schedules, queues, waiting, confirmed] = await Promise.all([
       db.select({ id: schema.unitDutySchedules.id, queueId: schema.unitDutySchedules.queueId })
         .from(schema.unitDutySchedules)
         .where(and(eq(schema.unitDutySchedules.tenantId, context.tenantId), inArray(schema.unitDutySchedules.id, runningIds))),
@@ -83,10 +83,6 @@ export async function getEssentialDashboard(context: TenantContext, filter: { pe
       db.select({ queueId: schema.leads.queueId, value: count() })
         .from(schema.leads)
         .where(and(alive, isNull(schema.leads.corretorId), inArray(schema.leads.distributionStatus, [...WAITING_STATES])))
-        .groupBy(schema.leads.queueId),
-      db.select({ queueId: schema.leads.queueId, value: count() })
-        .from(schema.leads)
-        .where(and(alive, sql`${schema.leads.corretorId} is not null`, gte(schema.leads.assignedAt, dayStart)))
         .groupBy(schema.leads.queueId),
       db.select({ scheduleId: schema.dutyPresenceConfirmations.scheduleId, total: sql<number>`count(distinct ${schema.dutyPresenceConfirmations.brokerId})::int` })
         .from(schema.dutyPresenceConfirmations)
@@ -104,21 +100,27 @@ export async function getEssentialDashboard(context: TenantContext, filter: { pe
       const linked = queues.find((queue) => queue.exclusiveDutyScheduleIds.includes(scheduleId) || queue.exclusiveDutyScheduleId === scheduleId);
       dutyQueueIds.set(scheduleId, linked?.id ?? legacyQueueOf.get(scheduleId) ?? null);
     }
-    const perQueue = new Map<string, QueueWaitingRow>();
-    const rowFor = (queueId: string | null) => {
-      const key = queueId ?? "__none";
-      const current = perQueue.get(key) ?? { queueId, waiting: 0, distributed: 0 };
-      perQueue.set(key, current);
-      return current;
-    };
-    for (const row of waiting) rowFor(row.queueId).waiting += Number(row.value);
-    for (const row of distributed) rowFor(row.queueId).distributed += Number(row.value);
-    waitingRows = [...perQueue.values()];
+    for (const row of waiting) if (row.queueId) waitingByQueue.set(row.queueId, Number(row.value));
     for (const row of confirmed) confirmedBySchedule.set(row.scheduleId, Number(row.total));
+    // Distribuídos desde o início de cada plantão (não desde 00h): um contador por plantão, poucos plantões por unidade.
+    await Promise.all(running.map(async (duty) => {
+      const queueId = dutyQueueIds.get(duty.scheduleId) ?? null;
+      if (!queueId) return;
+      const [row] = await db.select({ value: count() })
+        .from(schema.leads)
+        .where(and(
+          alive,
+          eq(schema.leads.queueId, queueId),
+          sql`${schema.leads.corretorId} is not null`,
+          gte(schema.leads.assignedAt, dutyStartsAt(duty.dutyDate, duty.startsAt)),
+        ));
+      distributedBySchedule.set(duty.scheduleId, Number(row?.value ?? 0));
+    }));
   }
   const duties = summarizeDuties(
     running.map((duty) => ({ ...duty, queueId: dutyQueueIds.get(duty.scheduleId) ?? null })),
-    waitingRows,
+    waitingByQueue,
+    distributedBySchedule,
     confirmedBySchedule,
   );
 

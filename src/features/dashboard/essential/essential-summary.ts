@@ -86,7 +86,7 @@ export function summarizeQueues(leads: QueueLeadRow[], waiting: QueueWaitingRow[
   return { queues, totals };
 }
 
-export type DutyInput = { scheduleId: string; name: string; startsAt: string; endsAt: string; queueId: string | null; minimumBrokers: number };
+export type DutyInput = { scheduleId: string; name: string; startsAt: string; endsAt: string; queueId: string | null; minimumBrokers: number; brokerCount: number };
 export type EssentialDuty = DutyInput & {
   /** Leads esperando distribuição na fila do plantão. */
   available: number;
@@ -98,19 +98,27 @@ export type EssentialDuty = DutyInput & {
 };
 
 /** Plantões ativos agora, com o número de cada um. Sem fila ligada, os leads ficam em zero. */
-export function summarizeDuties(duties: DutyInput[], waiting: QueueWaitingRow[], confirmedBySchedule: Map<string, number>): EssentialDuty[] {
-  const waitingByQueue = new Map(waiting.map((row) => [row.queueId, row]));
+export function summarizeDuties(
+  duties: DutyInput[],
+  waitingByQueue: Map<string, number>,
+  distributedBySchedule: Map<string, number>,
+  confirmedBySchedule: Map<string, number>,
+): EssentialDuty[] {
   return duties.map((duty) => {
-    const queue = duty.queueId ? waitingByQueue.get(duty.queueId) : undefined;
     const activeBrokers = confirmedBySchedule.get(duty.scheduleId) ?? 0;
     return {
       ...duty,
-      available: queue?.waiting ?? 0,
-      distributed: queue?.distributed ?? 0,
+      available: duty.queueId ? waitingByQueue.get(duty.queueId) ?? 0 : 0,
+      distributed: distributedBySchedule.get(duty.scheduleId) ?? 0,
       activeBrokers,
       belowMinimum: activeBrokers < duty.minimumBrokers,
     };
   });
+}
+
+/** Início do plantão em São Paulo (UTC-3, sem horário de verão desde 2019): "08:00" de 24/10 vira 11h UTC. */
+export function dutyStartsAt(dutyDate: string, startsAt: string): Date {
+  return new Date(`${dutyDate}T${startsAt.slice(0, 5)}:00-03:00`);
 }
 
 export type BrokerWhatsAppRow = { id: string; name: string; connected: boolean; received: number; responding: number; active: number };

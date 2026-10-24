@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { summarizeDuties, summarizeQueues, summarizeWhatsApp } from "./essential-summary";
+import { dutyStartsAt, summarizeDuties, summarizeQueues, summarizeWhatsApp } from "./essential-summary";
 
 describe("fila: entraram, temperatura e requalificação", () => {
   it("fecha a conta: quentes, mornos, frios e em qualificação somam o que entrou", () => {
@@ -47,20 +47,25 @@ describe("fila: entraram, temperatura e requalificação", () => {
 });
 
 describe("plantões agora", () => {
-  const duty = { scheduleId: "s1", name: "Plantão Tatiana", startsAt: "08:00", endsAt: "19:00", queueId: "tatiana", minimumBrokers: 3 };
+  const duty = { scheduleId: "s1", name: "Plantão Tatiana", startsAt: "08:00", endsAt: "19:00", queueId: "tatiana", minimumBrokers: 3, brokerCount: 4 };
 
-  it("mostra leads disponíveis, distribuídos hoje e corretores confirmados", () => {
-    const [result] = summarizeDuties([duty], [{ queueId: "tatiana", waiting: 6, distributed: 9 }], new Map([["s1", 2]]));
-    expect(result).toMatchObject({ available: 6, distributed: 9, activeBrokers: 2, belowMinimum: true });
+  it("mostra leads disponíveis, distribuídos desde o início do plantão e corretores confirmados", () => {
+    const [result] = summarizeDuties([duty], new Map([["tatiana", 6]]), new Map([["s1", 9]]), new Map([["s1", 2]]));
+    expect(result).toMatchObject({ available: 6, distributed: 9, activeBrokers: 2, brokerCount: 4, belowMinimum: true });
   });
 
-  it("sem fila ligada ao plantão, os leads ficam em zero", () => {
-    const [result] = summarizeDuties([{ ...duty, queueId: null }], [{ queueId: "tatiana", waiting: 6, distributed: 9 }], new Map());
+  it("sem fila ligada ao plantão, os leads disponíveis ficam em zero", () => {
+    const [result] = summarizeDuties([{ ...duty, queueId: null }], new Map([["tatiana", 6]]), new Map(), new Map());
     expect(result).toMatchObject({ available: 0, distributed: 0, activeBrokers: 0 });
   });
 
   it("sem plantão ativo, a lista fica vazia", () => {
-    expect(summarizeDuties([], [], new Map())).toEqual([]);
+    expect(summarizeDuties([], new Map(), new Map(), new Map())).toEqual([]);
+  });
+
+  it("o início do plantão é o horário de São Paulo do dia do plantão (UTC-3)", () => {
+    expect(dutyStartsAt("2026-10-24", "08:00").toISOString()).toBe("2026-10-24T11:00:00.000Z");
+    expect(dutyStartsAt("2026-10-24", "19:30:00").toISOString()).toBe("2026-10-24T22:30:00.000Z");
   });
 });
 

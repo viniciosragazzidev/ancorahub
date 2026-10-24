@@ -39,13 +39,11 @@ export function buildEssential(period: OverviewPeriod, unit: string, now: Date):
 
   const running = summarizeDuties(
     [
-      { scheduleId: "pme", name: "Plantão PME", startsAt: "08:00", endsAt: "19:00", queueId: "tatiana", minimumBrokers: 3 },
-      { scheduleId: "presencial", name: "Plantão Presencial", startsAt: "09:00", endsAt: "18:00", queueId: "pf", minimumBrokers: 2 },
+      { scheduleId: "pme", name: "Plantão PME", startsAt: "08:00", endsAt: "19:00", queueId: "tatiana", minimumBrokers: 3, brokerCount: 3 },
+      { scheduleId: "presencial", name: "Plantão Presencial", startsAt: "09:00", endsAt: "18:00", queueId: "pf", minimumBrokers: 2, brokerCount: 3 },
     ],
-    [
-      { queueId: "tatiana", waiting: 6, distributed: 9 },
-      { queueId: "pf", waiting: 0, distributed: 4 },
-    ],
+    new Map([["tatiana", 6], ["pf", 0]]),
+    new Map([["pme", 9], ["presencial", 4]]),
     new Map([["pme", 2], ["presencial", 3]]),
   );
 

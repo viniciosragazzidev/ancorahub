@@ -46,8 +46,8 @@ function DutyCard({ duty, index }: { duty: EssentialDuty; index: number }) {
       </Link>
       <dl className={styles.figures}>
         <Figure label="Disponíveis" hint="Aguardando distribuição nesta fila agora." value={duty.available} />
-        <Figure label="Distribuídos hoje" hint="Entregues a corretor nesta fila desde 00h." value={duty.distributed} />
-        <Figure label="Corretores ativos" hint="Presença confirmada hoje neste plantão." value={duty.activeBrokers} warn={duty.belowMinimum} sub={`de ${duty.minimumBrokers} mín.`} />
+        <Figure label="Distribuídos hoje" hint="Entregues desde o início do plantão." value={duty.distributed} />
+        <Figure label="Corretores ativos" hint="Presença confirmada hoje." value={duty.activeBrokers} warn={duty.belowMinimum} sub={`de ${duty.brokerCount} escalados`} />
       </dl>
     </LiteItem>
   );
@@ -143,9 +143,9 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
                   <td data-label="Entraram" className={styles.numCol}><LiteNumber value={queue.arrived} /></td>
                   <td data-label="Qualificados" className={styles.numCol}><LiteNumber value={queue.qualified} /></td>
                   <td data-label="Frios" className={styles.numCol}><LiteNumber value={queue.cold} /></td>
-                  <td data-label="Requalificação">
-                    <span className={styles.tabular}>{plural(queue.requalification.attempts, "tentativa", "tentativas")}</span>
-                    <span className={styles.muted}> · {queue.requalification.coldLeads} frios: {queue.requalification.once} com 1, {queue.requalification.twice} com 2, {queue.requalification.threePlus} com 3+</span>
+                  <td data-label="Requalificação" className={styles.requalCell}>
+                    <span className={styles.requalMain}>{plural(queue.requalification.attempts, "tentativa", "tentativas")}</span>
+                    <span className={styles.requalDetail}>{queue.requalification.coldLeads} frios: {queue.requalification.once} com 1, {queue.requalification.twice} com 2, {queue.requalification.threePlus} com 3+</span>
                   </td>
                   <td data-label="Em qualificação" className={styles.numCol}><LiteNumber value={queue.inQualification} /></td>
                   <td data-label="Temperatura"><StackedTemperature queue={queue} delay={staggerDelay(index)} /></td>
@@ -156,9 +156,9 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
                 <td data-label="Entraram" className={styles.numCol}><LiteNumber value={totals.arrived} /></td>
                 <td data-label="Qualificados" className={styles.numCol}><LiteNumber value={totals.qualified} /></td>
                 <td data-label="Frios" className={styles.numCol}><LiteNumber value={totals.cold} /></td>
-                <td data-label="Requalificação">
-                  <span className={styles.tabular}>{plural(totals.requalification.attempts, "tentativa", "tentativas")}</span>
-                  <span className={styles.muted}> · {totals.requalification.coldLeads} frios: {totals.requalification.once} com 1, {totals.requalification.twice} com 2, {totals.requalification.threePlus} com 3+</span>
+                <td data-label="Requalificação" className={styles.requalCell}>
+                  <span className={styles.requalMain}>{plural(totals.requalification.attempts, "tentativa", "tentativas")}</span>
+                  <span className={styles.requalDetail}>{totals.requalification.coldLeads} frios: {totals.requalification.once} com 1, {totals.requalification.twice} com 2, {totals.requalification.threePlus} com 3+</span>
                 </td>
                 <td data-label="Em qualificação" className={styles.numCol}><LiteNumber value={totals.inQualification} /></td>
                 <td data-label="Temperatura"><StackedTemperature queue={totals} delay={0} /></td>

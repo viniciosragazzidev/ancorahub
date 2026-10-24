@@ -74,8 +74,9 @@ describe("bloco 1: plantões acontecendo agora", () => {
     expect(figures.getByText("Disponíveis")).toBeInTheDocument();
     expect(figures.getByText("Distribuídos hoje")).toBeInTheDocument();
     expect(figures.getByText("Corretores ativos")).toBeInTheDocument();
-    // PME tem 2 corretores confirmados e mínimo de 3: o número aparece em alerta.
-    expect(figures.getByText("de 3 mín.")).toBeInTheDocument();
+    // PME tem 2 corretores confirmados de 3 escalados (abaixo do mínimo): o número aparece em alerta.
+    expect(figures.getByText("de 3 escalados")).toBeInTheDocument();
+    expect(figures.getByText("Presença confirmada hoje.")).toBeInTheDocument();
     expect(pme.closest("li")!.querySelector('[data-warn="true"]')).not.toBeNull();
   });
 
