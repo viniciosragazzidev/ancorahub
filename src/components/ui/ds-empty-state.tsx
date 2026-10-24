@@ -1,5 +1,7 @@
 import * as React from "react";
 import { cn } from "@/utils/core/cn";
+import ArcEmptyState from "@/components/arc/empty-state/empty-state";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 export interface DsEmptyStateProps
   extends Omit<React.ComponentPropsWithoutRef<"div">, "title"> {
@@ -21,6 +23,19 @@ export const DsEmptyState = React.forwardRef<HTMLDivElement, DsEmptyStateProps>(
     { className, icon, title, description, action, bordered = true, ...props },
     ref,
   ) {
+    const directorLite = useArcScopeEnabled();
+    if (directorLite && typeof title === "string" && (description === undefined || typeof description === "string")) {
+      return (
+        <ArcEmptyState
+          ref={ref}
+          title={title}
+          description={description ?? ""}
+          action={action}
+          icon={icon}
+          className={className}
+        />
+      );
+    }
     return (
       <div
         ref={ref}

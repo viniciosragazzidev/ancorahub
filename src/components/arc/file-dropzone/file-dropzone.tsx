@@ -21,6 +21,7 @@ export type FileDropzoneProps = {
   defaultItems?: FileDropzoneItem[];
   /** Uploads each added file. Without it the list shows plain selections. */
   onUpload?: FileDropzoneUpload;
+  onRemove?: (item: FileDropzoneItem) => void;
   /** Files above this many bytes fail with a size reason and never upload. */
   maxSize?: number;
   /** Render the file list under the drop target or inside its edge. */
@@ -157,7 +158,7 @@ function FileRow({ item, reduce, delay, fresh, canRetry, onRemove, onRetry, remo
   useMotionValueEvent(progress, "change", value => { if (status === "uploaded" && value >= 99.5) setFilled(true); });
   const failed = status === "failed";
   const retry = failed && canRetry && item.retryable !== false;
-  return <motion.li className={styles.item} initial={reduce ? { opacity: 0 } : { height: 0 }} animate={{ height: "auto", opacity: 1 }}
+  return <motion.li data-slot="file-dropzone-row" className={styles.item} initial={reduce ? { opacity: 0 } : { height: 0 }} animate={{ height: "auto", opacity: 1 }}
     exit={reduce ? { opacity: 0, transition: fade } : { height: 0, opacity: 0, transition: { height: collapse, opacity: { ...exitFast, delay: .04 } } }}
     transition={reduce ? fade : { height: { ...motionTokens.spring.smooth, delay }, opacity: fade }}>
     {/* New rows rise a little and unblur while their height opens, so the rows below make room instead of jumping. */}
@@ -171,9 +172,9 @@ function FileRow({ item, reduce, delay, fresh, canRetry, onRemove, onRetry, remo
           <span>{formatFileSize(item.size)}</span>
           {phase && <><span className={styles.dot} aria-hidden="true">·</span><span className={styles.phase}><AnimatePresence mode="popLayout" initial={false}>
             <Swap key={phase} className={`${styles.state} ${phase === "uploaded" ? styles.uploaded : phase === "failed" ? styles.failed : ""}`} initial={reduce ? { opacity: 0 } : textIn} animate={shown} exit={reduce ? { opacity: 0, transition: fade } : textOut} transition={reduce ? fade : enter}>
-              {phase === "uploading" ? <span>Uploading <motion.span className={styles.percent}>{percent}</motion.span></span>
-                : phase === "uploaded" ? <><DrawnCheck reduce={reduce} /><span>Uploaded</span></>
-                : <><CircleAlert className={styles.stateIcon} size={14} strokeWidth={2.25} aria-hidden="true" /><span className={styles.reason} title={item.error}><span className={styles.srOnly}>Failed: </span>{item.error || "Upload failed"}</span></>}
+              {phase === "uploading" ? <span>Enviando <motion.span className={styles.percent}>{percent}</motion.span></span>
+                : phase === "uploaded" ? <><DrawnCheck reduce={reduce} /><span>Enviado</span></>
+                : <><CircleAlert className={styles.stateIcon} size={14} strokeWidth={2.25} aria-hidden="true" /><span className={styles.reason} title={item.error}><span className={styles.srOnly}>Falha: </span>{item.error || "Falha no envio"}</span></>}
             </Swap>
           </AnimatePresence></span></>}
         </span>
@@ -181,7 +182,7 @@ function FileRow({ item, reduce, delay, fresh, canRetry, onRemove, onRetry, remo
         <AnimatePresence initial={false}>{phase === "uploading" && <motion.span key="bar" className={styles.barFrame} initial={reduce ? { opacity: 0 } : { height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }}
           exit={reduce ? { opacity: 0, transition: fade } : { height: 0, opacity: 0, transition: { height: { ...collapse, delay: .22 }, opacity: { ...exitFast, delay: .16 } } }}
           transition={reduce ? fade : { height: motionTokens.spring.smooth, opacity: enter }}>
-          <span className={styles.bar} role="progressbar" aria-label={`Uploading ${item.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clamp(target))}><motion.span className={styles.barFill} style={{ x }} /></span>
+          <span className={styles.bar} role="progressbar" aria-label={`Enviando ${item.name}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(clamp(target))}><motion.span className={styles.barFill} style={{ x }} /></span>
         </motion.span>}</AnimatePresence>
       </span>
       <span className={styles.actions}>
@@ -190,16 +191,16 @@ function FileRow({ item, reduce, delay, fresh, canRetry, onRemove, onRetry, remo
           exit={reduce ? { opacity: 0, transition: fade } : { width: 0, opacity: 0, transition: { width: collapse, opacity: { duration: motionTokens.duration.instant } } }}
           transition={reduce ? fade : { width: motionTokens.spring.smooth, opacity: enter }}>
           <motion.span className={styles.retryInner} initial={reduce ? false : { scale: .8, filter: `blur(${motionTokens.blur.subtle}px)` }} animate={{ scale: 1, filter: "blur(0px)" }} transition={reduce ? instant : motionTokens.spring.snappy}>
-            <button type="button" className={styles.retry} onClick={onRetry} aria-label={`Retry ${item.name}`} title="Retry"><RotateCw size={14} strokeWidth={2} aria-hidden="true" /><span className={styles.retryLabel}>Retry</span></button>
+            <button type="button" data-slot="file-dropzone-retry" className={styles.retry} onClick={onRetry} aria-label={`Tentar novamente ${item.name}`} title="Tentar novamente"><RotateCw size={14} strokeWidth={2} aria-hidden="true" /><span className={styles.retryLabel}>Tentar novamente</span></button>
           </motion.span>
         </motion.span>}</AnimatePresence>
-        <button ref={removeRef} type="button" className={styles.remove} onClick={onRemove} aria-label={`Remove ${item.name}`} title="Remove"><X size={16} strokeWidth={1.75} aria-hidden="true" /></button>
+        <button ref={removeRef} type="button" data-slot="file-dropzone-remove" className={styles.remove} onClick={onRemove} aria-label={`Remover ${item.name}`} title="Remover"><X size={16} strokeWidth={1.75} aria-hidden="true" /></button>
       </span>
     </motion.div>
   </motion.li>;
 }
 
-export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesChange, label = "Add files", description = "Drop files here or choose from your device", defaultItems, onUpload, maxSize, listPlacement = "below", note, dropLabel, compactAt }: FileDropzoneProps) {
+export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesChange, onRemove, label = "Adicionar arquivos", description = "Arraste arquivos ou escolha do dispositivo", defaultItems, onUpload, maxSize, listPlacement = "below", note, dropLabel, compactAt }: FileDropzoneProps) {
   const [items, setItems] = useState<FileDropzoneItem[]>(() => defaultItems ?? []);
   const [dragging, setDragging] = useState(false);
   const [error, setError] = useState("");
@@ -290,12 +291,12 @@ export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesCha
     }).then(() => {
       if (controller.signal.aborted) return;
       patch(item.id, current => ({ ...current, status: "uploaded", progress: 100 }));
-      setAnnouncement(`${item.name} uploaded`);
+      setAnnouncement(`${item.name} enviado`);
     }, (reason: unknown) => {
       if (controller.signal.aborted) return;
-      const message = reason instanceof Error && reason.message ? reason.message : "Upload failed";
+      const message = reason instanceof Error && reason.message ? reason.message : "Falha no envio";
       patch(item.id, current => ({ ...current, status: "failed", error: message, retryable: true }));
-      setAnnouncement(`${item.name} failed. ${message}`);
+      setAnnouncement(`${item.name} falhou. ${message}`);
     }).finally(() => { if (controllers.current.get(item.id) === controller) controllers.current.delete(item.id); });
   }
 
@@ -312,11 +313,11 @@ export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesCha
       const id = `${file.name}-${file.size}-${file.lastModified}-${nextId.current++}`;
       const preview = file.type.startsWith("image/") && typeof URL.createObjectURL === "function" ? URL.createObjectURL(file) : undefined;
       if (preview) ownedPreviews.current.set(id, preview);
-      return { id, name: file.name, size: file.size, file, preview, status: tooLarge ? "failed" : onUpload ? "uploading" : undefined, progress: 0, error: tooLarge ? `File is larger than ${formatFileSize(maxSize)}` : undefined, retryable: !tooLarge };
+      return { id, name: file.name, size: file.size, file, preview, status: tooLarge ? "failed" : onUpload ? "uploading" : undefined, progress: 0, error: tooLarge ? `O arquivo excede ${formatFileSize(maxSize)}` : undefined, retryable: !tooLarge };
     });
     const rejected = matching.length !== list.length;
     const overflow = fresh.length > added.length;
-    setError(rejected ? (list.length - matching.length === 1 && list.length === 1 ? `${list[0]!.name} is not an accepted file type.` : "Some files were not added because their type is not accepted.") : overflow ? `You can add up to ${maxFiles} ${maxFiles === 1 ? "file" : "files"}.` : "");
+    setError(rejected ? (list.length - matching.length === 1 && list.length === 1 ? `${list[0]!.name} não é um formato aceito.` : "Alguns arquivos não foram adicionados porque o formato não é aceito.") : overflow ? `Você pode adicionar até ${maxFiles} ${maxFiles === 1 ? "arquivo" : "arquivos"}.` : "");
     if (rejected || overflow) shakeZone();
     if (!added.length) return;
     if (!multiple) { controllers.current.forEach(controller => controller.abort()); controllers.current.clear(); }
@@ -326,12 +327,13 @@ export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesCha
     setItems(current => multiple ? [...current, ...added] : added);
     onFilesChange?.(filesOf(next));
     const failed = added.filter(item => item.status === "failed");
-    setAnnouncement(`${added.length} ${added.length === 1 ? "file" : "files"} added.${failed.length ? ` ${failed.map(item => `${item.name}: ${item.error}`).join(". ")}.` : ""}`);
+    setAnnouncement(`${added.length} ${added.length === 1 ? "arquivo adicionado" : "arquivos adicionados"}.${failed.length ? ` ${failed.map(item => `${item.name}: ${item.error}`).join(". ")}.` : ""}`);
     added.filter(item => item.status === "uploading").forEach(startUpload);
   }
 
   // Focus stays in the list: the next row's remove button, else the previous one, else the drop target.
   function removeItem(target: FileDropzoneItem) {
+    onRemove?.(target);
     controllers.current.get(target.id)?.abort();
     controllers.current.delete(target.id);
     const index = items.findIndex(item => item.id === target.id);
@@ -342,14 +344,14 @@ export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesCha
     if (preview) { ownedPreviews.current.delete(target.id); window.setTimeout(() => URL.revokeObjectURL(preview), 600); }
     setItems(current => current.filter(item => item.id !== target.id));
     setError("");
-    setAnnouncement(`${target.name} removed`);
+    setAnnouncement(`${target.name} removido`);
     if (target.file) onFilesChange?.(filesOf(next));
     requestAnimationFrame(() => (neighbor ? removeRefs.current.get(neighbor.id) : dropRef.current)?.focus());
   }
 
   // The retry button leaves with the failure, so focus moves to the row's remove button.
   function retryItem(item: FileDropzoneItem) {
-    setAnnouncement(`Retrying ${item.name}`);
+    setAnnouncement(`Enviando novamente ${item.name}`);
     startUpload(item);
     requestAnimationFrame(() => removeRefs.current.get(item.id)?.focus());
   }
@@ -392,22 +394,22 @@ export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesCha
   }, [pasteArmed]);
 
   const carriesFiles = (event: DragEvent) => Array.from(event.dataTransfer?.types ?? []).includes("Files");
-  const dropCopy = dropLabel ?? (onUpload ? "Drop to upload" : multiple ? "Drop to add files" : "Drop to add the file");
-  const noteCopy = note ?? (accept ? `Accepted: ${accept}` : `Up to ${maxFiles} ${maxFiles === 1 ? "file" : "files"}`);
+  const dropCopy = dropLabel ?? (onUpload ? "Solte para enviar" : multiple ? "Solte para adicionar arquivos" : "Solte para adicionar o arquivo");
+  const noteCopy = note ?? (accept ? `Formatos aceitos: ${accept}` : `Até ${maxFiles} ${maxFiles === 1 ? "arquivo" : "arquivos"}`);
   // Slots open and fold their own height, so the prompt changes shape on a spring instead of in one frame.
   const slot = { initial: reduce ? { opacity: 0 } : { height: 0, opacity: 0 }, animate: { height: "auto", opacity: 1 }, exit: reduce ? { opacity: 0, transition: fade } : { height: 0, opacity: 0, transition: { height: collapse, opacity: exitFast } }, transition: reduce ? fade : { height: motionTokens.spring.smooth, opacity: enter } };
   const rowsInside = inside && items.length > 0;
 
   // The list's own padding opens with the first row, so the gap under the target never appears in one frame.
-  const list = <motion.ul className={styles.list} aria-label="Files" aria-hidden={items.length ? undefined : true} onKeyDown={moveFocus} initial={false}
+  const list = <motion.ul data-slot="file-dropzone-list" className={styles.list} aria-label="Arquivos" aria-hidden={items.length ? undefined : true} onKeyDown={moveFocus} initial={false}
     animate={{ paddingTop: items.length && !inside ? 4 : 0, paddingBottom: items.length && inside ? 12 : 0 }} transition={reduce ? instant : motionTokens.spring.smooth}>
     <AnimatePresence initial={false}>{items.map((item, index) => <FileRow key={item.id} item={item} reduce={reduce} delay={reduce ? 0 : Math.min(Math.max(0, index - batchStart), 7) * motionTokens.stagger.item * 1.6} fresh={freshIds.has(item.id)} canRetry={!!onUpload}
       onRemove={() => removeItem(item)} onRetry={() => retryItem(item)} removeRef={node => { if (node) removeRefs.current.set(item.id, node); else removeRefs.current.delete(item.id); }} />)}</AnimatePresence>
   </motion.ul>;
 
-  return <div className={styles.wrapper} onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}
+  return <div data-slot="file-dropzone" className={styles.wrapper} onPointerEnter={() => setHovered(true)} onPointerLeave={() => setHovered(false)}
     onFocus={() => setFocusWithin(true)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocusWithin(false); }}>
-    <div ref={zoneRef} className={`${styles.dropzone} ${dragging ? styles.dragging : ""} ${inside ? styles.inside : ""} ${compact ? styles.compact : ""}`}
+    <div ref={zoneRef} data-slot="file-dropzone-surface" data-dragging={dragging || undefined} className={`${styles.dropzone} ${dragging ? styles.dragging : ""} ${inside ? styles.inside : ""} ${compact ? styles.compact : ""}`}
       onDragEnter={event => { if (!carriesFiles(event)) return; event.preventDefault(); if (!dragDepth.current) track(event); dragDepth.current += 1; setDragging(true); }}
       onDragOver={event => { if (!carriesFiles(event)) return; event.preventDefault(); event.dataTransfer.dropEffect = "copy"; track(event); }}
       onDragLeave={event => { if (!carriesFiles(event)) return; dragDepth.current = Math.max(0, dragDepth.current - 1); if (!dragDepth.current) setDragging(false); }}
@@ -416,14 +418,14 @@ export function FileDropzone({ accept, multiple = true, maxFiles = 5, onFilesCha
       <svg className={styles.edge} aria-hidden="true"><rect ref={edgeRef} width="100%" height="100%" rx={33.5} pathLength={1358} /></svg>
       <motion.span className={styles.glow} style={{ backgroundImage: edgeLight }} aria-hidden="true" />
       {/* Children ignore pointer events, so the whole target is one hit area for clicks and drags. */}
-      <motion.button ref={dropRef} type="button" className={styles.trigger} onClick={() => inputRef.current?.click()} aria-describedby={compact ? descriptionId : `${descriptionId} ${noteId}`}
+      <motion.button ref={dropRef} data-slot="file-dropzone-trigger" type="button" className={styles.trigger} onClick={() => inputRef.current?.click()} aria-describedby={compact ? descriptionId : `${descriptionId} ${noteId}`}
         initial={false} animate={{ paddingTop: compact ? 16 : 26, paddingBottom: compact ? (rowsInside ? 8 : 16) : rowsInside ? 26 : 34 }} transition={reduce ? instant : motionTokens.spring.smooth}>
         {/* Three sheets fan open on hover and spread wider under a file; a folded prompt opens them again to receive it. */}
         <AnimatePresence initial={false}>{(!compact || dragging) && <motion.span key="icon" className={styles.iconSlot} {...slot}>
           <span className={styles.sheets} aria-hidden="true">
-            <span className={styles.sheet} data-sheet="back" />
-            <span className={styles.sheet} data-sheet="side" />
-            <span className={styles.sheet} data-sheet="front"><ArrowUp size={14} strokeWidth={2} /></span>
+            <span data-slot="file-dropzone-sheet" className={styles.sheet} data-sheet="back" />
+            <span data-slot="file-dropzone-sheet" className={styles.sheet} data-sheet="side" />
+            <span data-slot="file-dropzone-sheet" className={styles.sheet} data-sheet="front"><ArrowUp size={14} strokeWidth={2} /></span>
           </span>
         </motion.span>}</AnimatePresence>
         <strong className={styles.label}><TextSwap text={dragging ? dropCopy : label} className={styles.labelText} reduce={reduce} /></strong>

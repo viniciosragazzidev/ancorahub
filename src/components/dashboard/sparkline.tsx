@@ -3,6 +3,8 @@
 import { useId } from "react";
 
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { LegacyChartGradient, legacyGradientFill } from "@/lib/chart-gradient";
 
 type SparklineProps = {
   data: number[];
@@ -16,6 +18,7 @@ type SparklineProps = {
  * visual de linha com gradiente usado nos demais cards.
  */
 export function Sparkline({ data, color = "var(--chart-1)", className }: SparklineProps) {
+  const directorLite = useArcScopeEnabled();
   const gradientId = useId().replace(/:/g, "");
   const values = data.length ? data : [0];
   const max = Math.max(...values, 1);
@@ -33,12 +36,7 @@ export function Sparkline({ data, color = "var(--chart-1)", className }: Sparkli
   return (
     <div className={cn("h-9 w-full overflow-visible", className)} aria-hidden="true">
       <svg viewBox="0 0 100 36" className="h-9 w-full overflow-visible" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.28" />
-            <stop offset="100%" stopColor={color} stopOpacity="0" />
-          </linearGradient>
-        </defs>
+        {!directorLite ? <LegacyChartGradient id={gradientId} color={color} vertical fromOpacity={0.28} toOpacity={0} /> : null}
         <path
           d={line}
           fill="none"
@@ -47,7 +45,7 @@ export function Sparkline({ data, color = "var(--chart-1)", className }: Sparkli
           strokeLinecap="round"
           strokeLinejoin="round"
         />
-        <path d={`${line} L 100 34 L 0 34 Z`} fill={`url(#${gradientId})`} />
+        <path d={`${line} L 100 34 L 0 34 Z`} fill={directorLite ? color : legacyGradientFill(gradientId)} opacity={directorLite ? 0.14 : 1} />
         {points.map((point, index) => (
           <circle key={index} cx={point.x} cy={point.y} r="1.8" fill={color} />
         ))}

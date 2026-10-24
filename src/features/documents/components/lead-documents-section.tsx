@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 import {
   FileText,
-  Eye,
   FolderSimple,
   Trash,
 } from "@/components/huge-icons";
@@ -16,6 +15,8 @@ import { DocumentStatusBadge } from "@/components/status-badges";
 import { confirmDocumentUploadAction, deleteDocumentAction } from "@/features/documents/actions";
 import { FileUpload, type FileUploadItem } from "@/components/motion/file-upload";
 import { AttachmentUpload, type AttachmentUploadItem } from "@/components/motion/attachment-upload";
+import { FileDropzone, type FileDropzoneItem } from "@/components/arc/file-dropzone/file-dropzone";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 type Requirement = {
   id: string;
@@ -77,6 +78,7 @@ export function LeadDocumentsSection({
   checklist?: ChecklistItem[];
   beneficiaries?: Beneficiary[];
 }) {
+  const directorLite = useArcScopeEnabled();
   const router = useRouter();
   const [documents] = useState<UserDoc[]>(initialDocs);
   const [selectedBeneficiaryByRequirement, setSelectedBeneficiaryByRequirement] = useState<Record<string, string>>({});
@@ -87,7 +89,7 @@ export function LeadDocumentsSection({
   const [avulsoQueue, setAvulsoQueue] = useState<FileUploadItem[]>([]);
   const [, startTransition] = useTransition();
 
-  const handleFileUploadSingle = async (file: File, reqId: string | null, beneficiaryId: string | null = null) => {
+  const handleFileUploadSingle = async (file: File, reqId: string | null, beneficiaryId: string | null = null, awaitConfirmation = false) => {
     if (file.size > 10 * 1024 * 1024) {
       toast.error("Arquivo muito grande. Limite de 10MB por arquivo.");
       return;
@@ -111,7 +113,7 @@ export function LeadDocumentsSection({
 
       const data = await uploadRes.json();
 
-      startTransition(async () => {
+      const confirmUpload = async () => {
         const res = await confirmDocumentUploadAction({
           leadId,
           requirementId: reqId,
@@ -127,25 +129,19 @@ export function LeadDocumentsSection({
           clientId,
         });
 
-        if (res.error) {
-          toast.error(res.error);
-        } else {
-          toast.success(`Documento "${file.name}" enviado com sucesso!`);
-          setDescription("");
-          router.refresh();
-        }
-      });
+        if (res.error) throw new Error(res.error);
+        toast.success(`Documento "${file.name}" enviado com sucesso!`);
+        setDescription("");
+        router.refresh();
+      };
+
+      if (awaitConfirmation) await confirmUpload();
+      else startTransition(() => { void confirmUpload().catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Erro ao confirmar o documento.")); });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Erro no envio.");
+      if (awaitConfirmation) throw err;
     } finally {
       setUploadingId(null);
-    }
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>, reqId: string | null, beneficiaryId: string | null = null) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      void handleFileUploadSingle(file, reqId, beneficiaryId);
     }
   };
 
@@ -357,7 +353,32 @@ export function LeadDocumentsSection({
                     </div>
 
                     {!needsBeneficiary ? (
-                      <AttachmentUpload
+                      directorLite ? (
+                        <FileDropzone
+                          key={doc ? `${doc.id}-${doc.status}` : `${req.id}-vazio`}
+                          multiple={false}
+                          maxFiles={1}
+                          maxSize={10 * 1024 * 1024}
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          label={doc ? "Substituir documento" : "Adicionar documento de " + req.name}
+                          description="PDF, JPG ou PNG de até 10 MB"
+                          defaultItems={doc ? [{
+                            id: doc.id,
+                            name: doc.filename,
+                            size: 0,
+                            status: doc.status === "approved" ? "uploaded" : doc.status === "rejected" ? "failed" : undefined,
+                            error: doc.status === "rejected" ? "Documento recusado" : undefined,
+                            preview: doc.filename.match(/\.(jpg|jpeg|png|webp|gif)$/i) ? doc.fileUrl : undefined,
+                          } satisfies FileDropzoneItem] : []}
+                          onUpload={(item) => {
+                            if (!item.file) throw new Error("Não foi possível acessar o arquivo selecionado.");
+                            return handleFileUploadSingle(item.file, req.id, req.appliesPerBeneficiary ? selectedBeneficiaryId : null, true);
+                          }}
+                          onRemove={(item) => {
+                            if (doc && item.id === doc.id) void handleDelete(doc.id);
+                          }}
+                        />
+                      ) : <AttachmentUpload
                         value={attachmentItems}
                         maxFiles={1}
                         maxFileSize={10 * 1024 * 1024}

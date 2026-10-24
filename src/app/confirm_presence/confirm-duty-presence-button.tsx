@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import ActionButton from "@/components/arc/action-button/action-button";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { StatefulButton } from "@/components/ui/stateful-button";
 
 export function ConfirmDutyPresenceButton({ confirmationId }: { confirmationId: string }) {
+  const directorLite = useArcScopeEnabled();
   const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -24,11 +27,24 @@ export function ConfirmDutyPresenceButton({ confirmationId }: { confirmationId: 
     } catch (error) {
       setState("error");
       setMessage(error instanceof Error ? error.message : "Tente novamente em instantes.");
+      throw error;
     }
   }
 
   return <div className="space-y-3">
-    <StatefulButton className="w-full" onClick={confirmPresence} state={state} loadingText="Confirmando…" successText="Presença confirmada" errorText="Tentar novamente">Confirmar presença</StatefulButton>
+    {directorLite ? (
+      <ActionButton
+        className="w-full"
+        label="Confirmar presença"
+        pendingLabel="Confirmando"
+        successLabel="Presença confirmada"
+        onAction={confirmPresence}
+        onActionError={() => undefined}
+        disabled={state === "success"}
+      />
+    ) : (
+      <StatefulButton className="w-full" onClick={confirmPresence} state={state} loadingText="Confirmando…" successText="Presença confirmada" errorText="Tentar novamente">Confirmar presença</StatefulButton>
+    )}
     {message ? <p role={state === "error" ? "alert" : "status"} className="text-sm text-muted-foreground">{message}</p> : null}
   </div>;
 }

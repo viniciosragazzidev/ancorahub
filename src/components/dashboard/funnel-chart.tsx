@@ -4,6 +4,8 @@ import { useId } from "react";
 import { motion } from "motion/react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { LegacyChartGradient, legacyGradientFill } from "@/lib/chart-gradient";
 
 export type FunnelDatum = {
   stage: string;
@@ -47,6 +49,7 @@ function stagePath(index: number, total: number, value: number, nextValue: numbe
 
 export function FunnelChart({ data, className }: FunnelChartProps) {
   const gradientId = useId();
+  const directorLite = useArcScopeEnabled();
   const enabled = useInterfaceMotionEnabled();
   const stages = data.filter((item) => !item.lost);
   const terminal = data.find((item) => item.lost);
@@ -66,17 +69,12 @@ export function FunnelChart({ data, className }: FunnelChartProps) {
           preserveAspectRatio="none"
           role="presentation"
         >
-          <defs>
-            <linearGradient id={gradientId} x1="0" x2="1" y1="0" y2="0">
-              <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="1" />
-            </linearGradient>
-          </defs>
+          {!directorLite ? <LegacyChartGradient id={gradientId} color="var(--chart-1)" fromOpacity={0.35} toOpacity={1} /> : null}
           {stages.map((stage, index) => (
             <path
               key={stage.stage}
               d={stagePath(index, stages.length, stage.volume, stages[index + 1]?.volume ?? stage.volume, maximum)}
-              fill={`url(#${gradientId})`}
+              fill={directorLite ? "var(--chart-1)" : legacyGradientFill(gradientId)}
               opacity={1 - index * 0.045}
               stroke="var(--card)"
               strokeWidth="3"

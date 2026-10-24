@@ -6,6 +6,8 @@ import * as React from "react";
 import { motion } from "motion/react";
 import { transitions } from "@/lib/motion";
 import { cn } from "@/utils/core/cn";
+import SegmentedControl from "@/components/arc/segmented-control/segmented-control";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 export interface DsSegmentedOption<T extends string = string> {
   value: T;
@@ -41,9 +43,26 @@ export function DsSegmentedControl<T extends string = string>({
   className,
   ...props
 }: DsSegmentedControlProps<T>) {
+  const directorLite = useArcScopeEnabled();
   const refs = React.useRef<Array<HTMLButtonElement | null>>([]);
   const pillId = React.useId();
   const reduce = useReducedMotion();
+  if (directorLite) {
+    return (
+      <SegmentedControl
+        options={options.map((option) => ({
+          value: option.value,
+          label: option.label,
+          accessory: option.count ? <span className="tabular-nums">{option.count > 99 ? "99+" : option.count}</span> : undefined,
+          disabled: option.disabled,
+        }))}
+        value={value}
+        onValueChange={(next) => onValueChange(next as T)}
+        label={props["aria-label"]}
+        className={className}
+      />
+    );
+  }
   const enabled = options.filter((option) => !option.disabled);
 
   function move(delta: number, from: number) {

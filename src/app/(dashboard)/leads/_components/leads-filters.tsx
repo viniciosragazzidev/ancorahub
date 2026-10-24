@@ -4,8 +4,9 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import ActionButton from "@/components/arc/action-button/action-button";
 import { StatefulButton } from "@/components/ui/stateful-button";
-import { Input } from "@/components/ui/input";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
@@ -21,18 +22,6 @@ import {
 
 type Branch = { id: string; name: string };
 type Broker = { id: string; name: string };
-
-const statusLabels: Record<string, string> = {
-  new: "Novos",
-  distributed: "Distribuídos",
-  in_contact: "Em Atendimento",
-  quote_sent: "Cotação Enviada",
-  negotiation: "Negociação",
-  documentation_pending: "Doc Pendente",
-  under_analysis: "Em Análise",
-  converted: "Convertidos",
-  lost: "Perdidos",
-};
 
 const qualificationLabels: Record<string, string> = {
   unqualified: "Sem Qualificação",
@@ -78,7 +67,8 @@ export function LeadsFilters({
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isPending, startTransition] = useTransition();
+  const directorLite = useArcScopeEnabled();
+  const [, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
 
   // States
@@ -502,15 +492,25 @@ export function LeadsFilters({
                 Limpar
               </Button>
 
-              <StatefulButton
-                state="idle"
-                onClick={() => applyFilters()}
-                size="sm"
-                className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
-                icon={<SlidersHorizontal className="size-3.5" />}
-              >
-                Aplicar
-              </StatefulButton>
+              {directorLite ? (
+                <ActionButton
+                  label="Aplicar filtros"
+                  pendingLabel="Aplicando"
+                  successLabel="Filtros aplicados"
+                  onAction={async () => { await applyFilters(); }}
+                  className="min-h-11 gap-1.5 px-3.5 text-xs font-semibold"
+                />
+              ) : (
+                <StatefulButton
+                  state="idle"
+                  onClick={() => applyFilters()}
+                  size="sm"
+                  className="h-8 gap-1.5 px-3.5 text-xs font-semibold"
+                  icon={<SlidersHorizontal className="size-3.5" />}
+                >
+                  Aplicar
+                </StatefulButton>
+              )}
             </div>
           </>
         }

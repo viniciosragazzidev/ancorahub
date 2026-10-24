@@ -5,6 +5,8 @@ import type { ComponentType, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { cardItemVariants } from "@/shared/animations";
 import { Skeleton } from "@/components/ui/skeleton";
+import ArcEmptyState from "@/components/arc/empty-state/empty-state";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 /* ─── Types ─── */
 
@@ -86,8 +88,21 @@ export function EmptyState({
   animationDelay = 0,
   loading,
 }: EmptyStateProps) {
+  const directorLite = useArcScopeEnabled();
   if (loading) {
     return <EmptyStateSkeleton variant={variant} />;
+  }
+
+  if (directorLite && variant !== "inline") {
+    return (
+      <ArcEmptyState
+        title={title}
+        description={description ?? ""}
+        action={action}
+        icon={Icon ? <Icon className="size-6" /> : undefined}
+        className={className}
+      />
+    );
   }
 
   const content = variant === "inline" ? (

@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
+import { Avatar as ArcAvatar } from "@/components/arc/avatar/avatar";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 export type DiceBearStyle =
   | "lorelei"
@@ -34,6 +36,7 @@ export function UserAvatar({
   fallbackClassName,
   photoUrl,
 }: UserAvatarProps) {
+  const directorLite = useArcScopeEnabled();
   const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   const avatarUrl = useMemo(() => {
     const cleanSeed = encodeURIComponent(seed || name || "CorreTop");
@@ -49,6 +52,18 @@ export function UserAvatar({
       .join("")
       .toUpperCase();
   }, [name, seed]);
+
+  if (directorLite) {
+    const arcSize = size === "sm" ? "sm" : size === "lg" ? "lg" : "md";
+    return (
+      <ArcAvatar
+        name={name || seed || "Cliente"}
+        src={photoUrl ?? undefined}
+        size={arcSize}
+        className={className}
+      />
+    );
+  }
 
   return (
     <Avatar size={size} className={cn("overflow-hidden border border-border/40 shadow-xs", className)}>
