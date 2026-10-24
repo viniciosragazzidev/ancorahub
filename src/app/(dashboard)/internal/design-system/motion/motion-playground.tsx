@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motionTokens, fade, fadeUp, scaleFade, slideInRight, staggerContainer, staggerItem } from "@/lib/motion";
+import { LiteMotionKit } from "./lite-motion-kit";
 
 export default function MotionPlaygroundPage() {
   const [activeTab, setActiveTab] = useState("presets");
@@ -39,6 +40,13 @@ export default function MotionPlaygroundPage() {
         <p className="text-sm text-muted-foreground">
           Biblioteca viva de microinterações, tokens de tempo, presets e respostas táteis do AncoraHub.
         </p>
+      </div>
+
+      <LiteMotionKit />
+
+      <div className="space-y-2 border-t border-border pt-8">
+        <h2 className="text-lg font-semibold">Presets e referências anteriores</h2>
+        <p className="text-sm text-muted-foreground">Mantido como referência do playground original; o kit Lite acima é o padrão do diretor.</p>
       </div>
 
       {/* Sliding Tabs */}
