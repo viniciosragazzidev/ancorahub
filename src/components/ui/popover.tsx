@@ -30,7 +30,8 @@ function PopoverContent({
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Positioner
-        className="isolate z-50 outline-none"
+        data-skin={arcScope["data-skin"]}
+        className={cn("isolate z-50 outline-none", arcScope.className)}
         align={align}
         alignOffset={alignOffset}
         side={side}

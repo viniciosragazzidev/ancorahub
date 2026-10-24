@@ -7,6 +7,7 @@ import { AnimatePresence, animate, motion, useMotionValue, usePresence, useReduc
 import { X } from "lucide-react";
 import { motionTokens } from "../lib/motion-tokens";
 import styles from "./bottom-sheet.module.css";
+import { useArcPortalTarget, useArcScopeProps } from "../arc-scope-context";
 
 /**
  * A sheet that rises from the bottom edge and rests at one or more heights (detents).
@@ -66,6 +67,7 @@ function velocityOf(samples: Drag["samples"], now: number) {
 }
 
 export function BottomSheet({ trigger, open: openProp, defaultOpen = false, onOpenChange, ...props }: BottomSheetProps) {
+  const portalTarget = useArcPortalTarget();
   const [uncontrolled, setUncontrolled] = useState(defaultOpen);
   const open = openProp ?? uncontrolled;
   const setOpen = useCallback((next: boolean) => {
@@ -97,11 +99,12 @@ export function BottomSheet({ trigger, open: openProp, defaultOpen = false, onOp
   return <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
     {trigger ? <DialogPrimitive.Trigger asChild>{trigger}</DialogPrimitive.Trigger> : null}
     {/* The sheet stays mounted while it leaves, so a close can be caught and reversed mid-flight. */}
-    <AnimatePresence>{open && <DialogPrimitive.Portal key="sheet" forceMount><Sheet {...props} onDismiss={dismiss} /></DialogPrimitive.Portal>}</AnimatePresence>
+    <AnimatePresence>{open && <DialogPrimitive.Portal key="sheet" forceMount container={portalTarget ?? undefined}><Sheet {...props} onDismiss={dismiss} /></DialogPrimitive.Portal>}</AnimatePresence>
   </DialogPrimitive.Root>;
 }
 
 function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, onDetentChange, closeLabel = "Close", className, children, onDismiss }: Omit<BottomSheetProps, "trigger" | "open" | "defaultOpen" | "onOpenChange"> & { onDismiss: () => void }) {
+  const arcScope = useArcScopeProps();
   const [isPresent, safeToRemove] = usePresence();
   const reduced = useReducedMotion() ?? false;
   const detentKey = detents.join(",");
@@ -370,8 +373,8 @@ function Sheet({ title, description, detents = [.45, .92], initialDetent = 0, on
   const style = { y, opacity: presence, "--sheet-max": stops[top], "--sheet-extension": `${EXTENSION}px` } as unknown as CSSProperties;
 
   return <>
-    <DialogPrimitive.Overlay forceMount asChild><motion.div className={styles.overlay} style={{ opacity: backdrop }} /></DialogPrimitive.Overlay>
-    <DialogPrimitive.Content forceMount {...(description ? {} : { "aria-describedby": undefined })} onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }} onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }} asChild><motion.div ref={sheetRef} className={[styles.sheet, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey}><div className={styles.header} onPointerDown={headerDown} onPointerMove={headerMove} onPointerUp={headerUp} onPointerCancel={headerUp}>
+    <DialogPrimitive.Overlay forceMount asChild><motion.div {...arcScope} className={[arcScope.className, styles.overlay].filter(Boolean).join(" ")} style={{ opacity: backdrop }} /></DialogPrimitive.Overlay>
+    <DialogPrimitive.Content forceMount {...(description ? {} : { "aria-describedby": undefined })} onOpenAutoFocus={event => { event.preventDefault(); sheetRef.current?.focus({ preventScroll: true }); }} onPointerDownOutside={event => { const { present, at } = presenceChange.current; if (!present || event.detail.originalEvent.timeStamp < at) event.preventDefault(); }} asChild><motion.div {...arcScope} ref={sheetRef} className={[arcScope.className, styles.sheet, className].filter(Boolean).join(" ")} style={style} data-expanded={expanded ? "" : undefined} onKeyDown={sheetKey}><div className={styles.header} onPointerDown={headerDown} onPointerMove={headerMove} onPointerUp={headerUp} onPointerCancel={headerUp}>
                 <button type="button" className={styles.grabber} data-grabber="" aria-label={expanded ? "Recolher painel" : "Expandir painel"} aria-expanded={expanded} onClick={grabberClick} onKeyDown={grabberKey}>
                   <span className={styles.grabberBar} aria-hidden="true" />
                 </button>

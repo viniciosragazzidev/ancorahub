@@ -35,7 +35,8 @@ function DropdownMenuContent({
   return (
     <MenuPrimitive.Portal>
       <MenuPrimitive.Positioner
-        className="isolate z-50 outline-none"
+        data-skin={arcScope["data-skin"]}
+        className={cn("isolate z-50 outline-none", arcScope.className)}
         align={align}
         alignOffset={alignOffset}
         side={side}
@@ -159,10 +160,12 @@ function DropdownMenuSubContent({
   className,
   ...props
 }: React.ComponentProps<typeof DropdownMenuContent>) {
+  const arcScope = useArcScopeProps()
   return (
     <DropdownMenuContent
       data-slot="dropdown-menu-sub-content"
-      className={cn("w-auto min-w-[96px] rounded-[var(--radius-card)] bg-popover p-1 text-popover-foreground shadow-[var(--shadow-dialog)] ring-1 ring-foreground/10 ", className)}
+      data-skin={arcScope["data-skin"]}
+      className={cn(arcScope.className, "w-auto min-w-[96px] rounded-[var(--radius-card)] bg-popover p-1 text-popover-foreground shadow-[var(--shadow-dialog)] ring-1 ring-foreground/10 ", className)}
       align={align}
       alignOffset={alignOffset}
       side={side}

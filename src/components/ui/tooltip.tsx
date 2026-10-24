@@ -56,11 +56,12 @@ function TooltipContent({
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner
+        data-skin={arcScope["data-skin"]}
         align={align}
         alignOffset={alignOffset}
         side={side}
         sideOffset={sideOffset}
-        className="isolate z-50"
+        className={cn("isolate z-50", arcScope.className)}
       >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"

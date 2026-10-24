@@ -391,9 +391,10 @@ function ImagePreviewDialog({
       <div className="pointer-events-none fixed inset-0 z-[10000]">
         <motion.button
           type="button"
+          data-skin={arcScope["data-skin"]}
           aria-label="Fechar pré-visualização de imagem"
           tabIndex={-1}
-          className="pointer-events-auto absolute inset-0 size-full cursor-default bg-black/45 backdrop-blur-xl"
+          className={cn("pointer-events-auto absolute inset-0 size-full cursor-default bg-black/45 backdrop-blur-xl", arcScope.className)}
           initial={reduce ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={reduce ? undefined : { opacity: 0 }}

@@ -118,8 +118,9 @@ function DrawerContent({
       )}
       <DrawerPrimitive.Viewport
         data-slot="drawer-viewport"
+        data-skin={arcScope["data-skin"]}
         data-modal={modal}
-        className="pointer-events-none fixed inset-0 z-50 select-none data-[modal=true]:pointer-events-auto"
+        className={cn("pointer-events-none fixed inset-0 z-50 select-none data-[modal=true]:pointer-events-auto", arcScope.className)}
       >
         <DrawerPrimitive.Popup
           data-slot="drawer-popup"
