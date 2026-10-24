@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getMetaLeadAdsWebhookConfig } from "@/features/communication-channels/meta-cloud-config";
 import { ingestMetaLeadAdsWebhook, type MetaLeadAdsWebhookPayload, verifyMetaWebhookSignature } from "@/features/communication-channels/meta-lead-ads";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,7 +28,7 @@ function summarizeWebhookPayload(payload: MetaLeadAdsWebhookPayload) {
   };
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   try {
     const config = getMetaLeadAdsWebhookConfig();
     const params = new URL(request.url).searchParams;
@@ -42,7 +43,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     const config = getMetaLeadAdsWebhookConfig();
     const rawBody = await request.text();
@@ -73,3 +74,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ accepted: false }, { status: 500 });
   }
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const GET = backgroundRoute(handleGET);
+export const POST = backgroundRoute(handlePOST);

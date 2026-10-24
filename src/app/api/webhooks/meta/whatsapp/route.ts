@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { getMetaCloudServerConfig } from "@/features/communication-channels/meta-cloud-config";
 import { ingestMetaCloudWebhook, isMetaCloudWhatsAppEnabled } from "@/features/communication-channels/service";
 import type { MetaWebhookPayload } from "@/features/communication-channels/types";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -18,7 +19,7 @@ function signatureMatches(rawBody: string, signatureHeader: string | null, appSe
   return left.length === right.length && left.length > 0 && timingSafeEqual(left, right);
 }
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   try {
     const config = getMetaCloudServerConfig();
     const { searchParams } = new URL(request.url);
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   try {
     const config = getMetaCloudServerConfig();
     const rawBody = await request.text();
@@ -47,3 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ accepted: false }, { status: 500 });
   }
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const GET = backgroundRoute(handleGET);
+export const POST = backgroundRoute(handlePOST);

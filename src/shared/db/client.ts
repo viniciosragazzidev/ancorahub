@@ -4,10 +4,12 @@ import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 import { callDbQueryHook } from "@/shared/observability/db-hook";
+import { isInBackgroundPool } from "./background-pool";
 
 type Database = ReturnType<typeof drizzlePostgres<typeof schema>>;
 
 let database: Database | undefined;
+let backgroundDatabase: Database | undefined;
 
 /** Supavisor transaction mode (port 6543): many client sockets share few server connections. */
 export function isTransactionPooler(databaseUrl = process.env.SUPABASE_DB_URL?.trim() || process.env.DATABASE_URL?.trim() || "") {
@@ -44,7 +46,9 @@ export function connectionLimit() {
  * pooler each socket holds one of the project's 15 slots, so it is released
  * quickly, as before.
  */
-const IDLE_TIMEOUT_SECONDS = isTransactionPooler() ? 120 : 5;
+// 24/10: 5 s on the session pooler reconnected (TLS + auth) after every short pause, adding
+// 50-150 ms to the next click. 30 s keeps the few sockets warm and still frees them quickly.
+const IDLE_TIMEOUT_SECONDS = isTransactionPooler() ? 120 : 30;
 const MAX_LIFETIME_SECONDS = isTransactionPooler() ? 30 * 60 : 60;
 
 function getDatabaseUrl(): string {
@@ -114,13 +118,23 @@ function statementTimeoutMs(): number {
   return 30_000;
 }
 
-function createPostgresDatabase(databaseUrl: string): Database {
+/**
+ * Sockets for background work (jobs, webhooks, their after() work): its own small pool, so
+ * a job or a burst of WhatsApp messages never takes the sockets that serve the pages.
+ */
+export function backgroundConnectionLimit() {
+  const configured = Number.parseInt(process.env.DB_BACKGROUND_POOL_MAX ?? "", 10);
+  if (Number.isFinite(configured) && configured >= 1 && configured <= 10) return configured;
+  return process.env.NODE_ENV === "production" ? 3 : 1;
+}
+
+function createPostgresDatabase(databaseUrl: string, max = connectionLimit()): Database {
   logDbConfig(databaseUrl);
 
   return drizzlePostgres(
     postgres(databaseUrl, {
       prepare: false,
-      max: connectionLimit(),
+      max,
       connect_timeout: 10,
       idle_timeout: IDLE_TIMEOUT_SECONDS,
       max_lifetime: MAX_LIFETIME_SECONDS,
@@ -141,6 +155,11 @@ function createPostgresDatabase(databaseUrl: string): Database {
 /** Infrastructure-only database entry point. Domain code must use tenantDb. */
 export function getDatabase(): Database {
   const databaseUrl = getDatabaseUrl();
+  // Jobs and webhooks (backgroundRoute) get their own pool; pages keep theirs.
+  if (isInBackgroundPool() && usesPostgresJsDriver(databaseUrl)) {
+    backgroundDatabase ??= createPostgresDatabase(databaseUrl, backgroundConnectionLimit());
+    return backgroundDatabase;
+  }
   if (usesPostgresJsDriver(databaseUrl)) {
     database ??= createPostgresDatabase(databaseUrl);
   } else {

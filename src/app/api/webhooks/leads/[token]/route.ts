@@ -6,6 +6,7 @@ import {
 } from "@/features/leads/webhooks/utils/lead-webhook.utils";
 import { authenticateLeadWebhook, WebhookAuthError } from "@/features/leads/webhooks/services/authenticate-lead-webhook";
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const runtime = "nodejs";
 
@@ -27,7 +28,7 @@ export async function OPTIONS() {
  * Flow: authenticate → validate → honeypot check → create lead + beneficiary
  * → distribute synchronously → push notification synchronously → respond 201.
  */
-export async function POST(
+async function handlePOST(
   request: NextRequest,
   { params }: { params: Promise<{ token: string }> },
 ) {
@@ -142,3 +143,6 @@ function getErrorMessage(code: string): string {
   };
   return messages[code] ?? "Não foi possível processar a requisição.";
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const POST = backgroundRoute(handlePOST);

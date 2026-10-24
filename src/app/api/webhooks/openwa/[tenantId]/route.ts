@@ -9,10 +9,11 @@ import { processInboundAiResponse } from "@/features/ai-agent/conversation-state
 import { enqueueLeadDistributionJob } from "@/features/lead-distribution/jobs";
 import { startServiceOnFirstMessage } from "@/features/leads/start-service-on-message";
 import { scheduleLeadConversationAnalysis } from "@/features/conversation-intelligence/trigger";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 type OpenWaPayload = { id?: string; messageId?: string; from?: string; to?: string; sender?: string; recipient?: string; chatId?: string; body?: string; text?: string; type?: string; timestamp?: number; direction?: string; fromMe?: boolean; data?: OpenWaPayload; content?: { text?: string; body?: string }; message?: { text?: string; body?: string; type?: string } };
 
-export async function POST(request: Request, { params }: { params: Promise<{ tenantId: string }> }) {
+async function handlePOST(request: Request, { params }: { params: Promise<{ tenantId: string }> }) {
   const { tenantId: routeTenantId } = await params;
   const raw = await request.text();
   let payload: OpenWaPayload;
@@ -120,3 +121,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ ten
   console.info("[OpenWA] mensagem persistida", JSON.stringify({ hasLead: Boolean(lead), hasClient: Boolean(client), direction: event.direction === "outgoing" || event.fromMe === true ? "outgoing" : "incoming" }));
   return NextResponse.json({ accepted: true, persisted: true });
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const POST = backgroundRoute(handlePOST);

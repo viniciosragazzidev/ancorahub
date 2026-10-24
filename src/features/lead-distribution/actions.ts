@@ -26,6 +26,7 @@ import { selectBulkDistributionCandidateIds } from "./bulk-recovery";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { AuthorizationService } from "@/shared/auth/authorization-service";
 import { buildOfferOutcomeHistory } from "./assignment-history";
+import { runInBackgroundPool } from "@/shared/db/background-pool";
 
 export type DistributionActionState = {
   success?: boolean;
@@ -670,9 +671,10 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
       });
     });
 
-    await runWithConcurrency(candidateIds, 10, async (id) => {
+    // Bulk work: 2 at a time on the background DB sockets, so the pages keep theirs (24/10).
+    await runInBackgroundPool(() => runWithConcurrency(candidateIds, 2, async (id) => {
       await enqueueLeadDistributionJob({ tenantId: context.tenantId, leadId: id });
-    });
+    }));
 
     void publishLeadInvalidation({
       tenantId: context.tenantId,
@@ -688,13 +690,13 @@ export async function distributeAllUnassignedLeadsAction(): Promise<Distribution
     });
     const initialDelivery = { processed: 0, sent: 0, failed: 0, retried: 0 };
     if (initialDistribution?.outboundMessageIds.length) {
-      await runWithConcurrency(initialDistribution.outboundMessageIds, 5, async (outboundMessageId) => {
+      await runInBackgroundPool(() => runWithConcurrency(initialDistribution.outboundMessageIds, 2, async (outboundMessageId) => {
         const delivery = await processMetaOutboundBatch(1, context.tenantId, outboundMessageId);
         initialDelivery.processed += delivery.processed;
         initialDelivery.sent += delivery.sent;
         initialDelivery.failed += delivery.failed;
         initialDelivery.retried += delivery.retried;
-      });
+      }));
     }
 
     scheduleAfterResponse("lead-distribution-bulk-recovery", async () => {

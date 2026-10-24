@@ -13,10 +13,25 @@ tabela.
 - Comando base de cada tarefa (troque o caminho):
 
 ```sh
-curl --fail --silent --show-error \
+curl --fail --silent --show-error --max-time 280 \
   -H "Authorization: Bearer $CRON_SECRET" \
   http://127.0.0.1:3000<caminho>
 ```
+
+### Banco de dados das tarefas (24/10/2026)
+
+As tarefas e os webhooks usam um grupo próprio de conexões com o banco, separado das
+conexões que atendem as telas (`src/shared/db/background-pool.ts`). Assim, uma tarefa
+demorada não trava a navegação de ninguém.
+
+- `DB_POOL_MAX` (padrão 4): conexões das telas.
+- `DB_BACKGROUND_POOL_MAX` (padrão 3): conexões das tarefas, dos webhooks e das ações em massa.
+- A soma das duas, mais qualquer outro app ou script, precisa caber no `pool size` do
+  pooler de sessão do Supabase (30 desde 06/10).
+- Tarefas que não podem rodar duas ao mesmo tempo usam uma reserva curta
+  (`src/shared/db/job-lease.ts`, linhas `lease:*` em `system_settings`) em vez de uma
+  transação aberta durante toda a execução.
+- `--max-time 280` só encerra o `curl`; a rodada no servidor termina pelo próprio orçamento de tempo.
 
 ## Tarefas
 

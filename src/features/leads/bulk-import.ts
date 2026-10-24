@@ -61,6 +61,7 @@ function parseCsv(text: string) {
 }
 
 import { ensureBrazilPhone as normalizePhone } from "@/shared/utils/phone";
+import { runInBackgroundPool } from "@/shared/db/background-pool";
 
 export async function importLeadsFromCsvAction(formData: FormData) {
   try {
@@ -320,13 +321,14 @@ export async function importLeadsFromCsvAction(formData: FormData) {
 
     if (imported > 0 && !shouldQualifyLead) {
       try {
-        await runWithConcurrency(distributionLeadIds, 5, async (leadId) => {
+        // Bulk work: 2 at a time on the background DB sockets, so the pages keep theirs (24/10).
+        await runInBackgroundPool(() => runWithConcurrency(distributionLeadIds, 2, async (leadId) => {
           await enqueueAndProcessLeadDistribution({
             tenantId: context.tenantId,
             leadId,
             source: "intake",
           });
-        });
+        }));
       } catch (error) {
         // Do not report a committed import as failed. Every lead remains
         // queued and can be recovered by the scheduled processor.

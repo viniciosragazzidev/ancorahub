@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { drainLeadDistributionBacklog } from "@/features/lead-distribution/jobs";
 import { processDutyPresenceReminders } from "@/features/lead-distribution/duty-presence";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,10 +35,14 @@ async function handle(request: NextRequest) {
   return NextResponse.json({ success, result, dutyPresence }, { status: success ? 200 : 500 });
 }
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   return handle(request);
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   return handle(request);
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const GET = backgroundRoute(handleGET);
+export const POST = backgroundRoute(handlePOST);

@@ -2,12 +2,13 @@ import { NextResponse } from "next/server";
 import { createLeadFeedbackReminders } from "@/features/leads/feedback-reminders";
 import { createClientRenewalReminders } from "@/features/customers/renewal-reminders";
 import { runTaskOverdueSweep } from "@/features/leads/task-overdue-sweep";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   try {
     const secret = process.env.CRON_SECRET;
     if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) {
@@ -24,3 +25,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ success: false, error: "Reminders unavailable" }, { status: 500 });
   }
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const GET = backgroundRoute(handleGET);

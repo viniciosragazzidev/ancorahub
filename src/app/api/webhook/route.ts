@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const runtime = "nodejs";
 
@@ -14,7 +15,10 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const { POST: unifiedPost } = await import("../webhooks/leads/route");
   return unifiedPost(request);
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const POST = backgroundRoute(handlePOST);

@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-export async function GET(request: NextRequest) {
+async function handleGET(request: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   try {
@@ -20,6 +21,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   return GET(request);
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const GET = backgroundRoute(handleGET);
+export const POST = backgroundRoute(handlePOST);

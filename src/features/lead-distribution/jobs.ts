@@ -536,7 +536,8 @@ export async function runLeadDistributionProcessor(input: { tenantId?: string; l
   // In waves, hottest first: a colder lead never races a hotter one for the
   // same free broker inside a batch.
   for (const wave of groupByTemperatureRank(claimedJobs, (claimed) => claimed.rank).map((group) => group.map((claimed) => claimed.job))) {
-    await runWithConcurrency(wave, Math.min(5, wave.length || 1), async (job) => {
+    // 2 at a time: the jobs share a small set of DB sockets (24/10).
+    await runWithConcurrency(wave, Math.min(2, wave.length || 1), async (job) => {
       const [currentLead] = await getDatabase().select({ status: schema.leads.status, qualificationStatus: schema.leads.qualificationStatus, qualificationState: schema.leads.qualificationState, distributionStatus: schema.leads.distributionStatus, deletedAt: schema.leads.deletedAt, archivedAt: schema.leads.archivedAt, nome: schema.leads.nome })
         .from(schema.leads)
         .where(and(eq(schema.leads.id, job.leadId), eq(schema.leads.tenantId, job.tenantId)))

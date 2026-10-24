@@ -5,6 +5,7 @@ import { and, asc, desc, eq, gte, inArray, isNull, notInArray, sql } from "drizz
 import type { TenantContext } from "@/shared/auth/types";
 import { AuthorizationError } from "@/shared/auth/errors";
 import { getDatabase, schema } from "@/shared/db";
+import { withJobLease } from "@/shared/db/job-lease";
 import { operationDayStart } from "@/features/reports/metrics/lead-quality-period";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
@@ -27,10 +28,10 @@ import {
   normalizeColdLeadRequalificationPolicy,
   partitionColdLeadsByResponse,
   requalificationSendDecision,
-  runWithRequalificationLock,
   selectColdLeadsForOperationDay,
 } from "./cold-lead-requalification-policy";
 import { readDistributionPolicy } from "@/features/lead-distribution/domain";
+import { runInBackgroundPool } from "@/shared/db/background-pool";
 
 const REQUALIFICATION_PREFIX = COLD_LEAD_REQUALIFICATION_OUTBOUND_PREFIX;
 const LEGACY_PREFIX = "cold-lead-reactivation:";
@@ -57,13 +58,9 @@ function assertDirector(context: TenantContext) {
   if (context.role !== "director") throw new AuthorizationError("Somente o Diretor pode requalificar leads frios.");
 }
 
+/** One requalification per tenant at a time, with a lease instead of a transaction held open (24/10). */
 async function withTenantRequalificationLock<T>(tenantId: string, task: () => Promise<T>) {
-  return getDatabase().transaction(async (tx) => runWithRequalificationLock(async () => {
-    const [lock] = await tx.execute(sql`
-      select pg_try_advisory_xact_lock(hashtext(${tenantId}), hashtext('cold-lead-requalification')) as acquired
-    `);
-    return lock?.acquired === true;
-  }, task));
+  return withJobLease(`cold-lead-requalification:${tenantId}`, 10 * 60_000, task);
 }
 
 async function getActiveTenantRule(tenantId: string) {
@@ -339,7 +336,8 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
   }
 
   let sent = 0;
-  await runWithConcurrency(outgoing, 4, async (queued) => {
+  // Bulk work: 2 at a time on the background DB sockets, so the pages keep theirs (24/10).
+  await runInBackgroundPool(() => runWithConcurrency(outgoing, 2, async (queued) => {
     const delivery = await processMetaOutboundBatch(1, context.tenantId, queued.outboundId).catch(() => null);
     if (delivery?.sent) {
       await persistSentMessage(context.tenantId, queued.leadId, queued.outboundId);
@@ -352,7 +350,7 @@ export async function requalifyColdLeadsManually(context: TenantContext, input: 
       skipped.push({ leadId: queued.leadId, name: queued.name, reason });
       await recordAudit({ tenantId: context.tenantId, actorUserId: context.userId, leadId: queued.leadId, action: "cold_lead_requalification.manual.skipped", metadata: { reason } });
     }
-  });
+  }));
   return { sent, skipped };
 }
 

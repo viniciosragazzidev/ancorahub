@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { and, eq, lt } from "drizzle-orm";
 import { getDatabase, schema } from "@/shared/db";
 import { runMetaTenantSync } from "@/features/meta-ads/meta-sync-service";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,7 +17,7 @@ const STALE_SYNC_MS = 15 * 60_000;
  * it was cut and left a log "in_progress" forever. It now runs after the
  * response, on the server.
  */
-export async function GET(request: Request) {
+async function handleGET(request: Request) {
   const authHeader = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET || process.env.INTERNAL_JOB_SECRET;
 
@@ -49,3 +50,6 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ started: true, tenants: activeConnections.length, staleClosed: closed.length }, { status: 202 });
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const GET = backgroundRoute(handleGET);

@@ -98,6 +98,7 @@ function validateHeaders(headers: string[], type: ImportType): Map<string, numbe
 }
 
 import { ensureBrazilPhone } from "@/shared/utils/phone";
+import { runInBackgroundPool } from "@/shared/db/background-pool";
 // normalizePhone agora é ensureBrazilPhone — ambos garantem prefixo 55
 
 function parseDate(raw: string): Date | null {
@@ -432,9 +433,10 @@ export async function importMetaLeads(
     await flushBuffer(insertBuffer);
     insertBuffer = [];
 
-    await runWithConcurrency(importedLeadIds, 5, async (leadId) => {
+    // Bulk work: 2 at a time on the background DB sockets, so the pages keep theirs (24/10).
+    await runInBackgroundPool(() => runWithConcurrency(importedLeadIds, 2, async (leadId) => {
       await enqueueAndProcessLeadDistribution({ tenantId: context.tenantId, leadId, source: "intake" });
-    });
+    }));
 
     // Update import record
     const durationMs = Date.now() - startTime;

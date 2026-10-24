@@ -6,6 +6,7 @@ import {
 } from "@/features/leads/webhooks/utils/lead-webhook.utils";
 import { authenticateLeadWebhook, WebhookAuthError } from "@/features/leads/webhooks/services/authenticate-lead-webhook";
 import { createLeadFromWebhookSync } from "@/features/leads/webhooks/services/create-lead-from-webhook-sync";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const runtime = "nodejs";
 
@@ -25,7 +26,7 @@ export async function OPTIONS() {
  * Used by server-to-server integrations (n8n, Make, and other approved sources).
  * For landing page embeds, use /api/webhooks/leads/[token] instead.
  */
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   const receivedAt = new Date();
   const requestId = resolveRequestId(request.headers.get("X-Request-Id"));
 
@@ -136,3 +137,6 @@ function getErrorMessage(code: string): string {
   };
   return messages[code] ?? "Erro interno.";
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const POST = backgroundRoute(handlePOST);

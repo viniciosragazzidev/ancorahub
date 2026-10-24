@@ -5,6 +5,7 @@ import { runColdLeadRequalificationSweep } from "@/features/ai-qualification/col
 import { runSlaSweep } from "@/features/leads/sla";
 import { flowEffectHandlers } from "@/features/attendance-flows/handlers";
 import { attendanceFlowsEnabled, wakeDueRuns } from "@/features/attendance-flows/runtime";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 /**
  * DEC-127: wakes attendance flow runs whose wait is over (only with the switch
@@ -49,5 +50,9 @@ async function handle(request: NextRequest) {
   }
 }
 
-export async function GET(request: NextRequest) { return handle(request); }
-export async function POST(request: NextRequest) { return handle(request); }
+async function handleGET(request: NextRequest) { return handle(request); }
+async function handlePOST(request: NextRequest) { return handle(request); }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const GET = backgroundRoute(handleGET);
+export const POST = backgroundRoute(handlePOST);

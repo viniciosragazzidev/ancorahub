@@ -6,12 +6,13 @@ import {
   verifyRelaySignature,
   wahaWebhookSchema,
 } from "@/features/waha-cadence/contract";
+import { backgroundRoute } from "@/shared/db/background-pool";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-export async function POST(request: Request) {
+async function handlePOST(request: Request) {
   const secret = process.env.WAHA_RELAY_SHARED_SECRET?.trim();
   if (!secret) return NextResponse.json({ accepted: false, error: "WAHA webhook não configurado." }, { status: 503 });
   const rawBody = await request.text();
@@ -34,3 +35,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ accepted: false }, { status: 400 });
   }
 }
+
+// Jobs and webhooks run on their own DB sockets, never the ones serving pages (24/10).
+export const POST = backgroundRoute(handlePOST);

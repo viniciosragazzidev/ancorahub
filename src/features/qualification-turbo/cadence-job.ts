@@ -5,6 +5,7 @@ import { and, desc, eq, gt, inArray, isNotNull, isNull, sql } from "drizzle-orm"
 import { getQualificationTenantSettings } from "@/features/ai-qualification/tenant-settings-service";
 import { enqueueMetaTemplateMessage, processMetaOutboundBatch } from "@/features/communication-channels/outbound-service";
 import { getDatabase, schema } from "@/shared/db";
+import { withJobLease } from "@/shared/db/job-lease";
 
 import { qualificationTemplateVariables, requestedOperator } from "./approaches";
 import { decideNextTouch, type TurboState, type TurboTouchRecord } from "./cadence";
@@ -62,11 +63,9 @@ export type CadenceRunResult = { candidates: number; sent: number; failed: numbe
  */
 export async function runQualificationCadenceJob(now = new Date()): Promise<CadenceRunResult | { skipped: "locked" }> {
   // One run at a time: an overlapping run would write the turbo state from a stale snapshot.
-  return getDatabase().transaction(async (tx) => {
-    const [lock] = await tx.execute(sql`select pg_try_advisory_xact_lock(hashtext('qualification-turbo-cadence')) as acquired`);
-    if ((lock as { acquired?: boolean } | undefined)?.acquired !== true) return { skipped: "locked" as const };
-    return runCadence(now);
-  });
+  // A lease, not a transaction held open for the whole run (it pinned a DB socket, 24/10).
+  const lease = await withJobLease("qualification-turbo-cadence", TIME_BUDGET_MS + 60_000, () => runCadence(now));
+  return lease.acquired ? lease.value : { skipped: "locked" as const };
 }
 
 async function runCadence(now: Date): Promise<CadenceRunResult> {

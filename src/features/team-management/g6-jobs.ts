@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
@@ -10,16 +10,16 @@ import { backfillBrokerMetricDailySnapshots } from "@/features/reports/metrics/t
 import { publishInAppNotification } from "@/features/notifications/send-push-helper";
 import { isNotificationCapabilityEnabled } from "@/features/notifications/queries";
 import { getDatabase, schema } from "@/shared/db";
+import { withJobLease } from "@/shared/db/job-lease";
 import type { TenantContext } from "@/shared/auth/types";
-import { isMissingBrokerMetricDailyTable, isMondayMorningInSaoPaulo, isNightlySnapshotWindowInSaoPaulo, runG6LockedWork, saoPauloDayKey } from "./g6-pure";
+import { isMissingBrokerMetricDailyTable, isMondayMorningInSaoPaulo, isNightlySnapshotWindowInSaoPaulo, saoPauloDayKey } from "./g6-pure";
 
 type JobResult = { skipped: boolean; sent?: number; inserted?: number; historyAvailable?: boolean };
 
+/** One run per key at a time, with a lease instead of a transaction held open (24/10). */
 async function withG6Lock<T>(key: string, work: () => Promise<T>): Promise<{ skipped: true } | { skipped: false; value: T }> {
-  return getDatabase().transaction(async (tx) => runG6LockedWork(async () => {
-    const [lock] = await tx.execute(sql`select pg_try_advisory_xact_lock(hashtext('team-management-g6'), hashtext(${key})) as acquired`);
-    return lock?.acquired === true;
-  }, work));
+  const lease = await withJobLease(`team-management-g6:${key}`, 10 * 60_000, work);
+  return lease.acquired ? { skipped: false, value: lease.value } : { skipped: true };
 }
 
 function contextForRecipient(

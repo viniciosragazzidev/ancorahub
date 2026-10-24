@@ -26,7 +26,9 @@ const settingsCache = new TtlCache<{ key: string; value: string }[]>(SETTINGS_CA
 async function loadAllSettings() {
   return settingsCache.getOrLoad("all", () => getDatabase()
     .select({ key: schema.systemSettings.key, value: schema.systemSettings.value })
-    .from(schema.systemSettings));
+    .from(schema.systemSettings)
+    // Job leases (shared/db/job-lease.ts) live in this table but are not settings.
+    .where(sql`${schema.systemSettings.key} not like 'lease:%'`));
 }
 
 export function invalidateSystemSettingsCache() {
