@@ -13,8 +13,8 @@ export interface LiteStaggerProps {
 }
 
 /**
- * Cascata de filhos diretos. Cada item entra com atraso de 35 ms; do 9º em diante
- * o atraso para no máximo (stagger.max = 8), então as linhas restantes entram juntas.
+ * Cascata de filhos diretos. Cada item entra com atraso de 35 ms, em no máximo 8 atrasos
+ * distintos (stagger.max): do 8º item em diante, todos entram com o atraso do 8º.
  */
 export function LiteStagger({ children, className }: LiteStaggerProps) {
   return (
@@ -32,10 +32,10 @@ export interface LiteStaggerItemProps {
   className?: string;
 }
 
-/** Item avulso da cascata; `index` define o atraso. Usado direto quando o pai não é uma lista. */
+/** Item avulso da cascata; `index` define o atraso, limitado a stagger.max - 1. */
 export function LiteStaggerItem({ index, children, className }: LiteStaggerItemProps) {
   const reduce = useReducedMotion();
-  const step = Math.min(index, motionTokens.stagger.max);
+  const step = Math.min(index, motionTokens.stagger.max - 1);
   return (
     <motion.div
       className={className}

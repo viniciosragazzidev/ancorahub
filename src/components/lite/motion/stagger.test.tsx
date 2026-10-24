@@ -25,14 +25,16 @@ describe("LiteStagger", () => {
     expect(screen.getByText("Linha 12")).toBeInTheDocument();
   });
 
-  it("delays each row by 35 ms and stops the delay at the eighth row", () => {
+  it("delays each row by 35 ms, with at most eight distinct delays", () => {
     const items = Array.from({ length: 12 }, (_, i) => <p key={i}>Linha {i + 1}</p>);
     const { container } = render(<LiteStagger>{items}</LiteStagger>);
     const rows = Array.from(container.firstElementChild!.children);
-    expect((readMotion(rows[3]!).transition as { delay: number }).delay).toBeCloseTo(0.105);
-    expect((readMotion(rows[7]!).transition as { delay: number }).delay).toBeCloseTo(0.245);
-    expect((readMotion(rows[8]!).transition as { delay: number }).delay).toBeCloseTo(0.28);
-    expect((readMotion(rows[11]!).transition as { delay: number }).delay).toBeCloseTo(0.28);
+    const delays = rows.map((row) => (readMotion(row).transition as { delay: number }).delay);
+    expect(delays[3]).toBeCloseTo(0.105);
+    expect(delays[7]).toBeCloseTo(0.245);
+    // Do 8º item em diante, todos repetem o atraso do 8º.
+    expect(delays.slice(7)).toEqual(Array(5).fill(delays[7]));
+    expect(new Set(delays).size).toBeLessThanOrEqual(8);
   });
 
   it("moves rows 6 px up when motion is on", () => {
