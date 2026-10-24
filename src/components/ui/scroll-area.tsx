@@ -54,7 +54,7 @@ function ScrollBar({
       )}
       {...props}
     >
-      <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-muted-foreground/35" />
+      <ScrollAreaPrimitive.ScrollAreaThumb data-slot="scroll-area-thumb" className="relative flex-1 rounded-full bg-muted-foreground/35" />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   );
 }
