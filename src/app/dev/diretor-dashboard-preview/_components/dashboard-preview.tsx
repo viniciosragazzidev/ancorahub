@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Building2, FlaskConical } from "lucide-react";
 
 import type { DrilldownId } from "@/features/reports/metrics/metrics-service";
+import type { EssentialDashboard } from "@/features/dashboard/essential/essential-data";
 import type { CommandCenterData } from "@/features/dashboard/today";
 import type { FunnelPeriod } from "@/features/qualification-turbo/funnel";
 
@@ -23,7 +24,8 @@ import { enterT, fadeT, LitePills, LiteSwap, useMedia, useReduce } from "./motio
 import { LiteLayer, LitePick } from "./overlay";
 import { DrillContent, ExportContent, FocusContent, FullPageLink, RangeContent } from "./panels";
 import { FunnelTab } from "./funnel-tab";
-import { OverviewTab } from "./overview-tab";
+import { EssentialView } from "@/features/dashboard/components/director-lite/essential-view";
+import { buildEssential, emptyEssential } from "./essential-example";
 import { QualityDisabled, QualityTab, type FocusTarget } from "./quality-tab";
 import { ErrorState, SkeletonToContent, TabSkeleton } from "./states";
 
@@ -100,6 +102,10 @@ export function DirectorDashboardPreview({ initialTab, initialState, initialVist
       generatedAt: now.toISOString(),
     };
   }, [empty, baseNow, overviewPeriod, unit, liveNow, now]);
+  const essential = useMemo<EssentialDashboard>(() => {
+    if (empty) return emptyEssential(baseNow);
+    return buildEssential(overviewPeriod === "today" ? "today" : overviewPeriod === 7 ? "7d" : "30d", unit, baseNow);
+  }, [empty, baseNow, overviewPeriod, unit]);
   const funnel = useMemo(() => {
     const data = buildFunnel(funnelPeriod, unit, baseNow);
     if (!empty) return data;
@@ -233,15 +239,7 @@ export function DirectorDashboardPreview({ initialTab, initialState, initialVist
               <SkeletonToContent loading={loading} id={effectiveTab} skeleton={<TabSkeleton tab={effectiveTab} />}>
                 <LiteSwap id={effectiveTab}>
                   {effectiveTab === "overview" ? (
-                    <OverviewTab
-                      data={overview}
-                      period={overviewPeriod}
-                      now={now}
-                      pulse={liveNow.ticks}
-                      freshId={liveNow.leads[0]?.id ?? null}
-                      onDrill={(item) => openLayer({ kind: "drill", id: item.id as DrilldownId, total: item.count })}
-                      onQuality={() => (showTabs ? goTab("quality") : window.location.assign("/relatorios"))}
-                    />
+                    <EssentialView data={essential} />
                   ) : effectiveTab === "funnel" ? (
                     <FunnelTab data={funnel} unitName={unit === "all" ? null : unitInfo.name} />
                   ) : state === "off" ? (

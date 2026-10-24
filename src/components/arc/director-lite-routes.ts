@@ -13,7 +13,6 @@
   "/conversas/broker",
   "/conversas/dashboard",
   "/cotacao",
-  "/dashboard",
   "/dashboard/c/[assistant]",
   "/dashboard/drill/[drillId]",
   "/desempenho",
