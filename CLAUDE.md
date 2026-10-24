@@ -16,6 +16,7 @@ Produção roda no **Coolify** (VPS), em `https://crm.ancorasaude.cloud`. **Não
 Todo trabalho visual DEVE seguir estritamente `docs/design-system.md`.
 Nunca criar cor, radius, spacing ou tipografia fora dos tokens definidos ali.
 Se algo não estiver coberto pelo design system, PARE e pergunte — não assuma.
+Exceção aprovada: quando `feature_director_lite_style` está ativa para a empresa, o modo Diretor segue `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md`, conforme a seção de exceção em `docs/design-system.md`.
 
 ### Regras não-negociáveis deste sistema específico:
 - Bordas definem containers (1px #e5e5e5), NÃO usar sombras pesadas para elevação

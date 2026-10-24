@@ -346,6 +346,10 @@ Refinamento pontual em `/primeiro-acesso` (2026-09-26): papel membro convidado; 
 | UX-H1 — Padronização transversal | `CRM_CODE_COMPLETE_WITH_LITE_EXCEPTION` | `docs/ux/DESIGN_SYSTEM_MANUAL.md`<br>`docs/ux/COMPONENT_STANDARDIZATION_PLAN.md`<br>`docs/ux/audits/ROUTE_COMPONENT_CATALOG.json`<br>`scripts/ui/audit-ui-components.ts`<br>DEC-015 preserva o visual clássico do Corretor Lite | Executar QA visual/funcional autenticado; abrir ondas separadas para Corretor Lite, Super Admin, dev, auth e público |
 | UX-M1 — Mobile Experience | `CODE_COMPLETE_QA_PENDING` | `docs/ux/mobile/MOBILE_UX_AUDIT.md`<br>`docs/ux/mobile/MOBILE_PATTERNS.md`<br>`docs/ux/mobile/MOBILE_FUNCTIONALITY_MATRIX.md`<br>`src/features/broker-workspace/broker-lite-experience.test.tsx`<br>`docs/implementations/active/2026-09-05-mobile-experience-m1.md`<br>DEC-016 | Executar M1.10 e só então marcar funcionalidades como `PRESERVED` |
 
+## Etapa complementar: fundação do Diretor Lite
+
+Autorizada pelo Vinicios em 2026-10-24, conforme DEC-149 e plano `docs/implementations/active/2026-10-24-diretor-lite-redesign.md`. O papel alvo é Diretor; a ação principal continua sendo operar cada tela nas rotas e funções atuais. A F0a entrega o controle reversível por empresa, a pele isolada do chrome e dos portais e opt-out para todas as páginas ainda não revisadas. Estados: chave desligada preserva a experiência existente; chave ligada aplica a pele somente ao Diretor; rota em opt-out preserva o conteúdo da página; camada flutuante usa o escopo Lite. Não altera a estratégia de disclosure das telas nem avança UX-M1.10.
+
 ## 2026-09-26 — Refinamento das integrações
 
 - Etapa UX-H1. Em WhatsApp, Diretor navega entre Oficial e Diretoria; a segunda visão amplia e centraliza os cartões sem alterar as ações. O aviso de proteção removido era apenas texto da aba Oficial.

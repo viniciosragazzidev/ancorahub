@@ -1814,3 +1814,7 @@ mantém o destino autorizado `/plantoes/corretor/<brokerId>`. Tenant, equipe, da
 e permissões continuam derivados e validados no servidor. A decisão altera somente
 navegação e apresentação; não muda regras de distribuição nem a autoridade de
 gestão.
+
+## DEC-149 - Visual Lite do modo Diretor sob controle por empresa
+
+**Aprovada pelo Vinicios em 2026-10-24.** O modo Diretor adota o design system Lite somente quando a flag por empresa `feature_director_lite_style` estiver ativa. A flag nasce desligada, é controlada pelo Super-admin para cada empresa e pode ser desligada sem deploy. O papel Diretor é validado no servidor; gestor, supervisor e corretor não recebem essa pele por causa da flag. Com a flag desligada, a renderização atual não muda. A conversão mantém rotas, funções, dados, permissões e regras de negócio. As rotas ainda não revisadas permanecem em opt-out, enquanto chrome e camadas flutuantes podem usar o escopo Lite. A exceção visual está registrada em `docs/design-system.md` e o plano executável em `docs/implementations/active/2026-10-24-diretor-lite-redesign.md`.

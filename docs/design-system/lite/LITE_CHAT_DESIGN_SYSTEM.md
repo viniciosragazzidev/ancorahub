@@ -252,9 +252,12 @@ Regras de roteiro (conteúdo gerado): funções puras sobre os dados (`build*Scr
 
 ## 10. Modo normal (diretor e gestor)
 
-**Fora do escopo.** Em 2026-10-09 a pele do Lite chegou a ser aplicada ao modo normal e foi **desfeita a pedido do Vinicios** no mesmo dia. Este design system vale **só para o modo Lite (corretor)**; o modo normal segue o visual que já tinha. O histórico da tentativa está nos commits `3fdd31a0` a `c78cb73b` da branch `feat/diretor-visual-lite`.
+O modo Diretor segue este design system quando a flag por empresa `feature_director_lite_style` está ativa, conforme a exceção registrada em `docs/design-system.md` e a decisão DEC-149. A flag nasce desligada, vale somente para o papel Diretor e permite reverter ao visual anterior sem alteração nas rotas, funções ou dados. Com a flag desligada, o Diretor mantém o modo normal atual. Gestor e supervisor no modo normal continuam fora deste escopo; seus modos Lite também não são alterados nesta etapa.
+
+Em 2026-10-09 a pele do Lite chegou a ser aplicada ao modo normal e foi desfeita a pedido do Vinicios no mesmo dia. O histórico dessa tentativa está nos commits `3fdd31a0` a `c78cb73b` da branch `feat/diretor-visual-lite`.
 
 ## 11. Histórico
+- 2026-10-24 · escopo do modo Diretor reaberto por decisão DEC-149, atrás da flag por empresa `feature_director_lite_style`.
 - 2026-10-09 · v1.2 · aplicação no modo normal desfeita a pedido do Vinicios; vale só para o Lite.
 - 2026-10-09 · v1.1 · vira o único design system; §10 reescrita: no modo normal só a camada visual.
 - 2026-10-09 · v1.0 · registro inicial a partir do modo Lite (fases F0 a F6 + ajustes do mesmo dia: sem sidebar, voltar sem loop, aviso dinâmico em pílula, balões do WhatsApp).

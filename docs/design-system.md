@@ -699,3 +699,7 @@ The 9999px radius is deployed 367 times — the second most common radius token.
   --shadow-subtle-3: rgb(255, 255, 255) 0px 0px 0px 3px, rgb(0, 0, 0) 0px 0px 0px 4px;
 }
 ```
+
+## Exceção: modo diretor com a chave ligada
+
+O modo diretor segue o sistema visual Lite descrito em `docs/design-system/lite/LITE_CHAT_DESIGN_SYSTEM.md` somente quando a flag por empresa `feature_director_lite_style` está ativa. A flag nasce desligada e pode ser controlada pelo Super-admin na empresa correspondente. Com a flag desligada, o modo diretor mantém o sistema descrito neste documento. A exceção não altera o visual dos modos Lite de corretor, gestor ou supervisor, nem as regras, rotas, permissões ou dados das telas.
