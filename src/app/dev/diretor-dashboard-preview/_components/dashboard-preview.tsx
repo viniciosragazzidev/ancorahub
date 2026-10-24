@@ -23,7 +23,7 @@ import { enterT, fadeT, LitePills, LiteSwap, useMedia, useReduce } from "./motio
 import { LiteLayer, LitePick } from "./overlay";
 import { DrillContent, ExportContent, FocusContent, FullPageLink, RangeContent } from "./panels";
 import { FunnelTab } from "./funnel-tab";
-import { OverviewTab } from "./overview-tab";
+import { OverviewTab } from "@/features/dashboard/components/director-lite/overview-tab";
 import { QualityDisabled, QualityTab, type FocusTarget } from "./quality-tab";
 import { ErrorState, SkeletonToContent, TabSkeleton } from "./states";
 
@@ -235,7 +235,7 @@ export function DirectorDashboardPreview({ initialTab, initialState, initialVist
                   {effectiveTab === "overview" ? (
                     <OverviewTab
                       data={overview}
-                      period={overviewPeriod}
+                      period={overviewPeriod === "today" ? "today" : overviewPeriod === 7 ? "7d" : "30d"}
                       now={now}
                       pulse={liveNow.ticks}
                       freshId={liveNow.leads[0]?.id ?? null}
