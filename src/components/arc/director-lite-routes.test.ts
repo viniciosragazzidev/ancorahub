@@ -1,4 +1,4 @@
-import { readdirSync } from "node:fs";
+﻿import { readdirSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -21,10 +21,16 @@ function pageRoutes(directory = dashboardRoot): string[] {
 }
 
 describe("rotas do Diretor Lite", () => {
-  it("mantém todas as páginas atuais em opt-out até a revisão de cada rota", () => {
-    const missing = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
-    expect(missing).toEqual([]);
+  it("mantém em opt-out todas as páginas ainda não revisadas (só o painel já saiu)", () => {
+    const revised = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
+    expect(revised).toEqual(["/dashboard"]);
     expect(DIRECTOR_LITE_OPT_OUT_ROUTES.length).toBeGreaterThan(0);
+  });
+
+  it("tira o painel do opt-out, com ou sem query string", () => {
+    expect(isDirectorLiteRouteOptedOut("/dashboard")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/dashboard?periodo=7")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/dashboard/drill/out-of-sla")).toBe(true);
   });
 
   it("reconhece rotas dinâmicas e remove query string", () => {

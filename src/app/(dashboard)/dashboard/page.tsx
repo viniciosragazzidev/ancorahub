@@ -17,6 +17,11 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import { getQualificationFunnel, parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
 import { QualificationFunnelView } from "@/features/qualification-turbo/components/qualification-funnel-view";
+import { parseOverviewPeriod } from "@/features/dashboard/overview-filter";
+import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
+import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
+import { listDashboardBranches } from "@/features/dashboard/director-lite-branches";
+import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -87,6 +92,17 @@ export default async function DashboardPage({
       const detailed = singleParam(resolvedSearchParams.vista) === "detalhada" || Boolean(focus);
       const simple = report.enabled && !detailed ? await getSimpleLeadQualityReport(context, qualityPeriod, { queueId, origin: null }) : null;
       return <LeadQualityCenter report={report} showQualityTab={report.enabled} queues={queues} simple={simple} />;
+    }
+
+    // Painel do diretor no visual Lite (chave feature_director_lite_style). Com a chave desligada, segue a versão de hoje.
+    if (activeTab !== "quality" && activeTab !== "funnel" && (await shouldUseDirectorLiteStyle(context.role, context.tenantId))) {
+      const period = parseOverviewPeriod(singleParam(resolvedSearchParams.periodo));
+      const branches = await listDashboardBranches(context.tenantId);
+      // Unidade de outra empresa (ou inexistente) cai em "Todas as unidades" antes de chegar aos dados.
+      const requestedBranch = parseBranchIdParam(singleParam(resolvedSearchParams.unidade));
+      const branchId = branches.some((branch) => branch.id === requestedBranch) ? requestedBranch : null;
+      const data = await getCommandCenterData(context, { period, branchId });
+      return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={branches} now={new Date()} />;
     }
 
     const [data, reportingEnabled] = await Promise.all([
