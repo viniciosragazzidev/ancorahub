@@ -86,6 +86,18 @@ export const QUEUES = [
 
 const OVERVIEW_SCALE: Record<string, number> = { today: 1, 7: 6.6, 30: 27.5 };
 
+/** Window the real query returns: N operation days (19:00 in Brasília, 22:00Z) ending with today's. */
+function overviewWindow(period: OverviewPeriod, unitId: UnitId, now: Date): CommandCenterData["today"]["window"] {
+  const turn = new Date(now);
+  turn.setUTCHours(22, 0, 0, 0);
+  if (turn > now) turn.setUTCDate(turn.getUTCDate() - 1);
+  turn.setUTCDate(turn.getUTCDate() - ((period === "today" ? 1 : period) - 1));
+  return { period: period === "today" ? "today" : period === 7 ? "7d" : "30d", start: turn.toISOString(), end: now.toISOString(), branchId: unitId === "all" ? null : unitId };
+}
+
+/** "Respostas no WhatsApp" is always the last 7 days. */
+const activityWindow = (now: Date) => ({ start: new Date(now.getTime() - 7 * 86_400_000).toISOString(), end: now.toISOString() });
+
 export function buildCommandCenter(period: OverviewPeriod, unitId: UnitId, now: Date): CommandCenterData {
   const unit = unitOf(unitId);
   const scale = OVERVIEW_SCALE[String(period)] * unit.share;
@@ -144,7 +156,7 @@ export function buildCommandCenter(period: OverviewPeriod, unitId: UnitId, now: 
   }));
 
   return {
-    today: { received, distributed, waiting, withoutFirstContact, queues },
+    today: { received, distributed, waiting, withoutFirstContact, queues, window: overviewWindow(period, unitId, now) },
     welcome: {
       firstName: "Renata",
       nextDuty: { scheduleId: "d-noite", name: "Plantão noite", dutyDate: "2026-10-24", startsAt: "19:00", endsAt: "23:00", running: false, queueName: "Meta pessoa física", brokerCount: 9, minimumBrokers: 8 },
@@ -160,6 +172,7 @@ export function buildCommandCenter(period: OverviewPeriod, unitId: UnitId, now: 
         totalLeads: connectedBrokers.reduce((sum, broker) => sum + broker.leadCount, 0),
         brokers: connectedBrokers,
       },
+      activityWindow: activityWindow(now),
     },
     attention,
     recentLeads,
@@ -169,9 +182,9 @@ export function buildCommandCenter(period: OverviewPeriod, unitId: UnitId, now: 
 
 export function emptyCommandCenter(now: Date): CommandCenterData {
   return {
-    today: { received: 0, distributed: 0, waiting: 0, withoutFirstContact: 0, queues: [] },
+    today: { received: 0, distributed: 0, waiting: 0, withoutFirstContact: 0, queues: [], window: overviewWindow("today", "all", now) },
     welcome: { firstName: "Renata", nextDuty: null, runningDuties: [], pulse: { activeQueues: 0, runningDuties: 0, brokersOnDutyNow: 0 } },
-    whatsapp: { total: 0, connected: 0, notConnected: [], activity: { connectedBrokerCount: 0, totalLeads: 0, brokers: [] } },
+    whatsapp: { total: 0, connected: 0, notConnected: [], activity: { connectedBrokerCount: 0, totalLeads: 0, brokers: [] }, activityWindow: activityWindow(now) },
     attention: [],
     recentLeads: [],
     generatedAt: now.toISOString(),
