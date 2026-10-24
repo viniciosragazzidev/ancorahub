@@ -68,3 +68,12 @@ export function pickNextDuty<T extends WelcomeSchedule>(schedules: readonly T[],
   }
   return best;
 }
+
+/**
+ * Rows (plantões, queues) of one unit when a Diretor picked it on the overview;
+ * all rows when no unit was picked. A row without a unit belongs to none, so it
+ * only shows with "Todas as unidades".
+ */
+export function inOverviewBranch<T extends { branchId: string | null }>(rows: readonly T[], branchId?: string | null): T[] {
+  return branchId ? rows.filter((row) => row.branchId === branchId) : [...rows];
+}

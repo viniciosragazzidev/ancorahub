@@ -10,6 +10,7 @@ import { fillTrendDays } from "@/shared/period";
 import type { FunnelStage } from "./metrics-math";
 import { buildFunnelRows, cohortConversionRate, percentage, safeRate } from "./metrics-math";
 import { resolveReportDataScope, type ReportDataScope } from "./metric-scope";
+import { narrowReportScopeToBranch } from "./narrow-scope";
 import {
   type CohortConversion,
   type PeriodWindows,
@@ -305,11 +306,18 @@ export async function getCommercialBySource(
 
 
 
+/**
+ * `options.branchId` narrows every count to one unit (an AND on top of the
+ * session scope, so it never widens it). Pass only a unit already resolved for
+ * the viewer (the dashboard's `resolveOverviewFilter`: Diretor only, checked
+ * against the tenant). Without it nothing changes.
+ */
 export async function getAttentionSnapshot(
   context: TenantContext,
   period: PeriodValue,
+  options: { branchId?: string | null } = {},
 ): Promise<AttentionSnapshot> {
-  const scope = await resolveReportDataScope(context);
+  const scope = narrowReportScopeToBranch(await resolveReportDataScope(context), options.branchId);
   const db = getDatabase();
   const { currentStart } = resolveWindows(period);
   const sla = await getTenantSlaParams(context.tenantId);

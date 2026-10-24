@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { pickBusiestRunning, pickNextDuty, upcomingShift, type WelcomeSchedule } from "./welcome-rules";
+import { inOverviewBranch, pickBusiestRunning, pickNextDuty, upcomingShift, type WelcomeSchedule } from "./welcome-rules";
 
 const base: Omit<WelcomeSchedule, "id" | "name" | "dayOfWeek" | "validFrom" | "validUntil"> = {
   startsAt: "09:00",
@@ -58,5 +58,23 @@ describe("busiest running plantão", () => {
     expect(pickBusiestRunning([pf, pme], new Map([["pf", { confirmedBrokers: 1, leadsToday: 1, brokers: 1 }], ["pme", { confirmedBrokers: 1, leadsToday: 1, brokers: 4 }]]))?.schedule.id).toBe("pme");
     const early = { schedule: { id: "early" }, shift: shift(11) };
     expect(pickBusiestRunning([pf, early], new Map())?.schedule.id).toBe("early");
+  });
+});
+
+describe("inOverviewBranch", () => {
+  const rows = [
+    { id: "pf-centro", branchId: "br-centro" },
+    { id: "pme-ni", branchId: "br-ni" },
+    { id: "legado", branchId: null },
+  ];
+
+  it("keeps every row without a unit", () => {
+    expect(inOverviewBranch(rows).map((row) => row.id)).toEqual(["pf-centro", "pme-ni", "legado"]);
+    expect(inOverviewBranch(rows, null)).toHaveLength(3);
+  });
+
+  it("keeps only the unit's rows; a row without a unit shows only with every unit", () => {
+    expect(inOverviewBranch(rows, "br-ni").map((row) => row.id)).toEqual(["pme-ni"]);
+    expect(inOverviewBranch(rows, "br-outra")).toEqual([]);
   });
 });

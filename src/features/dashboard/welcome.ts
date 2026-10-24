@@ -5,7 +5,7 @@ import { and, eq, gt, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
-import { pickBusiestRunning, pickNextDuty, upcomingShift, type RunningDutyActivity } from "./welcome-rules";
+import { inOverviewBranch, pickBusiestRunning, pickNextDuty, upcomingShift, type RunningDutyActivity } from "./welcome-rules";
 
 export type DashboardDuty = {
   scheduleId: string;
@@ -30,10 +30,13 @@ export type DashboardWelcome = {
 /**
  * Data for the dashboard's welcome band: who is looking, the plantão running
  * now (or the next one) and whether distribution has queues and people on duty.
+ * `options.branchId` keeps only the plantões and queues of one unit; pass only a
+ * unit already resolved for the viewer (the overview's `resolveOverviewFilter`).
+ * Without it nothing changes.
  */
-export async function getDashboardWelcome(context: TenantContext, now = new Date()): Promise<DashboardWelcome> {
+export async function getDashboardWelcome(context: TenantContext, now = new Date(), options: { branchId?: string | null } = {}): Promise<DashboardWelcome> {
   const db = getDatabase();
-  const [userRows, schedules, queues] = await Promise.all([
+  const [userRows, tenantSchedules, queues] = await Promise.all([
     db.select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1),
     db
       .select({
@@ -47,6 +50,7 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
         validUntil: schema.unitDutySchedules.validUntil,
         minimumBrokers: schema.unitDutySchedules.minimumBrokers,
         queueId: schema.unitDutySchedules.queueId,
+        branchId: schema.unitDutySchedules.branchId,
       })
       .from(schema.unitDutySchedules)
       .where(and(
@@ -61,11 +65,14 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
         status: schema.leadQueues.status,
         exclusiveDutyScheduleIds: schema.leadQueues.exclusiveDutyScheduleIds,
         exclusiveDutyScheduleId: schema.leadQueues.exclusiveDutyScheduleId,
+        branchId: schema.leadQueues.branchId,
       })
       .from(schema.leadQueues)
       .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt))),
   ]);
 
+  // A handful of rows per tenant: the unit is applied here; queue names still resolve from every queue.
+  const schedules = inOverviewBranch(tenantSchedules, options.branchId);
   let next = pickNextDuty(schedules, now);
   const running = schedules.filter((schedule) => upcomingShift(schedule, now)?.running);
   const scheduleIds = [...new Set([...(next ? [next.schedule.id] : []), ...running.map((schedule) => schedule.id)])];
@@ -176,7 +183,7 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
       })
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.name.localeCompare(b.name, "pt-BR")),
     pulse: {
-      activeQueues: queues.filter((queue) => queue.status === "active").length,
+      activeQueues: inOverviewBranch(queues, options.branchId).filter((queue) => queue.status === "active").length,
       runningDuties: running.length,
       brokersOnDutyNow: brokersOn(new Set(running.map((schedule) => schedule.id)), today, publishedToday),
     },

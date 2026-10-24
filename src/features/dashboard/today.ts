@@ -265,8 +265,8 @@ export async function getCommandCenterData(context: TenantContext, filter?: Over
   const branchWhere = overview.narrowBranchId ? eq(schema.leads.branchId, overview.narrowBranchId) : undefined;
   const [today, welcome, attention, recentLeads, whatsapp] = await Promise.all([
     getDashboardToday(context, now, scope, overview),
-    getDashboardWelcome(context),
-    getAttentionSnapshot(context, 7),
+    getDashboardWelcome(context, now, { branchId: overview.narrowBranchId }),
+    getAttentionSnapshot(context, 7, { branchId: overview.narrowBranchId }),
     db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, branchName: schema.branches.name, createdAt: schema.leads.createdAt })
       .from(schema.leads)
       .leftJoin(schema.branches, and(eq(schema.leads.branchId, schema.branches.id), eq(schema.branches.tenantId, context.tenantId)))
