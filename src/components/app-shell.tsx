@@ -12,15 +12,16 @@ import { cn } from "@/lib/utils";
 import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { ViewAsBanner, type ViewAsState } from "@/features/super-admin/components/view-as";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
+import { LightChrome } from "@/components/light/light-chrome";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
 import { ArcScopeProvider, DIRECTOR_LITE_PORTAL_ROOT_ID } from "@/components/arc/arc-scope-context";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
-import { DirectorLiteStyleGate } from "@/components/arc/director-lite-style-gate";
+// Already in the shell bundle before the director skin (LightChrome imports venancor-scope.css);
+// every rule of director-skin.css sits under [data-skin="diretor"], so with the key off nothing changes.
+import "@/components/arc/director-skin.css";
 
 // Client only: it reads the broker's WhatsApp session (server actions) and stays hidden until it knows.
 const WhatsAppMissingBanner = dynamic(() => import("@/components/whatsapp/whatsapp-missing-banner").then((mod) => mod.WhatsAppMissingBanner), { ssr: false });
-// Keep the Lite stylesheet out of normal CRM routes; LightChrome imports it as an entry stylesheet.
-const LightChrome = dynamic(() => import("@/components/light/light-chrome").then((mod) => mod.LightChrome));
 
 type Branding = {
   brandColor: string | null;
@@ -207,7 +208,6 @@ export function AppShell({
 
   return (
     <ArcScopeProvider enabled={directorLiteEnabled}>
-    <DirectorLiteStyleGate enabled={directorLiteEnabled} />
     <OnboardingProvider>
       <SidebarProvider
         data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
