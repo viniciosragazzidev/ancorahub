@@ -4,13 +4,13 @@ import { and, count, eq, gte, inArray, isNotNull, isNull, lte, sql } from "drizz
 
 import { getAttentionSnapshot } from "@/features/reports/metrics/metrics-service";
 import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
-import { operationDayStart } from "@/features/reports/metrics/lead-quality-period";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 import { notStatusBroadcastSql } from "@/features/conversations/status-broadcast";
 import { getDashboardWelcome } from "./welcome";
 import { summarizeWhatsAppActivity } from "./whatsapp-activity";
 import { brokerWhatsAppMembershipScope, brokerWhatsAppMessageSourceCondition } from "./whatsapp-activity-query";
+import { overviewWindowBounds, resolveOverviewBranch, type OverviewFilter, type OverviewWindow } from "./overview-filter";
 
 /** Distribution states of a lead that is waiting for a broker. */
 const WAITING_STATES = ["queued", "unassigned", "returned_to_queue"] as const;
@@ -26,18 +26,87 @@ export type DashboardToday = {
   /** Leads with a broker that nobody started to serve yet (any day). */
   withoutFirstContact: number;
   queues: DashboardTodayQueue[];
+  /** Period and unit the arrivals/distribution were counted in ("today" when no filter is given). */
+  window: OverviewWindow;
 };
+
+type ReportScope = Awaited<ReturnType<typeof resolveReportDataScope>>;
+
+/** A Diretor asked for a unit that is not one of the tenant's. */
+export class OverviewBranchNotFoundError extends Error {
+  constructor() {
+    super("Unidade não encontrada nesta empresa.");
+    this.name = "OverviewBranchNotFoundError";
+  }
+}
+
+/** The overview filter after the role rules and the tenant check (see `resolveOverviewFilter`). */
+export type ResolvedOverviewFilter = {
+  readonly resolved: true;
+  readonly window: OverviewWindow;
+  readonly since: Date;
+  /** Unit to add to the queries; null when the report scope already sets it (Gestor) or there is none. */
+  readonly narrowBranchId: string | null;
+};
+
+/**
+ * Applies the overview filter to the viewer: tenant always from the session,
+ * a unit only for a Diretor (checked against the tenant, one primary-key
+ * lookup and only when a unit was asked), the Gestor's own unit and the
+ * Supervisor's team stay as the report scope sets them.
+ */
+export async function resolveOverviewFilter(context: TenantContext, scope: ReportScope, filter: OverviewFilter = {}, now = new Date()): Promise<ResolvedOverviewFilter> {
+  const period = filter.period ?? "today";
+  const { start, end } = overviewWindowBounds(period, now);
+  const branch = resolveOverviewBranch({
+    role: context.role,
+    sessionBranchId: context.branchId,
+    canCompareUnits: scope.canCompareUnits,
+    requestedBranchId: filter.branchId,
+  });
+  if (branch.source === "request" && branch.branchId) {
+    const [row] = await getDatabase()
+      .select({ id: schema.branches.id })
+      .from(schema.branches)
+      .where(and(eq(schema.branches.id, branch.branchId), eq(schema.branches.tenantId, context.tenantId)))
+      .limit(1);
+    if (!row) throw new OverviewBranchNotFoundError();
+  }
+  return {
+    resolved: true,
+    window: { period, start: start.toISOString(), end: end.toISOString(), branchId: branch.branchId },
+    since: start,
+    narrowBranchId: branch.source === "request" ? branch.branchId : null,
+  };
+}
+
+function isResolvedFilter(filter: OverviewFilter | ResolvedOverviewFilter | undefined): filter is ResolvedOverviewFilter {
+  return Boolean(filter && "resolved" in filter && filter.resolved);
+}
+
+function overviewFilterFor(context: TenantContext, scope: ReportScope, filter: OverviewFilter | ResolvedOverviewFilter | undefined, now: Date) {
+  return isResolvedFilter(filter) ? Promise.resolve(filter) : resolveOverviewFilter(context, scope, filter, now);
+}
 
 /**
  * What matters today, in the viewer's report scope (a Gestor sees their own
  * unit): arrivals, distribution, waiting leads and leads per queue.
+ * `filter` widens arrivals/distribution to 7 or 30 operation days and lets a
+ * Diretor pick one unit; waiting and without first contact stay "right now".
  */
-export async function getDashboardToday(context: TenantContext, now = new Date(), resolvedScope?: Awaited<ReturnType<typeof resolveReportDataScope>>): Promise<DashboardToday> {
+export async function getDashboardToday(context: TenantContext, now = new Date(), resolvedScope?: ReportScope, filter?: OverviewFilter | ResolvedOverviewFilter): Promise<DashboardToday> {
   const db = getDatabase();
   const scope = resolvedScope ?? await resolveReportDataScope(context);
+  const overview = await overviewFilterFor(context, scope, filter, now);
   // The operation day turns at 19:00, the same window as Qualidade dos leads ("Hoje").
-  const todayStart = operationDayStart(now);
-  const alive = and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), scope.leadScope);
+  const todayStart = overview.since;
+  const alive = and(
+    eq(schema.leads.tenantId, context.tenantId),
+    isNull(schema.leads.deletedAt),
+    isNull(schema.leads.archivedAt),
+    scope.leadScope,
+    overview.narrowBranchId ? eq(schema.leads.branchId, overview.narrowBranchId) : undefined,
+  );
   const waitingWhere = and(alive, isNull(schema.leads.corretorId), inArray(schema.leads.distributionStatus, [...WAITING_STATES]));
   const todayWhere = and(alive, gte(schema.leads.createdAt, todayStart));
 
@@ -74,6 +143,7 @@ export async function getDashboardToday(context: TenantContext, now = new Date()
     waiting: Number(waiting?.value ?? 0),
     withoutFirstContact: Number(withoutFirstContact?.value ?? 0),
     queues: [...byQueue.values()].sort((a, b) => b.today - a.today || b.waiting - a.waiting || a.name.localeCompare(b.name, "pt-BR")),
+    window: overview.window,
   };
 }
 
@@ -83,23 +153,33 @@ export type BrokerWhatsAppStatus = {
   /** First brokers still without WhatsApp, by name, to chase before the 20/10 rule. */
   notConnected: Array<{ id: string; name: string }>;
   activity: ReturnType<typeof summarizeWhatsAppActivity>;
+  /**
+   * Window of `activity` ("Respostas no WhatsApp"): always the last 7 days,
+   * whatever the overview period, matching the `respondeu=7d` link of /conversas.
+   */
+  activityWindow: { start: string; end: string };
 };
 
 /**
  * Active brokers in the viewer's scope (Diretor: tenant, Gestor: unit,
  * Supervisor: team) and how many have their WhatsApp connected ("ready").
+ * With `filter.branchId` a Diretor narrows it to the brokers (and their leads)
+ * of one unit; the period does not change it: readiness is "now" and the
+ * replies are always the last 7 days (see `activityWindow`).
  */
-export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awaited<ReturnType<typeof resolveReportDataScope>>): Promise<BrokerWhatsAppStatus> {
-  const empty: BrokerWhatsAppStatus = { total: 0, connected: 0, notConnected: [], activity: summarizeWhatsAppActivity([]) };
+export async function getBrokerWhatsAppStatus(context: TenantContext, scope: ReportScope, filter?: OverviewFilter | ResolvedOverviewFilter): Promise<BrokerWhatsAppStatus> {
+  const now = new Date();
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const activityWindow = { start: sevenDaysAgo.toISOString(), end: now.toISOString() };
+  const empty: BrokerWhatsAppStatus = { total: 0, connected: 0, notConnected: [], activity: summarizeWhatsAppActivity([]), activityWindow };
   const brokerScope = brokerWhatsAppMembershipScope({
     role: context.role,
     branchId: context.branchId,
     supervisedBrokerIds: scope.supervisedBrokerIds,
   });
   if (brokerScope === null) return empty;
-
-  const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  // No extra query without a filter: the unit is only checked when a Diretor asks for one.
+  const narrowBranchId = filter ? (await overviewFilterFor(context, scope, filter, now)).narrowBranchId : null;
   const personalConnectionReady = sql<boolean>`exists (
     select 1 from ${schema.whatsappConnections}
     where ${schema.whatsappConnections.tenantId} = ${context.tenantId}
@@ -124,6 +204,7 @@ export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awa
       isNull(schema.leads.deletedAt),
       isNull(schema.leads.archivedAt),
       scope.leadScope,
+      narrowBranchId ? eq(schema.leads.branchId, narrowBranchId) : undefined,
       personalConnectionReady,
     ))
     .leftJoin(schema.whatsappMessages, and(
@@ -146,6 +227,7 @@ export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awa
       eq(schema.tenantMemberships.role, "broker"),
       eq(schema.tenantMemberships.status, "active"),
       brokerScope,
+      narrowBranchId ? eq(schema.tenantMemberships.branchId, narrowBranchId) : undefined,
     ))
     .groupBy(schema.tenantMemberships.userId, schema.user.name)
     .orderBy(schema.user.name);
@@ -156,13 +238,14 @@ export async function getBrokerWhatsAppStatus(context: TenantContext, scope: Awa
     connected: rows.length - notConnected.length,
     notConnected: notConnected.sort((a, b) => a.name.localeCompare(b.name, "pt-BR")).slice(0, 6),
     activity: summarizeWhatsAppActivity(rows),
+    activityWindow,
   };
 }
 
 /** Resolve report scope and load the metric for Lite Inicio pages that do not render CommandCenter. */
-export async function getBrokerWhatsAppStatusForContext(context: TenantContext): Promise<BrokerWhatsAppStatus> {
+export async function getBrokerWhatsAppStatusForContext(context: TenantContext, filter?: OverviewFilter): Promise<BrokerWhatsAppStatus> {
   const scope = await resolveReportDataScope(context);
-  return getBrokerWhatsAppStatus(context, scope);
+  return getBrokerWhatsAppStatus(context, scope, filter);
 }
 
 export type CommandCenterData = Awaited<ReturnType<typeof getCommandCenterData>>;
@@ -171,21 +254,26 @@ export type CommandCenterData = Awaited<ReturnType<typeof getCommandCenterData>>
  * Everything the dashboard (the command center) shows: today's numbers, the
  * plantões running now, what needs attention and the latest leads. Lighter
  * than the old reporting dashboard: no funnel, trend or rankings here.
+ * `filter` (period and, for a Diretor, a unit) is resolved once and shared by
+ * the numbers, the WhatsApp cards and the recent leads.
  */
-export async function getCommandCenterData(context: TenantContext) {
+export async function getCommandCenterData(context: TenantContext, filter?: OverviewFilter) {
   const db = getDatabase();
   const scope = await resolveReportDataScope(context);
+  const now = new Date();
+  const overview = await resolveOverviewFilter(context, scope, filter, now);
+  const branchWhere = overview.narrowBranchId ? eq(schema.leads.branchId, overview.narrowBranchId) : undefined;
   const [today, welcome, attention, recentLeads, whatsapp] = await Promise.all([
-    getDashboardToday(context, new Date(), scope),
+    getDashboardToday(context, now, scope, overview),
     getDashboardWelcome(context),
     getAttentionSnapshot(context, 7),
     db.select({ id: schema.leads.id, name: schema.leads.nome, status: schema.leads.status, branchName: schema.branches.name, createdAt: schema.leads.createdAt })
       .from(schema.leads)
       .leftJoin(schema.branches, and(eq(schema.leads.branchId, schema.branches.id), eq(schema.branches.tenantId, context.tenantId)))
-      .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), scope.leadScope))
+      .where(and(eq(schema.leads.tenantId, context.tenantId), isNull(schema.leads.deletedAt), isNull(schema.leads.archivedAt), scope.leadScope, branchWhere))
       .orderBy(sql`${schema.leads.createdAt} desc`)
       .limit(6),
-    getBrokerWhatsAppStatus(context, scope),
+    getBrokerWhatsAppStatus(context, scope, overview),
   ]);
   return {
     today,

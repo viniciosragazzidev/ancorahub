@@ -19,6 +19,7 @@ const data: CommandCenterData = {
       { id: "q-pme", name: "FILA PME - RENAN", hue: 10, today: 25, waiting: 4 },
       { id: "q-pf", name: "FILA PF", hue: 200, today: 17, waiting: 0 },
     ],
+    window: { period: "today", start: "2026-10-08T22:00:00.000Z", end: "2026-10-09T15:00:00.000Z", branchId: null },
   },
   welcome: {
     firstName: "Vinicios",
@@ -35,6 +36,7 @@ const data: CommandCenterData = {
       totalLeads: 12,
       brokers: [{ id: "b3", name: "Carla Costa", leadCount: 4 }, { id: "b4", name: "Daniel Lima", leadCount: 2 }],
     },
+    activityWindow: { start: "2026-10-02T15:00:00.000Z", end: "2026-10-09T15:00:00.000Z" },
   },
   attention: [],
   recentLeads: [],
