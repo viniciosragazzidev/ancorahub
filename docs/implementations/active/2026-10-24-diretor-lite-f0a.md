@@ -76,6 +76,19 @@ fica sob responsabilidade do Maestro.
   `npx tsc --noEmit -p .` passou; ESLint dirigido passou sem erros (4 avisos
   preexistentes em `attachment-upload.tsx`).
 
+## Correção após a segunda rodada do Vigia
+
+- O layout raiz importa somente `globals.css`. As folhas `venancor-scope.css` e
+  `director-skin.css` são carregadas pelo chunk dinâmico do Diretor apenas quando
+  a flag está ativa.
+- `LightChrome`, que também importa a folha compartilhada Lite, agora é carregado
+  sob demanda para o público Lite. As entradas Lite independentes mantêm seus
+  imports existentes.
+- Testes cobrem a ausência de carregamento com a flag desligada e a remoção dos
+  imports Arc do layout raiz.
+- Verificação desta correção: 4 arquivos de teste focados, 43 testes passaram;
+  `npx tsc --noEmit -p .`, ESLint dirigido e `git diff --check` passaram.
+
 Commits locais:
 
 - `bdbbe467 docs: registra excecao visual do Diretor Lite`

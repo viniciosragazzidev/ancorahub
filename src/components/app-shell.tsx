@@ -9,16 +9,18 @@ import { CorreTopSidebar } from "@/components/corretop-sidebar";
 import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
-import { LightChrome } from "@/components/light/light-chrome";
 import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
 import { ViewAsBanner, type ViewAsState } from "@/features/super-admin/components/view-as";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
 import { ArcScopeProvider, DIRECTOR_LITE_PORTAL_ROOT_ID } from "@/components/arc/arc-scope-context";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
+import { DirectorLiteStyleGate } from "@/components/arc/director-lite-style-gate";
 
 // Client only: it reads the broker's WhatsApp session (server actions) and stays hidden until it knows.
 const WhatsAppMissingBanner = dynamic(() => import("@/components/whatsapp/whatsapp-missing-banner").then((mod) => mod.WhatsAppMissingBanner), { ssr: false });
+// Keep the Lite stylesheet out of normal CRM routes; LightChrome imports it as an entry stylesheet.
+const LightChrome = dynamic(() => import("@/components/light/light-chrome").then((mod) => mod.LightChrome));
 
 type Branding = {
   brandColor: string | null;
@@ -205,6 +207,7 @@ export function AppShell({
 
   return (
     <ArcScopeProvider enabled={directorLiteEnabled}>
+    <DirectorLiteStyleGate enabled={directorLiteEnabled} />
     <OnboardingProvider>
       <SidebarProvider
         data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}

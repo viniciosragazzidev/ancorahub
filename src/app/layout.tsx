@@ -11,8 +11,6 @@ import { SkipToContent } from "@/components/skip-to-content";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import "./globals.css";
-import "@/components/arc/venancor-scope.css";
-import "@/components/arc/director-skin.css";
 
 const jakartaSans = Plus_Jakarta_Sans({
   variable: "--font-jakarta-sans",
