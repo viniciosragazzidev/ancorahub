@@ -8,8 +8,9 @@
   --text-secondary: #71717a;
   --text-muted: #71717a;
   --accent: #f4f3f0;
-  --accent-strong: #e7e5e4;
-  --accent-subtle: #f4f3f0;
+  /* Azul de destaque da prévia aprovada (links, selo, texto de ação). Com cinza, o texto some no app real. */
+  --accent-strong: #2a1fd1;
+  --accent-subtle: rgb(59 45 255 / 0.1);
   --accent-foreground: #09090b;
   --arc-accent: #3b2dff;
   --arc-accent-strong: #2a1fd1;
