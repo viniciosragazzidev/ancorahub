@@ -20,35 +20,43 @@ import { enterT, fadeT, LiteItem, LiteNumber, LiteReveal, staggerDelay, useReduc
 
 type Totals = EssentialDashboard["queues"]["totals"];
 
-/** Número com legenda curta embaixo: o que conta e o que não conta. */
-function Figure({ label, hint, value, warn, sub }: { label: string; hint: string; value: number; warn?: boolean; sub?: string }) {
+/** Um número do card: valor médio e rótulo curto embaixo. `text` troca o número por um texto (ex.: 2/3). */
+function Stat({ label, value, text, warn }: { label: string; value?: number; text?: string; warn?: boolean }) {
   return (
-    <div className={styles.figure} data-warn={warn ? "true" : undefined} title={hint}>
-      <dt className={styles.muted}>{label}</dt>
-      <dd className={styles.figureDetail}>
-        <LiteNumber value={value} className={styles.figureValue} />
-        {sub ? <span className={styles.muted}>{sub}</span> : null}
-      </dd>
-      <p className={styles.hint}>{hint}</p>
+    <div className={styles.stat2} data-warn={warn ? "true" : undefined}>
+      <span className={styles.statNumber}>{text ?? <LiteNumber value={value ?? 0} />}</span>
+      <span className={styles.statCaption}>{label}</span>
     </div>
+  );
+}
+
+/** Ajuda de uma seção: um ícone de 44px que abre a explicação em linhas curtas (sem frases dentro dos cards). */
+function Help({ label, lines }: { label: string; lines: string[] }) {
+  return (
+    <details className={styles.help}>
+      <summary className={styles.helpButton} aria-label={label} title={label}>?</summary>
+      <ul className={styles.helpPanel}>
+        {lines.map((line) => <li key={line}>{line}</li>)}
+      </ul>
+    </details>
   );
 }
 
 function DutyCard({ duty, index }: { duty: EssentialDuty; index: number }) {
   return (
     <LiteItem as="li" index={index} className={styles.dutyCard}>
-      <Link href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className={styles.dutyHead}>
-        <span className={styles.rowTitle}>
+      <div className={styles.dutyTop}>
+        <Link href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className={styles.dutyName}>
           <span className={styles.liveDot} aria-hidden="true" />
           <span className={styles.truncate} title={duty.name}>{duty.name}</span>
-        </span>
-        <span className={styles.muted}>{duty.startsAt} às {duty.endsAt}{duty.queueId ? "" : " · sem fila ligada"}</span>
-      </Link>
-      <dl className={styles.figures}>
-        <Figure label="Disponíveis" hint="Aguardando distribuição nesta fila agora." value={duty.available} />
-        <Figure label="Distribuídos hoje" hint="Entregues desde o início do plantão." value={duty.distributed} />
-        <Figure label="Corretores ativos" hint="Presença confirmada hoje." value={duty.activeBrokers} warn={duty.belowMinimum} sub={`de ${duty.brokerCount} escalados`} />
-      </dl>
+        </Link>
+        <span className={styles.dutyTime}>{duty.startsAt} às {duty.endsAt}</span>
+      </div>
+      <div className={styles.dutyNumbers}>
+        <Stat label="disponíveis" value={duty.available} />
+        <Stat label="distribuídos" value={duty.distributed} />
+        <Stat label="corretores" text={`${duty.activeBrokers}/${duty.brokerCount}`} warn={duty.belowMinimum} />
+      </div>
     </LiteItem>
   );
 }
@@ -61,6 +69,14 @@ function DutiesBlock({ running, next }: { running: EssentialDuty[]; next: Dashbo
           <h2 className={styles.cardTitle}>Plantões acontecendo agora</h2>
           <p className={styles.cardDescription}>{running.length ? `${plural(running.length, "plantão ativo", "plantões ativos")} neste momento.` : "Nenhum plantão ativo neste momento."}</p>
         </div>
+        <Help
+          label="Como ler os números dos plantões"
+          lines={[
+            "Disponíveis: aguardando distribuição nesta fila agora.",
+            "Distribuídos: entregues a corretor desde o início do plantão.",
+            "Corretores: com presença confirmada hoje, de quantos escalados. Laranja quando está abaixo do mínimo.",
+          ]}
+        />
       </header>
       {running.length ? (
         <ul className={styles.dutyGrid}>
@@ -184,19 +200,27 @@ function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["what
       <header className={styles.cardHeader}>
         <div>
           <h2 className={styles.cardTitle}>WhatsApp dos corretores</h2>
-          <p className={styles.cardDescription}>Conexão pessoal ativa e atendimentos. Recebidos: leads que entraram para corretores conectados {label}.</p>
+          <p className={styles.cardDescription}>Corretores com WhatsApp pessoal conectado, {label}.</p>
         </div>
+        <Help
+          label="Como ler os números do WhatsApp"
+          lines={[
+            "Recebidos: leads entregues a corretores conectados na janela.",
+            "Respondendo: desses, o cliente mandou mensagem pelo WhatsApp do corretor. A porcentagem é respondendo sobre recebidos.",
+            "Atendimentos ativos: leads abertos, sem ganho nem perda, com mensagem do cliente nas últimas 24h.",
+          ]}
+        />
       </header>
       <div className={styles.cardBody}>
         <p className={styles.headline}>
           <LiteNumber value={whatsapp.connected} className={styles.headlineValue} />
           <span>de {n(whatsapp.total)} {whatsapp.total === 1 ? "corretor conectou" : "corretores conectaram"} o WhatsApp pessoal</span>
         </p>
-        <dl className={styles.figures}>
-          <Figure label="Recebidos" hint={`Leads entregues a corretores conectados ${label}.`} value={whatsapp.received} />
-          <Figure label="Respondendo" hint="Desses, o cliente mandou mensagem pelo WhatsApp do corretor." value={whatsapp.responding} sub={`${whatsapp.responseRate}%`} />
-          <Figure label="Atendimentos ativos" hint="Leads abertos (sem ganho nem perda) com mensagem do cliente nas últimas 24h." value={whatsapp.active} />
-        </dl>
+        <div className={styles.dutyNumbers}>
+          <Stat label="recebidos" value={whatsapp.received} />
+          <Stat label={`respondendo · ${whatsapp.responseRate}%`} value={whatsapp.responding} />
+          <Stat label="atendimentos ativos" value={whatsapp.active} />
+        </div>
         {whatsapp.brokers.length ? (
           <ul className={styles.nameList} aria-label="Corretores conectados, com atendimentos ativos">
             {whatsapp.brokers.map((broker, index) => (

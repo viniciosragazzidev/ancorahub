@@ -73,13 +73,16 @@ describe("bloco 1: plantões acontecendo agora", () => {
     expect(pme).toHaveAttribute("href", "/leads/distribuicao/plantao/pme");
     expect(screen.getByText("2 plantões ativos neste momento.", { exact: false })).toBeInTheDocument();
     const figures = within(pme.closest("li") as HTMLElement);
-    expect(figures.getByText("Disponíveis")).toBeInTheDocument();
-    expect(figures.getByText("Distribuídos hoje")).toBeInTheDocument();
-    expect(figures.getByText("Corretores ativos")).toBeInTheDocument();
-    // PME tem 2 corretores confirmados de 3 escalados (abaixo do mínimo): o número aparece em alerta.
-    expect(figures.getByText("de 3 escalados")).toBeInTheDocument();
-    expect(figures.getByText("Presença confirmada hoje.")).toBeInTheDocument();
+    expect(figures.getByText("disponíveis")).toBeInTheDocument();
+    expect(figures.getByText("distribuídos")).toBeInTheDocument();
+    // PME tem 2 corretores confirmados de 3 escalados: "2/3", em alerta por estar abaixo do mínimo.
+    expect(figures.getByText("2/3")).toBeInTheDocument();
+    expect(figures.getByText("corretores")).toBeInTheDocument();
     expect(pme.closest("li")!.querySelector('[data-warn="true"]')).not.toBeNull();
+    // As frases explicativas saíram do card: ficam no ícone de ajuda da seção.
+    expect(figures.queryByText(/Aguardando distribuição/)).not.toBeInTheDocument();
+    expect(screen.getByText("Disponíveis: aguardando distribuição nesta fila agora.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Como ler os números dos plantões")).toBeInTheDocument();
   });
 
   it("sem plantão ativo, mostra o estado vazio com o próximo plantão", () => {
@@ -125,9 +128,10 @@ describe("bloco 3: WhatsApp dos corretores", () => {
   it("mostra quantos conectaram, recebidos, respondendo, taxa e atendimentos ativos", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     expect(screen.getByText("de 5 corretores conectaram o WhatsApp pessoal", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("Recebidos")).toBeInTheDocument();
-    expect(screen.getByText("37%")).toBeInTheDocument();
-    expect(screen.getByText("Atendimentos ativos")).toBeInTheDocument();
+    expect(screen.getByText("recebidos")).toBeInTheDocument();
+    expect(screen.getByText("respondendo · 37%")).toBeInTheDocument();
+    expect(screen.getByText("atendimentos ativos")).toBeInTheDocument();
+    expect(screen.getByLabelText("Como ler os números do WhatsApp")).toBeInTheDocument();
   });
 
   it("lista só os corretores conectados, ordenados por atendimentos ativos", () => {
