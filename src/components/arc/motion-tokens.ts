@@ -18,7 +18,12 @@ export const motionTokens = {
     morph: { type: "spring", visualDuration: 0.42, bounce: 0.16 },
   },
   /** Stagger steps in seconds. Keep total stagger under roughly 0.4s. */
-  stagger: { char: 0.016, word: 0.04, line: 0.08, item: 0.035 },
+  /** `max` caps how many items cascade; later items enter together with the last one. */
+  stagger: { char: 0.016, word: 0.04, line: 0.08, item: 0.035, max: 8 },
   /** Blur radii in px for text and content crossfades. Keep blur small and brief. */
   blur: { subtle: 2, soft: 4, text: 8 },
+  /** Offsets in px for entering and leaving elements, by element type. */
+  distance: { xs: 4, sm: 6, md: 8, lg: 12, sheet: 24 },
+  /** Scale targets for presses and pops. */
+  scale: { pressButton: 0.97, pressRow: 0.99, pressCard: 0.985, popIn: 0.96 },
 } as const;
