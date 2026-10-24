@@ -1,0 +1,6 @@
+/* Raiz da lista Lite de /leads: fundo e texto da pele do diretor, mesmo com a rota fora do opt-out. */
+.root {
+  min-width: 0;
+  background: var(--background);
+  color: var(--foreground);
+}

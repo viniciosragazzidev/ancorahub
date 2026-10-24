@@ -41,6 +41,7 @@ import { LeadDistributionRemovedTag } from "./_components/lead-distribution-remo
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
+import { LeadsListSwitch } from "./leads-lite-list";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
@@ -649,7 +650,7 @@ export function LeadsWorkspace({
               {selectionActions}
             </SelectionToolbar>
             <div className="w-full">
-              <LeadsDataTable
+              <LeadsListSwitch
                 leads={workspaceLeads}
                 contextRole={contextRole}
                 shouldMask={shouldMask}
