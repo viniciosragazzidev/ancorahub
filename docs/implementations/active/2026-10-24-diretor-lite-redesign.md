@@ -208,6 +208,8 @@ PR separado, com `type-check` limpo e lista de arquivos removidos no PR. Inclui 
 
 **Pronto quando:** o catálogo mostra todas as primitivas no padrão; o guarda-corpo dá zero desvio em `src/components/ui`; Button, Input, Select, Checkbox, Switch e Tabs têm 44px medidos no navegador; teclado e foco visível funcionam em todos; **e o Vinicios aprovou os prints do catálogo com a chave desligada e ligada antes do merge** (a F1 muda primitivas usadas por mais de 300 arquivos; é o ponto em que 09/10 deu errado).
 
+Registro de execução F1: [`2026-10-24-diretor-lite-f1.md`](2026-10-24-diretor-lite-f1.md). Implementação entregue na branch própria; a revisão visual dos prints pelo Vinicios continua pendente antes do merge.
+
 ### F1b. Sistema de movimento e acabamento
 Especificação completa em `2026-10-24-diretor-lite/motion-e-acabamento.md` (exigência do Vinicios, 24/10: animações profissionais e cuidado detalhista de ponta a ponta).
 1. Tokens novos em `motion-tokens.ts` e no CSS (`distance`, `scale`, `stagger.max`), com o par CSS de cada um.
