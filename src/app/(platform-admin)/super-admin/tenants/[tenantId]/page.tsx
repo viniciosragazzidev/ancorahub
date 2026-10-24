@@ -8,6 +8,7 @@ import {
   getPurgeJobStatusAction,
   setTenantStatusAction,
   updateCleanUiOperationalLegacyTenantAction,
+  updateDirectorLiteStylePilotAction,
   updateMetaLeadAdsPilotAction,
   updateTenantCustomRolesPilotAction,
 } from "../../actions";
@@ -21,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getPlatformTenant, getTenantBranches, getTenantMembers } from "@/features/platform-admin/service";
 import { ArrowRight } from "@/components/huge-icons";
 import { getSystemSettings } from "@/features/system-settings/queries";
+import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 import { CLEAN_UI_FEATURE, getCleanUiOperationalLegacyTenantIds } from "@/features/clean-ui/feature";
 import { getMetaLeadAdsPilotTenantIds } from "@/features/communication-channels/meta-lead-ads-platform";
 import { getDatabase, schema } from "@/shared/db";
@@ -74,6 +76,7 @@ export default async function SuperAdminTenantDetailPage({
       "feature_meta_lead_ads_enabled",
       CLEAN_UI_FEATURE,
       "feature_custom_roles_enabled",
+      directorLiteStyleSettingKey(tenantId.data),
     ]),
     getMetaLeadAdsPilotTenantIds(),
     getCleanUiOperationalLegacyTenantIds(),
@@ -86,6 +89,7 @@ export default async function SuperAdminTenantDetailPage({
   const metaLeadAdsGlobalEnabled = settingMap.get("feature_meta_lead_ads_enabled") === "true";
   const cleanUiGlobalEnabled = settingMap.get(CLEAN_UI_FEATURE) !== "false";
   const customRolesGlobalEnabled = settingMap.get("feature_custom_roles_enabled") === "true";
+  const directorLiteEnabled = settingMap.get(directorLiteStyleSettingKey(tenant.id)) === "true";
   const metaLeadAdsPilotEnabled = metaLeadAdsPilotTenantIds.includes(tenant.id);
   const usingLegacyLayout = cleanUiLegacyTenantIds.includes(tenant.id);
   const metaLeadAdsState = operationalState(metaLeadAdsGlobalEnabled, metaLeadAdsPilotEnabled);
@@ -93,6 +97,7 @@ export default async function SuperAdminTenantDetailPage({
   const metaLeadAdsAction = updateMetaLeadAdsPilotAction.bind(null, tenant.id);
   const cleanUiAction = updateCleanUiOperationalLegacyTenantAction.bind(null, tenant.id);
   const customRolesAction = updateTenantCustomRolesPilotAction.bind(null, tenant.id);
+  const directorLiteAction = updateDirectorLiteStylePilotAction.bind(null, tenant.id);
 
   return (
     <>
@@ -153,6 +158,21 @@ export default async function SuperAdminTenantDetailPage({
 
           <Card>
             <CardContent className="divide-y divide-border p-0">
+              <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="max-w-2xl">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="font-medium">Visual Lite do Diretor</h3>
+                    <Badge variant={directorLiteEnabled ? "success" : "outline"}>{directorLiteEnabled ? "Disponível para o Diretor" : "Não liberado"}</Badge>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">Ativa o piloto visual somente para o papel Diretor desta empresa. As rotas seguem protegidas por padrão durante a revisão.</p>
+                </div>
+                <form action={directorLiteAction}>
+                  <input name="enabled" type="hidden" value={directorLiteEnabled ? "false" : "true"} />
+                  <Button type="submit" variant={directorLiteEnabled ? "outline" : "default"}>
+                    {directorLiteEnabled ? "Desativar piloto" : "Ativar piloto"}
+                  </Button>
+                </form>
+              </div>
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-2xl">
                   <div className="flex flex-wrap items-center gap-2">

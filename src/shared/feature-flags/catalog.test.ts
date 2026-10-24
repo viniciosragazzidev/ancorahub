@@ -24,6 +24,17 @@ describe("manager Lite feature flag", () => {
   });
 });
 
+describe("director Lite visual feature flag", () => {
+  it("is controlled per company and disabled by default", () => {
+    expect(FEATURE_FLAGS.DIRECTOR_LITE_STYLE).toMatchObject({
+      key: "feature_director_lite_style",
+      scope: "tenant",
+      defaultValue: "false",
+      allowedValues: ["true", "false"],
+    });
+  });
+});
+
 describe("team management feature flag", () => {
   it("is globally controlled and disabled by default", () => {
     expect(FEATURE_FLAGS.TEAM_MANAGEMENT).toMatchObject({

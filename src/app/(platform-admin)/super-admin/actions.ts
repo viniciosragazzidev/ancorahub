@@ -34,6 +34,7 @@ import { CLEAN_UI_FEATURE, CLEAN_UI_LEGACY_TENANTS_SETTING } from "@/features/cl
 import { REALTIME_SYNC_FEATURE } from "@/features/notifications/realtime-sync";
 import { SYSTEM_REPORT_DESTINATION_KEY, SYSTEM_REPORT_ENABLED_KEY } from "@/features/system-report/message";
 import { DEFAULT_META_OUTBOUND_STALE_AFTER_HOURS, META_OUTBOUND_STALE_AFTER_HOURS_SETTING } from "@/features/communication-channels/outbound-service";
+import { directorLiteStyleSettingKey } from "@/features/director-lite/style-flag";
 
 async function requirePlatformTenantTarget(tenantId: string) {
   const parsedTenantId = z.string().uuid().safeParse(tenantId);
@@ -338,6 +339,26 @@ export async function updateMetaLeadAdsPilotAction(tenantId: string, formData: F
   const now = new Date();
   await setSystemSetting(key, JSON.stringify(next), now);
   await getDatabase().insert(schema.platformAuditLogs).values({ id: crypto.randomUUID(), actorUserId: admin.userId, action: "meta_lead_ads.tenant_pilot_updated", targetType: "tenant", targetId: targetTenantId, metadata: { enabled: input.enabled === "true" }, createdAt: now });
+}
+
+export async function updateDirectorLiteStylePilotAction(tenantId: string, formData: FormData) {
+  const admin = await getRequiredPlatformAdmin();
+  const input = z.object({ enabled: z.enum(["true", "false"]) }).parse({ enabled: formData.get("enabled") });
+  const targetTenantId = await requirePlatformTenantTarget(tenantId);
+  const now = new Date();
+  const key = directorLiteStyleSettingKey(targetTenantId);
+
+  await setSystemSetting(key, input.enabled, now);
+  await getDatabase().insert(schema.platformAuditLogs).values({
+    id: crypto.randomUUID(),
+    actorUserId: admin.userId,
+    action: "director_lite_style.tenant_pilot_updated",
+    targetType: "tenant",
+    targetId: targetTenantId,
+    metadata: { enabled: input.enabled === "true" },
+    createdAt: now,
+  });
+  revalidatePath(`/super-admin/tenants/${targetTenantId}`);
 }
 
 export async function updateNotificationCapabilityAction(formData: FormData) {

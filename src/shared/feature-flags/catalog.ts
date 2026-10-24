@@ -6,7 +6,7 @@
  *
  * Escopo:
  * - "global"  → controlado pelo Super-admin. Afeta todos os tenants.
- * - "tenant"  → controlado pelo Diretor do tenant. Afeta apenas aquele tenant.
+ * - "tenant"  → valor isolado por empresa; a autoridade de controle é definida pela capacidade.
  */
 
 // ─── Tipos ───────────────────────────────────────────────────────────────────
@@ -199,6 +199,13 @@ export const FEATURE_FLAGS = {
     defaultValue: "false",
     allowedValues: ["true", "false"] as const,
     description: "Força o Gestor a usar a experiência Lite, começando por Leads.",
+  },
+  DIRECTOR_LITE_STYLE: {
+    key: "feature_director_lite_style",
+    scope: "tenant",
+    defaultValue: "false",
+    allowedValues: ["true", "false"] as const,
+    description: "Habilita o visual Lite somente para o Diretor desta empresa. O Super-admin controla cada piloto.",
   },
   TEAM_MANAGEMENT: {
     key: "feature_team_management_enabled",

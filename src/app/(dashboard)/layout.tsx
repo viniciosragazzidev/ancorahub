@@ -33,6 +33,7 @@ import { hasPermission } from "@/shared/auth/permissions";
 import { isCleanUiOperationalEnabled } from "@/features/clean-ui/feature";
 import { getRouteDefinition } from "@/features/custom-roles/routes";
 import { hasEffectiveRouteAccess } from "@/features/custom-roles/service";
+import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 
 export default async function DashboardLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   let context;
@@ -72,6 +73,9 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const supervisorLitePromise = isSupervisorLiteAvailable(context);
   const managerLitePromise = isManagerLiteAvailable(context);
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
+  const directorLiteStylePromise = context.role === "director"
+    ? shouldUseDirectorLiteStyle(context.role, context.tenantId).catch(() => false)
+    : Promise.resolve(false);
   const headersPromise = headers();
   // Tenant branding, the signed-in user and their membership in one round trip:
   // the layout renders on every navigation and every realtime refresh, and the
@@ -147,6 +151,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     welcomeVideoFlag,
     whatsappPlantaoNoticeFlag,
     whatsappConnection,
+    directorLiteStyleEnabled,
   ] = await Promise.all([
     experienceModePromise,
     headersPromise,
@@ -161,6 +166,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
     welcomeVideoFlagPromise,
     whatsappPlantaoNoticeFlagPromise,
     whatsappConnectionPromise,
+    directorLiteStylePromise,
   ]);
 
   // Flag criada no G0 (feature_team_management_enabled): só libera o item Gestão do gestor Lite.
@@ -219,6 +225,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
       <AppShell
         viewAs={viewAsState}
         cleanUiEnabled={cleanUiEnabled}
+        directorLiteEnabled={directorLiteStyleEnabled}
         isLightBroker={isLightBroker || isLightSupervisor || isLightManager}
         liteAudience={liteAudience}
         initialChatRail={initialChatRail}
