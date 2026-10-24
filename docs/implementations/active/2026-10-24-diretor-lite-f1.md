@@ -38,3 +38,10 @@ Status: implementada na branch `feat/diretor-lite-f1`, aguardando revisão visua
 - Revisados os codemods B: os dois pontos de uso de `StatefulButton` usam `ActionButton` somente no escopo do Diretor; segmented control, empty state, switch, avatar e upload mantêm seus caminhos legados fora dele. `AnimatedBadge` conserva o mapa legado e só condiciona os novos atributos.
 - Os quatro prints foram regenerados em `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/f1-prints/`; aguardam aprovação visual do Vinicios.
 - Validação desta correção: Vitest focado aprovou 3 arquivos e 46 testes; `npx tsc --noEmit -p .` passou; ESLint passou sem erros, com 13 avisos preexistentes; `node scripts/check-lite-skin.mjs` analisou 811 arquivos; `git diff --check` passou. A comparação das linhas de estilo alteradas registrou zero novos desvios visuais.
+
+## Acompanhamento visual da ScrollArea
+
+- Causa: o exemplo do catálogo aplicava `radius-control` inline no contêiner e em cada parágrafo, com fundo próprio e espaçamento entre os itens. Isso formava uma moldura grossa e linhas em forma de pílula.
+- Sob `[data-skin="diretor"]`, o contêiner agora usa borda fina e `radius-panel`; as atividades são linhas sem fundo nem raio, separadas por divisórias sutis. A versão sem a chave preserva a marcação e estilos anteriores. O thumb continua fino pela barra de 8px e arredondado.
+- Os quatro prints foram apagados e capturados de novo pelo servidor Next ativo às 16:27. Tamanhos: 1440 desligada 146250 bytes, 1440 ligada 162761, 390 desligada 131908, 390 ligada 151488. Prints ligados em desktop e celular conferidos visualmente.
+- Validação adicional: os mesmos 46 testes focados, type-check aprovado, ESLint sem erros, guarda-corpo com 811 arquivos e zero novos desvios nas alterações, `git diff --check` aprovado.
