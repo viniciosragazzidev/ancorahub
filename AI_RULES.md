@@ -67,12 +67,12 @@ retenção ou integração externa, registre-a antes de implementar.
 - Seguir Conventional Commits. Não incluir alterações não relacionadas nem sobrescrever
   alterações pré-existentes do usuário.
 - Antes de concluir uma feature, aplicar o checklist em `docs/engineering-checklist.md`.
-- **Roadmap obrigatorio apos toda implementacao:** ao concluir uma feature ou item do
-  plano, atualize imediatamente o item correspondente em `/roadmap` e em
-  `src/features/roadmap/roadmap-data.ts`. O item deve conter status, descricao do
-  escopo entregue, resumo tecnico com arquivos/fluxos afetados e validacoes executadas.
-  Nunca marque um item como `done` sem esse registro; se a entrega for incompleta,
-  use `partial` e descreva claramente o que ainda falta.
+- **Registro obrigatorio apos toda implementacao:** ao concluir uma feature ou item do
+  plano, atualize o plano correspondente em `docs/implementations/active/` (status,
+  escopo entregue, arquivos/fluxos afetados e validacoes executadas) e registre a
+  entrega em `docs/features-log.md`. Entrega incompleta fica como parcial, com o que
+  ainda falta. A rota `/roadmap` e o `roadmap-data.ts` foram aposentados em 2026-10-24
+  (a rota so redireciona para `/dashboard`).
 - **Build obrigatorio:** sempre execute `npm run build` ao finalizar qualquer
   implementacao. Uma feature nao pode ser considerada concluida nem marcada como
   `done` no roadmap se o build de producao nao passar.

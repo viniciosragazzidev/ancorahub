@@ -1,5 +1,11 @@
 # ADR-0016: Registro obrigatório de implementação no roadmap
 
+> **Substituída em 2026-10-24.** A rota `/roadmap` já redirecionava para `/dashboard` e o
+> `src/features/roadmap/roadmap-data.ts` foi removido junto com o código morto (plano
+> `docs/implementations/active/2026-10-24-diretor-lite-redesign.md`, etapa D12). O registro
+> passa a ser feito no plano em `docs/implementations/active/` e em `docs/features-log.md`
+> (regra em `AI_RULES.md`).
+
 ## Contexto
 
 O roadmap é a fonte operacional do progresso do MVP. Marcar apenas um status não
