@@ -22,6 +22,7 @@ import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getDashboardUnitFilter, resolveRequestedUnit } from "@/features/dashboard/director-lite-branches";
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
+import { getEssentialDashboard } from "@/features/dashboard/essential/essential-data";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -100,7 +101,7 @@ export default async function DashboardPage({
       // Só as unidades autorizadas aparecem; sem permissão de comparar, o filtro some. Unidade fora do escopo cai em "Todas".
       const { canCompare, units } = await getDashboardUnitFilter(context);
       const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
-      const data = await getCommandCenterData(context, { period, branchId });
+      const data = await getEssentialDashboard(context, { period, branchId });
       return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={canCompare ? units : []} now={new Date()} />;
     }
 

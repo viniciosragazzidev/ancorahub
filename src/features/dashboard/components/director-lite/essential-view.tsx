@@ -1,0 +1,229 @@
+"use client";
+
+/**
+ * Painel essencial do diretor (chave ligada): só três blocos, nesta ordem.
+ * 1) Plantões acontecendo agora · 2) Leads por fila na janela · 3) WhatsApp dos corretores.
+ */
+import Link from "next/link";
+import { motion } from "motion/react";
+import { ArrowRight, CalendarCheck, Inbox, MessagesSquare } from "lucide-react";
+
+import { EmptyState } from "@/components/arc/empty-state/empty-state";
+import { motionTokens as m } from "@/components/arc/motion-tokens";
+import type { DashboardDuty } from "@/features/dashboard/welcome";
+import type { EssentialDashboard } from "@/features/dashboard/essential/essential-data";
+import type { EssentialDuty, EssentialQueue } from "@/features/dashboard/essential/essential-summary";
+
+import styles from "./director-lite.module.css";
+import { n, plural } from "./format";
+import { enterT, fadeT, LiteItem, LiteNumber, LiteReveal, staggerDelay, useReduce } from "./motion";
+
+type Totals = EssentialDashboard["queues"]["totals"];
+
+/** Número com legenda curta embaixo: o que conta e o que não conta. */
+function Figure({ label, hint, value, warn, sub }: { label: string; hint: string; value: number; warn?: boolean; sub?: string }) {
+  return (
+    <div className={styles.figure} data-warn={warn ? "true" : undefined} title={hint}>
+      <dt className={styles.muted}>{label}</dt>
+      <dd className={styles.figureDetail}>
+        <LiteNumber value={value} className={styles.figureValue} />
+        {sub ? <span className={styles.muted}>{sub}</span> : null}
+      </dd>
+      <p className={styles.hint}>{hint}</p>
+    </div>
+  );
+}
+
+function DutyCard({ duty, index }: { duty: EssentialDuty; index: number }) {
+  return (
+    <LiteItem as="li" index={index} className={styles.dutyCard}>
+      <Link href={`/leads/distribuicao/plantao/${duty.scheduleId}`} className={styles.dutyHead}>
+        <span className={styles.rowTitle}>
+          <span className={styles.liveDot} aria-hidden="true" />
+          <span className={styles.truncate} title={duty.name}>{duty.name}</span>
+        </span>
+        <span className={styles.muted}>{duty.startsAt} às {duty.endsAt}{duty.queueId ? "" : " · sem fila ligada"}</span>
+      </Link>
+      <dl className={styles.figures}>
+        <Figure label="Disponíveis" hint="Aguardando distribuição nesta fila agora." value={duty.available} />
+        <Figure label="Distribuídos hoje" hint="Entregues a corretor nesta fila desde 00h." value={duty.distributed} />
+        <Figure label="Corretores ativos" hint="Presença confirmada hoje neste plantão." value={duty.activeBrokers} warn={duty.belowMinimum} sub={`de ${duty.minimumBrokers} mín.`} />
+      </dl>
+    </LiteItem>
+  );
+}
+
+function DutiesBlock({ running, next }: { running: EssentialDuty[]; next: DashboardDuty | null }) {
+  return (
+    <LiteReveal as="section" className={styles.card} label="Plantões acontecendo agora">
+      <header className={styles.cardHeader}>
+        <div>
+          <h2 className={styles.cardTitle}>Plantões acontecendo agora</h2>
+          <p className={styles.cardDescription}>{running.length ? `${plural(running.length, "plantão ativo", "plantões ativos")} neste momento.` : "Nenhum plantão ativo neste momento."}</p>
+        </div>
+      </header>
+      {running.length ? (
+        <ul className={styles.dutyGrid}>
+          {running.map((duty, index) => <DutyCard key={duty.scheduleId} duty={duty} index={index} />)}
+        </ul>
+      ) : (
+        <div className={styles.cardEmpty}>
+          <p className={styles.muted}>
+            {next ? `Próximo: ${next.name}, ${next.dutyDate.slice(8, 10)}/${next.dutyDate.slice(5, 7)} às ${next.startsAt}.` : "Nenhum plantão configurado para as próximas horas."}
+          </p>
+          <Link href="/leads/distribuicao?view=plantao" className={styles.textLink}>
+            <CalendarCheck aria-hidden="true" size={16} /> Ver plantões <ArrowRight aria-hidden="true" size={14} />
+          </Link>
+        </div>
+      )}
+    </LiteReveal>
+  );
+}
+
+/** Barra empilhada quente, morno e frio da fila (um só tom de azul, do mais forte ao mais claro). */
+function StackedTemperature({ queue, delay }: { queue: Pick<EssentialQueue, "hot" | "warm" | "cold">; delay: number }) {
+  const reduce = useReduce();
+  const total = queue.hot + queue.warm + queue.cold;
+  const parts = [
+    { level: "hot", value: queue.hot, label: "quentes" },
+    { level: "warm", value: queue.warm, label: "mornos" },
+    { level: "cold", value: queue.cold, label: "frios" },
+  ];
+  return (
+    <span className={styles.stacked} role="img" aria-label={`${queue.hot} quentes, ${queue.warm} mornos, ${queue.cold} frios`}>
+      {total ? parts.filter((part) => part.value > 0).map((part) => (
+        <motion.span
+          key={part.level}
+          data-level={part.level}
+          style={{ flexGrow: part.value }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={reduce ? fadeT : { ...enterT, delay: delay + m.stagger.line }}
+          title={`${part.value} ${part.label}`}
+        />
+      )) : <span className={styles.muted}>sem leads</span>}
+    </span>
+  );
+}
+
+function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; totals: Totals; label: string; empty: boolean }) {
+  return (
+    <LiteReveal as="section" className={styles.card} label="Leads por fila" delay={staggerDelay(1)}>
+      <header className={styles.cardHeader}>
+        <div>
+          <h2 className={styles.cardTitle}>Leads por fila</h2>
+          <p className={styles.cardDescription}>{totals.arrived ? `${plural(totals.arrived, "lead entrou", "leads entraram")} ${label}.` : `Nenhum lead entrou ${label}.`}</p>
+        </div>
+        <span className={styles.badge} data-tone="info">{label}</span>
+      </header>
+      {rows.length && !empty ? (
+        <div className={styles.cardBody}>
+          <table className={styles.table}>
+            <caption className={styles.srOnly}>Leads por fila, {label}</caption>
+            <thead>
+              <tr>
+                <th scope="col">Fila</th>
+                <th scope="col" className={styles.numCol} title="Leads que entraram na janela">Entraram</th>
+                <th scope="col" className={styles.numCol} title="Quentes e mornos">Qualificados</th>
+                <th scope="col" className={styles.numCol} title="Leads frios">Frios</th>
+                <th scope="col" title="Tentativas de requalificação de WhatsApp nos frios">Requalificação</th>
+                <th scope="col" className={styles.numCol} title="Leads ainda sem temperatura">Em qualificação</th>
+                <th scope="col">Temperatura</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((queue, index) => (
+                <tr key={queue.id ?? "none"}>
+                  <td data-label="Fila">
+                    <span className={styles.queueName}>
+                      <span className={styles.seriesDot} data-series={(index % 6) + 1} aria-hidden="true" />
+                      <span className={styles.truncate} title={queue.name}>{queue.name}</span>
+                    </span>
+                  </td>
+                  <td data-label="Entraram" className={styles.numCol}><LiteNumber value={queue.arrived} /></td>
+                  <td data-label="Qualificados" className={styles.numCol}><LiteNumber value={queue.qualified} /></td>
+                  <td data-label="Frios" className={styles.numCol}><LiteNumber value={queue.cold} /></td>
+                  <td data-label="Requalificação">
+                    <span className={styles.tabular}>{plural(queue.requalification.attempts, "tentativa", "tentativas")}</span>
+                    <span className={styles.muted}> · {queue.requalification.coldLeads} frios: {queue.requalification.once} com 1, {queue.requalification.twice} com 2, {queue.requalification.threePlus} com 3+</span>
+                  </td>
+                  <td data-label="Em qualificação" className={styles.numCol}><LiteNumber value={queue.inQualification} /></td>
+                  <td data-label="Temperatura"><StackedTemperature queue={queue} delay={staggerDelay(index)} /></td>
+                </tr>
+              ))}
+              <tr className={styles.totalRow}>
+                <td data-label="Total">Total</td>
+                <td data-label="Entraram" className={styles.numCol}><LiteNumber value={totals.arrived} /></td>
+                <td data-label="Qualificados" className={styles.numCol}><LiteNumber value={totals.qualified} /></td>
+                <td data-label="Frios" className={styles.numCol}><LiteNumber value={totals.cold} /></td>
+                <td data-label="Requalificação">
+                  <span className={styles.tabular}>{plural(totals.requalification.attempts, "tentativa", "tentativas")}</span>
+                  <span className={styles.muted}> · {totals.requalification.coldLeads} frios: {totals.requalification.once} com 1, {totals.requalification.twice} com 2, {totals.requalification.threePlus} com 3+</span>
+                </td>
+                <td data-label="Em qualificação" className={styles.numCol}><LiteNumber value={totals.inQualification} /></td>
+                <td data-label="Temperatura"><StackedTemperature queue={totals} delay={0} /></td>
+              </tr>
+            </tbody>
+          </table>
+          <p className={styles.hint}>
+            Qualificados = quentes + mornos. Em qualificação = leads que ainda não têm temperatura, para a conta fechar. Requalificação = tentativas de WhatsApp enviadas aos frios; cada frio conta uma vez na faixa da sua tentativa mais alta.
+          </p>
+        </div>
+      ) : (
+        <div className={styles.cardEmpty}>
+          <EmptyState icon={<Inbox aria-hidden="true" />} title="Nenhum lead nesta janela" description="Quando um lead chegar, ele aparece aqui, por fila." />
+        </div>
+      )}
+    </LiteReveal>
+  );
+}
+
+function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["whatsapp"]; label: string }) {
+  return (
+    <LiteReveal as="section" className={styles.card} label="WhatsApp dos corretores" delay={staggerDelay(2)}>
+      <header className={styles.cardHeader}>
+        <div>
+          <h2 className={styles.cardTitle}>WhatsApp dos corretores</h2>
+          <p className={styles.cardDescription}>Conexão pessoal ativa e atendimentos. Recebidos: leads que entraram para corretores conectados {label}.</p>
+        </div>
+      </header>
+      <div className={styles.cardBody}>
+        <p className={styles.headline}>
+          <LiteNumber value={whatsapp.connected} className={styles.headlineValue} />
+          <span>de {n(whatsapp.total)} {whatsapp.total === 1 ? "corretor conectou" : "corretores conectaram"} o WhatsApp pessoal</span>
+        </p>
+        <dl className={styles.figures}>
+          <Figure label="Recebidos" hint={`Leads entregues a corretores conectados ${label}.`} value={whatsapp.received} />
+          <Figure label="Respondendo" hint="Desses, o cliente mandou mensagem pelo WhatsApp do corretor." value={whatsapp.responding} sub={`${whatsapp.responseRate}%`} />
+          <Figure label="Atendimentos ativos" hint="Leads abertos (sem ganho nem perda) com mensagem do cliente nas últimas 24h." value={whatsapp.active} />
+        </dl>
+        {whatsapp.brokers.length ? (
+          <ul className={styles.nameList} aria-label="Corretores conectados, com atendimentos ativos">
+            {whatsapp.brokers.map((broker, index) => (
+              <LiteItem as="li" key={broker.id} index={index}>
+                <Link href={`/conversas?tab=leads&brokerId=${encodeURIComponent(broker.id)}`} className={styles.nameRow} title={`Ver conversas de ${broker.name}`}>
+                  <span className={styles.truncate}>{broker.name}</span>
+                  <span className={styles.tabular}>{broker.active} ativos · {broker.responding} de {broker.received} respondendo</span>
+                  <ArrowRight aria-hidden="true" size={14} className={styles.arrow} />
+                </Link>
+              </LiteItem>
+            ))}
+          </ul>
+        ) : (
+          <EmptyState icon={<MessagesSquare aria-hidden="true" />} title="Nenhum corretor conectou o WhatsApp" description="Quem conectar o WhatsApp pessoal aparece aqui com os atendimentos." />
+        )}
+      </div>
+    </LiteReveal>
+  );
+}
+
+/** O painel: blocos de cima para baixo. Só o bloco 2 segue o período; o 1 e o 3 são "agora". */
+export function EssentialView({ data }: { data: EssentialDashboard }) {
+  return (
+    <div className={styles.essential}>
+      <DutiesBlock running={data.duties.running} next={data.duties.next} />
+      <QueuesBlock rows={data.queues.rows} totals={data.queues.totals} label={data.queues.label} empty={data.queues.totals.arrived === 0} />
+      <WhatsAppBlock whatsapp={data.whatsapp} label={data.whatsapp.label} />
+    </div>
+  );
+}
