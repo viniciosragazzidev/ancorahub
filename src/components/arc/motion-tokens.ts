@@ -17,8 +17,7 @@ export const motionTokens = {
     /** Shape morphs, shared layout highlights, and width changes that follow new content. */
     morph: { type: "spring", visualDuration: 0.42, bounce: 0.16 },
   },
-  /** Stagger steps in seconds. Keep total stagger under roughly 0.4s. */
-  /** `max` caps how many items cascade; later items enter together with the last one. */
+  /** Stagger steps in seconds. Keep total stagger under roughly 0.4s. `max` is the number of distinct delays: item `max - 1` and later items share one. */
   stagger: { char: 0.016, word: 0.04, line: 0.08, item: 0.035, max: 8 },
   /** Blur radii in px for text and content crossfades. Keep blur small and brief. */
   blur: { subtle: 2, soft: 4, text: 8 },
@@ -29,5 +28,5 @@ export const motionTokens = {
   /** Offsets in px for entering and leaving elements, by element type. */
   distance: { xs: 4, sm: 6, md: 8, lg: 12, sheet: 24 },
   /** Scale targets for presses and pops. */
-  scale: { pressButton: 0.97, pressRow: 0.99, pressCard: 0.985, popIn: 0.96 },
+  scale: { pressButton: 0.97, pressRow: 0.99, pressCard: 0.985, popIn: 0.96, attention: 1.04 },
 } as const;

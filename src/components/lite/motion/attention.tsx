@@ -32,7 +32,7 @@ export function LiteAttention({ pulseKey, children, className }: LiteAttentionPr
           aria-hidden
           style={{ position: "absolute", inset: 0, borderRadius: "inherit", border: "2px solid var(--primary)", pointerEvents: "none" }}
           initial={{ opacity: motionTokens.attention.opacity, scale: 1 }}
-          animate={{ opacity: 0, scale: reduce ? 1 : 1.04 }}
+          animate={{ opacity: 0, scale: reduce ? 1 : motionTokens.scale.attention }}
           transition={{ duration: reduce ? motionTokens.duration.instant : motionTokens.attention.duration, ease: easeStandard }}
         />
       ) : null}
