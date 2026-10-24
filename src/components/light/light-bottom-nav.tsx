@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { NavPending } from "@/components/nav-pending";
+
 import { cn } from "@/lib/utils";
 
 import { LIGHT_TABS, type LightTabId } from "./light-routes";
@@ -49,6 +51,7 @@ export function LightBottomNav({
                 aria-current={isActive ? "page" : undefined}
                 className={cn(itemBase, isActive ? itemActive : itemIdle)}
               >
+                <NavPending className="text-(--accent)" />
                 <Icon className="size-5" strokeWidth={isActive ? 2.4 : 1.9} aria-hidden="true" />
                 {isActive ? <span>{tab.label}</span> : null}
                 {badge ? (

@@ -118,7 +118,8 @@ export function LeadsFilters({
     if (!stored) return;
     const target = buildUrl(stored);
     if (`${window.location.pathname}${window.location.search}` !== target) {
-      window.location.replace(target);
+      // A soft replace (24/10): window.location.replace reloaded the whole app, layout included.
+      router.replace(target, { scroll: false });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [restored, searchParams, storageKey]);

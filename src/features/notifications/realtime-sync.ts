@@ -115,25 +115,67 @@ export async function publishConversationInvalidation(input: {
 }): Promise<void> {
   if (!(await isRealtimeSyncEnabled())) return;
 
-  const directors = await getDatabase()
-    .select({ userId: schema.tenantMemberships.userId })
-    .from(schema.tenantMemberships)
-    .where(
-      and(
-        eq(schema.tenantMemberships.tenantId, input.tenantId),
-        eq(schema.tenantMemberships.status, "active"),
-        eq(schema.tenantMemberships.role, "director"),
-      ),
-    )
-    .limit(20);
-
-  const userIds = new Set(directors.map((director) => director.userId));
+  // The broker in the conversation hears every message; the directors hear at most one
+  // signal per tenant every DIRECTOR_SIGNAL_WINDOW_MS (24/10): each signal re-renders
+  // their whole workspace, and a busy WhatsApp hour sent one per message to each of them.
+  const userIds = new Set<string>();
   for (const userId of input.participantUserIds ?? []) if (userId) userIds.add(userId);
+  if (shouldSignalDirectorsNow(input.tenantId)) {
+    for (const userId of await activeDirectorIds(input.tenantId)) userIds.add(userId);
+  }
+  if (!userIds.size) return;
 
   await publishDomainInvalidation(
     [...userIds].map((userId) => ({ tenantId: input.tenantId, userId })),
     "conversations",
   );
+}
+
+const DIRECTOR_SIGNAL_WINDOW_MS = 10_000;
+const DIRECTORS_CACHE_MS = 60_000;
+const lastDirectorSignal = new Map<string, number>();
+const trailingDirectorSignal = new Map<string, ReturnType<typeof setTimeout>>();
+const directorsCache = new Map<string, { at: number; ids: string[] }>();
+
+async function activeDirectorIds(tenantId: string) {
+  const cached = directorsCache.get(tenantId);
+  if (cached && Date.now() - cached.at < DIRECTORS_CACHE_MS) return cached.ids;
+  const rows = await getDatabase()
+    .select({ userId: schema.tenantMemberships.userId })
+    .from(schema.tenantMemberships)
+    .where(
+      and(
+        eq(schema.tenantMemberships.tenantId, tenantId),
+        eq(schema.tenantMemberships.status, "active"),
+        eq(schema.tenantMemberships.role, "director"),
+      ),
+    )
+    .limit(20);
+  const ids = rows.map((row) => row.userId);
+  directorsCache.set(tenantId, { at: Date.now(), ids });
+  return ids;
+}
+
+/**
+ * True when the directors may be signalled now. Inside the window the signal is skipped,
+ * and one trailing signal goes out when the window ends, so the last message is never missed.
+ */
+function shouldSignalDirectorsNow(tenantId: string, now = Date.now()) {
+  const last = lastDirectorSignal.get(tenantId) ?? 0;
+  if (now - last >= DIRECTOR_SIGNAL_WINDOW_MS) {
+    lastDirectorSignal.set(tenantId, now);
+    return true;
+  }
+  if (!trailingDirectorSignal.has(tenantId)) {
+    trailingDirectorSignal.set(tenantId, setTimeout(() => {
+      trailingDirectorSignal.delete(tenantId);
+      lastDirectorSignal.set(tenantId, Date.now());
+      void activeDirectorIds(tenantId)
+        .then((ids) => publishDomainInvalidation(ids.map((userId) => ({ tenantId, userId })), "conversations"))
+        .catch(() => undefined);
+    }, last + DIRECTOR_SIGNAL_WINDOW_MS - now));
+  }
+  return false;
 }
 
 async function sendRealtimeSignal(target: RealtimeSyncTarget, signal: RealtimeSyncSignal | DomainInvalidationSignal) {

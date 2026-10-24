@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IncomingLeadCard } from "@/components/notifications/incoming-lead-card";
 import { DynamicNotice, type DynamicNoticeItem } from "@/components/chat/dynamic-notice";
@@ -43,8 +43,19 @@ type RecentNotification = {
 
 const LEADS_REVISION_KEY = "ancorahub:leads-revision";
 
-/** Multiple realtime events inside this window produce one server refresh. */
-export const REFRESH_COALESCE_MS = 1_500;
+/**
+ * Realtime events are gathered into one server refresh: it runs this long after the last
+ * event (24/10: 1.5 s fixed gave a full re-render every 1.5 s on a busy WhatsApp hour)...
+ */
+export const REFRESH_COALESCE_MS = 3_000;
+/** ...but never later than this after the first one, so a steady stream still updates. */
+export const REFRESH_MAX_WAIT_MS = 10_000;
+/** A click or key press this recent postpones the refresh, so it does not fight a navigation. */
+export const INTERACTION_QUIET_MS = 1_500;
+
+export function refreshDelay(firstEventAt: number, now: number) {
+  return Math.max(0, Math.min(REFRESH_COALESCE_MS, firstEventAt + REFRESH_MAX_WAIT_MS - now));
+}
 
 /**
  * Reconciliation interval: how often to check for missed notifications when the
@@ -117,6 +128,8 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
   const refreshTimerRef = useRef<number | null>(null);
   const realtimeFailureTimerRef = useRef<number | null>(null);
   const refreshPendingRef = useRef(false);
+  const firstEventAtRef = useRef(0);
+  const lastInteractionAtRef = useRef(0);
   const pendingEventsRef = useRef(0);
   const shellStartedAtRef = useRef<number | null>(null);
   const hiddenAtRef = useRef<number | null>(null);
@@ -154,15 +167,35 @@ export function RealtimeSyncProvider({ children, tenantId, userId, role, syncTop
     refreshPendingRef.current = false;
     pendingEventsRef.current += 1;
 
-    // If a timer is already running, it will pick up the coalesced event.
-    if (refreshTimerRef.current !== null) return;
+    // Trailing window (24/10): every new event pushes the refresh to REFRESH_COALESCE_MS
+    // after it, never past REFRESH_MAX_WAIT_MS from the first one.
+    const now = Date.now();
+    if (refreshTimerRef.current === null) firstEventAtRef.current = now;
+    else window.clearTimeout(refreshTimerRef.current);
 
-    refreshTimerRef.current = window.setTimeout(() => {
+    const fire = () => {
+      // Someone is clicking or typing: a refresh now would compete with their navigation.
+      const sinceInteraction = Date.now() - lastInteractionAtRef.current;
+      if (sinceInteraction < INTERACTION_QUIET_MS) {
+        refreshTimerRef.current = window.setTimeout(fire, INTERACTION_QUIET_MS - sinceInteraction);
+        return;
+      }
       refreshTimerRef.current = null;
       pendingEventsRef.current = 0;
-      router.refresh();
-    }, REFRESH_COALESCE_MS);
+      startTransition(() => router.refresh());
+    };
+    refreshTimerRef.current = window.setTimeout(fire, refreshDelay(firstEventAtRef.current, now));
   }, [router]);
+
+  useEffect(() => {
+    const markInteraction = () => { lastInteractionAtRef.current = Date.now(); };
+    window.addEventListener("pointerdown", markInteraction, { capture: true, passive: true });
+    window.addEventListener("keydown", markInteraction, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener("pointerdown", markInteraction, { capture: true });
+      window.removeEventListener("keydown", markInteraction, { capture: true });
+    };
+  }, []);
 
   /**
    * Client-only state sync: updates the local revision, dispatches browser

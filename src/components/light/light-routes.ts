@@ -117,7 +117,8 @@ export type LightTab = { id: Exclude<LightTabId, "mais">; href: string; label: s
 /** The three destinations that live directly in the bar; "Mais" opens the sheet. */
 export const LIGHT_TABS: readonly LightTab[] = [
   { id: "inicio", href: "/dashboard", label: "Início" },
-  { id: "fila", href: "/minha-fila", label: "Fila" },
+  // The final URL: /minha-fila is a redirect (next.config.ts) that cost a round trip per tap (24/10).
+  { id: "fila", href: "/leads?tab=minha-fila", label: "Fila" },
   { id: "insights", href: "/conversas/broker", label: "Dicas de Atendimento" },
 ];
 

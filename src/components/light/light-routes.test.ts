@@ -31,7 +31,7 @@ describe("Light routes", () => {
   it("exposes Início, Fila and Insights as bar tabs", () => {
     expect(LIGHT_TABS.map((tab) => [tab.label, tab.href])).toEqual([
       ["Início", "/dashboard"],
-      ["Fila", "/minha-fila"],
+      ["Fila", "/leads?tab=minha-fila"],
       ["Dicas de Atendimento", "/conversas/broker"],
     ]);
   });

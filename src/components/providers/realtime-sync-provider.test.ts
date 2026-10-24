@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { REFRESH_COALESCE_MS, RESUME_REFRESH_AFTER_MS, shouldDelayRealtimeUnavailable, shouldRefreshOnResume, shouldScheduleShellRefresh } from "./realtime-sync-provider";
+import { REFRESH_COALESCE_MS, REFRESH_MAX_WAIT_MS, refreshDelay, RESUME_REFRESH_AFTER_MS, shouldDelayRealtimeUnavailable, shouldRefreshOnResume, shouldScheduleShellRefresh } from "./realtime-sync-provider";
 import { logSupabaseRealtimeDiagnostic } from "@/utils/supabase/client";
 
 describe("shouldScheduleShellRefresh", () => {
@@ -41,8 +41,12 @@ describe("shouldScheduleShellRefresh", () => {
     expect(shouldScheduleShellRefresh(connectionEvent, "/leads/lead-1")).toBe(false);
   });
 
-  it("coalesces realtime refreshes within 1.5 seconds", () => {
-    expect(REFRESH_COALESCE_MS).toBe(1_500);
+  it("gathers realtime refreshes: 3 s after the last event, 10 s at most after the first", () => {
+    expect(REFRESH_COALESCE_MS).toBe(3_000);
+    expect(REFRESH_MAX_WAIT_MS).toBe(10_000);
+    expect(refreshDelay(1_000, 1_000)).toBe(3_000);
+    expect(refreshDelay(1_000, 8_500)).toBe(2_500);
+    expect(refreshDelay(1_000, 12_000)).toBe(0);
   });
 
   it("waits for a reconnect window before reporting the realtime channel unavailable", () => {

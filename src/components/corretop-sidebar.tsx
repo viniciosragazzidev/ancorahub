@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+
+import { NavPending } from "@/components/nav-pending";
 import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "@/components/ui/sonner";
@@ -219,7 +221,6 @@ const marketingHiddenPaths = [
 ];
 
 const brokerHiddenPaths = ["/cotacao", "/automacoes", "/filiais", "/unidades"];
-const priorityNavigationPaths = new Set(["/dashboard", "/leads", "/conversas", "/clientes", "/vendas"]);
 const managerHiddenPaths = [
   "/marketing",
   "/integrations",
@@ -387,7 +388,6 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                         data-slot="sidebar-nav-link"
                         href={itemTargetUrl}
                         aria-current={isActive ? "page" : undefined}
-                        prefetch={priorityNavigationPaths.has(itemTargetUrl)}
                         onClick={() => isMobile && setOpenMobile(false)}
                         className={cn(
                           "group/navitem relative flex min-h-10 w-full items-center gap-3 rounded-full px-3 py-2 outline-none select-none transition-[background-color,color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:bg-primary/8 focus-visible:ring-2 focus-visible:ring-sidebar-ring/50 active:scale-[0.98] motion-reduce:transition-none",
@@ -398,6 +398,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       />
                     }
                   >
+                    <NavPending className="text-primary" />
                     {isActive ? (
                       <motion.span
                         layoutId="corretop-sidebar-active"

@@ -228,15 +228,27 @@ export function ConversationsWorkspace({
 
   // The Director workspace consumes the same opaque conversation signal as
   // Lite. The resulting refresh re-runs server-side tenant and lead scoping.
+  // 24/10: one refresh per message re-sent the whole workspace (hundreds of leads and their
+  // messages) and froze clicks. Signals are gathered for 3 s (10 s at most) into one refresh.
   useEffect(() => {
+    let timer: number | null = null;
+    let firstAt = 0;
     const onConversationInvalidated = (event: Event) => {
       const detail = (event as CustomEvent<RealtimeSyncBrowserDetail>).detail;
-      if (detail?.kind === "domain.invalidated" && detail.domain === "conversations") {
+      if (detail?.kind !== "domain.invalidated" || detail.domain !== "conversations") return;
+      const now = Date.now();
+      if (timer === null) firstAt = now;
+      else window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
         router.refresh();
-      }
+      }, Math.max(0, Math.min(3_000, firstAt + 10_000 - now)));
     };
     window.addEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
-    return () => window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
+    return () => {
+      window.removeEventListener(REALTIME_SYNC_BROWSER_EVENT, onConversationInvalidated);
+      if (timer !== null) window.clearTimeout(timer);
+    };
   }, [router]);
 
   const [query, setQuery] = useState("");
