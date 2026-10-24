@@ -4,6 +4,8 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { SuccessMoment } from "@/components/motion/success-moment";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { useArcScopeProps } from "@/components/arc/arc-scope-context";
+import { cn } from "@/lib/utils";
 
 const VISIBLE_MS = 1400;
 
@@ -14,6 +16,7 @@ const VISIBLE_MS = 1400;
  */
 export function useSuccessOverlay(): { celebrate: (title?: string) => void; node: ReactNode } {
   const enabled = useInterfaceMotionEnabled();
+  const arcScope = useArcScopeProps();
   const [state, setState] = useState<{ id: number; title?: string } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -30,8 +33,9 @@ export function useSuccessOverlay(): { celebrate: (title?: string) => void; node
       {state ? (
         <motion.div
           key={state.id}
+          data-skin={arcScope["data-skin"]}
           aria-live="polite"
-          className="pointer-events-none fixed inset-0 z-[60] grid place-items-center"
+          className={cn("pointer-events-none fixed inset-0 z-[60] grid place-items-center", arcScope.className)}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

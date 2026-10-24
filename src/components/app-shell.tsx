@@ -14,6 +14,8 @@ import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-da
 import { ViewAsBanner, type ViewAsState } from "@/features/super-admin/components/view-as";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welcome-dialog";
+import { ArcScopeProvider, DIRECTOR_LITE_PORTAL_ROOT_ID } from "@/components/arc/arc-scope-context";
+import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
 
 // Client only: it reads the broker's WhatsApp session (server actions) and stays hidden until it knows.
 const WhatsAppMissingBanner = dynamic(() => import("@/components/whatsapp/whatsapp-missing-banner").then((mod) => mod.WhatsAppMissingBanner), { ssr: false });
@@ -59,6 +61,7 @@ export function AppShell({
   initialAvailability = "available",
   cleanUiEnabled = false,
   queueBadgeCount = 0,
+  directorLiteEnabled = false,
 }: {
   children: ReactNode;
   branding?: Branding;
@@ -81,10 +84,12 @@ export function AppShell({
   cleanUiEnabled?: boolean;
   /** Leads waiting for the broker to accept; shown as the badge on the Fila tab (Light only). */
   queueBadgeCount?: number;
+  directorLiteEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const canvasRef = useRef<HTMLDivElement>(null);
   const isFinanceiro = pathname === "/financeiro" || pathname.startsWith("/financeiro/");
+  const directorLiteRouteOptedOut = isDirectorLiteRouteOptedOut(pathname);
   const readableBrandForeground = branding?.brandColor
     ? getReadableForeground(branding.brandColor)
     : null;
@@ -98,6 +103,8 @@ export function AppShell({
       "--sidebar-primary": branding?.brandColor ?? "",
       "--sidebar-primary-foreground": readableBrandForeground ?? "",
       "--sidebar-ring": branding?.brandColor ?? "",
+      "--director-brand-color": directorLiteEnabled ? branding?.brandColor ?? "#3b2dff" : "",
+      "--director-brand-foreground": directorLiteEnabled ? readableBrandForeground ?? "#ffffff" : "",
     } as const;
     const previous = Object.fromEntries(
       Object.keys(variables).map((name) => [name, root.style.getPropertyValue(name)]),
@@ -114,7 +121,7 @@ export function AppShell({
         else root.style.removeProperty(name);
       }
     };
-  }, [branding?.brandColor, readableBrandForeground]);
+  }, [branding?.brandColor, directorLiteEnabled, readableBrandForeground]);
 
   // The authenticated shell owns vertical scrolling. Route changes must start at
   // its top, while query-only navigation (for example choosing a conversation)
@@ -189,7 +196,15 @@ export function AppShell({
     );
   }
 
+  const directorSkinStyle = directorLiteEnabled
+    ? {
+        "--director-brand-color": branding?.brandColor ?? "#3b2dff",
+        "--director-brand-foreground": readableBrandForeground ?? "#ffffff",
+      } as CSSProperties
+    : undefined;
+
   return (
+    <ArcScopeProvider enabled={directorLiteEnabled}>
     <OnboardingProvider>
       <SidebarProvider
         data-ui-refinement={cleanUiEnabled ? "clean" : "classic"}
@@ -215,16 +230,23 @@ export function AppShell({
         <ViewAsBanner viewingAs={viewAs.viewingAs} />
         {isFinanceiro ? (
           <CorreTopFinanceiroSidebar />
+        ) : directorLiteEnabled ? (
+          <div className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}>
+            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
+          </div>
         ) : (
           <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
         )}
+        {directorLiteEnabled ? <div id={DIRECTOR_LITE_PORTAL_ROOT_ID} className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }} /> : null}
         <SidebarInset
           ref={canvasRef}
           data-slot="app-scroll-frame"
-          className="app-shell-canvas min-h-0 h-app overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]"
+          data-skin={directorLiteEnabled ? directorLiteRouteOptedOut ? "off" : "diretor" : undefined}
+          className={cn("app-shell-canvas min-h-0 h-app overflow-y-auto overflow-x-hidden overscroll-contain [scrollbar-gutter:stable]", directorLiteEnabled && !directorLiteRouteOptedOut && "arc-venancor")}
           style={{
             scrollPaddingTop: "var(--header-height)",
             scrollPaddingBottom: "var(--mobile-safe-bottom)",
+            ...(directorLiteEnabled && !directorLiteRouteOptedOut ? directorSkinStyle : {}),
           }}
         >
           <div data-slot="app-content" className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
@@ -232,5 +254,6 @@ export function AppShell({
         <OnboardingWelcomeDialog />
       </SidebarProvider>
     </OnboardingProvider>
+    </ArcScopeProvider>
   );
 }

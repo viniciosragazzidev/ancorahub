@@ -4,6 +4,7 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer"
 
 import { cn } from "@/lib/utils"
+import { useArcScopeProps } from "@/components/arc/arc-scope-context"
 
 type DrawerContextProps = {
   hasSnapPoints: boolean
@@ -68,11 +69,14 @@ function DrawerOverlay({
   className,
   ...props
 }: DrawerPrimitive.Backdrop.Props) {
+  const arcScope = useArcScopeProps()
   return (
     <DrawerPrimitive.Backdrop
       data-slot="drawer-overlay"
+      data-skin={arcScope["data-skin"]}
       className={cn(
         "fixed inset-0 z-50 min-h-dvh bg-black/10 dark:bg-black/40 opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] select-none data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0 supports-backdrop-filter:backdrop-blur-xs supports-[-webkit-touch-callout:none]:absolute",
+        arcScope.className,
         className
       )}
       {...props}
@@ -102,6 +106,7 @@ function DrawerContent({
   children,
   ...props
 }: DrawerPrimitive.Popup.Props) {
+  const arcScope = useArcScopeProps()
   const { hasSnapPoints, modal, showSwipeHandle, swipeDirection } = useDrawer()
   const swipeAxis =
     swipeDirection === "down" || swipeDirection === "up" ? "y" : "x"
@@ -118,6 +123,7 @@ function DrawerContent({
       >
         <DrawerPrimitive.Popup
           data-slot="drawer-popup"
+          data-skin={arcScope["data-skin"]}
           data-swipe-axis={swipeAxis}
           data-snap-points={hasSnapPoints ? "" : undefined}
           className={cn(
@@ -145,6 +151,7 @@ function DrawerContent({
             "data-[swipe-direction=left]:left-0 data-[swipe-direction=left]:origin-left data-[swipe-direction=left]:[--closed-transform:translate3d(calc(-100%-var(--drawer-inset,0px)-2px),0,0)] data-[swipe-direction=left]:[--translate-x:calc(var(--drawer-swipe-movement-x)+var(--stack-peek-offset)+(var(--stack-shrink)*100%))]",
             // Direction: right.
             "data-[swipe-direction=right]:right-0 data-[swipe-direction=right]:origin-right data-[swipe-direction=right]:[--closed-transform:translate3d(calc(100%+var(--drawer-inset,0px)+2px),0,0)] data-[swipe-direction=right]:[--translate-x:calc(var(--drawer-swipe-movement-x)-var(--stack-peek-offset)-(var(--stack-shrink)*100%))]",
+            arcScope.className,
             className
           )}
           {...props}

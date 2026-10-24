@@ -18,21 +18,35 @@ function getInitialTheme(): Theme {
 
 const ThemeContext = React.createContext<ThemeContextValue | null>(null);
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = React.useState<Theme>(getInitialTheme);
+export function ThemeProvider({ children, forceLightTheme = false }: { children: React.ReactNode; forceLightTheme?: boolean }) {
+  const [storedTheme, setThemeState] = React.useState<Theme>(() => forceLightTheme ? "light" : getInitialTheme());
+  const theme: Theme = forceLightTheme ? "light" : storedTheme;
+  const wasForcedLight = React.useRef(forceLightTheme);
 
   React.useEffect(() => {
+    if (forceLightTheme) {
+      wasForcedLight.current = true;
+      document.documentElement.classList.remove("dark");
+      document.documentElement.style.colorScheme = "light";
+      return;
+    }
+    if (wasForcedLight.current) {
+      wasForcedLight.current = false;
+      setThemeState(getInitialTheme());
+      return;
+    }
     persistTheme(theme);
     document.documentElement.classList.toggle("dark", theme === "dark");
     document.documentElement.style.colorScheme = theme;
-  }, [theme]);
+  }, [forceLightTheme, theme]);
 
   const setTheme = React.useCallback((nextTheme: Theme) => {
+    if (forceLightTheme) return;
     setThemeState(nextTheme);
     persistTheme(nextTheme);
     document.documentElement.classList.toggle("dark", nextTheme === "dark");
     document.documentElement.style.colorScheme = nextTheme;
-  }, []);
+  }, [forceLightTheme]);
 
   return <ThemeContext.Provider value={{ theme, setTheme }}>{children}</ThemeContext.Provider>;
 }

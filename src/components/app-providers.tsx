@@ -14,7 +14,7 @@ function ShortcutRegistrar() {
   return null;
 }
 
-export function AppProviders({ children }: { children: React.ReactNode }) {
+export function AppProviders({ children, forceLightTheme = false }: { children: React.ReactNode; forceLightTheme?: boolean }) {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
@@ -29,7 +29,7 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
 
   return (
     <NuqsAdapter>
-      <ThemeProvider>
+      <ThemeProvider forceLightTheme={forceLightTheme}>
         <KeyboardShortcutsProvider>
           <ShortcutRegistrar />
           {children}

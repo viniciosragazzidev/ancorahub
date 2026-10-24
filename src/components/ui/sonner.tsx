@@ -3,8 +3,9 @@
 import { Toaster as Sonner, toast as sonnerToast, type ToasterProps } from "sonner";
 import { AnimatedToast } from "@/components/motion/animated-toast";
 import React from "react";
+import { cn } from "@/lib/utils";
 
-const Toaster = ({ ...props }: ToasterProps) => {
+const Toaster = ({ directorLiteEnabled = false, className, ...props }: ToasterProps & { directorLiteEnabled?: boolean }) => {
   return (
     <Sonner
       position="bottom-right"
@@ -12,7 +13,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
       duration={4500}
       gap={10}
       visibleToasts={4}
-      className="ct-toaster"
+      className={cn("ct-toaster", directorLiteEnabled && "arc-venancor", className)}
+      data-skin={directorLiteEnabled ? "diretor" : undefined}
       toastOptions={{
         className: "ct-toast group font-sans pointer-events-auto",
         style: {

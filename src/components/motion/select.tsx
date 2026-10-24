@@ -19,6 +19,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { useArcPortalTarget, useArcScopeProps } from "@/components/arc/arc-scope-context";
 
 type Placement = "bottom" | "top";
 
@@ -279,6 +280,8 @@ export interface SelectContentProps {
 
 export function SelectContent({ className, children }: SelectContentProps) {
   const ctx = useSelectContext("SelectContent");
+  const portalTarget = useArcPortalTarget();
+  const arcScope = useArcScopeProps();
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState({ left: 0, top: 0, width: 0 });
   const open = ctx.open;
@@ -319,10 +322,11 @@ export function SelectContent({ className, children }: SelectContentProps) {
   }, [open, updatePosition]);
 
   const isTop = ctx.placement === "top";
-  if (!mounted) return null;
+  if (!mounted || !portalTarget) return null;
 
   return createPortal(
     <motion.div
+      data-skin={arcScope["data-skin"]}
       ref={ctx.setContentElement}
       id={ctx.listId}
       role="listbox"
@@ -343,6 +347,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
       }}
       className={cn(
         "max-h-60 overflow-y-auto rounded-xl border border-border bg-popover text-popover-foreground shadow-lg",
+        arcScope.className,
         className,
       )}
     >
@@ -350,7 +355,7 @@ export function SelectContent({ className, children }: SelectContentProps) {
         {children}
       </div>
     </motion.div>,
-    document.body,
+    portalTarget,
   );
 }
 

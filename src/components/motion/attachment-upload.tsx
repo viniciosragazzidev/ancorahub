@@ -29,6 +29,7 @@ import { createPortal } from "react-dom";
 import { Tooltip } from "@/components/motion/tooltip";
 import { motionTokens, transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
+import { useArcPortalTarget, useArcScopeProps } from "@/components/arc/arc-scope-context";
 
 export type AttachmentUploadKind = "file" | "link" | "image" | "audio";
 export type AttachmentRejectReason = "too-large" | "max-files";
@@ -352,6 +353,8 @@ function ImagePreviewDialog({
   reduce: boolean;
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const portalTarget = useArcPortalTarget();
+  const arcScope = useArcScopeProps();
 
   useEffect(() => {
     if (!item) return;
@@ -380,7 +383,7 @@ function ImagePreviewDialog({
     };
   }, [item, onClose]);
 
-  if (typeof document === "undefined") return null;
+  if (typeof document === "undefined" || !portalTarget) return null;
 
   const src = item ? imageSource(item) : undefined;
   const content =
@@ -401,13 +404,14 @@ function ImagePreviewDialog({
         <div className="absolute inset-0 flex items-center justify-center p-4 sm:p-8">
           <motion.div
             role="dialog"
+            data-skin={arcScope["data-skin"]}
             aria-modal="true"
             aria-label={`Visualização de ${item.name}`}
             initial={reduce ? false : { opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={reduce ? undefined : { opacity: 0 }}
             transition={reduce ? { duration: 0 } : ITEM_TRANSITION}
-            className="pointer-events-auto relative"
+            className={cn("pointer-events-auto relative", arcScope.className)}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <motion.img
@@ -440,7 +444,7 @@ function ImagePreviewDialog({
 
   return createPortal(
     reduce ? content : <AnimatePresence>{content}</AnimatePresence>,
-    document.body,
+    portalTarget,
   );
 }
 

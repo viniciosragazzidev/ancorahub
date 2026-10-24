@@ -4,6 +4,7 @@ import * as React from "react";
 import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 import { cn } from "@/utils/core/cn";
+import { useArcScopeProps } from "@/components/arc/arc-scope-context";
 
 /**
  * Sheet / Drawer — docs/design-system.md § Sheet / Drawer.
@@ -28,20 +29,24 @@ function DsSheetContent({
   side = "right",
   ...props
 }: SheetPrimitive.Popup.Props & { side?: DsSheetSide }) {
+  const arcScope = useArcScopeProps();
   return (
     <SheetPrimitive.Portal>
       <SheetPrimitive.Backdrop
         data-slot="ds-sheet-overlay"
-        className="fixed inset-0 z-50 bg-ds-midnight-ink/40 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none"
+        data-skin={arcScope["data-skin"]}
+        className={cn("fixed inset-0 z-50 bg-ds-midnight-ink/40 transition-opacity duration-200 data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none", arcScope.className)}
       />
       <SheetPrimitive.Popup
         data-slot="ds-sheet-content"
+        data-skin={arcScope["data-skin"]}
         data-side={side}
         className={cn(
           "fixed inset-y-0 z-50 flex h-dvh w-full flex-col border-ds-ash bg-ds-canvas-white font-ds-inter text-ds-charcoal shadow-ds-lg outline-none transition-[transform,opacity] duration-200 ease-out motion-reduce:transition-none sm:w-[min(100vw,34rem)]",
           side === "right"
             ? "right-0 border-l sm:rounded-l-ds-large-cards data-ending-style:opacity-0 data-starting-style:opacity-0"
             : "left-0 border-r sm:rounded-r-ds-large-cards data-ending-style:opacity-0 data-starting-style:opacity-0",
+          arcScope.className,
           className,
         )}
         {...props}

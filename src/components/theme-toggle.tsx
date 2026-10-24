@@ -5,9 +5,11 @@ import { useSyncExternalStore } from "react";
 import { AnimatedThemeToggler } from "@/components/ui/animated-theme-toggler";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/components/theme-provider";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 export function ThemeToggle({ className }: { className?: string }) {
   const { theme, setTheme } = useTheme();
+  const directorLiteEnabled = useArcScopeEnabled();
 
   const isClient = useSyncExternalStore(
     () => () => {},
@@ -18,6 +20,8 @@ export function ThemeToggle({ className }: { className?: string }) {
   function toggle(next: "light" | "dark") {
     setTheme(next);
   }
+
+  if (directorLiteEnabled) return null;
 
   if (!isClient) {
     return (

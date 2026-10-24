@@ -6,6 +6,7 @@ import { Dialog as SheetPrimitive } from "@base-ui/react/dialog";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { XIcon } from "@/components/huge-icons";
+import { useArcScopeProps } from "@/components/arc/arc-scope-context";
 
 function Sheet({ ...props }: SheetPrimitive.Root.Props) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -24,11 +25,14 @@ function SheetPortal({ ...props }: SheetPrimitive.Portal.Props) {
 }
 
 function SheetOverlay({ className, ...props }: SheetPrimitive.Backdrop.Props) {
+  const arcScope = useArcScopeProps();
   return (
     <SheetPrimitive.Backdrop
       data-slot="sheet-overlay"
+      data-skin={arcScope["data-skin"]}
       className={cn(
         "fixed inset-0 z-50 bg-foreground/24 supports-backdrop-filter:backdrop-blur-[2px] transition-[background-color,backdrop-filter,opacity] duration-[var(--motion-duration-normal)] ease-[var(--dialog-ease)] data-ending-style:duration-[var(--duration-quick)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none",
+        arcScope.className,
         className,
       )}
       {...props}
@@ -46,14 +50,17 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left";
   showCloseButton?: boolean;
 }) {
+  const arcScope = useArcScopeProps();
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Popup
         data-slot="sheet-content"
+        data-skin={arcScope["data-skin"]}
         data-side={side}
         className={cn(
         "fixed z-50 flex max-h-[calc(100dvh-1rem)] flex-col overflow-visible border border-border bg-popover bg-clip-padding text-sm text-popover-foreground shadow-[var(--shadow-dialog)] outline-none transition-[transform,opacity,translate] duration-[var(--motion-duration-normal)] data-ending-style:duration-[var(--duration-quick)] ease-[var(--dialog-ease)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none data-[side=bottom]:inset-x-2 data-[side=bottom]:bottom-2 data-[side=bottom]:h-auto data-[side=bottom]:rounded-[var(--radius-panel)] sm:data-[side=bottom]:inset-x-4 sm:data-[side=bottom]:bottom-4 sm:data-[side=bottom]:mx-auto sm:data-[side=bottom]:max-w-xl data-[side=left]:inset-y-2 data-[side=left]:left-2 data-[side=left]:h-[calc(100dvh-1rem)] data-[side=left]:w-[min(100vw-1rem,32rem)] data-[side=left]:rounded-[var(--radius-panel)] sm:data-[side=left]:inset-y-3 sm:data-[side=left]:left-3 sm:data-[side=left]:h-[calc(100dvh-1.5rem)] data-[side=right]:inset-y-2 data-[side=right]:right-2 data-[side=right]:h-[calc(100dvh-1rem)] data-[side=right]:w-[min(100vw-1rem,32rem)] data-[side=right]:rounded-[var(--radius-panel)] sm:data-[side=right]:inset-y-3 sm:data-[side=right]:right-3 sm:data-[side=right]:h-[calc(100dvh-1.5rem)] data-[side=top]:inset-x-2 data-[side=top]:top-2 data-[side=top]:h-auto data-[side=top]:rounded-[var(--radius-panel)] sm:data-[side=top]:inset-x-4 sm:data-[side=top]:top-4 sm:data-[side=top]:mx-auto sm:data-[side=top]:max-w-xl max-[559px]:data-[side=left]:inset-0 max-[559px]:data-[side=left]:h-dvh max-[559px]:data-[side=left]:max-h-dvh max-[559px]:data-[side=left]:w-full max-[559px]:data-[side=left]:rounded-none max-[559px]:data-[side=right]:inset-0 max-[559px]:data-[side=right]:h-dvh max-[559px]:data-[side=right]:max-h-dvh max-[559px]:data-[side=right]:w-full max-[559px]:data-[side=right]:rounded-none ",
+          arcScope.className,
           className,
         )}
         {...props}

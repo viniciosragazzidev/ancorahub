@@ -4,6 +4,7 @@ import * as React from "react"
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
 
 import { cn } from "@/lib/utils"
+import { useArcScopeProps } from "@/components/arc/arc-scope-context"
 
 function TooltipProvider({
   delay = 300,
@@ -51,6 +52,7 @@ function TooltipContent({
     TooltipPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset"
   >) {
+  const arcScope = useArcScopeProps()
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner
@@ -62,8 +64,10 @@ function TooltipContent({
       >
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
+          data-skin={arcScope["data-skin"]}
           className={cn(
             "z-50 inline-flex w-fit max-w-xs origin-(--transform-origin) items-center gap-1.5 rounded-xl border border-border bg-popover shadow-[var(--shadow-dialog)] px-3 py-1.5 text-xs text-popover-foreground has-data-[slot=kbd]:pr-1.5 **:data-[slot=kbd]:relative **:data-[slot=kbd]:isolate **:data-[slot=kbd]:z-50 **:data-[slot=kbd]:rounded-sm ",
+            arcScope.className,
             className
           )}
           {...props}

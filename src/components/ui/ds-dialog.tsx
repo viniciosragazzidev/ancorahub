@@ -4,6 +4,7 @@ import * as React from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { X } from "lucide-react";
 import { cn } from "@/utils/core/cn";
+import { useArcScopeProps } from "@/components/arc/arc-scope-context";
 
 /**
  * Dialog / Modal — docs/design-system.md § Dialog / Modal.
@@ -20,16 +21,20 @@ function DsDialogPopup({
   children,
   ...props
 }: DialogPrimitive.Popup.Props) {
+  const arcScope = useArcScopeProps();
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Backdrop
         data-slot="ds-dialog-overlay"
-        className="fixed inset-0 z-50 bg-ds-midnight-ink/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0"
+        data-skin={arcScope["data-skin"]}
+        className={cn("fixed inset-0 z-50 bg-ds-midnight-ink/40 transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0", arcScope.className)}
       />
       <DialogPrimitive.Popup
         data-slot="ds-dialog-popup"
+        data-skin={arcScope["data-skin"]}
         className={cn(
           "fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-ds-16 overflow-y-auto rounded-ds-large-cards border border-ds-ash bg-ds-canvas-white p-ds-24 font-ds-inter text-ds-charcoal shadow-ds-lg transition-[opacity,transform] duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0",
+          arcScope.className,
           className,
         )}
         {...props}

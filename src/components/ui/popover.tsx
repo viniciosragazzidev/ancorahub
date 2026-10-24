@@ -4,6 +4,7 @@ import * as React from "react";
 import { Popover as PopoverPrimitive } from "@base-ui/react/popover";
 
 import { cn } from "@/lib/utils";
+import { useArcScopeProps } from "@/components/arc/arc-scope-context";
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
   return <PopoverPrimitive.Root data-slot="popover" {...props} />;
@@ -25,6 +26,7 @@ function PopoverContent({
     PopoverPrimitive.Positioner.Props,
     "align" | "alignOffset" | "side" | "sideOffset"
   >) {
+  const arcScope = useArcScopeProps();
   return (
     <PopoverPrimitive.Portal>
       <PopoverPrimitive.Positioner
@@ -36,8 +38,10 @@ function PopoverContent({
       >
         <PopoverPrimitive.Popup
           data-slot="popover-content"
+          data-skin={arcScope["data-skin"]}
           className={cn(
             "z-50 w-80 max-w-[calc(100vw-1rem)] origin-(--transform-origin) overflow-visible rounded-[var(--radius-card)] border border-border bg-popover p-[var(--size-spacing-04)] text-foreground shadow-[var(--shadow-dialog)] outline-none ",
+            arcScope.className,
             className
           )}
           {...props}

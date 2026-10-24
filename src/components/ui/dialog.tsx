@@ -4,6 +4,7 @@ import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 
 import { cn } from "@/lib/utils"
+import { useArcScopeProps } from "@/components/arc/arc-scope-context"
 
 function Dialog({ ...props }: DialogPrimitive.Root.Props) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -22,11 +23,14 @@ function DialogClose({ ...props }: DialogPrimitive.Close.Props) {
 }
 
 function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) {
+  const arcScope = useArcScopeProps()
   return (
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
+      data-skin={arcScope["data-skin"]}
       className={cn(
         "fixed inset-0 z-50 bg-foreground/28 backdrop-blur-sm transition-[background-color,backdrop-filter,opacity] duration-[var(--duration-fast)] ease-[var(--dialog-ease)] data-ending-style:duration-[var(--duration-quick)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none",
+        arcScope.className,
         className
       )}
       {...props}
@@ -40,13 +44,16 @@ function DialogPopup({
   overlayClassName,
   ...props
 }: DialogPrimitive.Popup.Props & { overlayClassName?: string }) {
+  const arcScope = useArcScopeProps()
   return (
     <DialogPortal>
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Popup
         data-slot="dialog-popup"
+        data-skin={arcScope["data-skin"]}
         className={cn(
         "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] min-h-0 w-[calc(100%-2rem)] max-w-lg translate-x-[-50%] translate-y-[-50%] gap-[var(--size-spacing-04)] overflow-visible rounded-[var(--radius-panel)] border border-border/80 bg-popover p-[var(--size-spacing-05)] text-popover-foreground shadow-[var(--shadow-dialog)] transition-[opacity,transform,scale] duration-[var(--duration-fast)] ease-[var(--dialog-ease)] data-ending-style:duration-[var(--duration-quick)] data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none sm:w-full sm:p-[var(--size-spacing-06)] [&>*]:min-w-0",
+          arcScope.className,
           className
         )}
         {...props}
