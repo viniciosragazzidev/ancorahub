@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { CheckCircle, XCircle, Loader } from "lucide-react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 import { transitions } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -74,6 +75,7 @@ export function StatefulButton({
   disabled,
   ...props
 }: StatefulButtonProps) {
+  const directorLite = useArcScopeEnabled();
   const reduce = useReducedMotion();
   const motionEnabled = useInterfaceMotionEnabled() && !reduce;
   const isPendingOrComplete = state === "loading" || state === "success";
@@ -109,8 +111,8 @@ export function StatefulButton({
     <motion.button
       data-slot="button"
       data-motion="static"
-      data-variant={variant}
-      data-size={size}
+      data-variant={directorLite ? variant : undefined}
+      data-size={directorLite ? size : undefined}
       data-state={state}
       type="button"
       disabled={disabled || isPendingOrComplete}

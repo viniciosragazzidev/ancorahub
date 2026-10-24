@@ -4,20 +4,18 @@ import { Toaster as Sonner, toast as sonnerToast, type ToasterProps } from "sonn
 import { AnimatedToast } from "@/components/motion/animated-toast";
 import React from "react";
 import { cn } from "@/lib/utils";
-import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
+import { ArcScopeProvider, useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
-const Toaster = ({ directorLiteEnabled = false, className, ...props }: ToasterProps & { directorLiteEnabled?: boolean }) => {
-  return (
-    <ArcScopeProvider enabled={directorLiteEnabled}>
+const ScopedSonner = ({ className, ...props }: ToasterProps) => {
+  const directorLite = useArcScopeEnabled();
+  const sonner = (
     <Sonner
       position="bottom-right"
       closeButton={false}
       duration={4500}
       gap={10}
       visibleToasts={4}
-      className={cn("ct-toaster", directorLiteEnabled && "arc-venancor", className)}
-      data-slot="sonner"
-      data-skin={directorLiteEnabled ? "diretor" : undefined}
+      className={cn("ct-toaster", className)}
       toastOptions={{
         className: "ct-toast group font-sans pointer-events-auto",
         style: {
@@ -30,9 +28,20 @@ const Toaster = ({ directorLiteEnabled = false, className, ...props }: ToasterPr
       }}
       {...props}
     />
-    </ArcScopeProvider>
   );
+
+  return directorLite ? (
+    <div className="arc-venancor" data-slot="sonner" data-skin="diretor">
+      {sonner}
+    </div>
+  ) : sonner;
 };
+
+const Toaster = ({ directorLiteEnabled = false, ...props }: ToasterProps & { directorLiteEnabled?: boolean }) => (
+  <ArcScopeProvider enabled={directorLiteEnabled}>
+    <ScopedSonner {...props} />
+  </ArcScopeProvider>
+);
 
 /** Internal helper to render AnimatedToast via sonnerToast.custom */
 function renderToast(

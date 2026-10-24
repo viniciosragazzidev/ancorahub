@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
-import { DirectorLiteStyleGate } from "@/components/arc/director-lite-style-gate";
 import { Button } from "@/components/ui/button";
 import ArcEmptyState from "@/components/arc/empty-state/empty-state";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +48,6 @@ export default function PrimitivesCatalog() {
 
   return (
     <ArcScopeProvider enabled={directorSkin}>
-      <DirectorLiteStyleGate enabled={directorSkin} />
       <main
         className={directorSkin ? "arc-venancor min-h-screen" : "min-h-screen bg-background text-foreground"}
         data-skin={directorSkin ? "diretor" : "off"}

@@ -1,7 +1,10 @@
+"use client"
+
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context"
 
 const cardVariants = cva(
   "group/card flex min-w-0 flex-col text-card-foreground",
@@ -26,20 +29,24 @@ function Card({
   variant = "default",
   size = "default",
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof cardVariants> & { size?: "default" | "sm" }) {
-  const interactive = Boolean(props.onClick || props.onKeyDown || props.role === "button" || props.tabIndex != null);
+}: React.ComponentProps<"div"> & VariantProps<typeof cardVariants> & { size?: "default" | "sm"; "data-slot"?: string }) {
+  const directorLite = useArcScopeEnabled();
+  const { "data-slot": requestedSlot, ...restProps } = props;
+  // StatCard pede o slot da pele; fora do escopo Arc ele continua como card legado.
+  const slot = requestedSlot === "stat-card" && !directorLite ? "card" : requestedSlot ?? "card";
+  const interactive = Boolean(restProps.onClick || restProps.onKeyDown || restProps.role === "button" || restProps.tabIndex != null);
   return (
     <div
-      data-slot="card"
+      data-slot={slot}
       data-variant={variant}
       data-size={size}
-      data-interactive={interactive ? "true" : undefined}
+      data-interactive={directorLite && interactive ? "true" : undefined}
       className={cn(
         cardVariants({ variant }),
         size === "sm" && variant === "default" && "gap-[var(--size-spacing-03)] p-[var(--size-spacing-04)]",
         className
       )}
-      {...props}
+      {...restProps}
     />
   )
 }

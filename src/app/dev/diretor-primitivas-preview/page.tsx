@@ -1,5 +1,8 @@
 import { notFound } from "next/navigation";
 
+import "@/components/arc/venancor-scope.css";
+import "@/components/arc/director-skin.css";
+import "@/components/arc/director-primitives.css";
 import PrimitivesCatalog from "@/app/(dashboard)/internal/design-system/primitives-catalog";
 import { DirectorPrimitivesPreviewViewport } from "./preview-viewport";
 

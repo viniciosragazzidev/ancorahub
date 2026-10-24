@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 function ScrollArea({
   className,
@@ -40,12 +41,15 @@ function ScrollArea({
 function ScrollBar({
   className,
   orientation = "vertical",
+  forceMount,
   ...props
 }: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
+  const directorLite = useArcScopeEnabled();
   return (
     <ScrollAreaPrimitive.ScrollAreaScrollbar
       data-slot="scroll-area-scrollbar"
       orientation={orientation}
+      forceMount={forceMount}
       className={cn(
         "flex touch-none select-none opacity-0 transition-opacity duration-150 hover:opacity-100 data-[state=visible]:opacity-100",
         orientation === "vertical" && "h-full w-2 border-l border-l-transparent p-px",
@@ -54,7 +58,11 @@ function ScrollBar({
       )}
       {...props}
     >
-      <ScrollAreaPrimitive.ScrollAreaThumb data-slot="scroll-area-thumb" className="relative flex-1 rounded-full bg-muted-foreground/35" />
+      <ScrollAreaPrimitive.ScrollAreaThumb
+        forceMount={forceMount}
+        data-slot={directorLite ? "scroll-area-thumb" : undefined}
+        className="relative flex-1 rounded-full bg-muted-foreground/35"
+      />
     </ScrollAreaPrimitive.ScrollAreaScrollbar>
   );
 }

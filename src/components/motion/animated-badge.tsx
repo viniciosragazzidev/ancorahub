@@ -116,8 +116,8 @@ export function AnimatedBadge({
 
   return (
     <motion.span
-      data-slot="animated-badge"
-      data-status={status}
+      data-slot={directorLite ? "animated-badge" : undefined}
+      data-status={directorLite ? status : undefined}
       layout={motionEnabled}
       transition={motionEnabled ? transitions.normal : { duration: 0 }}
       className={cn(

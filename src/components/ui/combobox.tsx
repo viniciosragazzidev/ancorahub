@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 export type ComboboxOption = {
   value: string;
@@ -50,6 +51,7 @@ export function AppCombobox({
   contentClassName,
   "aria-label": ariaLabel,
 }: AppComboboxProps) {
+  const directorLite = useArcScopeEnabled();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [internalValue, setInternalValue] = React.useState<string>(
@@ -125,8 +127,8 @@ export function AppCombobox({
                 return (
                   <button
                     key={opt.value}
-                    data-slot="combobox-option"
-                    data-selected={isSelected ? "true" : undefined}
+                    data-slot={directorLite ? "combobox-option" : undefined}
+                    data-selected={directorLite && isSelected ? "true" : undefined}
                     type="button"
                     disabled={opt.disabled}
                     onClick={() => handleSelect(opt.value)}

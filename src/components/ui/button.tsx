@@ -102,8 +102,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <Slot
           ref={ref as React.Ref<HTMLElement>}
           data-slot="button"
-          data-variant={variant}
-          data-size={size}
+          data-variant={directorLite ? variant : undefined}
+          data-size={directorLite ? size : undefined}
           className={mergedClass}
           {...safeRestProps}
           aria-busy={loading || restProps["aria-busy"]}
@@ -128,8 +128,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <Slot
           ref={ref as React.Ref<HTMLElement>}
           data-slot="button"
-          data-variant={variant}
-          data-size={size}
+          data-variant={directorLite ? variant : undefined}
+          data-size={directorLite ? size : undefined}
           className={mergedClass}
           {...safeRestProps}
           aria-busy={loading || restProps["aria-busy"]}
@@ -157,8 +157,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         <motion.button
           ref={ref}
           data-slot="button"
-          data-variant={variant}
-          data-size={size}
+          data-variant={directorLite ? variant : undefined}
+          data-size={directorLite ? size : undefined}
           data-motion-press=""
           type={nativeType}
           className={mergedClass}
@@ -177,8 +177,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       <button
         ref={ref}
         data-slot="button"
-        data-variant={variant}
-        data-size={size}
+        data-variant={directorLite ? variant : undefined}
+        data-size={directorLite ? size : undefined}
         type={nativeType}
         className={mergedClass}
         {...restProps}
