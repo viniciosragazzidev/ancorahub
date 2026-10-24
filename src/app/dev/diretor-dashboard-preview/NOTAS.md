@@ -48,6 +48,8 @@ Parâmetros para print: `?tab=overview|quality|funnel`, `&estado=ready|loading|e
 | "Nenhum lead neste período" (simples e detalhada) | `EmptyState` (estado "Vazio") |
 
 ### Funil de qualificação (`QualificationFunnelView`)
+
+A prévia fornece dados sintéticos tipados por `buildFunnel`; o adaptador `FunnelTab` os encaminha ao componente compartilhado `src/features/dashboard/components/director-lite/qualification-funnel-view.tsx`.
 | Antigo | Novo |
 |---|---|
 | 4 `StatCard` (chegaram, responderam % com mediana, qualificados %, vendas) | 4 blocos cinza com odômetro (% anima entre períodos) |

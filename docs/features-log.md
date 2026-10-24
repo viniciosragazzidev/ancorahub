@@ -460,3 +460,7 @@ Os assistentes de leads, plantao, agenda, desempenho e equipe abrem as respectiv
 ## 2026-10-24 - Diretor Lite F1, paridade sem provider
 
 O snapshot HTML das primitivas sem provider usa a referência de `origin/feat/diretor-visual-lite` e cobre Button, Card, StatCard, Sonner, ScrollArea, Combobox e AnimatedBadge. A ScrollArea preserva a marcação da origin quando a pele está desligada; o Card foi auditado em 53 usos de Server Components sem callbacks ou refs não serializáveis. Implementação: `docs/implementations/active/2026-10-24-diretor-lite-f1.md`.
+
+## 2026-10-24 - Diretor Lite, Funil de qualificação
+
+A aba Funil usa o mesmo `getQualificationFunnel` e as métricas existentes, com período e unidade autorizada. O filtro de unidade é aplicado à coorte do tenant; o custo empresarial da Meta não aparece para uma unidade específica. A flag desligada mantém a apresentação antiga. A prévia `/dev/diretor-dashboard-preview` compartilha o componente Lite com fixtures tipadas. Implementação: `docs/implementations/completed/2026-10-24-diretor-lite-funil.md`.
