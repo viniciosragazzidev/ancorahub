@@ -10,6 +10,7 @@ import { APPROACHES, type ApproachId } from "./approaches";
 import { CADENCE, type TurboState } from "./cadence";
 import { replyRate } from "./experiments";
 import { RECOMMENDED_TEMPLATES } from "./templates-pack";
+import { resolveFunnelBranchScope } from "./funnel-scope";
 
 /**
  * Director's qualification funnel (plan 2026-10-21, Fase 0): the leads that
@@ -84,12 +85,6 @@ const VARIANT_LABEL = new Map<string, string>([
 ]);
 
 /** Director: the whole company. Anyone else: their unit (the page refuses a manager without one). */
-function scopeBranch(context: TenantContext): string | null {
-  if (context.role === "director") return null;
-  if (!context.branchId) throw new Error("Funil disponível só para a unidade do gestor.");
-  return context.branchId;
-}
-
 type CohortRow = {
   id: string;
   status: string;
@@ -160,14 +155,21 @@ async function loadCohort(tenantId: string, since: Date, branchId: string | null
   return rowsOf<CohortRow>(result);
 }
 
-export async function getQualificationFunnel(context: TenantContext, period: FunnelPeriod): Promise<QualificationFunnel> {
+/** `requestedBranchId` is supplied only after the dashboard page validates the viewer's allowed units. */
+export async function getQualificationFunnel(
+  context: TenantContext,
+  period: FunnelPeriod,
+  requestedBranchId?: string | null,
+): Promise<QualificationFunnel> {
   const db = getDatabase();
   const since = new Date(Date.now() - period * 24 * 60 * 60_000);
   const isDirector = context.role === "director";
+  const branchId = resolveFunnelBranchScope(context, requestedBranchId);
+  const includeCompanyCost = isDirector && branchId === null;
 
   const [rows, costRows, real] = await Promise.all([
-    loadCohort(context.tenantId, since, scopeBranch(context)),
-    isDirector
+    loadCohort(context.tenantId, since, branchId),
+    includeCompanyCost
       ? db.select({
         templateName: schema.whatsappOutboundMessages.templateName,
         category: schema.metaWhatsAppTemplates.category,
@@ -189,7 +191,7 @@ export async function getQualificationFunnel(context: TenantContext, period: Fun
         ))
         .groupBy(schema.whatsappOutboundMessages.templateName, schema.metaWhatsAppTemplates.category)
       : Promise.resolve([]),
-    isDirector ? realMetaCost(context.tenantId, since) : Promise.resolve(null),
+    includeCompanyCost ? realMetaCost(context.tenantId, since) : Promise.resolve(null),
   ]);
 
   const count = (predicate: (row: CohortRow) => boolean) => rows.reduce((total, row) => total + (predicate(row) ? 1 : 0), 0);
@@ -304,7 +306,7 @@ export async function getQualificationFunnel(context: TenantContext, period: Fun
     lossReasons,
     variants,
     touches,
-    cost: !isDirector ? null : {
+    cost: !includeCompanyCost ? null : {
       total,
       marketing,
       utility,

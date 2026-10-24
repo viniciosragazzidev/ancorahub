@@ -510,6 +510,17 @@ button.heatCell:hover { transform: scale(1.12); }
   gap: 20px;
 }
 
+.funnelPage .chip[aria-current] {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .funnelPage .chip { transition: none; }
+}
+
+html[data-reduce-motion="1"] .funnelPage .chip { transition: none; }
+
 .chipRow {
   display: flex;
   flex-wrap: wrap;

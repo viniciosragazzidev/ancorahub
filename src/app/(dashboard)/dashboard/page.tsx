@@ -22,6 +22,7 @@ import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getDashboardUnitFilter, resolveRequestedUnit } from "@/features/dashboard/director-lite-branches";
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
+import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
 import { getEssentialDashboard } from "@/features/dashboard/essential/essential-data";
 import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-quality-page";
 
@@ -77,7 +78,14 @@ export default async function DashboardPage({
     const canReadQuality = await canAccessLeadQualityCenter(context);
     // Funil de qualificação (qualificação turbo): director and manager with the quality center.
     if (activeTab === "funnel" && canReadQuality && (context.role === "director" || (context.role === "manager" && context.branchId))) {
-      const funnel = await getQualificationFunnel(context, parseFunnelPeriod(singleParam(resolvedSearchParams.period)));
+      const funnelPeriod = parseFunnelPeriod(singleParam(resolvedSearchParams.period));
+      if (context.role === "director" && (await shouldUseDirectorLiteStyle(context.role, context.tenantId))) {
+        const { canCompare, units } = await getDashboardUnitFilter(context);
+        const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
+        const funnel = await getQualificationFunnel(context, funnelPeriod, branchId);
+        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={branchId} branches={canCompare ? units : []} />;
+      }
+      const funnel = await getQualificationFunnel(context, funnelPeriod);
       return <QualificationFunnelView data={funnel} showQualityTab />;
     }
     if (activeTab === "quality" && canReadQuality) {
