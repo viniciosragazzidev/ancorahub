@@ -449,6 +449,11 @@ export const leads = pgTable(
     index("leads_tenant_deleted_idx").on(table.tenantId, table.deletedAt),
     index("leads_tenant_archived_idx").on(table.tenantId, table.archivedAt),
     index("leads_corretor_assigned_at_live_idx").on(table.corretorId, table.assignedAt).where(sql`${table.deletedAt} is null`),
+    // Dashboard overview (7d/30d) and attention: arrivals and distribution in a window, per tenant or unit.
+    // Created by hand with CONCURRENTLY (drizzle/0214_dashboard_overview_indexes.sql, outside the journal).
+    index("leads_tenant_created_live_idx").on(table.tenantId, table.createdAt).where(sql`${table.deletedAt} is null and ${table.archivedAt} is null`),
+    index("leads_tenant_branch_created_live_idx").on(table.tenantId, table.branchId, table.createdAt).where(sql`${table.deletedAt} is null and ${table.archivedAt} is null`),
+    index("leads_tenant_assigned_live_idx").on(table.tenantId, table.assignedAt).where(sql`${table.deletedAt} is null and ${table.archivedAt} is null and ${table.corretorId} is not null`),
     uniqueIndex("leads_credential_external_id_unique").on(table.webhookCredentialId, table.externalId).where(sql`${table.externalId} IS NOT NULL`),
     uniqueIndex("leads_tenant_source_external_id_unique").on(table.tenantId, table.sourceChannel, table.externalId).where(sql`${table.externalId} IS NOT NULL AND ${table.sourceChannel} <> 'landing_page'`),
   ],
