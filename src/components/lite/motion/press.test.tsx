@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const motionState = vi.hoisted(() => ({ reduce: false }));
 vi.mock("motion/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("motion/react")>();
-  return { ...actual, useReducedMotion: () => motionState.reduce };
+  const { captureMotion } = await import("./capture-motion");
+  return { ...actual, motion: captureMotion(), useReducedMotion: () => motionState.reduce };
 });
 
+import { displacementOf, readMotion } from "./capture-motion";
 import { LitePress } from "./press";
 
 beforeEach(() => {
@@ -23,9 +25,16 @@ describe("LitePress", () => {
     expect(screen.getByRole("button", { name: "Abrir card" })).toBeInTheDocument();
   });
 
-  it("keeps the content with reduced motion (no press scale)", () => {
+  it("scales the button to 0.97 on press when motion is on", () => {
+    const { container } = render(<LitePress><button>Salvar</button></LitePress>);
+    expect(readMotion(container.firstElementChild!).whileTap).toEqual({ scale: 0.97 });
+  });
+
+  it("does not scale on press with reduced motion", () => {
     motionState.reduce = true;
-    render(<LitePress><button>Salvar</button></LitePress>);
-    expect(screen.getByRole("button", { name: "Salvar" })).toBeInTheDocument();
+    const { container } = render(<LitePress><button>Salvar</button></LitePress>);
+    const motion = readMotion(container.firstElementChild!);
+    expect(motion.whileTap).toBeUndefined();
+    expect(displacementOf(motion.whileTap)).toEqual([]);
   });
 });

@@ -35,7 +35,7 @@ export function LiteSuccess({ label, className }: LiteSuccessProps) {
           d="M5 12.5l4.5 4.5L19 7.5"
           initial={{ pathLength: reduce ? 1 : 0 }}
           animate={{ pathLength: 1 }}
-          transition={reduce ? { duration: 0 } : { duration: motionTokens.duration.standard, ease: easeStandard }}
+          transition={reduce ? { duration: 0 } : { duration: motionTokens.duration.draw, ease: easeStandard }}
         />
       </motion.svg>
       <span>{label}</span>

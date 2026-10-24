@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const motionState = vi.hoisted(() => ({ reduce: false }));
 vi.mock("motion/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("motion/react")>();
-  return { ...actual, useReducedMotion: () => motionState.reduce };
+  const { captureMotion } = await import("./capture-motion");
+  return { ...actual, motion: captureMotion(), useReducedMotion: () => motionState.reduce };
 });
 
+import { readMotion } from "./capture-motion";
 import { LiteProgress } from "./progress";
 
 beforeEach(() => {
@@ -30,9 +32,14 @@ describe("LiteProgress", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "0");
   });
 
-  it("renders the final bar with reduced motion", () => {
+  it("starts the fill from zero width and grows with scaleX when motion is on", () => {
+    const { container } = render(<LiteProgress value={75} label="Upload" />);
+    expect(readMotion(container.querySelector("[role=progressbar] > div")!).initial).toEqual({ scaleX: 0 });
+  });
+
+  it("shows the final width at once with reduced motion, with no movement", () => {
     motionState.reduce = true;
-    render(<LiteProgress value={75} label="Upload" />);
-    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "75");
+    const { container } = render(<LiteProgress value={75} label="Upload" />);
+    expect(readMotion(container.querySelector("[role=progressbar] > div")!).initial).toEqual({ scaleX: 0.75 });
   });
 });

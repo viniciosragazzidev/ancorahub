@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const motionState = vi.hoisted(() => ({ reduce: false }));
 vi.mock("motion/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("motion/react")>();
-  return { ...actual, useReducedMotion: () => motionState.reduce };
+  const { captureMotion } = await import("./capture-motion");
+  return { ...actual, motion: captureMotion(), useReducedMotion: () => motionState.reduce };
 });
 
+import { displacementOf, readMotion } from "./capture-motion";
 import { LiteSkeletonToContent } from "./skeleton-to-content";
 
 beforeEach(() => {
@@ -36,13 +38,19 @@ describe("LiteSkeletonToContent", () => {
     expect((container.firstElementChild as HTMLElement).style.minHeight).toBe("320px");
   });
 
-  it("renders the loaded content with reduced motion", () => {
-    motionState.reduce = true;
-    render(
-      <LiteSkeletonToContent loading={false} skeleton={<p>Carregando lista</p>}>
-        <p>Lista pronta</p>
+  it("swaps with a small upward step and no scale when motion is on, and only a fade with reduced motion", () => {
+    const { container, rerender } = render(
+      <LiteSkeletonToContent loading skeleton={<p>Carregando</p>}>
+        <p>Pronto</p>
       </LiteSkeletonToContent>,
     );
-    expect(screen.getByText("Lista pronta")).toBeInTheDocument();
+    expect(displacementOf(readMotion(container.querySelector(":scope > div > div")!).initial)).toEqual([["y", 4]]);
+    motionState.reduce = true;
+    rerender(
+      <LiteSkeletonToContent loading={false} skeleton={<p>Carregando</p>}>
+        <p>Pronto</p>
+      </LiteSkeletonToContent>,
+    );
+    expect(screen.getByText("Pronto")).toBeInTheDocument();
   });
 });

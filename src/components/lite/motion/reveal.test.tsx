@@ -5,9 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const motionState = vi.hoisted(() => ({ reduce: false }));
 vi.mock("motion/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("motion/react")>();
-  return { ...actual, useReducedMotion: () => motionState.reduce };
+  const { captureMotion } = await import("./capture-motion");
+  return { ...actual, motion: captureMotion(), useReducedMotion: () => motionState.reduce };
 });
 
+import { displacementOf, readMotion } from "./capture-motion";
 import { LiteReveal } from "./reveal";
 
 class FakeIntersectionObserver {
@@ -31,9 +33,18 @@ describe("LiteReveal", () => {
     expect(screen.getByText("Configuração de WhatsApp")).toBeInTheDocument();
   });
 
-  it("renders the section with reduced motion", () => {
+  it("rises 12 px and reveals once when motion is on", () => {
+    const { container } = render(<LiteReveal><p>Bloco</p></LiteReveal>);
+    const motion = readMotion(container.firstElementChild!);
+    expect(motion.initial).toEqual({ opacity: 0, y: 12 });
+    expect(motion.whileInView).toEqual({ opacity: 1, y: 0 });
+  });
+
+  it("has no displacement with reduced motion", () => {
     motionState.reduce = true;
-    render(<LiteReveal amount={0.5}><p>Configuração de WhatsApp</p></LiteReveal>);
-    expect(screen.getByText("Configuração de WhatsApp")).toBeInTheDocument();
+    const { container } = render(<LiteReveal amount={0.5}><p>Bloco</p></LiteReveal>);
+    const motion = readMotion(container.firstElementChild!);
+    expect(motion.initial).toEqual({ opacity: 0 });
+    expect(displacementOf(motion.whileInView)).toEqual([]);
   });
 });

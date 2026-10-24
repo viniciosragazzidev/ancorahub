@@ -32,6 +32,13 @@ describe("LiteCollapse", () => {
     expect(grid).toHaveAttribute("aria-hidden", "true");
   });
 
+  it("never moves the content: no transform on the grid or its child", () => {
+    const { container } = render(<LiteCollapse open><p>Detalhe</p></LiteCollapse>);
+    const grid = container.firstElementChild as HTMLElement;
+    expect(grid.style.transform).toBe("");
+    expect(grid.firstElementChild!.getAttribute("style")).not.toMatch(/transform/);
+  });
+
   it("only changes opacity on the transition with reduced motion", () => {
     motionState.reduce = true;
     const { container } = render(<LiteCollapse open><p>Detalhe</p></LiteCollapse>);
