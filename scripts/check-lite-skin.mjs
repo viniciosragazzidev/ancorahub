@@ -13,7 +13,7 @@ const RULES = {
   arbitraryValues: /\b(?:text|w|rounded)-\[[^\]]+\]/gi,
   smallTargets: /\bh-(?:7|8|9)\b|\bsize-(?:7|8|9|sm|icon)\b|\bsize=["'](?:sm|icon)["']/gi,
   forbiddenWeights: /\bfont-(?:thin|extralight|light|extrabold|black)\b|font-weight\s*:\s*(?:100|200|300|800|900)\b/gi,
-  icons: /from\s+["'](?:lucide-react|@phosphor-icons\/react|@remixicon\/react|react-icons(?:\/[^"']+)?|@iconify\/[^"']+|@\/components\/huge-icons)["']/gi,
+  icons: /from\s+["'](?:@phosphor-icons\/react|@remixicon\/react|react-icons(?:\/[^"']+)?|@iconify\/[^"']+|@\/components\/huge-icons)["']/gi,
   charts: /from\s+["'](?:recharts|@\/components\/ui\/chart)["']/gi,
   uiImports: /from\s+["']@\/components\/ui\/([a-z0-9-]+)["']/gi,
   arcImports: /from\s+["']@\/components\/arc(?:\/[^"']+)?["']/gi,
@@ -24,10 +24,20 @@ function countMatches(source, pattern) {
   return [...source.matchAll(new RegExp(pattern.source, pattern.flags))].length;
 }
 
+// Tokens do design system (o plano manda usar --shadow-resting nos cartões) não são desvio.
+const SHADOW_TOKEN = /var\(--shadow-[\w-]+\)|shadow-\(--shadow-[\w-]+\)/g;
+// Informativos, não desvios: @/components/arc é a biblioteca aprovada do Lite.
+const INFORMATIONAL = new Set(["arcImports"]);
+
 export function scanLiteSkinSource(file, source) {
-  const counts = Object.fromEntries(Object.entries(RULES).map(([category, pattern]) => [category, countMatches(source, pattern)]));
+  const withoutTokens = source.replace(SHADOW_TOKEN, "");
+  const counts = Object.fromEntries(Object.entries(RULES).map(([category, pattern]) => [
+    category,
+    countMatches(category === "shadows" ? withoutTokens : source, pattern),
+  ]));
   const uiImports = new Set([...source.matchAll(RULES.uiImports)].map((match) => match[1]));
-  return { file: file.replaceAll("\\", "/"), counts, uiImports: [...uiImports], total: Object.values(counts).reduce((sum, count) => sum + count, 0) };
+  const total = Object.entries(counts).filter(([category]) => !INFORMATIONAL.has(category)).reduce((sum, [, count]) => sum + count, 0);
+  return { file: file.replaceAll("\\", "/"), counts, uiImports: [...uiImports], total };
 }
 
 async function walk(directory, skip = new Set()) {

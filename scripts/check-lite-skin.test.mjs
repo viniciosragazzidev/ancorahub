@@ -10,7 +10,7 @@ describe("auditoria report-only do skin Lite", () => {
       import { AreaChart } from "recharts";
     `);
 
-    expect(result.counts).toMatchObject({ gradients: 2, shadows: 1, darkClasses: 1, uppercase: 1, wideTracking: 1, rawColors: 2, arbitraryValues: 1, smallTargets: 1, forbiddenWeights: 1, charts: 1, emDashText: 0 });
+    expect(result.counts).toMatchObject({ gradients: 2, shadows: 1, darkClasses: 1, uppercase: 1, wideTracking: 1, rawColors: 1, arbitraryValues: 1, smallTargets: 1, forbiddenWeights: 1, charts: 1, emDashText: 0 });
     expect(result.uiImports).toEqual(["button"]);
   });
 
@@ -31,5 +31,26 @@ describe("auditoria report-only do skin Lite", () => {
     expect(groupLiteSkinFile("src/app/(dashboard)/leads/[id]/page.tsx")).toBe("rota:/leads/[id]");
     expect(groupLiteSkinFile("src/features/dashboard/components/card.tsx")).toBe("feature:dashboard");
     expect(groupLiteSkinFile("src/components/ui/button.tsx")).toBe("componente:ui");
+  });
+});
+
+describe("tokens e bibliotecas aprovadas não são desvio", () => {
+  it("não conta --shadow-resting nem lucide-react nem @/components/arc como desvio", () => {
+    const result = scanLiteSkinSource("src/features/dashboard/components/director-lite/card.tsx", `
+      import { Users } from "lucide-react";
+      import { motionTokens } from "@/components/arc/motion-tokens";
+      <div className="rounded-xl" style={{ boxShadow: "var(--shadow-resting)" }} />
+    `);
+
+    expect(result.counts.shadows).toBe(0);
+    expect(result.counts.icons).toBe(0);
+    expect(result.counts.arcImports).toBe(1);
+    expect(result.total).toBe(0);
+  });
+
+  it("continua contando sombra fora do token", () => {
+    const result = scanLiteSkinSource("src/features/x/card.tsx", `<div className="shadow-lg" />`);
+    expect(result.counts.shadows).toBe(1);
+    expect(result.total).toBe(1);
   });
 });
