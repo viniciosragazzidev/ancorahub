@@ -10,7 +10,7 @@ import { fillTrendDays } from "@/shared/period";
 import type { FunnelStage } from "./metrics-math";
 import { buildFunnelRows, cohortConversionRate, percentage, safeRate } from "./metrics-math";
 import { resolveReportDataScope, type ReportDataScope } from "./metric-scope";
-import { narrowReportScopeToBranch } from "./narrow-scope";
+import { brokersOfBranchCondition, drilldownHref, narrowReportScopeToBranch } from "./narrow-scope";
 import {
   type CohortConversion,
   type PeriodWindows,
@@ -317,7 +317,8 @@ export async function getAttentionSnapshot(
   period: PeriodValue,
   options: { branchId?: string | null } = {},
 ): Promise<AttentionSnapshot> {
-  const scope = narrowReportScopeToBranch(await resolveReportDataScope(context), options.branchId);
+  const sessionScope = await resolveReportDataScope(context);
+  const scope = narrowReportScopeToBranch(sessionScope, options.branchId);
   const db = getDatabase();
   const { currentStart } = resolveWindows(period);
   const sla = await getTenantSlaParams(context.tenantId);
@@ -370,10 +371,11 @@ export async function getAttentionSnapshot(
           scope.leadScope,
         ),
       ),
-    resolveBrokersOverCapacity(context, scope),
+    // The unit picks which brokers enter; their load still counts across the tenant.
+    resolveBrokersOverCapacity(context, sessionScope, options.branchId),
   ]);
 
-  const periodQuery = `?period=${period}`;
+  const href = (id: DrilldownId) => drilldownHref(id, period, options.branchId);
 
   return {
     sla,
@@ -383,28 +385,28 @@ export async function getAttentionSnapshot(
         title: "Leads com alta intenção aguardando corretor",
         description: "Qualificação hot sem corretor responsável.",
         count: Number(hotUnassigned[0]?.total ?? 0),
-        href: `/dashboard/drill/high-intent-unassigned${periodQuery}`,
+        href: href("high-intent-unassigned"),
       },
       {
         id: "out-of-sla",
         title: "Primeiro atendimento fora do SLA",
         description: `Distribuídos no período com latência acima de ${sla.firstContactMinutes} min ou sem contato dentro do prazo.`,
         count: Number(outOfSla[0]?.total ?? 0),
-        href: `/dashboard/drill/out-of-sla${periodQuery}`,
+        href: href("out-of-sla"),
       },
       {
         id: "stale-negotiations",
         title: "Negociações paradas",
         description: `Sem avanço de etapa há mais de ${sla.stagnantDays} dias.`,
         count: Number(stale[0]?.total ?? 0),
-        href: `/dashboard/drill/stale-negotiations${periodQuery}`,
+        href: href("stale-negotiations"),
       },
       {
         id: "brokers-over-capacity",
         title: "Corretores acima da capacidade",
         description: "Carteira ativa acima da capacidade da fila responsável.",
         count: overCapacity.length,
-        href: `/dashboard/drill/brokers-over-capacity${periodQuery}`,
+        href: href("brokers-over-capacity"),
       },
     ],
   };
@@ -417,9 +419,14 @@ export interface BrokerCapacityRow {
   readonly capacity: number;
 }
 
+/**
+ * `branchId` only chooses which brokers enter (the unit's members); the load of
+ * each one keeps counting every active lead the session scope sees.
+ */
 async function resolveBrokersOverCapacity(
   context: TenantContext,
   scope: ReportDataScope,
+  branchId?: string | null,
 ): Promise<BrokerCapacityRow[]> {
   const db = getDatabase();
 
@@ -462,6 +469,7 @@ async function resolveBrokersOverCapacity(
         isNotNull(schema.leads.corretorId),
         inArray(schema.leads.status, [...ACTIVE_LEAD_STATUSES]),
         scope.leadScope,
+        branchId ? brokersOfBranchCondition(context.tenantId, branchId) : undefined,
         inArray(schema.leads.queueId, [...capacities.keys()]),
       ),
     )
@@ -837,12 +845,19 @@ const DRILLDOWN_META: Record<DrilldownId, { title: string; explanation: string }
 
 const DRILLDOWN_LIMIT = 200;
 
+/**
+ * `options.branchId` narrows the drill to one unit like `getAttentionSnapshot`
+ * (pass only a unit resolved for the viewer); `options.scope` reuses a report
+ * scope the caller already resolved. Without options nothing changes.
+ */
 export async function getDrilldown(
   context: TenantContext,
   id: DrilldownId,
   period: PeriodValue,
+  options: { branchId?: string | null; scope?: ReportDataScope } = {},
 ): Promise<DrilldownResult> {
-  const scope = await resolveReportDataScope(context);
+  const sessionScope = options.scope ?? await resolveReportDataScope(context);
+  const scope = narrowReportScopeToBranch(sessionScope, options.branchId);
   const db = getDatabase();
   const sla = await getTenantSlaParams(context.tenantId);
   const { currentStart } = resolveWindows(period);
@@ -851,7 +866,7 @@ export async function getDrilldown(
   const meta = DRILLDOWN_META[id];
 
   if (id === "brokers-over-capacity") {
-    const brokers = await resolveBrokersOverCapacity(context, scope);
+    const brokers = await resolveBrokersOverCapacity(context, sessionScope, options.branchId);
     return {
       id,
       title: meta.title,

@@ -5,6 +5,9 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { parsePeriod } from "@/shared/period";
 import { isDrilldownId, getDrilldown } from "@/features/reports/metrics/metrics-service";
+import { resolveReportDataScope } from "@/features/reports/metrics/metric-scope";
+import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
+import { OverviewBranchNotFoundError, resolveOverviewFilter } from "@/features/dashboard/today";
 import { ArrowLeft } from "@/components/huge-icons";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -16,14 +19,23 @@ export default async function DrilldownPage({
   searchParams,
 }: {
   params: Promise<{ drillId: string }>;
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; branchId?: string }>;
 }) {
   const { drillId } = await params;
   if (!isDrilldownId(drillId)) notFound();
 
   const context = await getRequiredTenantContext();
-  const period = parsePeriod((await searchParams).period);
-  const drilldown = await getDrilldown(context, drillId, period);
+  const query = await searchParams;
+  const period = parsePeriod(query.period);
+  // Same unit rule as the overview: only a Diretor picks one (checked against the
+  // tenant); a Gestor stays on their unit and a Supervisor on their team.
+  const scope = await resolveReportDataScope(context);
+  const overview = await resolveOverviewFilter(context, scope, { branchId: parseBranchIdParam(query.branchId) }).catch((error: unknown) => {
+    if (error instanceof OverviewBranchNotFoundError) notFound();
+    throw error;
+  });
+  const branchId = overview.narrowBranchId;
+  const drilldown = await getDrilldown(context, drillId, period, { scope, branchId });
 
   return (
     <>
@@ -32,7 +44,7 @@ export default async function DrilldownPage({
         title={drilldown.title}
         rightSlot={
           <Link
-            href={`/dashboard?period=${period}&tab=overview`}
+            href={`/dashboard?period=${period}&tab=overview${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`}
             className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
