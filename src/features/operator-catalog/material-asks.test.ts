@@ -15,7 +15,7 @@ describe("buildMaterialAsks", () => {
   it("suggests only subjects with material, one per area first", () => {
     const asks = buildMaterialAsks(rows, { seed: 0, limit: 3 });
     expect(asks.map((ask) => ask.areaSlug)).toEqual(["precos", "rede_credenciada", "carencias"]);
-    expect(asks[0]).toMatchObject({ label: "Preços Amil S380 para 2 vidas", question: "Quanto fica Amil S380 para 2 vidas de 30 e 25 anos?" });
+    expect(asks[0]).toMatchObject({ label: "Tabela de preços da Amil S380", question: "Qual a tabela de preços da Amil S380?" });
     expect(asks.some((ask) => ask.areaSlug === "comissionamento")).toBe(false);
   });
 

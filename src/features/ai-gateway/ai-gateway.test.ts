@@ -175,3 +175,12 @@ describe("Anthropic direct request", () => {
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).not.toHaveProperty("temperature");
   });
 });
+
+describe("extractJson", () => {
+  it("finds the object among text with braces of its own", () => {
+    expect(extractJson("```json\n{\"order\": [3, 1]}\n```")).toEqual({ order: [3, 1] });
+    expect(extractJson("Ordem {mais útil primeiro}: {\"order\": [2]} pronto")).toEqual({ order: [2] });
+    expect(extractJson("{\"answer\": \"chave } dentro\", \"found\": true}")).toEqual({ answer: "chave } dentro", found: true });
+    expect(extractJson("sem json")).toBeNull();
+  });
+});

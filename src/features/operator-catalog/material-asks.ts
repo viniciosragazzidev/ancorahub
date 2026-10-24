@@ -18,9 +18,10 @@ function fullName(carrier: string, plan: string | null) {
 type Template = (subject: { carrier: string; plan: string | null }) => { label: string; question: string };
 
 const TEMPLATES: Record<string, Template> = {
+  // The whole table, not made-up ages: a suggestion must never land on "não encontrei" (24/10).
   precos: ({ carrier, plan }) => ({
-    label: `Preços ${plan ?? carrier} para 2 vidas`,
-    question: `Quanto fica ${fullName(carrier, plan)} para 2 vidas de 30 e 25 anos?`,
+    label: `Tabela de preços da ${plan ?? carrier}`,
+    question: `Qual a tabela de preços da ${fullName(carrier, plan)}?`,
   }),
   rede_credenciada: ({ carrier, plan }) => ({
     label: `Hospitais da ${plan ?? carrier}`,

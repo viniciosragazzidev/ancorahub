@@ -40,12 +40,34 @@ function allow(user: string, now = Date.now()) {
   return true;
 }
 
-/** The first JSON object in a model answer (models sometimes wrap it in text or code fences). */
+/**
+ * The JSON object in a model answer. Models sometimes wrap it in code fences or write a line
+ * before or after it, sometimes with braces of their own (24/10, Claude direct): the whole
+ * span is tried first, then each balanced object from the first brace on.
+ */
 export function extractJson(text: string): unknown {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start) return null;
-  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
+  try { return JSON.parse(text.slice(start, end + 1)); } catch { /* fall through */ }
+  for (let open = start; open >= 0 && open < text.length; open = text.indexOf("{", open + 1)) {
+    let depth = 0;
+    let inString = false;
+    for (let index = open; index < text.length; index += 1) {
+      const char = text[index];
+      if (inString) {
+        if (char === "\\") index += 1;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') inString = true;
+      else if (char === "{") depth += 1;
+      else if (char === "}" && --depth === 0) {
+        try { return JSON.parse(text.slice(open, index + 1)); } catch { break; }
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -119,10 +141,11 @@ export async function runGateway<T>(input: {
         const detail = (await response.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
         throw new Error(`HTTP ${response.status}${detail ? ` ${detail}` : ""}`);
       }
-      const body = await response.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: Parameters<typeof logAiUsage>[0]["usage"] };
+      const body = await response.json() as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }>; usage?: Parameters<typeof logAiUsage>[0]["usage"] };
       const text = body.choices?.[0]?.message?.content ?? "";
       const parsed = input.schema.safeParse(extractJson(text));
-      if (!parsed.success) throw new Error("invalid_output");
+      // The reason without the content (it may carry client data): cut by max_tokens or not JSON.
+      if (!parsed.success) throw new Error(`invalid_output (${body.choices?.[0]?.finish_reason ?? "?"}, ${text.length} chars)`);
       void logAiUsage({ ...log, model: `${ref.provider}/${ref.model}`, startedAt, usage: body.usage ?? null, success: true });
       return { ok: true, value: parsed.data, text, model: ref, attempts };
     } catch (error) {

@@ -53,6 +53,7 @@ const SYSTEM_PROMPT = [
   "Trechos marcados como leitura automática de imagem podem ter erros: avise para confirmar no material original.",
   "Organize a resposta em seções curtas: uma seção por plano ou tabela (no título, as condições: acomodação, vidas, contratação, coparticipação) ou por grupo (ex.: hospitais por plano). Cada linha tem um rótulo curto (faixa, idade, hospital, regra) e o valor; a citação vai no campo cite da linha, nunca dentro do texto.",
   "Em missing, escreva para o corretor em palavras simples, sem códigos como [F] ou [T] e sem falar em informações catalogadas ou trechos (ex.: tabela de preços da Bradesco).",
+  "No máximo 40 linhas somando todas as seções. Uma lista maior (ex.: todos os hospitais) vira as 40 mais relevantes para a pergunta, e em notes diga quantas ficaram de fora.",
   "Em intro, uma frase simples dizendo o que foi encontrado. Em notes, os avisos (preço não conferido, leitura de imagem, condições escolhidas). Sem markdown, sem asteriscos.",
   'Devolva somente um JSON: {"found": true ou false, "intro": "frase", "sections": [{"title": "Amil S380 · QC · 2 vidas · coparticipação 30%", "rows": [{"label": "33 anos (29-33)", "value": "R$ 391,50", "cite": "F2"}, {"label": "Total", "value": "R$ 717,75", "cite": "F1, F2"}]}], "notes": ["aviso"], "missing": "o que não está no material, ou vazio"}.',
 ].join(" ");
@@ -351,6 +352,12 @@ async function computeOperatorAnswer(input: { tenantId: string; userId: string; 
   // Facts first (one fast query): when they cover the subject asked, the excerpt search is light.
   let allFacts = await loadFacts(input.tenantId, scope);
   if (!allFacts.length && scope.areas.length) allFacts = await loadFacts(input.tenantId, { ...scope, areas: [] });
+  // No price for the bands asked (a table written "24 a 28", or other bands): the whole table
+  // goes and the model finds each age in it (24/10, KLINI 200 AD).
+  if (scope.bands.length && !allFacts.some((fact) => fact.areaSlug === "precos")) {
+    const table = await loadFacts(input.tenantId, { ...scope, bands: [], asksPrice: true, areas: ["precos"] });
+    allFacts = [...allFacts, ...table];
+  }
   // "Quais os planos da X": the plans the catalog has for the operator are an answer too.
   if (scope.areas.includes("planos")) allFacts = [...(await loadPlanListFacts(input.tenantId, scope.factCarrierIds)), ...allFacts];
   const covered = scope.areas.length > 0 && allFacts.some((fact) => scope.areas.includes(fact.areaSlug));
