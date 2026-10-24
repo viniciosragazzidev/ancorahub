@@ -5,7 +5,7 @@
  * o `LiteNumber` do kit (`@/components/lite/motion`). Os demais são locais porque o kit não tem
  * a forma exata (pílula de texto, barra de cor de série, `li` e `section` com atraso).
  */
-import type { ReactNode } from "react";
+import { useSyncExternalStore, type ReactNode } from "react";
 import { motion, useReducedMotion, type Transition } from "motion/react";
 
 import { motionTokens as m } from "@/components/arc/motion-tokens";
@@ -20,8 +20,19 @@ export const fadeT: Transition = { duration: m.duration.instant };
 /** Atraso de cascata: até `stagger.max - 1` passos distintos. */
 export const staggerDelay = (index: number) => Math.min(index, m.stagger.max - 1) * m.stagger.item;
 
+/** Preferência de acessibilidade do próprio site (html[data-reduce-motion="1"], ver features/assist). */
+function subscribeUserReduce(onChange: () => void) {
+  const observer = new MutationObserver(onChange);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-reduce-motion"] });
+  return () => observer.disconnect();
+}
+const readUserReduce = () => document.documentElement.dataset.reduceMotion === "1";
+
+/** Movimento reduzido vale se o sistema pedir OU se o usuário ligou a preferência no site. */
 export function useReduce() {
-  return !!useReducedMotion();
+  const system = !!useReducedMotion();
+  const user = useSyncExternalStore(subscribeUserReduce, readUserReduce, () => false);
+  return system || user;
 }
 
 /** Número que muda (odômetro do kit). `kind` segue o da prévia: inteiro, percentual, real ou decimal. */
