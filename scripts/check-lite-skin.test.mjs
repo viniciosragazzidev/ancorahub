@@ -48,6 +48,11 @@ describe("tokens e bibliotecas aprovadas não são desvio", () => {
     expect(result.total).toBe(0);
   });
 
+  it("não conta box-shadow que usa só um token da escala", () => {
+    const result = scanLiteSkinSource("src/features/x/card.module.css", ".card { box-shadow: var(--shadow-resting); }");
+    expect(result.counts.shadows).toBe(0);
+  });
+
   it("continua contando sombra fora do token", () => {
     const result = scanLiteSkinSource("src/features/x/card.tsx", `<div className="shadow-lg" />`);
     expect(result.counts.shadows).toBe(1);

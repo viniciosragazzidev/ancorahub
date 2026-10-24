@@ -25,7 +25,7 @@ function countMatches(source, pattern) {
 }
 
 // Tokens do design system (o plano manda usar --shadow-resting nos cartões) não são desvio.
-const SHADOW_TOKEN = /var\(--shadow-[\w-]+\)|shadow-\(--shadow-[\w-]+\)/g;
+const SHADOW_TOKEN = /(?:box-shadow\s*:\s*)?var\(--shadow-[\w-]+\)|shadow-\(--shadow-[\w-]+\)/g;
 // Informativos, não desvios: @/components/arc é a biblioteca aprovada do Lite.
 const INFORMATIONAL = new Set(["arcImports"]);
 
