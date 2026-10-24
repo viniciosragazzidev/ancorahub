@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 
 import { MOTIVO_PERDA_LABELS, type MotivoPerda } from "@/features/leads/lead-status-constants";
+import { operationDayStart } from "@/features/reports/metrics/lead-quality-period";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -19,7 +20,16 @@ import { resolveFunnelBranchScope } from "./funnel-scope";
  * Meta cost. Cohort by arrival: every rate divides numbers of the same leads.
  */
 export const FUNNEL_PERIODS = [7, 30, 90] as const;
-export type FunnelPeriod = (typeof FUNNEL_PERIODS)[number];
+export type FunnelPeriod = (typeof FUNNEL_PERIODS)[number] | "today";
+
+export function funnelPeriodForOverview(period: "today" | "7d" | "30d"): FunnelPeriod {
+  if (period === "today") return "today";
+  return period === "7d" ? 7 : 30;
+}
+
+export function funnelPeriodStart(period: FunnelPeriod, now = new Date()) {
+  return period === "today" ? operationDayStart(now) : new Date(now.getTime() - period * 24 * 60 * 60_000);
+}
 
 export function parseFunnelPeriod(value: string | undefined | null): FunnelPeriod {
   const number = Number(value);
@@ -162,7 +172,7 @@ export async function getQualificationFunnel(
   requestedBranchId?: string | null,
 ): Promise<QualificationFunnel> {
   const db = getDatabase();
-  const since = new Date(Date.now() - period * 24 * 60 * 60_000);
+  const since = funnelPeriodStart(period);
   const isDirector = context.role === "director";
   const branchId = resolveFunnelBranchScope(context, requestedBranchId);
   const includeCompanyCost = isDirector && branchId === null;

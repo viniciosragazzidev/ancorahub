@@ -50,6 +50,13 @@ describe("funil de qualificação Lite", () => {
     expect(screen.getByRole("list", { name: "Situação atual dos leads do período" })).toBeInTheDocument();
   });
 
+  it("mostra Hoje como período operacional, sem rótulo de sete dias", () => {
+    const { container } = render(<QualificationFunnelView data={{ ...fixture, period: "today" }} unitName="Centro" />);
+    expect(container.textContent).toContain("Hoje, Centro");
+    expect(container.textContent).toContain("chegaram hoje, etapa por etapa");
+    expect(container.textContent).not.toContain("Últimos today dias");
+  });
+
   it("mostra vazio explícito quando a coorte não tem leads", () => {
     const empty: QualificationFunnel = {
       ...fixture,

@@ -15,7 +15,7 @@ import { listLeadQualityQueues } from "@/features/reports/metrics/lead-quality-e
 import { LeadQualityCenter } from "@/features/reports/components/lead-quality-center";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { getFeatureFlag } from "@/features/system-settings/queries";
-import { getQualificationFunnel, parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
+import { funnelPeriodForOverview, getQualificationFunnel, parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
 import { QualificationFunnelView } from "@/features/qualification-turbo/components/qualification-funnel-view";
 import { parseOverviewPeriod } from "@/features/dashboard/overview-filter";
 import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
@@ -79,8 +79,9 @@ export default async function DashboardPage({
     const canReadQuality = await canAccessLeadQualityCenter(context);
     // Funil de qualificação (qualificação turbo): director and manager with the quality center.
     if (activeTab === "funnel" && canReadQuality && (context.role === "director" || (context.role === "manager" && context.branchId))) {
-      const funnelPeriod = parseFunnelPeriod(singleParam(resolvedSearchParams.period));
       if (context.role === "director" && (await shouldUseDirectorLiteStyle(context.role, context.tenantId))) {
+        const overviewPeriod = parseOverviewPeriod(singleParam(resolvedSearchParams.periodo) ?? singleParam(resolvedSearchParams.period));
+        const funnelPeriod = funnelPeriodForOverview(overviewPeriod);
         const { canCompare, units } = await getDashboardUnitFilter(context);
         const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
         const [funnel, firstName] = await Promise.all([
@@ -89,6 +90,7 @@ export default async function DashboardPage({
         ]);
         return <DirectorLiteQualificationFunnelPage data={funnel} branchId={branchId} branches={canCompare ? units : []} firstName={firstName} now={new Date()} />;
       }
+      const funnelPeriod = parseFunnelPeriod(singleParam(resolvedSearchParams.period));
       const funnel = await getQualificationFunnel(context, funnelPeriod);
       return <QualificationFunnelView data={funnel} showQualityTab />;
     }

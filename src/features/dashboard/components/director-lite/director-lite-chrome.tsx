@@ -23,9 +23,7 @@ const TAB_BASE: Record<DirectorLiteTab, string> = { overview: "/dashboard", qual
 
 /** Link de uma aba ou de um filtro: mantém período e unidade (o único ponto que monta essas rotas). */
 export function dashboardHref(tab: DirectorLiteTab, periodValue: string, branchId: string | null) {
-  const params = tab === "funnel"
-    ? new URLSearchParams({ period: periodValue === "hoje" ? "7" : periodValue })
-    : new URLSearchParams({ periodo: periodValue });
+  const params = new URLSearchParams({ periodo: periodValue });
   if (branchId) params.set("unidade", branchId);
   return `${TAB_BASE[tab]}${TAB_BASE[tab].includes("?") ? "&" : "?"}${params.toString()}`;
 }

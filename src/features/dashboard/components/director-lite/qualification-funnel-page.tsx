@@ -5,32 +5,14 @@ import { useRouter } from "next/navigation";
 import type { FunnelPeriod, QualificationFunnel } from "@/features/qualification-turbo/funnel";
 
 import type { DashboardBranch } from "./director-lite-dashboard";
+import { dashboardHref, PERIOD_OPTIONS } from "./director-lite-chrome";
 import { DirectorLiteHeader, type HeaderOption, type HeaderUnit } from "./director-lite-header";
 import styles from "./director-lite.module.css";
 import { QualificationFunnelView } from "./qualification-funnel-view";
 
-const periods: readonly FunnelPeriod[] = [7, 30, 90];
-
-function funnelHref(period: FunnelPeriod, branchId: string | null) {
-  const params = new URLSearchParams({ tab: "funnel", period: String(period) });
-  if (branchId) params.set("unidade", branchId);
-  return `/dashboard?${params.toString()}`;
-}
-
-function standardPeriod(period: FunnelPeriod) {
+function periodValue(period: FunnelPeriod) {
+  if (period === "today") return "hoje";
   return period === 7 ? "7" : "30";
-}
-
-function overviewHref(period: FunnelPeriod, branchId: string | null) {
-  const params = new URLSearchParams({ periodo: standardPeriod(period) });
-  if (branchId) params.set("unidade", branchId);
-  return `/dashboard?${params.toString()}`;
-}
-
-function qualityHref(period: FunnelPeriod, branchId: string | null) {
-  const params = new URLSearchParams({ tab: "quality", periodo: standardPeriod(period) });
-  if (branchId) params.set("unidade", branchId);
-  return `/dashboard?${params.toString()}`;
 }
 
 export function DirectorLiteQualificationFunnelPage({
@@ -49,15 +31,16 @@ export function DirectorLiteQualificationFunnelPage({
 }) {
   const router = useRouter();
   const selectedBranch = branches.find((branch) => branch.id === branchId) ?? null;
+  const activePeriod = periodValue(data.period);
   const tabs: HeaderOption[] = [
-    { value: "overview", label: "Visão da operação", href: overviewHref(data.period, branchId) },
-    { value: "quality", label: "Qualidade dos leads", href: qualityHref(data.period, branchId) },
-    { value: "funnel", label: "Funil de qualificação", href: funnelHref(data.period, branchId) },
+    { value: "overview", label: "Visão da operação", href: dashboardHref("overview", activePeriod, branchId) },
+    { value: "quality", label: "Qualidade dos leads", href: dashboardHref("quality", activePeriod, branchId) },
+    { value: "funnel", label: "Funil de qualificação", href: dashboardHref("funnel", activePeriod, branchId) },
   ];
-  const periodOptions: HeaderOption[] = periods.map((period) => ({
-    value: String(period),
-    label: `${period} dias`,
-    href: funnelHref(period, branchId),
+  const periodOptions: HeaderOption[] = PERIOD_OPTIONS.map((period) => ({
+    value: period.value,
+    label: period.label,
+    href: dashboardHref("funnel", period.value, branchId),
   }));
   const units: HeaderUnit[] | undefined = branches.length
     ? [{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))]
@@ -71,10 +54,10 @@ export function DirectorLiteQualificationFunnelPage({
         tabs={tabs}
         activeTab="funnel"
         periods={periodOptions}
-        activePeriod={String(data.period)}
+        activePeriod={activePeriod}
         units={units}
         activeUnit={branchId ?? ""}
-        onUnit={(value) => router.push(funnelHref(data.period, value || null))}
+        onUnit={(value) => router.push(dashboardHref("funnel", activePeriod, value || null))}
       />
       <QualificationFunnelView data={data} unitName={selectedBranch?.name ?? null} />
     </div>

@@ -6,7 +6,8 @@ import { notFound } from "next/navigation";
 
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
-import { parseFunnelPeriod } from "@/features/qualification-turbo/funnel";
+import { funnelPeriodForOverview } from "@/features/qualification-turbo/funnel";
+import { parseOverviewPeriod } from "@/features/dashboard/overview-filter";
 import styles from "@/features/dashboard/components/director-lite/director-lite.module.css";
 
 import { buildEssential } from "../diretor-dashboard-preview/_components/essential-example";
@@ -46,7 +47,8 @@ export default async function DirectorDashboardRealPage({ searchParams }: { sear
   const branch = BRANCHES.find((item) => item.id === rawBranchId) ?? null;
 
   if (activeTab === "funnel") {
-    const period = parseFunnelPeriod(singleParam(params.period));
+    const overviewPeriod = parseOverviewPeriod(singleParam(params.periodo) ?? singleParam(params.period));
+    const period = funnelPeriodForOverview(overviewPeriod);
     const data = buildFunnel(period, branch ? FUNNEL_UNIT_IDS[branch.id] : "all", now);
     return (
       <div className="arc-venancor" data-skin="diretor">

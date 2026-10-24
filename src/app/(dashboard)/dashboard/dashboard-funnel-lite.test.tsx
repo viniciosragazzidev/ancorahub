@@ -24,6 +24,7 @@ vi.mock("@/shared/feature-flags/catalog", () => ({ FEATURE_FLAGS: { REPORTING_CE
 vi.mock("@/features/system-settings/queries", () => ({ getFeatureFlag: async () => "true" }));
 vi.mock("@/features/qualification-turbo/funnel", () => ({
   parseFunnelPeriod: (value: string | undefined) => (value === "30" ? 30 : value === "90" ? 90 : 7),
+  funnelPeriodForOverview: (period: "today" | "7d" | "30d") => period === "today" ? "today" : period === "7d" ? 7 : 30,
   getQualificationFunnel: (...args: unknown[]) => state.getFunnel(...args),
 }));
 vi.mock("@/features/reports/metrics/narrow-scope", () => ({ parseBranchIdParam: (value: string | undefined) => value ?? null }));
@@ -54,17 +55,23 @@ afterEach(() => vi.clearAllMocks());
 
 describe("aba Funil de qualificação do Diretor Lite", () => {
   it("usa a tela Lite e o período/unidade autorizada selecionados", async () => {
-    const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", period: "30", unidade: allowedUnit }) });
+    const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", periodo: "30", unidade: allowedUnit }) });
     expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
     expect(element.props).toMatchObject({ branchId: allowedUnit, branches: state.units, data: fixture, firstName: "Renata", now: expect.any(Date) });
     expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil", role: "director" }), 30, allowedUnit);
   });
 
+  it("mapeia Hoje para o período operacional e mantém a unidade selecionada", async () => {
+    const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", periodo: "hoje", unidade: allowedUnit }) });
+    expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
+    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil", role: "director" }), "today", allowedUnit);
+  });
+
   it("ignora unidade não autorizada e consulta todas as unidades", async () => {
-    const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", period: "90", unidade: "88888888-8888-4888-8888-888888888888" }) });
+    const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", periodo: "7", unidade: "88888888-8888-4888-8888-888888888888" }) });
     expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
     expect(element.props.branchId).toBeNull();
-    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil" }), 90, null);
+    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil" }), 7, null);
   });
 
   it("com a chave desligada mantém a tela antiga e sua chamada sem filtro adicional", async () => {

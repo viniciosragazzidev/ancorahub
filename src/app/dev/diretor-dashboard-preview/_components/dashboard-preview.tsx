@@ -62,8 +62,8 @@ export function DirectorDashboardPreview({ initialTab, initialState, initialVist
   const [state, setState] = useState<PreviewState>(initialState);
   const [unit, setUnit] = useState<UnitId>("all");
   const [overviewPeriod, setOverviewPeriod] = useState<OverviewPeriod>("today");
-  // Um período só, do topo (Hoje, 7 ou 30 dias), para as três abas: o funil não tem "hoje", então usa 7.
-  const funnelPeriod: FunnelPeriod = overviewPeriod === "today" ? 7 : overviewPeriod;
+  // Um período só, do topo (Hoje, 7 ou 30 dias), para as três abas.
+  const funnelPeriod: FunnelPeriod = overviewPeriod;
   const qualityPeriod: QualityPeriod = overviewPeriod;
   const [queueId, setQueueId] = useState<string | null>(null);
   const [vista, setVista] = useState<"simples" | "detalhada">(initialVista);

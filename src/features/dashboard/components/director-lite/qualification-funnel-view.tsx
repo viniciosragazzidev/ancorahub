@@ -77,11 +77,13 @@ export function QualificationFunnelView({ data, unitName }: { data: Qualificatio
   const sent = byKey.get("sent") ?? 0;
   const maxTouch = Math.max(1, ...data.touches.map((touch) => touch.repliesAfter));
   const maxLoss = Math.max(1, ...data.lossReasons.map((row) => row.count));
+  const periodDescription = data.period === "today" ? "hoje" : `nos últimos ${data.period} dias`;
+  const periodLabel = data.period === "today" ? "Hoje" : `Últimos ${data.period} dias`;
 
   return (
     <div className={styles.stack}>
       <section aria-label="Resumo do período" className={styles.stats4}>
-        <Stat index={0} label="Leads que chegaram" value={arrived} detail={`Últimos ${data.period} dias${unitName ? `, ${unitName}` : ""}`} />
+        <Stat index={0} label="Leads que chegaram" value={arrived} detail={`${periodLabel}${unitName ? `, ${unitName}` : ""}`} />
         <Stat index={1} label="Responderam à primeira mensagem" value={ratio(replied, arrived)} kind="pct" detail={`${plural(replied, "lead", "leads")}, resposta em ${minutesLabel(data.medianMinutesToReply)} (mediana)`} />
         <Stat index={2} label="Qualificados" value={ratio(qualified, arrived)} kind="pct" detail={`${plural(qualified, "lead pronto", "leads prontos")} para o corretor`} />
         <Stat index={3} label="Vendas" value={converted} detail={`${pct(converted, arrived)} dos leads que chegaram`} />
@@ -103,7 +105,7 @@ export function QualificationFunnelView({ data, unitName }: { data: Qualificatio
                 <div>
                   <h2 className={styles.cardTitle}>Do anúncio à venda</h2>
                   <p className={styles.cardDescription}>
-                    Os mesmos leads que chegaram nos últimos {data.period} dias, etapa por etapa.
+                    Os mesmos leads que chegaram {periodDescription}, etapa por etapa.
                     {sent && delivered < sent ? ` ${plural(sent - delivered, "primeira mensagem não foi entregue", "primeiras mensagens não foram entregues")} pela Meta.` : ""}
                   </p>
                 </div>

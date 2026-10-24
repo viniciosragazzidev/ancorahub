@@ -29,8 +29,8 @@ Status: implementação concluída na branch `feat/diretor-lite-funil`.
 
 ## Cabeçalho compartilhado e prévia real
 
-- Rebaseada em `feat/diretor-lite-qualidade` (`8926f5ee`), a aba agora usa `DirectorLiteHeader` para saudação, abas, período e unidade. Os links de aba preservam filtros; o link para Funil usa `period=`, que é o parâmetro lido pela rota.
-- `/dev/diretor-dashboard-real?tab=funnel` renderiza este componente real com fixtures, sem a moldura da prévia.
+- Rebaseada em `feat/diretor-lite-qualidade`, a aba usa `DirectorLiteHeader` para saudação, abas, período e unidade. As três abas compartilham Hoje, 7 e 30 dias em `?periodo=` e preservam a unidade selecionada.
+- `/dev/diretor-dashboard-real?tab=funnel&periodo=hoje` renderiza este componente real com fixtures, sem a moldura da prévia.
 - Vitest focado: 4 arquivos, 20 testes aprovados, cobrindo aba, filtros, unidades autorizadas, vazio e rota real de desenvolvimento.
 - A rota real retornou 200 em navegador com movimento reduzido e sem erro de hidratação. Sem `DATABASE_URL`, o endpoint de preferências de movimento responde 503, sem afetar os dados de exemplo.
 

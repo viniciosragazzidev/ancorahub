@@ -3,6 +3,16 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const motionState = vi.hoisted(() => ({ reduce: false }));
+vi.stubGlobal("matchMedia", (media: string) => ({
+  matches: motionState.reduce,
+  media,
+  onchange: null,
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+}));
 // O cabeçalho navega com o router do Next; nos testes, só o push é observado.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("motion/react", async (importOriginal) => {

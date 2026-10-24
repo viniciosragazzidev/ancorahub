@@ -111,8 +111,9 @@ describe("filtros do topo na aba Qualidade", () => {
     expect(dashboardHref("quality", "30", "branch-centro")).toBe("/dashboard?tab=quality&periodo=30&unidade=branch-centro");
     expect(dashboardHref("quality", "hoje", null)).toBe("/dashboard?tab=quality&periodo=hoje");
     expect(dashboardHref("overview", "7", null)).toBe("/dashboard?periodo=7");
-    expect(dashboardHref("funnel", "7", null)).toBe("/dashboard?tab=funnel&period=7");
-    expect(dashboardHref("funnel", "30", "branch-centro")).toBe("/dashboard?tab=funnel&period=30&unidade=branch-centro");
+    expect(dashboardHref("funnel", "hoje", null)).toBe("/dashboard?tab=funnel&periodo=hoje");
+    expect(dashboardHref("funnel", "7", null)).toBe("/dashboard?tab=funnel&periodo=7");
+    expect(dashboardHref("funnel", "30", "branch-centro")).toBe("/dashboard?tab=funnel&periodo=30&unidade=branch-centro");
   });
 
   it("na aba Qualidade, o cabeçalho traz o nome, o período marcado e a unidade escolhida", () => {

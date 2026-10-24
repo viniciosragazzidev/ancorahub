@@ -47,20 +47,25 @@ describe("filtros da aba Funil Lite", () => {
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("href", "/dashboard?periodo=30&unidade=branch-autorizada");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=30&unidade=branch-autorizada");
+    expect(tabs.getByRole("link", { name: "Funil de qualificação" })).toHaveAttribute("href", "/dashboard?tab=funnel&periodo=30&unidade=branch-autorizada");
     const periods = within(screen.getByRole("navigation", { name: "Período" }));
     expect(periods.getByRole("link", { name: "30 dias" })).toHaveAttribute("aria-current", "true");
-    expect(periods.getByRole("link", { name: "7 dias" })).toHaveAttribute("href", "/dashboard?tab=funnel&period=7&unidade=branch-autorizada");
+    expect(periods.getByRole("link", { name: "Hoje" })).toHaveAttribute("href", "/dashboard?tab=funnel&periodo=hoje&unidade=branch-autorizada");
+    expect(periods.getByRole("link", { name: "7 dias" })).toHaveAttribute("href", "/dashboard?tab=funnel&periodo=7&unidade=branch-autorizada");
     const unit = screen.getByRole("combobox", { name: "Unidade" }) as HTMLSelectElement;
     expect(unit.value).toBe("branch-autorizada");
     expect(within(unit).getByRole("option", { name: "Centro" })).toBeInTheDocument();
     expect(within(unit).queryByRole("option", { name: "Unidade de outro tenant" })).not.toBeInTheDocument();
     fireEvent.change(unit, { target: { value: "" } });
-    expect(motionState.push).toHaveBeenCalledWith("/dashboard?tab=funnel&period=30");
+    expect(motionState.push).toHaveBeenCalledWith("/dashboard?tab=funnel&periodo=30");
   });
 
-  it("limita o período de 90 dias ao maior período disponível ao voltar para a visão da operação", () => {
-    render(<DirectorLiteQualificationFunnelPage data={{ ...data, period: 90 }} branchId={null} branches={[]} firstName="Renata" now={now} />);
-    expect(within(screen.getByRole("navigation", { name: "Abas do painel" })).getByRole("link", { name: "Visão da operação" })).toHaveAttribute("href", "/dashboard?periodo=30");
+  it("mantém Hoje ao trocar de aba", () => {
+    render(<DirectorLiteQualificationFunnelPage data={{ ...data, period: "today" }} branchId={null} branches={[]} firstName="Renata" now={now} />);
+    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
+    expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("href", "/dashboard?periodo=hoje");
+    expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=hoje");
+    expect(within(screen.getByRole("navigation", { name: "Período" })).getByRole("link", { name: "Hoje" })).toHaveAttribute("aria-current", "true");
   });
 
   it("oculta o filtro de unidade se o servidor não autorizou comparação", () => {

@@ -8,7 +8,7 @@ import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { DashboardSectionTabs } from "@/features/dashboard/components/dashboard-section-tabs";
 import { cn } from "@/lib/utils";
 
-import { FUNNEL_PERIODS, type QualificationFunnel } from "../funnel";
+import { FUNNEL_PERIODS, type FunnelPeriod, type QualificationFunnel } from "../funnel";
 
 const integer = new Intl.NumberFormat("pt-BR");
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -25,7 +25,7 @@ function minutesLabel(minutes: number | null) {
   return `${hours}h${String(minutes % 60).padStart(2, "0")}`;
 }
 
-function PeriodLinks({ active }: { active: number }) {
+function PeriodLinks({ active }: { active: FunnelPeriod }) {
   return (
     <nav aria-label="Período do funil" className="flex items-center gap-1 rounded-lg border border-border bg-card p-1">
       {FUNNEL_PERIODS.map((period) => (
@@ -90,7 +90,7 @@ export function QualificationFunnelView({ data, showQualityTab }: { data: Qualif
         <DashboardSectionTabs active="funnel" period={30} showQuality={showQualityTab} />
 
         <section aria-label="Resumo do período" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard label="Leads que chegaram" value={integer.format(arrived)} sublabel={`Últimos ${data.period} dias`} icon={UsersThree} />
+          <StatCard label="Leads que chegaram" value={integer.format(arrived)} sublabel={data.period === "today" ? "Hoje" : `Últimos ${data.period} dias`} icon={UsersThree} />
           <StatCard label="Responderam a mensagem" value={percent(replied, arrived)} sublabel={`${integer.format(replied)} leads · resposta em ${minutesLabel(data.medianMinutesToReply)} (mediana)`} icon={Timer} />
           <StatCard label="Qualificados" value={percent(qualified, arrived)} sublabel={`${integer.format(qualified)} leads prontos para o corretor`} icon={Funnel} />
           <StatCard label="Vendas" value={integer.format(converted)} sublabel={`${percent(converted, arrived)} dos leads que chegaram`} icon={ChartBar} />
@@ -101,7 +101,7 @@ export function QualificationFunnelView({ data, showQualityTab }: { data: Qualif
             <SectionCardHeader
               icon={<Funnel />}
               title="Do anúncio à venda"
-              description={`Os mesmos leads que chegaram nos últimos ${data.period} dias, etapa por etapa. ${sent && delivered < sent ? `${integer.format(sent - delivered)} primeiras mensagens não foram entregues pela Meta.` : ""}`}
+              description={`Os mesmos leads que chegaram ${data.period === "today" ? "hoje" : `nos últimos ${data.period} dias`}, etapa por etapa. ${sent && delivered < sent ? `${integer.format(sent - delivered)} primeiras mensagens não foram entregues pela Meta.` : ""}`}
             />
             <CardContent className="p-4">
               <FunnelBars stages={data.stages} />

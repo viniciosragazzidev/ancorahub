@@ -10,7 +10,7 @@ vi.mock("@/features/dashboard/components/director-lite/qualification-funnel-page
 vi.mock("../diretor-dashboard-preview/_components/essential-example", () => ({ buildEssential: state.buildEssential }));
 vi.mock("../diretor-dashboard-preview/_components/data", () => ({ buildFunnel: state.buildFunnel }));
 vi.mock("@/features/qualification-turbo/funnel", () => ({
-  parseFunnelPeriod: (value: string | undefined) => value === "90" ? 90 : value === "30" ? 30 : 7,
+  funnelPeriodForOverview: (period: "today" | "7d" | "30d") => period === "today" ? "today" : period === "7d" ? 7 : 30,
 }));
 
 import { DirectorLiteDashboard } from "@/features/dashboard/components/director-lite/director-lite-dashboard";
@@ -38,7 +38,7 @@ function findElement(element: unknown, type: unknown): { type: unknown; props: R
 describe("prévia do componente real do painel", () => {
   it("renderiza a aba Funil real com período e unidade de exemplo selecionados", async () => {
     const element = await DirectorDashboardRealPage({
-      searchParams: Promise.resolve({ tab: "funnel", period: "30", unidade: "branch-barra" }),
+      searchParams: Promise.resolve({ tab: "funnel", periodo: "30", unidade: "branch-barra" }),
     });
     const funnel = findElement(element, DirectorLiteQualificationFunnelPage);
 
@@ -50,6 +50,11 @@ describe("prévia do componente real do painel", () => {
       branches: expect.arrayContaining([{ id: "branch-barra", name: "Barra da Tijuca" }]),
       now: expect.any(Date),
     });
+  });
+
+  it("aceita Hoje como janela operacional no parâmetro compartilhado", async () => {
+    await DirectorDashboardRealPage({ searchParams: Promise.resolve({ tab: "funnel", periodo: "hoje" }) });
+    expect(state.buildFunnel).toHaveBeenCalledWith("today", "all", expect.any(Date));
   });
 
   it("mantém a aba Visão como padrão", async () => {

@@ -5,6 +5,7 @@
  */
 import type { CommandCenterData } from "@/features/dashboard/today";
 import type { QualificationFunnel, FunnelPeriod } from "@/features/qualification-turbo/funnel";
+import { operationDayStart } from "@/features/reports/metrics/lead-quality-period";
 import type { LeadQualityReport, LeadQualitySegment, SimpleLeadQualityReportData } from "@/features/reports/metrics/lead-quality-service";
 import type { LeadQualityDimension } from "@/features/reports/metrics/lead-quality-contract";
 import type { DrilldownId, DrilldownResult } from "@/features/reports/metrics/metrics-service";
@@ -28,9 +29,9 @@ export const OVERVIEW_PERIODS: Array<{ value: OverviewPeriod; label: string }> =
   { value: 30, label: "30 dias" },
 ];
 export const FUNNEL_PERIOD_OPTIONS: Array<{ value: FunnelPeriod; label: string }> = [
+  { value: "today", label: "Hoje" },
   { value: 7, label: "7 dias" },
   { value: 30, label: "30 dias" },
-  { value: 90, label: "90 dias" },
 ];
 export type QualityPeriod = "today" | 3 | 7 | 14 | 30 | 90;
 export const QUALITY_PERIODS: Array<{ value: QualityPeriod; label: string }> = [
@@ -237,7 +238,7 @@ export function buildDrill(id: DrilldownId, total: number, unitId: UnitId, now: 
 
 /* ------------------------------------------------------------------ funnel */
 
-const FUNNEL_SCALE: Record<FunnelPeriod, number> = { 7: 1, 30: 4.2, 90: 12.1 };
+const FUNNEL_SCALE: Record<FunnelPeriod, number> = { today: 0.15, 7: 1, 30: 4.2, 90: 12.1 };
 
 export function buildFunnel(period: FunnelPeriod, unitId: UnitId, now: Date): QualificationFunnel {
   const unit = unitOf(unitId);
@@ -254,7 +255,7 @@ export function buildFunnel(period: FunnelPeriod, unitId: UnitId, now: Date): Qu
     { key: "with_broker", label: "Com corretor", count: round(arrived * counts.with_broker) },
     { key: "converted", label: "Venda", count: round(arrived * counts.converted) },
   ];
-  const since = new Date(now.getTime() - period * 86_400_000).toISOString();
+  const since = (period === "today" ? operationDayStart(now) : new Date(now.getTime() - period * 86_400_000)).toISOString();
   const nowRows = [
     { key: "qualifying", label: "Em qualificação", count: round(arrived * 0.07), hint: "Conversando com a IA agora." },
     { key: "ready", label: "Prontos esperando corretor", count: round(arrived * 0.012), hint: "Qualificados, ainda sem corretor." },
