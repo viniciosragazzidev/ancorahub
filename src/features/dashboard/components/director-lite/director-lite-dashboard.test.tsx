@@ -159,4 +159,31 @@ describe("movimento", () => {
     const moving = Array.from(container.querySelectorAll("[data-initial]")).filter((element) => displacementOf(readMotion(element).initial).length > 0);
     expect(moving.length).toBeGreaterThan(0);
   });
+
+  it("com a preferência de movimento do site, o odômetro dos números não roda", () => {
+    const digitsRolling = (container: HTMLElement) => container.querySelectorAll('span[style*="inline-flex"]').length;
+    const data = buildEssential("30d", "all", NOW);
+    motionState.reduce = false;
+    const { container, unmount } = render(<DirectorLiteDashboard data={data} period="30d" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(digitsRolling(container)).toBeGreaterThan(0);
+    unmount();
+
+    document.documentElement.dataset.reduceMotion = "1";
+    try {
+      const reduced = render(<DirectorLiteDashboard data={data} period="30d" branchId={null} branches={BRANCHES} now={NOW} />);
+      expect(digitsRolling(reduced.container)).toBe(0);
+      // 30 dias: o total de entradas do exemplo é 576 (36 x 16).
+      expect(reduced.container.textContent).toContain("576");
+    } finally {
+      delete document.documentElement.dataset.reduceMotion;
+    }
+  });
+
+  it("agrupa o milhar em pt-BR nas contagens por corretor e de requalificação", () => {
+    const data = buildEssential("today", "all", NOW);
+    const [first] = data.whatsapp.brokers;
+    const big = { ...data, whatsapp: { ...data.whatsapp, brokers: [{ ...first!, received: 1234, responding: 1000 }] } };
+    render(<DirectorLiteDashboard data={big} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    expect(screen.getByText(/1\.000 de 1\.234 respondendo/)).toBeInTheDocument();
+  });
 });

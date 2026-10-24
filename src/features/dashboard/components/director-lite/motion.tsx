@@ -35,8 +35,21 @@ export function useReduce() {
   return system || user;
 }
 
-/** Número que muda (odômetro do kit). `kind` segue o da prévia: inteiro, percentual, real ou decimal. */
+/** Texto final de um número, em pt-BR, igual ao que o odômetro mostra no fim. */
+function staticNumber(value: number, kind: "int" | "pct" | "brl" | "dec", decimals?: number) {
+  if (kind === "pct") return new Intl.NumberFormat("pt-BR", { style: "percent", minimumFractionDigits: decimals ?? 0, maximumFractionDigits: decimals ?? 0 }).format(value / 100);
+  if (kind === "brl") return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: decimals ?? 2, maximumFractionDigits: decimals ?? 2 }).format(value);
+  const digits = kind === "dec" ? (decimals ?? 1) : (decimals ?? 0);
+  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+}
+
+/**
+ * Número que muda (odômetro do kit). `kind` segue o da prévia: inteiro, percentual, real ou decimal.
+ * Com movimento reduzido (sistema ou preferência do site) o número aparece pronto, sem as colunas rolando.
+ */
 export function LiteNumber({ value, kind = "int", decimals, className }: { value: number; kind?: "int" | "pct" | "brl" | "dec"; decimals?: number; className?: string }) {
+  const reduce = useReduce();
+  if (reduce) return <span className={className}>{staticNumber(value, kind, decimals)}</span>;
   const format = kind === "pct" ? "percent" : kind === "brl" ? "currency" : kind === "dec" ? "decimal" : "integer";
   return <KitLiteNumber value={value} format={format} decimals={decimals} className={className} />;
 }

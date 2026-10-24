@@ -5,7 +5,7 @@ import { and, eq, gt, gte, inArray, isNull, or, sql } from "drizzle-orm";
 import { getPublishedDutyScheduleIds, getSaoPauloDateKey, selectEffectiveDutyAssignments } from "@/features/lead-distribution/dated-duty-roster";
 import type { TenantContext } from "@/shared/auth/types";
 import { getDatabase, schema } from "@/shared/db";
-import { inOverviewBranch, pickBusiestRunning, pickNextDuty, upcomingShift, type RunningDutyActivity } from "./welcome-rules";
+import { pickBusiestRunning, pickNextDuty, upcomingShift, type RunningDutyActivity } from "./welcome-rules";
 
 export type DashboardDuty = {
   scheduleId: string;
@@ -57,6 +57,7 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
         eq(schema.unitDutySchedules.tenantId, context.tenantId),
         eq(schema.unitDutySchedules.status, "active"),
         or(isNull(schema.unitDutySchedules.validUntil), gt(schema.unitDutySchedules.validUntil, now)),
+        options.branchId ? eq(schema.unitDutySchedules.branchId, options.branchId) : undefined,
       )),
     db
       .select({
@@ -68,11 +69,15 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
         branchId: schema.leadQueues.branchId,
       })
       .from(schema.leadQueues)
-      .where(and(eq(schema.leadQueues.tenantId, context.tenantId), isNull(schema.leadQueues.deletedAt))),
+      .where(and(
+        eq(schema.leadQueues.tenantId, context.tenantId),
+        isNull(schema.leadQueues.deletedAt),
+        options.branchId ? eq(schema.leadQueues.branchId, options.branchId) : undefined,
+      )),
   ]);
 
-  // A handful of rows per tenant: the unit is applied here; queue names still resolve from every queue.
-  const schedules = inOverviewBranch(tenantSchedules, options.branchId);
+  // A unidade já entra na consulta (com tenant); aqui só segue o que a consulta devolveu.
+  const schedules = tenantSchedules;
   let next = pickNextDuty(schedules, now);
   const running = schedules.filter((schedule) => upcomingShift(schedule, now)?.running);
   const scheduleIds = [...new Set([...(next ? [next.schedule.id] : []), ...running.map((schedule) => schedule.id)])];
@@ -183,7 +188,7 @@ export async function getDashboardWelcome(context: TenantContext, now = new Date
       })
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt) || a.name.localeCompare(b.name, "pt-BR")),
     pulse: {
-      activeQueues: inOverviewBranch(queues, options.branchId).filter((queue) => queue.status === "active").length,
+      activeQueues: queues.filter((queue) => queue.status === "active").length,
       runningDuties: running.length,
       brokersOnDutyNow: brokersOn(new Set(running.map((schedule) => schedule.id)), today, publishedToday),
     },

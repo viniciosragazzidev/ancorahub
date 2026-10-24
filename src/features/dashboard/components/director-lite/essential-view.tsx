@@ -145,7 +145,7 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
                   <td data-label="Frios" className={styles.numCol}><LiteNumber value={queue.cold} /></td>
                   <td data-label="Requalificação" className={styles.requalCell}>
                     <span className={styles.requalMain}>{plural(queue.requalification.attempts, "tentativa", "tentativas")}</span>
-                    <span className={styles.requalDetail}>{queue.requalification.coldLeads} frios: {queue.requalification.once} com 1, {queue.requalification.twice} com 2, {queue.requalification.threePlus} com 3+</span>
+                    <span className={styles.requalDetail}>{n(queue.requalification.coldLeads)} frios: {n(queue.requalification.once)} com 1, {n(queue.requalification.twice)} com 2, {n(queue.requalification.threePlus)} com 3+</span>
                   </td>
                   <td data-label="Em qualificação" className={styles.numCol}><LiteNumber value={queue.inQualification} /></td>
                   <td data-label="Temperatura"><StackedTemperature queue={queue} delay={staggerDelay(index)} /></td>
@@ -158,7 +158,7 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
                 <td data-label="Frios" className={styles.numCol}><LiteNumber value={totals.cold} /></td>
                 <td data-label="Requalificação" className={styles.requalCell}>
                   <span className={styles.requalMain}>{plural(totals.requalification.attempts, "tentativa", "tentativas")}</span>
-                  <span className={styles.requalDetail}>{totals.requalification.coldLeads} frios: {totals.requalification.once} com 1, {totals.requalification.twice} com 2, {totals.requalification.threePlus} com 3+</span>
+                  <span className={styles.requalDetail}>{n(totals.requalification.coldLeads)} frios: {n(totals.requalification.once)} com 1, {n(totals.requalification.twice)} com 2, {n(totals.requalification.threePlus)} com 3+</span>
                 </td>
                 <td data-label="Em qualificação" className={styles.numCol}><LiteNumber value={totals.inQualification} /></td>
                 <td data-label="Temperatura"><StackedTemperature queue={totals} delay={0} /></td>
@@ -203,7 +203,7 @@ function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["what
               <LiteItem as="li" key={broker.id} index={index}>
                 <Link href={`/conversas?tab=leads&brokerId=${encodeURIComponent(broker.id)}`} className={styles.nameRow} title={`Ver conversas de ${broker.name}`}>
                   <span className={styles.truncate}>{broker.name}</span>
-                  <span className={styles.tabular}>{plural(broker.active, "ativo", "ativos")} · {broker.responding} de {broker.received} respondendo</span>
+                  <span className={styles.tabular}>{plural(broker.active, "ativo", "ativos")} · {n(broker.responding)} de {n(broker.received)} respondendo</span>
                   <ArrowRight aria-hidden="true" size={14} className={styles.arrow} />
                 </Link>
               </LiteItem>
