@@ -24,6 +24,13 @@ fica sob responsabilidade do Maestro.
 - Skin `director-skin.css`, provider React de escopo, wrappers de Portal/Popup,
   destino de portais motion, sucesso animado e toaster ficam isolados sob
   `.arc-venancor[data-skin="diretor"]`.
+- A escala de texto 115% e 130% do Lite só alcança a raiz quando existe `.arc-venancor`;
+  a preferência sozinha não muda a escala do CRM normal. O tema claro do Diretor
+  depende apenas do papel e da flag, inclusive quando a página está em opt-out.
+- Dialog, sheet, drawer, popover, menus, tooltip, command, combobox, motion e
+  BottomSheet recebem classe e `data-skin` nos pontos flutuantes com provider ativo.
+  O BottomSheet usa a raiz `director-lite-portal-root` do Diretor; sem provider,
+  continua no `body` sem escopo.
 - As 92 páginas atuais de `(dashboard)` ficam em opt-out até sua onda de revisão.
   Há teste que compara a lista com o filesystem.
 - `/distribuicao` herda a proteção que bloqueia acesso de gestores.
@@ -37,7 +44,8 @@ fica sob responsabilidade do Maestro.
 - Para reverter o piloto, o Super-admin desativa a chave da empresa. Os padrões de
   rota permanecem em opt-out até aprovação visual das próximas fases.
 - Não copiar `.env.local`, rodar migrations ou testes de banco. Nenhum push.
-- Não editar `venancor-scope.css` nem a base compartilhada do Lite.
+- Não editar a base compartilhada de tokens do Lite. Os seletores de escala em
+  `venancor-scope.css` ficam condicionados à existência do escopo Arc.
 
 ## Validações e commits
 
@@ -54,6 +62,19 @@ fica sob responsabilidade do Maestro.
   para a suíte inteira, fora da validação focada aprovada para esta etapa. Nenhum
   teste de banco, build, migration ou acesso a `.env.local` foi executado.
 - Item 8, baseline autenticada em produção, permanece com o Maestro.
+
+## Correções após a revisão do Vigia
+
+- Corrigida a interferência da preferência 115%/130% com o CRM normal e adicionado
+  teste de classe/escopo para a preferência 115% sem a flag.
+- Tema claro não depende mais da lista de rotas em opt-out; o teste cobre uma rota
+  opt-out com a flag ativa.
+- O `BottomSheet`, o `DropdownMenuSubContent` e os portais/positioners receberam o
+  escopo ativo; o teste renderiza cada wrapper com e sem `ArcScopeProvider`.
+- DEC-149 explicita a ativação e desativação individual por empresa pelo Super-admin.
+- Validação das correções: 4 arquivos de teste focados, 38 testes passaram;
+  `npx tsc --noEmit -p .` passou; ESLint dirigido passou sem erros (4 avisos
+  preexistentes em `attachment-upload.tsx`).
 
 Commits locais:
 

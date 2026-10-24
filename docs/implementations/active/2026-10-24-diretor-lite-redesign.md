@@ -179,7 +179,7 @@ Pré-requisito: D0 e D17 respondidas.
 1. Registrar a decisão nova no `docs/decision-log.md` (revoga a parte "modo normal fora do escopo" do `LITE_CHAT_DESIGN_SYSTEM.md:253-259`), a exceção em `docs/design-system.md`, o `CLAUDE.md` e o `AGENTS.md` (D0) e atualizar o §10 do doc do Lite.
 2. Chave `feature_director_lite_style` no catálogo, no super admin e no layout, só para diretor (C0, D17). `director-lite-routes.ts` com o opt-out de todas as rotas.
 3. Carregar `venancor-scope.css` + `director-skin.css` no `app/layout.tsx` (C1, C2, C3). Tudo do diretor fica sob `[data-skin="diretor"]`; nada muda no bloco `.arc-venancor` base.
-4. `ArcScopeProvider` e classe nas camadas flutuantes listadas em C5. O provider só atua com `data-skin="diretor"`; o `BottomSheet` do Lite não muda nesta fase.
+4. `ArcScopeProvider` e classe nas camadas flutuantes listadas em C5. O provider só atua com `data-skin="diretor"`; o `BottomSheet` do Lite preserva o portal e o visual atuais sem provider e usa o portal isolado e o escopo Arc quando ativado para o Diretor.
 5. Tema claro forçado com a chave ligada (C6).
 6. Alvos em px (`--control-height-sm: 44px`) só dentro de `[data-skin="diretor"]`.
 7. Correção do `/distribuicao` sem o bloqueio de gestor (seção 7).
