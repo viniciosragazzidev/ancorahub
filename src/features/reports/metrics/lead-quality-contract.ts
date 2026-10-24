@@ -31,7 +31,8 @@ export function parseLeadOrigin(raw: unknown): LeadOrigin | null {
 }
 
 /** Report filters chosen on the page / export: one queue or all, one origin or all. */
-export type LeadQualityFilters = { queueId: string | null; origin: LeadOrigin | null };
+/** `branchId` é opcional: só o painel Lite do diretor passa (filtro de unidade do topo); a tela antiga não usa. */
+export type LeadQualityFilters = { queueId: string | null; origin: LeadOrigin | null; branchId?: string | null };
 
 export type LeadQualityDimension = (typeof LEAD_QUALITY_DIMENSIONS)[number];
 export type LeadQualityFocus = { dimension: LeadQualityDimension; key: string };

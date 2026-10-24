@@ -174,6 +174,7 @@ export function leadQualityCohortWhere(window: LeadQualityWindow, filters: LeadQ
     window.until ? lt(schema.leads.createdAt, window.until) : undefined,
     filters.queueId ? sql`${leadEntryQueueExpression()} = ${filters.queueId}` : undefined,
     filters.origin ? sql`${leadOriginExpression()} = ${filters.origin}` : undefined,
+    filters.branchId ? eq(schema.leads.branchId, filters.branchId) : undefined,
   );
 }
 
