@@ -28,3 +28,13 @@ Status: implementada na branch `feat/diretor-lite-f1`, aguardando revisão visua
 - A base não contém `src/components/ui/toggle.tsx`; os estados encontrados de toggle são cobertos pelos seletores existentes de botão, checkbox e switch.
 - A checagem completa continua listando desvios antigos em outras rotas e componentes. A F1 não converteu o modo Diretor inteiro.
 - A aprovação visual dos prints pelo Vinicios continua pendente. Nenhum teste de banco, migration, build ou push foi executado.
+
+## Correções após revisão do Vigia
+
+- Revertido o `cbdb902b`: `LightChrome`, `director-skin.css` e `director-primitives.css` permanecem estáticos no shell, conforme a solução aprovada da F0a. Os arquivos do gate dinâmico foram removidos e `layout.test.ts` voltou ao conteúdo da origin.
+- Testes verificam que cada seletor da folha de primitivas inclui `[data-skin="diretor"]` e que o HTML das primitivas principais sem provider coincide com a referência da origin.
+- `data-variant`, `data-size`, `data-interactive` e slots de StatCard, combobox, Sonner, ScrollArea e AnimatedBadge só aparecem com o escopo Arc ativo. Os cinco focos de menu preservam `focus:bg-accent` fora do escopo e usam `focus:bg-muted` dentro.
+- A área de rolagem mantém a trilha e o conteúdo; o thumb usa raio de 999px e a barra continua com 8px pelas classes existentes.
+- Revisados os codemods B: os dois pontos de uso de `StatefulButton` usam `ActionButton` somente no escopo do Diretor; segmented control, empty state, switch, avatar e upload mantêm seus caminhos legados fora dele. `AnimatedBadge` conserva o mapa legado e só condiciona os novos atributos.
+- Os quatro prints foram regenerados em `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/f1-prints/`; aguardam aprovação visual do Vinicios.
+- Validação desta correção: Vitest focado aprovou 3 arquivos e 46 testes; `npx tsc --noEmit -p .` passou; ESLint passou sem erros, com 13 avisos preexistentes; `node scripts/check-lite-skin.mjs` analisou 811 arquivos; `git diff --check` passou. A comparação das linhas de estilo alteradas registrou zero novos desvios visuais.
