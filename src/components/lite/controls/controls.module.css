@@ -1,0 +1,148 @@
+/* Controles Lite compartilhados (F3). Só tokens: sem cor crua, sem sombra fora de --shadow-*. */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-resting);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+}
+
+.chip:focus-visible,
+.bulkButton:focus-visible,
+.dialogButton:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.bulk {
+  position: sticky;
+  bottom: 16px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 16px;
+  padding: 10px 12px 10px 16px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.bulkCount {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bulkActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bulkButton {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bulkButton[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--veil);
+}
+
+.dialog {
+  width: min(440px, 100%);
+  padding: 20px 20px 16px;
+  border-radius: 20px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 600;
+}
+
+.dialogDescription {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.dialogButton {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dialogButton[data-tone="primary"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.dialogButton[data-tone="danger"] {
+  background: var(--danger);
+  color: var(--destructive-foreground);
+}
