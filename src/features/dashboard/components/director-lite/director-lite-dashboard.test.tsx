@@ -45,6 +45,14 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(blocks).toEqual(["Plantões acontecendo agora", "Leads por fila", "WhatsApp dos corretores"]);
   });
 
+  it("as abas têm rótulo curto para o celular, escondido do leitor de tela (o nome acessível segue completo)", () => {
+    render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
+    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
+    const quality = tabs.getByRole("link", { name: "Qualidade dos leads" });
+    expect(quality.querySelector('[aria-hidden="true"]')).toHaveTextContent("Qualidade");
+    expect(tabs.getByRole("link", { name: "Funil de qualificação" }).querySelector('[aria-hidden="true"]')).toHaveTextContent("Funil");
+  });
+
   it("marca o período ativo e leva o filtro de unidade junto", () => {
     render(<DirectorLiteDashboard data={buildEssential("7d", "all", NOW)} period="7d" branchId="branch-centro" branches={BRANCHES} now={NOW} />);
     const periods = within(screen.getByRole("navigation", { name: "Período" }));

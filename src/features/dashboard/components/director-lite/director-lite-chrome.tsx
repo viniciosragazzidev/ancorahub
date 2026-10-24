@@ -41,9 +41,9 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
   const router = useRouter();
   const periodValue = PERIOD_OPTIONS.find((option) => option.period === period)?.value ?? "hoje";
   const tabs = [
-    { value: "overview", label: "Visão da operação", href: dashboardHref("overview", periodValue, branchId) },
-    { value: "quality", label: "Qualidade dos leads", href: dashboardHref("quality", periodValue, branchId) },
-    { value: "funnel", label: "Funil de qualificação", href: dashboardHref("funnel", periodValue, branchId) },
+    { value: "overview", label: "Visão da operação", short: "Operação", href: dashboardHref("overview", periodValue, branchId) },
+    { value: "quality", label: "Qualidade dos leads", short: "Qualidade", href: dashboardHref("quality", periodValue, branchId) },
+    { value: "funnel", label: "Funil de qualificação", short: "Funil", href: dashboardHref("funnel", periodValue, branchId) },
   ];
   const periods = PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label, href: dashboardHref(tab, option.value, branchId) }));
   const units = branches.length ? [{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))] : undefined;

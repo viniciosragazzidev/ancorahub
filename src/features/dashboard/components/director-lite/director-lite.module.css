@@ -765,6 +765,22 @@ button.heatCell:hover { transform: scale(1.12); }
   align-items: center;
   justify-content: center;
   text-decoration: none;
+  white-space: nowrap;
+}
+
+/* Rótulos das abas: completo no computador, curto abaixo de 640px (nunca quebra linha). */
+.labelShort {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .labelFull {
+    display: none;
+  }
+
+  .labelShort {
+    display: inline;
+  }
 }
 
 /* Pílula ativa do controle segmentado: superfície branca com sombra leve, como na prévia aprovada. */

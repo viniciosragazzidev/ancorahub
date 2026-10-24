@@ -10,7 +10,8 @@ import Link from "next/link";
 import styles from "./director-lite.module.css";
 import { dateTitle } from "./format";
 
-export type HeaderOption = { value: string; label: string; href: string };
+/** `short` é o rótulo do celular (abaixo de 640px); o `label` completo segue no aria-label e no computador. */
+export type HeaderOption = { value: string; label: string; href: string; short?: string };
 export type HeaderUnit = { value: string; label: string };
 
 function Segmented({ label, items, active, onSelect, kind }: { label: string; items: HeaderOption[]; active: string; onSelect?: (value: string) => void; kind: "period" | "tab" }) {
@@ -18,10 +19,17 @@ function Segmented({ label, items, active, onSelect, kind }: { label: string; it
     <nav aria-label={label} className={styles.pills}>
       {items.map((item) => {
         const current = item.value === active;
+        // Dois rótulos no DOM: o completo (computador) e o curto (celular), trocados por CSS; o nome acessível é o completo.
+        const text = (
+          <>
+            <span className={styles.labelFull}>{item.label}</span>
+            <span className={styles.labelShort} aria-hidden="true">{item.short ?? item.label}</span>
+          </>
+        );
         if (onSelect) {
           return (
-            <button key={item.value} type="button" className={styles.pill} data-active={current ? "true" : undefined} aria-pressed={current} onClick={() => onSelect(item.value)}>
-              {item.label}
+            <button key={item.value} type="button" className={styles.pill} data-active={current ? "true" : undefined} aria-pressed={current} aria-label={item.label} onClick={() => onSelect(item.value)}>
+              {text}
             </button>
           );
         }
@@ -32,8 +40,9 @@ function Segmented({ label, items, active, onSelect, kind }: { label: string; it
             className={styles.pill}
             data-active={current ? "true" : undefined}
             aria-current={current ? (kind === "tab" ? "page" : "true") : undefined}
+            aria-label={item.label}
           >
-            {item.label}
+            {text}
           </Link>
         );
       })}
