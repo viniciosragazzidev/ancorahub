@@ -201,6 +201,14 @@ describe("pele das primitivas do Diretor", () => {
     expect(source).toMatch(/\[data-slot="scroll-area-scrollbar"\]\s*\{\s*opacity:\s*1;/);
     expect(source.match(/border-radius:\s*999px;/g)).toHaveLength(2);
     expect(source).not.toMatch(/\[data-slot="scroll-area-scrollbar"\]\s*\{[^}]*\b(?:width|height):/);
+    expect(source).toContain('[data-skin="diretor"] .director-scroll-area-demo');
+    expect(source).toContain('border: 1px solid var(--border);');
+    expect(source).toContain('border-radius: var(--radius-panel);');
+    expect(source).toContain('[data-skin="diretor"] .director-scroll-area-demo-row');
+    expect(source).toContain('background: transparent;');
+    expect(source).toContain('[data-skin="diretor"] .director-scroll-area-demo-row + .director-scroll-area-demo-row');
+    const scrollArea = readFileSync(join(process.cwd(), "src/components/ui/scroll-area.tsx"), "utf8");
+    expect(scrollArea).toContain('orientation === "vertical" && "h-full w-2 border-l border-l-transparent p-px"');
   });
 
   it("troca os cinco focos dos menus somente no escopo do Diretor", () => {

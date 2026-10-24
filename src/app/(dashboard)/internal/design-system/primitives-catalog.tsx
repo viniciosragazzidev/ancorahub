@@ -160,8 +160,21 @@ export default function PrimitivesCatalog() {
               <div className="grid gap-3"><p>Informações do corretor</p><Separator /><p className="text-sm text-muted-foreground">Última atualização há 5 minutos</p></div>
             </Section>
             <Section title="ScrollArea">
-              <ScrollArea className="h-36 bg-[var(--surface-muted)] p-3" style={{ borderRadius: "var(--radius-control)" }}>
-                <div className="grid gap-2">{Array.from({ length: 8 }, (_, index) => <p key={index} className="bg-[var(--surface)] p-3" style={{ borderRadius: "var(--radius-control)" }}>Linha de atividade {index + 1}</p>)}</div>
+              <ScrollArea
+                className={directorSkin ? "h-36 director-scroll-area-demo" : "h-36 bg-[var(--surface-muted)] p-3"}
+                style={directorSkin ? undefined : { borderRadius: "var(--radius-control)" }}
+              >
+                <div className={directorSkin ? "director-scroll-area-demo-rows" : "grid gap-2"}>
+                  {Array.from({ length: 8 }, (_, index) => (
+                    <p
+                      key={index}
+                      className={directorSkin ? "director-scroll-area-demo-row" : "bg-[var(--surface)] p-3"}
+                      style={directorSkin ? undefined : { borderRadius: "var(--radius-control)" }}
+                    >
+                      Linha de atividade {index + 1}
+                    </p>
+                  ))}
+                </div>
               </ScrollArea>
             </Section>
           </div>
