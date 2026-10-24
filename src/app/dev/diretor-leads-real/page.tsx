@@ -6,8 +6,9 @@ import { notFound } from "next/navigation";
 import type { CSSProperties } from "react";
 
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
-import { LeadsListSwitch } from "@/app/(dashboard)/leads/leads-lite-list";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
+
+import { LeadsFixtureList } from "./leads-fixture-list";
 
 /**
  * Dev-only: a lista de /leads (LeadsListSwitch, com a chave ligada) com dados de exemplo, dentro do mesmo canvas do app.
@@ -46,19 +47,7 @@ export default function DirectorLeadsRealPage() {
         <div className="app-shell-canvas h-app overflow-y-auto overflow-x-hidden overscroll-contain arc-venancor" data-slot="app-scroll-frame" data-skin="diretor" style={{ ...skin, background: "var(--background)" }}>
           <div className="mx-auto w-full max-w-[1328px] px-4 pb-28 pt-4 md:px-6">
             <h1 className="mb-4 text-xl">Leads</h1>
-            <LeadsListSwitch
-              leads={LEADS}
-              contextRole="director"
-              shouldMask={false}
-              slaFirstContactMinutes={15}
-              slaStagnantDays={3}
-              pageSize={50}
-              selectedIds={new Set<string>()}
-              isAllSelected={false}
-              onToggleRow={() => {}}
-              onSelectAll={() => {}}
-              onRowClick={() => {}}
-            />
+            <LeadsFixtureList leads={LEADS} />
           </div>
         </div>
       </div>
