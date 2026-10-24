@@ -84,6 +84,7 @@ export default async function DashboardPage({
       // Qualidade no visual Lite (chave ligada), vista Simples. Detalhada e recortes seguem na tela antiga.
       const liteQuality = !singleParam(resolvedSearchParams.dimension)
         && singleParam(resolvedSearchParams.vista) !== "detalhada"
+        && singleParam(resolvedSearchParams.legado) !== "1"
         && (await shouldUseDirectorLiteStyle(context.role, context.tenantId));
       if (liteQuality) {
         return renderDirectorLiteQuality(context, {

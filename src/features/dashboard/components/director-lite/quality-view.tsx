@@ -80,6 +80,22 @@ export function QualityDisabled() {
   );
 }
 
+/**
+ * Barra da aba: Simples (esta tela) e os recursos que ainda só existem na tela antiga (Detalhada, fila, intervalo e
+ * exportar). Cada um leva à tela antiga com o mesmo período (`legado=1` impede o retorno à versão Lite).
+ */
+export function QualityToolbar({ legacyHref, detailedHref }: { legacyHref: string; detailedHref: string }) {
+  return (
+    <nav aria-label="Vista e ferramentas da qualidade" className={styles.chipRow}>
+      <span className={styles.chip} aria-current="true">Simples</span>
+      <Link href={detailedHref} className={styles.chip}>Detalhada</Link>
+      <Link href={legacyHref} className={styles.chip} title="Filtrar por fila na tela completa">Fila: todas</Link>
+      <Link href={legacyHref} className={styles.chip} title="Escolher um intervalo na tela completa">Intervalo</Link>
+      <Link href={legacyHref} className={styles.chip} title="Exportar na tela completa">Exportar</Link>
+    </nav>
+  );
+}
+
 /** A vista Simples: entraram e bons, por fila, hora a hora e o que mudaria sem os frios. `unitName` null = todas as unidades. */
 export function QualityView({ report, unitName }: { report: SimpleLeadQualityReportData; unitName: string | null }) {
   const [table, setTable] = useState(false);

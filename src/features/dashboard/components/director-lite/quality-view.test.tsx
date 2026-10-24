@@ -15,7 +15,7 @@ import type { SimpleLeadQualityReportData } from "@/features/reports/metrics/lea
 import { displacementOf, readMotion } from "@/components/lite/motion/capture-motion";
 
 import { DirectorLiteChrome, dashboardHref } from "./director-lite-chrome";
-import { QualityDisabled, QualityView } from "./quality-view";
+import { QualityDisabled, QualityToolbar, QualityView } from "./quality-view";
 
 // jsdom não tem IntersectionObserver: as colunas do gráfico (useInView) só precisam que o observador exista.
 class FakeIntersectionObserver {
@@ -123,5 +123,15 @@ describe("filtros do topo na aba Qualidade", () => {
       </DirectorLiteChrome>,
     );
     expect(screen.queryByRole("navigation", { name: "Unidade" })).not.toBeInTheDocument();
+  });
+
+  it("Detalhada, fila, intervalo e exportar levam à tela antiga com o mesmo período", () => {
+    render(<QualityToolbar legacyHref="/dashboard?tab=quality&period=7&legado=1" detailedHref="/dashboard?tab=quality&period=7&vista=detalhada&legado=1" />);
+    const tools = within(screen.getByRole("navigation", { name: "Vista e ferramentas da qualidade" }));
+    expect(tools.getByRole("link", { name: "Detalhada" })).toHaveAttribute("href", "/dashboard?tab=quality&period=7&vista=detalhada&legado=1");
+    for (const name of ["Fila: todas", "Intervalo", "Exportar"]) {
+      expect(tools.getByRole("link", { name })).toHaveAttribute("href", "/dashboard?tab=quality&period=7&legado=1");
+    }
+    expect(tools.getByText("Simples")).toHaveAttribute("aria-current", "true");
   });
 });

@@ -35,11 +35,8 @@ export const FUNNEL_PERIOD_OPTIONS: Array<{ value: FunnelPeriod; label: string }
 export type QualityPeriod = "today" | 3 | 7 | 14 | 30 | 90;
 export const QUALITY_PERIODS: Array<{ value: QualityPeriod; label: string }> = [
   { value: "today", label: "Hoje" },
-  { value: 3, label: "3 dias" },
   { value: 7, label: "7 dias" },
-  { value: 14, label: "14 dias" },
   { value: 30, label: "30 dias" },
-  { value: 90, label: "90 dias" },
 ];
 
 /* ------------------------------------------------------------------ helpers */
