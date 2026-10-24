@@ -98,7 +98,7 @@ describe("painel do diretor: cabeçalho, abas e lead novo", () => {
   it("anuncia e destaca só o lead que chegou numa atualização nova", () => {
     const first = buildCommandCenter("today", "all", NOW);
     const { rerender } = render(<DirectorLiteDashboard data={first} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    const second = { ...first, recentLeads: [{ id: "lead-novo", name: "Maria Nova", status: "new", branchName: "Centro", createdAt: NOW.toISOString() }, ...first.recentLeads] };
+    const second = { ...first, recentLeads: [{ id: "lead-novo", name: "Maria Nova", status: "new" as const, branchName: "Centro", createdAt: NOW.toISOString() }, ...first.recentLeads] };
     rerender(<DirectorLiteDashboard data={second} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     expect(screen.getByText("Novo lead: Maria Nova")).toBeInTheDocument();
     expect(screen.getByText("Novo lead: Maria Nova").closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
