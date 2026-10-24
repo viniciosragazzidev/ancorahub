@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Building2, FlaskConical } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 
 import type { DrilldownId } from "@/features/reports/metrics/metrics-service";
 import type { EssentialDashboard } from "@/features/dashboard/essential/essential-data";
@@ -16,14 +16,14 @@ import type { FunnelPeriod } from "@/features/qualification-turbo/funnel";
 import styles from "../preview.module.css";
 import { LiteDrawer, LiteHeader, LiteSidebar } from "./chrome";
 import {
-  buildCommandCenter, buildDrill, buildFunnel, buildQualityReport, buildSimpleQuality, emptyCommandCenter, focusLeads, FUNNEL_PERIOD_OPTIONS, nextLeadName,
+  buildCommandCenter, buildDrill, buildFunnel, buildQualityReport, buildSimpleQuality, emptyCommandCenter, focusLeads, nextLeadName,
   NOW_ISO, OVERVIEW_PERIODS, QUALITY_PERIODS, QUEUES, UNITS, unitOf, type OverviewPeriod, type QualityPeriod, type UnitId,
 } from "./data";
-import { dateTitle } from "./format";
 import { enterT, fadeT, LitePills, LiteSwap, useMedia, useReduce } from "./motion";
-import { LiteLayer, LitePick } from "./overlay";
+import { LiteLayer } from "./overlay";
 import { DrillContent, ExportContent, FocusContent, FullPageLink, RangeContent } from "./panels";
 import { FunnelTab } from "./funnel-tab";
+import { DirectorLiteHeader } from "@/features/dashboard/components/director-lite/director-lite-header";
 import { EssentialView } from "@/features/dashboard/components/director-lite/essential-view";
 import { buildEssential, emptyEssential } from "./essential-example";
 import { QualityDisabled, QualityTab, type FocusTarget } from "./quality-tab";
@@ -62,8 +62,9 @@ export function DirectorDashboardPreview({ initialTab, initialState, initialVist
   const [state, setState] = useState<PreviewState>(initialState);
   const [unit, setUnit] = useState<UnitId>("all");
   const [overviewPeriod, setOverviewPeriod] = useState<OverviewPeriod>("today");
-  const [funnelPeriod, setFunnelPeriod] = useState<FunnelPeriod>(7);
-  const [qualityPeriod, setQualityPeriod] = useState<QualityPeriod>(7);
+  // Um período só, do topo (Hoje, 7 ou 30 dias), para as três abas: o funil não tem "hoje", então usa 7.
+  const funnelPeriod: FunnelPeriod = overviewPeriod === "today" ? 7 : overviewPeriod;
+  const qualityPeriod: QualityPeriod = overviewPeriod;
   const [queueId, setQueueId] = useState<string | null>(null);
   const [vista, setVista] = useState<"simples" | "detalhada">(initialVista);
   const [booting, setBooting] = useState(true);
@@ -191,15 +192,6 @@ export function DirectorDashboardPreview({ initialTab, initialState, initialVist
   const effectiveTab: Tab = showTabs ? tab : tab === "quality" ? "quality" : "overview";
   const qualityPeriodLabel = QUALITY_PERIODS.find((option) => option.value === qualityPeriod)?.label ?? "";
 
-  const periodControl =
-    effectiveTab === "overview" ? (
-      <LitePills group="period-overview" label="Período" options={OVERVIEW_PERIODS} value={overviewPeriod} onChange={setOverviewPeriod} />
-    ) : effectiveTab === "funnel" ? (
-      <LitePills group="period-funnel" label="Período do funil" options={FUNNEL_PERIOD_OPTIONS} value={funnelPeriod} onChange={setFunnelPeriod} />
-    ) : (
-      <LitePills group="period-quality" label="Período da análise de qualidade" options={QUALITY_PERIODS} value={qualityPeriod} onChange={setQualityPeriod} />
-    );
-
   const layerTitle = !layer ? "" : layer.kind === "drill" ? buildDrill(layer.id, layer.total, unit, baseNow).title : layer.kind === "focus" ? "Leads deste recorte" : layer.kind === "range" ? "Escolher o intervalo" : "Exportar relatório";
 
   return (
@@ -215,22 +207,19 @@ export function DirectorDashboardPreview({ initialTab, initialState, initialVist
           animate={{ opacity: 1, y: 0 }}
           transition={reduce ? fadeT : enterT}
         >
-          <div className={styles.pageHead}>
-            <div className={styles.titleBlock}>
-              <h1 className={styles.pageTitle}>Olá, {overview.welcome.firstName ?? "diretor"}</h1>
-              <p className={styles.pageSubtitle}>{dateTitle(baseNow)}. O dia da operação começa às 19h de ontem.</p>
-            </div>
-            <div className={styles.filters}>
-              <LitePick label="Unidade" icon={<Building2 aria-hidden="true" size={18} />} value={unit} onChange={(value) => setUnit(value as UnitId)} options={UNITS.map((item) => ({ value: item.id, label: item.name, hint: item.id === "all" ? "Empresa toda" : undefined }))} />
-              {periodControl}
-            </div>
-          </div>
-
-          {showTabs ? (
-            <div className={styles.tabsRow}>
-              <LitePills kind="tabs" group="dashboard-tabs" label="Seções do painel" options={TABS} value={tab} onChange={goTab} controls="painel-conteudo" />
-            </div>
-          ) : null}
+          <DirectorLiteHeader
+            firstName={essential.firstName}
+            now={baseNow}
+            tabs={showTabs ? TABS.map((item) => ({ value: item.value, label: item.label, href: "#" })) : []}
+            activeTab={tab}
+            onTab={(value) => goTab(value as Tab)}
+            periods={OVERVIEW_PERIODS.map((item) => ({ value: String(item.value), label: item.label, href: "#" }))}
+            activePeriod={String(overviewPeriod)}
+            onPeriod={(value) => setOverviewPeriod(value === "today" ? "today" : (Number(value) as 7 | 30))}
+            units={UNITS.map((item) => ({ value: item.id, label: item.name }))}
+            activeUnit={unit}
+            onUnit={(value) => setUnit(value as UnitId)}
+          />
 
           <div id="painel-conteudo" role={showTabs ? "tabpanel" : undefined} aria-label={TABS.find((item) => item.value === effectiveTab)?.label}>
             {state === "error" ? (

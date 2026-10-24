@@ -19,7 +19,7 @@ export function DirectorLiteDashboard({ data, period, branchId, branches, now }:
   now: Date;
 }) {
   return (
-    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches}>
+    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName}>
       <p className={styles.hint}>O período muda só os leads por fila. Plantões e WhatsApp mostram agora.</p>
       <EssentialView data={data} />
     </DirectorLiteChrome>

@@ -1,16 +1,16 @@
 "use client";
 
-/** Topo do painel do diretor no visual Lite: saudação, abas, período e unidade. Igual nas abas Visão, Qualidade e Funil. */
-import Link from "next/link";
+/** Topo do painel do diretor no visual Lite nas abas Visão, Qualidade e Funil: o cabeçalho compartilhado com os links reais. */
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
+import { DirectorLiteHeader } from "./director-lite-header";
 import styles from "./director-lite.module.css";
-import { dateTitle } from "./format";
 
 export type DashboardBranch = { id: string; name: string };
-export type DirectorLiteTab = "overview" | "quality";
+export type DirectorLiteTab = "overview" | "quality" | "funnel";
 
 /** Valores de `?periodo=` aceitos por `parseOverviewPeriod`. */
 export const PERIOD_OPTIONS: Array<{ value: "hoje" | "7" | "30"; period: OverviewPeriod; label: string }> = [
@@ -19,57 +19,48 @@ export const PERIOD_OPTIONS: Array<{ value: "hoje" | "7" | "30"; period: Overvie
   { value: "30", period: "30d", label: "30 dias" },
 ];
 
-/** Monta o link de uma aba ou de um filtro, mantendo período e unidade. */
-export function dashboardHref(tab: DirectorLiteTab | "funnel", periodValue: string, branchId: string | null) {
-  if (tab === "funnel") return "/dashboard?tab=funnel";
+const TAB_BASE: Record<DirectorLiteTab, string> = { overview: "/dashboard", quality: "/dashboard?tab=quality", funnel: "/dashboard?tab=funnel" };
+
+/** Link de uma aba ou de um filtro: mantém período e unidade (o único ponto que monta essas rotas). */
+export function dashboardHref(tab: DirectorLiteTab, periodValue: string, branchId: string | null) {
   const params = new URLSearchParams({ periodo: periodValue });
   if (branchId) params.set("unidade", branchId);
-  return tab === "quality" ? `/dashboard?tab=quality&${params.toString()}` : `/dashboard?${params.toString()}`;
+  return `${TAB_BASE[tab]}${TAB_BASE[tab].includes("?") ? "&" : "?"}${params.toString()}`;
 }
 
-export function DirectorLiteChrome({ now, tab, period, branchId, branches, children }: {
+export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, children }: {
   now: Date;
   tab: DirectorLiteTab;
   period: OverviewPeriod;
   /** Unidade escolhida já validada contra as unidades do tenant; null = todas. */
   branchId: string | null;
   branches: DashboardBranch[];
+  firstName: string | null;
   children: ReactNode;
 }) {
+  const router = useRouter();
   const periodValue = PERIOD_OPTIONS.find((option) => option.period === period)?.value ?? "hoje";
-  const periodLink = (nextPeriod: string, nextBranch: string | null) => dashboardHref(tab, nextPeriod, nextBranch);
+  const tabs = [
+    { value: "overview", label: "Visão da operação", href: dashboardHref("overview", periodValue, branchId) },
+    { value: "quality", label: "Qualidade dos leads", href: dashboardHref("quality", periodValue, branchId) },
+    { value: "funnel", label: "Funil de qualificação", href: dashboardHref("funnel", periodValue, branchId) },
+  ];
+  const periods = PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label, href: dashboardHref(tab, option.value, branchId) }));
+  const units = branches.length ? [{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))] : undefined;
 
   return (
     <div className={styles.dashboard}>
-      <header className={styles.stack}>
-        <h1 className={styles.pageTitle}>Olá</h1>
-        <p className={styles.muted}>{dateTitle(now)}</p>
-      </header>
-      <nav aria-label="Abas do painel" className={styles.chipRow}>
-        <Link href={dashboardHref("overview", periodValue, branchId)} className={styles.chip} aria-current={tab === "overview" ? "page" : undefined}>Visão da operação</Link>
-        <Link href={dashboardHref("quality", periodValue, branchId)} className={styles.chip} aria-current={tab === "quality" ? "page" : undefined}>Qualidade dos leads</Link>
-        {/* O funil ainda usa a tela antiga; a versão Lite dessa aba é a próxima entrega. */}
-        <Link href={dashboardHref("funnel", periodValue, branchId)} className={styles.chip}>Funil de qualificação</Link>
-      </nav>
-      <nav aria-label="Período" className={styles.chipRow}>
-        {PERIOD_OPTIONS.map((option) => (
-          <Link key={option.value} href={periodLink(option.value, branchId)} className={styles.chip} aria-current={option.period === period ? "true" : undefined}>
-            {option.label}
-          </Link>
-        ))}
-      </nav>
-      {branches.length > 0 ? (
-        <nav aria-label="Unidade" className={styles.chipRow}>
-          <Link href={periodLink(periodValue, null)} className={styles.chip} aria-current={branchId ? undefined : "true"}>
-            Todas as unidades
-          </Link>
-          {branches.map((branch) => (
-            <Link key={branch.id} href={periodLink(periodValue, branch.id)} className={styles.chip} aria-current={branchId === branch.id ? "true" : undefined}>
-              {branch.name}
-            </Link>
-          ))}
-        </nav>
-      ) : null}
+      <DirectorLiteHeader
+        firstName={firstName}
+        now={now}
+        tabs={tabs}
+        activeTab={tab}
+        periods={periods}
+        activePeriod={periodValue}
+        units={units}
+        activeUnit={branchId ?? ""}
+        onUnit={(value) => router.push(dashboardHref(tab, periodValue, value || null))}
+      />
       {children}
     </div>
   );

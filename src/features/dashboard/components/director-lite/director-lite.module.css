@@ -648,6 +648,53 @@ button.heatCell:hover { transform: scale(1.12); }
 .stacked > span[data-level="warm"] { background: color-mix(in oklab, var(--primary) 45%, var(--surface)); }
 .stacked > span[data-level="cold"] { background: var(--neutral-5); }
 
+/* Cabeçalho do painel (DirectorLiteHeader): uma fonte para o real e a prévia. */
+
+.headerBlock {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Controle segmentado: texto centralizado na pílula (o link ou botão ocupa a altura toda). */
+.pills .pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+/* Pílula ativa do controle segmentado: superfície branca com sombra leve, como na prévia aprovada. */
+.pill[data-active="true"] {
+  background: var(--surface);
+  box-shadow: var(--shadow-resting);
+}
+
+.unitPick {
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.unitSelect {
+  min-height: 44px;
+  max-width: 100%;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: var(--shadow-resting);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.unitSelect:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
 /* Link do lead na lista recente: área de toque de 44px. */
 .leadLink {
   display: inline-flex;

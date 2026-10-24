@@ -34,6 +34,8 @@ const PERIOD_DAYS: Record<OverviewPeriod, number> = { today: 1, "7d": 7, "30d": 
 
 export type EssentialDashboard = {
   generatedAt: string;
+  /** Primeiro nome de quem olha (saudação do cabeçalho); null quando o usuário não tem nome. */
+  firstName: string | null;
   duties: { running: EssentialDuty[]; next: DashboardDuty | null };
   queues: { since: string; label: string; rows: EssentialQueue[]; totals: ReturnType<typeof summarizeQueues>["totals"] };
   whatsapp: EssentialWhatsApp & { since: string; label: string };
@@ -185,6 +187,7 @@ export async function getEssentialDashboard(context: TenantContext, filter: { pe
 
   return {
     generatedAt: now.toISOString(),
+    firstName: welcome.firstName,
     duties: { running: duties, next: welcome.nextDuty },
     queues: { since: queueSince.toISOString(), label: windowLabel(queueSince), rows: queues.queues, totals: queues.totals },
     whatsapp: { ...whatsapp, since: todayTurn.toISOString(), label: windowLabel(todayTurn) },

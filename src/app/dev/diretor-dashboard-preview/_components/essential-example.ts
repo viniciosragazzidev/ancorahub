@@ -57,6 +57,7 @@ export function buildEssential(period: OverviewPeriod, unit: string, now: Date):
 
   return {
     generatedAt: now.toISOString(),
+    firstName: "Renata",
     duties: { running, next: null },
     queues: { since: queueSince.toISOString(), label: windowLabel(queueSince), rows: queues.queues, totals: queues.totals },
     whatsapp: { ...whatsapp, since: whatsappSince.toISOString(), label: windowLabel(whatsappSince) },
@@ -69,6 +70,7 @@ export function emptyEssential(now: Date): EssentialDashboard {
   const queues = summarizeQueues([], [], []);
   return {
     generatedAt: now.toISOString(),
+    firstName: null,
     duties: { running: [], next: null },
     queues: { since: since.toISOString(), label: windowLabel(since), rows: queues.queues, totals: queues.totals },
     whatsapp: { ...summarizeWhatsApp([]), since: since.toISOString(), label: windowLabel(since) },

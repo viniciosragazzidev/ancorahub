@@ -9,7 +9,15 @@ import { getSimpleLeadQualityReport } from "@/features/reports/metrics/lead-qual
 import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import type { TenantContext } from "@/shared/auth/types";
+import { getDatabase, schema } from "@/shared/db";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { eq } from "drizzle-orm";
+
+/** Primeiro nome de quem olha: a saudação do cabeçalho (mesma regra do painel essencial). */
+async function viewerFirstName(context: TenantContext) {
+  const [row] = await getDatabase().select({ name: schema.user.name }).from(schema.user).where(eq(schema.user.id, context.userId)).limit(1);
+  return row?.name?.trim().split(/\s+/)[0] ?? null;
+}
 
 /** Período do topo ("hoje", 7 ou 30 dias) para o período da análise de qualidade. */
 const QUALITY_PERIOD: Record<OverviewPeriod, LeadQualityPeriod> = { today: "today", "7d": 7, "30d": 30 };
@@ -33,8 +41,9 @@ export async function renderDirectorLiteQuality(context: TenantContext, params: 
   const legacyPeriod = QUALITY_LEGACY_PERIOD[period];
   const legacyHref = `/dashboard?tab=quality&period=${legacyPeriod}&legado=1`;
   const detailedHref = `/dashboard?tab=quality&period=${legacyPeriod}&vista=detalhada&legado=1`;
+  const firstName = await viewerFirstName(context);
   return (
-    <DirectorLiteChrome now={now} tab="quality" period={period} branchId={branchId} branches={canCompare ? units : []}>
+    <DirectorLiteChrome now={now} tab="quality" period={period} branchId={branchId} branches={canCompare ? units : []} firstName={firstName}>
       {report ? (
         <>
           <QualityToolbar legacyHref={legacyHref} detailedHref={detailedHref} />

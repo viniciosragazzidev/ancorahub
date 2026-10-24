@@ -3,6 +3,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const motionState = vi.hoisted(() => ({ reduce: false }));
+// O cabeçalho navega com o router do Next; nos testes, só a chamada é observada.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("motion/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("motion/react")>();
   const { captureMotion } = await import("@/components/lite/motion/capture-motion");
@@ -99,30 +101,30 @@ describe("filtros do topo na aba Qualidade", () => {
     expect(dashboardHref("quality", "30", "branch-centro")).toBe("/dashboard?tab=quality&periodo=30&unidade=branch-centro");
     expect(dashboardHref("quality", "hoje", null)).toBe("/dashboard?tab=quality&periodo=hoje");
     expect(dashboardHref("overview", "7", null)).toBe("/dashboard?periodo=7");
-    expect(dashboardHref("funnel", "7", null)).toBe("/dashboard?tab=funnel");
+    expect(dashboardHref("funnel", "7", null)).toBe("/dashboard?tab=funnel&periodo=7");
   });
 
-  it("na aba Qualidade, o período marcado e os links mantêm a unidade", () => {
+  it("na aba Qualidade, o cabeçalho traz o nome, o período marcado e a unidade escolhida", () => {
     render(
-      <DirectorLiteChrome now={NOW} tab="quality" period="7d" branchId="branch-centro" branches={BRANCHES}>
+      <DirectorLiteChrome now={NOW} tab="quality" period="7d" branchId="branch-centro" branches={BRANCHES} firstName="Renata">
         <p>conteúdo</p>
       </DirectorLiteChrome>,
     );
+    expect(screen.getByRole("heading", { level: 1, name: "Olá, Renata" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("aria-current", "page");
     const periods = within(screen.getByRole("navigation", { name: "Período" }));
     expect(periods.getByRole("link", { name: "7 dias" })).toHaveAttribute("aria-current", "true");
     expect(periods.getByRole("link", { name: "30 dias" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=30&unidade=branch-centro");
-    const units = within(screen.getByRole("navigation", { name: "Unidade" }));
-    expect(units.getByRole("link", { name: "Barra da Tijuca" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=7&unidade=branch-barra");
+    expect((screen.getByRole("combobox", { name: "Unidade" }) as HTMLSelectElement).value).toBe("branch-centro");
   });
 
-  it("sem unidades no escopo, o filtro de unidade some", () => {
+  it("sem unidades no escopo, o seletor de unidade some", () => {
     render(
-      <DirectorLiteChrome now={NOW} tab="quality" period="today" branchId={null} branches={[]}>
+      <DirectorLiteChrome now={NOW} tab="quality" period="today" branchId={null} branches={[]} firstName="Renata">
         <p>conteúdo</p>
       </DirectorLiteChrome>,
     );
-    expect(screen.queryByRole("navigation", { name: "Unidade" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Unidade" })).not.toBeInTheDocument();
   });
 
   it("Detalhada, fila, intervalo e exportar levam à tela antiga com o mesmo período", () => {

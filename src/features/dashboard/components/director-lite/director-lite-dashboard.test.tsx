@@ -3,6 +3,8 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const motionState = vi.hoisted(() => ({ reduce: false }));
+// O cabeçalho navega com o router do Next; nos testes, só o push é observado.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("motion/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("motion/react")>();
   const { captureMotion } = await import("@/components/lite/motion/capture-motion");
@@ -30,7 +32,7 @@ afterEach(() => {
 describe("painel essencial: ordem, cabeçalho e filtros", () => {
   it("mostra a saudação, as abas e a nota de que o período muda só os leads por fila", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
-    expect(screen.getByRole("heading", { level: 1, name: "Olá" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Olá, Renata" })).toBeInTheDocument();
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("aria-current", "page");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=hoje");
@@ -50,17 +52,17 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(periods.getByRole("link", { name: "Hoje" })).toHaveAttribute("href", "/dashboard?periodo=hoje&unidade=branch-centro");
   });
 
-  it("oferece as unidades e marca a escolhida", () => {
+  it("oferece só as unidades autorizadas num seletor e marca a escolhida", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId="branch-barra" branches={BRANCHES} now={NOW} />);
-    const units = within(screen.getByRole("navigation", { name: "Unidade" }));
-    expect(units.getByRole("link", { name: "Todas as unidades" })).not.toHaveAttribute("aria-current");
-    expect(units.getByRole("link", { name: "Barra da Tijuca" })).toHaveAttribute("aria-current", "true");
-    expect(units.getByRole("link", { name: "Centro" })).toHaveAttribute("href", "/dashboard?periodo=hoje&unidade=branch-centro");
+    const select = screen.getByRole("combobox", { name: "Unidade" }) as HTMLSelectElement;
+    expect(select.value).toBe("branch-barra");
+    const names = within(select).getAllByRole("option").map((option) => option.textContent);
+    expect(names).toEqual(["Todas as unidades", "Centro", "Barra da Tijuca"]);
   });
 
-  it("sem unidades no escopo (sem permissão de comparar), o filtro de unidade some", () => {
+  it("sem unidades no escopo (sem permissão de comparar), o seletor de unidade some", () => {
     render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={[]} now={NOW} />);
-    expect(screen.queryByRole("navigation", { name: "Unidade" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Unidade" })).not.toBeInTheDocument();
   });
 });
 
