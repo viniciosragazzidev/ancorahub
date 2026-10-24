@@ -103,7 +103,8 @@ export async function runGateway<T>(input: {
         body: JSON.stringify({
           model: ref.model,
           messages,
-          temperature: input.temperature ?? 0.3,
+          // Claude Haiku 5.5 direct refuses `temperature` (HTTP 400 "deprecated for this model", 24/10).
+          ...(ref.provider === "anthropic" ? {} : { temperature: input.temperature ?? 0.3 }),
           max_tokens: input.maxTokens ?? 500,
           ...(ref.provider === "anthropic" ? {} : { response_format: { type: "json_object" } }),
           // LGPD: paid OpenRouter calls only go to providers that neither keep nor train on the data

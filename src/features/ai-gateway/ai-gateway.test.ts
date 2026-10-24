@@ -164,3 +164,14 @@ describe("Anthropic direct first when its key exists (Console credit, 24/10)", (
     }
   });
 });
+
+describe("Anthropic direct request", () => {
+  it("never sends temperature, which Claude Haiku 5.5 refuses", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: "{\"text\":\"ok\"}" } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    process.env = { ...env, ANTHROPIC_API_KEY: "a", OPENROUTER_API_KEY: "", GROQ_API_KEY: "", GOOGLE_API_KEY: "", OPENAI_API_KEY: "" };
+    const result = await runGateway({ profile: "chat-smart", purpose: "test", tenantId: "t", userId: "anthropic", messages: [{ role: "user", content: "x" }], schema: z.object({ text: z.string() }), temperature: 0 });
+    expect(result).toMatchObject({ ok: true, model: { provider: "anthropic" } });
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body)).not.toHaveProperty("temperature");
+  });
+});
