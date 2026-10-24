@@ -456,3 +456,7 @@ por categoria e com documentação local.
 ## 2026-10-17 - Navegacao direta no Lite (Frente A)
 
 Os assistentes de leads, plantao, agenda, desempenho e equipe abrem as respectivas paginas; Jack permanece como a unica conversa de assistente. Aliases legados redirecionam por papel, mantendo o acesso autorizado. O corretor tem Agenda com concluir, cancelar/desfazer e reagendar, Desempenho e controle de pausa no plantao ativo. O supervisor tem pagina de plantao da equipe, com links para o plantao individual. DEC-148 e registro: docs/implementations/completed/2026-10-17-lite-nav-front-a.md. A reformulacao do perfil de lead e das listas continua nas Frentes B e C.
+
+## 2026-10-24 - Diretor Lite F1, paridade sem provider
+
+O snapshot HTML das primitivas sem provider usa a referência de `origin/feat/diretor-visual-lite` e cobre Button, Card, StatCard, Sonner, ScrollArea, Combobox e AnimatedBadge. A ScrollArea preserva a marcação da origin quando a pele está desligada; o Card foi auditado em 53 usos de Server Components sem callbacks ou refs não serializáveis. Implementação: `docs/implementations/active/2026-10-24-diretor-lite-f1.md`.

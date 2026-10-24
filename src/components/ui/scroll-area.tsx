@@ -59,7 +59,7 @@ function ScrollBar({
       {...props}
     >
       <ScrollAreaPrimitive.ScrollAreaThumb
-        forceMount={forceMount}
+        forceMount={directorLite ? forceMount : undefined}
         data-slot={directorLite ? "scroll-area-thumb" : undefined}
         className="relative flex-1 rounded-full bg-muted-foreground/35"
       />

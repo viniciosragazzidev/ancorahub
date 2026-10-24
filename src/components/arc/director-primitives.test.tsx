@@ -5,7 +5,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppCombobox } from "@/components/ui/combobox";
 import { Input } from "@/components/ui/input";
@@ -61,13 +61,6 @@ function classSnapshot(enabled?: boolean) {
   return snapshot;
 }
 
-function htmlSnapshot() {
-  const { container } = render(<PrimitiveSet />);
-  const snapshot = container.innerHTML;
-  cleanup();
-  return snapshot;
-}
-
 function ScrollbarFixture() {
   return (
     <ScrollAreaPrimitive.Root type="always" style={{ height: 48, width: 100 }}>
@@ -76,6 +69,25 @@ function ScrollbarFixture() {
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar forceMount orientation="vertical" />
     </ScrollAreaPrimitive.Root>
+  );
+}
+
+// Baseline fixture snapshot gerado no commit 71e631f3 de origin/feat/diretor-visual-lite.
+function OriginHTMLSnapshotFixture() {
+  return (
+    <>
+      <section aria-label="Button"><Button variant="outline" size="sm">Salvar</Button></section>
+      <section aria-label="Card">
+        <Card variant="subtle" size="sm"><CardHeader><CardTitle>Resumo</CardTitle></CardHeader><CardContent>Conteudo</CardContent></Card>
+      </section>
+      <section aria-label="MetricCard"><StatCard label="Leads do dia" value={12} sublabel="Recebidos hoje" /></section>
+      <section aria-label="Sonner"><Toaster /></section>
+      <section aria-label="ScrollArea"><ScrollbarFixture /></section>
+      <section aria-label="Combobox">
+        <AppCombobox aria-label="Status" defaultValue="ativo" options={[{ value: "ativo", label: "Ativo" }, { value: "pausado", label: "Pausado" }]} />
+      </section>
+      <section aria-label="AnimatedBadge"><AnimatedBadge status="success">Conectado</AnimatedBadge></section>
+    </>
   );
 }
 
@@ -89,8 +101,22 @@ describe("pele das primitivas do Diretor", () => {
     expect(shell).not.toMatch(/const LightChrome\s*=\s*dynamic/);
   });
 
-  it("mantem o HTML sem escopo igual a referencia da origin", () => {
-    expect(htmlSnapshot()).toMatchInlineSnapshot(`"<button data-slot="button" type="button" class="ct-press group/button inline-flex shrink-0 items-center justify-center rounded-full border border-transparent bg-clip-padding text-xs font-medium whitespace-nowrap transition-[background-color,border-color,color,box-shadow,scale] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] outline-none select-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 motion-reduce:transition-none [&amp;_svg]:pointer-events-none [&amp;_svg]:shrink-0 [&amp;_svg:not([class*='size-'])]:size-4 cursor-pointer bg-primary text-primary-foreground shadow-none hover:bg-primary/90 h-9 gap-1.5 px-3.5 has-data-[icon=inline-end]:pr-2.5 has-data-[icon=inline-start]:pl-2.5">Salvar</button><input id="base-ui-_r_0_" data-slot="input" aria-label="Nome" class="h-8 w-full min-w-0 rounded-full border border-input bg-card px-2.5 py-1.5 text-xs text-foreground shadow-none transition-[background-color,border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] outline-none file:inline-flex file:h-6 file:border-0 file:bg-transparent file:text-xs file:font-medium file:text-foreground placeholder:text-muted-foreground hover:border-border-strong focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/20 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-muted/50 disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-1 aria-invalid:ring-destructive/20 motion-reduce:transition-none dark:bg-card dark:border-border"><div class="relative inline-block w-full"><div class="relative inline-block w-full"><button data-slot="select-trigger" type="button" id="_r_1_-trigger" aria-label="Plano" aria-haspopup="listbox" aria-expanded="false" aria-controls="_r_1_-list" class="relative z-10 flex w-full items-center justify-between gap-2 rounded-[10px] border border-input bg-card px-3 text-foreground outline-none transition-colors select-none hover:border-border-strong focus-visible:ring-2 focus-visible:ring-ring/20 disabled:pointer-events-none disabled:opacity-50 h-8 py-1.5 text-xs !rounded-full"><span class="truncate text-left flex-1 text-muted-foreground">Selecione...</span><span aria-hidden="true" animate="[object Object]" transition="[object Object]" class="text-muted-foreground shrink-0"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-down h-4 w-4" aria-hidden="true"><path d="m6 9 6 6 6-6"></path></svg></span></button></div></div><span data-unchecked="" role="checkbox" tabindex="0" id="base-ui-_r_2_" aria-checked="false" data-slot="checkbox" aria-label="Selecionar" class="peer relative flex size-4 shrink-0 items-center justify-center rounded-md border border-input transition-[background-color,border-color,box-shadow] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] outline-none group-has-disabled/field:opacity-50 after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20 aria-invalid:aria-checked:border-primary bg-card dark:bg-input/30 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:border-primary data-checked:bg-primary data-checked:text-primary-foreground dark:data-checked:bg-primary"><span data-unchecked="" data-slot="checkbox-indicator" class="grid place-content-center text-current [&amp;>svg]:size-3.5"><span class="inline-flex shrink-0 items-center justify-center"><div class="inline-flex size-full items-center justify-center [&amp;_svg]:size-full"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 14L8.5 17.5L19 6.5" variants="[object Object]" animate="[object Object]"></path></svg></div></span></span></span><input style="clip-path: inset(50%); overflow: hidden; white-space: nowrap; border: 0px; padding: 0px; width: 1px; height: 1px; margin: -1px; position: fixed; top: 0px; left: 0px;" tabindex="-1" aria-hidden="true" type="checkbox"><span data-unchecked="" role="switch" tabindex="0" id="base-ui-_r_5_" aria-checked="false" data-slot="switch" aria-label="Ativar" class="peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-[var(--motion-duration-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:cursor-not-allowed disabled:opacity-50 data-checked:bg-primary data-unchecked:bg-muted"><span data-unchecked="" data-slot="switch-thumb" class="pointer-events-none block h-4 w-4 rounded-full bg-background shadow-[var(--shadow-xs)] ring-0 transition-transform duration-[var(--motion-duration-fast)] data-checked:translate-x-4 data-unchecked:translate-x-0"></span></span><input id="base-ui-_r_6_" style="clip-path: inset(50%); overflow: hidden; white-space: nowrap; border: 0px; padding: 0px; width: 1px; height: 1px; margin: -1px; position: fixed; top: 0px; left: 0px;" tabindex="-1" aria-hidden="true" type="checkbox"><div class="flex flex-col gap-2"><div role="tablist" class="inline-flex w-full items-center gap-1 overflow-x-auto border-b border-border bg-transparent [scrollbar-width:none] [&amp;::-webkit-scrollbar]:hidden"><button type="button" role="tab" data-slot="tabs-trigger" aria-selected="true" class="relative isolate inline-flex shrink-0 cursor-pointer items-center gap-2 whitespace-nowrap px-2 pb-2.5 pt-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-foreground">Hoje<span layoutid="_r_8_" class="absolute -bottom-px left-0 right-0 h-0.5 bg-primary"></span></button></div></div>"`);
+  it("preserva o HTML legado sem provider para as sete primitivas", async () => {
+    vi.stubGlobal("ResizeObserver", class ResizeObserverMock { observe() {} unobserve() {} disconnect() {} });
+    render(<OriginHTMLSnapshotFixture />);
+    fireEvent.click(screen.getByRole("combobox", { name: "Status" }));
+    await screen.findByRole("button", { name: "Ativo" });
+
+    expect(screen.getByRole("button", { name: "Salvar" })).not.toHaveAttribute("data-variant");
+    const card = screen.getByText("Resumo").closest('[data-slot="card"]');
+    expect(card).toHaveAttribute("data-variant", "subtle");
+    expect(card).toHaveAttribute("data-size", "sm");
+    expect(screen.getByText("Leads do dia").closest('[data-slot="card"]')).not.toBeNull();
+    expect(document.querySelector('[data-slot="sonner"]')).toBeNull();
+    expect(document.querySelector('[data-slot="scroll-area-thumb"]')).toBeNull();
+    expect(screen.getByRole("button", { name: "Ativo" })).not.toHaveAttribute("data-slot", "combobox-option");
+    expect(document.querySelector('[data-slot="animated-badge"]')).toBeNull();
+    expect(document.body.innerHTML).toMatchSnapshot();
   });
 
   it("so emite atributos de skin nos componentes quando o escopo esta ativo", () => {

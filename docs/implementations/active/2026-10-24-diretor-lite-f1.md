@@ -45,3 +45,10 @@ Status: implementada na branch `feat/diretor-lite-f1`, aguardando revisão visua
 - Sob `[data-skin="diretor"]`, o contêiner agora usa borda fina e `radius-panel`; as atividades são linhas sem fundo nem raio, separadas por divisórias sutis. A versão sem a chave preserva a marcação e estilos anteriores. O thumb continua fino pela barra de 8px e arredondado.
 - Os quatro prints foram apagados e capturados de novo pelo servidor Next ativo às 16:27. Tamanhos: 1440 desligada 146250 bytes, 1440 ligada 162761, 390 desligada 131908, 390 ligada 151488. Prints ligados em desktop e celular conferidos visualmente.
 - Validação adicional: os mesmos 46 testes focados, type-check aprovado, ESLint sem erros, guarda-corpo com 811 arquivos e zero novos desvios nas alterações, `git diff --check` aprovado.
+
+## Última rodada de paridade com a origin
+
+- O snapshot externo foi gerado em worktree destacado no commit `71e631f3`, conferindo os componentes com `git show origin/feat/diretor-visual-lite:<arquivo>`. A fixture cobre Button, Card, StatCard, Sonner, ScrollArea, Combobox e AnimatedBadge sem `ArcScopeProvider`; a referência também confirma que o Card legado mantém `data-slot`, `data-variant` e `data-size`.
+- A comparação encontrou que o thumb da ScrollArea só era forçado no código atual. `forceMount` no thumb agora só é repassado com o escopo do Diretor ativo; sem provider, o HTML coincide com a origin.
+- Auditoria dos usos de Card: 53 arquivos de Server Components usam a primitiva. Nenhum passa callback, `ref` ou spread de props aos componentes Card; os usos de `DashboardCard` observados passam apenas atributos serializáveis. Mantido o hook existente.
+- Validação desta rodada: `npx vitest run src/components/arc/director-primitives.test.tsx` passou com 11 testes; `npx tsc --noEmit -p .` passou; ESLint dos dois arquivos de código passou; `node scripts/check-lite-skin.mjs` analisou 811 arquivos; `git diff --check` passou. Não executados testes de banco, build, migration ou push.
