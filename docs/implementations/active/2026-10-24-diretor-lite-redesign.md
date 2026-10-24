@@ -74,7 +74,7 @@
 **Regra de ouro:** nenhuma tela usa `data-lite` + `!important` (técnica do `ed0af666`). Isso só serve de remendo até C4 existir; depois, as Conversas migram para a pele padrão (onda 2).
 
 ### 3.2 Opt-out por rota
-`director-lite-routes.ts` lista as rotas que ainda não foram revisadas. Nelas, o `SidebarInset` recebe `data-skin="off"`: o chrome fica Lite e a página fica como hoje. A lista começa com todas as rotas e cada onda remove as suas. Isso evita tela "meio convertida" em produção.
+`director-lite-routes.ts` lista as rotas que ainda não foram revisadas. Nelas, o `SidebarInset` recebe `data-skin="off"`: o chrome fica Lite e a página fica como hoje. A lista começa com todas as rotas e cada onda remove as suas. Isso evita tela "meio convertida" em produção. Exceção decidida em 2026-10-24 (segue D2): com a chave ligada, o tema claro vale em todas as rotas do diretor, inclusive nas que estão no opt-out, para o chrome Lite nunca conviver com página escura.
 
 ### 3.3 Arquivos de alto conflito
 `app-shell.tsx`, `(dashboard)/layout.tsx`, `corretop-sidebar.tsx`, `dashboard-header.tsx`, `globals.css`, `venancor-scope.css`, `light-routes.ts` e os wrappers de `ui/`. Mudanças aditivas e pequenas por etapa; o Maestro resolve conflitos no merge.
