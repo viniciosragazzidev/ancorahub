@@ -203,7 +203,7 @@ function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["what
               <LiteItem as="li" key={broker.id} index={index}>
                 <Link href={`/conversas?tab=leads&brokerId=${encodeURIComponent(broker.id)}`} className={styles.nameRow} title={`Ver conversas de ${broker.name}`}>
                   <span className={styles.truncate}>{broker.name}</span>
-                  <span className={styles.tabular}>{broker.active} ativos · {broker.responding} de {broker.received} respondendo</span>
+                  <span className={styles.tabular}>{plural(broker.active, "ativo", "ativos")} · {broker.responding} de {broker.received} respondendo</span>
                   <ArrowRight aria-hidden="true" size={14} className={styles.arrow} />
                 </Link>
               </LiteItem>
