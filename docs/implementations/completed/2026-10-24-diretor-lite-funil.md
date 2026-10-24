@@ -25,4 +25,13 @@ Status: implementação concluída na branch `feat/diretor-lite-funil`.
 - Vitest focado: 4 arquivos, 13 testes aprovados, cobrindo escopo, filtros, vazio, apresentação da prévia e chave ligada/desligada.
 - `npx tsc --noEmit -p .`, ESLint dos arquivos alterados e `node scripts/check-lite-skin.mjs` concluídos sem erro. O relatório global do check-lite-skin inclui desvios preexistentes fora deste escopo.
 - Prévia visual conferida nos arquivos `scratchpad/abas-prints/funil-1440.png` (1440 × 1100) e `scratchpad/abas-prints/funil-390.png` (390 × 844), com fixtures sintéticas tipadas.
-- Não foi necessário alterar o roteamento das abas nem executar consulta de banco em teste.
+- Rotas existentes do painel foram mantidas; o cabeçalho converte o filtro do Funil para `period=` ao navegar até a aba.
+
+## Cabeçalho compartilhado e prévia real
+
+- Rebaseada em `feat/diretor-lite-qualidade` (`8926f5ee`), a aba agora usa `DirectorLiteHeader` para saudação, abas, período e unidade. Os links de aba preservam filtros; o link para Funil usa `period=`, que é o parâmetro lido pela rota.
+- `/dev/diretor-dashboard-real?tab=funnel` renderiza este componente real com fixtures, sem a moldura da prévia.
+- Vitest focado: 4 arquivos, 20 testes aprovados, cobrindo aba, filtros, unidades autorizadas, vazio e rota real de desenvolvimento.
+- A rota real retornou 200 em navegador com movimento reduzido e sem erro de hidratação. Sem `DATABASE_URL`, o endpoint de preferências de movimento responde 503, sem afetar os dados de exemplo.
+
+- Prints atuais: `scratchpad/dash-real-fix/funil-1440.png` (1440 × 1100, 171446 bytes, 18:39:17 -03:00) e `funil-390.png` (390 × 844, 60828 bytes, 18:39:23 -03:00); ambos foram abertos e conferidos.

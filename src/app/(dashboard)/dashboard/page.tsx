@@ -25,6 +25,7 @@ import { DirectorLiteDashboard } from "@/features/dashboard/components/director-
 import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/components/director-lite/qualification-funnel-page";
 import { getEssentialDashboard } from "@/features/dashboard/essential/essential-data";
 import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-quality-page";
+import { getDirectorLiteViewerFirstName } from "@/features/dashboard/director-lite-viewer";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -82,8 +83,11 @@ export default async function DashboardPage({
       if (context.role === "director" && (await shouldUseDirectorLiteStyle(context.role, context.tenantId))) {
         const { canCompare, units } = await getDashboardUnitFilter(context);
         const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
-        const funnel = await getQualificationFunnel(context, funnelPeriod, branchId);
-        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={branchId} branches={canCompare ? units : []} />;
+        const [funnel, firstName] = await Promise.all([
+          getQualificationFunnel(context, funnelPeriod, branchId),
+          getDirectorLiteViewerFirstName(context.userId),
+        ]);
+        return <DirectorLiteQualificationFunnelPage data={funnel} branchId={branchId} branches={canCompare ? units : []} firstName={firstName} now={new Date()} />;
       }
       const funnel = await getQualificationFunnel(context, funnelPeriod);
       return <QualificationFunnelView data={funnel} showQualityTab />;

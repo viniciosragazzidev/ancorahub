@@ -4,6 +4,7 @@ const state = vi.hoisted(() => ({
   role: "director" as string,
   flag: true,
   units: [{ id: "77777777-7777-4777-8777-777777777777", name: "Centro" }],
+  firstName: "Renata",
   getFunnel: vi.fn(),
 }));
 
@@ -33,6 +34,7 @@ vi.mock("@/features/dashboard/director-lite-branches", () => ({
 }));
 vi.mock("@/features/dashboard/today", () => ({ getCommandCenterData: async () => ({}) }));
 vi.mock("@/features/dashboard/essential/essential-data", () => ({ getEssentialDashboard: async () => ({}) }));
+vi.mock("@/features/dashboard/director-lite-viewer", () => ({ getDirectorLiteViewerFirstName: async () => state.firstName }));
 vi.mock("@/features/dashboard/components/command-center", () => ({ CommandCenter: () => null }));
 
 import DashboardPage from "./page";
@@ -54,7 +56,7 @@ describe("aba Funil de qualificação do Diretor Lite", () => {
   it("usa a tela Lite e o período/unidade autorizada selecionados", async () => {
     const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", period: "30", unidade: allowedUnit }) });
     expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
-    expect(element.props).toMatchObject({ branchId: allowedUnit, branches: state.units, data: fixture });
+    expect(element.props).toMatchObject({ branchId: allowedUnit, branches: state.units, data: fixture, firstName: "Renata", now: expect.any(Date) });
     expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil", role: "director" }), 30, allowedUnit);
   });
 

@@ -6,7 +6,7 @@
  * a forma exata (pílula de texto, barra de cor de série, `li` e `section` com atraso).
  */
 import { useRef, useSyncExternalStore, type ReactNode } from "react";
-import { motion, useInView, useReducedMotion, type Transition } from "motion/react";
+import { motion, useInView, type Transition } from "motion/react";
 
 import { motionTokens as m } from "@/components/arc/motion-tokens";
 import { LiteNumber as KitLiteNumber } from "@/components/lite/motion";
@@ -28,28 +28,29 @@ function subscribeUserReduce(onChange: () => void) {
 }
 const readUserReduce = () => document.documentElement.dataset.reduceMotion === "1";
 
+function subscribeSystemReduce(onChange: () => void) {
+  if (typeof window.matchMedia !== "function") return () => undefined;
+  const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+const readSystemReduce = () => typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+const readServerReduce = () => false;
+
 /** Movimento reduzido vale se o sistema pedir OU se o usuário ligou a preferência no site. */
 export function useReduce() {
-  const system = !!useReducedMotion();
-  const user = useSyncExternalStore(subscribeUserReduce, readUserReduce, () => false);
+  // Keep the server and hydration snapshots stable; browser preferences apply after mount.
+  const system = useSyncExternalStore(subscribeSystemReduce, readSystemReduce, readServerReduce);
+  const user = useSyncExternalStore(subscribeUserReduce, readUserReduce, readServerReduce);
   return system || user;
 }
 
 /** Texto final de um número, em pt-BR, igual ao que o odômetro mostra no fim. */
-function staticNumber(value: number, kind: "int" | "pct" | "brl" | "dec", decimals?: number) {
-  if (kind === "pct") return new Intl.NumberFormat("pt-BR", { style: "percent", minimumFractionDigits: decimals ?? 0, maximumFractionDigits: decimals ?? 0 }).format(value / 100);
-  if (kind === "brl") return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: decimals ?? 2, maximumFractionDigits: decimals ?? 2 }).format(value);
-  const digits = kind === "dec" ? (decimals ?? 1) : (decimals ?? 0);
-  return new Intl.NumberFormat("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
-}
-
 /**
  * Número que muda (odômetro do kit). `kind` segue o da prévia: inteiro, percentual, real ou decimal.
  * Com movimento reduzido (sistema ou preferência do site) o número aparece pronto, sem as colunas rolando.
  */
 export function LiteNumber({ value, kind = "int", decimals, className }: { value: number; kind?: "int" | "pct" | "brl" | "dec"; decimals?: number; className?: string }) {
-  const reduce = useReduce();
-  if (reduce) return <span className={className}>{staticNumber(value, kind, decimals)}</span>;
   const format = kind === "pct" ? "percent" : kind === "brl" ? "currency" : kind === "dec" ? "decimal" : "integer";
   return <KitLiteNumber value={value} format={format} decimals={decimals} className={className} />;
 }

@@ -3,6 +3,16 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const motionState = vi.hoisted(() => ({ reduce: false }));
+vi.stubGlobal("matchMedia", (media: string) => ({
+  matches: motionState.reduce,
+  media,
+  onchange: null,
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  addListener: vi.fn(),
+  removeListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+}));
 // O cabeçalho navega com o router do Next; nos testes, só a chamada é observada.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 vi.mock("motion/react", async (importOriginal) => {
@@ -101,7 +111,8 @@ describe("filtros do topo na aba Qualidade", () => {
     expect(dashboardHref("quality", "30", "branch-centro")).toBe("/dashboard?tab=quality&periodo=30&unidade=branch-centro");
     expect(dashboardHref("quality", "hoje", null)).toBe("/dashboard?tab=quality&periodo=hoje");
     expect(dashboardHref("overview", "7", null)).toBe("/dashboard?periodo=7");
-    expect(dashboardHref("funnel", "7", null)).toBe("/dashboard?tab=funnel&periodo=7");
+    expect(dashboardHref("funnel", "7", null)).toBe("/dashboard?tab=funnel&period=7");
+    expect(dashboardHref("funnel", "30", "branch-centro")).toBe("/dashboard?tab=funnel&period=30&unidade=branch-centro");
   });
 
   it("na aba Qualidade, o cabeçalho traz o nome, o período marcado e a unidade escolhida", () => {
