@@ -71,12 +71,16 @@ export function defaultChains(env: Env): Record<AiProfile, ModelRef[]> {
     { provider: "openrouter", model: env.AI_INTERPRETER_MODEL || "google/gemini-3.1-flash-lite" },
     { provider: "openrouter", model: env.AI_INTERPRETER_FALLBACK_MODEL || "anthropic/claude-haiku-5.5" },
   ];
+  // 2026-10-24: the organization has API credit on the Claude Console, so Claude Haiku 5.5
+  // direct from Anthropic goes first in every profile. Without an Anthropic key it is dropped
+  // by resolveChain and the order below is the one of before (OpenRouter first).
+  const anthropicDirect: ModelRef = { provider: "anthropic", model: anthropic };
   return {
-    interpreter: [...interpreter, ...paid],
-    "chat-fast": [...routerPaid, ...paid, { provider: "groq", model: groqFast }, { provider: "groq", model: groqSmart }, { provider: "openrouter", model: openrouterFree }],
-    "chat-smart": [...routerPaid, ...paid, { provider: "groq", model: groqSmart }, { provider: "google", model: gemini }, { provider: "openrouter", model: openrouterFree }],
-    "json-structured": [...routerPaid, ...paid, { provider: "groq", model: groqSmart }, { provider: "google", model: gemini }, { provider: "openrouter", model: openrouterFree }],
-    "long-context": [...routerPaid, ...paid, { provider: "google", model: gemini }, { provider: "groq", model: groqSmart }, { provider: "openrouter", model: openrouterFree }],
+    interpreter: [anthropicDirect, ...interpreter, ...paid],
+    "chat-fast": [anthropicDirect, ...routerPaid, ...paid, { provider: "groq", model: groqFast }, { provider: "groq", model: groqSmart }, { provider: "openrouter", model: openrouterFree }],
+    "chat-smart": [anthropicDirect, ...routerPaid, ...paid, { provider: "groq", model: groqSmart }, { provider: "google", model: gemini }, { provider: "openrouter", model: openrouterFree }],
+    "json-structured": [anthropicDirect, ...routerPaid, ...paid, { provider: "groq", model: groqSmart }, { provider: "google", model: gemini }, { provider: "openrouter", model: openrouterFree }],
+    "long-context": [anthropicDirect, ...routerPaid, ...paid, { provider: "google", model: gemini }, { provider: "groq", model: groqSmart }, { provider: "openrouter", model: openrouterFree }],
   };
 }
 
