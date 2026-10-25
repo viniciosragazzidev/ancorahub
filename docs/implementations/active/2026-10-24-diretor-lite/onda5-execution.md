@@ -32,8 +32,9 @@ As telas internas Lite recebem papel e permissões do contexto autenticado. Rest
 
 ## Validação desta rodada
 
-- Vitest focado: 9 arquivos, 17 testes aprovados. O teste de Saúde verifica os rótulos exibidos atualmente.
-- `npx tsc --noEmit -p .`: aprovado após as alterações de implementação.
-- ESLint nos arquivos TypeScript alterados: zero erros e 6 avisos de regras já presentes na inbox e no workspace de plantões.
-- `node scripts/check-lite-skin.mjs`: relatório executado. Comparação dos arquivos alterados com a base `d2d80a01` não encontrou novos desvios de estilo.
-- A prévia iniciou, mas `/dev/diretor-shell-real?tela=distribuicao-operar` não terminou de compilar em 120 segundos, sob pressão de memória dos servidores de outras worktrees. O servidor desta worktree foi encerrado. Prints e medições de viewport continuam pendentes; não usar esta validação como aprovação visual.
+- Vitest focado: 18 arquivos e 86 testes aprovados; a verificação isolada do DutyNowView também passou, com 7 testes.
+- npx tsc --noEmit -p .: código 0, sem erros.
+- ESLint: zero erros; permanecem 6 avisos preexistentes na inbox e no workspace de plantões. Os módulos CSS não fazem parte da configuração do ESLint.
+- node scripts/check-lite-skin.mjs: relatório executado. A comparação dos arquivos alterados com d2d80a01 não encontrou desvios novos de estilo.
+- Prévia real /dev/diretor-shell-real: 24 capturas em 1440 e 390, para diretor e super-admin, cobrindo operação, filas, calendário, ocorrência, saúde e dashboard. Erros de console: 0; largura do documento igual ao viewport; cabeçalho e conteúdo alinhados (258/1425 no desktop, 0/375 no celular). Arquivos e medições em C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/.
+- Refinamento visual: controles da inbox cabem na tabela desktop; nomes longos truncam com reticências; cards de plantão empilham nome e horário no celular. O gate desligado mantém o HTML legado do DutyNowView.

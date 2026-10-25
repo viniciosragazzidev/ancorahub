@@ -477,4 +477,4 @@ O topo global e o /dashboard agora seguem um container e ritmo Arc comum, com ca
 
 ## 2026-10-25 - Onda 5, distribuicao e plantoes no Lite
 
-OperaÃ§Ã£o, filas, calendÃ¡rio, ocorrÃªncia, saÃºde da distribuiÃ§Ã£o e dashboard reaproveitam consultas, aÃ§Ãµes e permissÃµes existentes, incluindo o papel real do contexto. Vitest, type-check e ESLint foram executados; a inspeÃ§Ã£o visual da prÃ©via real e seus prints seguem pendentes porque a compilaÃ§Ã£o excedeu o tempo limite sob pressÃ£o de memÃ³ria. ExecuÃ§Ã£o: `docs/implementations/active/2026-10-24-diretor-lite/onda5-execution.md`.
+Operação, filas, calendário, ocorrência, saúde da distribuição e dashboard mantêm consultas, ações e permissões existentes. /plantoes/agora também usa o gate Lite, preservando os checks atuais do corretor. Validação final: 18 arquivos e 86 testes Vitest aprovados, TypeScript sem erros, ESLint sem erros e 24 capturas reais sem rolagem horizontal. Execução: docs/implementations/active/2026-10-24-diretor-lite/onda5-execution.md.
