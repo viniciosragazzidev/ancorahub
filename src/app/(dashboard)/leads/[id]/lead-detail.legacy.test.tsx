@@ -259,4 +259,26 @@ describe("perfil do lead com a chave desligada", () => {
     expect(screen.getAllByText("Maria Nova").length).toBeGreaterThan(0);
     expect(container.innerHTML).toMatchSnapshot();
   }, 30_000);
+
+  it("com a chave do diretor, mostra o perfil Lite com as mesmas peças e ações", async () => {
+    fixtures.liteStyle.current = true;
+    const tree = await resolveLeadDetailPage();
+    const { container } = render(<NuqsTestingAdapter>{tree}</NuqsTestingAdapter>);
+    fixtures.liteStyle.current = false;
+    expect(container.querySelector('[data-skin="diretor"]')).not.toBeNull();
+    expect(screen.getByTestId("dashboard-header")).toHaveTextContent("Perfil do lead");
+    expect(screen.getByRole("heading", { level: 2, name: "Maria Nova" })).toBeInTheDocument();
+    expect(screen.getAllByText("Em atendimento").length).toBeGreaterThan(0);
+    expect(screen.getByRole("tab", { name: "Atendimento" })).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /Documentos/ })).toBeDisabled();
+    expect(screen.getByRole("tab", { name: "Tarefas (1)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dados do lead" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Conversas/ })).toHaveAttribute("href", `/conversas?leadId=${fixtures.lead.id}&draft=broker_intro`);
+    expect(screen.getByRole("heading", { name: "Dados da empresa (PME)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Origem Meta Ads" })).toBeInTheDocument();
+    expect(container.textContent).toContain("Supervisão");
+    expect(container.textContent).toContain("Excluir");
+    // Contrato: sem título da página repetido no corpo e sem caixa alta nas peças Lite.
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+  }, 30_000);
 });

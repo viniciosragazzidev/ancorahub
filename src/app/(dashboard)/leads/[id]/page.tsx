@@ -26,6 +26,10 @@ import { StartServiceButton } from "./start-service-button";
 import { MarkLeadInServiceButton } from "@/features/leads/components/mark-lead-in-service-button";
 import { canDirectorMarkLeadInService } from "@/features/leads/director-service-start";
 import { SupervisionPanel } from "./supervision-panel";
+import { DirectorLiteLeadDetail } from "./director-lite-lead-detail";
+import litePageStyles from "../leads-lite-page.module.css";
+import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
+import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { DeleteLeadControl } from "./delete-lead-control";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-workspace/components/light-lead-detail";
@@ -461,6 +465,147 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
 
   if (shouldMask) {
     lead.nome = maskName(lead.nome);
+  }
+
+  // Chave do diretor (mesma regra do useDirectorLitePage, no servidor): o perfil sai no visual Lite com as mesmas peças.
+  const directorLitePage = context.role === "director"
+    && !isDirectorLiteRouteOptedOut(`/leads/${id}`)
+    && (await shouldUseDirectorLiteStyle(context.role, context.tenantId).catch(() => false));
+  if (directorLitePage) {
+    const qualDetails = lead.qualificationDetails as { status?: string; score?: number } | null;
+    const leadNextBestAction = resolveLeadNextBestAction({
+      id: lead.id,
+      name: lead.nome,
+      status: lead.status,
+      qualificationStatus: qualDetails?.status ?? null,
+      score: qualDetails?.score ?? null,
+      phone: lead.telefone,
+      hasSlaBreach: Boolean(lead.slaBreachedAt),
+      documentsPendingCount: leadDocs.filter((d) => d.status === "pending" || d.status === "rejected").length,
+      documentsApprovedCount: leadDocs.filter((d) => d.status === "approved").length,
+      totalDocumentsRequired: leadDocs.length,
+      hasCompletedSale: lead.status === "converted",
+      firstContactCompleted: lead.status !== "new" && lead.status !== "distributed",
+    }, context.role, context.jobTitle);
+    return (
+      <>
+        <DashboardHeader breadcrumb="Operação comercial" title="Perfil do lead" />
+        <main className={litePageStyles.page}>
+          <DirectorLiteLeadDetail
+            lead={{
+              id: lead.id,
+              nome: lead.nome,
+              telefone: lead.telefone,
+              email: lead.email,
+              status: lead.status,
+              tipo: lead.tipo,
+              origem: lead.origem,
+              sourceCampaign: lead.sourceCampaign,
+              sourceAd: lead.sourceAd,
+              sourceForm: lead.sourceForm,
+              sourceChannel: lead.sourceChannel,
+              sourceMetadata: lead.sourceMetadata,
+              capturedAt: lead.capturedAt,
+              createdAt: lead.createdAt,
+              metaCampaignId: lead.metaCampaignId,
+              metaAdId: lead.metaAdId,
+              metaFormId: lead.metaFormId,
+              branchNome: lead.branchNome,
+              corretorNome: lead.corretorNome,
+              motivoPerda: lead.motivoPerda,
+              lossCategory: lead.lossCategory,
+            }}
+            meta={{
+              campaignName: metaCampaignName,
+              adName: metaAdName,
+              formName: metaFormName,
+              entry: metaLeadDetails.entry ?? null,
+              adsLabel: metaLeadDetails.adsLabel ?? null,
+              tipoCnpj: metaLeadDetails.tipoCnpj ?? null,
+              tipoPlano: metaLeadDetails.tipoPlano ?? null,
+              tipoPlanoStatus: metaLeadDetails.tipoPlanoStatus ?? null,
+              operadora: metaLeadDetails.operadora ?? null,
+              productLabel: getLeadProductLabel({ tipo: lead.tipo, sourceChannel: lead.sourceChannel, sourceMetadata: lead.sourceMetadata }),
+            }}
+            qualification={qualificationDetails}
+            formData={formData}
+            canSeePersonalData={canSeePersonalData}
+            shouldMask={shouldMask}
+            maskedPhone={maskedPhone}
+            maskedEmail={maskedEmail}
+            stageRank={stageRank}
+            defaultTab={defaultLeadTab}
+            documentsCount={leadDocs.length}
+            openTasksCount={tasks.filter((t) => !t.completedAt).length}
+            canAccessConversas={hasPermission(context.role, "acessar_conversas")}
+            sla={{
+              urgent: slaUrgent,
+              label: lead.status === "distributed" ? `SLA: ${remainingMinutes > 0 ? `expira em ${remainingMinutes}min` : "expirado"}` : "SLA em acompanhamento",
+            }}
+            slots={{
+              actions: (
+                <>
+                  {lead.status !== "distributed" && lead.qualificationState !== "QUALIFIED" && (!lead.qualificationStatus || ["pending", "qualifying"].includes(lead.qualificationStatus)) ? (
+                    <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="outline" size="xs" />
+                  ) : null}
+                  <DeleteLeadControl leadId={lead.id} leadName={lead.nome} />
+                  {canDirectorMarkLeadInService({ role: context.role, corretorId: lead.corretorId, status: lead.status }) ? (
+                    <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} />
+                  ) : null}
+                  {(lead.corretorId ? (context.userId === lead.corretorId && lead.status !== "distributed") : true) ? (
+                    <LeadStatusSelector
+                      leadId={lead.id}
+                      currentStatus={lead.status}
+                      role={context.role}
+                      isOwner={context.userId === lead.corretorId}
+                      isSameBranch={context.branchId === lead.branchId}
+                      qualificationDetails={lead.qualificationDetails}
+                      documents={leadDocs.map((document) => ({ id: document.id, filename: document.filename, status: document.status }))}
+                      carriers={carriers}
+                    />
+                  ) : null}
+                </>
+              ),
+              nextBestAction: <NextBestActionCard action={leadNextBestAction} />,
+              supervision: (
+                <SupervisionPanel
+                  leadId={lead.id}
+                  currentStatus={lead.status}
+                  currentOwner={lead.corretorNome}
+                  currentOwnerId={lead.corretorId}
+                  assignedAt={lead.assignedAt}
+                  stageEnteredAt={lead.stageEnteredAt}
+                  serviceStartedAt={lead.serviceStartedAt}
+                  brokers={brokers}
+                  slaFirstContactMinutes={slaMinutes}
+                  tasks={tasks}
+                  isLost={lead.status === "lost"}
+                  currentUserId={context.userId}
+                />
+              ),
+              insight: (
+                <AiConversationInsightCard
+                  leadId={lead.id}
+                  assessment={(qualificationDetails as any).aiIntelligence}
+                  policyResult={(qualificationDetails as any).aiPolicyResult}
+                  lastAnalyzedAt={(qualificationDetails as any).aiLastAnalyzedAt}
+                  autoMove={(qualificationDetails as any).aiLastAutoMove}
+                  leadStatus={lead.status}
+                  canManage
+                />
+              ),
+              startQualification: <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="default" size="sm" />,
+              person: <PersonRecordDetails kind="lead" hideRegistrationDate={false} createdAt={lead.createdAt} consentimentoLgpd={lead.consentimentoLgpd} dependents={beneficiaries} documentCount={leadDocs.length} formData={formData} />,
+              beneficiaries: <BeneficiariesSection leadId={lead.id} contactName={lead.nome} initialBeneficiaries={beneficiaries} />,
+              chat: hasPermission(context.role, "acessar_conversas") ? <LeadChat leadId={lead.id} phone={canSeePersonalData ? lead.telefone : null} /> : null,
+              documents: <LeadDocumentsSection leadId={lead.id} requirements={requirements} documents={leadDocs} checklist={checklist} beneficiaries={beneficiaries.map((beneficiary) => ({ id: beneficiary.id, name: beneficiary.name, isHolder: beneficiary.isHolder }))} />,
+              timeline: <LeadTimeline leadId={lead.id} interactions={interactions} />,
+              tasks: <LeadTasks assignees={brokers} leadId={lead.id} tasks={tasks.map((task) => ({ ...task, dueAt: task.dueAt?.toISOString() ?? null, completedAt: task.completedAt?.toISOString() ?? null }))} />,
+            }}
+          />
+        </main>
+      </>
+    );
   }
 
   return (
