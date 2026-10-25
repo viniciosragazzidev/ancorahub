@@ -14,6 +14,7 @@ import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import form from "@/components/lite/page/lite-form.module.css";
 import page from "@/components/lite/page/lite-page.module.css";
+import { formatLiteDate } from "@/components/lite/format/date";
 import sections from "@/components/lite/page/lite-sections.module.css";
 import { toast } from "@/components/ui/sonner";
 import { testPhraseAction } from "@/features/attendance-situations/actions";
@@ -25,7 +26,7 @@ import { AUTO_ACTIVATE_MIN_OCCURRENCES } from "@/features/situation-learning/lea
 import type { SuggestionRow } from "@/features/situation-learning/service";
 
 import { SituationDrawer, type SituationTarget } from "./situation-drawer";
-import { formatAskedAt, SuggestionDrawer } from "./suggestion-drawer";
+import { SuggestionDrawer } from "./suggestion-drawer";
 import type { LearningOverview } from "./situations-workspace";
 
 type KindFilter = "all" | SituationRow["kind"] | "suggestions";
@@ -124,7 +125,7 @@ export function SituationsWorkspaceLite({ situations, learning, autoActivatedKey
     { id: "title", label: "Dúvida dos clientes", primary: true, render: (row) => <span><span className={page.cellTitle}>{row.kind === "merge" ? `Parece "${row.targetTitle ?? row.title}"` : row.title}</span><span className={page.cellSub}>{row.examples.slice(0, 2).join(" · ")}</span></span> },
     { id: "kind", label: "Sugestão", render: (row) => <span className={page.badge} data-tone={row.kind === "merge" ? undefined : "info"}>{row.kind === "merge" ? "Ensinar frases" : "Situação nova"}</span> },
     { id: "occurrences", label: "Vezes", numeric: true, render: (row) => row.occurrences },
-    { id: "last", label: "Última vez", nowrap: true, render: (row) => formatAskedAt(row.lastAskedAt) },
+    { id: "last", label: "Última vez", nowrap: true, render: (row) => formatLiteDate(row.lastAskedAt, { dateStyle: "short", timeStyle: "short" }, "Sem registro") },
     { id: "source", label: "Resposta", render: (row) => (row.kind === "merge" ? "A da situação" : row.fromBroker ? "Do corretor + IA" : "Sugerida pela IA") },
   ];
 
