@@ -16,8 +16,6 @@
   "/desempenho",
   "/distribuicao",
   "/distribuicao/dashboard",
-  "/equipe/[id]",
-  "/equipe/cargos",
   "/equipe/dashboard",
   "/equipe/desempenho",
   "/equipe/minha",

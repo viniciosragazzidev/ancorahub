@@ -10,6 +10,9 @@ import { UnitProfileLite, type UnitProfileLiteData } from "@/features/branches/c
 import { TeamHeaderActionsLite, TeamLite, TeamTabsLite } from "@/app/(dashboard)/equipe/_components/team-lite";
 import type { TeamMemberLite } from "@/app/(dashboard)/equipe/_components/member-sheets-lite";
 import { UnitsLite, type UnitLite } from "@/features/branches/components/units-lite";
+import { MemberProfileLite } from "@/app/(dashboard)/equipe/[id]/_components/member-profile-lite";
+import { MEMBER_PROFILE_FIXTURE, PROFILE_NOW } from "@/app/(dashboard)/equipe/[id]/_components/member-profile-fixtures";
+import { CargosLite, type CargoCapability, type CargoRole } from "@/app/(dashboard)/equipe/cargos/_components/cargos-lite";
 import { TeamInviteLite } from "@/app/(dashboard)/equipe/_components/team-invite-lite";
 import { RecoveryLite, type RecoveryLiteRequest } from "@/app/(dashboard)/equipe/recuperacoes/_components/recovery-lite";
 
@@ -186,6 +189,54 @@ export function UnidadesShellScreen() {
           <TeamTabsLite active="unidades" />
           <UnitsLite branches={UNITS_FIXTURE} canManage />
         </div>
+      </main>
+    </>
+  );
+}
+
+export function MembroShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Equipe" title="Perfil do membro" />
+      <main className={litePage.stack}>
+        <MemberProfileLite
+          profile={MEMBER_PROFILE_FIXTURE}
+          leadsLimit={200}
+          notes={[{ id: "n1", kind: "elogio", body: "Ótimo ritmo na semana: respondeu todas as ofertas do plantão em menos de 2 min.", createdAt: "2026-10-23T15:00:00.000Z", followUpAt: "2026-10-30T15:00:00.000Z" }] as unknown as Parameters<typeof MemberProfileLite>[0]["notes"]}
+          showFeedbacks
+          ranking={{ stats: { offered: 120, accepted: 104, medianAcceptSeconds: 74 } as never, ranks: [{ key: "speed", position: 2, total: 18 }, { key: "rate", position: 4, total: 18 }] as never, periodDays: 7, withoutStep: 2 }}
+          scopeNote={false}
+          now={PROFILE_NOW}
+        />
+      </main>
+    </>
+  );
+}
+
+const CARGO_CATALOG: CargoCapability[] = [
+  { key: "leads.ver", label: "Ver leads", description: "Lista e ficha dos leads dentro da abrangência.", category: "LEADS", delegable: true, scopes: ["tenant", "branch", "own"] },
+  { key: "leads.editar", label: "Editar leads", description: "Alterar dados, etapa e responsável.", category: "LEADS", delegable: true, scopes: ["tenant", "branch"] },
+  { key: "relatorios.ver", label: "Ver relatórios", description: "Painéis de desempenho e funil.", category: "RELATÓRIOS", delegable: true, scopes: ["tenant", "branch"] },
+  { key: "relatorios.exportar", label: "Exportar relatórios", description: "Baixar planilhas com dados de clientes.", category: "RELATÓRIOS", delegable: true, scopes: ["tenant"] },
+  { key: "campanhas.gerir", label: "Gerir campanhas", description: "Criar e pausar campanhas de marketing.", category: "MARKETING", delegable: true, scopes: ["tenant", "none"] },
+];
+const CARGO_ROUTES = [
+  { key: "vendas", label: "Vendas", description: "Fechamentos e comissões.", category: "Comercial", path: "/vendas" },
+  { key: "campanhas", label: "Campanhas", description: "Campanhas e origens de lead.", category: "Marketing", path: "/campanhas" },
+] as never;
+const CARGO_ROLES: CargoRole[] = [
+  { id: "c1", name: "Marketing digital", description: "Campanhas, origens e qualidade dos leads de anúncio.", color: "primary", icon: "shield", scope: "tenant", status: "active", version: 4, updatedAt: "2026-10-20T15:00:00.000Z", memberCount: 3, permissions: ["leads.ver", "campanhas.gerir", "route:campanhas"] },
+  { id: "c2", name: "Financeiro e comissões", description: "Confere vendas e repasse de comissão das unidades.", color: "primary", icon: "shield", scope: "branch", status: "active", version: 2, updatedAt: "2026-10-18T15:00:00.000Z", memberCount: 1, permissions: ["relatorios.ver"] },
+  { id: "c3", name: "Operador de suporte", description: null, color: "primary", icon: "shield", scope: "own", status: "draft", version: 1, updatedAt: "2026-10-23T15:00:00.000Z", memberCount: 0, permissions: [] },
+  { id: "c4", name: "Auditoria externa", description: "Acesso temporário de leitura para a auditoria anual.", color: "primary", icon: "shield", scope: "none", status: "archived", version: 5, updatedAt: "2026-09-02T15:00:00.000Z", memberCount: 0, permissions: [] },
+];
+
+export function CargosShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Equipe / Cargos e permissões" title="Cargos e permissões" />
+      <main className={litePage.stack}>
+        <CargosLite enabled catalog={CARGO_CATALOG} routeCatalog={CARGO_ROUTES} roles={CARGO_ROLES} />
       </main>
     </>
   );
