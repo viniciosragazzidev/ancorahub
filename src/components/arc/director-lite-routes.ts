@@ -64,7 +64,6 @@
   "/qualificacao/turbo",
   "/relacionamento",
   "/roadmap",
-  "/settings",
   "/settings/extension",
   "/settings/feedback-templates",
   "/settings/integrations",
