@@ -467,7 +467,6 @@ button.heatCell:hover { transform: scale(1.12); }
   .periodGroup > .pills { flex: 1 1 auto; }
   .tabsRow .pills { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
   .tabsRow .pill { padding: 6px 8px; white-space: normal; line-height: 1.2; font-size: var(--text-xs); }
-  .pageContainer { padding: 24px 16px 96px; }
   .cardHeader { gap: 8px; padding: 16px 16px 12px; }
   .cardBody { padding: 0 16px 16px; }
   .cardEmpty { padding: 0 16px 16px; }
@@ -525,16 +524,12 @@ button.heatCell:hover { transform: scale(1.12); }
   gap: 24px;
 }
 
+/* Largura, gutter e respiros vêm do container único da moldura (director-chrome.css); aqui só o fluxo. */
 .pageContainer {
-  box-sizing: border-box;
   display: flex;
-  width: 100%;
-  max-width: 1328px;
   min-width: 0;
   flex: 1 1 auto;
   flex-direction: column;
-  margin-inline: auto;
-  padding: 24px clamp(16px, 4vw, 32px) 96px;
 }
 
 .chipRow {

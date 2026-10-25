@@ -1,18 +1,15 @@
 /*
- * Container da página /leads com a chave do diretor (contrato de espaçamento, 25/10): o mesmo da moldura do diretor,
- * 1328px no máximo, 24px no topo, gutter de 16 a 32px e 96px no fim para a barra de lote. Os blocos Lite dentro dele
- * não somam gutter próprio. Quando a moldura passar a dar este container, esta classe some.
+ * Fluxo da página /leads e do perfil com a chave do diretor: 24px entre regiões. Largura, gutter e respiros vêm do
+ * container único da moldura (director-chrome.css); a página não soma padding próprio.
  */
 .page {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 24px;
-  width: 100%;
-  max-width: 1328px;
+  min-width: 0;
   min-height: 0;
-  margin-inline: auto;
-  padding: 24px clamp(16px, 4vw, 32px) 96px;
 }
 
 .page > * {

@@ -915,3 +915,17 @@
     transition-duration: var(--duration-instant);
   }
 }
+
+/*
+ * Container único das páginas do diretor (contrato de espaçamento, 25/10): a moldura dá a largura máxima, o respiro do
+ * topo, o gutter e o respiro do fim para a barra de lote. Vale só para rotas fora do opt-out (frame com
+ * data-skin="diretor"); as páginas não somam padding próprio. O topo da página (64px) usa a mesma largura.
+ */
+[data-slot="app-scroll-frame"][data-skin="diretor"] [data-slot="app-content"] main:not(main main) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1328px;
+  min-width: 0;
+  margin-inline: auto;
+  padding: 24px clamp(16px, 4vw, 32px) 96px;
+}
