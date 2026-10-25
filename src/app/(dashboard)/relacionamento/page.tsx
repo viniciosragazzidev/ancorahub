@@ -41,7 +41,7 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
     const [audienceOptions, broadcasts] = messageData;
     const historyItems = broadcasts.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() }));
     // Diretor com a chave ligada e a rota fora do opt-out: mesmos dados e mesmas Server Actions, visual Lite.
-    if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/relacionamento")) {
+    if (await isDirectorLitePageOnServer(context, "/relacionamento")) {
       return (
         <>
           <DashboardHeader breadcrumb="Relacionamento" title="Central de relacionamento" />

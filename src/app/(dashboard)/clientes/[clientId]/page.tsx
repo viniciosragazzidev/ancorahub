@@ -212,7 +212,7 @@ export default async function ClientDetailPage({ params }: { params: Promise<{ c
 
   // Diretor com a chave ligada e a rota fora do opt-out: mesma ficha, mesmas ações e mesmas peças de documentos e
   // linha do tempo, no visual Lite.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/clientes/[clientId]")) {
+  if (await isDirectorLitePageOnServer(context, "/clientes/[clientId]")) {
     return (
       <>
         <DashboardHeader breadcrumb="Pós-venda" title={client.name} />
