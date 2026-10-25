@@ -1,0 +1,147 @@
+/* Validador de comprovante no visual Lite (Onda 8). Coluna de leitura de até 880px (só max-width), só tokens. */
+
+.column {
+  display: grid;
+  width: 100%;
+  max-width: 880px;
+  gap: 24px;
+}
+
+.headRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headRow > :first-child {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.files,
+.checks {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fileRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-height: 64px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.fileText {
+  display: grid;
+  flex: 1 1 220px;
+  gap: 2px;
+  min-width: 0;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ghostButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.ghostButton:hover {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.ghostButton:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.checkIcon {
+  flex: none;
+  margin-top: 2px;
+}
+
+.checkIcon[data-tone="success"] { color: var(--success); }
+.checkIcon[data-tone="warning"] { color: var(--warning); }
+.checkIcon[data-tone="danger"] { color: var(--danger); }
+.checkIcon[data-tone="muted"] { color: var(--text-muted); }
+
+.readData {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.readData summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--text-secondary);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.readData dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 8px 24px;
+  margin: 8px 0 0;
+}
+
+.readData dl > div {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.readData dt {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.readData dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
