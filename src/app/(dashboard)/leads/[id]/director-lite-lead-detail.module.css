@@ -354,3 +354,16 @@
     padding: 16px;
   }
 }
+
+/*
+ * Peças compartilhadas dentro do perfil Lite (dados do registro, documentos, IA): sem caixa alta nem letras
+ * espaçadas, e rótulos de 10px sobem para o menor token. Vale só dentro deste perfil (só existe com a chave).
+ */
+.root :global(.uppercase) {
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.root :global(.text-\[10px\]) {
+  font-size: var(--text-xs);
+}
