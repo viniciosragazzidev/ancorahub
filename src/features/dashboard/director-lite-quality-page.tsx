@@ -35,12 +35,16 @@ export async function renderDirectorLiteQuality(context: TenantContext, params: 
   const legacyHref = `/dashboard?tab=quality&period=${legacyPeriod}&legado=1`;
   const detailedHref = `/dashboard?tab=quality&period=${legacyPeriod}&vista=detalhada&legado=1`;
   const firstName = await getDirectorLiteViewerFirstName(context.userId);
+  // Próximo passo do dia zerado: a mesma aba nos últimos 7 dias (montado aqui: o helper do topo é de componente cliente).
+  const widerParams = new URLSearchParams({ tab: "quality", periodo: "7" });
+  if (branchId) widerParams.set("unidade", branchId);
+  const widerHref = `/dashboard?${widerParams.toString()}`;
   return (
     <DirectorLiteChrome now={now} tab="quality" period={period} branchId={branchId} branches={canCompare ? units : []} firstName={firstName}>
       {report ? (
         <>
           <QualityToolbar legacyHref={legacyHref} detailedHref={detailedHref} />
-          <QualityView report={report} unitName={unitName} />
+          <QualityView report={report} unitName={unitName} now={now} widerHref={widerHref} />
         </>
       ) : <QualityDisabled />}
     </DirectorLiteChrome>

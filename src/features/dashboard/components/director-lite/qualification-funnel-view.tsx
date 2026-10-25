@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { motion, type Transition } from "motion/react";
 import { Funnel, Info } from "lucide-react";
 
@@ -9,19 +10,19 @@ import type { QualificationFunnel } from "@/features/qualification-turbo/funnel"
 
 import styles from "./director-lite.module.css";
 import { LiteBar, LiteItem, LiteNumber, LiteReveal, useReduce } from "./motion";
-import { minutesLabel, n, pct, plural } from "./format";
+import { minutesLabel, n, noLeadsSince, pct, periodWords, plural } from "./format";
 
 const enterT: Transition = { duration: m.duration.standard, ease: [...m.ease.enter] };
 const fadeT: Transition = { duration: m.duration.instant };
 
 const ratio = (part: number, whole: number) => (whole ? Math.round((part / whole) * 100) : 0);
 
-function Stat({ label, value, kind = "int", detail, index }: { label: string; value: number; kind?: "int" | "pct"; detail: string; index: number }) {
+function Stat({ label, value, kind = "int", detail, index }: { label: string; value: number; kind?: "int" | "pct"; detail?: string; index: number }) {
   return (
     <LiteItem index={index} className={styles.stat}>
       <span className={styles.statLabel}>{label}</span>
       <LiteNumber value={value} kind={kind} className={styles.statValue} />
-      <span className={styles.statDetail}>{detail}</span>
+      {detail ? <span className={styles.statDetail}>{detail}</span> : null}
     </LiteItem>
   );
 }
@@ -67,7 +68,15 @@ function Interval({ rate, low, high }: { rate: number; low: number; high: number
   );
 }
 
-export function QualificationFunnelView({ data, unitName }: { data: QualificationFunnel; unitName: string | null }) {
+/** Linha de detalhe de "Responderam": sem "resposta em sem respostas ainda" quando ninguém respondeu. */
+export function repliedDetail(replied: number, medianMinutes: number | null) {
+  if (!replied) return "Ninguém respondeu ainda";
+  const leads = plural(replied, "lead", "leads");
+  return medianMinutes === null ? leads : `${leads}, resposta em ${minutesLabel(medianMinutes)} (mediana)`;
+}
+
+/** `widerHref` é o próximo passo do dia sem leads (a mesma aba nos últimos 7 dias). */
+export function QualificationFunnelView({ data, unitName, widerHref, now }: { data: QualificationFunnel; unitName: string | null; widerHref?: string; now?: Date | null }) {
   const byKey = new Map(data.stages.map((stage) => [stage.key, stage.count]));
   const arrived = byKey.get("arrived") ?? 0;
   const replied = byKey.get("replied") ?? 0;
@@ -79,26 +88,32 @@ export function QualificationFunnelView({ data, unitName }: { data: Qualificatio
   const maxLoss = Math.max(1, ...data.lossReasons.map((row) => row.count));
   const periodDescription = data.period === "today" ? "hoje" : `nos últimos ${data.period} dias`;
   const periodLabel = data.period === "today" ? "Hoje" : `Últimos ${data.period} dias`;
+  const when = periodWords(data.period);
+  const anyTouch = data.touches.some((touch) => touch.sent > 0);
+
+  if (arrived === 0) {
+    return (
+      <section aria-label="Funil vazio" className={`${styles.card} ${styles.cardEmpty}`} role="status">
+        <EmptyState
+          icon={<Funnel aria-hidden="true" />}
+          title={data.period === "today" ? "Nenhum lead chegou hoje" : "Nenhum lead chegou neste período"}
+          description={data.period === "today" ? `${noLeadsSince(data.since, now)} O funil aparece quando o primeiro lead chegar.` : "Tente ampliar o período ou escolher outra unidade."}
+          action={data.period === "today" && widerHref ? <Link href={widerHref} className={styles.secondaryButton}>Ver os últimos 7 dias</Link> : undefined}
+        />
+      </section>
+    );
+  }
 
   return (
     <div className={styles.stack}>
       <section aria-label="Resumo do período" className={styles.stats4}>
         <Stat index={0} label="Leads que chegaram" value={arrived} detail={`${periodLabel}${unitName ? `, ${unitName}` : ""}`} />
-        <Stat index={1} label="Responderam à primeira mensagem" value={ratio(replied, arrived)} kind="pct" detail={`${plural(replied, "lead", "leads")}, resposta em ${minutesLabel(data.medianMinutesToReply)} (mediana)`} />
-        <Stat index={2} label="Qualificados" value={ratio(qualified, arrived)} kind="pct" detail={`${plural(qualified, "lead pronto", "leads prontos")} para o corretor`} />
-        <Stat index={3} label="Vendas" value={converted} detail={`${pct(converted, arrived)} dos leads que chegaram`} />
+        <Stat index={1} label="Responderam à primeira mensagem" value={ratio(replied, arrived)} kind="pct" detail={repliedDetail(replied, data.medianMinutesToReply)} />
+        <Stat index={2} label="Qualificados" value={ratio(qualified, arrived)} kind="pct" detail={qualified ? `${plural(qualified, "lead pronto", "leads prontos")} para o corretor` : "Nenhum lead pronto ainda"} />
+        <Stat index={3} label="Vendas" value={converted} detail={converted ? `${pct(converted, arrived)} dos leads que chegaram` : `Nenhuma venda ${when}`} />
       </section>
 
-      {arrived === 0 ? (
-        <section aria-label="Funil vazio" className={`${styles.card} ${styles.cardEmpty}`} role="status">
-          <EmptyState
-            icon={<Funnel aria-hidden="true" />}
-            title="Nenhum lead chegou neste período"
-            description="Tente ampliar o período ou escolher outra unidade."
-          />
-        </section>
-      ) : (
-        <>
+      <>
           <div className={styles.split32}>
             <LiteReveal as="section" className={styles.card} label="Do anúncio à venda">
               <header className={styles.cardHeader}>
@@ -175,7 +190,7 @@ export function QualificationFunnelView({ data, unitName }: { data: Qualificatio
                   <p className={styles.cardDescription}>Último toque enviado antes da primeira resposta do lead.</p>
                 </div>
               </header>
-              <ul className={styles.barList} aria-label="Respostas por mensagem enviada">
+              {anyTouch ? <ul className={styles.barList} aria-label="Respostas por mensagem enviada">
                 {data.touches.map((row, index) => (
                   <li key={row.touch} className={styles.barRow}>
                     <span className={styles.barHead}>
@@ -185,7 +200,7 @@ export function QualificationFunnelView({ data, unitName }: { data: Qualificatio
                     <LiteBar value={row.repliesAfter / maxTouch} delay={index * 0.03} />
                   </li>
                 ))}
-              </ul>
+              </ul> : <p className={styles.cardEmptyText}>Nenhuma mensagem enviada {when}.</p>}
             </LiteReveal>
           </div>
 
@@ -233,7 +248,7 @@ export function QualificationFunnelView({ data, unitName }: { data: Qualificatio
                   <span className={styles.stat}><span className={styles.statLabel}>Utilidade</span><LiteNumber value={data.cost.utility} kind="brl" className={styles.miniValue} /></span>
                   <span className={styles.stat}>
                     <span className={styles.statLabel}>Por lead qualificado</span>
-                    {data.cost.perQualified === null ? <span className={styles.miniValue}>Sem qualificados</span> : <LiteNumber value={data.cost.perQualified} kind="brl" className={styles.miniValue} />}
+                    {data.cost.perQualified === null ? <span className={styles.statEmpty}>Sem qualificados {when}</span> : <LiteNumber value={data.cost.perQualified} kind="brl" className={styles.miniValue} />}
                   </span>
                 </div>
               ) : (
@@ -241,8 +256,7 @@ export function QualificationFunnelView({ data, unitName }: { data: Qualificatio
               )}
             </LiteReveal>
           </div>
-        </>
-      )}
+      </>
     </div>
   );
 }

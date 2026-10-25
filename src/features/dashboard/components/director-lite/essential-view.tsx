@@ -6,9 +6,8 @@
  */
 import Link from "next/link";
 import { motion } from "motion/react";
-import { ArrowRight, CalendarCheck, Inbox, MessagesSquare } from "lucide-react";
+import { ArrowRight, CalendarCheck } from "lucide-react";
 
-import { EmptyState } from "@/components/arc/empty-state/empty-state";
 import { motionTokens as m } from "@/components/arc/motion-tokens";
 import type { DashboardDuty } from "@/features/dashboard/welcome";
 import type { EssentialDashboard } from "@/features/dashboard/essential/essential-data";
@@ -84,9 +83,7 @@ function DutiesBlock({ running, next }: { running: EssentialDuty[]; next: Dashbo
         </ul>
       ) : (
         <div className={styles.cardEmpty}>
-          <p className={styles.muted}>
-            {next ? `Próximo: ${next.name}, ${next.dutyDate.slice(8, 10)}/${next.dutyDate.slice(5, 7)} às ${next.startsAt}.` : "Nenhum plantão configurado para as próximas horas."}
-          </p>
+          {next ? <p className={styles.emptyLine}>Próximo: {next.name}, {next.dutyDate.slice(8, 10)}/{next.dutyDate.slice(5, 7)} às {next.startsAt}.</p> : null}
           <Link href="/leads/distribuicao?view=plantao" className={styles.textLink}>
             <CalendarCheck aria-hidden="true" size={16} /> Ver plantões <ArrowRight aria-hidden="true" size={14} />
           </Link>
@@ -131,7 +128,7 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
           <p className={styles.cardDescription}>{totals.arrived ? `${plural(totals.arrived, "lead entrou", "leads entraram")} ${label}.` : `Nenhum lead entrou ${label}.`}</p>
         </div>
         <div className={styles.cardTools}>
-          <span className={styles.badge} data-tone="info">{label}</span>
+          <span className={`${styles.badge} ${styles.hideSm}`} data-tone="info">{label}</span>
           <Help
             label="Como ler os dados de leads por fila"
             lines={[
@@ -196,9 +193,7 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
           </div>
         </div>
       ) : (
-        <div className={styles.cardEmpty}>
-          <EmptyState icon={<Inbox aria-hidden="true" />} title="Nenhum lead nesta janela" description="Quando um lead chegar, ele aparece aqui, por fila." />
-        </div>
+        <p className={styles.cardEmptyText}>Quando um lead entrar, ele aparece aqui, separado por fila.</p>
       )}
     </LiteReveal>
   );
@@ -221,6 +216,15 @@ function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["what
           ]}
         />
       </header>
+      {whatsapp.connected === 0 ? (
+        <div className={styles.cardEmpty}>
+          <p className={styles.emptyLine}>
+            {whatsapp.total
+              ? `Nenhum dos ${n(whatsapp.total)} corretores conectou o WhatsApp pessoal ainda. Quem conectar aparece aqui com os atendimentos.`
+              : "Nenhum corretor ativo para mostrar. Quem conectar o WhatsApp pessoal aparece aqui com os atendimentos."}
+          </p>
+        </div>
+      ) : (
       <div className={styles.cardBody}>
         <p className={styles.headline}>
           <LiteNumber value={whatsapp.connected} className={styles.headlineValue} />
@@ -244,9 +248,10 @@ function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["what
             ))}
           </ul>
         ) : (
-          <EmptyState icon={<MessagesSquare aria-hidden="true" />} title="Nenhum corretor conectou o WhatsApp" description="Quem conectar o WhatsApp pessoal aparece aqui com os atendimentos." />
+          <p className={styles.emptyLine}>Nenhum atendimento ativo agora nos WhatsApp conectados.</p>
         )}
       </div>
+      )}
     </LiteReveal>
   );
 }
