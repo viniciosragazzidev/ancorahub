@@ -32,10 +32,12 @@ export function SettingsLite({ sections }: { sections: SettingsLiteSection[] }) 
   const wantsPasskey = requested === "passkey";
 
   // O ?tab= mudou por fora (link, voltar do navegador): a seção acompanha.
+  // Dependência estável: os ids das seções (a lista de nós muda de identidade a cada render do servidor).
+  const sectionIds = sections.map((section) => section.id).join(",");
   useEffect(() => {
-    const next = resolveTab(requested, sections);
-    if (next) setChosen(next);
-  }, [requested, sections]);
+    const id = requested === "passkey" ? "seguranca" : requested;
+    if (id && sectionIds.split(",").includes(id)) setChosen(id);
+  }, [requested, sectionIds]);
 
   useEffect(() => {
     if (!wantsPasskey) return;
