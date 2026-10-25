@@ -11,6 +11,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { SubscriptionLite } from "./_components/subscription-lite";
 import { getDatabase, schema } from "@/shared/db";
 
 export const dynamic = "force-dynamic";
@@ -120,6 +123,26 @@ export default async function SubscriptionPage() {
       label: tenant.subscriptionPlan,
       features: [],
     };
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/assinatura")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Administração" title="Assinatura" />
+        <main className={litePage.stack}>
+          <SubscriptionLite
+            tenant={{ name: tenant.name, legalName: tenant.legalName, cnpj: tenant.cnpj, status: tenant.status, createdAt: tenant.createdAt }}
+            plan={planInfo}
+            usage={[
+              { label: "Usuários ativos", value: userCount[0]?.count ?? 0, limit: tenant.subscriptionPlan === "Essencial" ? 3 : 99 },
+              { label: "Filiais ativas", value: branchCount[0]?.count ?? 0, limit: 99 },
+              { label: "Leads registrados", value: leadCount[0]?.count ?? 0, limit: null },
+              { label: "Clientes convertidos", value: clientCount[0]?.count ?? 0, limit: null },
+            ]}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
