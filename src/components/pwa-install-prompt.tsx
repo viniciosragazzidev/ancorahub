@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { useReducedMotion } from "motion/react";
 import { toast } from "@/components/ui/sonner";
 import { FileArrowDown, ArrowSquareOut, X } from "@/components/huge-icons";
 import { Button } from "@/components/ui/button";
@@ -66,13 +67,15 @@ function useIsStandalone(): boolean {
   return isStandalone;
 }
 
-export function PwaInstallPrompt() {
+export function PwaInstallPrompt({ directorLiteEnabled = false }: { directorLiteEnabled?: boolean }) {
   const deferredPrompt = useRef<InstallPromptEvent | null>(null);
   const [canInstall, setCanInstall] = useState(false);
+  const [nativeInstallAvailable, setNativeInstallAvailable] = useState(false);
   const [showCard, setShowCard] = useState(false);
   const isIOS = useIsIOS();
   const isMobileBrowser = useIsMobileBrowser();
   const isStandalone = useIsStandalone();
+  const reduceMotion = useReducedMotion();
 
   const closeCard = useCallback(() => {
     setShowCard(false);
@@ -82,6 +85,7 @@ export function PwaInstallPrompt() {
     const promptEvent = deferredPrompt.current;
     if (!promptEvent) return;
     deferredPrompt.current = null;
+    setNativeInstallAvailable(false);
     setShowCard(false);
     await promptEvent.prompt();
     const choice = await promptEvent.userChoice;
@@ -101,6 +105,7 @@ export function PwaInstallPrompt() {
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       deferredPrompt.current = event as InstallPromptEvent;
+      setNativeInstallAvailable(true);
       setCanInstall(true);
     };
 
@@ -108,20 +113,27 @@ export function PwaInstallPrompt() {
     return () => window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
   }, [isMobileBrowser]);
 
+  useEffect(() => {
+    if (!directorLiteEnabled) return;
+    const openFromMore = () => setShowCard(true);
+    window.addEventListener("director-pwa-install", openFromMore);
+    return () => window.removeEventListener("director-pwa-install", openFromMore);
+  }, [directorLiteEnabled]);
+
   // Se já está instalado, não mostra nada
-  if (isStandalone) return null;
+  if (isStandalone || (!canInstall && !(directorLiteEnabled && showCard)) || (directorLiteEnabled && !showCard)) return null;
 
   return (
     <AnimatePresence>
-      {canInstall && (
-        <div className="fixed bottom-6 right-6 z-50 max-[559px]:bottom-[calc(7rem+env(safe-area-inset-bottom))] max-[559px]:right-3">
+      {(directorLiteEnabled ? showCard : canInstall) && (
+        <div className={directorLiteEnabled ? "arc-venancor director-pwa-prompt fixed bottom-6 right-6 z-50 max-[559px]:bottom-6 max-[559px]:right-3" : "fixed bottom-6 right-6 z-50 max-[559px]:bottom-[calc(7rem+env(safe-area-inset-bottom))] max-[559px]:right-3"} data-skin={directorLiteEnabled ? "diretor" : undefined}>
           <AnimatePresence mode="wait">
             {showCard && (
               <motion.div
-                initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                initial={directorLiteEnabled && reduceMotion ? false : { opacity: 0, y: 8, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                transition={{ duration: 0.15, ease: "easeOut" }}
+                exit={directorLiteEnabled && reduceMotion ? { opacity: 0 } : { opacity: 0, y: 8, scale: 0.95 }}
+                transition={{ duration: directorLiteEnabled && reduceMotion ? 0.01 : 0.15, ease: "easeOut" }}
                 className="absolute bottom-16 right-0 w-72 max-[559px]:bottom-12 max-[559px]:right-0 max-[559px]:w-64"
               >
                 <Card size="sm" className="shadow-lg">
@@ -132,7 +144,7 @@ export function PwaInstallPrompt() {
                         <CardDescription>
                           {isIOS
                             ? "Toque no botão Compartilhar e depois em \"Adicionar à Tela de Início\"."
-                            : deferredPrompt.current
+                            : nativeInstallAvailable
                               ? "Acesse o sistema direto da tela inicial, mesmo offline."
                               : "Abra o menu do navegador e escolha \"Instalar app\" ou \"Adicionar à tela inicial\"."}
                         </CardDescription>
@@ -157,7 +169,7 @@ export function PwaInstallPrompt() {
                     >
                       Agora não
                     </Button>
-                    {isIOS || !deferredPrompt.current ? (
+                    {isIOS || !nativeInstallAvailable ? (
                       <Button
                         size="sm"
                         className="flex-1 gap-1.5"
@@ -186,7 +198,7 @@ export function PwaInstallPrompt() {
             )}
           </AnimatePresence>
 
-          <motion.button
+          {!directorLiteEnabled ? <motion.button
             initial={{ opacity: 0, scale: 0 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0 }}
@@ -196,7 +208,7 @@ export function PwaInstallPrompt() {
             aria-label="Instalar CorreTop"
           >
             <FileArrowDown className="size-5 max-[559px]:size-4" />
-          </motion.button>
+          </motion.button> : null}
         </div>
       )}
     </AnimatePresence>

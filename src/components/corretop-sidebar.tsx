@@ -53,6 +53,10 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { UserAvatar } from "@/components/ui/user-avatar";
+import { Avatar as ArcAvatar } from "@/components/arc/avatar/avatar";
+import { Badge as ArcBadge } from "@/components/arc/badge/badge";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { useDirectorChrome } from "@/components/light/director-chrome-context";
 import { signOut } from "@/shared/auth/client";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
 import { type PermissionKey } from "@/shared/auth/permissions";
@@ -259,16 +263,25 @@ function canShowItem(item: NavItemConfig, user: UserDisplayInfo | null, roleKey:
   return permissions.includes(item.permission);
 }
 
-export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
-  const pathname = usePathname();
+export function CorreTopSidebar({ logoUrl, initialUser, initialPathname }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string }) {
+  const currentPathname = usePathname();
+  const pathname = initialPathname ?? currentPathname;
   const { isMobile, setOpenMobile } = useSidebar();
-  const [user, setUser] = useState<UserDisplayInfo | null>(null);
+  const directorLite = useArcScopeEnabled();
+  const chrome = useDirectorChrome();
+  const [user, setUser] = useState<UserDisplayInfo | null>(initialUser ?? null);
   const [onDuty, setOnDuty] = useState(false);
 
   useEffect(() => {
-    getUserDisplayInfo().then(setUser);
-    isCurrentUserOnDuty().then(setOnDuty);
-  }, []);
+    if (!initialUser) {
+      getUserDisplayInfo().then(setUser);
+      isCurrentUserOnDuty().then(setOnDuty);
+    }
+  }, [initialUser]);
+
+  useEffect(() => {
+    if (user) chrome?.setProfile(user);
+  }, [chrome, user]);
 
   const userName = user?.name ?? "Usuário";
   const userRole = user?.role ?? "";
@@ -301,7 +314,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
       data-slot="navigation-rail"
       variant="floating"
       collapsible="icon"
-      className="sticky top-0 h-app max-h-app overflow-hidden select-none"
+      className={cn("sticky top-0 h-app max-h-app overflow-hidden select-none", directorLite && "director-sidebar")}
     >
       {/* Header: Logo & SuperAdmin Switcher */}
       <SidebarHeader className={cn("gap-3 border-b border-sidebar-border/70 p-3", isMobile && "px-3 pt-[calc(0.75rem+var(--mobile-safe-top))] pb-3")}>
@@ -322,7 +335,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
 
         {user?.isPlatformAdmin && (
           <div className="flex w-full min-w-0 justify-center">
-            <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} compact={isMobile} />
+            <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} compact={isMobile || directorLite} />
             {!isMobile ? <div className="mt-2 w-full px-2 group-data-[collapsible=icon]:hidden"><ViewAsButton state={{ canViewAs: true, viewingAs: null }} variant="sidebar" /></div> : null}
           </div>
         )}
@@ -337,6 +350,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     href="/distribuicao?view=plantao"
                     onClick={() => isMobile && setOpenMobile(false)}
                     className={cn(
+                      directorLite ? "director-duty-link" : "",
                       "relative flex w-full items-center gap-2.5 rounded-[var(--radius-card)] border border-emerald-500/40 bg-emerald-500/15 px-3 py-2 text-emerald-700 transition-colors hover:bg-emerald-500/25 dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-9 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0",
                       isPlantaoActive && "border-emerald-400 bg-emerald-500/30 ring-2 ring-emerald-400/50"
                     )}
@@ -399,7 +413,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     }
                   >
                     <NavPending className="text-primary" />
-                    {isActive ? (
+                    {isActive && !directorLite ? (
                       <motion.span
                         layoutId="corretop-sidebar-active"
                         aria-hidden="true"
@@ -412,7 +426,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       data-slot="sidebar-nav-icon"
                       className={cn(
                         "relative flex size-8 shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-hover/navitem:scale-[1.04] motion-reduce:transition-none",
-                        !isActive && !item.isWhatsApp && `${item.iconTone} bg-sidebar-accent/55`,
+                        directorLite ? "director-nav-icon" : !isActive && !item.isWhatsApp && `${item.iconTone} bg-sidebar-accent/55`,
                         isActive && "bg-primary/8 text-primary",
                         item.isWhatsApp && "bg-emerald-500/12 text-emerald-600 dark:text-emerald-300",
                       )}
@@ -421,7 +435,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                         weight={isActive ? "fill" : "regular"}
                         className={cn(
                           "size-[1.15rem] shrink-0 transition-[color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] motion-reduce:transition-none",
-                          isActive ? "text-sidebar-primary" : item.isWhatsApp ? "text-emerald-600 dark:text-emerald-300" : item.iconTone,
+                          directorLite ? "text-(--text-secondary)" : isActive ? "text-sidebar-primary" : item.isWhatsApp ? "text-emerald-600 dark:text-emerald-300" : item.iconTone,
                         )}
                       />
 
@@ -445,7 +459,8 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                       {item.label}
                     </span>
 
-                    {item.beta ? (
+                    {item.beta && directorLite ? <ArcBadge data-slot="director-nav-beta" tone="info" size="sm">Beta</ArcBadge> : null}
+                    {item.beta && !directorLite ? (
                       <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[9px] font-semibold tracking-[0.08em] text-primary uppercase group-data-[collapsible=icon]:hidden">
                         Beta
                       </span>
@@ -484,7 +499,7 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                     const event = new CustomEvent("open-agent-drawer");
                     window.dispatchEvent(event);
                   }}
-                  className={cn("h-10 w-full justify-start gap-3 rounded-[var(--radius-control)] border border-emerald-500/25 bg-emerald-500/10 px-3 text-emerald-700 shadow-none transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-emerald-500/45 hover:bg-emerald-500/15 active:scale-[0.98] dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none", isMobile && "min-h-(--mobile-touch-target)")}
+                  className={cn("h-10 w-full justify-start gap-3 rounded-[var(--radius-control)] border border-emerald-500/25 bg-emerald-500/10 px-3 text-emerald-700 shadow-none transition-[background-color,border-color,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] hover:border-emerald-500/45 hover:bg-emerald-500/15 active:scale-[0.98] dark:text-emerald-300 group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 motion-reduce:transition-none", isMobile && "min-h-(--mobile-touch-target)", directorLite && "director-agent-link")}
                 />
               }
             >
@@ -509,12 +524,12 @@ export function CorreTopSidebar({ logoUrl }: { logoUrl?: string | null }) {
                 />
               }
             >
-              <UserAvatar
+              {directorLite ? <ArcAvatar name={userName} size="md" className="shrink-0" /> : <UserAvatar
                 seed={userName}
                 name={userName}
                 size="sm"
                 className="size-9 rounded-[var(--radius-control)] ring-1 ring-emerald-500/40"
-              />
+              />}
               <span className="min-w-0 flex-1 text-left transition-[max-width,opacity,transform] duration-[var(--duration-quick)] ease-[var(--ease-smooth-out)] group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:max-w-0 group-data-[collapsible=icon]:-translate-x-2 group-data-[collapsible=icon]:opacity-0 motion-reduce:transition-none">
                 <span className="block truncate text-sm font-medium">{userName}</span>
                 <span className="block truncate text-[11px] text-sidebar-foreground/55">{userRole || "Conta"}</span>

@@ -1,13 +1,16 @@
 "use client"
 
-import Image from "next/image"
 import Link from "next/link"
+import Image from "next/image"
 import { useEffect } from "react"
 import { LayoutDashboard, RotateCcw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { buttonVariants } from "@/components/ui/button-variants"
 import { cn } from "@/lib/utils"
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context"
+import { EmptyState } from "@/components/empty-state"
+import { Button as ArcButton } from "@/components/arc/button/button"
 
 type RouteErrorProps = {
   error: Error & { digest?: string }
@@ -26,6 +29,7 @@ export function RouteError({
   description = "Ocorreu um problema inesperado ao carregar os dados. Tente novamente ou volte para o Dashboard.",
   imageSrc = "/404.png",
 }: RouteErrorProps) {
+  const directorLite = useArcScopeEnabled();
   useEffect(() => {
     console.error("RouteError details:", {
       message: error.message,
@@ -43,6 +47,26 @@ export function RouteError({
     } else {
       window.location.reload();
     }
+  }
+
+  if (directorLite) {
+    return (
+      <main className="arc-venancor director-route-state" data-skin="diretor" aria-label={title}>
+        <EmptyState
+          title={title}
+          description={description}
+          icon={RotateCcw}
+          animated={false}
+          action={(
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <ArcButton variant="secondary" onClick={handleRetry}><RotateCcw className="size-4" />Tentar novamente</ArcButton>
+              <Link className="director-route-link" href="/dashboard"><LayoutDashboard className="size-4" />Início</Link>
+            </div>
+          )}
+        />
+        {(error.message || error.digest) ? <details className="director-error-details"><summary>Detalhes técnicos</summary><p>{error.message || error.digest}</p></details> : null}
+      </main>
+    );
   }
 
   return (

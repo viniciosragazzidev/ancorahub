@@ -7,7 +7,14 @@ import { NotificationPopover } from "@/components/notification-popover";
 import { AnimatedPageTitle } from "@/components/motion/animated-page-title";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ExperienceModeToggle } from "@/components/experience-mode-toggle";
-import { HelpCircle } from "lucide-react";
+import { Avatar } from "@/components/arc/avatar/avatar";
+import { CircleHelp, HelpCircle, Search } from "lucide-react";
+import { LightAppHeader } from "@/components/light/light-app-header";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { useDirectorRoute } from "@/components/light/use-director-route";
+import { DirectorMoreSheet } from "@/components/light/director-more-sheet";
+import { useDirectorChrome } from "@/components/light/director-chrome-context";
+import { useState } from "react";
 
 type DashboardHeaderProps = {
   breadcrumb: string;
@@ -24,6 +31,15 @@ export function DashboardHeader({
   showModeToggle = false,
   showSidebarTrigger = true,
 }: DashboardHeaderProps) {
+  if (useArcScopeEnabled()) {
+    return <DirectorDashboardHeader
+      breadcrumb={breadcrumb}
+      title={title}
+      rightSlot={rightSlot}
+      showSidebarTrigger={showSidebarTrigger}
+    />;
+  }
+
   return (
     <header
       data-slot="dashboard-header"
@@ -61,5 +77,48 @@ export function DashboardHeader({
         <NotificationPopover />
       </div>
     </header>
+  );
+}
+
+function DirectorDashboardHeader({
+  breadcrumb,
+  title,
+  rightSlot,
+  showSidebarTrigger,
+}: Pick<DashboardHeaderProps, "breadcrumb" | "title" | "rightSlot" | "showSidebarTrigger">) {
+  const route = useDirectorRoute();
+  const chrome = useDirectorChrome();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const root = route.parentHref === null;
+
+  return (
+    <div data-slot="dashboard-header" className="arc-venancor director-dashboard-header" data-skin="diretor">
+      <LightAppHeader
+        availability="available"
+        availabilityPending={false}
+        onToggleAvailability={() => undefined}
+        onOpenMore={() => setMoreOpen(true)}
+        hideAvailability
+        routeOverride={{ title, isRoot: root, parentHref: route.parentHref, backToParent: true }}
+        leading={root && showSidebarTrigger ? <SidebarTrigger aria-label="Abrir menu principal" className="size-11" /> : null}
+        actions={(
+          <>
+            {rightSlot ? <div data-slot="page-actions" aria-label="Ações da página" className="director-page-actions">{rightSlot}</div> : null}
+            <button type="button" aria-label="Buscar páginas, leads e clientes" title="Buscar (Ctrl+K)" className="director-header-action director-search-trigger" onClick={() => window.dispatchEvent(new Event("open-command-palette"))}>
+              <Search aria-hidden="true" className="size-4" />
+            </button>
+            <NotificationPopover />
+            <button type="button" aria-label="Reportar problema" title="Reportar problema" className="director-header-action director-feedback-trigger" onClick={() => window.dispatchEvent(new Event("open-system-feedback"))}>
+              <CircleHelp aria-hidden="true" className="size-4" />
+            </button>
+            <button type="button" aria-label="Abrir perfil e mais opções" className="director-header-action director-profile-trigger" onClick={() => setMoreOpen(true)}>
+              <Avatar name={chrome?.shellUser?.name || breadcrumb || title || "Diretor"} size="sm" aria-hidden="true" />
+            </button>
+          </>
+        )}
+        className="director-light-app-header"
+      />
+      <DirectorMoreSheet open={moreOpen} onOpenChange={setMoreOpen} />
+    </div>
   );
 }

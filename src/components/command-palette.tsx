@@ -9,12 +9,19 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { FEATURE_SEARCH_INDEX, type FeatureIndexItem } from "@/shared/feature-search-index";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+
+type SearchItem = { id: string; title: string; subtitle: string | null; href: string };
+type SearchGroup = { type: string; label: string; items: SearchItem[] };
 
 export function CommandPalette() {
   const router = useRouter();
+  const directorLite = useArcScopeEnabled();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [user, setUser] = useState<UserDisplayInfo | null>(null);
+  const [searchGroups, setSearchGroups] = useState<SearchGroup[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
 
   useEffect(() => {
     getUserDisplayInfo().then(setUser);
@@ -36,6 +43,30 @@ export function CommandPalette() {
       window.removeEventListener("open-command-palette", handleCustomOpen);
     };
   }, []);
+
+  useEffect(() => {
+    if (!directorLite || !open || query.trim().length < 2) {
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const response = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
+        if (!response.ok) throw new Error("Falha na busca");
+        const result = await response.json() as { groups?: SearchGroup[] };
+        setSearchGroups(result.groups ?? []);
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError")) setSearchGroups([]);
+      } finally {
+        if (!controller.signal.aborted) setSearchLoading(false);
+      }
+    }, 180);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [directorLite, open, query]);
 
   const userPermissions = user?.permissions ?? [];
 
@@ -63,20 +94,37 @@ export function CommandPalette() {
   const handleSelect = (url: string) => {
     setOpen(false);
     setQuery("");
+    setSearchGroups([]);
+    setSearchLoading(false);
     router.push(url);
   };
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setQuery("");
+      setSearchGroups([]);
+      setSearchLoading(false);
+    }
+  };
+
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    setSearchGroups([]);
+    if (value.trim().length < 2) setSearchLoading(false);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogPopup className="max-w-2xl gap-0 p-0 overflow-hidden rounded-xl border-border/80 shadow-2xl">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogPopup className={`max-w-2xl gap-0 p-0 overflow-hidden rounded-xl border-border/80 shadow-2xl${directorLite ? " director-command-palette" : ""}`}>
         <DialogHeader className="p-4 border-b border-border/60">
           <DialogTitle className="sr-only">Busca Global e Atalhos do AncoraHub</DialogTitle>
           <div className="flex items-center gap-3 px-1">
             <Search className="size-4 shrink-0 text-muted-foreground" />
             <Input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Digite para buscar páginas, funções ou comandos (ex: 'resetar memória', 'comissões', 'leads')..."
+              onChange={(e) => handleQueryChange(e.target.value)}
+              placeholder={directorLite ? "Buscar páginas, leads e clientes..." : "Digite para buscar páginas, funções ou comandos (ex: 'resetar memória', 'comissões', 'leads')..."}
               className="border-0 bg-transparent text-sm focus-visible:ring-0 focus-visible:ring-offset-0 px-0 h-9"
               autoFocus
             />
@@ -86,8 +134,24 @@ export function CommandPalette() {
           </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[380px] p-2">
-          {Object.keys(groupedByDomain).length === 0 ? (
+        <ScrollArea className="max-h-[min(70vh,520px)] p-2">
+          {directorLite && query.trim().length >= 2 ? (
+            <section aria-label="Resultados da busca global" className="space-y-1 p-1">
+              {searchLoading ? <p role="status" className="px-3 py-4 text-sm text-muted-foreground">Buscando no CRM…</p> : null}
+              {!searchLoading && searchGroups.length === 0 ? <p className="px-3 py-4 text-sm text-muted-foreground">Nenhum resultado encontrado.</p> : null}
+              {searchGroups.map((group) => (
+                <div key={group.type} className="space-y-1">
+                  <p className="px-3 py-1 text-xs font-medium text-muted-foreground">{group.label}</p>
+                  {group.items.map((item) => (
+                    <button key={`${group.type}-${item.id}`} type="button" onClick={() => handleSelect(item.href)} className="director-command-result">
+                      <span className="min-w-0 flex-1"><span className="block truncate">{item.title}</span><span className="block truncate text-xs text-muted-foreground">{item.subtitle || ""}</span></span>
+                      <ArrowRight className="size-4 shrink-0" aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              ))}
+            </section>
+          ) : Object.keys(groupedByDomain).length === 0 ? (
             <div className="p-8 text-center space-y-2">
               <Sparkles className="size-8 text-muted-foreground/50 mx-auto" />
               <p className="text-sm font-semibold text-foreground">Nenhuma funcionalidade encontrada</p>

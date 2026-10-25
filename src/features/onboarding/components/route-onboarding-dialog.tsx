@@ -26,6 +26,7 @@ import { Dialog, DialogClose, DialogDescription, DialogPopup, DialogTitle } from
 import { cn } from "@/lib/utils";
 import type { RouteOnboardingDefinition, RouteOnboardingIcon } from "../route-onboarding";
 import { completeRouteOnboardingAction } from "../actions/route-onboarding-actions";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 const iconMap: Record<RouteOnboardingIcon, typeof House> = {
   dashboard: SquaresFour,
@@ -50,6 +51,7 @@ const iconMap: Record<RouteOnboardingIcon, typeof House> = {
 type RouteOnboardingDialogProps = { definition: RouteOnboardingDefinition; initialOpen: boolean };
 
 export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardingDialogProps) {
+  const directorLite = useArcScopeEnabled();
   const [open, setOpen] = useState(initialOpen);
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(1);
@@ -112,10 +114,10 @@ export function RouteOnboardingDialog({ definition, initialOpen }: RouteOnboardi
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogPopup
-        className="border-0 bg-transparent p-0 shadow-none max-w-[380px] w-full select-none focus:outline-none focus-visible:outline-none focus-visible:ring-0"
+        className={cn("border-0 bg-transparent p-0 shadow-none max-w-[380px] w-full select-none focus:outline-none focus-visible:outline-none focus-visible:ring-0", directorLite && "director-route-onboarding-popup")}
         overlayClassName="bg-foreground/45 backdrop-blur-sm"
       >
-        <div className="relative flex min-h-[280px] max-h-[calc(100dvh-2rem)] w-full flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-6 shadow-lg focus:outline-none focus-visible:outline-none sm:p-7">
+        <div className={cn("relative flex min-h-[280px] max-h-[calc(100dvh-2rem)] w-full flex-col justify-between overflow-hidden rounded-xl border border-border bg-card p-6 shadow-lg focus:outline-none focus-visible:outline-none sm:p-7", directorLite && "director-route-onboarding-card")}>
 
           {/* Close button */}
           <DialogClose render={

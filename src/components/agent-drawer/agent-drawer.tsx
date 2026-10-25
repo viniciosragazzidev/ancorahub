@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { AgentShortcutChips } from "./agent-shortcut-chips";
 import { useAgentDrawer } from "./agent-drawer-provider";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export function AgentDrawer() {
+  const directorLite = useArcScopeEnabled();
   const { isOpen, setIsOpen, user, shortcuts, activePrompt, setActivePrompt } = useAgentDrawer();
   const [isExpanded, setIsExpanded] = useState(false);
   const [input, setInput] = useState("");
@@ -74,20 +76,20 @@ export function AgentDrawer() {
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetContent
         side="right"
-        className={`p-0 flex flex-col transition-all duration-300 border-l border-border/80 bg-background shadow-2xl ${
+        className={`${directorLite ? "director-agent-drawer" : "p-0 flex flex-col transition-all duration-300 border-l border-border/80 bg-background shadow-2xl"} ${
           isExpanded ? "w-full sm:max-w-4xl" : "w-full sm:max-w-lg"
         }`}
       >
         {/* Header with dotted canvas background */}
         <div className="relative border-b border-border/80 bg-muted/20 overflow-hidden shrink-0">
-          {/* Dotted Canvas Background */}
-          <div
+          {/* Dotted canvas is retained in the regular experience only. */}
+          {!directorLite ? <div
             className="absolute inset-0 opacity-40 pointer-events-none"
             style={{
               backgroundImage: "radial-gradient(var(--border) 1px, transparent 1px)",
               backgroundSize: "10px 10px",
             }}
-          />
+          /> : null}
 
           <SheetHeader className="relative p-4 flex flex-row items-center justify-between space-y-0">
             {/* Left Header Controls: New Chat Selector */}
@@ -99,7 +101,7 @@ export function AgentDrawer() {
                     size="sm"
                     className="h-8 gap-1.5 text-xs font-semibold rounded-lg bg-card/80 border border-border/70 hover:bg-accent cursor-pointer"
                   >
-                    <span>New Chat</span>
+                    <span>{directorLite ? "Nova conversa" : "New Chat"}</span>
                     <ChevronDown className="size-3 text-muted-foreground" />
                   </Button>
                 }
@@ -138,13 +140,13 @@ export function AgentDrawer() {
           {/* Agent Banner Title */}
           <div className="relative px-6 pb-6 pt-2 space-y-1">
             <div className="flex items-center gap-2">
-              <span className="text-xl font-bold text-foreground tracking-tight">Agent</span>
-              <Badge variant="outline" className="text-[10px] font-semibold tracking-wide uppercase px-1.5 py-0.2 bg-card">
+              <span className="text-xl font-bold text-foreground tracking-tight">{directorLite ? "Agente IA" : "Agent"}</span>
+              <Badge variant="outline" className={directorLite ? "text-xs font-medium bg-card" : "text-[10px] font-semibold tracking-wide uppercase px-1.5 py-0.2 bg-card"}>
                 Beta
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Consulte e gerencie a sua operação na plataforma CorreTop. Como posso ajudar agora?
+              {directorLite ? "Consulte a operação e encontre o próximo passo." : "Consulte e gerencie a sua operação na plataforma CorreTop. Como posso ajudar agora?"}
             </p>
           </div>
         </div>
@@ -155,7 +157,7 @@ export function AgentDrawer() {
             <div className="space-y-6">
               <div className="space-y-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
-                  Atalhos Rápidos ({user?.role?.toUpperCase() ?? "OPERACIONAL"})
+                  {directorLite ? "Atalhos rápidos" : `Atalhos Rápidos (${user?.role?.toUpperCase() ?? "OPERACIONAL"})`}
                 </span>
                 <AgentShortcutChips shortcuts={shortcuts} onSelectShortcut={handleShortcutClick} />
               </div>
@@ -165,9 +167,7 @@ export function AgentDrawer() {
               {messages.map((m: any) => (
                 <div
                   key={m.id}
-                  className={`flex gap-3 text-xs leading-relaxed ${
-                    m.role === "user" ? "justify-end" : "justify-start"
-                  }`}
+                  className={directorLite ? `director-agent-message ${m.role === "user" ? "is-user" : "is-assistant"}` : `flex gap-3 text-xs leading-relaxed ${m.role === "user" ? "justify-end" : "justify-start"}`}
                 >
                   {m.role !== "user" && (
                     <div className="size-7 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0 border border-primary/20 mt-0.5">
@@ -176,11 +176,7 @@ export function AgentDrawer() {
                   )}
 
                   <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-3 space-y-2 ${
-                      m.role === "user"
-                        ? "bg-primary text-primary-foreground font-medium rounded-tr-xs"
-                        : "bg-card border border-border/80 text-foreground shadow-2xs rounded-tl-xs"
-                    }`}
+                    className={directorLite ? `director-agent-bubble ${m.role === "user" ? "is-user" : "is-assistant"}` : `max-w-[85%] rounded-2xl px-4 py-3 space-y-2 ${m.role === "user" ? "bg-primary text-primary-foreground font-medium rounded-tr-xs" : "bg-card border border-border/80 text-foreground shadow-2xs rounded-tl-xs"}`}
                   >
                     {/* Tool Calls Execution Feed */}
                     {m.parts &&
@@ -214,9 +210,9 @@ export function AgentDrawer() {
               {isLoading && (
                 <div className="flex gap-3 items-center text-xs text-muted-foreground pl-1">
                   <div className="size-7 rounded-xl bg-primary/10 text-primary flex items-center justify-center border border-primary/20">
-                    <Sparkles className="size-4 animate-pulse" />
+                    <Sparkles className={directorLite ? "size-4" : "size-4 animate-pulse"} />
                   </div>
-                  <span className="animate-pulse font-medium">Agente consultando operação...</span>
+                  <span className={directorLite ? "font-medium" : "animate-pulse font-medium"}>{directorLite ? "Consultando a operação..." : "Agente consultando operação..."}</span>
                 </div>
               )}
             </div>
@@ -235,7 +231,7 @@ export function AgentDrawer() {
                   handleSubmit();
                 }
               }}
-              placeholder="Ask anything..."
+              placeholder={directorLite ? "Escreva sua pergunta..." : "Ask anything..."}
               rows={2}
               className="min-h-12 w-full resize-none border-0 bg-transparent p-0 text-xs shadow-none focus-visible:ring-0"
             />
@@ -263,7 +259,7 @@ export function AgentDrawer() {
           </form>
 
           <p className="text-[10px] text-center text-muted-foreground/70">
-            Agent pode cometer erros. Verifique informações críticas da operação.
+            {directorLite ? "Confirme informações importantes antes de agir." : "Agent pode cometer erros. Verifique informações críticas da operação."}
           </p>
         </div>
       </SheetContent>

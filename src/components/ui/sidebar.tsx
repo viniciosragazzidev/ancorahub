@@ -28,13 +28,14 @@ import {
 } from "@/components/ui/tooltip"
 import { PanelLeftIcon } from "@/components/huge-icons"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context"
+import { handleDirectorSidebarShortcut } from "./director-sidebar-shortcut"
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "15rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3.5rem"
-const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
   activeIndicatorId: string
@@ -72,6 +73,7 @@ function SidebarProvider({
   onOpenChange?: (open: boolean) => void
 }) {
   const isMobile = useIsMobile()
+  const directorLiteEnabled = useArcScopeEnabled()
   const activeIndicatorId = React.useId()
   const [openMobile, setOpenMobile] = React.useState(false)
 
@@ -98,6 +100,15 @@ function SidebarProvider({
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open)
   }, [isMobile, setOpen, setOpenMobile])
+
+  React.useEffect(() => {
+    if (!directorLiteEnabled) return
+    const handleShortcut = (event: KeyboardEvent) => {
+      handleDirectorSidebarShortcut(event, toggleSidebar)
+    }
+    window.addEventListener("keydown", handleShortcut)
+    return () => window.removeEventListener("keydown", handleShortcut)
+  }, [directorLiteEnabled, toggleSidebar])
 
   // Keyboard shortcut disabled — sidebar is permanently expanded.
 
@@ -158,6 +169,7 @@ function Sidebar({
   rail?: boolean
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+  const directorLiteEnabled = useArcScopeEnabled()
 
   if (isMobile) {
     return (
@@ -167,7 +179,9 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="!inset-y-0 !h-dvh !max-h-dvh !w-[min(86vw,18rem)] !rounded-none !border-y-0 bg-sidebar p-0 text-sidebar-foreground data-[side=left]:!left-0 data-[side=left]:!border-l-0 data-[side=left]:data-ending-style:-translate-x-full data-[side=left]:data-starting-style:-translate-x-full data-[side=right]:!right-0 data-[side=right]:!border-r-0 data-[side=right]:data-ending-style:translate-x-full data-[side=right]:data-starting-style:translate-x-full"
+          className={directorLiteEnabled
+            ? cn("!inset-y-0 !h-dvh !max-h-dvh !w-[min(86vw,18rem)] !rounded-none !border-y-0 bg-sidebar p-0 text-sidebar-foreground data-[side=left]:!left-0 data-[side=left]:!border-l-0 data-[side=left]:data-ending-style:-translate-x-full data-[side=left]:data-starting-style:-translate-x-full data-[side=right]:!right-0 data-[side=right]:!border-r-0 data-[side=right]:data-ending-style:translate-x-full data-[side=right]:data-starting-style:translate-x-full", "director-mobile-sidebar")
+            : "!inset-y-0 !h-dvh !max-h-dvh !w-[min(86vw,18rem)] !rounded-none !border-y-0 bg-sidebar p-0 text-sidebar-foreground data-[side=left]:!left-0 data-[side=left]:!border-l-0 data-[side=left]:data-ending-style:-translate-x-full data-[side=left]:data-starting-style:-translate-x-full data-[side=right]:!right-0 data-[side=right]:!border-r-0 data-[side=right]:data-ending-style:translate-x-full data-[side=right]:data-starting-style:translate-x-full"}
           style={
             {
               "--sidebar-width": SIDEBAR_WIDTH_MOBILE,

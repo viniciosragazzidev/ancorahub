@@ -24,6 +24,10 @@ export function LightAppHeader({
   actions,
   className,
   hideAvailability = false,
+  routeOverride,
+  leading,
+  moreButton,
+  showMoreButton = true,
 }: {
   /** Supervisor Lite: no availability (they do not receive leads). */
   hideAvailability?: boolean;
@@ -34,8 +38,17 @@ export function LightAppHeader({
   /** Extra buttons before "Mais" (44px round, white). */
   actions?: ReactNode;
   className?: string;
+  /** Lets the director share this frame while keeping the existing Lite route table untouched. */
+  routeOverride?: { title: string; isRoot: boolean; parentHref: string | null; backToParent?: boolean };
+  leading?: ReactNode;
+  moreButton?: ReactNode;
+  showMoreButton?: boolean;
 }) {
-  const { title, isRoot, parentHref, backToParent } = useLightRoute();
+  const lightRoute = useLightRoute();
+  const title = routeOverride?.title ?? lightRoute.title;
+  const isRoot = routeOverride?.isRoot ?? lightRoute.isRoot;
+  const parentHref = routeOverride?.parentHref ?? lightRoute.parentHref;
+  const backToParent = routeOverride?.backToParent ?? lightRoute.backToParent;
 
   return (
     <header
@@ -43,10 +56,12 @@ export function LightAppHeader({
         "arc-venancor z-30 shrink-0 bg-(--surface)/92 pt-(--mobile-safe-top) backdrop-blur-md",
         className,
       )}
+      data-skin={routeOverride ? "diretor" : undefined}
     >
       {/* Same header as the chat screens: full width, back at the left edge, 16/500 title. */}
       <div className="flex min-h-[60px] w-full items-center gap-2.5 px-3 py-2.5">
-        {!isRoot && parentHref ? <LightBackButton fallbackHref={parentHref} alwaysParent={backToParent} className="size-10 border border-(--border)" /> : null}
+        {leading}
+        {!isRoot && parentHref ? <LightBackButton fallbackHref={parentHref} alwaysParent={backToParent} className={routeOverride ? "size-11 border border-(--border)" : "size-10 border border-(--border)"} /> : null}
         <p
           className={cn(
             "min-w-0 flex-1 truncate tracking-tight text-(--foreground)",
@@ -63,15 +78,17 @@ export function LightAppHeader({
             onToggle={onToggleAvailability}
           />
         ) : null}
-        <button
-          type="button"
-          aria-label="Abrir menu Mais"
-          aria-haspopup="dialog"
-          onClick={onOpenMore}
-          className={cn(roundButton, "md:hidden")}
-        >
-          <Ellipsis className="size-5" aria-hidden="true" />
-        </button>
+        {showMoreButton ? moreButton ?? (
+          <button
+            type="button"
+            aria-label="Abrir menu Mais"
+            aria-haspopup="dialog"
+            onClick={onOpenMore}
+            className={cn(roundButton, routeOverride ? "min-[1024px]:hidden" : "md:hidden")}
+          >
+            <Ellipsis className="size-5" aria-hidden="true" />
+          </button>
+        ) : null}
       </div>
     </header>
   );

@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { getArcScopeProps } from "@/components/arc/arc-scope-context";
 
 /* ─── Types ─── */
 
@@ -119,8 +120,10 @@ function useSequenceDetector() {
 
 export function KeyboardShortcutsProvider({
   children,
+  directorLiteEnabled = false,
 }: {
   children: React.ReactNode;
+  directorLiteEnabled?: boolean;
 }) {
   const [shortcuts, setShortcuts] = useState<ShortcutAction[]>([]);
   const shortcutsRef = useRef<ShortcutAction[]>([]);
@@ -198,7 +201,7 @@ export function KeyboardShortcutsProvider({
   return (
     <ShortcutContext.Provider value={value}>
       {children}
-      {helpOpen && <KeyboardShortcutsDialog onClose={() => setHelpOpen(false)} />}
+      {helpOpen && <KeyboardShortcutsDialog onClose={() => setHelpOpen(false)} directorLiteEnabled={directorLiteEnabled} />}
     </ShortcutContext.Provider>
   );
 }
@@ -220,7 +223,7 @@ function formatKeys(keys: string): string {
     .trim();
 }
 
-export function KeyboardShortcutsDialog({ onClose }: { onClose: () => void }) {
+export function KeyboardShortcutsDialog({ onClose, directorLiteEnabled = false }: { onClose: () => void; directorLiteEnabled?: boolean }) {
   const { shortcuts } = useShortcuts();
   const dialogRef = useRef<HTMLDivElement>(null);
 
@@ -257,6 +260,8 @@ export function KeyboardShortcutsDialog({ onClose }: { onClose: () => void }) {
 
   return (
     <div
+      {...getArcScopeProps(directorLiteEnabled)}
+      data-slot={directorLiteEnabled ? "keyboard-shortcuts-dialog" : undefined}
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

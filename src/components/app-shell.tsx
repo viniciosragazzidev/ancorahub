@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
 import { useInterfaceMotionEnabled } from "@/components/motion/interface-motion-provider";
 import { CorreTopSidebar } from "@/components/corretop-sidebar";
-import { CorreTopFinanceiroSidebar } from "@/components/corretop-financeiro-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import type { ChatRailData } from "@/features/broker-workspace/chat/chat-rail-data";
@@ -17,10 +16,13 @@ import { OnboardingWelcomeDialog } from "@/components/onboarding/onboarding-welc
 import { ArcScopeProvider, DIRECTOR_LITE_PORTAL_ROOT_ID } from "@/components/arc/arc-scope-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
+import { DirectorChromeProvider } from "@/components/light/director-chrome-context";
+import type { UserDisplayInfo } from "@/shared/auth/actions";
 // Already in the shell bundle before the director skin (LightChrome imports venancor-scope.css);
 // every rule of director-skin.css sits under [data-skin="diretor"], so with the key off nothing changes.
 import "@/components/arc/director-skin.css";
 import "@/components/arc/director-primitives.css";
+import "@/components/arc/director-chrome.css";
 
 // Client only: it reads the broker's WhatsApp session (server actions) and stays hidden until it knows.
 const WhatsAppMissingBanner = dynamic(() => import("@/components/whatsapp/whatsapp-missing-banner").then((mod) => mod.WhatsAppMissingBanner), { ssr: false });
@@ -36,6 +38,7 @@ type UserInfo = {
   email: string | null;
   role?: string;
   jobTitle?: string | null;
+  isPlatformAdmin?: boolean;
 };
 
 function getReadableForeground(hex: string) {
@@ -67,6 +70,8 @@ export function AppShell({
   cleanUiEnabled = false,
   queueBadgeCount = 0,
   directorLiteEnabled = false,
+  initialSidebarUser,
+  initialSidebarPathname,
 }: {
   children: ReactNode;
   branding?: Branding;
@@ -90,10 +95,13 @@ export function AppShell({
   /** Leads waiting for the broker to accept; shown as the badge on the Fila tab (Light only). */
   queueBadgeCount?: number;
   directorLiteEnabled?: boolean;
+  /** Só usado pela prévia de desenvolvimento, sem consultar dados de usuário. */
+  initialSidebarUser?: UserDisplayInfo | null;
+  /** Só usado pela prévia de desenvolvimento para destacar a rota representada. */
+  initialSidebarPathname?: string;
 }) {
   const pathname = usePathname();
   const canvasRef = useRef<HTMLDivElement>(null);
-  const isFinanceiro = pathname === "/financeiro" || pathname.startsWith("/financeiro/");
   const directorLiteRouteOptedOut = isDirectorLiteRouteOptedOut(pathname);
   const readableBrandForeground = branding?.brandColor
     ? getReadableForeground(branding.brandColor)
@@ -210,6 +218,10 @@ export function AppShell({
 
   return (
     <ArcScopeProvider enabled={directorLiteEnabled}>
+    <DirectorChromeProvider
+      shellUser={user ? { name: user.name, email: user.email, role: user.role, jobTitle: user.jobTitle, isPlatformAdmin: user.isPlatformAdmin } : undefined}
+      viewAs={viewAs}
+    >
     <TooltipProvider delay={directorLiteEnabled ? 400 : 300} timeout={directorLiteEnabled ? 600 : 400}>
     <OnboardingProvider>
       <SidebarProvider
@@ -217,8 +229,8 @@ export function AppShell({
         className={cn("min-h-app overflow-hidden", viewAs.viewingAs && "flex-wrap content-start")}
         style={
           {
-            "--sidebar-width": isFinanceiro ? "16rem" : "17rem",
-            "--sidebar-width-icon": isFinanceiro ? "3.5rem" : "4.5rem",
+            "--sidebar-width": "17rem",
+            "--sidebar-width-icon": "4.5rem",
             "--header-height": "4rem",
             ...(branding?.brandColor
               ? {
@@ -233,15 +245,13 @@ export function AppShell({
           } as CSSProperties
         }
       >
-        <ViewAsBanner viewingAs={viewAs.viewingAs} />
-        {isFinanceiro ? (
-          <CorreTopFinanceiroSidebar />
-        ) : directorLiteEnabled ? (
+        {directorLiteEnabled ? <div className="arc-venancor director-view-as-banner" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}><ViewAsBanner viewingAs={viewAs.viewingAs} /></div> : <ViewAsBanner viewingAs={viewAs.viewingAs} />}
+        {directorLiteEnabled ? (
           <div className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}>
-            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
+            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} />
           </div>
         ) : (
-          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} />
+          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} />
         )}
         {directorLiteEnabled ? <div id={DIRECTOR_LITE_PORTAL_ROOT_ID} className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }} /> : null}
         <SidebarInset
@@ -261,6 +271,7 @@ export function AppShell({
       </SidebarProvider>
     </OnboardingProvider>
     </TooltipProvider>
+    </DirectorChromeProvider>
     </ArcScopeProvider>
   );
 }

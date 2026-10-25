@@ -7,6 +7,7 @@ import { ArrowsClockwise, Lightning, ShieldCheck } from "@/components/huge-icons
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { setSuperAdminRoleOverrideAction } from "@/features/super-admin/role-impersonation-actions";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import type { RoleOverrideOption } from "@/features/super-admin/role-impersonation";
 import {
   DropdownMenu,
@@ -33,6 +34,7 @@ const ROLE_OPTIONS: Array<{ value: RoleOverrideOption; label: string; badge: str
 ];
 
 export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: SuperAdminRoleSwitcherProps) {
+  const directorLite = useArcScopeEnabled();
   const [isPending, startTransition] = useTransition();
   const [selectedRole, setSelectedRole] = useState<RoleOverrideOption>((activeOverride as RoleOverrideOption) || "none");
   const router = useRouter();
@@ -85,7 +87,7 @@ export function SuperAdminRoleSwitcher({ activeOverride, compact = false }: Supe
           <DropdownMenuRadioGroup value={selectedRole} onValueChange={(v) => handleRoleChange(v as RoleOverrideOption)}>
             {ROLE_OPTIONS.map((opt) => (
               <DropdownMenuRadioItem key={opt.value} value={opt.value} disabled={isPending} className="text-xs">
-                {opt.label}
+                {directorLite ? opt.label.replace(/^[^\p{L}\p{N}]+/u, "") : opt.label}
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>

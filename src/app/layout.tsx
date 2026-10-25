@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { Plus_Jakarta_Sans, Geist_Mono, JetBrains_Mono } from "next/font/google";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
@@ -10,6 +10,7 @@ import { RouteViewTransition } from "@/components/motion/route-view-transition";
 import { SkipToContent } from "@/components/skip-to-content";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { isDirectorF2DevPreview } from "@/components/light/director-f2-dev-preview";
 import "./globals.css";
 
 const jakartaSans = Plus_Jakarta_Sans({
@@ -105,13 +106,17 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   const cookieStore = await cookies();
+  const requestPath = process.env.NODE_ENV === "development" ? (await headers()).get("x-pathname") ?? "" : "";
+  const isDirectorF2Preview = isDirectorF2DevPreview(requestPath);
   let directorLiteEnabled = false;
 
-  try {
-    const context = await getRequiredTenantContext();
-    directorLiteEnabled = await shouldUseDirectorLiteStyle(context.role, context.tenantId);
-  } catch {
-    directorLiteEnabled = false;
+  if (!isDirectorF2Preview) {
+    try {
+      const context = await getRequiredTenantContext();
+      directorLiteEnabled = await shouldUseDirectorLiteStyle(context.role, context.tenantId);
+    } catch {
+      directorLiteEnabled = false;
+    }
   }
 
   const theme = !directorLiteEnabled && cookieStore.get("corretop-theme")?.value === "dark" ? "dark" : "light";
@@ -121,8 +126,8 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <SkipToContent />
         <SplashScreen />
-        <InterfaceMotionProvider>
-          <AppProviders forceLightTheme={directorLiteEnabled}>
+        <InterfaceMotionProvider enabled={isDirectorF2Preview ? false : undefined}>
+          <AppProviders forceLightTheme={directorLiteEnabled} directorLiteEnabled={directorLiteEnabled}>
             <TooltipProvider><div id="main-content" tabIndex={-1}><RouteViewTransition>{children}</RouteViewTransition></div></TooltipProvider>
             <Toaster directorLiteEnabled={directorLiteEnabled} />
           </AppProviders>

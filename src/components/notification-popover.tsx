@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { PushNotificationManager } from "@/features/notifications/components/push-notification-manager";
 import { cn } from "@/lib/utils";
+import { useArcPortalTarget, useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 type NotificationItem = { id: string; title: string; message: string; type: string; readAt: string | null; createdAt: string; leadId: string | null };
 type RecentNotificationsResponse = { notifications: NotificationItem[]; unreadCount: number; totalCount: number };
@@ -36,6 +37,8 @@ function relativeTime(value: string) {
 }
 
 export function NotificationPopover() {
+  const directorLite = useArcScopeEnabled();
+  const portalTarget = useArcPortalTarget();
   const reduceMotion = useReducedMotion();
   const router = useRouter();
   const { unreadCount, userId } = useNotificationCount();
@@ -126,7 +129,7 @@ export function NotificationPopover() {
       {open ? (
         <>
           <div
-            className="fixed inset-0 z-[9998] bg-black/20 backdrop-blur-[1.5px] dark:bg-black/45"
+            className={cn("fixed inset-0 z-[9998] bg-black/20 backdrop-blur-[1.5px] dark:bg-black/45", directorLite && "director-notification-backdrop")}
             aria-hidden="true"
             onClick={() => setOpen(false)}
           />
@@ -142,7 +145,7 @@ export function NotificationPopover() {
               top: `${popoverPos.top}px`,
               right: `${popoverPos.right}px`,
             }}
-            className="fixed z-[9999] flex max-h-[75vh] w-[calc(100vw-2rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl border border-border/80 bg-card/98 shadow-2xl backdrop-blur-xl max-[559px]:inset-x-4 max-[559px]:top-16 max-[559px]:w-auto sm:max-h-[min(32rem,calc(100vh-5rem))]"
+            className={cn("fixed z-[9999] flex max-h-[75vh] w-[calc(100vw-2rem)] max-w-[400px] flex-col overflow-hidden rounded-2xl border border-border/80 bg-card/98 shadow-2xl backdrop-blur-xl max-[559px]:inset-x-4 max-[559px]:top-16 max-[559px]:w-auto sm:max-h-[min(32rem,calc(100vh-5rem))]", directorLite && "director-notification-popover")}
           >
             <header className="flex items-center justify-between px-4 py-3 bg-muted/20">
               <div className="flex items-center gap-2">
@@ -190,7 +193,12 @@ export function NotificationPopover() {
                         key={item.id}
                         initial={isNew ? { opacity: 0, y: -8 } : false}
                         animate={{ opacity: 1, y: 0 }}
-                        className={cn("flex items-start gap-2.5 px-4 py-3", !item.readAt && "bg-primary/[0.03]")}
+                        className={cn(
+                          "flex items-start gap-2.5 px-4 py-3",
+                          !item.readAt && "bg-primary/[0.03]",
+                          directorLite && "director-notification-row",
+                          directorLite && !item.readAt && "is-unread",
+                        )}
                       >
                         <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
                         <div className="min-w-0 flex-1">
@@ -262,6 +270,7 @@ export function NotificationPopover() {
         }}
         className={cn(
           "group/notif-trigger relative size-8 text-muted-foreground",
+          directorLite && "director-notification-trigger",
           open && "bg-muted text-foreground"
         )}
         size="icon-sm"
@@ -278,7 +287,7 @@ export function NotificationPopover() {
         ) : null}
       </Button>
 
-      {mounted && createPortal(popoverContent, document.body)}
+      {mounted && createPortal(popoverContent, portalTarget ?? document.body)}
     </div>
   );
 }

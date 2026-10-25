@@ -1,8 +1,12 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import { LayoutDashboard } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { cn } from "@/lib/utils";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { EmptyState } from "@/components/empty-state";
 
 export function RouteNotFound({
   title = "Página não encontrada",
@@ -17,6 +21,20 @@ export function RouteNotFound({
   backUrl?: string;
   backText?: string;
 }) {
+  const directorLite = useArcScopeEnabled();
+  if (directorLite) {
+    return (
+      <main className="arc-venancor director-route-state" data-skin="diretor" aria-label={title}>
+        <EmptyState
+          title={title}
+          description={description}
+          icon={LayoutDashboard}
+          animated={false}
+          action={<Link href={backUrl} className="director-route-link"><LayoutDashboard className="size-4" />{backText}</Link>}
+        />
+      </main>
+    );
+  }
   return (
     <main
       className="mx-auto flex min-h-[75vh] w-full max-w-2xl flex-col items-center justify-center px-4 py-8 text-center"

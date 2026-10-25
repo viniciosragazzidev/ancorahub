@@ -247,6 +247,7 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
           email: currentUser?.email ?? null,
           role: context.role,
           jobTitle: context.jobTitle,
+          isPlatformAdmin: currentUser?.isPlatformAdmin ?? false,
         }}
         initialAvailability={(membership?.availabilityStatus as "available" | "paused" | "offline") ?? "available"}
       >

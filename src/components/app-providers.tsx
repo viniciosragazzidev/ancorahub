@@ -14,7 +14,7 @@ function ShortcutRegistrar() {
   return null;
 }
 
-export function AppProviders({ children, forceLightTheme = false }: { children: React.ReactNode; forceLightTheme?: boolean }) {
+export function AppProviders({ children, forceLightTheme = false, directorLiteEnabled = false }: { children: React.ReactNode; forceLightTheme?: boolean; directorLiteEnabled?: boolean }) {
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
@@ -30,12 +30,12 @@ export function AppProviders({ children, forceLightTheme = false }: { children: 
   return (
     <NuqsAdapter>
       <ThemeProvider forceLightTheme={forceLightTheme}>
-        <KeyboardShortcutsProvider>
+        <KeyboardShortcutsProvider directorLiteEnabled={directorLiteEnabled}>
           <ShortcutRegistrar />
           {children}
         </KeyboardShortcutsProvider>
         <PerformanceMonitor />
-        <PwaInstallPrompt />
+        <PwaInstallPrompt directorLiteEnabled={directorLiteEnabled} />
       </ThemeProvider>
     </NuqsAdapter>
   );

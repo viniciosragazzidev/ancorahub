@@ -20,6 +20,7 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { completeInitialSetup } from "../actions/complete-initial-setup";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 
 type DirectorWizardProps = {
   tenantName: string;
@@ -135,6 +136,7 @@ export function DirectorWizard({
   tenantName,
   logoUrl,
 }: DirectorWizardProps) {
+  const directorLite = useArcScopeEnabled();
   const router = useRouter();
   const [open, setOpen] = useState(true);
   const [step, setStep] = useState(0);
@@ -176,7 +178,7 @@ export function DirectorWizard({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogPopup
-        className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 sm:max-w-lg data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:translate-y-3 data-starting-style:translate-y-3 data-ending-style:scale-[0.98] data-starting-style:scale-[0.98]"
+        className={`flex max-h-[calc(100dvh-2rem)] flex-col gap-0 sm:max-w-lg data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:translate-y-3 data-starting-style:translate-y-3 data-ending-style:scale-[0.98] data-starting-style:scale-[0.98]${directorLite ? " director-wizard-popup" : ""}`}
       >
         <DialogClose
           aria-label="Fechar wizard"

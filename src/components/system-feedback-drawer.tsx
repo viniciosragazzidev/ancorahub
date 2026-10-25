@@ -7,7 +7,10 @@ import { ChevronLeft, MessageSquareWarning, Send, ShieldCheck, TriangleAlert } f
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { Textarea } from "@/components/ui/textarea";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { sendSystemReportAction, type SystemReportActionState } from "@/features/system-report/actions";
 import { SYSTEM_REPORT_TRIGGERS, getSystemReportTrigger } from "@/features/system-report/message";
 
@@ -15,6 +18,8 @@ const initialState: SystemReportActionState = {};
 
 export function SystemFeedbackDrawer() {
   const [open, setOpen] = useState(false);
+  const directorLite = useArcScopeEnabled();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const handleOpen = () => setOpen(true);
@@ -22,16 +27,24 @@ export function SystemFeedbackDrawer() {
     return () => window.removeEventListener("open-system-feedback", handleOpen);
   }, []);
 
+  if (directorLite && isMobile) {
+    return (
+      <BottomSheet open={open} onOpenChange={setOpen} title="Reportar problema" detents={[0.62, 0.92]} closeLabel="Fechar" className="arc-venancor director-feedback-sheet">
+        <FeedbackBody directorLiteEnabled />
+      </BottomSheet>
+    );
+  }
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
-      <SheetContent className="w-full sm:max-w-md">
-        <FeedbackBody />
+      <SheetContent className={directorLite ? "w-full sm:max-w-md director-feedback-drawer" : "w-full sm:max-w-md"}>
+        <FeedbackBody directorLiteEnabled={directorLite} />
       </SheetContent>
     </Sheet>
   );
 }
 
-function FeedbackBody() {
+function FeedbackBody({ directorLiteEnabled = false }: { directorLiteEnabled?: boolean }) {
   const [triggerId, setTriggerId] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(sendSystemReportAction, initialState);
   const selectedTrigger = triggerId ? getSystemReportTrigger(triggerId) : null;
@@ -39,13 +52,13 @@ function FeedbackBody() {
   return (
     <>
       <SheetHeader className="space-y-1">
-        <Badge variant="outline" className="w-fit text-[10px] gap-1">
+        <Badge variant="outline" className={directorLiteEnabled ? "w-fit text-xs gap-1" : "w-fit text-[10px] gap-1"}>
           <TriangleAlert className="size-3 text-primary" />
           Reportar problema
         </Badge>
-        <SheetTitle className="text-lg font-bold">Central de Feedback</SheetTitle>
+        <SheetTitle className={directorLiteEnabled ? "text-lg font-medium" : "text-lg font-bold"}>{directorLiteEnabled ? "Central de feedback" : "Central de Feedback"}</SheetTitle>
         <SheetDescription className="text-xs">
-          Encontrou um problema no sistema? Escolha o assunto e descreva o que aconteceu. O responsável recebe a mensagem direto no WhatsApp.
+          {directorLiteEnabled ? "Escolha o assunto e conte o que aconteceu." : "Encontrou um problema no sistema? Escolha o assunto e descreva o que aconteceu. O responsável recebe a mensagem direto no WhatsApp."}
         </SheetDescription>
       </SheetHeader>
 
@@ -102,7 +115,7 @@ function FeedbackBody() {
               transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
               className="min-h-0 flex-1 space-y-2.5 overflow-y-auto px-5 py-5 sm:px-6 sm:py-6"
             >
-              <p className="pb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground/80">Qual é o assunto?</p>
+              <p className={directorLiteEnabled ? "pb-1 text-sm font-medium text-muted-foreground" : "pb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground/80"}>Qual é o assunto?</p>
               {SYSTEM_REPORT_TRIGGERS.map((item) => (
                 <Button
                   key={item.id}

@@ -1,7 +1,23 @@
+"use client";
+
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { Skeleton as ArcSkeleton } from "@/components/arc/skeleton/skeleton";
 
 export function RouteLoading() {
+  const directorLite = useArcScopeEnabled();
+  if (directorLite) {
+    return (
+      <main className="arc-venancor director-route-loading" data-skin="diretor" aria-busy="true" aria-label="Carregando conteúdo">
+        <div className="director-route-loading-tabs" aria-hidden="true"><span /><span /><span /></div>
+        <div className="director-route-loading-grid">
+          {Array.from({ length: 3 }, (_, index) => <div className="director-route-loading-surface" key={index}><ArcSkeleton label="Carregando" lines={3} avatar /></div>)}
+        </div>
+        <div className="director-route-loading-surface"><ArcSkeleton label="Carregando conteúdo" lines={4} /></div>
+      </main>
+    );
+  }
   return (
     <main
       aria-busy="true"
