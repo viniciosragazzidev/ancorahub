@@ -3,7 +3,6 @@
   "/assinatura",
   "/atendimento",
   "/atendimento/fluxo",
-  "/atendimento/mensagens",
   "/clientes",
   "/clientes/[clientId]",
   "/conversas/broker",
