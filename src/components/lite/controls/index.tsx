@@ -8,6 +8,8 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 
 import styles from "./controls.module.css";
 
+export { LiteMenu, type LiteMenuItem } from "./menu";
+
 export type FilterChip = { id: string; label: string; count?: number };
 
 /** Chips de filtro em alternância (aria-pressed). Ativo com fundo de acento, nunca quebra linha. */
