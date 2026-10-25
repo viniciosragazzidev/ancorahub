@@ -741,6 +741,8 @@ export function DistributionInbox({
               <h2 id="distribution-inbox-title">Leads para distribuir</h2>
               <p>{filtered.length} na fila. Selecione até {MAX_BATCH} para enviar em lote.</p>
             </div>
+            {/* Como no legado: PDF e arquivar sem corretor só para o diretor (as ações do servidor também exigem). */}
+            {role === "director" ? (
             <div className={liteStyles.headerActions}>
               <Button variant="outline" render={<a href="/api/reports/distribution-unassigned" download />}>
                 <Download aria-hidden="true" /> Baixar PDF
@@ -756,6 +758,7 @@ export function DistributionInbox({
                 <Archive aria-hidden="true" /> Arquivar sem corretor
               </Button>
             </div>
+            ) : null}
           </header>
 
           <div className={liteStyles.filters}>
@@ -784,20 +787,22 @@ export function DistributionInbox({
             <div className={liteStyles.bulkForms}>
               <form action={batchAction} onSubmit={submitBatch}>
                 <input name="leadIds" type="hidden" value={selected.join(",")} />
-                <AppSelect
-                  aria-label="Unidade de destino"
-                  name="branchId"
-                  value={branchId}
-                  onValueChange={changeBatchUnit}
-                  options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
-                />
+                {role === "director" ? (
+                  <AppSelect
+                    aria-label="Unidade de destino"
+                    name="branchId"
+                    value={branchId}
+                    onValueChange={changeBatchUnit}
+                    options={branches.map((branch) => ({ value: branch.id, label: branch.name }))}
+                  />
+                ) : <input name="branchId" type="hidden" value={managerBranchId} />}
                 <ActionButton pending={batchPending} success={batchSuccess} variant="default" lite>
                   <ArrowRight /> Enviar {selected.length}/{MAX_BATCH}
                 </ActionButton>
               </form>
               <form action={assignAction} onSubmit={submitBatch}>
                 <input name="leadIds" type="hidden" value={selected.join(",")} />
-                <input name="branchId" type="hidden" value={branchId} />
+                <input name="branchId" type="hidden" value={role === "director" ? branchId : managerBranchId} />
                 <AppSelect
                   aria-label="Corretor em massa"
                   value={batchBrokerId}
