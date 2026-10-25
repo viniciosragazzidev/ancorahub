@@ -29,6 +29,8 @@ vi.mock("@/features/ai-qualification/stats-service", () => ({ getQualificationSt
 vi.mock("@/features/ai-qualification/alerts-service", () => ({ getQualificationAlerts: mocks.getQualificationAlerts }));
 vi.mock("@/features/agent-training/actions", () => ({ getAgentTrainingCenter: mocks.getAgentTrainingCenter }));
 vi.mock("./_components/qualification-hub-client", () => ({ QualificationHubClient: () => null }));
+vi.mock("./_components/lite/qualification-hub-lite", () => ({ QualificationHubLite: () => null }));
+vi.mock("@/features/director-lite/style-flag", () => ({ isDirectorLitePageOnServer: async () => false }));
 
 import QualificacaoPage from "./page";
 
