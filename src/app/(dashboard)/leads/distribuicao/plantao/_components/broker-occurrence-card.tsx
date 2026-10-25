@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { CheckCircle2, Clock3 } from "lucide-react";
 import { DetailDrawer } from "@/components/foundations/detail-drawer";
 import { LeadStatusBadge } from "@/components/status-badges";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +13,9 @@ import { assignDutyLeadToBrokerAction, getBrokerDayHistoryAction, getBrokerOccur
 import { cn } from "@/lib/utils";
 import { BrokerPresenceReleaseButton } from "./broker-presence-release-button";
 import { BrokerDayHistoryTrigger } from "./broker-day-history-trigger";
+import { BrokerPauseButton } from "./broker-pause-button";
+import { BrokerPresenceInviteButton } from "./broker-presence-invite-button";
+import { BrokerCapacityBar, BrokerLiveStatus } from "./broker-live-status";
 import { DutySwapDoneNotice, DutySwapPicker } from "./duty-swap-picker";
 import { swapNoticeText, whatsappStatusLabel, type SwapNotice } from "@/features/lead-distribution/duty-swap";
 import type { DutySwapResult } from "@/features/lead-distribution/duty-swap-actions";
@@ -21,8 +25,24 @@ type LeadResult = Extract<Awaited<ReturnType<typeof getBrokerOccurrenceLeadsActi
 type AvailableResult = Extract<Awaited<ReturnType<typeof getDutyAvailableLeadsAction>>, { ok: true }>;
 type Tab = "received" | "available";
 
-export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null, scheduleAttendanceMode = attendanceMode, canSetAttendanceMode = false, canSwap = false, swapNotice = null }: {
-  children: ReactNode;
+export type BrokerOccurrenceSummary = {
+  internalCode: string | null;
+  availabilityStatus: string | null;
+  presenceEnabled: boolean;
+  releasedByName: string | null;
+  onlineOverride: boolean;
+  notificationErrorCode: string | null;
+  liveStatus: import("@/features/lead-distribution/duty-roster-live-status").BrokerLiveOfferStatus;
+  nextEventAt: string | null;
+  activeLeads: number;
+  capacity: number | null;
+  crossesCut: boolean;
+  leadsMorning: number;
+  leadsAfternoon: number;
+};
+
+export function BrokerOccurrenceCard({ summary, scheduleId, leadsSince = "plantao", assignmentId, brokerId, brokerName, phone, presenceStatus, paused, confirmedAt, absent, attendanceMode, onSitePending, branchName = null, canAssignLeads = false, presencePhotoId = null, onSiteReleaseOpen = onSitePending, presenceReleaseNote = null, scheduleAttendanceMode = attendanceMode, canSetAttendanceMode = false, canSwap = false, swapNotice = null }: {
+  summary: BrokerOccurrenceSummary;
   scheduleId: string;
   /** The page's "considerar leads a partir de" choice. */
   leadsSince?: string;
@@ -166,7 +186,26 @@ export function BrokerOccurrenceCard({ children, scheduleId, leadsSince = "plant
     <div className="relative flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-border/70 px-3 py-2.5">
       <button type="button" onClick={show} className="absolute inset-0 rounded-[var(--radius-card)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`Abrir detalhes de ${brokerName} neste plantão`} />
       <div className="pointer-events-none relative z-10 flex w-full items-center justify-between gap-3 [&_a]:pointer-events-auto [&_button]:pointer-events-auto">
-        {children}
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-sm font-medium">{brokerName}</span>
+            {swapNotice ? <Badge variant="info" title={swapNoticeText(swapNotice)}>Troca feita</Badge> : null}
+            {summary.onlineOverride ? <Badge variant="info" title="Online neste plantão presencial: confirma com um toque, sem foto">Online</Badge> : null}
+            {summary.presenceEnabled && presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`${summary.releasedByName ? `Liberado por ${summary.releasedByName}` : "Presença confirmada"}${confirmedAt ? ` às ${dateTime.format(new Date(confirmedAt))}` : ""}`} title={`${summary.releasedByName ? `Liberado por ${summary.releasedByName}` : "Confirmado"}${confirmedAt ? ` em ${dateTime.format(new Date(confirmedAt))}` : ""}`}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
+            {summary.presenceEnabled && presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={summary.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
+            {summary.presenceEnabled && attendanceMode !== "presencial" ? <BrokerPresenceInviteButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} /> : null}
+            {attendanceMode === "presencial" && presencePhotoId && onSitePending && !absent ? <Badge variant="warning">Foto para validar</Badge> : null}
+            {(summary.presenceEnabled || attendanceMode === "presencial") && presenceStatus === "pending" && !absent && !(attendanceMode === "presencial" && presencePhotoId) ? <BrokerPresenceReleaseButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} inUnit={attendanceMode === "presencial"} /> : null}
+            {!absent && !onSitePending ? <BrokerPauseButton scheduleId={scheduleId} assignmentId={assignmentId} brokerName={brokerName} paused={paused} /> : null}
+          </div>
+          <p className="text-xs text-muted-foreground">{summary.internalCode ? `Código ${summary.internalCode}` : "Sem código"} · {branchName ?? "Sem unidade"} · {summary.availabilityStatus ?? String.fromCharCode(0x2014)}{summary.presenceEnabled && summary.releasedByName ? ` · Liberado por ${summary.releasedByName}` : ""}</p>
+          <div className="mt-1.5"><BrokerLiveStatus status={summary.liveStatus} nextEventAt={summary.nextEventAt} /></div>
+          <BrokerCapacityBar activeLeads={summary.activeLeads} capacity={summary.capacity} />
+        </div>
+        {summary.crossesCut ? <div className="flex shrink-0 items-center gap-1.5" aria-label={`${summary.leadsMorning} leads de manhã e ${summary.leadsAfternoon} à tarde neste plantão`}>
+          <Badge variant="info" title="Leads recebidos de manhã neste plantão">Manhã {summary.leadsMorning}</Badge>
+          <Badge variant="destructive" title="Leads recebidos à tarde neste plantão">Tarde {summary.leadsAfternoon}</Badge>
+        </div> : <Badge variant="outline" title="Leads recebidos neste plantão">{summary.leadsMorning + summary.leadsAfternoon} leads</Badge>}
       </div>
     </div>
     <DetailDrawer open={open} onOpenChange={setOpen} size="lg" title={brokerName} description={`${branchName ?? "Sem unidade"} · corretor nesta ocorrência do plantão`} summary={<div className="flex flex-wrap gap-2">

@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckCircle2, Clock3, Download, FileSpreadsheet } from "lucide-react";
+import { Download, FileSpreadsheet } from "lucide-react";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { ArrowLeft, UserList, Users, WhatsappLogo } from "@/components/huge-icons";
 import { readMetaLeadDisplayDetails } from "@/features/leads/meta-lead-display";
@@ -22,9 +22,6 @@ import { leadDistributionStatusUi } from "@/features/lead-distribution/status-ui
 import { getReturnedUnacceptedLeadIds } from "@/features/lead-distribution/returned-unaccepted";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
-import { BrokerCapacityBar, BrokerLiveStatus } from "../_components/broker-live-status";
-import { BrokerPresenceInviteButton } from "../_components/broker-presence-invite-button";
-import { BrokerPauseButton } from "../_components/broker-pause-button";
 import { countBrokerLeadsByShift, groupDutyLeadsByShift, sortByAssignmentTime } from "@/features/lead-distribution/duty-leads-shift-groups";
 import { sortByTemperaturePriority } from "@/features/lead-distribution/temperature-priority";
 import { normalizeRoutingQualificationStatus } from "@/features/lead-distribution/routing-catalog";
@@ -33,18 +30,21 @@ import { StatCard } from "@/components/dashboard/metric-card";
 import { dataTableStyles } from "@/components/ui/data-table/data-table-frame";
 import { SectionCardHeader } from "@/components/ui/section-card-header";
 import { getCachedLeadsBranches, getCachedLeadsBrokers, getCachedSlaSettings } from "@/features/leads/reference-data";
-import { BrokerPresenceReleaseButton } from "../_components/broker-presence-release-button";
 import { DutyLeadDetailsTrigger } from "../_components/duty-lead-details-trigger";
 import { BrokerDayHistoryTrigger } from "../_components/broker-day-history-trigger";
 import { BrokerOccurrenceCard } from "../_components/broker-occurrence-card";
 import { PendingRoster } from "../_components/pending-roster";
 import { getDutySwapNotices } from "@/features/lead-distribution/duty-swap-queries";
-import { swapNoticeText } from "@/features/lead-distribution/duty-swap";
 import { ScheduleEscalarButton } from "../_components/schedule-escalar-button";
 import { listInvitedBrokers, listPendingRosterEntries } from "@/features/lead-distribution/duty-roster-pending";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { dutyShifts, worksInShift } from "@/features/lead-distribution/duty-shifts";
 import { getDutyLeadQueueTabs, resolveDutyLeadQueueId, selectDutyLeadsForQueue } from "@/features/lead-distribution/duty-lead-queue-tabs";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { DirectorDutyLeads, type DutyLeadRecord } from "../_components/director-duty-leads";
+import directorDutyStyles from "../_components/director-duty-schedule.module.css";
+import { DirectorDutyHeaderActions } from "../_components/director-duty-header-actions";
+import { DirectorDutyHistoryDistributions } from "../_components/director-duty-history-distributions";
 
 export const dynamic = "force-dynamic";
 
@@ -53,8 +53,8 @@ const dateTime = new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium", timeSty
 const timeOnly = new Intl.DateTimeFormat("pt-BR", { timeStyle: "short", timeZone: "America/Sao_Paulo" });
 const dayMonth = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "America/Sao_Paulo" });
 const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" });
-const historyDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: "UTC" });
-function historyDateLabel(value: string) { return historyDate.format(new Date(`${value}T12:00:00Z`)); }
+const historyDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeZone: "America/Sao_Paulo" });
+function historyDateLabel(value: string) { return historyDate.format(new Date(`${value}T12:00:00-03:00`)); }
 
 function DutyProfileHeader({
   name, state, stateTone, description, details, actions,
@@ -90,6 +90,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { scheduleId } = await params;
+  const directorLite = await isDirectorLitePageOnServer(context.role, context.tenantId, `/leads/distribuicao/plantao/${scheduleId}`);
   const { situacao, data, canal, fila, desde } = await searchParams;
   const leadsSinceOption = parseDutyLeadsSince(desde);
 
@@ -125,8 +126,9 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   if (historicalWindow && occurrenceHistory) {
     const canExportHistory = hasCapability(context.role, "exportar_relatorios_operacionais", context.jobTitle);
     return <>
-      <DashboardHeader breadcrumb="Distribuição · Plantões" title={schedule.name} rightSlot={<Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>} />
-      <main className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
+      <DashboardHeader breadcrumb="Distribuição · Plantões" title={schedule.name} rightSlot={directorLite ? undefined : <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>} />
+      <main className={cn(directorLite ? "flex min-h-full w-full flex-col bg-background" : "mx-auto flex w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6", directorLite && directorDutyStyles.page)}>
+        {directorLite ? <DirectorDutyHeaderActions scheduleId={schedule.id} canExport={canExportHistory} reportDate={historicalWindow.dutyDate} /> : null}
         <DutyProfileHeader
           name={schedule.name}
           state="Terminado"
@@ -164,7 +166,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
             description="Aceites e atribuições registrados neste turno. O vínculo antigo pode ser estimado quando a fila era compartilhada."
           />
           <CardContent className="p-0">
-          {occurrenceHistory.distributions.length ? <DragScrollTable><Table className={dataTableStyles.native}><TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Corretor na época</TableHead><TableHead>Distribuído em</TableHead><TableHead>Origem</TableHead><TableHead>Vínculo</TableHead></TableRow></TableHeader><TableBody>{occurrenceHistory.distributions.map((entry) => <TableRow key={entry.id}><TableCell className="font-medium">{entry.leadName}</TableCell><TableCell>{entry.brokerName}</TableCell><TableCell>{dateTime.format(entry.assignedAt)}</TableCell><TableCell><Badge variant="outline">{entry.kind}</Badge></TableCell><TableCell><Badge variant={entry.exact ? "success" : "outline"}>{entry.exact ? "Confirmado" : "Estimado pela fila"}</Badge></TableCell></TableRow>)}</TableBody></Table></DragScrollTable> : <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma atribuição registrada neste período.</p>}
+          {occurrenceHistory.distributions.length ? (directorLite ? <DirectorDutyHistoryDistributions rows={occurrenceHistory.distributions.map((entry) => ({ id: entry.id, leadName: entry.leadName, brokerName: entry.brokerName, assignedAt: entry.assignedAt.toISOString(), kind: entry.kind, exact: entry.exact }))} /> : <DragScrollTable><Table className={dataTableStyles.native}><TableHeader><TableRow><TableHead>Lead</TableHead><TableHead>Corretor na época</TableHead><TableHead>Distribuído em</TableHead><TableHead>Origem</TableHead><TableHead>Vínculo</TableHead></TableRow></TableHeader><TableBody>{occurrenceHistory.distributions.map((entry) => <TableRow key={entry.id}><TableCell className="font-medium">{entry.leadName}</TableCell><TableCell>{entry.brokerName}</TableCell><TableCell>{dateTime.format(entry.assignedAt)}</TableCell><TableCell><Badge variant="outline">{entry.kind}</Badge></TableCell><TableCell><Badge variant={entry.exact ? "success" : "outline"}>{entry.exact ? "Confirmado" : "Estimado pela fila"}</Badge></TableCell></TableRow>)}</TableBody></Table></DragScrollTable>) : <p className="p-8 text-center text-sm text-muted-foreground">Nenhuma atribuição registrada neste período.</p>}
           {occurrenceHistory.truncated ? <p className="border-t border-border/70 p-3 text-xs text-muted-foreground">Exibindo os primeiros 200 registros deste período.</p> : null}
           </CardContent>
         </Card>
@@ -297,6 +299,58 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
       ? groupDutyLeadsByShift(visibleLeads, schedule.shiftSplitAt, { keepEmpty: true })
       : [{ key: "ordem", label: `Ordem de entrega · ${schedule.startsAt.slice(0, 5)}–${schedule.endsAt.slice(0, 5)}`, leads: visibleLeads }]
     : [{ key: "ordem", label: "Ordem de distribuição · quentes, mornos e frios", leads: visibleLeads }];
+  const directorLeadGroups: Array<{ key: string; label: string; leads: DutyLeadRecord[] }> = leadGroups.map((group) => ({
+    key: group.key,
+    label: group.label,
+    leads: group.leads.map((lead) => {
+      const distribution = leadDistributionStatusUi(lead.distributionStatus);
+      const whatsappEntry = whatsappEntryOf(lead);
+      const drawerLead: LeadWorkspaceItem = {
+        id: lead.id,
+        nome: lead.nome,
+        telefone: lead.telefone,
+        status: lead.status,
+        qualificationStatus: lead.qualificationStatus ?? "",
+        qualificationState: lead.qualificationState,
+        distributionStatus: lead.distributionStatus,
+        origem: lead.origem,
+        email: lead.email,
+        sourceChannel: lead.sourceChannel,
+        sourceCampaign: lead.sourceCampaign,
+        sourceMetadata: lead.sourceMetadata,
+        tipo: lead.tipo,
+        createdAt: lead.createdAt.toISOString(),
+        assignedAt: lead.assignedAt?.toISOString() ?? null,
+        stageEnteredAt: lead.stageEnteredAt?.toISOString() ?? null,
+        serviceStartedAt: lead.serviceStartedAt?.toISOString() ?? null,
+        firstContactAt: lead.firstContactAt?.toISOString() ?? null,
+        corretorId: lead.corretorId,
+        corretorNome: lead.brokerName,
+        branchId: lead.branchId,
+        branchName: lead.branchName,
+        qualificationDetails: lead.qualificationDetails as Record<string, unknown> | null,
+        queueId: lead.queueId,
+        queueName: lead.queueName,
+        queueColorHue: lead.queueColorHue,
+        distributionRemovalReason: lead.distributionRemovalReason,
+        distributionRemovalNote: lead.distributionRemovalNote,
+      };
+      return {
+        lead: drawerLead,
+        groupKey: group.key,
+        groupLabel: group.label,
+        createdAt: lead.createdAt.toISOString(),
+        assignedAt: lead.assignedAt?.toISOString() ?? null,
+        brokerName: lead.brokerName,
+        queueName: lead.queueName,
+        distributionLabel: distribution.label,
+        distributionTone: distribution.tone,
+        whatsappLabel: whatsappEntry?.label ?? null,
+        returnedUnaccepted: returnedUnaccepted.has(lead.id),
+        coldHeld: lead.qualificationStatus === "cold" && !lead.corretorId && Boolean(linkedQueues.find((queue) => queue.id === lead.queueId)?.holdColdLeads),
+      };
+    }),
+  }));
   const filters = [
     { key: "aguardando", label: "Aguardando distribuição", count: waitingCount },
     { key: "distribuidos", label: "Distribuídos", count: distributedCount },
@@ -318,7 +372,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
     <DashboardHeader
       breadcrumb="Distribuição · Plantões"
       title={schedule.name}
-      rightSlot={<div className="flex flex-wrap items-center gap-2">
+      rightSlot={directorLite ? undefined : <div className="flex flex-wrap items-center gap-2">
         {canExportReport ? (
           <Button render={<a href={`/api/reports/duty-schedule/${schedule.id}`} download />} size="sm" variant="outline" className="gap-1.5">
             <Download className="size-3.5" aria-hidden="true" /> Exportar PDF
@@ -332,7 +386,8 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
         <Button render={<Link href="/distribuicao?view=plantao" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar aos plantões</Button>
       </div>}
     />
-    <main className="mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6">
+    <main className={cn(directorLite ? "flex min-h-full w-full flex-col bg-background" : "mx-auto flex min-h-full w-full max-w-[1440px] flex-col gap-5 bg-background p-4 lg:p-6", directorLite && directorDutyStyles.page)}>
+      {directorLite ? <DirectorDutyHeaderActions scheduleId={schedule.id} canExport={canExportReport} /> : null}
       <DutyProfileHeader
         name={schedule.name}
         state={isDutyWindowActive(liveWindow, now) ? "Em andamento" : leadsUpcomingStartsAt ? "Próximo turno" : schedule.status === "active" ? "Regra ativa" : schedule.status === "archived" ? "Arquivado" : "Inativo"}
@@ -444,6 +499,20 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
               ))}
             </nav>
             {visibleLeads.length ? (
+              directorLite ? (
+                <DirectorDutyLeads
+                  groups={directorLeadGroups}
+                  brokers={brokers}
+                  branches={branches}
+                  contextRole={drawerContextRole}
+                  contextJobTitle={context.jobTitle}
+                  contextBranchId={context.branchId}
+                  manualAssignmentChoiceEnabled={assignmentChoiceSetting !== "false"}
+                  slaFirstContactMinutes={Number.parseInt(slaSettings.slaFirstContactMinutes ?? "15", 10) || 15}
+                  slaStagnantDays={Number.parseInt(slaSettings.slaStagnantDays ?? "3", 10) || 3}
+                  empty="Nenhum lead nesta ordem."
+                />
+              ) : (
               <DragScrollTable className="[&_[data-slot=table-container]]:max-h-[60vh] [&_[data-slot=table-container]]:overflow-y-auto [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-10">
                 <Table className={dataTableStyles.native}>
                   <TableHeader>
@@ -538,6 +607,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                   </TableBody>
                 </Table>
               </DragScrollTable>
+              )
             ) : (
               <div className="p-8 text-center text-sm text-muted-foreground">Nenhum lead {channel === "whatsapp" ? "do WhatsApp " : channel === "formulario" ? "de formulário " : ""}nesta situação para este plantão {sinceLabel}.</div>
             )}
@@ -582,33 +652,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
                 ]).map((group) => <section key={group.key} aria-label={group.label} className="space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground">{group.label} <Badge variant="outline">{group.entries.length}</Badge></h4>
                   {group.entries.length ? <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{group.entries.map((entry) => (
-              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} leadsSince={leadsSinceOption} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={entry.attendanceMode} scheduleAttendanceMode={schedule.attendanceMode} canSetAttendanceMode={context.role === "director"} onSitePending={entry.onSitePending} onSiteReleaseOpen={entry.onSiteReleaseOpen} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting !== "false"} presencePhotoId={entry.presencePhotoId ?? null} presenceReleaseNote={entry.presenceReleaseNote ?? null} canSwap={entry.publishedDutyDate !== null} swapNotice={swapNotices.get(entry.id) ?? null}>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm font-medium">{entry.brokerName}</span>
-                    {swapNotices.has(entry.id) ? <Badge variant="info" title={swapNoticeText(swapNotices.get(entry.id)!)}>Troca feita</Badge> : null}
-                    {entry.onlineOverride ? <Badge variant="info" title="Online neste plantão presencial: confirma com um toque, sem foto">Online</Badge> : null}
-                    {presenceEnabled && entry.presenceStatus === "confirmed" ? <Badge variant="success" aria-label={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Presença confirmada"}${entry.confirmedAt ? ` às ${dateTime.format(entry.confirmedAt)}` : ""}`} title={`${entry.releasedByName ? `Liberado por ${entry.releasedByName}` : "Confirmado"}${entry.confirmedAt ? ` em ${dateTime.format(entry.confirmedAt)}` : ""}`}><CheckCircle2 className="size-3.5" aria-hidden="true" /></Badge> : null}
-                    {presenceEnabled && entry.presenceStatus === "pending" ? <Badge variant="warning" aria-label="Aguardando confirmação" title={entry.notificationErrorCode ? "Não foi possível enviar o lembrete" : "Aguardando confirmação"}><Clock3 className="size-3.5" aria-hidden="true" /></Badge> : null}
-                    {presenceEnabled && entry.attendanceMode !== "presencial" && !entry.absent ? <BrokerPresenceInviteButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} /> : null}
-                    {/* Presencial with a photo: release only from the drawer, where the photo is (validation is mandatory). */}
-                    {entry.attendanceMode === "presencial" && entry.presencePhotoId && entry.onSitePending && !entry.absent ? <Badge variant="warning">Foto para validar</Badge> : null}
-                    {(presenceEnabled || entry.attendanceMode === "presencial") && entry.presenceStatus === "pending" && !entry.absent && !(entry.attendanceMode === "presencial" && entry.presencePhotoId) ? <BrokerPresenceReleaseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} inUnit={entry.attendanceMode === "presencial"} /> : null}
-                    {!entry.absent && !entry.onSitePending ? <BrokerPauseButton scheduleId={schedule.id} assignmentId={entry.id} brokerName={entry.brokerName} paused={Boolean(entry.pausedAt)} /> : null}
-                  </div>
-                  <p className="text-xs text-muted-foreground">{entry.internalCode ? `Código ${entry.internalCode}` : "Sem código"} · {entry.branchName ?? "Sem unidade"} · {entry.availabilityStatus ?? "—"}{shiftSections && entry.shift === "dia" ? " · Dia todo" : ""}{presenceEnabled && entry.releasedByName ? ` · Liberado por ${entry.releasedByName}` : ""}</p>
-                  {entry.blockedReason ? <p className="mt-0.5 text-xs font-medium text-warning">{entry.blockedReason}</p> : null}
-                  <div className="mt-1.5">
-                    <BrokerLiveStatus status={entry.liveStatus} nextEventAt={entry.nextEventAt ? entry.nextEventAt.toISOString() : null} />
-                  </div>
-                  <BrokerCapacityBar activeLeads={entry.activeLeads} capacity={entry.capacity} />
-                </div>
-                {/* Leads received in this occurrence, by the same morning/afternoon cut as the leads list. */}
-                {crossesCut ? <div className="flex shrink-0 items-center gap-1.5" aria-label={`${brokerShiftCounts(entry.brokerId).manha} leads de manhã e ${brokerShiftCounts(entry.brokerId).tarde} à tarde neste plantão`}>
-                  <Badge variant="info" title="Leads recebidos de manhã neste plantão">Manhã {brokerShiftCounts(entry.brokerId).manha}</Badge>
-                  <Badge variant="destructive" title="Leads recebidos à tarde neste plantão">Tarde {brokerShiftCounts(entry.brokerId).tarde}</Badge>
-                </div> : <Badge variant="outline" title="Leads recebidos neste plantão">{brokerShiftCounts(entry.brokerId).manha + brokerShiftCounts(entry.brokerId).tarde} leads</Badge>}
-              </BrokerOccurrenceCard>
+              <BrokerOccurrenceCard key={`${section.key}:${entry.id}`} scheduleId={schedule.id} leadsSince={leadsSinceOption} assignmentId={entry.id} brokerId={entry.brokerId} brokerName={entry.brokerName} phone={entry.phone} presenceStatus={entry.presenceStatus} paused={Boolean(entry.pausedAt)} confirmedAt={entry.confirmedAt?.toISOString() ?? null} absent={entry.absent} attendanceMode={entry.attendanceMode} scheduleAttendanceMode={schedule.attendanceMode} canSetAttendanceMode={context.role === "director"} onSitePending={entry.onSitePending} onSiteReleaseOpen={entry.onSiteReleaseOpen} branchName={entry.branchName ?? null} canAssignLeads={managementActionsSetting !== "false"} presencePhotoId={entry.presencePhotoId ?? null} presenceReleaseNote={entry.presenceReleaseNote ?? null} canSwap={entry.publishedDutyDate !== null} swapNotice={swapNotices.get(entry.id) ?? null} summary={{ internalCode: entry.internalCode, availabilityStatus: entry.availabilityStatus, presenceEnabled, releasedByName: entry.releasedByName, onlineOverride: entry.onlineOverride, notificationErrorCode: entry.notificationErrorCode, liveStatus: entry.liveStatus, nextEventAt: entry.nextEventAt?.toISOString() ?? null, activeLeads: entry.activeLeads, capacity: entry.capacity, crossesCut, leadsMorning: brokerShiftCounts(entry.brokerId).manha, leadsAfternoon: brokerShiftCounts(entry.brokerId).tarde }} />
             ))}</div> : <p className="text-sm text-muted-foreground">Nenhum corretor nesta seção.</p>}
                 </section>) : <p className="text-sm text-muted-foreground">Ninguém escalado neste turno.</p>}
               </section>
