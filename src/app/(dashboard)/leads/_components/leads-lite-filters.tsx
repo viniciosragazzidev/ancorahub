@@ -184,11 +184,13 @@ export function LeadsLiteFilters(props: LeadsFiltersProps) {
             className={styles.filtersButton}
             aria-haspopup="dialog"
             aria-expanded={open}
+            aria-label={activeCount > 0 ? `Filtros, ${activeCount} ${activeCount === 1 ? "ativo" : "ativos"}` : "Filtros"}
             onClick={() => setOpen(!open)}
           >
             <SlidersHorizontal aria-hidden="true" size={16} />
-            <span>Filtros</span>
-            {activeCount > 0 ? <span className={styles.countBadge} aria-label={`${activeCount} ativos`}>{activeCount}</span> : null}
+            {/* No celular fica só o ícone e a contagem, para a busca caber na mesma linha. */}
+            <span className={styles.filtersLabel}>Filtros</span>
+            {activeCount > 0 ? <span className={styles.countBadge} aria-hidden="true">{activeCount}</span> : null}
           </button>
           {open && !phone ? (
             <div role="dialog" aria-labelledby={panelTitleId} className={styles.popover}>

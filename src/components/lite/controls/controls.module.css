@@ -257,7 +257,21 @@
     display: inline;
   }
 
+  /* Celular: contagem em cima e as ações numa linha só, com rolagem lateral. */
   .bulk {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
     border-radius: 20px;
+  }
+
+  .bulkActions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .bulkButton {
+    flex: none;
   }
 }

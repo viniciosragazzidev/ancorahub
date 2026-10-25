@@ -2,6 +2,7 @@
 
 .root {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
   color: var(--foreground);
@@ -258,6 +259,15 @@
 
   .searchSubmit {
     display: none;
+  }
+
+  .filtersLabel {
+    display: none;
+  }
+
+  .filtersButton,
+  .ghostButton {
+    padding: 0 12px;
   }
 
   .longLabel {
