@@ -32,6 +32,13 @@ describe("DrilldownLite", () => {
     fireEvent.click(table.querySelectorAll("tbody tr")[1]!.querySelector("td:nth-child(2)")!);
     expect(push).toHaveBeenCalledWith("/leads/l2");
     expect(screen.getByText("Exibindo 25 de 300 registros.")).toBeInTheDocument();
+    // Nome é link de verdade (meio-clique e nova aba); o clique nele não dispara a navegação da linha.
+    const link = screen.getAllByRole("link", { name: "Lead 3" })[0]!;
+    expect(link).toHaveAttribute("href", "/leads/l3");
+    push.mockClear();
+    link.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(link);
+    expect(push).not.toHaveBeenCalled();
   });
 
   it("textos do Lite: sem crase, sem travessão, status em caixa de frase", () => {

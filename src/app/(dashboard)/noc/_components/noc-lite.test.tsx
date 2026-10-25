@@ -42,5 +42,7 @@ describe("NocLite", () => {
     expect(relativeTime("2026-10-25T01:20:00.000Z", NOC_NOW)).toBe("há 10 min");
     render(<NocLite data={NOC_FIXTURE} period={30} now={NOC_NOW} />);
     expect(document.body.textContent).not.toContain("—");
+    // NOC_NOW é 01:30 UTC do dia 25: em Brasília, 22:30.
+    expect(screen.getByText("Atualizado às 22:30")).toHaveAttribute("datetime", NOC_NOW);
   });
 });

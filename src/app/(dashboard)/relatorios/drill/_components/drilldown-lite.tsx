@@ -2,7 +2,7 @@
 
 /**
  * Drill de relatórios no visual Lite: explicação, total e as listas Lite de corretores e de leads (tabela no desktop,
- * cartões no celular). A linha inteira do lead abre o lead (clique, Enter ou espaço), no lugar do link do nome.
+ * cartões no celular). O nome é um link de verdade (abrir em nova aba funciona) e a linha inteira também abre o lead.
  */
 import { useRouter } from "next/navigation";
 
@@ -40,7 +40,7 @@ export function DrilldownLite({ explanation, total, rows, brokers }: { explanati
   ];
 
   const leadColumns: LiteColumn<DrillLeadLite>[] = [
-    { id: "name", label: "Nome", primary: true, render: (lead) => <span className={page.cellTitle} title={lead.nome}>{lead.nome}</span> },
+    { id: "name", label: "Nome", primary: true, render: (lead) => <a href={`/leads/${lead.id}`} className={`${page.cellTitle} ${page.cellLink}`} title={lead.nome}>{lead.nome}</a> },
     { id: "status", label: "Status", render: (lead) => <span className={page.badge}>{liteStatusLabel(lead.status)}</span> },
     { id: "broker", label: "Corretor", nowrap: true, render: (lead) => lead.brokerName ? <span title={lead.brokerName}>{lead.brokerName}</span> : <span className={page.muted}>Sem corretor</span> },
     { id: "branch", label: "Unidade", nowrap: true, render: (lead) => lead.branchName ? <span title={lead.branchName}>{lead.branchName}</span> : <span className={page.muted}>Sem unidade</span> },

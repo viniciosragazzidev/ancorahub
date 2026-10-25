@@ -15,6 +15,7 @@ import { StatCard } from "@/components/dashboard/metric-card";
 import { LiteUrlSelect } from "@/components/lite/controls";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
+import { liteDateFormatter } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
 import { INITIAL_DIMENSION } from "@/components/ui/chart";
 import type { BranchHealth, NocData } from "@/features/noc/queries";
@@ -38,6 +39,9 @@ const HEALTH = {
   attention: { label: "Atenção", tone: "warning" },
   critical: { label: "Crítico", tone: "danger" },
 } as const;
+
+/** Hora do retrato dos dados (instante do servidor), igual no HTML do servidor e do navegador. */
+const updatedAt = liteDateFormatter({ hour: "2-digit", minute: "2-digit" });
 
 const AXIS_TICK = { fill: "var(--text-secondary)", fontSize: 12 };
 
@@ -270,6 +274,7 @@ export function NocLite({ data, period, now, urgentLead = null }: { data: NocDat
           </span>
         </span>
         <span className={page.badge} data-tone="success"><span className={styles.liveDot} aria-hidden="true" />Ao vivo</span>
+        <time className={page.cellSub} dateTime={now}>Atualizado às {updatedAt.format(new Date(now))}</time>
         {urgentLead ? (
           <Link href={`/leads/${urgentLead.id}`} className={`${page.button} ${page.toolbarEnd}`} title={`${urgentLead.nome}: ${urgentLead.reason}`} aria-label={`Próximo lead: ${urgentLead.nome}`}>
             <Zap aria-hidden="true" size={16} />Próximo lead
