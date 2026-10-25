@@ -320,8 +320,10 @@
     min-width: 0;
   }
 
+  /* Etapa e período dividem a primeira linha; a fila (nomes longos) ocupa a linha de baixo inteira. */
   .selectQueue {
     flex: 1 1 100%;
+    order: 3;
     width: auto;
   }
 }
