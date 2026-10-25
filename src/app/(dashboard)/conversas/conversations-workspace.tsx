@@ -25,7 +25,7 @@ import { brokerDisplayName, CONTACT_SHORTCUT, contactShortcutMessage, isContactS
 import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
 import { LeadTagsPicker } from "@/features/lead-tags/components/lead-tags-picker";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
-import { metaBlockedQualificationLabel } from "@/features/leads/qualification-status";
+import { LEAD_QUALIFICATION_LABELS, metaBlockedQualificationLabel, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 import type { LeadTag } from "@/features/lead-tags/rules";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -193,6 +193,7 @@ export function ConversationsWorkspace({
   tenantId,
   leadTags = [],
   canManageTags = false,
+  directorActions,
 }: {
   role: string;
   branches: { id: string; name: string }[];
@@ -204,6 +205,8 @@ export function ConversationsWorkspace({
   leadTags?: LeadTag[];
   /** Directors and managers create, rename and recolor tags. */
   canManageTags?: boolean;
+  /** Actions and view navigation for the Director toolbar. */
+  directorActions?: ReactNode;
 }) {
   const directorSkinEnabled = useArcScopeEnabled();
   const router = useRouter();
@@ -328,6 +331,80 @@ export function ConversationsWorkspace({
     );
   }
 
+  const filterContent = (
+    <>
+      <h2 className="sr-only">Filtros dos atendimentos</h2>
+      {role === "director" && branches.length > 0 ? (
+        <Select
+          className="w-auto shrink-0"
+          labels={{ all: directorSkinEnabled ? "Unidade" : "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
+          onValueChange={(value) => setBranchFilter(value ?? "all")}
+          value={branchFilter}
+        >
+          <SelectTrigger aria-label="Filtrar atendimentos por unidade" className={directorSkinEnabled ? "w-auto min-w-28 shrink-0" : "w-auto min-w-[140px] shrink-0"} size="sm">
+            <SelectValue placeholder="Todas as unidades">
+              {(value) => value === "all" && directorSkinEnabled
+                ? "Unidade"
+                : value === "all"
+                  ? "Todas as unidades"
+                  : branches.find((branch) => branch.id === value)?.name ?? "Unidade"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as unidades</SelectItem>
+            {branches.map((branch) => (
+              <SelectItem key={branch.id} value={branch.id}>
+                {branch.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+
+      {allTags.length > 0 ? (
+        <Select
+          className="w-auto shrink-0"
+          labels={{ all: "Todas as tags", ...Object.fromEntries(allTags.map((tag) => [tag.id, tag.name])) }}
+          onValueChange={(value) => setTagFilter(value ?? "all")}
+          value={tagFilter}
+        >
+          <SelectTrigger aria-label="Filtrar atendimentos por tag" className="w-auto min-w-[130px] shrink-0" size="sm">
+            <SelectValue placeholder="Todas as tags" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as tags</SelectItem>
+            {allTags.map((tag) => (
+              <SelectItem key={tag.id} value={tag.id}>
+                <span className="inline-flex items-center gap-1.5"><QueueColorDot hue={tag.colorHue} />{tag.name}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+
+      <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar" data-conversations-part={directorSkinEnabled ? "filters" : undefined}>
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
+      </div>
+    </>
+  );
+
+  const selectedTagPicker = selected && !selected.id.startsWith("unassigned-") ? (
+    <LeadTagsPicker
+      leadId={selected.id}
+      allTags={allTags}
+      selected={selected.tags ?? []}
+      canManage={canManageTags}
+      onSelectedChange={(tags) => handleUpdateConversation(selected.id, { tags })}
+      onAllTagsChange={(tags) => {
+        setAllTags(tags);
+        setConversations((prev) => prev.map((item) => ({ ...item, tags: item.tags?.flatMap((tag) => tags.filter((next) => next.id === tag.id)) })));
+      }}
+    />
+  ) : null;
+
   return (
     <section
       aria-label="Central de conversas"
@@ -341,65 +418,19 @@ export function ConversationsWorkspace({
         data-conversations-part={directorSkinEnabled ? "toolbar" : undefined}
         aria-label="Filtros dos atendimentos"
         className="shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2.5 sm:px-5"
-        filters={
-          <>
-            <h2 className="sr-only">Filtros dos atendimentos</h2>
-            {role === "director" && branches.length > 0 ? (
-              <Select
-                className="w-auto shrink-0"
-                labels={{ all: "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
-                onValueChange={(value) => setBranchFilter(value ?? "all")}
-                value={branchFilter}
-              >
-                <SelectTrigger aria-label="Filtrar atendimentos por unidade" className="w-auto min-w-[140px] shrink-0" size="sm">
-                  <SelectValue placeholder="Todas as unidades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as unidades</SelectItem>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-
-            {allTags.length > 0 ? (
-              <Select
-                className="w-auto shrink-0"
-                labels={{ all: "Todas as tags", ...Object.fromEntries(allTags.map((tag) => [tag.id, tag.name])) }}
-                onValueChange={(value) => setTagFilter(value ?? "all")}
-                value={tagFilter}
-              >
-                <SelectTrigger aria-label="Filtrar atendimentos por tag" className="w-auto min-w-[130px] shrink-0" size="sm">
-                  <SelectValue placeholder="Todas as tags" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as tags</SelectItem>
-                  {allTags.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      <span className="inline-flex items-center gap-1.5"><QueueColorDot hue={tag.colorHue} />{tag.name}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-
-            <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar" data-conversations-part={directorSkinEnabled ? "filters" : undefined}>
-              <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
-              <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
-              <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
-              <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
-            </div>
-          </>
-        }
-        results={`${filtered.length} de ${conversations.length} atendimentos`}
+        filters={directorSkinEnabled ? (
+          <div data-conversations-part="filter-controls" className="flex min-w-0 flex-1 items-center gap-2">
+            {filterContent}
+            {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
+          </div>
+        ) : filterContent}
+        results={directorSkinEnabled ? undefined : `${filtered.length} de ${conversations.length} atendimentos`}
       />
 
       <div
           data-lite={directorSkinEnabled ? undefined : "panes"}
           data-conversations-part={directorSkinEnabled ? "panes" : undefined}
+          data-profile-open={directorSkinEnabled ? String(profileOpen) : undefined}
           className={cn(
             "grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
             profileOpen && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
@@ -418,7 +449,7 @@ export function ConversationsWorkspace({
                 aria-label="Buscar atendimento por nome, telefone ou e-mail"
                 className="h-10 pl-8 text-xs"
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por nome, telefone ou e-mail"
+                placeholder={directorSkinEnabled ? "Buscar conversa" : "Buscar por nome, telefone ou e-mail"}
                 value={query}
               />
             </div>
@@ -460,23 +491,18 @@ export function ConversationsWorkspace({
                 userId={userId}
                 tenantId={tenantId}
                 role={role}
+                tagControl={directorSkinEnabled && selectedTagPicker ? (
+                  <div data-conversations-part="header-tags" className="flex min-w-0 items-center gap-2 px-4 pb-2 sm:px-5">
+                    <LeadTagChips tags={selected.tags} max={4} className="min-w-0 flex-1" />
+                    {selectedTagPicker}
+                  </div>
+                ) : undefined}
               />
-              {!selected.id.startsWith("unassigned-") ? (
+              {!directorSkinEnabled && !selected.id.startsWith("unassigned-") ? (
                 <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-1.5 sm:px-5">
                   <LeadTagChips tags={selected.tags} max={6} className="flex-1" />
                   {!selected.tags?.length ? <span className="flex-1 text-[11px] text-muted-foreground">Sem tags</span> : null}
-                  <LeadTagsPicker
-                    leadId={selected.id}
-                    allTags={allTags}
-                    selected={selected.tags ?? []}
-                    canManage={canManageTags}
-                    onSelectedChange={(tags) => handleUpdateConversation(selected.id, { tags })}
-                    onAllTagsChange={(tags) => {
-                      setAllTags(tags);
-                      // Renamed, recolored or deleted tags update on every conversation.
-                      setConversations((prev) => prev.map((item) => ({ ...item, tags: item.tags?.flatMap((tag) => tags.filter((next) => next.id === tag.id)) })));
-                    }}
-                  />
+                  {selectedTagPicker}
                 </div>
               ) : null}
               <ConversationHistory client={selected} directorSkinEnabled={directorSkinEnabled} />
@@ -562,6 +588,7 @@ function ConversationHeader({
   onOpenProfile,
   onToggleProfile,
   onUpdateConversation,
+  tagControl,
   profileOpen,
   userId,
   tenantId,
@@ -572,6 +599,7 @@ function ConversationHeader({
   onOpenProfile: () => void;
   onToggleProfile: () => void;
   onUpdateConversation?: (leadId: string, updates: Partial<ConversationItem>) => void;
+  tagControl?: ReactNode;
   profileOpen: boolean;
   userId?: string;
   tenantId?: string;
@@ -716,7 +744,9 @@ function ConversationHeader({
             <div data-conversations-part={directorSkinEnabled ? "chat-header-title" : undefined} className="flex items-center gap-2 min-w-0">
               <h2 className="text-sm font-semibold tracking-tight text-foreground truncate" title={client.nome}>{client.nome}</h2>
               <Badge className="hidden shrink-0 md:inline-flex" variant="outline">
-                {LEAD_STATUS_LABELS[client.status] ?? client.status}
+                {directorSkinEnabled
+                  ? getConversationStatusLabel(client.status, client.qualificationStatus)
+                  : LEAD_STATUS_LABELS[client.status] ?? client.status}
               </Badge>
               {isAiActive ? (
                 <Badge className="hidden shrink-0 bg-primary/8 text-primary border-primary/25 sm:inline-flex" variant="outline">
@@ -743,8 +773,11 @@ function ConversationHeader({
                 <Button
                   aria-label="Ações do atendimento"
                   size="sm"
-                  className="h-10 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"
+                  className={directorSkinEnabled
+                    ? "h-11 border-border bg-transparent px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 text-foreground hover:bg-muted shadow-none shrink-0"
+                    : "h-10 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"}
                   disabled={isPending}
+                  variant={directorSkinEnabled ? "outline" : "default"}
                 >
                   <Sparkles className="size-3.5 text-amber-300" />
                   <span className="hidden sm:inline">Ações do Atendimento</span>
@@ -902,6 +935,7 @@ function ConversationHeader({
           </div>
         </div>
       </div>
+      {tagControl}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogPopup>
           <DialogPanel>
@@ -1140,7 +1174,7 @@ function ChatInput({
   }
 
   return (
-    <div className="border-t border-border bg-card px-4 py-3 sm:px-5">
+    <div data-conversations-part={directorSkinEnabled ? "chat-input" : undefined} className="border-t border-border bg-card px-4 py-3 sm:px-5">
       {phone ? (
         <a
           href={getWhatsAppUrl(phone)}
@@ -1159,9 +1193,10 @@ function ChatInput({
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={`Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
+            placeholder={directorSkinEnabled ? "Escreva uma mensagem" : `Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
+            aria-label={directorSkinEnabled ? "Escreva uma mensagem" : undefined}
             disabled={isPending}
-            className="h-10 text-sm"
+            className={directorSkinEnabled ? "h-10 min-w-0 text-sm" : "h-10 text-sm"}
           />
           {error && (
             <p className="absolute -top-6 left-1 text-[11px] font-medium text-destructive truncate max-w-full">
@@ -1651,8 +1686,14 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
   );
 }
 
+function getConversationStatusLabel(status: string, qualificationStatus?: string | null) {
+  const normalized = (qualificationStatus || status).toLowerCase() as LeadQualificationStatus;
+  return LEAD_STATUS_LABELS[status] ?? LEAD_QUALIFICATION_LABELS[normalized] ?? status;
+}
+
 function ConversationRow({ active, conversation, onClick, directorSkinEnabled }: { active: boolean; conversation: ConversationItem; onClick: () => void; directorSkinEnabled: boolean }) {
   const hasHistory = conversation.messages.length > 0;
+  const visibleMessageCount = conversation.messages.filter((message) => !message.transition).length;
   const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
 
   return (
@@ -1671,7 +1712,7 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled }:
       <span className="grid min-w-0 flex-1 gap-1">
         <span className="flex min-w-0 items-center justify-between gap-3">
           <span className="truncate text-sm font-medium">{conversation.nome}</span>
-          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          <span data-conversations-part={directorSkinEnabled ? "row-time" : undefined} className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
             {formatRelative(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt)}
           </span>
         </span>
@@ -1682,9 +1723,11 @@ function ConversationRow({ active, conversation, onClick, directorSkinEnabled }:
         {conversation.tags?.length ? <LeadTagChips tags={conversation.tags} className="pt-0.5" /> : null}
         <span className="flex items-center gap-2 pt-0.5">
           {renderRowQualificationBadge(conversation)}
-          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+          <span data-conversations-part={directorSkinEnabled ? "row-message-count" : undefined} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <Clock aria-hidden="true" className="size-3" />
-            {hasHistory ? `${conversation.messages.filter((message) => !message.transition).length} mensagens` : "Aguardando histórico"}
+            {hasHistory
+              ? `${visibleMessageCount} ${directorSkinEnabled && visibleMessageCount === 1 ? "mensagem" : "mensagens"}`
+              : "Aguardando histórico"}
           </span>
         </span>
       </span>
@@ -1765,6 +1808,7 @@ function ClientProfile({
   /** Brokers do not see where the lead came from. */
   hideOrigin?: boolean;
 }) {
+  const directorSkinEnabled = useArcScopeEnabled();
   const approvedDocuments = client.documents.filter((document) => document.status === "approved").length;
   const pendingDocuments = client.documents.filter((document) => document.status === "pending").length;
   const sharedMedia = getSharedMedia(client.messages);
@@ -1810,7 +1854,9 @@ function ClientProfile({
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">{client.telefone}</p>
               </div>
               <Badge className="shrink-0" variant="outline">
-                {LEAD_STATUS_LABELS[client.status] ?? client.status}
+                {directorSkinEnabled
+                  ? getConversationStatusLabel(client.status, client.qualificationStatus)
+                  : LEAD_STATUS_LABELS[client.status] ?? client.status}
               </Badge>
             </div>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">

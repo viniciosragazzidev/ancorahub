@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
 import { ConversationsFrame } from "./conversations-frame";
-import { ConversationsWorkspace } from "./conversations-workspace";
+import { ConversationsWorkspace, type ConversationItem } from "./conversations-workspace";
 import { OfficialBrokerConversations } from "./official-broker-conversations";
 import { ConversasHeaderNav } from "./_components/conversas-header-nav";
 
@@ -23,7 +23,6 @@ function renderWorkspace(enabled: boolean, pathname = "/conversas") {
       <ConversationsFrame
         legacyHeader={<header data-slot="dashboard-header">Conversas</header>}
         directorHeader={<header data-slot="dashboard-header">Conversas</header>}
-        pageActions={<nav aria-label="Ações da central">Ações</nav>}
       >
         <ConversationsWorkspace
           role="director"
@@ -31,6 +30,57 @@ function renderWorkspace(enabled: boolean, pathname = "/conversas") {
           conversations={[]}
           userId="fixture-director"
           tenantId="fixture-tenant"
+          directorActions={<nav aria-label="Ações da central">Ações</nav>}
+        />
+      </ConversationsFrame>
+    </ArcScopeProvider>,
+  );
+}
+
+function renderSelectedConversation() {
+  navigation.pathname = "/dev/diretor-shell-real";
+  const conversation: ConversationItem = {
+    id: "lead-fixture-ana",
+    nome: "Ana Ribeiro de Almeida Nogueira",
+    telefone: "+55 11 99999-0101",
+    email: "ana@example.test",
+    status: "qualified",
+    qualificationStatus: "qualified",
+    origem: "Meta Ads",
+    branchId: "branch-centro",
+    queueName: "PF",
+    corretorId: "fixture-director",
+    corretorNome: "Marina Exemplo",
+    branchName: "Centro",
+    consentimentoLgpd: true,
+    createdAt: "2026-10-24T12:10:00.000Z",
+    stageEnteredAt: "2026-10-24T14:20:00.000Z",
+    planName: null,
+    carrierName: null,
+    latestMessage: { body: "Queria entender as opções de atendimento e a rede da região.", direction: "incoming", sentAt: "2026-10-24T15:34:00.000Z" },
+    messages: [
+      { id: "message-1", leadId: "lead-fixture-ana", body: "Olá, gostaria de entender as opções disponíveis para minha família.", direction: "incoming", sentAt: "2026-10-24T15:28:00.000Z" },
+      { id: "message-2", leadId: "lead-fixture-ana", body: "Claro, posso te explicar com detalhes. Qual região e hospitais são importantes para vocês?", direction: "outgoing", sentAt: "2026-10-24T15:31:00.000Z" },
+      { id: "message-3", leadId: "lead-fixture-ana", body: "Queria entender as opções de atendimento e a rede da região.", direction: "incoming", sentAt: "2026-10-24T15:34:00.000Z" },
+    ],
+    documents: [],
+    aiConversation: { id: "ai-fixture-ana", status: "HUMAN_ACTIVE", aiModel: null, transferReason: "Solicitou atendimento", qualificationSummary: "Busca plano familiar", assignedUserId: "fixture-director" },
+    tags: [],
+  };
+  return renderToStaticMarkup(
+    <ArcScopeProvider enabled>
+      <ConversationsFrame
+        legacyHeader={<header data-slot="dashboard-header">Conversas</header>}
+        directorHeader={<header data-slot="dashboard-header">Conversas</header>}
+      >
+        <ConversationsWorkspace
+          role="director"
+          branches={[{ id: "branch-centro", name: "Centro" }]}
+          conversations={[conversation]}
+          initialLeadId={conversation.id}
+          userId="fixture-director"
+          tenantId="fixture-tenant"
+          directorActions={<nav aria-label="Tipo de conversa"><a href="/conversas">Leads</a></nav>}
         />
       </ConversationsFrame>
     </ArcScopeProvider>,
@@ -59,8 +109,21 @@ describe("pele da central de conversas", () => {
     expect(html).toContain('data-skin="diretor"');
     expect(html).toContain('data-conversations-part="frame"');
     expect(html).toContain('data-conversations-part="workspace"');
-    expect(html).toContain('data-conversations-part="page-actions"');
+    expect(html).toContain('data-conversations-part="filter-controls"');
+    expect(html).toContain('data-conversations-part="inline-actions"');
+    expect(html).not.toContain('data-conversations-part="page-actions"');
     expect(html).not.toContain('data-lite=');
+  });
+
+  it("mantém rótulos e controles do Diretor em português e sem linha de tags vazia", () => {
+    const html = renderSelectedConversation();
+    expect(html).toContain('placeholder="Buscar conversa"');
+    expect(html).toContain('placeholder="Escreva uma mensagem"');
+    expect(html).toContain(">Qualificado</span>");
+    expect(html).not.toMatch(/>qualified<\/span>/i);
+    expect(html).not.toContain("Sem tags");
+    expect(html).toContain('aria-label="Ações do atendimento"');
+    expect(html).toContain('data-variant="outline"');
   });
 
   it("mantem a pele desligada enquanto a rota continua no opt-out", () => {

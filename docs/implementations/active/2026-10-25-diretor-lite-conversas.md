@@ -20,23 +20,28 @@ Esta base nao possui `useDirectorLitePage`. Por isso `/conversas` continua no op
 
 ## Evidencia visual
 
-Capturas feitas em `/dev/diretor-shell-real?view=conversas`, com fixture Ana Ribeiro, AppShell real e chave ligada. Diretor comum e Super-admin vendo como Diretor, em 390, 768, 1024 e 1440 px:
+Capturas feitas em `/dev/diretor-shell-real?view=conversas`, com AppShell real, 40 conversas de fixture e chave ligada. Diretor comum e Super-admin vendo como Diretor, em 390, 1024 e 1440 px:
 
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-diretor-390.png`
-- `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-diretor-768.png`
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-diretor-1024.png`
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-diretor-1440.png`
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-super-admin-390.png`
-- `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-super-admin-768.png`
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-super-admin-1024.png`
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-super-admin-1440.png`
 
-Medicoes Playwright em `conversas-medidas.json`: titulo e primeiro bloco compartilham borda esquerda por viewport (390: 16px; 768: 289,1px; 1024 e 1440: 290,4px). Nao houve overflow horizontal no documento nem no canvas em nenhum dos oito casos. Quantidade de paineis visiveis: 1, 1, 2 e 3 nas quatro larguras. Cabecalho do chat sem overflow, fixture visivel e zero erros/requisicoes falhas nas capturas finais. As oito imagens foram abertas para revisao visual.
+Medições Playwright em `conversas-polish-medidas.json`: título e painel principal compartilham a borda esquerda (390: 16px; 1024 e 1440: 290,4px). A lista mede 300px em 1440px. Não há overflow horizontal da página; o filtro rola dentro da própria faixa em telas menores. `3 mensagens` não quebra, os dois placeholders cabem, “qualified” não aparece cru e “Ações” usa variante neutra. As seis capturas finais não registraram erros e foram abertas para revisão visual.
 
-| Caso | 390 px | 768 px | 1024 px | 1440 px |
-| --- | --- | --- | --- | --- |
-| Diretor | 48.216 B, 00:32:03 | 103.446 B, 00:32:09 | 118.108 B, 00:32:11 | 178.364 B, 00:32:19 |
-| Super-admin vendo como Diretor | 48.216 B, 00:32:24 | 107.289 B, 00:32:30 | 119.644 B, 00:32:33 | 179.730 B, 00:32:37 |
+| Caso | 390 px | 1024 px | 1440 px |
+| --- | --- | --- | --- |
+| Diretor | 48.179 B | 137.791 B | 230.523 B |
+| Super-admin vendo como Diretor | 48.179 B | 140.032 B | 231.337 B |
+
+### Polimento pedido pelo Maestro
+
+- O raio do item selecionado e dos grupos do perfil usa cantos de controle/painel, removendo o aspecto de pílula.
+- Rótulos de qualificação usam “Qualificado”; contagem e texto ficam em uma linha, e busca/compositor usam placeholders curtos.
+- A ação “Ações” fica neutra; tags ficam no cabeçalho da conversa e a indicação “Sem tags” não aparece vazia.
+- Filtros e ações compartilham uma faixa única; os dados de demonstração têm 40 conversas, nomes longos e textos de mensagem extensos.
 ## Checklist Arc, linha por linha
 
 ### Varreduras automatizadas
@@ -47,7 +52,7 @@ Medicoes Playwright em `conversas-medidas.json`: titulo e primeiro bloco compart
 - [x] Cores cruas: nenhuma cor crua adicionada; CSS ativo remapeia classes semanticas antigas. O scanner acusa classes Tailwind antigas ainda presentes no JSX para preservar paridade da chave desligada.
 - [x] Peso e gradiente: nenhum gradiente ou peso fora da escala adicionado; a pele normaliza pesos para tokens.
 - [x] Largura de viewport: nenhuma regra `100vw` nova.
-- [x] Typecheck e lint: typecheck sem erros; ESLint sem erros, com 31 warnings nos arquivos legados de conversas.
+- [x] Typecheck e lint: typecheck sem erros; ESLint sem erros, com 13 warnings preexistentes em `conversations-workspace.tsx`.
 
 ### Tipo e texto
 
@@ -102,13 +107,14 @@ Medicoes Playwright em `conversas-medidas.json`: titulo e primeiro bloco compart
 - [x] Dialogs/drawers continuam usando primitives compartilhadas para trap/retorno de foco e Escape.
 - [x] Status permanece acompanhado de texto, e status async existentes seguem anunciados.
 - [x] Alvos tocaveis da pele tem pelo menos 44px; controles estreitos sao ocultos ou transferidos ao menu de acoes em telas compactas.
-- [x] 390, 768, 1024 e 1440 foram verificados em Diretor e Super-admin. Sem scroll lateral; hover nao e necessario para abrir as acoes.
+- [x] 390, 1024 e 1440 foram verificados em Diretor e Super-admin. Sem scroll lateral; hover nao e necessario para abrir as acoes.
 - [ ] Tema escuro nao validado: a decisao D2 força tema claro para o Diretor com a chave ligada; superfícies neutras e acento indigo foram verificados no tema ativo.
 
 ## Validacao
 
-- Vitest focado: 3 arquivos, 15 testes aprovados (snapshot legado, rota opt-out, skin ativa, navegacao/aba oficial e atalho de contato).
+- Vitest focado: 3 arquivos, 16 testes aprovados (snapshot legado, rota opt-out, skin ativa, rótulos, placeholders, navegação/aba oficial e atalho de contato).
 - `npx tsc --noEmit`: aprovado.
-- ESLint nos arquivos TS/TSX tocados: 0 erros, 31 warnings em codigo legado de conversas.
+- ESLint nos arquivos TS/TSX tocados: 0 erros, 13 warnings em codigo legado de conversas.
 - `node scripts/check-lite-skin.mjs`: relatorio global de 859 arquivos. As classes antigas da conversas permanecem no JSX por paridade do modo desligado e sao mapeadas por seletores da pele ativa; por isso o diagnostico de fonte nao resulta em zero nesta tela.
+- Harness: `agent:docs` válido, segurança sem achados; arquitetura/desempenho apontam apenas os arquivos grandes já acima do limite na base (`conversations-workspace.tsx` 93 KB; `page.tsx` 54 KB). `agent:verify --level full` não foi executado porque inclui suíte global e `next build`, fora da validação focada desta etapa e com risco de renderizar a rota dinâmica de banco.
 - Build nao executado: a rota real `/conversas` usa consultas dinamicas de banco durante renderizacao; respeitei o limite de nao executar testes de banco.

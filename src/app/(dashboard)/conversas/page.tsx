@@ -1081,7 +1081,7 @@ export default async function ConversationsPage({
     <ConversationsFrame
       legacyHeader={<DashboardHeader breadcrumb="Atendimento" title="Conversas" rightSlot={pageActions} />}
       directorHeader={<DashboardHeader breadcrumb="Atendimento" title="Conversas" />}
-      pageActions={pageActions}
+      pageActions={officialBrokerTab ? pageActions : undefined}
     >
       {officialBrokerTab ? (
         <OfficialBrokerConversations
@@ -1099,6 +1099,7 @@ export default async function ConversationsPage({
           tenantId={context.tenantId}
           leadTags={leadTags}
           canManageTags={canManageLeadTags(context.role)}
+          directorActions={pageActions}
         />
       )}
     </ConversationsFrame>

@@ -480,3 +480,7 @@ A aba Funil usa o mesmo `getQualificationFunnel` e as métricas existentes, com 
 ## 2026-10-25 - Refinamento da moldura e painel Diretor Lite
 
 O topo global e o /dashboard agora seguem um container e ritmo Arc comum, com cards por borda, ajuda alinhada, linhas de plantao e alvo minimo de 44px. A rota de desenvolvimento `/dev/diretor-shell-real` valida AppShell e painel reais para diretor e super-admin em 390, 768, 1024 e 1440; prints e checklist linha a linha estao em `docs/implementations/completed/2026-10-25-diretor-lite-f2b.md`.
+
+## 2026-10-25 - Polimento de Conversas do Diretor Lite
+
+Na prévia da central, raios da seleção e dos grupos do perfil usam tokens de controle/painel; rótulos de qualificação são localizados; busca, contagem e composer cabem; ações ficam neutras; tags integram o cabeçalho; e filtros compartilham uma faixa. Fixtures incluem 40 conversas para validar a lista com nomes e mensagens longos. Capturas do AppShell real em 390, 1024 e 1440 para diretor e super-admin, com medidas, ficam em `scratchpad/final-prints`; `/conversas` permanece no opt-out até receber o gate compartilhado.
