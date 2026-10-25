@@ -1,0 +1,204 @@
+/* Lista Lite (F3): só tokens. Tabela a partir de 768px; cartões abaixo. */
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.empty {
+  padding: 24px 16px;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+/* Moldura da tabela: cartão de borda fina e raio de superfície; a tabela larga rola dentro dele, nunca a página. */
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.table th {
+  height: 44px;
+  padding: 0 16px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.table td {
+  height: 52px;
+  padding: 8px 16px;
+  border-top: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.table tbody tr:hover {
+  background: var(--surface-muted);
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.numeric {
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cards {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card,
+.cardStatic {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.card {
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.cardTitle {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardSub {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.cardDetails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+  margin: 8px 0 0;
+  font-size: var(--text-xs);
+}
+
+.cardDetails > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.cardDetails dt {
+  color: var(--text-muted);
+}
+
+.cardDetails dd {
+  margin: 0;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Troca desktop/celular por largura: tabela a partir de 768px. */
+.onlyDesktop {
+  display: none;
+}
+
+.onlyPhone {
+  display: block;
+}
+
+@media (min-width: 768px) {
+  .onlyDesktop {
+    display: block;
+  }
+
+  .onlyPhone {
+    display: none;
+  }
+}
+
+/* Seleção em massa: caixa nativa de 18px com alvo de 44px; linha e cartão selecionados em acento suave. */
+.table .selectCell {
+  width: 44px;
+  padding: 0 0 0 4px;
+}
+
+.selectBox {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.checkbox:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
+}
+
+/* Destaques de linha (sempre com texto na própria linha): atenção e cinza. */
+.table tbody tr[data-tone="warning"],
+.card[data-tone="warning"],
+.cardStatic[data-tone="warning"] {
+  background: var(--warning-subtle);
+}
+
+/* Cinza vira uma faixa na borda esquerda: o fundo cinza apagava os badges neutros da linha. */
+.table tbody tr[data-tone="muted"] > td:first-child {
+  border-left: 3px solid var(--border-strong);
+}
+
+.card[data-tone="muted"],
+.cardStatic[data-tone="muted"] {
+  border-left: 3px solid var(--border-strong);
+}
+
+.table tbody tr[data-selected="true"],
+.card[data-selected="true"],
+.cardStatic[data-selected="true"] {
+  background: var(--accent-subtle);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin: -12px -12px -4px 0;
+}

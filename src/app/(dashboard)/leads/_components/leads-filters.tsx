@@ -1,223 +1,53 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-
 import { Button } from "@/components/ui/button";
 import ActionButton from "@/components/arc/action-button/action-button";
 import { StatefulButton } from "@/components/ui/stateful-button";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSelect } from "@/components/ui/select";
 import { X, SlidersHorizontal } from "@/components/huge-icons";
 import { FilterBar } from "@/components/foundations/filter-bar";
-import { ActiveFilterChips, type FilterChipItem } from "@/components/foundations/active-filter-chips";
+import { ActiveFilterChips } from "@/components/foundations/active-filter-chips";
 import { cn } from "@/lib/utils";
-import {
-  hasLeadFilterQuery,
-  parseLeadFilterPreferences,
-  type LeadFilterPreferences,
-} from "@/features/leads/lead-filter-preferences";
 
-type Branch = { id: string; name: string };
-type Broker = { id: string; name: string };
+import { LeadsLiteFilters } from "./leads-lite-filters";
+import { useLeadFilters, type LeadsFiltersProps } from "./use-lead-filters";
 
-const qualificationLabels: Record<string, string> = {
-  unqualified: "Sem Qualificação",
-  warm: "Morna",
-  hot: "Quente",
-  disqualified: "Desqualificado",
-};
+/** Filtros de /leads: a versão Lite com a chave do diretor ligada; a tela atual, sem mudança, nos demais casos. */
+export function LeadsFilters(props: LeadsFiltersProps) {
+  const litePage = useDirectorLitePage();
+  if (litePage) return <LeadsLiteFilters {...props} />;
+  return <LeadsFiltersClassic {...props} />;
+}
 
-export function LeadsFilters({
-  initialSearch,
-  initialStatus,
-  initialBranch,
-  initialTipo,
-  initialOrigem,
-  hideOriginFilters = false,
-  initialQualification,
-  initialCorretor,
-  initialPageSize,
-  initialEligibleCampaigns,
-  initialTag,
-  storageKey,
-  branches,
-  brokers,
-  tags = [],
-}: {
-  initialSearch?: string;
-  initialStatus?: string;
-  initialBranch?: string;
-  initialTipo?: string;
-  initialOrigem?: string;
-  /** Brokers do not filter by origin or campaign. */
-  hideOriginFilters?: boolean;
-  initialQualification?: string;
-  initialCorretor?: string;
-  initialPageSize?: string;
-  initialEligibleCampaigns?: string;
-  initialTag?: string;
-  storageKey: string;
-  branches: Branch[];
-  brokers: Broker[];
-  /** The tenant's lead tags (filter by tag). */
-  tags?: { id: string; name: string; colorHue: number }[];
-}) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
+function LeadsFiltersClassic({ trailing: _trailing, ...props }: LeadsFiltersProps) {
+  // Mesmo comportamento de antes: com o provider ligado numa rota em opt-out, o botão de aplicar é o do Arc.
   const directorLite = useArcScopeEnabled();
-  const [, startTransition] = useTransition();
-  const [open, setOpen] = useState(false);
-
-  // States
-  const [search, setSearch] = useState(initialSearch ?? "");
-  const [status, setStatus] = useState(initialStatus ?? "");
-  // Keep the clicked pill responsive while the server-rendered table is
-  // revalidating. The URL remains the source of truth once navigation lands.
-  const [optimisticStatus, setOptimisticStatus] = useState<string | null>(null);
-  const [branch, setBranch] = useState(initialBranch ?? "");
-  const [tipo, setTipo] = useState(initialTipo ?? "");
-  const [origem, setOrigem] = useState(initialOrigem ?? "");
-  const [qualification, setQualification] = useState(initialQualification ?? "");
-  const [corretor, setCorretor] = useState(initialCorretor ?? "");
-  const [tag, setTag] = useState(initialTag ?? "");
-  const [pageSize, setPageSize] = useState(initialPageSize ?? "20");
-  const [eligibleCampaigns, setEligibleCampaigns] = useState(initialEligibleCampaigns === "1");
-  const [restored, setRestored] = useState(false);
-
-  const currentPreferences = (): LeadFilterPreferences => ({
-    search, status, branch, tipo, origem, qualification, corretor, tag, pageSize, eligibleCampaigns,
-  });
-
-  function buildUrl(preferences: LeadFilterPreferences) {
-    const currentQuery = typeof window === "undefined" ? searchParams.toString() : window.location.search;
-    const params = new URLSearchParams(currentQuery);
-    params.delete("page");
-
-    if (preferences.search) params.set("search", preferences.search); else params.delete("search");
-    if (preferences.status) params.set("status", preferences.status); else params.delete("status");
-    if (preferences.branch) params.set("branch", preferences.branch); else params.delete("branch");
-    if (preferences.tipo) params.set("tipo", preferences.tipo); else params.delete("tipo");
-    if (preferences.origem) params.set("origem", preferences.origem); else params.delete("origem");
-    if (preferences.qualification) params.set("qualification", preferences.qualification); else params.delete("qualification");
-    if (preferences.corretor) params.set("corretor", preferences.corretor); else params.delete("corretor");
-    if (preferences.tag) params.set("tag", preferences.tag); else params.delete("tag");
-    if (preferences.eligibleCampaigns) params.set("eligibleCampaigns", "1"); else params.delete("eligibleCampaigns");
-    if (preferences.pageSize !== "20") params.set("pageSize", preferences.pageSize); else params.delete("pageSize");
-
-    const queryStr = params.toString();
-    return `/leads${queryStr ? `?${queryStr}` : ""}`;
-  }
-
-  useEffect(() => {
-    if (restored || hasLeadFilterQuery(searchParams)) return;
-    setRestored(true);
-    const stored = parseLeadFilterPreferences(window.localStorage.getItem(storageKey));
-    if (!stored) return;
-    const target = buildUrl(stored);
-    if (`${window.location.pathname}${window.location.search}` !== target) {
-      // A soft replace (24/10): window.location.replace reloaded the whole app, layout included.
-      router.replace(target, { scroll: false });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [restored, searchParams, storageKey]);
-
-  // Keep controls aligned with URL changes (pagination, sorting, browser back)
-  // without remounting the whole leads workspace.
-  const serializedSearchParams = searchParams.toString();
-  useEffect(() => {
-    const params = new URLSearchParams(serializedSearchParams);
-    const nextStatus = params.get("status") ?? "";
-    setSearch(params.get("search") ?? "");
-    setStatus(nextStatus);
-    setOptimisticStatus(null);
-    setBranch(params.get("branch") ?? "");
-    setTipo(params.get("tipo") ?? "");
-    setOrigem(params.get("origem") ?? "");
-    setQualification(params.get("qualification") ?? "");
-    setCorretor(params.get("corretor") ?? "");
-    setTag(params.get("tag") ?? "");
-    setEligibleCampaigns(params.get("eligibleCampaigns") === "1");
-    setPageSize(params.get("pageSize") ?? "20");
-  }, [serializedSearchParams]);
-
-  function navigateTo(target: string) {
-    // Update the address bar immediately so rapid filter changes cannot appear
-    // stuck while the App Router waits for the next server payload.
-    if (`${window.location.pathname}${window.location.search}` !== target) {
-      window.history.replaceState(window.history.state, "", target);
-    }
-    startTransition(() => {
-      router.replace(target, { scroll: false });
-    });
-  }
-
-  const activeCount = [
-    status,
-    branch,
-    tipo,
-    origem,
-    qualification,
-    corretor,
-    tag,
-    eligibleCampaigns ? "eligible-campaigns" : "",
-    pageSize !== "20" ? pageSize : "",
-  ].filter(Boolean).length;
-
-  const hasAnyFilter = Boolean(search || activeCount > 0);
-
-  function applyFilters(overridePrefs?: LeadFilterPreferences) {
-    const preferences = overridePrefs ?? currentPreferences();
-    window.localStorage.setItem(storageKey, JSON.stringify(preferences));
-    setOpen(false);
-    navigateTo(buildUrl(preferences));
-  }
-
-  function handleReset() {
-    setSearch("");
-    setStatus("");
-    setBranch("");
-    setTipo("");
-    setOrigem("");
-    setQualification("");
-    setCorretor("");
-    setTag("");
-    setEligibleCampaigns(false);
-    setPageSize("20");
-
-    window.localStorage.removeItem(storageKey);
-    navigateTo("/leads");
-  }
-
-  // Active filter chips (status is displayed in the quick pills bar above, so omitted here to avoid duplication)
-  const chips: FilterChipItem[] = [];
-  if (search) chips.push({ id: "search", label: "Busca", value: `"${search}"` });
-  if (tipo) chips.push({ id: "tipo", label: "Tipo", value: tipo === "PME" ? "PJ" : tipo });
-  if (origem) chips.push({ id: "origem", label: "Origem", value: origem === "manual" ? "Manual" : "Webhook" });
-  if (eligibleCampaigns) chips.push({ id: "eligibleCampaigns", label: "Meta", value: "Elegíveis agora" });
-  if (qualification) chips.push({ id: "qualification", label: "Qualificação", value: qualificationLabels[qualification] ?? qualification });
-  if (branch) chips.push({ id: "branch", label: "Filial", value: branches.find((b) => b.id === branch)?.name ?? "Filial" });
-  if (corretor) chips.push({ id: "corretor", label: "Corretor", value: brokers.find((b) => b.id === corretor)?.name ?? "Corretor" });
-  if (tag) chips.push({ id: "tag", label: "Tag", value: tags.find((item) => item.id === tag)?.name ?? "Tag" });
-  if (pageSize !== "20") chips.push({ id: "pageSize", label: "Por página", value: `${pageSize}/pág.` });
-
-  function handleRemoveChip(chipId: string) {
-    const updated = { ...currentPreferences() };
-    if (chipId === "search") { setSearch(""); updated.search = ""; }
-    if (chipId === "tipo") { setTipo(""); updated.tipo = ""; }
-    if (chipId === "origem") { setOrigem(""); updated.origem = ""; }
-    if (chipId === "eligibleCampaigns") { setEligibleCampaigns(false); updated.eligibleCampaigns = false; }
-    if (chipId === "qualification") { setQualification(""); updated.qualification = ""; }
-    if (chipId === "branch") { setBranch(""); updated.branch = ""; }
-    if (chipId === "corretor") { setCorretor(""); updated.corretor = ""; }
-    if (chipId === "tag") { setTag(""); updated.tag = ""; }
-    if (chipId === "pageSize") { setPageSize("20"); updated.pageSize = "20"; }
-
-    window.localStorage.setItem(storageKey, JSON.stringify(updated));
-    navigateTo(buildUrl(updated));
-  }
+  const { hideOriginFilters = false, branches, brokers, tags = [] } = props;
+  const {
+    open, setOpen,
+    search, setSearch,
+    status, setStatus,
+    optimisticStatus, setOptimisticStatus,
+    tipo, setTipo,
+    origem, setOrigem,
+    qualification, setQualification,
+    branch, setBranch,
+    corretor, setCorretor,
+    tag, setTag,
+    pageSize, setPageSize,
+    eligibleCampaigns, setEligibleCampaigns,
+    currentPreferences,
+    activeCount,
+    hasAnyFilter,
+    applyFilters,
+    handleReset,
+    chips,
+    handleRemoveChip,
+  } = useLeadFilters(props);
 
   return (
     <div className="flex flex-col gap-2.5">

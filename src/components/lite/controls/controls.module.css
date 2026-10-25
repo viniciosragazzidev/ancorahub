@@ -1,0 +1,264 @@
+/* Controles Lite compartilhados (F3). Só tokens: sem cor crua, sem elevação fora dos tokens. */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Chip em alternância repousa em cartão; o removível fica sobre cinza, sem elevação. */
+.chip:not(.chipRemovable) {
+  box-shadow: var(--shadow-resting);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+}
+
+.bulk {
+  position: sticky;
+  bottom: 16px;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 12px 10px 16px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.bulkCount {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.bulkActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.bulkButton {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.bulkButton[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--veil);
+}
+
+.dialog {
+  width: min(440px, 100%);
+  padding: 20px 20px 16px;
+  border-radius: 20px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+}
+
+.dialogTitle {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.dialogDescription {
+  margin: 6px 0 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.dialogActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.dialogButton {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dialogButton[data-tone="primary"] {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.dialogButton[data-tone="danger"] {
+  background: var(--danger);
+  color: var(--destructive-foreground);
+}
+
+/* Menu de ações: disparador de 44px, lista em popover com itens de 44px. */
+.menuWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.menuTrigger {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.menuList {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: 2px;
+  min-width: 220px;
+  margin: 6px 0 0;
+  padding: 6px;
+  border-radius: 16px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-floating);
+  list-style: none;
+}
+
+.menuItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.menuItem:hover {
+  background: var(--surface-muted);
+}
+
+.menuItem[data-tone="success"] {
+  color: var(--success);
+}
+
+/* Chips numa linha só, com rolagem lateral (celular). */
+.chipsScroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.chipsScroll > li {
+  flex: none;
+}
+
+/* Filtro ativo removível: rótulo do campo em cinza, valor e o X. */
+.chipRemovable {
+  padding: 0 12px 0 16px;
+  background: var(--surface-muted);
+}
+
+.chipKey {
+  color: var(--text-secondary);
+}
+
+.chipX {
+  color: var(--text-muted);
+}
+
+/* Rótulos longos no desktop, curtos no celular (sem quebra dentro do botão). */
+.shortLabel {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .longLabel {
+    display: none;
+  }
+
+  .shortLabel {
+    display: inline;
+  }
+
+  /* Celular: contagem em cima e as ações numa linha só, com rolagem lateral. */
+  .bulk {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    border-radius: 20px;
+  }
+
+  .bulkActions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .bulkButton {
+    flex: none;
+  }
+}

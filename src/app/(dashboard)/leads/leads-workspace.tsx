@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { cloneElement, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 
 import {
@@ -41,6 +41,11 @@ import { LeadDistributionRemovedTag } from "./_components/lead-distribution-remo
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
+import { LeadsListSwitch } from "./leads-lite-list";
+import { LeadsLiteKanban } from "./leads-lite-kanban";
+import litePageStyles from "./leads-lite-page.module.css";
+import { computeSlaInfo, type SlaInfo } from "./lead-sla";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { EmptyState } from "@/components/empty-state";
 import { LeadQualificationBadge, LeadStatusBadge } from "@/components/status-badges";
@@ -205,6 +210,7 @@ export function LeadsWorkspace({
   unassignedLeads = [],
   unassignedPagination,
   queueTabs,
+  liteFilters,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -235,9 +241,13 @@ export function LeadsWorkspace({
   };
   /** Queue tabs, shown right under the view tabs in the same area. */
   queueTabs?: React.ReactNode;
+  /** Chave do diretor: os filtros Lite entram na mesma barra das visões (busca, filtros e lista/kanban numa linha). */
+  liteFilters?: React.ReactElement<{ trailing?: React.ReactNode }>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // Chave do diretor: a lista Lite traz a própria barra de lote, com as mesmas ações de `selectionActions`.
+  const directorLite = useDirectorLitePage();
   const [workspaceLeads, setWorkspaceLeads] = useState<LeadWorkspaceItem[]>(leads);
   const [selectedLead, setSelectedLead] = useState<LeadWorkspaceItem | null>(null);
   const selectedMetaDetails = selectedLead
@@ -541,115 +551,139 @@ export function LeadsWorkspace({
     setActiveDragId(String(event.active.id));
   }
 
-  function handleDragEnd(event: DragEndEvent) {
-    setActiveDragId(null);
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
+  // Reordena as colunas do kanban (mouse e teclado no Lite usam a mesma regra).
+  function moveKanbanColumn(activeId: string, overId: string) {
     setOrderedStatuses((current) => {
-      const oldIndex = current.indexOf(String(active.id));
-      const newIndex = current.indexOf(String(over.id));
+      const oldIndex = current.indexOf(activeId);
+      const newIndex = current.indexOf(overId);
       if (oldIndex === -1 || newIndex === -1) return current;
       return arrayMove(current, oldIndex, newIndex);
     });
   }
 
+  function handleDragEnd(event: DragEndEvent) {
+    setActiveDragId(null);
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    moveKanbanColumn(String(active.id), String(over.id));
+  }
+
+  // Abas de visão e menu de colunas: na tela atual ficam na própria linha; com a chave, entram na barra dos filtros.
+  const viewTabs = (
+    <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
+      <TabsTrigger value="list" className="text-xs gap-1.5">
+        <UserList className="size-4" />
+        <span className="hidden sm:inline">Todos os Leads</span>
+        <span className="sm:hidden">Lista</span>
+        {leadCount > 0 ? (
+          <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+            {leadCount}
+          </Badge>
+        ) : null}
+      </TabsTrigger>
+      <TabsTrigger value="kanban" className="text-xs gap-1.5">
+        <SquaresFour className="size-4" />
+        <span className="hidden sm:inline">Kanban do Funil</span>
+        <span className="sm:hidden">Kanban</span>
+      </TabsTrigger>
+      <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
+        <Target className="size-4 text-primary" />
+        <span className="hidden sm:inline">Qualificação IA</span>
+        <span className="sm:hidden">Qualificação</span>
+        {qualifyingLeads.length > 0 ? (
+          <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+            {qualifyingLeads.length}
+          </Badge>
+        ) : null}
+      </TabsTrigger>
+      <TabsTrigger value="radar" className="text-xs gap-1.5">
+        <Sparkle className="size-4 text-primary" />
+        <span className="hidden sm:inline">Radar de Negociações (IA)</span>
+        <span className="sm:hidden">Radar IA</span>
+      </TabsTrigger>
+      <TabsTrigger value="perdidos" className="text-xs gap-1.5 text-muted-foreground data-[state=active]:text-destructive">
+        <XCircle className="size-4 text-destructive" />
+        <span className="hidden sm:inline">Perdidos & Inativos</span>
+        <span className="sm:hidden">Perdidos</span>
+        {workspaceLeads.filter((l) => l.status === "lost").length > 0 ? (
+          <Badge variant="destructive" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+            {workspaceLeads.filter((l) => l.status === "lost").length}
+          </Badge>
+        ) : null}
+      </TabsTrigger>
+      {showUnassignedFilter ? (
+        <TabsTrigger value="sem-atribuicao" className="text-xs gap-1.5">
+          <UserSwitch className="size-4 text-warning" />
+          <span className="hidden sm:inline">Sem Atribuição</span>
+          <span className="sm:hidden">Sem atrib.</span>
+          {unassignedCount > 0 ? (
+            <Badge variant="warning" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+              {unassignedCount}
+            </Badge>
+          ) : null}
+        </TabsTrigger>
+      ) : null}
+    </TabsList>
+  );
+  const columnsMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
+        <SlidersHorizontal className="size-3.5" />
+        <span className="hidden sm:inline">Colunas</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuLabel className="text-xs">Colunas do Kanban</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {kanbanStatuses.map((status) => (
+          <DropdownMenuCheckboxItem
+            key={status}
+            className="text-xs"
+            checked={!hiddenStatuses.includes(status)}
+            onCheckedChange={() => toggleStatusVisibility(status)}
+          >
+            {statusLabel(status)}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <HideLeadArrivalContext.Provider value={contextRole === "broker"}>
-    <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-4">
+    <div className={directorLite ? `operational-workspace ${litePageStyles.workspace}` : "operational-workspace flex min-h-0 flex-1 flex-col gap-4"}>
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs value={activeTab} onValueChange={handleViewChange} className="flex min-h-0 flex-1 flex-col">
+        {directorLite ? (
+          <div className={litePageStyles.bar}>
+            {liteFilters ? cloneElement(liteFilters, { trailing: <>{viewTabs}{columnsMenu}</> }) : (
+              <div className="flex min-w-0 items-center gap-2">{viewTabs}{columnsMenu}</div>
+            )}
+            {queueTabs}
+          </div>
+        ) : (
         <div className="grid gap-2 border-b border-border/60 pb-2">
         <div className="flex items-center gap-2">
-          <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
-            <TabsTrigger value="list" className="text-xs gap-1.5">
-              <UserList className="size-4" />
-              <span className="hidden sm:inline">Todos os Leads</span>
-              <span className="sm:hidden">Lista</span>
-              {leadCount > 0 ? (
-                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {leadCount}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
-            <TabsTrigger value="kanban" className="text-xs gap-1.5">
-              <SquaresFour className="size-4" />
-              <span className="hidden sm:inline">Kanban do Funil</span>
-              <span className="sm:hidden">Kanban</span>
-            </TabsTrigger>
-            <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
-              <Target className="size-4 text-primary" />
-              <span className="hidden sm:inline">Qualificação IA</span>
-              <span className="sm:hidden">Qualificação</span>
-              {qualifyingLeads.length > 0 ? (
-                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {qualifyingLeads.length}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
-            <TabsTrigger value="radar" className="text-xs gap-1.5">
-              <Sparkle className="size-4 text-primary" />
-              <span className="hidden sm:inline">Radar de Negociações (IA)</span>
-              <span className="sm:hidden">Radar IA</span>
-            </TabsTrigger>
-            <TabsTrigger value="perdidos" className="text-xs gap-1.5 text-muted-foreground data-[state=active]:text-destructive">
-              <XCircle className="size-4 text-destructive" />
-              <span className="hidden sm:inline">Perdidos & Inativos</span>
-              <span className="sm:hidden">Perdidos</span>
-              {workspaceLeads.filter((l) => l.status === "lost").length > 0 ? (
-                <Badge variant="destructive" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {workspaceLeads.filter((l) => l.status === "lost").length}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
-            {showUnassignedFilter ? (
-              <TabsTrigger value="sem-atribuicao" className="text-xs gap-1.5">
-                <UserSwitch className="size-4 text-warning" />
-                <span className="hidden sm:inline">Sem Atribuição</span>
-                <span className="sm:hidden">Sem atrib.</span>
-                {unassignedCount > 0 ? (
-                  <Badge variant="warning" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                    {unassignedCount}
-                  </Badge>
-                ) : null}
-              </TabsTrigger>
-            ) : null}
-          </TabsList>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
-              <SlidersHorizontal className="size-3.5" />
-              <span className="hidden sm:inline">Colunas</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel className="text-xs">Colunas do Kanban</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {kanbanStatuses.map((status) => (
-                <DropdownMenuCheckboxItem
-                  key={status}
-                  className="text-xs"
-                  checked={!hiddenStatuses.includes(status)}
-                  onCheckedChange={() => toggleStatusVisibility(status)}
-                >
-                  {statusLabel(status)}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {viewTabs}
+          {columnsMenu}
         </div>
         {queueTabs}
         </div>
+        )}
 
         {/* ─── TAB 1: LISTA PRINCIPAL (TABELA) ─── */}
-        <TabsContent value="list" className="mt-4">
+        <TabsContent value="list" className={directorLite ? litePageStyles.region : "mt-4"}>
           <div className="space-y-4">
-            <SelectionToolbar
-              selectedCount={multiSelect.count}
-              totalCount={workspaceLeads.length}
-              onClear={multiSelect.clear}
-            >
-              {selectionActions}
-            </SelectionToolbar>
+            {directorLite ? null : (
+              <SelectionToolbar
+                selectedCount={multiSelect.count}
+                totalCount={workspaceLeads.length}
+                onClear={multiSelect.clear}
+              >
+                {selectionActions}
+              </SelectionToolbar>
+            )}
             <div className="w-full">
-              <LeadsDataTable
+              <LeadsListSwitch
                 leads={workspaceLeads}
                 contextRole={contextRole}
                 shouldMask={shouldMask}
@@ -665,13 +699,47 @@ export function LeadsWorkspace({
                   else multiSelect.clear();
                 }}
                 onRowClick={setSelectedLead}
+                liteBulk={directorLite ? {
+                  role: contextRole,
+                  brokers,
+                  branches,
+                  onStatusCommitted: handleBulkStatusCommitted,
+                  onReassignCommitted: handleBulkReassignCommitted,
+                  onBranchCommitted: handleBulkBranchCommitted,
+                  onRevertCommitted: handleBulkRevertCommitted,
+                } : undefined}
               />
             </div>
           </div>
         </TabsContent>
 
         {/* ─── TAB 2: KANBAN DO FUNIL ─── */}
-        <TabsContent value="kanban" className="relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]">
+        <TabsContent value="kanban" className={directorLite ? `relative ${litePageStyles.region}` : "relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]"}>
+          {directorLite ? (
+            <LeadsLiteKanban
+              statuses={visibleStatuses}
+              groupedLeads={groupedLeads}
+              onMoveColumn={moveKanbanColumn}
+              onOpen={setSelectedLead}
+              isSelected={multiSelect.isSelected}
+              onToggle={multiSelect.toggle}
+              selectedIds={multiSelect.selectedIds}
+              onClearSelection={multiSelect.clear}
+              bulk={{
+                role: contextRole,
+                brokers,
+                branches,
+                onStatusCommitted: handleBulkStatusCommitted,
+                onReassignCommitted: handleBulkReassignCommitted,
+                onBranchCommitted: handleBulkBranchCommitted,
+                onRevertCommitted: handleBulkRevertCommitted,
+              }}
+              hideArrival={contextRole === "broker"}
+              slaFirstContactMinutes={slaFirstContactMinutes}
+              slaStagnantDays={slaStagnantDays}
+            />
+          ) : (
+          <>
           <SelectionToolbar
             selectedCount={multiSelect.count}
             totalCount={workspaceLeads.length}
@@ -733,10 +801,12 @@ export function LeadsWorkspace({
           <p className="mt-3 text-xs text-muted-foreground">
             Arraste as colunas para reordenar. Use o botão &quot;Colunas&quot; para exibir/ocultar etapas.
           </p>
+          </>
+          )}
         </TabsContent>
 
         {/* ─── TAB 3: QUALIFICAÇÃO IA ─── */}
-        <TabsContent value="qualificacoes" className="mt-4">
+        <TabsContent value="qualificacoes" className={directorLite ? litePageStyles.region : "mt-4"}>
           {qualifyingLeads.length === 0 ? (
             <EmptyState
               variant="ghost"
@@ -757,7 +827,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 4: RADAR DE NEGOCIAÇÕES (IA) ─── */}
-        <TabsContent value="radar" className="mt-4">
+        <TabsContent value="radar" className={directorLite ? litePageStyles.region : "mt-4"}>
           <NegotiationsRadarTab
             leads={workspaceLeads}
             branches={branches}
@@ -767,7 +837,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 5: PERDIDOS & INATIVOS ─── */}
-        <TabsContent value="perdidos" className="mt-4">
+        <TabsContent value="perdidos" className={directorLite ? litePageStyles.region : "mt-4"}>
           <div className="space-y-4">
             <div className="w-full">
               <LeadsDataTable
@@ -790,7 +860,7 @@ export function LeadsWorkspace({
 
         {/* ─── TAB 6: SEM ATRIBUIÇÃO (DIREÇÃO) ─── */}
         {showUnassignedFilter ? (
-          <TabsContent value="sem-atribuicao" className="mt-4">
+          <TabsContent value="sem-atribuicao" className={directorLite ? litePageStyles.region : "mt-4"}>
             {unassignedLeads.length === 0 ? (
               <EmptyState
                 variant="ghost"
@@ -1106,92 +1176,6 @@ function SlaBar({ sla }: { sla: NonNullable<SlaInfo> }) {
       </TooltipContent>
     </Tooltip>
   );
-}
-
-type SlaInfo = {
-  ratio: number;
-  label: string;
-  title: string;
-  deadline: string;
-} | null;
-
-function computeSlaInfo(
-  lead: {
-    status: string;
-    createdAt: string;
-    assignedAt?: string | null;
-    stageEnteredAt?: string | null;
-    serviceStartedAt?: string | null;
-    firstContactAt?: string | null;
-    corretorId?: string | null;
-  },
-  slaFirstContactMinutes: number,
-  slaStagnantDays: number,
-): SlaInfo {
-  const now = Date.now();
-  const fmtTime = (ms: number) =>
-    new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(ms));
-  const fmtDate = (ms: number) =>
-    new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(ms));
-
-  // New or distributed without first contact → first-contact SLA
-  if ((lead.status === "new" || lead.status === "distributed") && !lead.firstContactAt) {
-    const anchor = lead.assignedAt || lead.createdAt;
-    if (!anchor) return null;
-    const anchorMs = new Date(anchor).getTime();
-    const elapsed = now - anchorMs;
-    const total = slaFirstContactMinutes * 60_000;
-    const ratio = Math.min(elapsed / total, 2);
-    const remaining = Math.max(0, total - elapsed);
-    const deadlineMs = anchorMs + total;
-
-    let label: string;
-    if (elapsed >= total) {
-      const over = Math.round((elapsed - total) / 60000);
-      label = over >= 60 ? `${Math.round(over / 60)}h atrasado` : `${over}min atrasado`;
-    } else if (remaining >= 3600000) {
-      label = `${Math.round(remaining / 3600000)}h restantes`;
-    } else {
-      label = `${Math.round(remaining / 60000)}min restantes`;
-    }
-
-    return {
-      ratio,
-      label,
-      title: "Prazo de 1º contato",
-      deadline: `Limite: ${fmtTime(deadlineMs)} (${slaFirstContactMinutes}min)`,
-    };
-  }
-
-  // Active stages → stagnation SLA
-  const activeStatuses: readonly string[] = ["in_contact", "quote_sent", "negotiation"];
-  if (activeStatuses.includes(lead.status) && lead.stageEnteredAt) {
-    const stageMs = new Date(lead.stageEnteredAt).getTime();
-    const elapsed = now - stageMs;
-    const total = slaStagnantDays * 24 * 60 * 60_000;
-    const ratio = Math.min(elapsed / total, 2);
-    const remaining = Math.max(0, total - elapsed);
-    const deadlineMs = stageMs + total;
-
-    let label: string;
-    if (elapsed >= total) {
-      const over = Math.round(elapsed / 86400000 - slaStagnantDays);
-      label = `${over}d atrasado`;
-    } else if (remaining >= 86400000) {
-      label = `${Math.round(remaining / 86400000)}d restantes`;
-    } else {
-      label = `${Math.round(remaining / 3600000)}h restantes`;
-    }
-
-    return {
-      ratio,
-      label,
-      title: `Tempo na etapa (${statusLabel(lead.status)})`,
-      deadline: `Limite: ${fmtDate(deadlineMs)} (${slaStagnantDays}d)`,
-    };
-  }
-
-  return null;
 }
 
 function LeadOverviewMetric({

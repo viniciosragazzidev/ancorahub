@@ -47,8 +47,6 @@
   "/internal/design-system",
   "/internal/design-system/motion",
   "/jornada",
-  "/leads",
-  "/leads/[id]",
   "/leads/[id]/feedback",
   "/leads/arquivados",
   "/leads/dashboard",

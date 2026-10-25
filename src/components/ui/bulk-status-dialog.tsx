@@ -25,6 +25,9 @@ export function BulkStatusDialog({
   role,
   bulkStatusAction,
   onCommitted,
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
 }: {
   leadIds: string[];
   role: string;
@@ -33,8 +36,17 @@ export function BulkStatusDialog({
     formData: FormData,
   ) => Promise<StatusChangeState>;
   onCommitted?: (input: { leadIds: string[]; newStatus: string }) => void;
+  /** Abertura controlada por fora (barra de lote Lite). Sem estes, o diálogo abre pelo próprio botão, como sempre. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = useCallback((next: boolean) => {
+    if (openProp === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  }, [openProp, onOpenChange]);
   const [targetStatus, setTargetStatus] = useState("");
   const [visibleError, setVisibleError] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState(bulkStatusAction, {});
@@ -46,7 +58,7 @@ export function BulkStatusDialog({
     if (result.changedLeadIds?.length && result.newStatus) {
       onCommitted?.({ leadIds: result.changedLeadIds, newStatus: result.newStatus });
     }
-  }, [leadIds.length, onCommitted]);
+  }, [leadIds.length, onCommitted, setOpen]);
   const handleError = useCallback((result: typeof state) => {
     if (!result.error) return;
     setVisibleError(result.error);
@@ -61,7 +73,7 @@ export function BulkStatusDialog({
       setTargetStatus("");
       setVisibleError(null);
     }
-  }, [pending]);
+  }, [pending, setOpen]);
 
   const validTargets =
     role === "director" || role === "manager"
@@ -70,7 +82,7 @@ export function BulkStatusDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button size="sm" variant="outline">Alterar status</Button>} />
+      {hideTrigger ? null : <DialogTrigger render={<Button size="sm" variant="outline">Alterar status</Button>} />}
       <DialogPopup key={open ? "open" : "closed"} className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>Alterar status em lote</DialogTitle>
