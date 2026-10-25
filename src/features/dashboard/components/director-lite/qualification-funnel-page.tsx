@@ -4,7 +4,7 @@ import type { FunnelPeriod, QualificationFunnel } from "@/features/qualification
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
 import type { DashboardBranch } from "./director-lite-dashboard";
-import { DirectorLiteChrome } from "./director-lite-chrome";
+import { dashboardHref, DirectorLiteChrome } from "./director-lite-chrome";
 import { QualificationFunnelView } from "./qualification-funnel-view";
 
 function overviewPeriod(period: FunnelPeriod): OverviewPeriod {
@@ -31,7 +31,7 @@ export function DirectorLiteQualificationFunnelPage({
 
   return (
     <DirectorLiteChrome now={now} tab="funnel" period={period} branchId={branchId} branches={branches} firstName={firstName}>
-      <QualificationFunnelView data={data} unitName={selectedBranch?.name ?? null} />
+      <QualificationFunnelView data={data} unitName={selectedBranch?.name ?? null} widerHref={dashboardHref("funnel", "7", branchId)} />
     </DirectorLiteChrome>
   );
 }
