@@ -68,3 +68,18 @@ export function initials(name: string) {
   const parts = name.trim().split(/\s+/);
   return ((parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toLocaleUpperCase("pt-BR");
 }
+
+/** Período do painel em palavras: "hoje" ou "no período" (7, 30 dias ou intervalo). */
+export function periodWords(period: unknown) {
+  return period === "today" ? "hoje" : "no período";
+}
+
+/** Rótulo curto de um número que não dá para calcular (nunca "sem dados para sem dados"). */
+export function noDataLabel(period: unknown) {
+  return period === "today" ? "Sem dados hoje" : "Sem dados no período";
+}
+
+/** "24/10 07h" vira "07h" em "Hoje" (o dia da operação passa da meia-noite, mas o diretor lê só a hora). */
+export function ranOutLabel(label: string, period: unknown) {
+  return period === "today" ? label.split(" ").pop() ?? label : label;
+}

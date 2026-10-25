@@ -135,12 +135,14 @@ export function LiteColumn({ value, delay = 0, tone = "primary", label }: { valu
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.3 });
   const reduce = useReduce();
+  // Hora sem lead: só a linha de base do gráfico, nunca um risco de 2% fingindo valor.
+  if (value <= 0) return <span ref={ref} className={styles.column} title={label} />;
   return (
     <span ref={ref} className={styles.column} title={label}>
       <motion.span
         className={styles.columnFill}
         data-tone={tone}
-        style={{ height: `${Math.max(2, Math.min(100, value * 100))}%` }}
+        style={{ height: `${Math.min(100, value * 100)}%` }}
         initial={reduce ? { opacity: 0 } : { scaleY: 0 }}
         animate={inView ? { opacity: 1, scaleY: 1 } : undefined}
         transition={reduce ? fadeT : { duration: m.duration.considered, ease: [...m.ease.standard], delay }}
