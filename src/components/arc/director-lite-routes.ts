@@ -37,7 +37,6 @@
   "/guia",
   "/guia/webhook",
   "/integrations/meta",
-  "/integrations/whats_alt",
   "/internal/design-system",
   "/internal/design-system/motion",
   "/jornada",
