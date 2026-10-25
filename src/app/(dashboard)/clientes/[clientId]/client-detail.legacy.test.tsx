@@ -50,6 +50,8 @@ vi.mock("@/features/post-sale/queries", async () => ({ getLeadBeneficiaries: asy
 vi.mock("@/features/post-sale/actions", () => ({ updateCustomerRenewalStatusAction: async () => ({}) }));
 vi.mock("@/features/leads/actions", () => ({ addLeadNoteAction: async () => ({}) }));
 vi.mock("@/features/broker-workspace/components/light-client-detail", () => ({ LightClientDetail: () => null }));
+// A área de soltar arquivos do Arc usa molas do motion (fora do mock global); aqui basta saber que ela aparece.
+vi.mock("@/components/arc/file-dropzone/file-dropzone", () => ({ FileDropzone: () => <div data-testid="file-dropzone" /> }));
 vi.mock("@/features/director-lite/style-flag", () => ({ isDirectorLitePageOnServer: async () => fixtures.liteStyle.current }));
 vi.mock("@/components/dashboard-header", () => ({
   DashboardHeader: ({ breadcrumb, title }: { breadcrumb?: string; title?: string }) => <header data-testid="dashboard-header">{breadcrumb} / {title}</header>,
@@ -89,5 +91,31 @@ describe("ficha do cliente do diretor com a chave desligada", () => {
     expect(container.innerHTML).toMatchSnapshot("documentos");
     fireEvent.click(screen.getByRole("tab", { name: /Linha do Tempo/ }));
     expect(container.innerHTML).toMatchSnapshot("linha do tempo");
+  }, 30_000);
+
+  it("com a chave do diretor, mostra a ficha Lite sem perder vendas, documentos, linha do tempo e renovação", async () => {
+    const { container } = await renderPage(true);
+    expect(container.querySelector('[data-skin="diretor"]')).not.toBeNull();
+    expect(screen.getByTestId("dashboard-header")).toHaveTextContent("Maria Aparecida Nova dos Santos");
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Maria Aparecida Nova dos Santos" })).toBeInTheDocument();
+    expect(screen.getAllByText("Renovação em 27 dias").length).toBe(2);
+    expect(screen.getByRole("link", { name: /Ver lead original/ })).toHaveAttribute("href", "/leads/11111111-1111-4111-8111-111111111111");
+    expect(screen.getByRole("link", { name: /Enviar mensagem pós-venda/ })).toHaveAttribute("href", "/conversas?leadId=11111111-1111-4111-8111-111111111111");
+    expect(screen.getByRole("tab", { name: /Vendas/ })).toHaveTextContent("2");
+    expect(screen.getAllByRole("link", { name: /Ver detalhes/ })[0]).toHaveAttribute("href", "/vendas/sale-1");
+    expect(screen.getByDisplayValue("Proposta enviada, aguardando retorno")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Salvar acompanhamento" })).toBeEnabled();
+    expect(screen.getAllByText("João Nova").length).toBeGreaterThan(0);
+    // Datas pt-BR no fuso de São Paulo.
+    expect(container.textContent).toContain("14 de agosto de 2026");
+    expect(container.textContent).toContain("01/09/2026");
+    fireEvent.click(screen.getByRole("tab", { name: "Documentos" }));
+    expect(container.textContent).toContain("RG ou CNH do titular");
+    expect(screen.getAllByTestId("file-dropzone").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByRole("tab", { name: "Linha do tempo" }));
+    expect(screen.getByRole("button", { name: "Adicionar nota" })).toBeInTheDocument();
+    expect(container.textContent).toContain("inclusão do filho");
+    expect(container.textContent).not.toContain("—");
   }, 30_000);
 });
