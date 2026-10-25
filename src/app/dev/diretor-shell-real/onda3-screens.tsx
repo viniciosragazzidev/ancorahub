@@ -9,6 +9,8 @@ import { LiteRelatedLinks } from "@/components/lite/page/related-links";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { SalesWorkspaceLite, type SaleLiteRow } from "@/app/(dashboard)/vendas/sales-workspace-lite";
 import { SaleDetailLite } from "@/app/(dashboard)/vendas/[id]/sale-detail-lite";
+import { PropostasLite } from "@/app/(dashboard)/propostas/_components/propostas-lite";
+import { PROPOSAL_FIXTURES, PROPOSAL_LEADS } from "@/app/(dashboard)/propostas/_components/proposals-fixtures";
 
 const BRANCHES = [
   { id: "branch-centro", name: "Centro" },
@@ -101,6 +103,17 @@ export function VendaShellScreen() {
           schedule={SCHEDULE}
           canManage
         />
+      </main>
+    </>
+  );
+}
+
+export function PropostasShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Operação comercial" title="Propostas" />
+      <main className={litePage.stack}>
+        <PropostasLite initialProposals={PROPOSAL_FIXTURES} expiringProposals={PROPOSAL_FIXTURES.slice(0, 3)} leads={PROPOSAL_LEADS} />
       </main>
     </>
   );
