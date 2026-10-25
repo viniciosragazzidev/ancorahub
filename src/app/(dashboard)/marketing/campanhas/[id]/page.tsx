@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import { and, count, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { DashboardHeader } from "@/components/dashboard-header";
 import { CampaignDetailView } from "@/features/meta-ads/components/campaign-detail-view";
+import { CampaignDetailLite } from "@/features/meta-ads/components/lite/campaign-detail-lite";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { getTenantMetaCampaignsPerformance } from "@/features/meta-ads/meta-analytics-service";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCapability } from "@/shared/auth/authorization";
@@ -198,6 +201,28 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
       ? { campaignId: campaign.campaignId, queueId: accountDefault, enabled: true }
       : undefined;
   const canConfigureCapture = context.role === "director" || context.role === "manager" || context.jobTitle === "marketing";
+
+  const detailProps = {
+    campaign,
+    ads: campaignAds,
+    forms: campaignForms,
+    queues,
+    initialQueueId: currentRoute?.queueId ?? null,
+    initialCaptureEnabled: currentRoute?.enabled ?? false,
+    canConfigureCapture,
+    canDisableCapture: context.role === "director",
+  };
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/marketing/campanhas/[id]")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Marketing / Campanhas" title={campaign.name} />
+        <main className={litePage.stack}>
+          <CampaignDetailLite {...detailProps} />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

@@ -1,0 +1,147 @@
+/* Detalhe da campanha Meta no visual Lite (Onda 7). Só tokens; grupos internos com divisória, sem card dentro de card. */
+
+.statusRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+}
+
+.settingRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.settingRow > :first-child {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.switchWrap {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 12px;
+}
+
+.summary {
+  display: grid;
+  gap: 4px;
+  padding: 16px 24px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+}
+
+.summaryTitle {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+}
+
+.list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listRow {
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.listText {
+  display: grid;
+  min-width: 0;
+}
+
+.listText > :first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+  align-items: stretch;
+  gap: 16px;
+}
+
+.facts {
+  display: grid;
+  margin: 0;
+}
+
+.facts > div {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.facts dt {
+  color: var(--text-secondary);
+}
+
+.facts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.funnel {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.funnelStep {
+  display: grid;
+  gap: 8px;
+}
+
+.funnelLabel {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--text-sm);
+}
+
+.funnelTrack {
+  display: block;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.funnelBar {
+  display: block;
+  max-width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+@media (max-width: 767px) {
+  .summary {
+    padding: 16px;
+  }
+}
