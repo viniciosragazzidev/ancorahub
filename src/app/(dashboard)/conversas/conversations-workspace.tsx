@@ -2067,7 +2067,6 @@ function ContactAvatar({ className, name, photoUrl }: { className?: string; name
 
 /** The contact's WhatsApp picture (read through the company number), for the open conversation only. */
 function contactPhotoUrl(conversation: Pick<ConversationItem, "id" | "telefone">) {
-  if (conversation.id.startsWith("lead-fixture-")) return null;
   if (!conversation.id.startsWith("unassigned-")) return `/api/contacts/avatar?lead=${encodeURIComponent(conversation.id)}`;
   const digits = conversation.telefone.replace(/\D/g, "");
   return digits.length >= 10 ? `/api/contacts/avatar?phone=${digits}` : null;

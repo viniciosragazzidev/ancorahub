@@ -236,7 +236,7 @@ export function AppShell({
     : undefined;
 
   return (
-    <ArcScopeProvider enabled={directorLiteEnabled && !directorLiteRouteOptedOut}>
+    <ArcScopeProvider enabled={directorLiteEnabled}>
     <DirectorChromeProvider
       shellUser={shellUser}
       viewAs={viewAs}
