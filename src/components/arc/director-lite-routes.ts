@@ -26,7 +26,6 @@
   "/ferramentas/materiais-operadoras",
   "/ferramentas/validador-comprovante",
   "/filiais",
-  "/fluxos-whatsapp",
   "/gestao",
   "/gestao/equipes/[supervisorId]",
   "/guia",
