@@ -29,9 +29,17 @@ const INTEGRATIONS = [
   { id: "int-3", name: "Formulário de cotação Bradesco Saúde Top Nacional Flex", source: "landing_page", branchId: "branch-barra", branchName: "Barra da Tijuca", status: "revoked" as const, tokenPrefix: "lp_77de", createdAt: new Date("2026-08-01T13:00:00Z") },
 ];
 
-export function SettingsShellScreen() {
-  const sections: SettingsLiteSection[] = [
-    { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: <AccountSummaryLite name="Marina Exemplo de Albuquerque" email="marina.albuquerque@ancora.example" role="director" /> },
+/** As mesmas seções por papel da página real (tabIds): diretor, marketing (com integrações) ou gestor/cargo personalizado. */
+const SETTINGS_TABS: Record<"director" | "marketing" | "manager", string[]> = {
+  director: ["conta", "empresa", "unidade", "atendimento", "whatsapp", "integracoes", "seguranca", "extensao"],
+  marketing: ["conta", "integracoes", "whatsapp", "seguranca", "extensao"],
+  manager: ["conta", "unidade", "atendimento", "whatsapp", "seguranca", "extensao"],
+};
+
+export function SettingsShellScreen({ variant = "director" }: { variant?: "director" | "marketing" | "manager" } = {}) {
+  const isDirector = variant === "director";
+  const all: SettingsLiteSection[] = [
+    { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: <AccountSummaryLite name="Marina Exemplo de Albuquerque" email="marina.albuquerque@ancora.example" role={isDirector ? "director" : "manager"} /> },
     { id: "empresa", title: "Empresa", description: "Dados da corretora e identidade visual", node: <EmpresaLite canEdit tenant={{ name: "Âncora Saúde", legalName: "Âncora Saúde Corretora de Seguros Ltda", cnpj: "12.345.678/0001-90", logoUrl: null, brandColor: "#2563EB" }} /> },
     { id: "unidade", title: "Unidade", description: "Centro", node: <UnitLite branch={{ id: "branch-centro", name: "Centro", status: "active", acceptingLeads: true, autoDistribute: false, createdAt: new Date("2025-03-12T12:00:00Z") }} /> },
     {
@@ -40,16 +48,17 @@ export function SettingsShellScreen() {
       description: "Lembretes de feedback, distribuição e etapa pela IA",
       node: (
         <>
-          <FeedbackLite feedbackReminderInterval="30" feedbackReminderMaxAttempts={5} feedbackPushEnabled feedbackToastEnabled feedbackRequiredEnabled={false} maxActiveLeadsLimit={10} canEdit />
-          <StageModeLite initialMode="suggest" />
+          <FeedbackLite feedbackReminderInterval="30" feedbackReminderMaxAttempts={5} feedbackPushEnabled feedbackToastEnabled feedbackRequiredEnabled={false} maxActiveLeadsLimit={10} canEdit={isDirector} />
+          {isDirector ? <StageModeLite initialMode="suggest" /> : null}
         </>
       ),
     },
     { id: "whatsapp", title: "WhatsApp", description: "O número que você usa no atendimento", node: <WhatsappLite /> },
     { id: "integracoes", title: "Integrações", description: "Fontes de captura, webhooks e pixels", node: <IntegrationsLite integrations={INTEGRATIONS} branches={BRANCHES} /> },
     { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityLite enabled={false} email="marina.albuquerque@ancora.example" /> },
-    { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLiteView data={{ enabled: true, minimumVersion: "0.4.2", canConfigure: true }} /> },
+    { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLiteView data={{ enabled: true, minimumVersion: "0.4.2", canConfigure: isDirector }} /> },
   ];
+  const sections = SETTINGS_TABS[variant].map((id) => all.find((section) => section.id === id)).filter((section): section is SettingsLiteSection => Boolean(section));
   return (
     <>
       <DashboardHeader breadcrumb="Administração" title="Configurações" />

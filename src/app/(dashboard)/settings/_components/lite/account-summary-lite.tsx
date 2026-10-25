@@ -1,6 +1,9 @@
 /** Resumo de "Minha conta" no visual Lite (sem perfil completo): nome, e-mail e perfil de acesso. */
 import styles from "@/components/lite/page/lite-sections.module.css";
 
+/** Nome do perfil em português (o Lite vale para qualquer papel do modo normal, não só o diretor). */
+const ROLE_LABELS: Record<string, string> = { director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" };
+
 export function AccountSummaryLite({ name, email, role }: { name: string; email: string; role: string }) {
   return (
     <dl className={styles.group}>
@@ -15,7 +18,7 @@ export function AccountSummaryLite({ name, email, role }: { name: string; email:
       <div className={styles.row}>
         <dt className={styles.rowDescription}>Perfil de acesso</dt>
         <dd className={styles.rowText}>
-          <span className={styles.value}>{role}</span>
+          <span className={styles.value}>{ROLE_LABELS[role] ?? role}</span>
           <span className={styles.rowDescription}>O perfil é administrado pela corretora e não pode ser alterado nesta tela.</span>
         </dd>
       </div>

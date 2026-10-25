@@ -20,6 +20,10 @@ import { ONDA3_SCREENS } from "./onda3-registry";
 import { ONDA6_SCREENS } from "./onda6-registry";
 import { ONDA5_SCREENS } from "./onda5-screens";
 import { ONDA10_SCREENS } from "./onda10-registry";
+import { EquipeShellScreen } from "./onda4-screens";
+import { VendasShellScreen } from "./onda3-screens";
+import { SettingsShellScreen } from "./onda6-settings-screens";
+import AccessDeniedPage from "@/app/(auth)/access-denied/page";
 
 const permissions = [
   "acessar_dashboard",
@@ -32,6 +36,36 @@ const permissions = [
   "acessar_campanhas_meta",
   "acessar_ferramentas",
 ];
+
+/**
+ * ?papel=marketing|personalizado: o mesmo shell Lite para papéis do modo normal que não são diretor (decisão de 25/10).
+ * Permissões de exemplo: marketing (manager com cargo marketing, sem unidade) e um cargo personalizado de gestor
+ * com unidade e permissões parciais. Telas que o papel não abre mostram o acesso negado, como o app real.
+ */
+const PAPEIS = {
+  marketing: {
+    label: "Marketing",
+    roleKey: "manager" as const,
+    jobTitle: "marketing",
+    branchId: null,
+    permissions: ["acessar_dashboard", "acessar_leads", "acessar_campanhas_meta", "acessar_configuracoes_pessoais"],
+    denied: ["/conversas", "/vendas", "/equipe"],
+    tabs: ["overview"] as const,
+    canOpenConversations: false,
+    settings: "marketing" as const,
+  },
+  personalizado: {
+    label: "Analista comercial",
+    roleKey: "manager" as const,
+    jobTitle: "manager",
+    branchId: "branch-centro",
+    permissions: ["acessar_dashboard", "acessar_leads", "acessar_conversas", "acessar_vendas", "acessar_configuracoes_pessoais"],
+    denied: [] as string[],
+    tabs: ["overview", "quality", "funnel"] as const,
+    canOpenConversations: true,
+    settings: "manager" as const,
+  },
+};
 
 const demoNow = new Date("2026-10-24T16:42:00.000Z");
 const demoBranches = [
@@ -162,6 +196,7 @@ export default async function DirectorShellRealPage({
   if (process.env.NODE_ENV !== "development") notFound();
   const params = await searchParams;
   const isSuperAdminViewingDirector = params.case === "super-admin";
+  const papel = params.papel === "marketing" || params.papel === "personalizado" ? PAPEIS[params.papel] : null;
   const showConversations = params.view === "conversas";
   // ?tela=dashboard (padrão), leads, kanban, qualificacao, sem-atribuicao, radar ou lead: a mesma moldura real com cada tela.
   const screen = typeof params.tela === "string" ? params.tela : "dashboard";
@@ -170,7 +205,7 @@ export default async function DirectorShellRealPage({
   const onda3 = ONDA3_SCREENS[screen] ?? ONDA6_SCREENS[screen] ?? ONDA10_SCREENS[screen];
   const onda5 = ONDA5_SCREENS[screen];
   const pathname = showConversations ? "/conversas" : onda5 ? onda5.path : onda3 ? onda3.path : leadsView ? "/leads" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
-  const name = isSuperAdminViewingDirector ? "Alex Exemplo" : "Marina Exemplo";
+  const name = isSuperAdminViewingDirector ? "Alex Exemplo" : papel ? "Rafaela Exemplo" : "Marina Exemplo";
   // Painel: ?aba=operacao|qualidade|funil e ?caso=uma-hora|zerado|cheio|uma-fila (casos de borda com dados de exemplo).
   const tab = params.aba === "qualidade" ? "qualidade" : params.aba === "funil" ? "funil" : "operacao";
   const dashboardCase = DASHBOARD_CASES.find((item) => item === params.caso) as DashboardCase | undefined;
@@ -188,16 +223,18 @@ export default async function DirectorShellRealPage({
       data={{ ...(dashboardCase ? essentialCase(dashboardCase) : buildEssential("today", "all", demoNow)), firstName }}
       period="today"
       branchId={null}
-      branches={demoBranches}
+      branches={papel ? [] : demoBranches}
       now={caseNow}
+      availableTabs={papel?.tabs}
+      canOpenConversations={papel?.canOpenConversations}
     />
   );
   const previewUser: UserDisplayInfo = {
     name,
-    role: "Diretor",
-    roleKey: "director",
-    jobTitle: "director",
-    permissions,
+    role: papel?.label ?? "Diretor",
+    roleKey: papel?.roleKey ?? "director",
+    jobTitle: papel?.jobTitle ?? "director",
+    permissions: papel?.permissions ?? permissions,
     redirectLogout: "/dashboard",
     isPlatformAdmin: isSuperAdminViewingDirector,
     activeRoleOverride: isSuperAdminViewingDirector ? "director" : null,
@@ -205,20 +242,29 @@ export default async function DirectorShellRealPage({
     relationshipCenterEnabled: true,
   };
 
+  if (papel && papel.denied.some((route) => pathname === route || pathname.startsWith(`${route}/`))) return <AccessDeniedPage />;
+  // Com ?papel=, as telas com regra por papel recebem o papel visto (as demais seguem a fixture de hoje).
+  const papelScreen = !papel ? null
+    : screen === "vendas" ? <VendasShellScreen role={papel.roleKey} />
+    : screen === "equipe" ? <EquipeShellScreen role="manager" branchId={papel.branchId} />
+    : screen === "configuracoes" ? <SettingsShellScreen variant={papel.settings} />
+    : leadsView ? <LeadsShellScreen view={leadsView} role={papel.roleKey} jobTitle={papel.jobTitle} branchId={papel.branchId} />
+    : null;
+
   return (
     <AppShell
       directorLiteEnabled
       initialSidebarUser={previewUser}
       initialSidebarPathname={pathname}
       initialSidebarOnDuty={isSuperAdminViewingDirector}
-      user={{ name, email: "fixture@ancora.example", role: "Diretor", jobTitle: "director", isPlatformAdmin: isSuperAdminViewingDirector }}
+      user={{ name, email: "fixture@ancora.example", role: papel?.label ?? "Diretor", jobTitle: papel?.jobTitle ?? "director", isPlatformAdmin: isSuperAdminViewingDirector }}
       branding={{ brandColor: null, logoUrl: null, tenantName: "\u00c2ncora Sa\u00fade" }}
       viewAs={{ canViewAs: isSuperAdminViewingDirector, viewingAs: null }}
     >
-      {showConversations ? (
+      {papelScreen ?? (showConversations ? (
         <ConversationsFrame
-          role="director"
-          branches={demoBranches}
+          role={papel?.roleKey ?? "director"}
+          branches={papel ? [] : demoBranches}
           conversations={conversationFixtures}
           initialLeadId="lead-fixture-ana"
           userId="fixture-director"
@@ -242,7 +288,7 @@ export default async function DirectorShellRealPage({
             <LeadDetailFixture />
           </main>
         </>
-      ) : dashboard}
+      ) : dashboard)}
     </AppShell>
   );
 }

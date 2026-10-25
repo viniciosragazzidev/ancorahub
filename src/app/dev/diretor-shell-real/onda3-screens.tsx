@@ -49,13 +49,13 @@ export const SALES: SaleLiteRow[] = SALE_NAMES.map((name, index) => ({
   createdAt: new Date(Date.UTC(2026, 9, 24 - index, 15, 0)).toISOString(),
 }));
 
-export function VendasShellScreen() {
+export function VendasShellScreen({ role = "director" }: { role?: string } = {}) {
   const totalRevenue = SALES.reduce((sum, sale) => sum + sale.saleValue, 0);
   return (
     <>
       <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />
       <main className={litePage.stack}>
-        <SalesWorkspaceLite sales={SALES} totalRevenue={totalRevenue} currentRole="director" period={30} branches={BRANCHES} />
+        <SalesWorkspaceLite sales={SALES} totalRevenue={totalRevenue} currentRole={role} period={30} branches={BRANCHES} />
         <LiteRelatedLinks
           title="Navegação comercial relacionada"
           description="Funções ligadas a vendas e faturamento."

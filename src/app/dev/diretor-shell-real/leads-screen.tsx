@@ -105,7 +105,8 @@ const QUALIFYING: QualifyingLeadItem[] = Array.from({ length: 60 }, (_, index) =
 
 const UNASSIGNED: LeadWorkspaceItem[] = LEADS.slice(0, 4).map((lead) => ({ ...lead, id: `u-${lead.id}`, corretorId: null, corretorNome: null, status: "new" }));
 
-export function LeadsShellScreen({ view }: { view: "list" | "kanban" | "qualificacoes" | "sem-atribuicao" | "radar" }) {
+export function LeadsShellScreen({ view, role = "director", jobTitle = "director", branchId = null }: { view: "list" | "kanban" | "qualificacoes" | "sem-atribuicao" | "radar"; role?: "director" | "manager" | "supervisor" | "broker"; jobTitle?: string; branchId?: string | null }) {
+  const isDirector = role === "director";
   return (
     <>
       <DashboardHeader
@@ -117,9 +118,9 @@ export function LeadsShellScreen({ view }: { view: "list" | "kanban" | "qualific
             plans={[]}
             branches={BRANCHES}
             queues={QUEUES.map(([id, name]) => ({ id, name, branchId: null }))}
-            role="director"
-            jobTitle="director"
-            branchId={null}
+            role={role}
+            jobTitle={jobTitle}
+            branchId={branchId}
             urgentLead={{ id: "l1", nome: "Justiniano Albuquerque de Souza", status: "new", urgentReason: "Primeiro contato vence em 3 min" }}
           />
         )}
@@ -128,11 +129,11 @@ export function LeadsShellScreen({ view }: { view: "list" | "kanban" | "qualific
         <LeadsWorkspace
           leads={LEADS}
           qualifyingLeads={QUALIFYING}
-          contextRole="director"
+          contextRole={role}
           initialView={view}
           brokers={BROKERS}
           branches={BRANCHES}
-          showUnassignedFilter
+          showUnassignedFilter={isDirector}
           unassignedLeads={UNASSIGNED}
           unassignedPagination={{ currentPage: 1, pageSize: 20, totalItems: 361, totalPages: 19 }}
           pageSize={20}

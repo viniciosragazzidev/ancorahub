@@ -145,10 +145,10 @@ export const TEAM_FIXTURE: TeamMemberLite[] = TEAM_PEOPLE.map(([name, role, jobT
   };
 });
 
-export function EquipeShellScreen() {
+export function EquipeShellScreen({ role = "director", branchId = null }: { role?: "director" | "manager"; branchId?: string | null } = {}) {
   return (
     <>
-      <DashboardHeader breadcrumb="Âncora Saúde" title="Equipe e unidades" rightSlot={<TeamHeaderActionsLite isDirector branches={BRANCH_FIXTURES} customRoles={[]} />} />
+      <DashboardHeader breadcrumb="Âncora Saúde" title="Equipe e unidades" rightSlot={<TeamHeaderActionsLite isDirector={role === "director"} branches={BRANCH_FIXTURES} customRoles={[]} />} />
       <main className={litePage.stack}>
         <TeamLite
           members={TEAM_FIXTURE}
@@ -157,8 +157,8 @@ export function EquipeShellScreen() {
           stats={{ total: 128, active: 117, unassignedLeads: 42, salesTotal: 1284390, membersTrend: [96, 101, 108, 113, 121, 128], leadsTrend: [880, 1020, 990, 1210, 1180, 1302], salesTrend: [180000, 210500, 198000, 232900, 221000, 241990] }}
           transferRequests={[{ id: "t1", brokerId: "user-4", brokerName: "Maximiliano Cavalcanti Rocha", fromSupervisorId: "user-3", fromSupervisorName: "Juliana Prado", toSupervisorId: "user-2", toSupervisorName: "Raimundo Nonato Silva", branchId: BRANCH_FIXTURES[1]!.id, branchName: "Barra da Tijuca", reason: "Mudou de turno e passa a atender os leads PME da tarde.", createdAt: "2026-10-24T18:20:00.000Z" }]}
           showTransfers
-          currentRole="director"
-          currentBranchId={null}
+          currentRole={role}
+          currentBranchId={branchId}
           currentUserId="user-1"
           canViewProfile
         />

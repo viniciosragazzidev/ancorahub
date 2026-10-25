@@ -59,7 +59,7 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
           <DirectorLiteHeader
             firstName={firstName}
             now={now}
-            tabs={tabs}
+            tabs={tabs.length > 1 ? tabs : []}
             activeTab={tab}
             periods={periods}
             activePeriod={periodValue}
