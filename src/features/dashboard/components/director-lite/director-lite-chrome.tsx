@@ -29,7 +29,7 @@ export function dashboardHref(tab: DirectorLiteTab, periodValue: string, branchI
   return `${TAB_BASE[tab]}${TAB_BASE[tab].includes("?") ? "&" : "?"}${params.toString()}`;
 }
 
-export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, children }: {
+export function DirectorLiteChrome({ now, tab, period, branchId, branches, firstName, availableTabs, children }: {
   now: Date;
   tab: DirectorLiteTab;
   period: OverviewPeriod;
@@ -37,6 +37,8 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
   branchId: string | null;
   branches: DashboardBranch[];
   firstName: string | null;
+  /** Abas que este usuário abre (ver liteDashboardTabs). Sem isto, as três: o diretor com a central de qualidade. */
+  availableTabs?: readonly DirectorLiteTab[];
   children: ReactNode;
 }) {
   const router = useRouter();
@@ -45,14 +47,14 @@ export function DirectorLiteChrome({ now, tab, period, branchId, branches, first
     { value: "overview", label: "Visão da operação", short: "Operação", href: dashboardHref("overview", periodValue, branchId) },
     { value: "quality", label: "Qualidade dos leads", short: "Qualidade", href: dashboardHref("quality", periodValue, branchId) },
     { value: "funnel", label: "Funil de qualificação", short: "Funil", href: dashboardHref("funnel", periodValue, branchId) },
-  ];
+  ].filter((item) => !availableTabs || availableTabs.includes(item.value as DirectorLiteTab));
   const periods = PERIOD_OPTIONS.map((option) => ({ value: option.value, label: option.label, href: dashboardHref(tab, option.value, branchId) }));
   const units = branches.length ? [{ value: "", label: "Todas as unidades" }, ...branches.map((branch) => ({ value: branch.id, label: branch.name }))] : undefined;
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <DashboardHeader breadcrumb="Início" title="Painel" />
-      <main className={styles.pageContainer} aria-label="Painel do diretor">
+      <main className={styles.pageContainer} aria-label="Painel">
         <div className={styles.dashboard}>
           <DirectorLiteHeader
             firstName={firstName}

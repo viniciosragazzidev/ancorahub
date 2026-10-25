@@ -51,7 +51,7 @@ describe("filtros da aba Funil Lite", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, name: /Ol\u00e1, Renata/ })).not.toBeInTheDocument();
     expect(screen.getByText(/Ol\u00e1, Renata/)).toBeInTheDocument();
-    expect(screen.getByRole("main", { name: "Painel do diretor" })).toHaveClass(styles.pageContainer);
+    expect(screen.getByRole("main", { name: "Painel" })).toHaveClass(styles.pageContainer);
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("href", "/dashboard?periodo=30&unidade=branch-autorizada");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=30&unidade=branch-autorizada");

@@ -50,7 +50,7 @@ describe("painel essencial: ordem, cabeçalho e filtros", () => {
     expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { level: 1, name: /Ol\u00e1, Renata/ })).not.toBeInTheDocument();
     expect(screen.getByText(/Ol\u00e1, Renata/)).toBeInTheDocument();
-    expect(screen.getByRole("main", { name: "Painel do diretor" })).toHaveClass(styles.pageContainer);
+    expect(screen.getByRole("main", { name: "Painel" })).toHaveClass(styles.pageContainer);
     const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
     expect(tabs.getByRole("link", { name: "Visão da operação" })).toHaveAttribute("aria-current", "page");
     expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=hoje");
@@ -226,5 +226,26 @@ describe("movimento", () => {
     const big = { ...data, whatsapp: { ...data.whatsapp, brokers: [{ ...first!, received: 1234, responding: 1000 }] } };
     render(<DirectorLiteDashboard data={big} period="today" branchId={null} branches={BRANCHES} now={NOW} />);
     expect(screen.getByText(/1\.000 de 1\.234 respondendo/)).toBeInTheDocument();
+  });
+});
+
+describe("painel Lite para papéis do modo normal que não são diretor", () => {
+  it("marketing: só a aba da operação, sem unidades e nomes dos corretores sem link para Conversas", () => {
+    const { container } = render(
+      <DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={[]} now={NOW} availableTabs={["overview"]} canOpenConversations={false} />,
+    );
+    expect(screen.getByRole("main", { name: "Painel" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Qualidade dos leads" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Funil de qualificação" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Todas as unidades")).not.toBeInTheDocument();
+    expect(container.querySelector('a[href^="/conversas"]')).toBeNull();
+    expect(container).not.toHaveTextContent(/diretor/i);
+  });
+
+  it("gestor sem unidade com a central de qualidade: Qualidade aparece, Funil não", () => {
+    render(<DirectorLiteDashboard data={buildEssential("today", "all", NOW)} period="today" branchId={null} branches={[]} now={NOW} availableTabs={["overview", "quality"]} />);
+    const tabs = within(screen.getByRole("navigation", { name: "Abas do painel" }));
+    expect(tabs.getByRole("link", { name: "Qualidade dos leads" })).toBeInTheDocument();
+    expect(tabs.queryByRole("link", { name: "Funil de qualificação" })).not.toBeInTheDocument();
   });
 });

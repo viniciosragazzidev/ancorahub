@@ -4,22 +4,26 @@
 import type { EssentialDashboard } from "@/features/dashboard/essential/essential-data";
 import type { OverviewPeriod } from "@/features/dashboard/overview-filter";
 
-import { DirectorLiteChrome, type DashboardBranch } from "./director-lite-chrome";
+import { DirectorLiteChrome, type DashboardBranch, type DirectorLiteTab } from "./director-lite-chrome";
 import { EssentialView } from "./essential-view";
 
 export type { DashboardBranch };
 
-export function DirectorLiteDashboard({ data, period, branchId, branches, now }: {
+export function DirectorLiteDashboard({ data, period, branchId, branches, now, availableTabs, canOpenConversations = true }: {
   data: EssentialDashboard;
   period: OverviewPeriod;
   /** Unidade escolhida já validada contra as unidades do tenant; null = todas. */
   branchId: string | null;
   branches: DashboardBranch[];
   now: Date;
+  /** Abas que o papel abre hoje (Qualidade e Funil dependem da central de qualidade). Sem isto, as três. */
+  availableTabs?: readonly DirectorLiteTab[];
+  /** Sem acesso às Conversas, os nomes dos corretores ficam sem link (a tela levaria a acesso negado). */
+  canOpenConversations?: boolean;
 }) {
   return (
-    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName}>
-      <EssentialView data={data} />
+    <DirectorLiteChrome now={now} tab="overview" period={period} branchId={branchId} branches={branches} firstName={data.firstName} availableTabs={availableTabs}>
+      <EssentialView data={data} canOpenConversations={canOpenConversations} />
     </DirectorLiteChrome>
   );
 }

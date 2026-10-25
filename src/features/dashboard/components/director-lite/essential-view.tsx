@@ -199,7 +199,7 @@ function QueuesBlock({ rows, totals, label, empty }: { rows: EssentialQueue[]; t
   );
 }
 
-function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["whatsapp"]; label: string }) {
+function WhatsAppBlock({ whatsapp, label, canOpenConversations }: { whatsapp: EssentialDashboard["whatsapp"]; label: string; canOpenConversations: boolean }) {
   return (
     <LiteReveal as="section" className={styles.card} label="WhatsApp dos corretores" delay={staggerDelay(2)}>
       <header className={styles.cardHeader}>
@@ -239,11 +239,18 @@ function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["what
           <ul className={styles.nameList} aria-label="Corretores conectados, com atendimentos ativos">
             {whatsapp.brokers.map((broker, index) => (
               <LiteItem as="li" key={broker.id} index={index}>
-                <Link href={`/conversas?tab=leads&brokerId=${encodeURIComponent(broker.id)}`} className={styles.nameRow} title={`Ver conversas de ${broker.name}`}>
-                  <span className={styles.truncate}>{broker.name}</span>
-                  <span className={styles.tabular}>{plural(broker.active, "ativo", "ativos")} · {n(broker.responding)} de {n(broker.received)} respondendo</span>
-                  <ArrowRight aria-hidden="true" size={14} className={styles.arrow} />
-                </Link>
+                {canOpenConversations ? (
+                  <Link href={`/conversas?tab=leads&brokerId=${encodeURIComponent(broker.id)}`} className={styles.nameRow} title={`Ver conversas de ${broker.name}`}>
+                    <span className={styles.truncate}>{broker.name}</span>
+                    <span className={styles.tabular}>{plural(broker.active, "ativo", "ativos")} · {n(broker.responding)} de {n(broker.received)} respondendo</span>
+                    <ArrowRight aria-hidden="true" size={14} className={styles.arrow} />
+                  </Link>
+                ) : (
+                  <div className={styles.nameRow}>
+                    <span className={styles.truncate}>{broker.name}</span>
+                    <span className={styles.tabular}>{plural(broker.active, "ativo", "ativos")} · {n(broker.responding)} de {n(broker.received)} respondendo</span>
+                  </div>
+                )}
               </LiteItem>
             ))}
           </ul>
@@ -257,12 +264,12 @@ function WhatsAppBlock({ whatsapp, label }: { whatsapp: EssentialDashboard["what
 }
 
 /** O painel: blocos de cima para baixo. Só o bloco 2 segue o período; o 1 e o 3 são "agora". */
-export function EssentialView({ data }: { data: EssentialDashboard }) {
+export function EssentialView({ data, canOpenConversations = true }: { data: EssentialDashboard; canOpenConversations?: boolean }) {
   return (
     <div className={styles.essential}>
       <DutiesBlock running={data.duties.running} next={data.duties.next} />
       <QueuesBlock rows={data.queues.rows} totals={data.queues.totals} label={data.queues.label} empty={data.queues.totals.arrived === 0} />
-      <WhatsAppBlock whatsapp={data.whatsapp} label={data.whatsapp.label} />
+      <WhatsAppBlock whatsapp={data.whatsapp} label={data.whatsapp.label} canOpenConversations={canOpenConversations} />
     </div>
   );
 }

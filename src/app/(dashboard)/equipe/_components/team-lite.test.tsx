@@ -90,3 +90,19 @@ describe("TeamLite", () => {
     expect(data.get("memberId")).toBe("m1");
   });
 });
+
+describe("equipe Lite para o gestor no modo normal", () => {
+  it("sem Cargos e permissões e convite só de corretores, como a tela de hoje", async () => {
+    const { TeamHeaderActionsLite } = await import("./team-lite");
+    render(<TeamHeaderActionsLite isDirector={false} branches={[{ id: "b1", name: "Centro" }]} customRoles={[]} />);
+    expect(screen.queryByRole("link", { name: "Cargos e permissões" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Novo funcionário" }));
+    expect(screen.getByText("Você pode criar apenas corretores.")).toBeInTheDocument();
+  });
+
+  it("a lista segue o papel real do gestor", () => {
+    renderTeam("manager");
+    expect(screen.getAllByText("Ana Souza").length).toBeGreaterThan(0);
+    expect(document.body).not.toHaveTextContent(/painel do diretor/i);
+  });
+});

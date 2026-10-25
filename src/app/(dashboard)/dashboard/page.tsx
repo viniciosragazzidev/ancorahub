@@ -26,6 +26,8 @@ import { DirectorLiteQualificationFunnelPage } from "@/features/dashboard/compon
 import { getEssentialDashboard } from "@/features/dashboard/essential/essential-data";
 import { renderDirectorLiteQuality } from "@/features/dashboard/director-lite-quality-page";
 import { getDirectorLiteViewerFirstName } from "@/features/dashboard/director-lite-viewer";
+import { liteDashboardTabs } from "@/features/dashboard/director-lite-tabs";
+import { hasPermission } from "@/shared/auth/permissions";
 
 type DashboardSearchParams = Record<string, string | string[] | undefined>;
 
@@ -128,7 +130,9 @@ export default async function DashboardPage({
       const { canCompare, units } = await getDashboardUnitFilter(context);
       const branchId = canCompare ? resolveRequestedUnit(parseBranchIdParam(singleParam(resolvedSearchParams.unidade)), units) : null;
       const data = await getEssentialDashboard(context, { period, branchId });
-      return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={canCompare ? units : []} now={new Date()} />;
+      // Só as abas e os links que a tela de hoje já libera para o papel (o visual Lite vale para todo o modo normal).
+      const canOpenConversations = hasPermission(context.role, "acessar_conversas") && context.jobTitle !== "marketing";
+      return <DirectorLiteDashboard data={data} period={period} branchId={branchId} branches={canCompare ? units : []} now={new Date()} availableTabs={liteDashboardTabs(context, canReadQuality)} canOpenConversations={canOpenConversations} />;
     }
 
     const [data, reportingEnabled] = await Promise.all([

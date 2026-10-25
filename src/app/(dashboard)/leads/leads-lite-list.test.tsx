@@ -238,3 +238,27 @@ describe("nome, telefone e a visão Qualificação IA", () => {
     expect(screen.getByText("41 a 45 de 45")).toBeInTheDocument();
   });
 });
+
+describe("lista Lite para papéis do modo normal que não são diretor", () => {
+  it("cargo sem gestão (ex.: supervisor no modo normal): o lote só oferece o que vale para todos", () => {
+    render(
+      <ArcScopeProvider enabled>
+        <LeadsListSwitch {...props} contextRole="supervisor" selectedIds={new Set([lead.id])} onRowClick={() => {}} />
+      </ArcScopeProvider>,
+    );
+    const bulk = within(screen.getByRole("region", { name: "Ações em lote" }));
+    expect(bulk.getByText("Exportar CSV")).toBeInTheDocument();
+    expect(bulk.queryByText("Alterar status")).not.toBeInTheDocument();
+    expect(bulk.queryByText("Trocar corretor")).not.toBeInTheDocument();
+  });
+
+  it("gestor no modo normal: lote de gestão, sem texto de diretor", () => {
+    const { container } = render(
+      <ArcScopeProvider enabled>
+        <LeadsListSwitch {...props} contextRole="manager" selectedIds={new Set([lead.id])} onRowClick={() => {}} />
+      </ArcScopeProvider>,
+    );
+    expect(within(screen.getByRole("region", { name: "Ações em lote" })).getByText("Alterar status")).toBeInTheDocument();
+    expect(container).not.toHaveTextContent(/diretor/i);
+  });
+});

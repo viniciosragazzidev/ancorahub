@@ -10,6 +10,7 @@ import { parseBranchIdParam } from "@/features/reports/metrics/narrow-scope";
 import { getFeatureFlag } from "@/features/system-settings/queries";
 import type { TenantContext } from "@/shared/auth/types";
 import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
+import { liteDashboardTabs } from "./director-lite-tabs";
 import { getDirectorLiteViewerFirstName } from "./director-lite-viewer";
 
 /** Período do topo ("hoje", 7 ou 30 dias) para o período da análise de qualidade. */
@@ -40,7 +41,7 @@ export async function renderDirectorLiteQuality(context: TenantContext, params: 
   if (branchId) widerParams.set("unidade", branchId);
   const widerHref = `/dashboard?${widerParams.toString()}`;
   return (
-    <DirectorLiteChrome now={now} tab="quality" period={period} branchId={branchId} branches={canCompare ? units : []} firstName={firstName}>
+    <DirectorLiteChrome now={now} tab="quality" period={period} branchId={branchId} branches={canCompare ? units : []} firstName={firstName} availableTabs={liteDashboardTabs(context, true)}>
       {report ? (
         <>
           <QualityToolbar legacyHref={legacyHref} detailedHref={detailedHref} />
