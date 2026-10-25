@@ -64,7 +64,6 @@
   "/qualificacao/turbo",
   "/relacionamento",
   "/roadmap",
-  "/settings/feedback-templates",
   "/settings/integrations",
   "/settings/meta",
   "/settings/waha-diagnostic",
