@@ -1,0 +1,107 @@
+"use client";
+
+/**
+ * Dev-only: as telas da Onda 3 no visual Lite dentro da moldura real, com dados de exemplo realistas (nomes longos,
+ * valores grandes, várias unidades). Cada tela usa os mesmos componentes Lite da página real.
+ */
+import { DashboardHeader } from "@/components/dashboard-header";
+import { LiteRelatedLinks } from "@/components/lite/page/related-links";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { SalesWorkspaceLite, type SaleLiteRow } from "@/app/(dashboard)/vendas/sales-workspace-lite";
+import { SaleDetailLite } from "@/app/(dashboard)/vendas/[id]/sale-detail-lite";
+
+const BRANCHES = [
+  { id: "branch-centro", name: "Centro" },
+  { id: "branch-barra", name: "Barra da Tijuca" },
+  { id: "branch-ni", name: "Niterói 1" },
+];
+
+const SALE_NAMES = [
+  "Justiniano Albuquerque de Souza", "Padaria Nova Esperança Ltda", "Cristiane Farizele Monteiro", "Bartolomeu Wanderley Castelo Branco",
+  "Nazareth Gonçalves Pereira", "Clínica Odontológica Sorriso Pleno", "Roseleia Oliveira Bittencourt", "Ana", "Maximiliano Cavalcanti Rocha",
+  "Transportadora Rápido Carioca", "Juliana Prado", "Raimundo Nonato Silva",
+];
+const PLANS = [["Amil S380 QC Nacional", "Amil"], ["Bradesco Saúde Top Nacional Flex", "Bradesco Saúde"], ["SulAmérica Exato", "SulAmérica"], ["Unimed Rio Pleno", "Unimed"]] as const;
+
+export const SALES: SaleLiteRow[] = SALE_NAMES.map((name, index) => ({
+  id: `sale-${index + 1}`,
+  leadId: `lead-${index + 1}`,
+  leadName: name,
+  clientName: index % 3 === 0 ? name.split(" ").slice(0, 2).join(" ") : null,
+  brokerId: `b${(index % 3) + 1}`,
+  brokerName: ["Ana Souza", "Bruno Lima", "Carla Dias"][index % 3] ?? null,
+  branchName: BRANCHES[index % 3]?.name ?? null,
+  planName: PLANS[index % 4]?.[0] ?? null,
+  carrierName: PLANS[index % 4]?.[1] ?? null,
+  saleDate: new Date(Date.UTC(2026, 9, 24 - index, 15, 0)).toISOString(),
+  saleValue: [12850.4, 1980, 642.9, 31200, 2340.5, 8760, 990, 455.3, 15400, 47210.8, 1205, 3399][index] ?? 1000,
+  status: index === 2 || index === 7 ? "cancelled" : "active",
+  createdAt: new Date(Date.UTC(2026, 9, 24 - index, 15, 0)).toISOString(),
+}));
+
+export function VendasShellScreen() {
+  const totalRevenue = SALES.reduce((sum, sale) => sum + sale.saleValue, 0);
+  return (
+    <>
+      <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />
+      <main className={litePage.stack}>
+        <SalesWorkspaceLite sales={SALES} totalRevenue={totalRevenue} currentRole="director" period={30} branches={BRANCHES} />
+        <LiteRelatedLinks
+          title="Navegação comercial relacionada"
+          description="Funções ligadas a vendas e faturamento."
+          links={[
+            { label: "Ver base de clientes", href: "/clientes", description: "Gestão da carteira de contratos ativos" },
+            { label: "Tabela de comissões", href: "/settings?tab=comissoes", description: "Regras de comissionamento por produto" },
+            { label: "Anexar documentos de propostas", href: "/documentos", description: "Conferência de documentos e apólices" },
+            { label: "Relatório de desempenho", href: "/dashboard?tab=commercial", description: "Métricas de fechamento por corretor" },
+          ]}
+        />
+      </main>
+    </>
+  );
+}
+
+const SCHEDULE = Array.from({ length: 6 }, (_, index) => ({
+  id: `p${index + 1}`,
+  saleId: "sale-1",
+  monthNumber: index + 1,
+  referenceMonth: `2026-${String(10 + index > 12 ? index - 2 : 10 + index).padStart(2, "0")}`,
+  dueDate: new Date(Date.UTC(2026, 9 + index, 10)).toISOString(),
+  percentage: index === 0 ? "100" : "20",
+  amount: index === 0 ? "12850.40" : "2570.08",
+  status: (index < 2 ? "paid" : index === 5 ? "cancelled" : "pending") as "paid" | "pending" | "cancelled",
+  paidAt: index < 2 ? new Date(Date.UTC(2026, 9 + index, 12)).toISOString() : null,
+  paidBy: index < 2 ? "director-1" : null,
+  paidByName: index < 2 ? "Marina Exemplo" : null,
+  notes: null,
+}));
+
+export function VendaShellScreen() {
+  const first = SALES[0]!;
+  return (
+    <>
+      <DashboardHeader breadcrumb="Operação comercial / Vendas" title="Detalhes da venda" />
+      <main className={litePage.stack}>
+        <SaleDetailLite
+          sale={{
+            id: "7f3c2a91-1111-4111-8111-111111111111",
+            leadId: first.leadId,
+            leadName: first.leadName,
+            clientName: first.clientName,
+            brokerName: first.brokerName,
+            branchName: first.branchName,
+            planName: first.planName,
+            carrierName: first.carrierName,
+            ruleName: "Amil PME: 100% + 5 x 20%",
+            status: "active",
+            saleDate: first.saleDate,
+            saleValue: first.saleValue,
+            notes: "Cliente pediu boleto com vencimento no dia 10. Contrato assinado digitalmente em 24/10.",
+          }}
+          schedule={SCHEDULE}
+          canManage
+        />
+      </main>
+    </>
+  );
+}
