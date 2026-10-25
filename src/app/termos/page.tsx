@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AncoraLogo } from "@/components/ancora-logo";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import "@/components/arc/venancor-scope.css";
+
+import styles from "./termos.module.css";
 
 export const metadata: Metadata = {
   title: "Termos de uso e responsabilidade | Âncora Corretora",
@@ -21,37 +23,38 @@ const sections = [
   { id: "atualizacoes", title: "9. Atualizações e contato", content: "Esta página pode ser atualizada para refletir evolução do produto, requisitos legais ou ajustes operacionais. Para dúvidas sobre dados de clientes, o titular deve procurar primeiro a corretora responsável pelo atendimento. O canal oficial de privacidade e a identificação jurídica da contratada serão informados no instrumento contratual e na política definitiva aplicável." },
 ];
 
+/** Termos no visual Lite para todo mundo (Onda 8): o mesmo texto, as mesmas âncoras e os mesmos links. */
 export default function TermsPage() {
   return (
-    <main className="h-dvh overflow-y-auto overscroll-contain bg-background text-foreground">
-      <header className="border-b bg-background/95">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Link aria-label="Voltar à página inicial" className="flex items-center" href="/"><AncoraLogo className="h-7 w-28 object-contain object-left" /></Link>
-          <Link className="text-sm font-medium text-primary hover:underline" href="/login">Acessar plataforma</Link>
+    <main className={`arc-venancor ${styles.page}`}>
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <Link aria-label="Voltar à página inicial" className={styles.logoLink} href="/"><AncoraLogo className="h-7 w-28 object-contain object-left" /></Link>
+          <Link className={styles.link} href="/login">Acessar plataforma</Link>
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-10 sm:px-6 lg:py-14">
-        <section className="max-w-3xl">
-          <p className="text-xs font-medium text-primary">ÂNCORA CORRETORA CRM</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Termos de uso e responsabilidade</h1>
-          <p className="mt-3 text-base leading-7 text-muted-foreground">Diretrizes gerais para o uso responsável do CRM por corretoras, gestores, corretores e demais usuários autorizados.</p>
+      <div className={styles.body}>
+        <section className={styles.intro}>
+          <h1 className={styles.title}>Termos de uso e responsabilidade</h1>
+          <p className={styles.lead}>Diretrizes gerais para o uso responsável do CRM Âncora Corretora por corretoras, gestores, corretores e demais usuários autorizados.</p>
         </section>
 
-        <Card className="border-primary/20 bg-primary/[0.04] shadow-none">
-          <CardHeader><CardTitle>Versão operacional — 16 de julho de 2026</CardTitle><CardDescription>Este conteúdo explica o funcionamento esperado da plataforma. A versão contratual definitiva deve ser revisada pelo jurídico responsável, com razão social, contato de privacidade e política de retenção aplicáveis.</CardDescription></CardHeader>
-        </Card>
+        <section className={styles.note} aria-label="Versão">
+          <h2 className={styles.noteTitle}>Versão operacional de 16 de julho de 2026</h2>
+          <p className={styles.noteText}>Este conteúdo explica o funcionamento esperado da plataforma. A versão contratual definitiva deve ser revisada pelo jurídico responsável, com razão social, contato de privacidade e política de retenção aplicáveis.</p>
+        </section>
 
-        <nav aria-label="Índice dos termos" className="rounded-xl border bg-card p-4 sm:p-5">
-          <p className="text-sm font-medium">Nesta página</p>
-          <ol className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">{sections.map((section) => <li key={section.id}><a className="hover:text-primary hover:underline" href={`#${section.id}`}>{section.title}</a></li>)}</ol>
+        <nav aria-label="Índice dos termos" className={styles.card}>
+          <h2 className={styles.cardTitle}>Nesta página</h2>
+          <ol className={styles.index}>{sections.map((section) => <li key={section.id}><a className={styles.indexLink} href={`#${section.id}`}>{section.title}</a></li>)}</ol>
         </nav>
 
-        <section className="grid gap-4" aria-label="Conteúdo dos termos">
-          {sections.map((section) => <Card className="border-border bg-card shadow-none" id={section.id} key={section.id}><CardContent className="p-5 sm:p-6"><h2 className="text-lg font-semibold tracking-tight">{section.title}</h2><p className="mt-2 leading-7 text-muted-foreground">{section.content}</p></CardContent></Card>)}
+        <section className={styles.sections} aria-label="Conteúdo dos termos">
+          {sections.map((section) => <article className={styles.card} id={section.id} key={section.id}><h2 className={styles.sectionTitle}>{section.title}</h2><p className={styles.sectionText}>{section.content}</p></article>)}
         </section>
 
-        <footer className="border-t pt-6 text-sm text-muted-foreground"><p>Ao continuar usando a plataforma, o usuário declara que leu estas diretrizes e atua em nome ou com autorização da corretora responsável.</p><Link className="mt-3 inline-flex font-medium text-primary hover:underline" href="/login">Voltar para o login</Link></footer>
+        <footer className={styles.footer}><p>Ao continuar usando a plataforma, o usuário declara que leu estas diretrizes e atua em nome ou com autorização da corretora responsável.</p><Link className={styles.link} style={{ paddingInline: 0 }} href="/login">Voltar para o login</Link></footer>
       </div>
     </main>
   );

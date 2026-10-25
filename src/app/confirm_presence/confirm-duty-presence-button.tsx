@@ -1,12 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import ActionButton from "@/components/arc/action-button/action-button";
-import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
-import { StatefulButton } from "@/components/ui/stateful-button";
+import { Button } from "@/components/arc/button/button";
 
 export function ConfirmDutyPresenceButton({ confirmationId }: { confirmationId: string }) {
-  const directorLite = useArcScopeEnabled();
   const [state, setState] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -31,20 +28,11 @@ export function ConfirmDutyPresenceButton({ confirmationId }: { confirmationId: 
     }
   }
 
-  return <div className="space-y-3">
-    {directorLite ? (
-      <ActionButton
-        className="w-full"
-        label="Confirmar presença"
-        pendingLabel="Confirmando"
-        successLabel="Presença confirmada"
-        onAction={confirmPresence}
-        onActionError={() => undefined}
-        disabled={state === "success"}
-      />
-    ) : (
-      <StatefulButton className="w-full" onClick={confirmPresence} state={state} loadingText="Confirmando…" successText="Presença confirmada" errorText="Tentar novamente">Confirmar presença</StatefulButton>
-    )}
-    {message ? <p role={state === "error" ? "alert" : "status"} className="text-sm text-muted-foreground">{message}</p> : null}
+  const label = state === "loading" ? "Confirmando…" : state === "success" ? "Presença confirmada" : state === "error" ? "Tentar novamente" : "Confirmar presença";
+
+  // Visual Lite para todo mundo (Onda 8): o mesmo fluxo de estados do botão anterior (confirmar, confirmando, tentar de novo, confirmada).
+  return <div style={{ display: "grid", gap: 12 }}>
+    <Button type="button" className="w-full" loading={state === "loading"} disabled={state === "success"} onClick={() => { void confirmPresence().catch(() => undefined); }}>{label}</Button>
+    {message ? <p role={state === "error" ? "alert" : "status"} style={{ margin: 0, color: "var(--text-secondary)", fontSize: "var(--text-sm)" }}>{message}</p> : null}
   </div>;
 }
