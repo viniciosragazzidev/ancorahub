@@ -54,3 +54,32 @@ describe("visões gerais órfãs com a chave desligada", () => {
     expect(renderToStaticMarkup(await Page())).toMatchSnapshot();
   });
 });
+
+describe("visões gerais órfãs com a chave ligada", () => {
+  it.each(PAGES)("%s ganha só a pele Lite, com os mesmos números", async (_route, Page) => {
+    state.liteKey.on = true;
+    const html = renderToStaticMarkup(await Page());
+    expect(html).toContain('data-skin="diretor"');
+    expect(html).not.toContain("shadow-none");
+    expect(html).not.toContain("<h1");
+    expect(html).not.toContain("—");
+  });
+
+  it("leads mantém gargalos com link e as etapas do funil", async () => {
+    state.liteKey.on = true;
+    const html = renderToStaticMarkup(await LeadsDashboardPage());
+    expect(html).toContain('href="/leads?f=1"');
+    expect(html).not.toContain('href="/leads?f=2"');
+    expect(html).toContain("12,3%");
+    expect(html).toContain("Em contato");
+  });
+
+  it.each(PAGES)("%s fica igual para quem não é diretor", async (_route, Page) => {
+    state.liteKey.on = true;
+    state.context = { role: "manager", tenantId: "t1", userId: "u2" };
+    const on = renderToStaticMarkup(await Page());
+    state.liteKey.on = false;
+    expect(on).toBe(renderToStaticMarkup(await Page()));
+  });
+});
+

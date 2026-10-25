@@ -3,6 +3,9 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpRight, ChartBar, Warning } from "@/components/huge-icons";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { LeadsOverviewLite } from "@/features/dashboard/components/domain-lite/leads-overview-lite";
 import { getAttentionSnapshot, getCommercialOverview, getFunnelSnapshot } from "@/features/reports/metrics/metrics-service";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +19,26 @@ export default async function LeadsDashboardPage() {
     getAttentionSnapshot(context, period),
   ]);
   const attentionCount = attention.items.reduce((total, item) => total + item.count, 0);
+  // Chave do diretor: só a pele Lite (container da moldura, números e grupos do contrato), mesmos dados.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/leads/dashboard")) {
+    return <>
+      <DashboardHeader breadcrumb="Leads" title="Visão geral de leads" rightSlot={<Link href="/leads" className={litePage.button}>Abrir lista <ArrowUpRight className="size-4" aria-hidden="true" /></Link>} />
+      <main className={litePage.stack}>
+        <LeadsOverviewLite
+          period={period}
+          metrics={[
+            ["Novos hoje", funnel.received],
+            ["Conversão", `${commercial.conversion.rate.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`],
+            ["Sem responsável", attention.items.find((item) => item.id === "high-intent-unassigned")?.count ?? 0],
+            ["Em risco", attentionCount],
+          ]}
+          attention={attention.items.map((item) => ({ id: item.id, title: item.title, description: item.description, count: item.count, href: item.href }))}
+          attentionCount={attentionCount}
+          stages={funnel.rows.map((row) => ({ stage: row.stage, inStage: row.inStage }))}
+        />
+      </main>
+    </>;
+  }
   return <>
     <DashboardHeader breadcrumb="Leads" title="Visão geral de leads" rightSlot={<Link href="/leads" className="text-sm font-medium text-primary hover:underline">Abrir lista <ArrowUpRight className="ml-1 inline size-3.5" /></Link>} />
     <main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) lg:p-6">
