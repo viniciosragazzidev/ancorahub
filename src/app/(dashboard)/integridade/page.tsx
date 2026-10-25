@@ -24,6 +24,9 @@ import {
   buildIntegrityLeadScope,
   canViewIntegrityPanel,
 } from "@/features/integrity/integrity-scope";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { IntegrityLite } from "./_components/integrity-lite";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +129,26 @@ export default async function IntegrityPage() {
 
   const leadsTrend = fillDaySeries(dailyLeads);
   const auditsTrend = fillDaySeries(dailyAudits);
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/integridade")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Governança" title="Integridade" />
+        <main className={litePage.stack}>
+          <IntegrityLite
+            data={{
+              stalled: Number(stalledLeads[0]?.count ?? 0),
+              unworked: Number(unworkedLeads[0]?.count ?? 0),
+              totalLeads: Number(leadCount[0]?.count ?? 0),
+              leadsTrend,
+              auditsTrend,
+              logs: auditLogs.map((log) => ({ id: log.id, acao: log.acao, entidade: log.entidade, entidadeId: log.entidadeId, userName: log.userName, createdAt: new Date(log.createdAt).toISOString() })),
+            }}
+          />
+        </main>
+      </>
+    );
+  }
 
   type IntegrityAlert = {
     type: "warning" | "danger" | "ok" | "info";

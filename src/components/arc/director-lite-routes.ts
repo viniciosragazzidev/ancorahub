@@ -42,7 +42,6 @@
   "/integrations/meta",
   "/integrations/whats_alt",
   "/integrations/whatsapp",
-  "/integridade",
   "/internal/design-system",
   "/internal/design-system/motion",
   "/jornada",

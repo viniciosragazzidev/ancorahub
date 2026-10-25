@@ -1,0 +1,95 @@
+/* Integridade Lite: duas colunas no desktop (auditoria larga, saúde estreita), uma no celular. Só tokens. */
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  }
+}
+
+.cardHeadRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.events,
+.health {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.event {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.event:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.eventMain {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.eventTitle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.health {
+  gap: 16px;
+}
+
+.healthItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.healthIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--text-secondary);
+}
+
+.healthIcon[data-tone="success"] {
+  color: var(--success);
+}
+
+.fullButton {
+  justify-content: center;
+  width: 100%;
+}
+
+.alerts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 767px) {
+  .alerts {
+    margin-left: 0;
+  }
+}

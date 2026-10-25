@@ -13,6 +13,7 @@ import { PropostasLite } from "@/app/(dashboard)/propostas/_components/propostas
 import { PROPOSAL_FIXTURES, PROPOSAL_LEADS } from "@/app/(dashboard)/propostas/_components/proposals-fixtures";
 import { DocumentsLite } from "@/features/documents/components/documents-lite";
 import { DrilldownLite } from "@/app/(dashboard)/relatorios/drill/_components/drilldown-lite";
+import { IntegrityLite } from "@/app/(dashboard)/integridade/_components/integrity-lite";
 import { DomainDashboardLite } from "@/features/dashboard/components/domain-dashboard-lite";
 import { CARRIER_FIXTURES, DOC_FIXTURES, PLAN_FIXTURES, REQUIREMENT_FIXTURES } from "@/features/documents/components/documents-fixtures";
 
@@ -167,6 +168,28 @@ export function DrillShellScreen() {
       <DashboardHeader breadcrumb="Relatórios / Negociações paradas" title="Negociações paradas" rightSlot={<a href="/dashboard?period=30&tab=overview" className={litePage.button}>Voltar</a>} />
       <main className={litePage.stack}>
         <DrilldownLite explanation="Leads em negociação, documentação ou análise cuja entrada na etapa atual excede o prazo de estagnação do tenant." total={312} rows={rows} brokers={brokers} />
+      </main>
+    </>
+  );
+}
+
+const AUDIT_ACTIONS = ["update", "assign", "export", "start_service", "create", "convert", "login", "delete"];
+const AUDIT_ENTITIES = ["lead", "lead_task", "sale", "proposal", "user", "commission_schedule"];
+
+export function IntegridadeShellScreen() {
+  const logs = Array.from({ length: 30 }, (_, index) => ({
+    id: `log-${index + 1}`,
+    acao: AUDIT_ACTIONS[index % AUDIT_ACTIONS.length]!,
+    entidade: AUDIT_ENTITIES[index % AUDIT_ENTITIES.length]!,
+    entidadeId: index % 4 === 3 ? null : `9f${index}c2a7-41b8-4e7d-a1f0-${String(index).padStart(12, "0")}`,
+    userName: ["Marina Exemplo", "Maximiliano Cavalcanti Rocha", "Ana Souza", "Sistema de distribuição"][index % 4]!,
+    createdAt: new Date(Date.UTC(2026, 9, 25, 1, 30) - index * 47 * 60_000).toISOString(),
+  }));
+  return (
+    <>
+      <DashboardHeader breadcrumb="Governança" title="Integridade" />
+      <main className={litePage.stack}>
+        <IntegrityLite data={{ stalled: 214, unworked: 37, totalLeads: 48_912, leadsTrend: [180, 212, 196, 240, 228, 251, 233], auditsTrend: [32, 41, 28, 55, 47, 39, 61], logs }} />
       </main>
     </>
   );
