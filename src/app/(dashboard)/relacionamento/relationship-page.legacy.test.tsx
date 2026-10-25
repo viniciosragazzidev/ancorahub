@@ -97,6 +97,11 @@ describe("/relacionamento do diretor com a chave desligada", () => {
     fireEvent.click(screen.getByRole("tab", { name: /^Campanhas/ }));
     expect(screen.getByRole("button", { name: /Nova campanha/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pausar" })).toBeInTheDocument();
+    // O "hoje" da nova campanha vem do servidor, no fuso de São Paulo.
+    fireEvent.click(screen.getByRole("button", { name: /Nova campanha/ }));
+    expect(screen.getByLabelText("Começa")).toHaveValue("2026-10-24");
+    expect(screen.getByLabelText("Termina")).toHaveValue("2026-10-30");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
     fireEvent.click(screen.getByRole("tab", { name: "Regras" }));
     expect(screen.getByRole("switch", { name: "Desligar Aceite rápido" })).toHaveAttribute("aria-checked", "true");
     expect(screen.getByRole("switch", { name: "Ligar Atendimento registrado" })).toHaveAttribute("aria-checked", "false");

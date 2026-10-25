@@ -19,13 +19,15 @@ import styles from "./relationship-lite.module.css";
 
 type HistoryItem = Omit<BroadcastSummary, "createdAt"> & { createdAt: string };
 
-export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, options, history, data, actions }: {
+export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, options, history, data, actions, today }: {
   relationshipEnabled: boolean;
   journeyEnabled: boolean;
   options: AudienceOptions | null;
   history: HistoryItem[];
   data: DirectorJourneyData | null;
   actions: DirectorJourneyActions;
+  /** Dia de hoje em São Paulo ("AAAA-MM-DD"), calculado no servidor. */
+  today: string;
 }) {
   const [tab, setTab] = useState("messages");
   return (
@@ -44,7 +46,7 @@ export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, o
           </div>
         )}
       </TabsContent>
-      {journeyEnabled && data ? <TabsContent value="journey" className={styles.panel}><DirectorJourneyLite data={data} actions={actions} /></TabsContent> : null}
+      {journeyEnabled && data ? <TabsContent value="journey" className={styles.panel}><DirectorJourneyLite data={data} actions={actions} today={today} /></TabsContent> : null}
     </Tabs>
   );
 }

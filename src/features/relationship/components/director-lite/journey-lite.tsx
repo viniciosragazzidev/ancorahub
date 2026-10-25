@@ -33,8 +33,8 @@ type AudienceKind = "all" | "branches" | "teams" | "duties" | "brokers";
 const pts = (value: number) => `${Math.round(value).toLocaleString("pt-BR")} pts`;
 const DAY_MONTH: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit" };
 const DATE_TIME: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" };
-const todayKey = () => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
-const plusDays = (days: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date(Date.now() + days * 86_400_000));
+/** Soma dias a uma data de calendário "AAAA-MM-DD" (sem relógio do navegador: o "hoje" vem do servidor). */
+const plusDays = (day: string, days: number) => new Date(Date.parse(`${day}T12:00:00.000Z`) + days * 86_400_000).toISOString().slice(0, 10);
 
 function SectionHead({ title, description, actions, as: Heading = "h2" }: { title: string; description?: string; actions?: ReactNode; as?: "h2" | "h3" }) {
   return (
@@ -59,7 +59,8 @@ function Empty({ icon, title, text, action }: { icon?: ReactNode; title: string;
   );
 }
 
-export function DirectorJourneyLite({ data, actions }: { data: DirectorJourneyData; actions: DirectorJourneyActions }) {
+/** `today`: dia de hoje em São Paulo ("AAAA-MM-DD"), calculado no servidor para não variar na hidratação. */
+export function DirectorJourneyLite({ data, actions, today }: { data: DirectorJourneyData; actions: DirectorJourneyActions; today: string }) {
   const [tab, setTab] = useState("overview");
   const outliers = data.risk?.brokers.filter((broker) => broker.rules.some((rule) => rule.outlier)).length ?? 0;
   const activeCampaigns = data.campaigns?.filter((campaign) => campaign.status === "active").length || 0;
@@ -74,7 +75,7 @@ export function DirectorJourneyLite({ data, actions }: { data: DirectorJourneyDa
         </TabsList>
       </div>
       <TabsContent value="overview" className={styles.panel}><Overview dashboard={data.dashboard} /></TabsContent>
-      <TabsContent value="campaigns" className={styles.panel}><Campaigns campaigns={data.campaigns} audience={data.audience} onCreate={actions.createCampaign} onPause={actions.pauseCampaign} /></TabsContent>
+      <TabsContent value="campaigns" className={styles.panel}><Campaigns today={today} campaigns={data.campaigns} audience={data.audience} onCreate={actions.createCampaign} onPause={actions.pauseCampaign} /></TabsContent>
       {data.canManageRules ? <TabsContent value="rules" className={styles.panel}><Rules rules={data.rules} onUpdate={actions.updateRule} onRestore={actions.restoreRules} /></TabsContent> : null}
       {data.canManageRules ? <TabsContent value="audit" className={styles.panel}><Audit report={data.risk} onReverse={actions.reverseEvent} /></TabsContent> : null}
     </Tabs>
@@ -198,7 +199,8 @@ function Overview({ dashboard }: { dashboard: JourneyDirectorDashboard | null })
 
 /* Campanhas */
 
-function Campaigns({ campaigns, audience, onCreate, onPause }: {
+function Campaigns({ today, campaigns, audience, onCreate, onPause }: {
+  today: string;
   campaigns: JourneyCampaignRow[] | null;
   audience: JourneyCampaignAudienceOptions | null;
   onCreate?: (input: CreateJourneyCampaignInput) => Promise<JourneyActionResponse<JourneyCampaignRow>>;
@@ -261,6 +263,7 @@ function Campaigns({ campaigns, audience, onCreate, onPause }: {
       )}
       {audience && onCreate ? (
         <CampaignPanel
+          today={today}
           open={open}
           onOpenChange={setOpen}
           audience={audience}
@@ -275,15 +278,15 @@ function Campaigns({ campaigns, audience, onCreate, onPause }: {
   );
 }
 
-function CampaignPanel({ open, onOpenChange, audience, onCreate }: { open: boolean; onOpenChange: (open: boolean) => void; audience: JourneyCampaignAudienceOptions; onCreate: (input: CreateJourneyCampaignInput) => Promise<JourneyActionResponse<JourneyCampaignRow>> }) {
+function CampaignPanel({ today, open, onOpenChange, audience, onCreate }: { today: string; open: boolean; onOpenChange: (open: boolean) => void; audience: JourneyCampaignAudienceOptions; onCreate: (input: CreateJourneyCampaignInput) => Promise<JourneyActionResponse<JourneyCampaignRow>> }) {
   const ids = { title: useId(), description: useId(), target: useId(), bonus: useId(), starts: useId(), ends: useId() };
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [metric, setMetric] = useState<MissionMetric>("contacts.evidenced");
   const [target, setTarget] = useState(10);
   const [bonus, setBonus] = useState(50);
-  const [startsAt, setStartsAt] = useState(todayKey());
-  const [endsAt, setEndsAt] = useState(plusDays(6));
+  const [startsAt, setStartsAt] = useState(today);
+  const [endsAt, setEndsAt] = useState(plusDays(today, 6));
   const [kind, setKind] = useState<AudienceKind>("all");
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);

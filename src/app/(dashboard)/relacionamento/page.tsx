@@ -53,6 +53,7 @@ export default async function RelationshipPage({ searchParams }: { searchParams:
               history={historyItems}
               data={data}
               actions={{ createCampaign, pauseCampaign, updateRule, restoreRules, reverseEvent }}
+              today={new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date())}
             />
           </main>
         </>

@@ -30,6 +30,7 @@ export function RelacionamentoShellScreen() {
           history={relationshipHistoryFixture}
           data={journeyDataFixture}
           actions={fixtureActions}
+          today="2026-10-24"
         />
       </main>
     </>
