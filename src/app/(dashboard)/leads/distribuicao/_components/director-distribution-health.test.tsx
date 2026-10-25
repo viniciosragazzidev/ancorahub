@@ -17,7 +17,8 @@ describe("saúde Lite da distribuição", () => {
     expect(html).toContain("Histórico de decisões");
     expect(html).toContain("Automação da fila");
     expect(html).toContain("Efeitos de entrada");
-    expect(html).toContain("A integração precisa de revisão.");
+    expect(html).toContain("Requer revisão");
+    expect(html).toContain("Repetir envio");
     expect(html).toContain("Lead atribuído");
     expect(html).toContain("25/10/2026, 12:00");
   });
