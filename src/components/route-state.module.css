@@ -22,6 +22,7 @@
 }
 
 .page {
+  max-width: none;
   min-height: 100dvh;
   padding-bottom: 24px;
   background: var(--background);
@@ -121,4 +122,11 @@
   margin: 8px 0 0;
   overflow-wrap: anywhere;
   font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+/* O html usa 97%: as alturas em rem do Arc ficariam abaixo de 44px. Classe dobrada para vencer o escopo .arc-venancor. */
+.state.state {
+  --control-height-sm: 44px;
+  --control-height-md: 44px;
+  --control-height-lg: 50px;
 }

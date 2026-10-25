@@ -216,8 +216,8 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={openReset}
-            className="min-h-11 text-sm font-medium"
-            style={{ color: "var(--chat-action-text)" }}
+            className="text-sm font-medium"
+            style={{ minHeight: 44, color: "var(--chat-action-text)" }}
           >
             Esqueceu a senha?
           </button>

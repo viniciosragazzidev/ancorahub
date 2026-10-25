@@ -256,3 +256,11 @@
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* O html usa 97%: as alturas em rem do Arc ficariam abaixo de 44px. Classe dobrada para vencer o escopo .arc-venancor. */
+.frame.frame,
+.centered.centered {
+  --control-height-sm: 44px;
+  --control-height-md: 44px;
+  --control-height-lg: 50px;
+}
