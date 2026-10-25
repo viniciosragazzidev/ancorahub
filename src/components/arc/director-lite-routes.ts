@@ -2,7 +2,6 @@
   "/agenda",
   "/assinatura",
   "/atendimento",
-  "/atendimento/fluxo",
   "/clientes",
   "/clientes/[clientId]",
   "/conversas/broker",
