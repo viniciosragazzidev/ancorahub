@@ -4,6 +4,7 @@
  * Paginação Lite (F3): "1 a 20 de 134", anterior e próxima com 44px. No celular fica só "Página 2 de 7" com as setas.
  * Não navega sozinha: avisa `onPageChange` e quem usa leva a página para a URL.
  */
+import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import styles from "./pagination.module.css";
@@ -41,4 +42,16 @@ export function LitePagination({ page, totalPages, totalItems, pageSize, onPageC
       </div>
     </nav>
   );
+}
+
+/** Páginas no cliente para listas que já chegam inteiras: devolve a fatia da página e as props da LitePagination. */
+export function useLitePages<T>(rows: T[], pageSize: number) {
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const current = Math.min(page, totalPages);
+  return {
+    pageRows: rows.slice((current - 1) * pageSize, current * pageSize),
+    pagination: { page: current, totalPages, totalItems: rows.length, pageSize, onPageChange: setPage },
+    reset: () => setPage(1),
+  };
 }
