@@ -10,6 +10,8 @@ import { redirect } from "next/navigation";
 import { WhatsAppPage } from "../../settings/whatsapp-page";
 import { DirectorWhatsAppView } from "./director-whatsapp-view";
 import { MaterialsWhatsAppView } from "./materials-whatsapp-view";
+import { WhatsAppPageLite } from "../../settings/whatsapp-page-lite";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +19,13 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
   const context = await getRequiredTenantContext();
   if (context.role === "broker") redirect("/integrations");
   const { visao } = await searchParams;
+  // Chave do visual Lite: as mesmas três visões, com os mesmos dados e regras de acesso.
+  const lite = await isDirectorLitePageOnServer(context.role, context.tenantId, "/integrations/whatsapp");
   if (visao === "diretoria") {
     if (context.role !== "director") redirect("/access-denied");
     return <>
       <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
-      <DirectorWhatsAppView context={context} />
+      <DirectorWhatsAppView context={context} lite={lite} />
     </>;
   }
 
@@ -29,7 +33,7 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
     if (context.role !== "director") redirect("/access-denied");
     return <>
       <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
-      <MaterialsWhatsAppView context={context} />
+      <MaterialsWhatsAppView context={context} lite={lite} />
     </>;
   }
 
@@ -78,6 +82,14 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
   ]) : [[], [], []];
   const intakeByKey = new Map(intakeRows.map((row) => [row.key, row.value]));
   const channelsWithIntake = channels.map((channel) => ({ ...channel, leadIntake: parseChannelLeadIntake(intakeByKey.get(channelLeadIntakeKey(channel.id))) }));
+
+  const official = { ...getMetaCloudConfigurationState(), enabled: metaEnabled, canConfigure: context.role === "director", branches, channels: channelsWithIntake, companyAccount, queues, adAccountNames: adAccounts.map((account) => account.name) };
+  if (lite) {
+    return <>
+      <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />
+      <WhatsAppPageLite official={official} />
+    </>;
+  }
 
   return <>
     <DashboardHeader breadcrumb="Integrações" title="WhatsApp" />

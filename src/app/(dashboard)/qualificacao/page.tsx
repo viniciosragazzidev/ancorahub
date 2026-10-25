@@ -13,6 +13,8 @@ import { getQualificationStats } from "@/features/ai-qualification/stats-service
 import { getQualificationAlerts } from "@/features/ai-qualification/alerts-service";
 import { getAgentTrainingCenter } from "@/features/agent-training/actions";
 import { QualificationHubClient } from "./_components/qualification-hub-client";
+import { QualificationHubLite } from "./_components/lite/qualification-hub-lite";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 
 export const dynamic = "force-dynamic";
 
@@ -101,8 +103,11 @@ export default async function QualificacaoPage({ searchParams }: { searchParams?
     }),
   ]);
 
+  // Chave do visual Lite: os mesmos dados e ações, no hub Lite quebrado por aba.
+  const Hub = (await isDirectorLitePageOnServer(context.role, context.tenantId, "/qualificacao")) ? QualificationHubLite : QualificationHubClient;
+
   return (
-    <QualificationHubClient
+    <Hub
       settings={settings}
       testNumbers={testNumbers}
       whatsappDiagnostic={whatsappDiagnostic}

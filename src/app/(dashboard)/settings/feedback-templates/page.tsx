@@ -2,12 +2,27 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { FeedbackTemplatesClient } from "./client";
 import { listChecklistTemplatesAction } from "@/features/leads/checklist-actions";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { FeedbackTemplatesLite } from "./feedback-templates-lite";
 
 export default async function FeedbackTemplatesPage() {
   const context = await getRequiredTenantContext();
   if (context.role === "broker") throw new Error("Acesso restrito a Gestores e Diretores.");
 
   const templates = await listChecklistTemplatesAction();
+
+  // Chave do visual Lite: os mesmos modelos e as mesmas ações, com a lista Lite e o novo modelo no painel lateral.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/settings/feedback-templates")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Configurações" title="Checklists de atendimento" />
+        <main className={litePage.stack}>
+          <FeedbackTemplatesLite initialTemplates={templates} />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

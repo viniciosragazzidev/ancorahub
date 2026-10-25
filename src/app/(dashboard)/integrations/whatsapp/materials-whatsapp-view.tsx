@@ -19,35 +19,10 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { MaterialGroupsCard } from "../whats_alt/_components/material-groups-card";
 import { TenantChannelCard } from "../whats_alt/_components/tenant-channel-card";
 import { WhatsAppIntegrationHeading } from "./whatsapp-integration-heading";
+import { CAPTURE_STATUS_LABELS, formatDateTime, MATERIALS_CARD_TEXTS } from "./materials-whatsapp-texts";
+import { MaterialsWhatsAppLite } from "./materials-whatsapp-lite";
 
-const MATERIALS_CARD_TEXTS = {
-  title: "Número de materiais",
-  description:
-    "WhatsApp que já está nos grupos das operadoras. O sistema só lê: não envia mensagens por ele e as conversas dele nunca viram lead. Recomendamos um chip dedicado, separado do canal da diretoria.",
-  subject: "Número de materiais",
-  pairingHint: "No celular que está nos grupos das operadoras, abra o WhatsApp.",
-  idleHint: "Nenhum número conectado. Conecte o celular que já está nos grupos das operadoras para escolher quais grupos ler.",
-};
-
-/** What each capture status means for the person who selected the groups. */
-const CAPTURE_STATUS_LABELS: Record<string, string> = {
-  captured: "Material publicado",
-  duplicate_material: "Arquivo repetido (já publicado)",
-  stored: "Mensagem registrada, sem arquivo",
-  needs_ocr: "PDF escaneado, sem texto",
-  needs_vision: "Imagem sem leitor de imagem configurado",
-  no_text: "Imagem sem texto útil",
-  too_large: "Arquivo grande demais",
-  too_small: "Imagem pequena demais",
-  expired: "Tabela com vigência vencida",
-  error: "Erro ao processar",
-};
-
-function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(value);
-}
-
-export async function MaterialsWhatsAppView({ context }: { context: TenantContext }) {
+export async function MaterialsWhatsAppView({ context, lite = false }: { context: TenantContext; lite?: boolean }) {
   // The tables of this screen come from migrations applied by hand: a missing one must not take the page down.
   const [channel, captureFlag, statsLoad] = await Promise.all([
     getMaterialsChannel(context),
@@ -75,6 +50,11 @@ export async function MaterialsWhatsAppView({ context }: { context: TenantContex
 
   const captureOn = captureFlag === "true";
   const statusRows = Object.entries(stats?.byStatus ?? {}).sort((a, b) => b[1] - a[1]);
+
+  // Visual Lite: os mesmos avisos, cartões e o resumo de 7 dias, na página Lite.
+  if (lite) {
+    return <MaterialsWhatsAppLite channel={channel} captureOn={captureOn} loadFailed={loadFailed} missingTables={Boolean(missingTables)} groups={groupsLoad.ok ? groups : null} stats={stats} />;
+  }
 
   return (
     <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) antialiased sm:gap-6 lg:p-6">

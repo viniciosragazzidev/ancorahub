@@ -6,6 +6,9 @@ import { getCommissionRules, getCarrierOptions } from "@/features/commissions/qu
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getPostSaleSettings } from "@/features/post-sale/queries";
 import { PostSaleSettings } from "@/features/post-sale/components/post-sale-settings";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { CommissionRulesLite, PostSaleSettingsLite } from "@/features/commissions/components/commission-rules-lite";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 
 export default async function CommissionRulesPage() {
   const context = await getRequiredTenantContext();
@@ -16,6 +19,19 @@ export default async function CommissionRulesPage() {
     getCarrierOptions(),
     getPostSaleSettings(),
   ]);
+
+  // Chave do visual Lite: as mesmas regras, operadoras e pós-venda, com as mesmas ações.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/configuracoes/comissoes")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Configurações / Financeiro" title="Regras de comissão" />
+        <main className={litePage.stack}>
+          <CommissionRulesLite rules={rules} carriers={carriers} />
+          <PostSaleSettingsLite {...postSaleSettings} />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

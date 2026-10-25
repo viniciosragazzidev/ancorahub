@@ -5,6 +5,10 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AtendimentoHeading } from "../_components/atendimento-heading";
 import { SituationsWorkspace } from "./_components/situations-workspace";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { AtendimentoHeadingLite } from "../_components/atendimento-heading-lite";
+import { SituationsWorkspaceLite } from "./_components/situations-workspace-lite";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +31,19 @@ export default async function AtendimentoSituacoesPage({ searchParams }: { searc
     autoActivatedKeys(context.tenantId),
     searchParams ?? Promise.resolve({} as { view?: string }),
   ]);
+
+  // Chave do visual Lite: os mesmos dados, filtros e ações, com a lista Lite.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/atendimento/situacoes")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Atendimento" title="Situações" />
+        <main className={litePage.stack}>
+          <AtendimentoHeadingLite active="situacoes" />
+          <SituationsWorkspaceLite situations={situations} learning={learning} autoActivatedKeys={aiKeys} initialView={params.view} canConfigure={context.role === "director"} />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

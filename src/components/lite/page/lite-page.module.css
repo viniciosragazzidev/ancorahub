@@ -202,6 +202,16 @@
   color: var(--primary-foreground);
 }
 
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.button[data-tone="danger"] {
+  background: var(--danger-subtle);
+  color: var(--danger);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;

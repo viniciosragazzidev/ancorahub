@@ -1,0 +1,172 @@
+/* Qualificação IA Lite: barra de ações, abas em chips, colunas e o simulador. Só tokens; alvos de 44px. */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  list-style: none;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+/* A pele do diretor pinta todo [role=tablist] como trilho cinza; aqui as abas são chips soltos. */
+.tabs.tabs[role="tablist"] {
+  flex: none;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--foreground);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab:hover {
+  background: var(--surface-muted);
+}
+
+.tab[aria-selected="true"] {
+  border-color: transparent;
+  background: var(--accent-subtle);
+  color: var(--accent-strong);
+}
+
+.tab:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+}
+
+@media (min-width: 1024px) {
+  .columns {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wide {
+    grid-column: 1 / -1;
+  }
+
+  .diag {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+
+  .sim {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
+.kv {
+  display: grid;
+  margin: 0;
+}
+
+.kv > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 16px;
+  min-height: 44px;
+  padding: 8px 24px;
+  font-size: var(--text-sm);
+}
+
+.kv > div + div {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.kv dt {
+  color: var(--text-secondary);
+}
+
+.kv dd {
+  margin: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.mono {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.chat {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  height: 440px;
+  min-width: 0;
+}
+
+.thread {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 16px 24px;
+  overflow-y: auto;
+}
+
+.bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: var(--surface-muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.bubble[data-from="user"] {
+  justify-self: end;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 767px) {
+  .kv > div {
+    padding-inline: 16px;
+  }
+
+  .thread {
+    padding-inline: 16px;
+  }
+
+  .chat {
+    height: 380px;
+  }
+}

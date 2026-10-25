@@ -9,6 +9,7 @@ import type { TenantContext } from "@/shared/auth/types";
 import { TeamNoticesCard, type TeamNoticeRow } from "../whats_alt/_components/team-notices-card";
 import { TenantChannelCard } from "../whats_alt/_components/tenant-channel-card";
 import { WhatsAppIntegrationHeading } from "./whatsapp-integration-heading";
+import { DirectorWhatsAppLite } from "./director-whatsapp-lite";
 
 /** Example values for the preview of each notice's built-in versions (same order as the outbox variables). */
 const PREVIEW_VARIABLES: Record<string, string[]> = {
@@ -23,7 +24,7 @@ const PREVIEW_VARIABLES: Record<string, string[]> = {
   dutyPresenceConfirmation: ["Ana", "08:00", "exemplo"],
 };
 
-export async function DirectorWhatsAppView({ context }: { context: TenantContext }) {
+export async function DirectorWhatsAppView({ context, lite = false }: { context: TenantContext; lite?: boolean }) {
   const [channel, settings, freeMessages] = await Promise.all([
     getTenantChannel(context),
     getTeamNoticeSettings(context.tenantId),
@@ -50,6 +51,9 @@ export async function DirectorWhatsAppView({ context }: { context: TenantContext
       builtInPreviews: notice.chat || notice.metaOnly ? [] : resolveNoticeTextVariants(notice.purpose, PREVIEW_VARIABLES[notice.purpose] ?? []),
     };
   });
+
+  // Visual Lite: os mesmos cartões (canal e avisos), na página Lite com a troca de visão em chips.
+  if (lite) return <DirectorWhatsAppLite channel={channel} notices={notices} freeMessages={freeMessages} />;
 
   return <main className="flex min-h-full flex-col gap-5 bg-background p-(--mobile-page-padding) antialiased sm:gap-6 lg:p-6">
     <WhatsAppIntegrationHeading active="diretoria" canViewDirector />
