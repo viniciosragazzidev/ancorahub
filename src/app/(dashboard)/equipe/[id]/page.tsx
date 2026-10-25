@@ -27,6 +27,9 @@ import { LiteBrokerProfileActions } from "@/features/manager-workspace/manager-l
 import { getTeamMetrics, type TeamMetricsResult } from "@/features/team-management/metrics";
 import { buildBrokerPerformanceView, normalizeBrokerPerformanceWindow } from "@/features/team-management-ui/build-broker-performance";
 import { getBrokerMetricTimeline } from "@/features/reports/metrics/team-metric-history-service";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { MemberProfileLite } from "./_components/member-profile-lite";
 
 export const dynamic = "force-dynamic";
 
@@ -215,6 +218,25 @@ export default async function TeamMemberProfilePage({
   const ranking = isBroker ? await getMemberOfferRanking(context.tenantId, member.userId).catch(() => null) : null;
   const roleName = member.customRoleName ?? ({ director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" }[member.role]);
   const firstContactRate = metrics.leads.total > 0 ? Math.round(((metrics.leads.total - metrics.leads.withoutFirstContact) / metrics.leads.total) * 100) : 0;
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe/[id]")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Equipe" title="Perfil do membro" />
+        <main className={litePage.stack}>
+          <MemberProfileLite
+            profile={profile}
+            leadsLimit={MEMBER_PROFILE_LEADS_LIMIT}
+            notes={supervisorNotes}
+            showFeedbacks={isBroker && (context.role === "director" || context.role === "manager")}
+            ranking={isBroker && ranking ? { stats: ranking.stats, ranks: ranking.ranks, periodDays: ranking.periodDays, withoutStep: ranking.withoutStep } : null}
+            scopeNote={context.role === "manager"}
+            now={new Date().toISOString()}
+          />
+        </main>
+      </>
+    );
+  }
 
   return <>
     <DashboardHeader breadcrumb="Equipe" title="Perfil do membro" rightSlot={<Button render={<Link href="/equipe" />} size="sm" variant="outline"><ArrowLeft className="size-4" /> Voltar à equipe</Button>} />
