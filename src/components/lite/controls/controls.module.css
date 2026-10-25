@@ -1,4 +1,4 @@
-/* Controles Lite compartilhados (F3). Só tokens: sem cor crua, sem sombra fora de --shadow-*. */
+/* Controles Lite compartilhados (F3). Só tokens: sem cor crua, sem elevação fora dos tokens. */
 
 .chips {
   display: flex;
@@ -19,12 +19,16 @@
   border-radius: 999px;
   background: var(--surface);
   color: var(--foreground);
-  box-shadow: var(--shadow-resting);
   font: inherit;
   font-size: var(--text-sm);
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
+}
+
+/* Chip em alternância repousa em cartão; o removível fica sobre cinza, sem elevação. */
+.chip:not(.chipRemovable) {
+  box-shadow: var(--shadow-resting);
 }
 
 .chip[aria-pressed="true"] {
@@ -211,4 +215,49 @@
 
 .menuItem[data-tone="success"] {
   color: var(--success);
+}
+
+/* Chips numa linha só, com rolagem lateral (celular). */
+.chipsScroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+
+.chipsScroll > li {
+  flex: none;
+}
+
+/* Filtro ativo removível: rótulo do campo em cinza, valor e o X. */
+.chipRemovable {
+  padding: 0 12px 0 16px;
+  background: var(--surface-muted);
+}
+
+.chipKey {
+  color: var(--text-secondary);
+}
+
+.chipX {
+  color: var(--text-muted);
+}
+
+/* Rótulos longos no desktop, curtos no celular (sem quebra dentro do botão). */
+.shortLabel {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .longLabel {
+    display: none;
+  }
+
+  .shortLabel {
+    display: inline;
+  }
+
+  .bulk {
+    border-radius: 20px;
+  }
 }

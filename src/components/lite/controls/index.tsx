@@ -5,18 +5,62 @@
  * Cada um tem a função de hoje; só muda o visual. Textos em pt-BR, sem travessão.
  */
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { X } from "lucide-react";
 
 import styles from "./controls.module.css";
 
 export { LiteMenu, type LiteMenuItem } from "./menu";
+export { LiteSelect, useLitePhone, type LiteOption, type LiteSelectProps } from "./select";
 
 export type FilterChip = { id: string; label: string; count?: number };
+/** Filtro ativo: rótulo do campo e valor escolhido ("Filial" e "Centro"). */
+export type ActiveFilterChip = { id: string; label: string; value: string };
 
-/** Chips de filtro em alternância (aria-pressed). Ativo com fundo de acento, nunca quebra linha. */
-export function LiteFilterChips({ label, chips, active, onToggle }: { label: string; chips: FilterChip[]; active: string[]; onToggle: (id: string) => void }) {
+type ToggleChipsProps = {
+  label: string;
+  chips: FilterChip[];
+  active: string[];
+  onToggle: (id: string) => void;
+  /** Uma linha só, com rolagem lateral (para o celular), em vez de quebrar em várias linhas. */
+  scroll?: boolean;
+};
+
+type RemovableChipsProps = {
+  label: string;
+  chips: ActiveFilterChip[];
+  /** Com `onRemove`, cada chip mostra um filtro ativo e o clique remove esse filtro. */
+  onRemove: (id: string) => void;
+  scroll?: boolean;
+};
+
+/**
+ * Chips de filtro. Em alternância (aria-pressed, ativo com fundo de acento) ou, com `onRemove`, como filtros ativos
+ * removíveis ("Filial: Centro" com um X). Nunca quebram linha por dentro.
+ */
+export function LiteFilterChips(props: ToggleChipsProps | RemovableChipsProps) {
+  const listClass = props.scroll ? `${styles.chips} ${styles.chipsScroll}` : styles.chips;
+  if ("onRemove" in props) {
+    const { label, chips, onRemove } = props;
+    return (
+      <div role="group" aria-label={label}>
+        <ul className={listClass}>
+          {chips.map((chip) => (
+            <li key={chip.id}>
+              <button type="button" className={`${styles.chip} ${styles.chipRemovable}`} aria-label={`Remover filtro ${chip.label}: ${chip.value}`} onClick={() => onRemove(chip.id)}>
+                <span className={styles.chipKey}>{chip.label}</span>
+                <span>{chip.value}</span>
+                <X aria-hidden="true" size={14} className={styles.chipX} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  const { label, chips, active, onToggle } = props;
   return (
     <div role="group" aria-label={label}>
-      <ul className={styles.chips}>
+      <ul className={listClass}>
         {chips.map((chip) => {
           const pressed = active.includes(chip.id);
           return (
@@ -33,7 +77,14 @@ export function LiteFilterChips({ label, chips, active, onToggle }: { label: str
   );
 }
 
-export type BulkAction = { id: string; label: string; onRun: () => void; tone?: "default" | "danger" };
+export type BulkAction = {
+  id: string;
+  label: string;
+  /** Rótulo curto para o celular (abaixo de 768px), para o botão não quebrar linha. */
+  shortLabel?: string;
+  onRun: () => void;
+  tone?: "default" | "danger";
+};
 
 /** Barra de lote: aparece com itens selecionados e leva as ações em massa. `count` 0 esconde a barra. */
 export function LiteBulkBar({ count, actions, onClear }: { count: number; actions: BulkAction[]; onClear: () => void }) {
@@ -44,11 +95,19 @@ export function LiteBulkBar({ count, actions, onClear }: { count: number; action
       <span className={styles.bulkCount}>{count} {words}</span>
       <div className={styles.bulkActions}>
         {actions.map((action) => (
-          <button key={action.id} type="button" className={styles.bulkButton} data-tone={action.tone === "danger" ? "danger" : undefined} onClick={action.onRun}>
-            {action.label}
+          <button key={action.id} type="button" className={styles.bulkButton} data-tone={action.tone === "danger" ? "danger" : undefined} aria-label={action.shortLabel ? action.label : undefined} onClick={action.onRun}>
+            {action.shortLabel ? (
+              <>
+                <span className={styles.longLabel}>{action.label}</span>
+                <span className={styles.shortLabel} aria-hidden="true">{action.shortLabel}</span>
+              </>
+            ) : action.label}
           </button>
         ))}
-        <button type="button" className={styles.bulkButton} onClick={onClear}>Limpar seleção</button>
+        <button type="button" className={styles.bulkButton} aria-label="Limpar seleção" onClick={onClear}>
+          <span className={styles.longLabel}>Limpar seleção</span>
+          <span className={styles.shortLabel} aria-hidden="true">Limpar</span>
+        </button>
       </div>
     </div>
   );

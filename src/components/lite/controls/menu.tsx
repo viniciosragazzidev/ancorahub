@@ -62,7 +62,7 @@ export function LiteMenu({ label, items }: { label: string; items: LiteMenuItem[
                   data-tone={item.tone === "success" ? "success" : undefined}
                   onClick={() => {
                     setOpen(false);
-                    item.onSelect();
+                    item.onSelect?.();
                   }}
                 >
                   {item.label}
