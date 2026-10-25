@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import "@/components/arc/venancor-scope.css";
 import { AncoraLogo } from "@/components/ancora-logo";
@@ -9,11 +9,20 @@ import { AncoraLogo } from "@/components/ancora-logo";
  * column that fits any phone, with the notch and the home bar respected. Without the
  * old floating card, nothing is wider than the screen, so phones never zoom out.
  */
+// O html usa 97% (e 95%/90% em telas menores), então as alturas em rem do Arc ficam abaixo de 44px; aqui elas vão em px.
+const AUTH_SHELL_STYLE = {
+  color: "var(--foreground)",
+  fontFamily: "var(--font-body)",
+  "--control-height-sm": "44px",
+  "--control-height-md": "44px",
+  "--control-height-lg": "50px",
+} as CSSProperties;
+
 export function LightAuthShell({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
   return (
     <div
       className="arc-venancor light-canvas flex min-h-dvh w-full flex-col overflow-x-hidden"
-      style={{ color: "var(--foreground)", fontFamily: "var(--font-body)" }}
+      style={AUTH_SHELL_STYLE}
     >
       <div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col px-5 pb-[calc(24px+var(--mobile-safe-bottom,0px))] pt-[calc(32px+var(--mobile-safe-top,0px))] sm:justify-center sm:pt-12">
         <header className="mb-8 flex justify-center">
