@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 25/10/2026 - Pele Arc preparada para Conversas do Diretor
+
+- A central reaproveita as mesmas consultas, permissoes e acoes; o modo desligado preserva o HTML legado por snapshot.
+- A pele usa tokens Arc para lista, conversa e perfil, com uma coluna no celular e tablet compacto, duas em 1024px e tres a partir de 1280px.
+- A previsualizacao real usa AppShell e fixtures para Diretor e Super-admin. O gate `useDirectorLitePage` libera `/conversas`; broker e dashboard continuam opt-out.
+- Evidencia, checklist Arc e medidas: `docs/implementations/active/2026-10-25-diretor-lite-conversas.md`.
 ## 24/10/2026 - Correcoes de revisao da moldura F2 do Diretor Lite
 
 - Seletores do chrome alcancam portais e estados em que o elemento raiz tambem recebe `arc-venancor`; o dialogo de atalhos preserva as classes Arc.
@@ -474,3 +480,7 @@ A aba Funil usa o mesmo `getQualificationFunnel` e as métricas existentes, com 
 ## 2026-10-25 - Refinamento da moldura e painel Diretor Lite
 
 O topo global e o /dashboard agora seguem um container e ritmo Arc comum, com cards por borda, ajuda alinhada, linhas de plantao e alvo minimo de 44px. A rota de desenvolvimento `/dev/diretor-shell-real` valida AppShell e painel reais para diretor e super-admin em 390, 768, 1024 e 1440; prints e checklist linha a linha estao em `docs/implementations/completed/2026-10-25-diretor-lite-f2b.md`.
+
+## 2026-10-25 - Conversas do Diretor liberadas no gate Lite
+
+`/conversas` passou a usar `useDirectorLitePage` em todos os pontos visuais e saiu do opt-out; `/conversas/broker` e `/conversas/dashboard` continuam opt-out. `ConversationsFrame` monta o layout cliente a partir de props serializaveis. A lista reserva largura para o horario e trunca nomes longos. Quatro capturas finais do AppShell real em 390 e 1440, com medidas, ficam em `scratchpad/final-prints`.

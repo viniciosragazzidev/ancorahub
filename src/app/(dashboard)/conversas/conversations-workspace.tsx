@@ -5,6 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
 import {
   REALTIME_SYNC_BROWSER_EVENT,
@@ -24,7 +26,7 @@ import { brokerDisplayName, CONTACT_SHORTCUT, contactShortcutMessage, isContactS
 import { LeadTagChips } from "@/features/lead-tags/components/lead-tag-chip";
 import { LeadTagsPicker } from "@/features/lead-tags/components/lead-tags-picker";
 import { QueueColorDot } from "@/features/lead-distribution/queue-color-tag";
-import { metaBlockedQualificationLabel } from "@/features/leads/qualification-status";
+import { LEAD_QUALIFICATION_LABELS, metaBlockedQualificationLabel, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 import type { LeadTag } from "@/features/lead-tags/rules";
 import { FilterToolbar } from "@/components/ui/filter-toolbar";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -192,6 +194,9 @@ export function ConversationsWorkspace({
   tenantId,
   leadTags = [],
   canManageTags = false,
+  canSeeBrokerTab = false,
+  currentTab = "leads",
+  coexLabel,
 }: {
   role: string;
   branches: { id: string; name: string }[];
@@ -203,7 +208,11 @@ export function ConversationsWorkspace({
   leadTags?: LeadTag[];
   /** Directors and managers create, rename and recolor tags. */
   canManageTags?: boolean;
+  canSeeBrokerTab?: boolean;
+  currentTab?: "leads" | "corretores" | "coex";
+  coexLabel?: string | null;
 }) {
+  const directorSkinEnabled = useDirectorLitePage();
   const router = useRouter();
   const [allTags, setAllTags] = useState(leadTags);
   const [tagFilter, setTagFilter] = useState<string>("all");
@@ -326,75 +335,116 @@ export function ConversationsWorkspace({
     );
   }
 
+  const filterContent = (
+    <>
+      <h2 className="sr-only">Filtros dos atendimentos</h2>
+      {role === "director" && branches.length > 0 ? (
+        <Select
+          className="w-auto shrink-0"
+          labels={{ all: directorSkinEnabled ? "Unidade" : "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
+          onValueChange={(value) => setBranchFilter(value ?? "all")}
+          value={branchFilter}
+        >
+          <SelectTrigger aria-label="Filtrar atendimentos por unidade" className={directorSkinEnabled ? "w-auto min-w-28 shrink-0" : "w-auto min-w-[140px] shrink-0"} size="sm">
+            <SelectValue placeholder="Todas as unidades">
+              {(value) => value === "all" && directorSkinEnabled
+                ? "Unidade"
+                : value === "all"
+                  ? "Todas as unidades"
+                  : branches.find((branch) => branch.id === value)?.name ?? "Unidade"}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as unidades</SelectItem>
+            {branches.map((branch) => (
+              <SelectItem key={branch.id} value={branch.id}>
+                {branch.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+
+      {allTags.length > 0 ? (
+        <Select
+          className="w-auto shrink-0"
+          labels={{ all: "Todas as tags", ...Object.fromEntries(allTags.map((tag) => [tag.id, tag.name])) }}
+          onValueChange={(value) => setTagFilter(value ?? "all")}
+          value={tagFilter}
+        >
+          <SelectTrigger aria-label="Filtrar atendimentos por tag" className="w-auto min-w-[130px] shrink-0" size="sm">
+            <SelectValue placeholder="Todas as tags" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as tags</SelectItem>
+            {allTags.map((tag) => (
+              <SelectItem key={tag.id} value={tag.id}>
+                <span className="inline-flex items-center gap-1.5"><QueueColorDot hue={tag.colorHue} />{tag.name}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : null}
+
+      <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar" data-conversations-part={directorSkinEnabled ? "filters" : undefined}>
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
+        <FilterChip directorSkinEnabled={directorSkinEnabled} active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
+      </div>
+    </>
+  );
+
+  const selectedTagPicker = selected && !selected.id.startsWith("unassigned-") ? (
+    <LeadTagsPicker
+      leadId={selected.id}
+      allTags={allTags}
+      selected={selected.tags ?? []}
+      canManage={canManageTags}
+      onSelectedChange={(tags) => handleUpdateConversation(selected.id, { tags })}
+      onAllTagsChange={(tags) => {
+        setAllTags(tags);
+        setConversations((prev) => prev.map((item) => ({ ...item, tags: item.tags?.flatMap((tag) => tags.filter((next) => next.id === tag.id)) })));
+      }}
+    />
+  ) : null;
+  const directorActions = canSeeBrokerTab ? (
+    <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
+      <ConversationsBulkQualificationAction />
+      <ConversasHeaderNav
+        currentTab={currentTab}
+        leadsCount={currentTab === "corretores" ? undefined : conversations.length}
+        coexLabel={coexLabel}
+      />
+    </nav>
+  ) : null;
+
   return (
     <section
       aria-label="Central de conversas"
       data-mobile-conversation-active={mobileView === "chat" && selected ? "true" : undefined}
-      data-lite="workspace"
+      data-lite={directorSkinEnabled ? undefined : "workspace"}
+      data-conversations-part={directorSkinEnabled ? "workspace" : undefined}
       className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
       <FilterToolbar
-        data-lite="toolbar"
+        data-lite={directorSkinEnabled ? undefined : "toolbar"}
+        data-conversations-part={directorSkinEnabled ? "toolbar" : undefined}
         aria-label="Filtros dos atendimentos"
         className="shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2.5 sm:px-5"
-        filters={
-          <>
-            <h2 className="sr-only">Filtros dos atendimentos</h2>
-            {role === "director" && branches.length > 0 ? (
-              <Select
-                className="w-auto shrink-0"
-                labels={{ all: "Todas as unidades", ...Object.fromEntries(branches.map((branch) => [branch.id, branch.name])) }}
-                onValueChange={(value) => setBranchFilter(value ?? "all")}
-                value={branchFilter}
-              >
-                <SelectTrigger aria-label="Filtrar atendimentos por unidade" className="w-auto min-w-[140px] shrink-0" size="sm">
-                  <SelectValue placeholder="Todas as unidades" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as unidades</SelectItem>
-                  {branches.map((branch) => (
-                    <SelectItem key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-
-            {allTags.length > 0 ? (
-              <Select
-                className="w-auto shrink-0"
-                labels={{ all: "Todas as tags", ...Object.fromEntries(allTags.map((tag) => [tag.id, tag.name])) }}
-                onValueChange={(value) => setTagFilter(value ?? "all")}
-                value={tagFilter}
-              >
-                <SelectTrigger aria-label="Filtrar atendimentos por tag" className="w-auto min-w-[130px] shrink-0" size="sm">
-                  <SelectValue placeholder="Todas as tags" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as tags</SelectItem>
-                  {allTags.map((tag) => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      <span className="inline-flex items-center gap-1.5"><QueueColorDot hue={tag.colorHue} />{tag.name}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : null}
-
-            <div className="flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5 no-scrollbar">
-              <FilterChip active={filter === "all"} count={conversations.length} label="Todos" onClick={() => setFilter("all")} />
-              <FilterChip active={filter === "qualified"} count={conversations.filter((c) => c.status === "distributed" || c.aiConversation?.status === "CLOSED" || ["hot", "warm", "cold", "qualified"].includes(c.status)).length} label="Qualificados" onClick={() => setFilter("qualified")} />
-              <FilterChip active={filter === "ai_active"} count={conversations.filter((c) => Boolean(c.aiConversation) && c.messages.some((m) => m.direction === "incoming" || m.direction === "inbound" || (m.direction !== "outgoing" && m.direction !== "outbound"))).length} label="Atendente Virtual" onClick={() => setFilter("ai_active")} />
-              <FilterChip active={filter === "human_active"} count={conversations.filter((c) => c.aiConversation?.status === "HUMAN_ACTIVE" || c.aiConversation?.status === "WAITING_HUMAN").length} label="Atendimento Humano" onClick={() => setFilter("human_active")} />
-            </div>
-          </>
-        }
-        results={`${filtered.length} de ${conversations.length} atendimentos`}
+        filters={directorSkinEnabled ? (
+          <div data-conversations-part="filter-controls" className="flex min-w-0 flex-1 items-center gap-2">
+            {filterContent}
+            {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
+          </div>
+        ) : filterContent}
+        results={directorSkinEnabled ? undefined : `${filtered.length} de ${conversations.length} atendimentos`}
       />
 
       <div
-          data-lite="panes"
+          data-lite={directorSkinEnabled ? undefined : "panes"}
+          data-conversations-part={directorSkinEnabled ? "panes" : undefined}
+          data-profile-open={directorSkinEnabled ? String(profileOpen) : undefined}
           className={cn(
             "grid min-h-0 flex-1 grid-cols-1 grid-rows-1 lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)]",
             profileOpen && "lg:grid-cols-[minmax(16rem,0.68fr)_minmax(0,1.65fr)_20rem]",
@@ -402,17 +452,18 @@ export function ConversationsWorkspace({
       >
         <section
           aria-label="Lista de atendimentos"
-          data-lite="pane"
+          data-lite={directorSkinEnabled ? undefined : "pane"}
+          data-conversations-part={directorSkinEnabled ? "pane" : undefined}
           className={cn("flex min-h-0 flex-col border-r border-border bg-card", mobileView === "chat" && selected && "max-lg:hidden")}
         >
           <div className="border-b border-border px-3 py-2.5">
-            <div className="relative" data-lite="search">
+            <div className="relative" data-lite={directorSkinEnabled ? undefined : "search"} data-conversations-part={directorSkinEnabled ? "search" : undefined}>
               <MagnifyingGlass aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 aria-label="Buscar atendimento por nome, telefone ou e-mail"
                 className="h-10 pl-8 text-xs"
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Buscar por nome, telefone ou e-mail"
+                placeholder={directorSkinEnabled ? "Buscar conversa" : "Buscar por nome, telefone ou e-mail"}
                 value={query}
               />
             </div>
@@ -424,11 +475,12 @@ export function ConversationsWorkspace({
                 <motion.div
                   key={conversation.id}
                   // The first rows come in one after the other; the rest just appear.
-                  initial={reduceMotion || index > 14 ? false : { opacity: 0, y: 6 }}
+                  initial={directorSkinEnabled || reduceMotion || index > 14 ? false : { opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.24, delay: index * 0.02, ease: LITE_EASE }}
                 >
                   <ConversationRow
+                    directorSkinEnabled={directorSkinEnabled}
                     active={conversation.id === selected?.id}
                     conversation={conversation}
                     onClick={() => selectConversation(conversation.id)}
@@ -440,7 +492,7 @@ export function ConversationsWorkspace({
           </ScrollArea>
         </section>
 
-        <section aria-live="polite" data-lite="pane" className={cn("flex min-h-0 flex-col bg-muted/15", (mobileView !== "chat" || !selected) && "max-lg:hidden")}>
+        <section aria-live="polite" data-lite={directorSkinEnabled ? undefined : "pane"} data-conversations-part={directorSkinEnabled ? "pane" : undefined} className={cn("flex min-h-0 flex-col bg-muted/15", (mobileView !== "chat" || !selected) && "max-lg:hidden")}>
           {selected ? (
             <>
               <ConversationHeader
@@ -453,26 +505,21 @@ export function ConversationsWorkspace({
                 userId={userId}
                 tenantId={tenantId}
                 role={role}
+                tagControl={directorSkinEnabled && selectedTagPicker ? (
+                  <div data-conversations-part="header-tags" className="flex min-w-0 items-center gap-2 px-4 pb-2 sm:px-5">
+                    <LeadTagChips tags={selected.tags} max={4} className="min-w-0 flex-1" />
+                    {selectedTagPicker}
+                  </div>
+                ) : undefined}
               />
-              {!selected.id.startsWith("unassigned-") ? (
+              {!directorSkinEnabled && !selected.id.startsWith("unassigned-") ? (
                 <div className="flex shrink-0 items-center gap-2 border-b border-border bg-card px-4 py-1.5 sm:px-5">
                   <LeadTagChips tags={selected.tags} max={6} className="flex-1" />
                   {!selected.tags?.length ? <span className="flex-1 text-[11px] text-muted-foreground">Sem tags</span> : null}
-                  <LeadTagsPicker
-                    leadId={selected.id}
-                    allTags={allTags}
-                    selected={selected.tags ?? []}
-                    canManage={canManageTags}
-                    onSelectedChange={(tags) => handleUpdateConversation(selected.id, { tags })}
-                    onAllTagsChange={(tags) => {
-                      setAllTags(tags);
-                      // Renamed, recolored or deleted tags update on every conversation.
-                      setConversations((prev) => prev.map((item) => ({ ...item, tags: item.tags?.flatMap((tag) => tags.filter((next) => next.id === tag.id)) })));
-                    }}
-                  />
+                  {selectedTagPicker}
                 </div>
               ) : null}
-              <ConversationHistory client={selected} />
+              <ConversationHistory client={selected} directorSkinEnabled={directorSkinEnabled} />
               <ChatInput
                 leadId={selected.id}
                 brokerName={brokerDisplayName(selected.corretorNome)}
@@ -511,13 +558,18 @@ export function ConversationsWorkspace({
 
         <aside
           aria-label="Perfil do cliente"
-          data-lite="pane"
-          className={cn("hidden min-h-0 overflow-y-auto border-l border-border bg-card lg:flex lg:flex-col", !profileOpen && "lg:hidden")}
+          data-lite={directorSkinEnabled ? undefined : "pane"}
+          data-conversations-part={directorSkinEnabled ? "pane" : undefined}
+          className={cn(
+            "hidden min-h-0 overflow-y-auto border-l border-border bg-card",
+            directorSkinEnabled ? "min-[1280px]:flex min-[1280px]:flex-col" : "lg:flex lg:flex-col",
+            !profileOpen && (directorSkinEnabled ? "min-[1280px]:hidden" : "lg:hidden"),
+          )}
         >
           {selected && profileOpen ? (
             <motion.div
               key={selected.id}
-              initial={reduceMotion ? false : { opacity: 0, x: 12 }}
+              initial={directorSkinEnabled || reduceMotion ? false : { opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.28, ease: LITE_EASE }}
             >
@@ -528,7 +580,7 @@ export function ConversationsWorkspace({
       </div>
 
       <Sheet onOpenChange={setProfileSheetOpen} open={profileSheetOpen}>
-        <SheetContent className="gap-0 p-0 lg:hidden" side="right">
+        <SheetContent className={cn("gap-0 p-0", directorSkinEnabled ? "min-[1280px]:hidden" : "lg:hidden")} side="right">
           {selected ? (
             <>
               <SheetHeader>
@@ -550,6 +602,7 @@ function ConversationHeader({
   onOpenProfile,
   onToggleProfile,
   onUpdateConversation,
+  tagControl,
   profileOpen,
   userId,
   tenantId,
@@ -560,11 +613,13 @@ function ConversationHeader({
   onOpenProfile: () => void;
   onToggleProfile: () => void;
   onUpdateConversation?: (leadId: string, updates: Partial<ConversationItem>) => void;
+  tagControl?: ReactNode;
   profileOpen: boolean;
   userId?: string;
   tenantId?: string;
   role?: string;
 }) {
+  const directorSkinEnabled = useDirectorLitePage();
   const [isPending, setIsPending] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const router = useRouter();
@@ -679,10 +734,14 @@ function ConversationHeader({
     toast.success("Link da conversa copiado para a área de transferência!");
   }
 
+  function handleCallClient() {
+    window.location.assign(`tel:${client.telefone.replace(/\D/g, "")}`);
+  }
+
   return (
-    <header className="shrink-0 border-b border-border bg-card px-4 py-3 sm:px-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+    <header data-conversations-part={directorSkinEnabled ? "chat-header" : undefined} className="shrink-0 border-b border-border bg-card px-4 py-3 sm:px-5">
+      <div data-conversations-part={directorSkinEnabled ? "chat-header-layout" : undefined} className="flex items-center justify-between gap-3">
+        <div data-conversations-part={directorSkinEnabled ? "chat-header-identity" : undefined} className="flex items-center gap-3 min-w-0 flex-1">
           <Button
             aria-label="Voltar para lista de atendimentos"
             className="lg:hidden shrink-0"
@@ -694,12 +753,14 @@ function ConversationHeader({
             <ArrowLeft className="size-4" />
           </Button>
 
-          <ContactAvatar name={client.nome} className="shrink-0" photoUrl={contactPhotoUrl(client)} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 min-w-0">
+          <ContactAvatar name={client.nome} className={cn("shrink-0", directorSkinEnabled && "max-[559px]:hidden")} photoUrl={contactPhotoUrl(client)} />
+          <div data-conversations-part={directorSkinEnabled ? "chat-header-details" : undefined} className="min-w-0 flex-1">
+            <div data-conversations-part={directorSkinEnabled ? "chat-header-title" : undefined} className="flex items-center gap-2 min-w-0">
               <h2 className="text-sm font-semibold tracking-tight text-foreground truncate" title={client.nome}>{client.nome}</h2>
               <Badge className="hidden shrink-0 md:inline-flex" variant="outline">
-                {LEAD_STATUS_LABELS[client.status] ?? client.status}
+                {directorSkinEnabled
+                  ? getConversationStatusLabel(client.status, client.qualificationStatus)
+                  : LEAD_STATUS_LABELS[client.status] ?? client.status}
               </Badge>
               {isAiActive ? (
                 <Badge className="hidden shrink-0 bg-primary/8 text-primary border-primary/25 sm:inline-flex" variant="outline">
@@ -719,15 +780,18 @@ function ConversationHeader({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 sm:gap-2">
+        <div data-conversations-part={directorSkinEnabled ? "chat-header-actions" : undefined} className="flex items-center gap-1.5 shrink-0 sm:gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
                 <Button
                   aria-label="Ações do atendimento"
                   size="sm"
-                  className="h-10 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"
+                  className={directorSkinEnabled
+                    ? "h-11 border-border bg-transparent px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 text-foreground hover:bg-muted shadow-none shrink-0"
+                    : "h-10 px-3 max-[559px]:px-2.5 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"}
                   disabled={isPending}
+                  variant={directorSkinEnabled ? "outline" : "default"}
                 >
                   <Sparkles className="size-3.5 text-amber-300" />
                   <span className="hidden sm:inline">Ações do Atendimento</span>
@@ -782,6 +846,25 @@ function ConversationHeader({
                 </div>
               </DropdownMenuItem>
 
+              {directorSkinEnabled ? (
+                <>
+                  <DropdownMenuItem
+                    onClick={() => void handleCopyLeadLink()}
+                    className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+                  >
+                    <LinkSimple className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <span>Copiar link da conversa</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleCallClient}
+                    className="flex items-start gap-2.5 rounded-[var(--radius-card)] px-2.5 py-2 text-xs font-medium"
+                  >
+                    <Phone className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                    <span>Ligar para cliente</span>
+                  </DropdownMenuItem>
+                </>
+              ) : null}
+
               {/* RESETAR CHAT IA (DIRETORES) */}
               {role === "director" && client.aiConversation?.id && (
                 <>
@@ -822,15 +905,15 @@ function ConversationHeader({
 
           <div className="flex items-center gap-1 border-l border-border/60 pl-1.5 sm:pl-2">
             <Tooltip>
-              <TooltipTrigger render={<Button aria-label="Copiar link direto da conversa" onClick={() => void handleCopyLeadLink()} size="icon-sm" type="button" variant="ghost"><LinkSimple className="size-3.5" /></Button>} />
+              <TooltipTrigger render={<Button aria-label="Copiar link direto da conversa" onClick={() => void handleCopyLeadLink()} className={directorSkinEnabled ? "max-[559px]:hidden" : undefined} size="icon-sm" type="button" variant="ghost"><LinkSimple className="size-3.5" /></Button>} />
               <TooltipContent>Copiar link da conversa</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} aria-label="Ligar para cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))} />} />
+              <TooltipTrigger render={<a href={`tel:${client.telefone.replace(/\D/g, "")}`} aria-label="Ligar para cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }), directorSkinEnabled && "max-[559px]:hidden" )} />} />
               <TooltipContent>Ligar</TooltipContent>
             </Tooltip>
             <Tooltip>
-              <TooltipTrigger render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" aria-label="Abrir WhatsApp do cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}><WhatsappLogo className="size-3.5" /></a>} />
+              <TooltipTrigger render={<a href={getWhatsAppUrl(client.telefone)} rel="noreferrer" target="_blank" aria-label="Abrir WhatsApp do cliente" className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}><WhatsappLogo data-conversations-brand={directorSkinEnabled ? "whatsapp" : undefined} className="size-3.5" /></a>} />
               <TooltipContent>Abrir WhatsApp</TooltipContent>
             </Tooltip>
             <Tooltip>
@@ -866,6 +949,7 @@ function ConversationHeader({
           </div>
         </div>
       </div>
+      {tagControl}
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogPopup>
           <DialogPanel>
@@ -896,7 +980,7 @@ function ConversationHeader({
 const LITE_EASE = [0.16, 1, 0.3, 1] as const;
 
 /** A filter tab: the white pill slides to the chosen one (Lite), with the count beside the label. */
-function FilterChip({ active, count, label, onClick }: { active: boolean; count: number; label: string; onClick: () => void }) {
+function FilterChip({ active, count, label, onClick, directorSkinEnabled }: { active: boolean; count: number; label: string; onClick: () => void; directorSkinEnabled: boolean }) {
   const reduceMotion = useReducedMotion();
   return (
     <button
@@ -917,12 +1001,12 @@ function FilterChip({ active, count, label, onClick }: { active: boolean; count:
         />
       ) : null}
       <span className="relative">{label}</span>
-      <span className="relative" data-lite="chip-count">{count}</span>
+      <span className="relative" data-lite={directorSkinEnabled ? undefined : "chip-count"} data-conversations-part={directorSkinEnabled ? "chip-count" : undefined}>{count}</span>
     </button>
   );
 }
 
-function ConversationHistory({ client }: { client: ConversationItem }) {
+function ConversationHistory({ client, directorSkinEnabled }: { client: ConversationItem; directorSkinEnabled: boolean }) {
   const viewportRef = useRef<HTMLDivElement>(null);
 
   // Chronological order: oldest first, newest at bottom ("o mais recente no fim")
@@ -1004,7 +1088,7 @@ function ConversationHistory({ client }: { client: ConversationItem }) {
                     <motion.div
                       key={message.id}
                       // Only the newest messages slide in; opening a long history stays still.
-                      initial={reduceMotion || !recentIds.has(message.id) ? false : { opacity: 0, y: 8, scale: 0.98 }}
+                      initial={directorSkinEnabled || reduceMotion || !recentIds.has(message.id) ? false : { opacity: 0, y: 8, scale: 0.98 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ duration: 0.26, ease: LITE_EASE }}
                     >
@@ -1047,6 +1131,7 @@ function ChatInput({
     media: { kind: string; mimeType: string; filename: string | null; sizeBytes: number; url: string };
   }) => void;
 }) {
+  const directorSkinEnabled = useDirectorLitePage();
   const [text, setText] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1103,7 +1188,7 @@ function ChatInput({
   }
 
   return (
-    <div className="border-t border-border bg-card px-4 py-3 sm:px-5">
+    <div data-conversations-part={directorSkinEnabled ? "chat-input" : undefined} className="border-t border-border bg-card px-4 py-3 sm:px-5">
       {phone ? (
         <a
           href={getWhatsAppUrl(phone)}
@@ -1111,7 +1196,7 @@ function ChatInput({
           target="_blank"
           className={cn(buttonVariants({ variant: "outline", size: "sm" }), "mb-2 w-full gap-2 lg:hidden")}
         >
-          <WhatsappLogo className="size-4 text-emerald-600" />
+          <WhatsappLogo data-conversations-brand={directorSkinEnabled ? "whatsapp" : undefined} className="size-4 text-emerald-600" />
           Abrir no WhatsApp
         </a>
       ) : null}
@@ -1122,9 +1207,10 @@ function ChatInput({
           <Input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={`Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
+            placeholder={directorSkinEnabled ? "Escreva uma mensagem" : `Digite sua mensagem para o cliente (ou ${CONTACT_SHORTCUT} para avisar quem vai ligar)...`}
+            aria-label={directorSkinEnabled ? "Escreva uma mensagem" : undefined}
             disabled={isPending}
-            className="h-10 text-sm"
+            className={directorSkinEnabled ? "h-10 min-w-0 text-sm" : "h-10 text-sm"}
           />
           {error && (
             <p className="absolute -top-6 left-1 text-[11px] font-medium text-destructive truncate max-w-full">
@@ -1614,14 +1700,21 @@ function renderRowQualificationBadge(conversation: ConversationItem) {
   );
 }
 
-function ConversationRow({ active, conversation, onClick }: { active: boolean; conversation: ConversationItem; onClick: () => void }) {
+function getConversationStatusLabel(status: string, qualificationStatus?: string | null) {
+  const normalized = (qualificationStatus || status).toLowerCase() as LeadQualificationStatus;
+  return LEAD_STATUS_LABELS[status] ?? LEAD_QUALIFICATION_LABELS[normalized] ?? status;
+}
+
+function ConversationRow({ active, conversation, onClick, directorSkinEnabled }: { active: boolean; conversation: ConversationItem; onClick: () => void; directorSkinEnabled: boolean }) {
   const hasHistory = conversation.messages.length > 0;
+  const visibleMessageCount = conversation.messages.filter((message) => !message.transition).length;
   const preview = conversation.latestMessage?.body ?? "Nenhuma mensagem sincronizada.";
 
   return (
     <button
       aria-current={active ? "page" : undefined}
-      data-lite="row"
+      data-lite={directorSkinEnabled ? undefined : "row"}
+      data-conversations-part={directorSkinEnabled ? "row" : undefined}
       className={cn(
         "group flex w-full items-start gap-3 rounded-full px-3 py-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
         active ? "bg-muted/80" : "hover:bg-muted/65",
@@ -1633,7 +1726,7 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
       <span className="grid min-w-0 flex-1 gap-1">
         <span className="flex min-w-0 items-center justify-between gap-3">
           <span className="truncate text-sm font-medium">{conversation.nome}</span>
-          <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+          <span data-conversations-part={directorSkinEnabled ? "row-time" : undefined} className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
             {formatRelative(conversation.latestMessage?.sentAt ?? conversation.stageEnteredAt)}
           </span>
         </span>
@@ -1644,9 +1737,11 @@ function ConversationRow({ active, conversation, onClick }: { active: boolean; c
         {conversation.tags?.length ? <LeadTagChips tags={conversation.tags} className="pt-0.5" /> : null}
         <span className="flex items-center gap-2 pt-0.5">
           {renderRowQualificationBadge(conversation)}
-          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+          <span data-conversations-part={directorSkinEnabled ? "row-message-count" : undefined} className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <Clock aria-hidden="true" className="size-3" />
-            {hasHistory ? `${conversation.messages.filter((message) => !message.transition).length} mensagens` : "Aguardando histórico"}
+            {hasHistory
+              ? `${visibleMessageCount} ${directorSkinEnabled && visibleMessageCount === 1 ? "mensagem" : "mensagens"}`
+              : "Aguardando histórico"}
           </span>
         </span>
       </span>
@@ -1727,6 +1822,7 @@ function ClientProfile({
   /** Brokers do not see where the lead came from. */
   hideOrigin?: boolean;
 }) {
+  const directorSkinEnabled = useDirectorLitePage();
   const approvedDocuments = client.documents.filter((document) => document.status === "approved").length;
   const pendingDocuments = client.documents.filter((document) => document.status === "pending").length;
   const sharedMedia = getSharedMedia(client.messages);
@@ -1772,7 +1868,9 @@ function ClientProfile({
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">{client.telefone}</p>
               </div>
               <Badge className="shrink-0" variant="outline">
-                {LEAD_STATUS_LABELS[client.status] ?? client.status}
+                {directorSkinEnabled
+                  ? getConversationStatusLabel(client.status, client.qualificationStatus)
+                  : LEAD_STATUS_LABELS[client.status] ?? client.status}
               </Badge>
             </div>
             <p className="mt-2 text-xs leading-5 text-muted-foreground">

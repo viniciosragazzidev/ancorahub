@@ -459,3 +459,6 @@ ficam em `tmp/e4/`; a etapa não avança a UX-M1.10.
 ## 2026-10-15: G6, destaques e evolucao da equipe
 
 Papeis e rotas: gestor em `/gestao` (unidade) e supervisor em `/gestao` (equipe propria); linha do tempo no perfil Lite `/equipe/[id]`. Acoes: consultar resumo dos ultimos sete dias, abrir o perfil destacado e, somente para supervisor, reconhecer corretor com motivo. Estados: sem historico, sem destaques, timeline indisponivel antes da migration, envio/sucesso/erro no reconhecimento existente. Disclosure no card semanal e tabela mensal. Reutiliza Card, Select, Button, Avatar e RecognizeSheet existentes, sem novo token, primitive ou animacao. Escopos continuam derivados no servidor e ranking_opt_out remove o corretor dos destaques automaticos.
+
+
+Registro de tela: `/conversas` recebeu a pele Arc sob a chave do Diretor e foi validada no AppShell real com fixtures. A acao principal segue consultar e responder conversas; os estados e o disclosure de lista, conversa e perfil permanecem. Sem token ou primitiva nova. A rota continua em opt-out ate a base ter `useDirectorLitePage`; este trabalho nao avanca UX-M1. Evidencia: `docs/implementations/active/2026-10-25-diretor-lite-conversas.md`.

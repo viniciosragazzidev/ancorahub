@@ -3,20 +3,10 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, exists, gte, inArray, isNotNull, isNull, like, lte, notInArray, or, sql } from "drizzle-orm";
 
 import "@/components/arc/venancor-scope.css";
-import { DashboardHeader } from "@/components/dashboard-header";
 
-import liteStyles from "./conversas-lite.module.css";
-import {
-  ConversationsWorkspace,
-  type ConversationItem,
-  type ConversationMessage,
-} from "./conversations-workspace";
-import {
-  OfficialBrokerConversations,
-  type OfficialBrokerConversation,
-  type OfficialBrokerMessage,
-} from "./official-broker-conversations";
-import { ConversasHeaderNav } from "./_components/conversas-header-nav";
+import { ConversationsFrame } from "./conversations-frame";
+import type { ConversationItem, ConversationMessage } from "./conversations-workspace";
+import type { OfficialBrokerConversation, OfficialBrokerMessage } from "./official-broker-conversations";
 import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
@@ -34,7 +24,6 @@ import { samePhoneSubscriber } from "@/features/waha-cadence/phone-matching";
 import { getDirectorFacingMetaDeliveryFailure } from "@/features/communication-channels/meta-delivery-failure";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
-import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { getSystemSetting } from "@/features/system-settings/queries";
 import { hasPermission } from "@/shared/auth/permissions";
@@ -1068,46 +1057,24 @@ export default async function ConversationsPage({
   }
 
   return (
-    <div className={`arc-venancor ${liteStyles.root} flex h-app min-h-0 w-full flex-1 flex-col overflow-hidden`}>
-      <DashboardHeader
-        breadcrumb="Atendimento"
-        title="Conversas"
-        rightSlot={
-          canSeeBrokerTab ? (
-            <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
-              <BulkQualificationDialog />
-              <ConversasHeaderNav
-                currentTab={officialBrokerTab ? "corretores" : coexTab ? "coex" : "leads"}
-                leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
-                coexLabel={coexLabel}
-              />
-            </nav>
-          ) : undefined
-        }
-      />
-      <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background p-0">
-        <div data-lite="frame" className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card">
-          {officialBrokerTab ? (
-            <OfficialBrokerConversations
-              enabled={officialBrokerMessagesEnabled}
-              deliveryChannel={internalBrokerDeliveryChannel}
-              conversations={officialBrokerConversations}
-            />
-          ) : (
-            <ConversationsWorkspace
-              role={context.role}
-              branches={branches}
-              conversations={finalConversations}
-              initialLeadId={leadId}
-              userId={context.userId}
-              tenantId={context.tenantId}
-              leadTags={leadTags}
-              canManageTags={canManageLeadTags(context.role)}
-            />
-          )}
-        </div>
-      </main>
-    </div>
+    <ConversationsFrame
+      role={context.role}
+      branches={branches}
+      conversations={finalConversations}
+      initialLeadId={leadId}
+      userId={context.userId}
+      tenantId={context.tenantId}
+      leadTags={leadTags}
+      canManageTags={canManageLeadTags(context.role)}
+      officialBrokerEnabled={officialBrokerMessagesEnabled}
+      officialBrokerDeliveryChannel={internalBrokerDeliveryChannel}
+      officialBrokerConversations={officialBrokerConversations}
+      canSeeBrokerTab={canSeeBrokerTab}
+      currentTab={officialBrokerTab ? "corretores" : coexTab ? "coex" : "leads"}
+      leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
+      coexLabel={coexLabel}
+      officialBrokerTab={officialBrokerTab}
+    />
   );
 }
 

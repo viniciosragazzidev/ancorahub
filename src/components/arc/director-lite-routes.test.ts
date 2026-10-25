@@ -23,7 +23,7 @@ function pageRoutes(directory = dashboardRoot): string[] {
 describe("rotas do Diretor Lite", () => {
   it("mantém em opt-out todas as páginas ainda não revisadas (saíram o painel, a lista e o perfil do lead e as telas simples da passada rápida)", () => {
     const revised = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
-    expect([...revised].sort()).toEqual(["/assistente", "/dashboard", "/documentos", "/empresas", "/equipe/recuperacoes", "/ferramentas", "/integridade", "/leads", "/leads/[id]", "/minha-fila", "/noc", "/notificacoes", "/propostas", "/relatorios", "/relatorios/drill/[drillId]", "/tarefas/dashboard", "/vendas", "/vendas/[id]"]);
+    expect([...revised].sort()).toEqual(["/assistente", "/conversas", "/dashboard", "/documentos", "/empresas", "/equipe/recuperacoes", "/ferramentas", "/integridade", "/leads", "/leads/[id]", "/minha-fila", "/noc", "/notificacoes", "/propostas", "/relatorios", "/relatorios/drill/[drillId]", "/tarefas/dashboard", "/vendas", "/vendas/[id]"]);
     expect(DIRECTOR_LITE_OPT_OUT_ROUTES.length).toBeGreaterThan(0);
   });
 
@@ -39,6 +39,13 @@ describe("rotas do Diretor Lite", () => {
     expect(isDirectorLiteRouteOptedOut("/leads/abc-123")).toBe(false);
     expect(isDirectorLiteRouteOptedOut("/leads/abc-123/feedback")).toBe(true);
     expect(isDirectorLiteRouteOptedOut("/leads/arquivados")).toBe(true);
+  });
+
+  it("libera a central de conversas no gate e mantém opt-out das rotas de corretor e dashboard", () => {
+    expect(isDirectorLiteRouteOptedOut("/conversas")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/conversas?tab=leads")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/conversas/broker")).toBe(true);
+    expect(isDirectorLiteRouteOptedOut("/conversas/dashboard")).toBe(true);
   });
 
   it("reconhece rotas dinâmicas e remove query string", () => {

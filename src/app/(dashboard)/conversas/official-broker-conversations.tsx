@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 
 import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -121,6 +122,7 @@ export function OfficialBrokerConversations({
   deliveryChannel: "meta" | "waha_direct";
   conversations: OfficialBrokerConversation[];
 }) {
+  const directorSkinEnabled = useDirectorLitePage();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
@@ -311,7 +313,7 @@ export function OfficialBrokerConversations({
 
   if (!enabled) {
     return (
-      <section className="flex min-h-[26rem] items-center justify-center rounded-[var(--radius-card)] border border-border bg-card p-6">
+      <section data-conversations-part={directorSkinEnabled ? "official-workspace" : undefined} className="flex min-h-[26rem] items-center justify-center rounded-[var(--radius-card)] border border-border bg-card p-6">
         <EmptyState
           icon={WhatsappLogo}
           title="Canal oficial desativado"
@@ -324,13 +326,14 @@ export function OfficialBrokerConversations({
   return (
     <section
       aria-label="Central de mensagens oficiais com corretores"
+      data-conversations-part={directorSkinEnabled ? "official-workspace" : undefined}
       className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card"
     >
       {/* Header com Ações de Disparo */}
       <header className="shrink-0 border-b border-border bg-card px-4 py-3 lg:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-[var(--radius-card)] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <div data-conversations-brand={directorSkinEnabled ? "whatsapp" : undefined} className="flex size-9 items-center justify-center rounded-[var(--radius-card)] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <WhatsappLogo className="size-5" />
             </div>
             <div>
