@@ -30,6 +30,36 @@
   gap: 16px;
 }
 
+/* Cartão de número em repouso: borda de 1px e nenhuma sombra (contrato de refino). A classe dobrada vence a pele diretor. */
+.stats.stats :global([data-slot="stat-card"]) {
+  border: 1px solid var(--border);
+  box-shadow: none;
+}
+
+/* Botão só de ícone (abrir, alterar): alvo de 44px, nome acessível obrigatório em aria-label. */
+.iconButton {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.iconButton:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}
+
 .stat {
   display: grid;
   gap: 4px;

@@ -14,6 +14,7 @@ import { LiteSelect } from "@/components/lite/controls";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LiteSidePanel } from "@/components/lite/data/side-panel";
 import form from "@/components/lite/page/lite-form.module.css";
+import { liteDateFormatter } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
 import { toast } from "@/components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -37,7 +38,7 @@ const STATUS: Record<ProposalStatus, { label: string; tone?: "success" | "warnin
 };
 
 const currency = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const shortDate = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short" });
+const shortDate = liteDateFormatter({ dateStyle: "short" });
 
 type PaymentMethod = "boleto" | "debito_automatico" | "cartao_credito" | "desconto_folha" | "outro";
 type RenewalType = "reajuste_operadora" | "portabilidade" | "manutencao" | "nova_contratacao";
@@ -157,8 +158,9 @@ export function PropostasLite({ initialProposals, expiringProposals, leads }: {
     {
       id: "lead",
       label: "Lead ou cliente",
+      nowrap: true,
       render: (proposal) => (
-        <span>
+        <span title={proposal.leadName}>
           <span>{proposal.leadName}</span>
           <span className={`${page.cellSub} ${page.numeric}`}>{proposal.leadPhone ? formatLeadPhone(proposal.leadPhone) : "Sem telefone"}</span>
         </span>

@@ -45,7 +45,9 @@ describe("vendas Lite", () => {
     fireEvent.click(screen.getByRole("option", { name: "Todas as vendas" }));
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar vendas" }), { target: { value: "nazareth" } });
     expect(within(table()).getAllByRole("row")).toHaveLength(2);
-    expect(within(table()).getByRole("link", { name: "Ver detalhes da venda de Nazareth Pereira" })).toHaveAttribute("href", "/vendas/s3");
+    expect(within(table()).getByRole("link", { name: "Ver detalhes da venda" })).toHaveAttribute("href", "/vendas/s3");
+    fireEvent.click(within(table()).getByText("Nazareth Pereira"));
+    expect(push).toHaveBeenLastCalledWith("/vendas/s3");
   });
 
   it("unidade e período vão para a URL como os seletores atuais", () => {

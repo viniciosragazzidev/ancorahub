@@ -15,7 +15,8 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { toast } from "@/components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { markCommissionPaidAction, markCommissionUnpaidAction, type SaleActionState } from "@/features/sales/actions";
-import { formatCurrency, formatDate } from "@/features/quotes/utils";
+import { formatLiteDate } from "@/components/lite/format/date";
+import { formatCurrency } from "@/features/quotes/utils";
 
 import type { ScheduleItem } from "./commission-schedule-table";
 import styles from "./sale-detail-lite.module.css";
@@ -60,7 +61,7 @@ export function SaleDetailLite({ sale, schedule, canManage }: { sale: SaleLite; 
   const columns: LiteColumn<ScheduleItem>[] = [
     { id: "parcel", label: "Parcela", primary: true, render: (item) => <span className={page.cellTitle}>{item.monthNumber}º mês</span> },
     { id: "ref", label: "Mês de referência", secondary: true, render: (item) => <span className={page.numeric}>{item.referenceMonth}</span> },
-    { id: "due", label: "Vencimento", render: (item) => <span className={page.numeric}>{formatDate(item.dueDate)}</span> },
+    { id: "due", label: "Vencimento", render: (item) => <span className={page.numeric}>{formatLiteDate(item.dueDate)}</span> },
     { id: "pct", label: "Percentual", numeric: true, render: (item) => <span className={page.numeric}>{item.percentage}%</span> },
     { id: "amount", label: "Valor", numeric: true, render: (item) => <span className={page.numeric}>{formatCurrency(item.amount)}</span> },
     {
@@ -75,7 +76,7 @@ export function SaleDetailLite({ sale, schedule, canManage }: { sale: SaleLite; 
       id: "payment",
       label: "Pagamento",
       render: (item) => item.status === "paid"
-        ? <span title={`Pago por ${item.paidByName ?? "Diretoria"} em ${formatDate(item.paidAt)}`}>{item.paidByName ? item.paidByName.split(" ")[0] : "Confirmado"} em {formatDate(item.paidAt)}</span>
+        ? <span title={`Pago por ${item.paidByName ?? "Diretoria"} em ${formatLiteDate(item.paidAt)}`}>{item.paidByName ? item.paidByName.split(" ")[0] : "Confirmado"} em {formatLiteDate(item.paidAt)}</span>
         : <span className={page.muted}>{item.status === "cancelled" ? "Cancelado" : "Pendente"}</span>,
     },
   ];
@@ -91,7 +92,7 @@ export function SaleDetailLite({ sale, schedule, canManage }: { sale: SaleLite; 
             <span className={page.badge} data-tone={sale.status === "active" ? "success" : undefined}>{sale.status === "active" ? "Ativa" : "Cancelada"}</span>
           </div>
           <p className={styles.meta}>
-            <span>Registrada em {new Intl.DateTimeFormat("pt-BR").format(new Date(sale.saleDate))}</span>
+            <span>Registrada em {formatLiteDate(sale.saleDate)}</span>
             {sale.branchName ? <span>{sale.branchName}</span> : null}
           </p>
         </div>

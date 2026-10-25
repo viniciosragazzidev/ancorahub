@@ -6,8 +6,9 @@
  * celular) com seleção e a exportação em lote pela mesma Server Action, e o "Exportar CSV" de comissões do mês.
  */
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
-import { ArrowRight, Download, Search } from "lucide-react";
+import { ArrowRight, ChevronRight, Download, Search } from "lucide-react";
 
 import { StatCard } from "@/components/dashboard/metric-card";
 import { LiteBulkBar, LiteSelect, LiteUrlSelect } from "@/components/lite/controls";
@@ -17,7 +18,8 @@ import page from "@/components/lite/page/lite-page.module.css";
 import { toast } from "@/components/ui/sonner";
 import { useMultiSelect } from "@/hooks/use-multi-select";
 import { bulkExportSalesAction } from "@/features/sales/actions";
-import { formatCurrency, formatDate } from "@/features/quotes/utils";
+import { formatLiteDate } from "@/components/lite/format/date";
+import { formatCurrency } from "@/features/quotes/utils";
 import { dailyCounts, dailySums } from "@/shared/trends";
 import { DEFAULT_PERIOD, PERIOD_OPTIONS, type PeriodValue } from "@/shared/period";
 
@@ -56,6 +58,7 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
   branches: { id: string; name: string }[];
   branchId?: string;
 }) {
+  const router = useRouter();
   const [status, setStatus] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
 
@@ -114,8 +117,8 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
         </span>
       ),
     },
-    { id: "broker", label: "Corretor", render: (sale) => sale.brokerName ?? <span className={page.muted}>Sem corretor</span> },
-    { id: "branch", label: "Filial", render: (sale) => sale.branchName ?? <span className={page.muted}>Sem filial</span> },
+    { id: "broker", label: "Corretor", nowrap: true, render: (sale) => sale.brokerName ? <span title={sale.brokerName}>{sale.brokerName}</span> : <span className={page.muted}>Sem corretor</span> },
+    { id: "branch", label: "Filial", nowrap: true, render: (sale) => sale.branchName ? <span title={sale.branchName}>{sale.branchName}</span> : <span className={page.muted}>Sem filial</span> },
     {
       id: "plan",
       label: "Plano",
@@ -126,7 +129,7 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
         </span>
       ),
     },
-    { id: "date", label: "Data da venda", render: (sale) => <span className={page.numeric}>{formatDate(sale.saleDate)}</span> },
+    { id: "date", label: "Data da venda", render: (sale) => <span className={page.numeric}>{formatLiteDate(sale.saleDate)}</span> },
     { id: "value", label: "Valor", numeric: true, render: (sale) => <span className={page.numeric}>{formatCurrency(sale.saleValue)}</span> },
     {
       id: "status",
@@ -138,8 +141,8 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
       label: "Ações",
       numeric: true,
       render: (sale) => (
-        <Link href={`/vendas/${sale.id}`} className={page.button} aria-label={`Ver detalhes da venda de ${sale.leadName}`}>
-          Ver detalhes <ArrowRight aria-hidden="true" size={16} />
+        <Link href={`/vendas/${sale.id}`} className={page.iconButton} aria-label="Ver detalhes da venda" title={`Ver detalhes da venda de ${sale.leadName}`}>
+          <ChevronRight aria-hidden="true" size={18} />
         </Link>
       ),
     },
@@ -194,6 +197,7 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
               rows={pageRows}
               rowKey={(sale) => sale.id}
               selection={selection}
+              onRowOpen={(sale) => router.push(`/vendas/${sale.id}`)}
               empty={<p>Nenhuma venda encontrada. Ajuste a busca ou o filtro de status.</p>}
             />
             <LitePagination label="Páginas de vendas" {...pagination} />
@@ -205,7 +209,7 @@ export function SalesWorkspaceLite({ sales, totalRevenue, currentRole, period, b
         <LiteBulkBar
           count={multiSelect.count}
           onClear={multiSelect.clear}
-          actions={[{ id: "export", label: exportPending ? "Exportando..." : "Exportar CSV", shortLabel: "Exportar", onRun: exportSelected }]}
+          actions={[{ id: "export", label: exportPending ? "Exportando..." : "Exportar CSV", shortLabel: "Exportar", onRun: exportSelected, disabled: exportPending }]}
         />
       ) : null}
     </div>

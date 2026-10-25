@@ -14,6 +14,7 @@ import { LiteBulkBar, LiteConfirmDialog, LiteFilterChips, LiteSelect } from "@/c
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LitePagination, useLitePages } from "@/components/lite/data/pagination";
 import form from "@/components/lite/page/lite-form.module.css";
+import { liteDateFormatter } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
 import { toast } from "@/components/ui/sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -50,7 +51,7 @@ export type PendingDocLite = {
 
 type StatusFilter = "pending" | "approved" | "rejected" | "all";
 
-const sentAt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+const sentAt = liteDateFormatter({ day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
 function isVersionSkewError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -187,8 +188,9 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
     {
       id: "owner",
       label: "Responsável e unidade",
+      nowrap: true,
       render: (doc) => doc.corretorNome || doc.branchName
-        ? <span><span>{doc.corretorNome ?? "Sem corretor"}</span><span className={page.cellSub}>{doc.branchName ?? "Sem unidade"}</span></span>
+        ? <span title={[doc.corretorNome, doc.branchName].filter(Boolean).join(", ")}><span>{doc.corretorNome ?? "Sem corretor"}</span><span className={page.cellSub}>{doc.branchName ?? "Sem unidade"}</span></span>
         : <span className={page.muted}>Não informado</span>,
     },
     { id: "sent", label: "Data de envio", render: (doc) => <span className={page.numeric}>{sentAt.format(new Date(doc.createdAt))}</span> },
@@ -201,8 +203,8 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
           <button type="button" className={styles.iconDanger} aria-label={`Rejeitar ${doc.filename} de ${doc.leadNome}`} title="Rejeitar" onClick={() => review(doc.id, doc.leadId, "rejected")}><XCircle aria-hidden="true" size={18} /></button>
         </span>
       ) : (
-        <button type="button" className={page.button} onClick={() => review(doc.id, doc.leadId, doc.status === "approved" ? "rejected" : "approved")}>
-          <RefreshCw aria-hidden="true" size={16} />Alterar status
+        <button type="button" className={page.iconButton} aria-label={`Alterar status de ${doc.filename}`} title="Alterar status" onClick={() => review(doc.id, doc.leadId, doc.status === "approved" ? "rejected" : "approved")}>
+          <RefreshCw aria-hidden="true" size={18} />
         </button>
       ),
     },

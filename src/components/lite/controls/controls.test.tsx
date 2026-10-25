@@ -26,6 +26,15 @@ describe("LiteFilterChips", () => {
 });
 
 describe("LiteBulkBar", () => {
+  it("ação em andamento fica desativada", () => {
+    const run = vi.fn();
+    render(<LiteBulkBar count={2} actions={[{ id: "export", label: "Exportando...", onRun: run, disabled: true }]} onClear={() => {}} />);
+    const button = screen.getByRole("button", { name: "Exportando..." });
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(run).not.toHaveBeenCalled();
+  });
+
   it("some sem seleção", () => {
     const { container } = render(<LiteBulkBar count={0} actions={[]} onClear={() => {}} />);
     expect(container).toBeEmptyDOMElement();
