@@ -13,7 +13,6 @@ import { useMemo } from "react";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data";
 import { LiteMenu, type LiteMenuItem } from "@/components/lite/controls";
-import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 import { buildWhatsAppWebUrl } from "@/lib/whatsapp-url";
 import { openWhatsApp } from "@/lib/whatsapp-open";
@@ -21,6 +20,7 @@ import { openWhatsApp } from "@/lib/whatsapp-open";
 import { LeadsDataTable, type LeadsDataTableProps } from "./leads-data-table";
 import { LeadsLiteBulk, type LeadsLiteBulkConfig } from "./leads-lite-bulk";
 import styles from "./leads-lite-list.module.css";
+import { liteStageLabel } from "./lite-stage-labels";
 
 const chegada = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -57,7 +57,7 @@ export function LeadsLiteList({ leads, contextRole, onRowClick, view = "list", t
         label: "Etapa",
         render: (lead) => (
           <span className={styles.badge} data-tone={stageTone(lead.status)}>
-            {(LEAD_STATUS_LABELS as Record<string, string>)[lead.status] ?? lead.status}
+            {liteStageLabel(lead.status)}
           </span>
         ),
       },

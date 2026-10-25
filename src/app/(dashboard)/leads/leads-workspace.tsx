@@ -42,6 +42,8 @@ import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
 import { LeadsListSwitch } from "./leads-lite-list";
+import { LeadsLiteKanban } from "./leads-lite-kanban";
+import { computeSlaInfo, type SlaInfo } from "./lead-sla";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { EmptyState } from "@/components/empty-state";
@@ -545,16 +547,21 @@ export function LeadsWorkspace({
     setActiveDragId(String(event.active.id));
   }
 
+  // Reordena as colunas do kanban (mouse e teclado no Lite usam a mesma regra).
+  function moveKanbanColumn(activeId: string, overId: string) {
+    setOrderedStatuses((current) => {
+      const oldIndex = current.indexOf(activeId);
+      const newIndex = current.indexOf(overId);
+      if (oldIndex === -1 || newIndex === -1) return current;
+      return arrayMove(current, oldIndex, newIndex);
+    });
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     setActiveDragId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-    setOrderedStatuses((current) => {
-      const oldIndex = current.indexOf(String(active.id));
-      const newIndex = current.indexOf(String(over.id));
-      if (oldIndex === -1 || newIndex === -1) return current;
-      return arrayMove(current, oldIndex, newIndex);
-    });
+    moveKanbanColumn(String(active.id), String(over.id));
   }
 
   return (
@@ -686,7 +693,32 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 2: KANBAN DO FUNIL ─── */}
-        <TabsContent value="kanban" className="relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]">
+        <TabsContent value="kanban" className={directorLite ? "relative mt-4 min-w-0" : "relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]"}>
+          {directorLite ? (
+            <LeadsLiteKanban
+              statuses={visibleStatuses}
+              groupedLeads={groupedLeads}
+              onMoveColumn={moveKanbanColumn}
+              onOpen={setSelectedLead}
+              isSelected={multiSelect.isSelected}
+              onToggle={multiSelect.toggle}
+              selectedIds={multiSelect.selectedIds}
+              onClearSelection={multiSelect.clear}
+              bulk={{
+                role: contextRole,
+                brokers,
+                branches,
+                onStatusCommitted: handleBulkStatusCommitted,
+                onReassignCommitted: handleBulkReassignCommitted,
+                onBranchCommitted: handleBulkBranchCommitted,
+                onRevertCommitted: handleBulkRevertCommitted,
+              }}
+              hideArrival={contextRole === "broker"}
+              slaFirstContactMinutes={slaFirstContactMinutes}
+              slaStagnantDays={slaStagnantDays}
+            />
+          ) : (
+          <>
           <SelectionToolbar
             selectedCount={multiSelect.count}
             totalCount={workspaceLeads.length}
@@ -748,6 +780,8 @@ export function LeadsWorkspace({
           <p className="mt-3 text-xs text-muted-foreground">
             Arraste as colunas para reordenar. Use o botão &quot;Colunas&quot; para exibir/ocultar etapas.
           </p>
+          </>
+          )}
         </TabsContent>
 
         {/* ─── TAB 3: QUALIFICAÇÃO IA ─── */}
@@ -1121,92 +1155,6 @@ function SlaBar({ sla }: { sla: NonNullable<SlaInfo> }) {
       </TooltipContent>
     </Tooltip>
   );
-}
-
-type SlaInfo = {
-  ratio: number;
-  label: string;
-  title: string;
-  deadline: string;
-} | null;
-
-function computeSlaInfo(
-  lead: {
-    status: string;
-    createdAt: string;
-    assignedAt?: string | null;
-    stageEnteredAt?: string | null;
-    serviceStartedAt?: string | null;
-    firstContactAt?: string | null;
-    corretorId?: string | null;
-  },
-  slaFirstContactMinutes: number,
-  slaStagnantDays: number,
-): SlaInfo {
-  const now = Date.now();
-  const fmtTime = (ms: number) =>
-    new Intl.DateTimeFormat("pt-BR", { timeStyle: "short" }).format(new Date(ms));
-  const fmtDate = (ms: number) =>
-    new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(ms));
-
-  // New or distributed without first contact → first-contact SLA
-  if ((lead.status === "new" || lead.status === "distributed") && !lead.firstContactAt) {
-    const anchor = lead.assignedAt || lead.createdAt;
-    if (!anchor) return null;
-    const anchorMs = new Date(anchor).getTime();
-    const elapsed = now - anchorMs;
-    const total = slaFirstContactMinutes * 60_000;
-    const ratio = Math.min(elapsed / total, 2);
-    const remaining = Math.max(0, total - elapsed);
-    const deadlineMs = anchorMs + total;
-
-    let label: string;
-    if (elapsed >= total) {
-      const over = Math.round((elapsed - total) / 60000);
-      label = over >= 60 ? `${Math.round(over / 60)}h atrasado` : `${over}min atrasado`;
-    } else if (remaining >= 3600000) {
-      label = `${Math.round(remaining / 3600000)}h restantes`;
-    } else {
-      label = `${Math.round(remaining / 60000)}min restantes`;
-    }
-
-    return {
-      ratio,
-      label,
-      title: "Prazo de 1º contato",
-      deadline: `Limite: ${fmtTime(deadlineMs)} (${slaFirstContactMinutes}min)`,
-    };
-  }
-
-  // Active stages → stagnation SLA
-  const activeStatuses: readonly string[] = ["in_contact", "quote_sent", "negotiation"];
-  if (activeStatuses.includes(lead.status) && lead.stageEnteredAt) {
-    const stageMs = new Date(lead.stageEnteredAt).getTime();
-    const elapsed = now - stageMs;
-    const total = slaStagnantDays * 24 * 60 * 60_000;
-    const ratio = Math.min(elapsed / total, 2);
-    const remaining = Math.max(0, total - elapsed);
-    const deadlineMs = stageMs + total;
-
-    let label: string;
-    if (elapsed >= total) {
-      const over = Math.round(elapsed / 86400000 - slaStagnantDays);
-      label = `${over}d atrasado`;
-    } else if (remaining >= 86400000) {
-      label = `${Math.round(remaining / 86400000)}d restantes`;
-    } else {
-      label = `${Math.round(remaining / 3600000)}h restantes`;
-    }
-
-    return {
-      ratio,
-      label,
-      title: `Tempo na etapa (${statusLabel(lead.status)})`,
-      deadline: `Limite: ${fmtDate(deadlineMs)} (${slaStagnantDays}d)`,
-    };
-  }
-
-  return null;
 }
 
 function LeadOverviewMetric({
