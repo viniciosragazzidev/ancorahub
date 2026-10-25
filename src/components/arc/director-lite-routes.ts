@@ -57,7 +57,6 @@
   "/marketing/meta",
   "/mensagens",
   "/mensagens/[leadId]",
-  "/minha-fila",
   "/plantoes",
   "/plantoes/agora",
   "/plantoes/corretor/[brokerId]",

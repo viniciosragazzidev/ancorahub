@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
 import { and, asc, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql } from "drizzle-orm";
 
 import { LightPageSkeleton } from "@/components/light/light-page-skeleton";
@@ -37,6 +38,8 @@ export const dynamic = "force-dynamic";
 
 export default async function MinhaFilaPage() {
   const context = await getRequiredTenantContext();
+  // Fila pessoal é do corretor: o diretor (decisão do Vinicios, 2026-10-25) vai para a lista de leads. Outros papéis seguem iguais.
+  if (context.role === "director") redirect("/leads");
   // The Light app streams its own skeleton while the queue loads; the Full screen is unchanged.
   if ((await getExperienceMode(context)) === "LIGHT") {
     return (
