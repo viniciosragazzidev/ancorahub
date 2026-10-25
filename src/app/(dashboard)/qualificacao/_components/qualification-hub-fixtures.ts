@@ -39,7 +39,7 @@ export const QUALIFICATION_HUB_FIXTURE: HubProps = {
     averageLatencyMs: 412,
     configVersion: 3,
     overallHealth: "healthy",
-  } as HubProps["whatsappDiagnostic"],
+  } as unknown as HubProps["whatsappDiagnostic"],
   followUpRules: [
     { id: "rule-1", name: "Lead abandonou a qualificação", enabled: false, trigger: "qualification_abandoned", delayMinutes: 120, maxAttempts: 3, minimumIntervalMinutes: 60, allowedDays: [1, 2, 3, 4, 5], allowedStartTime: "08:00", allowedEndTime: "18:00", timezone: "America/Sao_Paulo", messageMode: "fixed", fixedMessage: "Olá! Ainda posso te ajudar com a cotação?", templateId: null, stopConditions: [], destinationStatus: null },
     { id: "rule-2", name: "Cotação enviada sem retorno do cliente", enabled: false, trigger: "quote_without_response", delayMinutes: 1440, maxAttempts: 2, minimumIntervalMinutes: 120, allowedDays: [1, 2, 3, 4, 5], allowedStartTime: "09:00", allowedEndTime: "19:00", timezone: "America/Sao_Paulo", messageMode: "ai_generated", fixedMessage: null, templateId: null, stopConditions: [], destinationStatus: null },
