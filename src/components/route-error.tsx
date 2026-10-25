@@ -1,16 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import Image from "next/image"
 import { useEffect } from "react"
 import { LayoutDashboard, RotateCcw } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { buttonVariants } from "@/components/ui/button-variants"
-import { cn } from "@/lib/utils"
+import "@/components/arc/venancor-scope.css"
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context"
-import { EmptyState } from "@/components/empty-state"
 import { Button as ArcButton } from "@/components/arc/button/button"
+import styles from "./route-state.module.css"
 
 type RouteErrorProps = {
   error: Error & { digest?: string }
@@ -18,110 +15,63 @@ type RouteErrorProps = {
   unstable_retry?: () => void
   title?: string
   description?: string
+  /** Mantido por compatibilidade: o visual Lite não usa ilustração. */
   imageSrc?: string
+  /** Fora da moldura do app (erro na raiz): a tela ocupa a página inteira com o fundo Lite. */
+  standalone?: boolean
 }
 
+/** Erro de rota no visual Lite para todo mundo (Onda 8): mesmo texto, mesmo "Tentar novamente" e o mesmo link de volta. */
 export function RouteError({
   error,
   reset,
   unstable_retry,
   title = "Ops! Não foi possível carregar esta área",
-  description = "Ocorreu um problema inesperado ao carregar os dados. Tente novamente ou volte para o Dashboard.",
-  imageSrc = "/404.png",
+  description = "Ocorreu um problema inesperado ao carregar os dados. Tente novamente ou volte para o início.",
+  standalone = false,
 }: RouteErrorProps) {
-  const directorLite = useArcScopeEnabled();
+  const directorSkin = useArcScopeEnabled()
   useEffect(() => {
     console.error("RouteError details:", {
       message: error.message,
       digest: error.digest,
       stack: error.stack,
       error,
-    });
-  }, [error]);
+    })
+  }, [error])
 
   const handleRetry = () => {
     if (typeof reset === "function") {
-      reset();
+      reset()
     } else if (typeof unstable_retry === "function") {
-      unstable_retry();
+      unstable_retry()
     } else {
-      window.location.reload();
+      window.location.reload()
     }
-  }
-
-  if (directorLite) {
-    return (
-      <main className="arc-venancor director-route-state" data-skin="diretor" aria-label={title}>
-        <EmptyState
-          title={title}
-          description={description}
-          icon={RotateCcw}
-          animated={false}
-          action={(
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <ArcButton variant="secondary" onClick={handleRetry}><RotateCcw className="size-4" />Tentar novamente</ArcButton>
-              <Link className="director-route-link" href="/dashboard"><LayoutDashboard className="size-4" />Início</Link>
-            </div>
-          )}
-        />
-        {(error.message || error.digest) ? <details className="director-error-details"><summary>Detalhes técnicos</summary><p>{error.message || error.digest}</p></details> : null}
-      </main>
-    );
   }
 
   return (
     <main
-      className="mx-auto flex min-h-[75vh] w-full max-w-2xl flex-col items-center justify-center px-4 py-8 text-center"
+      className={["arc-venancor", styles.state, standalone ? styles.page : ""].filter(Boolean).join(" ")}
+      data-skin={directorSkin ? "diretor" : undefined}
       aria-labelledby="route-error-title"
     >
-      <div className="relative mb-6 flex items-center justify-center w-full">
-        <Image
-          src={imageSrc}
-          alt="Erro ao carregar a página"
-          width={560}
-          height={460}
-          priority
-          className="h-auto max-w-[360px] sm:max-w-[520px] md:max-w-[580px] object-contain transition-transform duration-300 hover:scale-[1.02]"
-        />
+      <span className={styles.icon} aria-hidden="true"><RotateCcw size={20} strokeWidth={1.75} /></span>
+      <div className={styles.copy}>
+        <h1 id="route-error-title" role="alert" className={styles.title}>{title}</h1>
+        <p className={styles.description}>{description}</p>
       </div>
-
-      <div className="space-y-2.5 max-w-lg">
-        <h1 id="route-error-title" role="alert" className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
-          {title}
-        </h1>
-        <p className="text-sm text-muted-foreground sm:text-base leading-relaxed">
-          {description}
-        </p>
+      <div className={styles.actions}>
+        <ArcButton type="button" variant="primary" onClick={handleRetry}><RotateCcw size={16} aria-hidden="true" />Tentar novamente</ArcButton>
+        <Link className={styles.link} href="/dashboard"><LayoutDashboard size={16} aria-hidden="true" />Voltar para o início</Link>
       </div>
-
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <Button type="button" size="lg" onClick={handleRetry} className="gap-2 px-6 shadow-sm hover:shadow transition-all">
-          <RotateCcw className="size-4" />
-          <span>Tentar novamente</span>
-        </Button>
-        <Link
-          href="/dashboard"
-          className={cn(
-            buttonVariants({ variant: "outline", size: "lg" }),
-            "gap-2 px-6 shadow-sm hover:shadow transition-all"
-          )}
-        >
-          <LayoutDashboard className="size-4" />
-          <span>Voltar para o Dashboard</span>
-        </Link>
-      </div>
-
-      {(error.message || error.digest) && (
-        <details className="mt-6 w-full max-w-md text-left text-xs text-muted-foreground border border-border/50 rounded-lg p-2.5 bg-muted/30">
-          <summary className="cursor-pointer font-medium hover:text-foreground">
-            Detalhes técnicos do erro
-          </summary>
-          <div className="mt-2 space-y-1 font-mono text-[11px] break-all">
-            {error.message && <p><span className="font-semibold text-foreground">Mensagem:</span> {error.message}</p>}
-            {error.digest && <p><span className="font-semibold text-foreground">Digest:</span> {error.digest}</p>}
-          </div>
+      {(error.message || error.digest) ? (
+        <details className={styles.details}>
+          <summary>Detalhes técnicos do erro</summary>
+          {error.message ? <p>Mensagem: {error.message}</p> : null}
+          {error.digest ? <p>Digest: {error.digest}</p> : null}
         </details>
-      )}
+      ) : null}
     </main>
   )
 }

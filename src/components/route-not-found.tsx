@@ -1,75 +1,45 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { LayoutDashboard } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { cn } from "@/lib/utils";
-import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
-import { EmptyState } from "@/components/empty-state";
+import { LayoutDashboard, SearchX } from "lucide-react";
 
+import "@/components/arc/venancor-scope.css";
+import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import styles from "./route-state.module.css";
+
+/** Página não encontrada no visual Lite para todo mundo (Onda 8): mesmo texto e o mesmo destino de volta. */
 export function RouteNotFound({
   title = "Página não encontrada",
   description = "A página que você procura não existe, foi movida ou o endereço está incorreto.",
-  imageSrc = "/404.png",
   backUrl = "/dashboard",
-  backText = "Voltar para o Dashboard",
+  backText = "Voltar para o início",
+  standalone = false,
 }: {
   title?: string;
   description?: string;
+  /** Mantido por compatibilidade: o visual Lite não usa ilustração. */
   imageSrc?: string;
   backUrl?: string;
   backText?: string;
+  /** Fora da moldura do app (rota inexistente na raiz): a tela ocupa a página inteira com o fundo Lite. */
+  standalone?: boolean;
 }) {
-  const directorLite = useArcScopeEnabled();
-  if (directorLite) {
-    return (
-      <main className="arc-venancor director-route-state" data-skin="diretor" aria-label={title}>
-        <EmptyState
-          title={title}
-          description={description}
-          icon={LayoutDashboard}
-          animated={false}
-          action={<Link href={backUrl} className="director-route-link"><LayoutDashboard className="size-4" />{backText}</Link>}
-        />
-      </main>
-    );
-  }
+  const directorSkin = useArcScopeEnabled();
   return (
     <main
-      className="mx-auto flex min-h-[75vh] w-full max-w-2xl flex-col items-center justify-center px-4 py-8 text-center"
+      className={["arc-venancor", styles.state, standalone ? styles.page : ""].filter(Boolean).join(" ")}
+      data-skin={directorSkin ? "diretor" : undefined}
       aria-labelledby="not-found-title"
     >
-      <div className="relative mb-6 flex items-center justify-center w-full">
-        <Image
-          src={imageSrc}
-          alt="404 - Página não encontrada"
-          width={560}
-          height={460}
-          priority
-          className="h-auto max-w-[360px] sm:max-w-[520px] md:max-w-[580px] object-contain transition-transform duration-300 hover:scale-[1.02]"
-        />
+      <span className={styles.icon} aria-hidden="true"><SearchX size={20} strokeWidth={1.75} /></span>
+      <div className={styles.copy}>
+        <h1 id="not-found-title" className={styles.title}>{title}</h1>
+        <p className={styles.description}>{description}</p>
       </div>
-
-      <div className="space-y-2.5 max-w-lg">
-        <h1 id="not-found-title" className="text-2xl font-bold tracking-tight sm:text-3xl text-foreground">
-          {title}
-        </h1>
-        <p className="text-sm text-muted-foreground sm:text-base leading-relaxed">
-          {description}
-        </p>
-      </div>
-
-      <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-        <Link
-          href={backUrl}
-          className={cn(
-            buttonVariants({ size: "lg" }),
-            "gap-2 px-6 shadow-sm hover:shadow transition-all"
-          )}
-        >
-          <LayoutDashboard className="size-4" />
-          <span>{backText}</span>
+      <div className={styles.actions}>
+        <Link href={backUrl} className={`${styles.link} ${styles.primary}`}>
+          <LayoutDashboard size={16} aria-hidden="true" />
+          {backText}
         </Link>
       </div>
     </main>
