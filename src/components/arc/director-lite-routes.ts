@@ -65,7 +65,6 @@
   "/plantoes",
   "/plantoes/agora",
   "/plantoes/corretor/[brokerId]",
-  "/propostas",
   "/qualificacao",
   "/qualificacao/turbo",
   "/relacionamento",
