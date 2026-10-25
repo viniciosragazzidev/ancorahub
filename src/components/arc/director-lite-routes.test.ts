@@ -23,7 +23,7 @@ function pageRoutes(directory = dashboardRoot): string[] {
 describe("rotas do Diretor Lite", () => {
   it("mantém em opt-out todas as páginas ainda não revisadas (saíram o painel, a lista e o perfil do lead e as telas simples da passada rápida)", () => {
     const revised = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
-    expect([...revised].sort()).toEqual(["/assistente", "/conversas", "/dashboard", "/documentos", "/empresas", "/ferramentas", "/integridade", "/leads", "/leads/[id]", "/noc", "/notificacoes", "/propostas", "/relatorios", "/relatorios/drill/[drillId]", "/tarefas/dashboard", "/vendas", "/vendas/[id]"]);
+    expect([...revised].sort()).toEqual(["/assinatura", "/assistente", "/conversas", "/dashboard", "/documentos", "/empresas", "/ferramentas", "/ferramentas/materiais-operadoras", "/ferramentas/validador-comprovante", "/guia", "/guia/webhook", "/integrations/meta", "/integridade", "/leads", "/leads/[id]", "/marketing", "/marketing/campanhas", "/marketing/campanhas/[id]", "/marketing/importacoes", "/marketing/meta", "/noc", "/notificacoes", "/propostas", "/relatorios", "/relatorios/drill/[drillId]", "/roadmap", "/tarefas/dashboard", "/vendas", "/vendas/[id]", "/welcome"]);
     expect(DIRECTOR_LITE_OPT_OUT_ROUTES.length).toBeGreaterThan(0);
   });
 
