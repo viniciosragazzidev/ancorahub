@@ -22,7 +22,7 @@ Status: implementado na branch `feat/diretor-lite-f2`; aprovação visual dos pr
 ## Arquivos e validação
 
 - O detalhe de implementação está no diff desta branch, concentrado em `src/components/app-shell.tsx`, `src/components/corretop-sidebar.tsx`, `src/components/dashboard-header.tsx`, `src/components/arc/director-chrome.css` e nos componentes globais condicionados ao escopo.
-- Vitest focado: 11 arquivos, 21 testes aprovados. Cobertura inclui rotas, preview dev, menu Mais, abas por seção, header com chave ligada e desligada, pesquisa, Ctrl+K/Ctrl+J/Ctrl+B, agente e PWA.
+- Vitest focado: 11 arquivos, 22 testes aprovados. Cobertura inclui rotas, preview dev, menu Mais, abas por seção, header com chave ligada e desligada, pesquisa, Ctrl+K/Ctrl+J/Ctrl+B, agente, PWA e a altura/consulta preservadas na paleta sem a chave.
 - `npx tsc --noEmit -p .`: passou.
 - ESLint dos arquivos TypeScript alterados: 0 erros; 19 avisos existentes nas áreas de agente, busca, sidebar, atalhos, notificações, PWA e onboarding.
 - `node scripts/check-lite-skin.mjs`: passou em modo relatório. O relatório inclui desvios preexistentes fora do escopo da F2.
