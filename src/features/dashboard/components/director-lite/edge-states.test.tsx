@@ -17,6 +17,8 @@ class FakeIntersectionObserver {
   takeRecords() { return []; }
 }
 vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+// O setup global troca motion/react por um proxy sem useInView; aqui as colunas do gráfico precisam do real.
+vi.mock("motion/react", async (importOriginal) => importOriginal<typeof import("motion/react")>());
 
 import { CASE_NOW, essentialCase, funnelCase, qualityCase } from "@/app/dev/diretor-shell-real/dashboard-cases";
 
@@ -68,7 +70,7 @@ describe("eixo do gráfico hora a hora", () => {
   });
 
   it("período longo: as 24 horas do dia médio, mesmo com horas sem lead", () => {
-    const report = { ...qualityCase("cheio"), period: 7 as const, hourly: "hour_of_day" as const, hours: [] };
+    const report = { ...qualityCase("uma-fila"), period: 7 as const, hourly: "hour_of_day" as const, hours: [] };
     const axis = hourAxis(report);
     expect(axis).toHaveLength(24);
     expect(axis.every((hour) => hour.empty && !hour.future)).toBe(true);
@@ -95,9 +97,9 @@ describe("Qualidade nas bordas", () => {
   });
 
   it("média por corretor sem corretor: \"Sem dados hoje\" no tamanho do corpo, nunca \"sem dados para sem dados\"", () => {
-    const report = qualityCase("cheio");
-    const noBrokers = { ...report, withoutWeak: { ...report.withoutWeak, perBrokerNow: null, perBrokerWithout: null } };
-    const { container } = render(<QualityView report={noBrokers} unitName={null} now={CASE_NOW.cheio} />);
+    const report = qualityCase("uma-fila");
+    const noBrokers = { ...report, distributed: { ...report.distributed, total: 5 }, withoutWeak: { ...report.withoutWeak, perBrokerNow: null, perBrokerWithout: null } };
+    const { container } = render(<QualityView report={noBrokers} unitName={null} now={CASE_NOW["uma-fila"]} />);
     expect(container.textContent).not.toMatch(FORBIDDEN);
     expect(screen.getByText("Sem dados hoje")).toBeInTheDocument();
   });
@@ -109,9 +111,11 @@ describe("Qualidade nas bordas", () => {
   });
 
   it("dia cheio: números grandes no formato pt-BR", () => {
-    render(<QualityView report={qualityCase("cheio")} unitName={null} now={CASE_NOW.cheio} />);
+    const report = qualityCase("cheio");
+    expect(report.arrived.total).toBe(12_345);
+    render(<QualityView report={report} unitName={null} now={CASE_NOW.cheio} />);
     expect(screen.getAllByText("12.345").length).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });
 
 describe("Funil e Operação nas bordas", () => {

@@ -94,11 +94,18 @@ function qualityRows(kase: DashboardCase, now: Date): SimpleLeadRow[] {
   return rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 }
 
+const qualityCache = new Map<DashboardCase, SimpleLeadQualityReportData>();
+
+/** Guardado por caso: o dia cheio (12.345 linhas) leva alguns segundos na conta pura. */
 export function qualityCase(kase: DashboardCase): SimpleLeadQualityReportData {
+  const cached = qualityCache.get(kase);
+  if (cached) return cached;
   const now = CASE_NOW[kase];
   const since = operationDayStart(now);
   const report = buildSimpleQualityReport(qualityRows(kase, now), { since, until: null }, now);
-  return { period: "today", window: { since: since.toISOString(), until: null }, filters: { queueId: null, origin: null }, truncated: false, ...report };
+  const data: SimpleLeadQualityReportData = { period: "today", window: { since: since.toISOString(), until: null }, filters: { queueId: null, origin: null }, truncated: false, ...report };
+  qualityCache.set(kase, data);
+  return data;
 }
 
 /** Funil de exemplo reescalado para `arrived` leads (0 = dia zerado). */

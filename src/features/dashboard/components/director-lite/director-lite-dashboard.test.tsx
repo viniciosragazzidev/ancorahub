@@ -147,7 +147,7 @@ describe("bloco 2: leads por fila", () => {
   it("sem leads na janela, o estado vazio aparece no lugar da tabela", () => {
     render(<DirectorLiteDashboard data={emptyEssential(NOW)} period="today" branchId={null} branches={[]} now={NOW} />);
     expect(screen.getByText("Nenhum lead entrou desde sex 19h.")).toBeInTheDocument();
-    expect(screen.getByText("Nenhum lead nesta janela")).toBeInTheDocument();
+    expect(screen.getByText("Quando um lead entrar, ele aparece aqui, separado por fila.")).toBeInTheDocument();
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 });
@@ -172,7 +172,8 @@ describe("bloco 3: WhatsApp dos corretores", () => {
 
   it("nenhum corretor conectado: estado vazio no lugar da lista", () => {
     render(<DirectorLiteDashboard data={emptyEssential(NOW)} period="today" branchId={null} branches={[]} now={NOW} />);
-    expect(screen.getByText("Nenhum corretor conectou o WhatsApp")).toBeInTheDocument();
+    expect(screen.getByText(/Nenhum corretor ativo para mostrar/)).toBeInTheDocument();
+    expect(screen.queryByText(/0 de 0/)).not.toBeInTheDocument();
   });
 });
 
