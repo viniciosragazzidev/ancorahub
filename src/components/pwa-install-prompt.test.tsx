@@ -55,4 +55,12 @@ describe("PwaInstallPrompt", () => {
 
     await waitFor(() => expect(prompt).toHaveBeenCalledTimes(1));
   });
+
+  it("abre as instruções pelo menu Mais e não sobrepõe a tela com um botão flutuante", async () => {
+    render(<PwaInstallPrompt directorLiteEnabled />);
+    await act(async () => { await Promise.resolve(); });
+    expect(screen.queryByRole("button", { name: "Instalar CorreTop" })).not.toBeInTheDocument();
+    act(() => window.dispatchEvent(new Event("director-pwa-install")));
+    expect(await screen.findByText(/Abra o menu do navegador/)).toBeInTheDocument();
+  });
 });
