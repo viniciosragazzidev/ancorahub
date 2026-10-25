@@ -19,8 +19,18 @@
   scrollbar-width: none;
 }
 
+/* A pele do diretor pinta todo [role=tablist] como trilho cinza; aqui as abas são chips soltos. */
+.tabs.tabs[role="tablist"] {
+  flex: none;
+  min-height: 44px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .tab {
   display: inline-flex;
+  flex: none;
   align-items: center;
   min-height: 44px;
   padding: 0 16px;
