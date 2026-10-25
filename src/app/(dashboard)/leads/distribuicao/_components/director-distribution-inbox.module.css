@@ -94,6 +94,10 @@
   white-space: nowrap;
 }
 
+:global([data-lite="table"]) .leadName {
+  max-width: 18ch;
+}
+
 .empty {
   margin: 0;
   padding: 24px 16px;

@@ -1,14 +1,16 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 
-const mocks = vi.hoisted(() => ({ runAction: vi.fn() }));
+const mocks = vi.hoisted(() => ({ runAction: vi.fn(), pathname: "/plantoes/agora" }));
 
 vi.mock("motion/react", async () => {
   const actual = await vi.importActual<typeof import("motion/react")>("motion/react");
   return { ...actual, useReducedMotion: () => true };
 });
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }), usePathname: () => mocks.pathname }));
 vi.mock("@/features/broker-workspace/chat/chat-actions", () => ({ runChatServerAction: mocks.runAction }));
 
 import { DutyNowView, type DutyNowViewData } from "./duty-now-view";
@@ -34,6 +36,18 @@ const data: DutyNowViewData = {
 };
 
 describe("DutyNowView", () => {
+  it("mantém o HTML original quando o gate Lite está desligado", () => {
+    const html = renderToStaticMarkup(<DutyNowView data={data} nowIso="2026-10-10T19:15:00.000Z" />);
+    expect(html).toMatchSnapshot("gate Lite desligado");
+  });
+
+  it("usa a entrada e o hero Lite quando a página está no escopo Arc", () => {
+    mocks.pathname = "/plantoes/agora";
+    render(<ArcScopeProvider enabled><DutyNowView data={data} nowIso="2026-10-10T19:15:00.000Z" /></ArcScopeProvider>);
+    expect(screen.getByRole("progressbar", { name: "Progresso do plantão" })).toBeTruthy();
+    expect(document.body.innerHTML).toContain("litePage");
+  });
+
   it("shows the plantão, its progress, the numbers and every lead received in it", () => {
     render(<DutyNowView data={data} nowIso="2026-10-10T19:15:00.000Z" />);
     expect(screen.getByRole("heading", { name: "PRESENCIAL TARDE" })).toBeTruthy();

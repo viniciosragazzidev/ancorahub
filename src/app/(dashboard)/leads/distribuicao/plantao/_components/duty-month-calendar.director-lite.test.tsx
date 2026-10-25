@@ -33,6 +33,7 @@ describe("calendário de plantões no Lite do diretor", () => {
     expect(html).toContain('aria-label="Plantões do mês"');
     expect(html).toContain("Plantão presencial da unidade Centro");
     expect(html).toContain("09:00 às 17:00 · escala publicada");
+    expect(html).toContain("shiftContent");
     expect(html).toContain("25 de outubro");
     expect(html).toContain('type="date"');
     expect(html).toContain("Novo plantão");

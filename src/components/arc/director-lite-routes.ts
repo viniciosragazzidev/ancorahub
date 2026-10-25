@@ -55,7 +55,6 @@
   "/mensagens/[leadId]",
   "/minha-fila",
   "/plantoes",
-  "/plantoes/agora",
   "/qualificacao",
   "/qualificacao/turbo",
   "/relacionamento",

@@ -192,10 +192,12 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
                     return (
                       <li key={schedule.id}>
                         <Button type="button" variant="secondary" className={styles.shift} onClick={() => onOpen(schedule)}>
-                          <span className={styles.shiftName}>{schedule.name}</span>
-                          <span className={styles.shiftMeta}>
-                            {schedule.startsAt.slice(0, 5)} às {schedule.endsAt.slice(0, 5)}
-                            {done ? " · encerrado" : published ? " · escala publicada" : inDraft ? " · na escala, rascunho" : gap ? " · falta corretor" : ""}
+                          <span className={styles.shiftContent}>
+                            <span className={styles.shiftName}>{schedule.name}</span>
+                            <span className={styles.shiftMeta}>
+                              {schedule.startsAt.slice(0, 5)} às {schedule.endsAt.slice(0, 5)}
+                              {done ? " · encerrado" : published ? " · escala publicada" : inDraft ? " · na escala, rascunho" : gap ? " · falta corretor" : ""}
+                            </span>
                           </span>
                         </Button>
                       </li>

@@ -70,6 +70,9 @@
 
 .shift {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  justify-content: stretch;
   gap: 4px;
   width: 100%;
   min-height: 52px;
@@ -79,11 +82,41 @@
   background: var(--surface-muted);
   color: var(--foreground);
   text-align: left;
+  white-space: normal;
   cursor: pointer;
+}
+
+.shift :global([class*="labelSlot"]) {
+  width: 100% !important;
+  min-width: 0;
+}
+
+.shift :global([class*="labelContent"]) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.shift :global([class*="labelPhase"]) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  justify-content: stretch;
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
 }
 
 .shift:hover {
   background: var(--surface-muted);
+}
+
+.shiftContent {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 4px;
+  white-space: normal;
 }
 
 .shift:focus-visible {
@@ -92,6 +125,9 @@
 }
 
 .shiftName {
+  display: block;
+  max-width: 100%;
+  min-width: 0;
   overflow: hidden;
   font-size: var(--text-sm);
   font-weight: 500;
@@ -100,9 +136,13 @@
 }
 
 .shiftMeta {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--text-secondary);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+  white-space: normal;
 }
 
 .create {

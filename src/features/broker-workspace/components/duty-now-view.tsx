@@ -6,7 +6,9 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 
 import { Button } from "@/components/arc/button/button";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { AssistantAvatar } from "@/components/chat/assistant-avatar";
+import { LiteNumber, LitePageEnter, LiteProgress } from "@/components/lite/motion";
 import { formatDuration } from "@/features/engagement/ranking";
 import { runChatServerAction } from "@/features/broker-workspace/chat/chat-actions";
 
@@ -45,6 +47,7 @@ function remaining(endsAt: number, now: number) {
 
 /** The plantão happening now: window, live progress, numbers and every lead received in it. */
 export function DutyNowView({ data, nowIso, canManageAvailability = false }: { data: DutyNowViewData; nowIso: string; canManageAvailability?: boolean }) {
+  const litePage = useDirectorLitePage();
   const reduce = useReducedMotion();
   const router = useRouter();
   const [now, setNow] = useState(() => new Date(nowIso).getTime());
@@ -71,16 +74,16 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
       setAvailabilityBusy(false);
     }
   }
-  const stats = [
-    { label: "Ofertas recebidas", value: String(data.totals.offered) },
-    { label: "Aceitas", value: String(data.totals.accepted) },
-    { label: "Perdidas", value: String(data.totals.missed), alert: data.totals.missed > 0 },
-    { label: "Em atendimento", value: String(data.totals.started) },
+  const stats: Array<{ label: string; value: string; numericValue?: number; alert?: boolean }> = [
+    { label: "Ofertas recebidas", value: String(data.totals.offered), numericValue: data.totals.offered },
+    { label: "Aceitas", value: String(data.totals.accepted), numericValue: data.totals.accepted },
+    { label: "Perdidas", value: String(data.totals.missed), numericValue: data.totals.missed, alert: data.totals.missed > 0 },
+    { label: "Em atendimento", value: String(data.totals.started), numericValue: data.totals.started },
     { label: "Tempo para aceitar", value: formatDuration(data.totals.medianAcceptSeconds) },
   ];
 
-  return (
-    <div className={`arc-venancor ${css.page}`}>
+  const content = (
+    <div className={litePage ? `arc-venancor ${css.page} ${css.litePage}` : `arc-venancor ${css.page}`}>
       <div className={css.inner}>
         {data.choices.length > 1 ? (
           <nav aria-label="Seus plantões agora" className={css.choices}>
@@ -97,7 +100,7 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
             ))}
           </nav>
         ) : null}
-        <motion.section className={css.hero} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease }} aria-label="Seu plantão agora">
+        <motion.section className={css.hero} initial={litePage || reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={litePage ? { duration: 0 } : { duration: 0.3, ease }} aria-label="Seu plantão agora">
           <div className={css.heroTop}>
             <AssistantAvatar shape="onigiri" hue={28} size={48} />
             <div className={css.heroText}>
@@ -107,9 +110,11 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
             <span className={`${css.state} ${state.className}`}><span className={css.stateDot} aria-hidden />{state.label}</span>
           </div>
           <div className={css.progress}>
-            <span className={css.track} aria-hidden>
-              <motion.span className={css.fill} initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: progress }} transition={{ duration: 0.8, ease }} />
-            </span>
+            {litePage ? <LiteProgress className={css.progressBar} value={progress * 100} label="Progresso do plantão" /> : (
+              <span className={css.track} aria-hidden>
+                <motion.span className={css.fill} initial={reduce ? false : { scaleX: 0 }} animate={{ scaleX: progress }} transition={{ duration: 0.8, ease }} />
+              </span>
+            )}
             <span className={css.progressText}>
               <span>{Math.round(progress * 100)}% do plantão</span>
               <span>{remaining(end, now)}</span>
@@ -119,9 +124,9 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
 
         <dl className={css.stats}>
           {stats.map((stat, index) => (
-            <motion.div key={stat.label} className={`${css.stat} ${stat.alert ? css.statAlert : ""}`} initial={reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: reduce ? 0 : 0.08 + index * 0.04 }}>
+            <motion.div key={stat.label} className={`${css.stat} ${stat.alert ? css.statAlert : ""}`} initial={litePage || reduce ? false : { opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={litePage ? { duration: 0 } : { duration: 0.25, delay: reduce ? 0 : 0.08 + index * 0.04 }}>
               <dt className={css.statLabel}>{stat.label}</dt>
-              <dd className={css.statValue}>{stat.value}</dd>
+              <dd className={css.statValue}>{litePage && stat.numericValue !== undefined ? <LiteNumber value={stat.numericValue} countFromZero /> : stat.value}</dd>
             </motion.div>
           ))}
         </dl>
@@ -133,7 +138,7 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
           ) : (
             <ul className={css.list}>
               {data.leads.map((lead, index) => (
-                <motion.li key={lead.leadId} initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, delay: reduce ? 0 : 0.12 + Math.min(index, 8) * 0.03 }}>
+                <motion.li key={lead.leadId} initial={litePage || reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={litePage ? { duration: 0 } : { duration: 0.2, delay: reduce ? 0 : 0.12 + Math.min(index, 8) * 0.03 }}>
                   {lead.openable ? (
                     <Link href={`/leads/${lead.leadId}`} className={css.row}>
                     <span className={css.initials} aria-hidden>{lead.name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("")}</span>
@@ -189,4 +194,6 @@ export function DutyNowView({ data, nowIso, canManageAvailability = false }: { d
       </div>
     </div>
   );
+
+  return litePage ? <LitePageEnter>{content}</LitePageEnter> : content;
 }
