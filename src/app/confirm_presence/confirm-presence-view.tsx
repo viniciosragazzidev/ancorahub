@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Clock3 } from "lucide-react";
 
 import { LightAuthShell, LightAuthTitle } from "@/components/light/light-auth-shell";
 import { SELF_CONFIRM_LATE_MESSAGE, SELF_CONFIRM_OPENS_MINUTES } from "@/features/lead-distribution/duty-presence-domain";
@@ -29,6 +29,7 @@ export function ConfirmPresenceView({ valid, record, confirmed, late, active, pr
   const strong = { color: "var(--foreground)", fontWeight: 500 } as const;
   // Visual Lite para todo mundo (Onda 8): a mesma moldura das telas de acesso, os mesmos estados e textos.
   return <LightAuthShell>
+    <span aria-hidden="true" style={{ display: "grid", width: 48, height: 48, placeItems: "center", marginBottom: 16, borderRadius: 999, background: "var(--surface-muted)", color: "var(--text-secondary)" }}><Clock3 size={24} strokeWidth={1.75} /></span>
     <LightAuthTitle
       title={record ? `Plantão ${record.scheduleName}` : "Confirmação de plantão"}
       description={record ? `${record.branchName ? `${record.branchName} · ` : ""}${new Intl.DateTimeFormat("pt-BR", { dateStyle: "full", timeStyle: "short", timeZone: record.timezone }).format(record.shiftStartsAt)}` : "Confirme sua presença na escala informada pela equipe."}
