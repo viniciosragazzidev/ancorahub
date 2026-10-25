@@ -66,7 +66,6 @@
   "/roadmap",
   "/settings/integrations",
   "/settings/meta",
-  "/settings/waha-diagnostic",
   "/settings/whatsapp",
   "/unidades/[branchId]",
   "/vendas/dashboard",
