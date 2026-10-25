@@ -8,7 +8,7 @@ import { ChevronRight } from "lucide-react";
 import page from "@/components/lite/page/lite-page.module.css";
 import sections from "@/components/lite/page/lite-sections.module.css";
 
-import styles from "./domain-lite.module.css";
+import styles from "./leads-overview-lite.module.css";
 
 export type LeadsOverviewLiteProps = {
   period: number;

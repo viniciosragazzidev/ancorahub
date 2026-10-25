@@ -2,7 +2,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDomainDashboard } from "@/features/dashboard/service";
 import { DomainDashboard } from "@/features/dashboard/components/domain-dashboard";
-import { DomainDashboardLite } from "@/features/dashboard/components/domain-lite/domain-dashboard-lite";
+import { DomainDashboardLite } from "@/features/dashboard/components/domain-dashboard-lite";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 export const dynamic = "force-dynamic";

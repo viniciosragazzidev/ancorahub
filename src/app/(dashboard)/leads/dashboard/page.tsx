@@ -5,7 +5,7 @@ import { ArrowUpRight, ChartBar, Warning } from "@/components/huge-icons";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
-import { LeadsOverviewLite } from "@/features/dashboard/components/domain-lite/leads-overview-lite";
+import { LeadsOverviewLite } from "@/features/dashboard/components/leads-overview-lite";
 import { getAttentionSnapshot, getCommercialOverview, getFunnelSnapshot } from "@/features/reports/metrics/metrics-service";
 
 export const dynamic = "force-dynamic";

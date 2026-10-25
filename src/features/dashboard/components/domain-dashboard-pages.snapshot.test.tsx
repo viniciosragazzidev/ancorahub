@@ -60,7 +60,7 @@ describe("visões gerais órfãs com a chave ligada", () => {
     state.liteKey.on = true;
     const html = renderToStaticMarkup(await Page());
     expect(html).toContain('data-skin="diretor"');
-    expect(html).not.toContain("shadow-none");
+    expect(html).not.toContain("p-(--mobile-page-padding)");
     expect(html).not.toContain("<h1");
     expect(html).not.toContain("—");
   });
