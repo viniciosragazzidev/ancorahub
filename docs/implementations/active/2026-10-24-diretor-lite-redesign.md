@@ -221,6 +221,8 @@ Especificação completa em `2026-10-24-diretor-lite/motion-e-acabamento.md` (ex
 **Pronto quando:** o kit tem testes (inclusive com movimento reduzido), aparece no catálogo, não há constante de duração ou curva fora dos tokens nas pastas convertidas, e o perfil de desempenho do `/dashboard` não mostra tarefa longa causada por animação.
 
 ### F2. Chrome do diretor
+Estado: aprovada e integrada em `4af57b0c`; correções de revisão pós-aprovação
+registradas em `docs/implementations/completed/2026-10-25-diretor-lite-f2b.md`.
 Detalhe peça por peça em `2026-10-24-diretor-lite/inv-shell.md`.
 1. `app-shell.tsx` (ramo normal): escopo e canvas `--background`; sai o ramo financeiro morto.
 2. `corretop-sidebar.tsx`: mesmas seções, itens e permissões; fundo `--surface-muted`; ícones monocromáticos (D9); item ativo em pílula; itens de 44px; seção em sentence case; "Beta" vira `arc/badge`; plantão e Agente IA viram linhas neutras com ponto `--success`; avatar Arc; menu do perfil com a pele; modo recolhido (D10). O drawer do celular (`SheetContent`) também recebe o escopo.

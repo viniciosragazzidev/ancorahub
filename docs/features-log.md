@@ -2,6 +2,12 @@
 
 Este documento registra todas as funcionalidades e melhorias de engenharia adicionadas ao **CorreTop**, organizadas por área e funcionalidade, para manter a rastreabilidade do sistema.
 
+## 24/10/2026 - Correcoes de revisao da moldura F2 do Diretor Lite
+
+- Seletores do chrome alcancam portais e estados em que o elemento raiz tambem recebe `arc-venancor`; o dialogo de atalhos preserva as classes Arc.
+- O shell memoiza os dados do perfil e sincroniza o perfil apenas no escopo Diretor.
+- Sidebar, paleta e `/api/search` compartilham regras de visibilidade por papel e permissao. A paleta mostra carregamento durante o debounce.
+- Implementacao e validacao: `docs/implementations/completed/2026-10-25-diretor-lite-f2b.md`.
 ## 01/10/2026 - Central de qualidade e origem dos leads
 
 - Nova aba “Qualidade dos leads” em `/dashboard`, com períodos de 7/14/30/90 dias e
