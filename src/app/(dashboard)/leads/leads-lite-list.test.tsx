@@ -240,7 +240,7 @@ describe("nome, telefone e a visão Qualificação IA", () => {
 });
 
 describe("lista Lite para papéis do modo normal que não são diretor", () => {
-  it("cargo sem gestão (ex.: supervisor no modo normal): o lote só oferece o que vale para todos", () => {
+  it("papel sem gestão: o lote só oferece o que vale para todos (regra do componente)", () => {
     render(
       <ArcScopeProvider enabled>
         <LeadsListSwitch {...props} contextRole="supervisor" selectedIds={new Set([lead.id])} onRowClick={() => {}} />

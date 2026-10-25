@@ -23,14 +23,19 @@ export function directorLiteAppliesTo(keyEnabled: boolean, ownLiteAudience: "bro
   return keyEnabled && ownLiteAudience === null;
 }
 
+/** Papéis que nunca entram no visual Lite das telas internas, em qualquer modo. */
+const DIRECTOR_LITE_EXCLUDED_ROLES: ReadonlySet<string> = new Set(["broker", "supervisor"]);
+
 /**
  * O visual Lite das telas internas vale para este usuário? Chave por empresa (feature_director_lite_style) ligada e
- * usuário no modo normal: diretor, marketing, financeiro, cargo personalizado, gestor fora do Lite de gestor e
- * qualquer outro papel que não esteja no Lite próprio. No "ver como" o contexto já é o do usuário visto, então a
+ * usuário no modo normal: diretor, marketing, financeiro, cargo personalizado e gestor fora do Lite de gestor.
+ * Corretor e supervisor ficam de fora em qualquer modo. No "ver como" o contexto já é o do usuário visto, então a
  * regra segue o papel visto. A chave é lida primeiro: desligada, nada mais é consultado e o resultado é falso.
  * Isto decide só o VISUAL; permissões continuam nas regras de cada tela.
  */
 export async function shouldUseDirectorLiteStyle(context: TenantContext) {
+  // Corretor e supervisor ficam exatamente como hoje em qualquer modo (inclusive NORMAL): fora da lista do dono (25/10).
+  if (DIRECTOR_LITE_EXCLUDED_ROLES.has(context.role)) return false;
   if (!(await isDirectorLiteStyleEnabled(context.tenantId))) return false;
   const { getLiteAudience } = await import("@/features/broker-workspace/lite-audience");
   const audience = await getLiteAudience(context).catch(() => "broker" as const);

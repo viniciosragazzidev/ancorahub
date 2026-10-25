@@ -74,6 +74,14 @@ describe("visual Lite das telas internas (chave por empresa + modo normal)", () 
     await expect(shouldUseDirectorLiteStyle(normalManager)).resolves.toBe(false);
   });
 
+  it("chave ligada: corretor e supervisor ficam fora também no modo NORMAL", async () => {
+    setup({ key: true, mode: "NORMAL" });
+    await expect(shouldUseDirectorLiteStyle(broker)).resolves.toBe(false);
+    await expect(shouldUseDirectorLiteStyle(supervisor)).resolves.toBe(false);
+    await expect(shouldUseDirectorLiteStyle(ctx({ role: "supervisor" }))).resolves.toBe(false);
+    expect(getSystemSetting).not.toHaveBeenCalled();
+  });
+
   it("gestor sem o Lite de gestor continua no visual Lite das telas internas", async () => {
     setup({ key: true, mode: "NORMAL", managerLite: false });
     await expect(shouldUseDirectorLiteStyle(normalManager)).resolves.toBe(true);
@@ -81,6 +89,7 @@ describe("visual Lite das telas internas (chave por empresa + modo normal)", () 
 
   it("ver como: a regra segue o papel visto (o contexto já é o do usuário visto)", async () => {
     setup({ key: true, mode: "LIGHT" });
+    await expect(shouldUseDirectorLiteStyle({ ...broker, viewAs: { adminUserId: "admin-1" } })).resolves.toBe(false);
     await expect(shouldUseDirectorLiteStyle({ ...broker, viewAs: { adminUserId: "admin-1" } })).resolves.toBe(false);
     setup({ key: true, mode: "NORMAL" });
     await expect(shouldUseDirectorLiteStyle({ ...marketing, viewAs: { adminUserId: "admin-1" } })).resolves.toBe(true);
