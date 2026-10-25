@@ -4,7 +4,6 @@
   "/atendimento",
   "/atendimento/fluxo",
   "/atendimento/mensagens",
-  "/atendimento/situacoes",
   "/clientes",
   "/clientes/[clientId]",
   "/conversas/broker",
