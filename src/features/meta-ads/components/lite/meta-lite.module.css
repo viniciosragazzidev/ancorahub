@@ -241,3 +241,17 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Linhas de apoio da campanha quebram em vez de cortar no cartão do celular. */
+.wrapLine.wrapLine {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.campaignCell .wrapLine {
+  display: block;
+}
+
+.campaignCell.campaignCell {
+  white-space: normal;
+}

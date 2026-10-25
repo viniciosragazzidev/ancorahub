@@ -66,7 +66,8 @@ export function CampaignsLite({ campaigns, totals }: { campaigns: MetaCampaignIt
       render: (campaign) => (
         <span className={styles.campaignCell}>
           <Link href={campaignDetailHref(campaign)} className={styles.campaignName}>{campaign.name}</Link>
-          <span className={page.cellSub}>ID {campaign.campaignId} · Destino: {distributionDestination(campaign)}</span>
+          <span className={`${page.cellSub} ${styles.wrapLine}`}>ID {campaign.campaignId}</span>
+          <span className={`${page.cellSub} ${styles.wrapLine}`}>Destino: {distributionDestination(campaign)}</span>
         </span>
       ),
     },
