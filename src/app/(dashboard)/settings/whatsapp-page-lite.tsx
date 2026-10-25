@@ -90,12 +90,12 @@ export function WhatsAppPageLite({ official }: { official: WhatsAppOfficialSetup
                 <div><dt>Atendimento</dt><dd>Conversas vinculadas ao lead e histórico no CRM.</dd></div>
                 <div><dt>Governança</dt><dd>Pausar, reativar ou desconectar sem apagar histórico.</dd></div>
               </dl>
-              <div className={compat.compat}>
-                <MetaCloudSetupCard companyAccount={official.companyAccount} configured={official.configured} enabled={official.enabled} missing={official.missing} canManage={official.canConfigure} />
-                {canConnectNumber ? <MetaEmbeddedSignupCard appId={official.appId!} configId={official.embeddedSignupConfigId!} /> : null}
-              </div>
             </div>
           </section>
+          <div className={compat.compat}>
+            <MetaCloudSetupCard companyAccount={official.companyAccount} configured={official.configured} enabled={official.enabled} missing={official.missing} canManage={official.canConfigure} />
+            {canConnectNumber ? <MetaEmbeddedSignupCard appId={official.appId!} configId={official.embeddedSignupConfigId!} /> : null}
+          </div>
           {official.canConfigure || coexistenceChannels.length ? (
             <div className={compat.compat}>
               <CoexistenceNumbersCard channels={coexistenceChannels} appId={official.appId} configId={official.embeddedSignupConfigId} canConnect={canConnectCoexistence} queues={official.queues ?? []} adAccountNames={official.adAccountNames ?? []} />
