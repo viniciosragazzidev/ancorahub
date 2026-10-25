@@ -4,9 +4,7 @@ import Link from "next/link"
 import { useEffect } from "react"
 import { LayoutDashboard, RotateCcw } from "lucide-react"
 
-import "@/components/arc/venancor-scope.css"
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context"
-import { Button as ArcButton } from "@/components/arc/button/button"
 import styles from "./route-state.module.css"
 
 type RouteErrorProps = {
@@ -21,13 +19,13 @@ type RouteErrorProps = {
   standalone?: boolean
 }
 
-/** Erro de rota no visual Lite para todo mundo (Onda 8): mesmo texto, mesmo "Tentar novamente" e o mesmo link de volta. */
+/** Erro de rota no visual Lite para todo mundo (Onda 8): mesmos textos, mesmo "Tentar novamente" e o mesmo link de volta. Fora do diretor com a chave segue o tema do usuário. */
 export function RouteError({
   error,
   reset,
   unstable_retry,
   title = "Ops! Não foi possível carregar esta área",
-  description = "Ocorreu um problema inesperado ao carregar os dados. Tente novamente ou volte para o início.",
+  description = "Ocorreu um problema inesperado ao carregar os dados. Tente novamente ou volte para o Dashboard.",
   standalone = false,
 }: RouteErrorProps) {
   const directorSkin = useArcScopeEnabled()
@@ -52,7 +50,7 @@ export function RouteError({
 
   return (
     <main
-      className={["arc-venancor", styles.state, standalone ? styles.page : ""].filter(Boolean).join(" ")}
+      className={[directorSkin ? "arc-venancor" : "", styles.state, standalone ? styles.page : ""].filter(Boolean).join(" ")}
       data-skin={directorSkin ? "diretor" : undefined}
       aria-labelledby="route-error-title"
     >
@@ -62,8 +60,8 @@ export function RouteError({
         <p className={styles.description}>{description}</p>
       </div>
       <div className={styles.actions}>
-        <ArcButton type="button" variant="primary" onClick={handleRetry}><RotateCcw size={16} aria-hidden="true" />Tentar novamente</ArcButton>
-        <Link className={styles.link} href="/dashboard"><LayoutDashboard size={16} aria-hidden="true" />Voltar para o início</Link>
+        <button type="button" className={styles.retry} onClick={handleRetry}><RotateCcw size={16} aria-hidden="true" />Tentar novamente</button>
+        <Link className={styles.link} href="/dashboard"><LayoutDashboard size={16} aria-hidden="true" />Voltar para o Dashboard</Link>
       </div>
       {(error.message || error.digest) ? (
         <details className={styles.details}>

@@ -18,15 +18,15 @@ describe("telas de erro no visual Lite para todo mundo", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Não foi possível carregar esta operação");
     fireEvent.click(screen.getByRole("button", { name: "Tentar novamente" }));
     expect(reset).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("link", { name: "Voltar para o início" })).toHaveAttribute("href", "/dashboard");
+    expect(screen.getByRole("link", { name: "Voltar para o Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(screen.getByText("Detalhes técnicos do erro")).toBeInTheDocument();
-    expect(container.querySelector("main")?.className).toContain("arc-venancor");
+    expect(container.querySelector("main")?.className).not.toContain("arc-venancor");
   });
 
-  it("página não encontrada: escopo Lite local e o mesmo destino de volta", () => {
+  it("página não encontrada: sem escopo Lite fora do diretor (segue o tema) e o mesmo destino de volta", () => {
     const { container } = render(<RouteNotFound title="Registro não encontrado" backUrl="/leads" backText="Voltar para leads" standalone />);
     expect(screen.getByRole("heading", { level: 1, name: "Registro não encontrado" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Voltar para leads" })).toHaveAttribute("href", "/leads");
-    expect(container.querySelector("main")?.className).toContain("arc-venancor");
+    expect(container.querySelector("main")?.className).not.toContain("arc-venancor");
   });
 });

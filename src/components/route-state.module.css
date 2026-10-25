@@ -1,6 +1,8 @@
 /*
- * Telas de erro e de página não encontrada no visual Lite, para todo mundo (Onda 8, conversão geral). O componente
- * põe o escopo .arc-venancor no próprio <main>, então os tokens valem dentro e fora da moldura do app.
+ * Fora do diretor com a chave, a tela usa os tokens do CRM (claro ou escuro, como o tema do usuário); os fallbacks cobrem
+ * os nomes Lite que o CRM não define. Com a pele do diretor, os tokens Lite valem.
+ *
+ * Telas de erro e de página não encontrada no visual Lite, para todo mundo (Onda 8, conversão geral).
  */
 
 .state {
@@ -17,7 +19,7 @@
   padding: 24px clamp(16px, 4vw, 32px) 96px;
   background: transparent;
   color: var(--foreground);
-  font-family: var(--font-body);
+  font-family: var(--font-body, inherit);
   text-align: center;
 }
 
@@ -34,8 +36,8 @@
   height: 48px;
   place-items: center;
   border-radius: 999px;
-  background: var(--surface-muted);
-  color: var(--text-secondary);
+  background: var(--surface-muted, var(--muted));
+  color: var(--text-secondary, var(--muted-foreground));
 }
 
 .copy {
@@ -46,7 +48,7 @@
 
 .title {
   margin: 0;
-  font-size: var(--text-xl);
+  font-size: var(--text-xl, 1.375rem);
   font-weight: 500;
   line-height: 1.25;
   letter-spacing: var(--tracking-display, -0.02em);
@@ -54,8 +56,8 @@
 
 .description {
   margin: 0;
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
+  color: var(--text-secondary, var(--muted-foreground));
+  font-size: var(--text-sm, 0.875rem);
   line-height: 1.5;
 }
 
@@ -75,16 +77,16 @@
   gap: 8px;
   padding: 0 16px;
   border-radius: 999px;
-  background: var(--surface-muted);
+  background: var(--surface-muted, var(--muted));
   color: var(--foreground);
-  font-size: var(--text-sm);
+  font-size: var(--text-sm, 0.875rem);
   font-weight: 500;
   text-decoration: none;
   white-space: nowrap;
 }
 
 .link:hover {
-  background: var(--border-subtle);
+  background: var(--border-subtle, var(--border));
 }
 
 .link:focus-visible {
@@ -105,8 +107,8 @@
 .details {
   width: 100%;
   max-width: 40rem;
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
+  color: var(--text-secondary, var(--muted-foreground));
+  font-size: var(--text-xs, 0.75rem);
   text-align: left;
 }
 
@@ -124,9 +126,31 @@
   font-family: var(--font-mono, ui-monospace, monospace);
 }
 
-/* O html usa 97%: as alturas em rem do Arc ficariam abaixo de 44px. Classe dobrada para vencer o escopo .arc-venancor. */
-.state.state {
-  --control-height-sm: 44px;
-  --control-height-md: 44px;
-  --control-height-lg: 50px;
+
+/* Botão de tentar de novo: 44px em px (o html usa 97%), sem depender do Arc para seguir o tema do usuário. */
+.retry {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font: inherit;
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.retry:hover {
+  opacity: 0.92;
+}
+
+.retry:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
 }

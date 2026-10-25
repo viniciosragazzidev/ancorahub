@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { LayoutDashboard, SearchX } from "lucide-react";
 
-import "@/components/arc/venancor-scope.css";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
 import styles from "./route-state.module.css";
 
@@ -12,7 +11,7 @@ export function RouteNotFound({
   title = "Página não encontrada",
   description = "A página que você procura não existe, foi movida ou o endereço está incorreto.",
   backUrl = "/dashboard",
-  backText = "Voltar para o início",
+  backText = "Voltar para o Dashboard",
   standalone = false,
 }: {
   title?: string;
@@ -27,7 +26,7 @@ export function RouteNotFound({
   const directorSkin = useArcScopeEnabled();
   return (
     <main
-      className={["arc-venancor", styles.state, standalone ? styles.page : ""].filter(Boolean).join(" ")}
+      className={[directorSkin ? "arc-venancor" : "", styles.state, standalone ? styles.page : ""].filter(Boolean).join(" ")}
       data-skin={directorSkin ? "diretor" : undefined}
       aria-labelledby="not-found-title"
     >
