@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Plus } from "@/components/huge-icons";
 import { Button } from "@/components/arc/button/button";
@@ -59,7 +59,36 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
 }) {
   const today = todayKey();
   const directorLite = useDirectorLitePage();
+  const desktopViewRef = useRef<HTMLDivElement>(null);
+  const mobileViewRef = useRef<HTMLElement>(null);
   const [newDutyDate, setNewDutyDate] = useState(today);
+  useEffect(() => {
+    if (!directorLite) return;
+
+    const desktopView = desktopViewRef.current;
+    const mobileView = mobileViewRef.current;
+    if (!desktopView || !mobileView) return;
+
+    const mobileViewport = window.matchMedia("(max-width: 767px)");
+    const syncVisibility = () => {
+      const desktopHidden = mobileViewport.matches;
+      if (desktopHidden) {
+        desktopView.setAttribute("inert", "");
+        desktopView.setAttribute("aria-hidden", "true");
+        mobileView.removeAttribute("inert");
+        mobileView.removeAttribute("aria-hidden");
+      } else {
+        desktopView.removeAttribute("inert");
+        desktopView.removeAttribute("aria-hidden");
+        mobileView.setAttribute("inert", "");
+        mobileView.setAttribute("aria-hidden", "true");
+      }
+    };
+
+    syncVisibility();
+    mobileViewport.addEventListener("change", syncVisibility);
+    return () => mobileViewport.removeEventListener("change", syncVisibility);
+  }, [directorLite]);
   const { cells, byDate, weekendCount } = useMemo(() => {
     const [year, monthNumber] = month.split("-").map(Number);
     const lastDay = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
@@ -88,7 +117,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
 
   return (
     <>
-    <div className={cn("overflow-x-auto", directorLite && styles.desktop)}>
+    <div ref={desktopViewRef} className={cn("overflow-x-auto", directorLite && styles.desktop)}>
       <div className="grid min-w-[640px] grid-cols-5 overflow-hidden rounded-[var(--radius-card)] border border-border bg-border gap-px" role="grid" aria-label="Calendário de plantões">
         {WEEKDAY_HEADERS.map((day) => (
           <div key={day} role="columnheader" className="bg-muted/40 px-2 py-1.5 text-[11px] font-semibold text-muted-foreground">{day}</div>
@@ -174,7 +203,7 @@ export function DutyMonthCalendar<T extends CalendarSchedule>({
       ) : null}
     </div>
     {directorLite ? (
-      <section className={styles.mobile} aria-label="Plantões do mês">
+      <section ref={mobileViewRef} className={styles.mobile} aria-label="Plantões do mês">
         <ul className={styles.days}>
           {[...byDate.keys()].filter((date) => date.startsWith(`${month}-`)).sort().map((date) => {
             const items = byDate.get(date) ?? [];

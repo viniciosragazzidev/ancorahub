@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
+import styles from "./duty-now-view.module.css";
 
 const mocks = vi.hoisted(() => ({ runAction: vi.fn(), pathname: "/plantoes/agora" }));
 
@@ -43,9 +44,9 @@ describe("DutyNowView", () => {
 
   it("usa a entrada e o hero Lite quando a página está no escopo Arc", () => {
     mocks.pathname = "/plantoes/agora";
-    render(<ArcScopeProvider enabled><DutyNowView data={data} nowIso="2026-10-10T19:15:00.000Z" /></ArcScopeProvider>);
+    const { container } = render(<ArcScopeProvider enabled><DutyNowView data={data} nowIso="2026-10-10T19:15:00.000Z" /></ArcScopeProvider>);
     expect(screen.getByRole("progressbar", { name: "Progresso do plantão" })).toBeTruthy();
-    expect(document.body.innerHTML).toContain("litePage");
+    expect(container.querySelector(`.${styles.litePage}`)).not.toBeNull();
   });
 
   it("shows the plantão, its progress, the numbers and every lead received in it", () => {
