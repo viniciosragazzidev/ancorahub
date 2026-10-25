@@ -11,6 +11,7 @@ import { SkipToContent } from "@/components/skip-to-content";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { isDirectorF2DevPreview } from "@/components/light/director-f2-dev-preview";
+import { isDirectorShellRealDevPreview } from "@/components/light/director-shell-real-dev-preview";
 import "./globals.css";
 
 const jakartaSans = Plus_Jakarta_Sans({
@@ -107,10 +108,10 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const requestPath = process.env.NODE_ENV === "development" ? (await headers()).get("x-pathname") ?? "" : "";
-  const isDirectorF2Preview = isDirectorF2DevPreview(requestPath);
+  const isDirectorDevPreview = isDirectorF2DevPreview(requestPath) || isDirectorShellRealDevPreview(requestPath);
   let directorLiteEnabled = false;
 
-  if (!isDirectorF2Preview) {
+  if (!isDirectorDevPreview) {
     try {
       const context = await getRequiredTenantContext();
       directorLiteEnabled = await shouldUseDirectorLiteStyle(context.role, context.tenantId);
@@ -126,7 +127,7 @@ export default async function RootLayout({
       <body className="min-h-full flex flex-col">
         <SkipToContent />
         <SplashScreen />
-        <InterfaceMotionProvider enabled={isDirectorF2Preview ? false : undefined}>
+        <InterfaceMotionProvider enabled={isDirectorDevPreview ? false : undefined}>
           <AppProviders forceLightTheme={directorLiteEnabled} directorLiteEnabled={directorLiteEnabled}>
             <TooltipProvider><div id="main-content" tabIndex={-1}><RouteViewTransition>{children}</RouteViewTransition></div></TooltipProvider>
             <Toaster directorLiteEnabled={directorLiteEnabled} />

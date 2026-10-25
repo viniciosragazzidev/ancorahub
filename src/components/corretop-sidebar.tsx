@@ -205,14 +205,14 @@ const navigationItems: NavItemConfig[] = [
   },
 ];
 
-export function CorreTopSidebar({ logoUrl, initialUser, initialPathname }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string }) {
+export function CorreTopSidebar({ logoUrl, initialUser, initialPathname, initialOnDuty }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string; initialOnDuty?: boolean }) {
   const currentPathname = usePathname();
   const pathname = initialPathname ?? currentPathname;
   const { isMobile, setOpenMobile } = useSidebar();
   const directorLite = useArcScopeEnabled();
   const chrome = useDirectorChrome();
   const [user, setUser] = useState<UserDisplayInfo | null>(initialUser ?? null);
-  const [onDuty, setOnDuty] = useState(false);
+  const [onDuty, setOnDuty] = useState(initialOnDuty ?? false);
 
   useEffect(() => {
     if (!initialUser) {
@@ -276,9 +276,16 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname }: { log
         </div>
 
         {user?.isPlatformAdmin && (
-          <div className="flex w-full min-w-0 justify-center">
+          <div className={cn(
+            "flex w-full min-w-0 justify-center",
+            directorLite && "flex-col items-stretch gap-2 px-2 director-super-admin-actions",
+          )}>
             <SuperAdminRoleSwitcher activeOverride={user.activeRoleOverride} compact={isMobile || directorLite} />
-            {!isMobile ? <div className="mt-2 w-full px-2 group-data-[collapsible=icon]:hidden"><ViewAsButton state={{ canViewAs: true, viewingAs: null }} variant="sidebar" /></div> : null}
+            {(!isMobile || directorLite) ? (
+              <div className={cn("mt-2 w-full px-2 group-data-[collapsible=icon]:hidden", directorLite && "mt-0 px-0")}>
+                <ViewAsButton state={{ canViewAs: true, viewingAs: null }} variant="sidebar" directorLite={directorLite} />
+              </div>
+            ) : null}
           </div>
         )}
 

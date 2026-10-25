@@ -72,6 +72,7 @@ export function AppShell({
   directorLiteEnabled = false,
   initialSidebarUser,
   initialSidebarPathname,
+  initialSidebarOnDuty,
 }: {
   children: ReactNode;
   branding?: Branding;
@@ -99,6 +100,8 @@ export function AppShell({
   initialSidebarUser?: UserDisplayInfo | null;
   /** Só usado pela prévia de desenvolvimento para destacar a rota representada. */
   initialSidebarPathname?: string;
+  /** So usado pela previa de desenvolvimento para mostrar o estado de plantao. */
+  initialSidebarOnDuty?: boolean;
 }) {
   const pathname = usePathname();
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -264,10 +267,10 @@ export function AppShell({
         {directorLiteEnabled ? <div className="arc-venancor director-view-as-banner" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}><ViewAsBanner viewingAs={viewAs.viewingAs} /></div> : <ViewAsBanner viewingAs={viewAs.viewingAs} />}
         {directorLiteEnabled ? (
           <div className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }}>
-            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} />
+            <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} />
           </div>
         ) : (
-          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} />
+          <CorreTopSidebar logoUrl={branding?.logoUrl ?? null} initialUser={initialSidebarUser} initialPathname={initialSidebarPathname} initialOnDuty={initialSidebarOnDuty} />
         )}
         {directorLiteEnabled ? <div id={DIRECTOR_LITE_PORTAL_ROOT_ID} className="arc-venancor" data-skin="diretor" style={{ ...directorSkinStyle, display: "contents" }} /> : null}
         <SidebarInset

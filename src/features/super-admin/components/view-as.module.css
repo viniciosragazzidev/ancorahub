@@ -53,3 +53,30 @@
 .bannerExit:hover { background: oklch(95% .02 300); }
 
 @media (prefers-reduced-motion: reduce) { .button { transition: none; } .button:active { transform: none; } }
+
+
+/* Linha neutra do menu do Diretor Lite. */
+.button.directorLiteButton {
+  display: flex;
+  min-height: var(--control-height-sm, 44px);
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-secondary);
+  transition: background-color var(--duration-fast) var(--ease-in-out), color var(--duration-fast) var(--ease-in-out);
+}
+.button.directorLiteButton:hover { background: var(--surface); box-shadow: none; color: var(--foreground); }
+.button.directorLiteButton:active { transform: scale(.98); box-shadow: none; }
+.button.directorLiteButton:focus-visible { outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--ring)); outline-offset: var(--focus-outline-offset, 2px); }
+.button.directorLiteButton .bolt { width: 20px; height: 20px; background: transparent; box-shadow: none; color: currentColor; }
+.button.directorLiteButton .label { display: block; flex: 1; }
+.button.directorLiteButton .label strong { color: inherit; font-size: var(--text-sm); font-weight: 500; }
+.button.directorLiteButton .label small { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .button.directorLiteButton { transition: none; }
+  .button.directorLiteButton:active { transform: none; }
+}
