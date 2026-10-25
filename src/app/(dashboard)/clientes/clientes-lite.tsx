@@ -3,12 +3,13 @@
 /**
  * /clientes no visual Lite do diretor: os mesmos quatro números (com a mesma tendência), a mesma busca local, unidade
  * e período na barra (mesmos ?branch= e ?period=), a lista Lite (tabela no desktop, cartões no celular) com 10 por
- * página e o mesmo atalho para o perfil do cliente. Os dados chegam do servidor já no escopo de quem vê.
+ * página e o mesmo atalho para o perfil do cliente (nome em link e a linha inteira, sem coluna de ação que vira
+ * ruído no cartão do celular). Os dados chegam do servidor já no escopo de quem vê.
  */
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ArrowRight, ChevronRight, Search } from "lucide-react";
+import { ArrowRight, Search } from "lucide-react";
 
 import { StatCard } from "@/components/dashboard/metric-card";
 import { LiteUrlSelect } from "@/components/lite/controls";
@@ -76,23 +77,13 @@ export function ClientesLite({ clients, metrics, period, branches, branchId }: {
     { id: "broker", label: "Responsável", nowrap: true, render: (client) => client.brokerName ? <span title={client.brokerName}>{client.brokerName}</span> : <span className={page.muted}>Sem responsável</span> },
     { id: "branch", label: "Unidade", nowrap: true, render: (client) => client.branchName ? <span title={client.branchName}>{client.branchName}</span> : <span className={page.muted}>Geral da empresa</span> },
     { id: "converted", label: "Conversão", render: (client) => <span className={page.numeric}>{formatLiteDate(client.convertedAt)}</span> },
-    {
-      id: "actions",
-      label: "Ações",
-      numeric: true,
-      render: (client) => (
-        <Link href={`/clientes/${client.id}`} className={page.iconButton} aria-label="Ver perfil" title={`Ver perfil de ${client.name}`}>
-          <ChevronRight aria-hidden="true" size={18} />
-        </Link>
-      ),
-    },
   ], []);
 
   return (
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
       <div className={page.stats}>
         <StatCard label="Total de clientes" value={metrics.totalClients} sublabel={`${metrics.recentConversions} nos últimos ${period} dias`} sparklineData={trend} sparklineColor="var(--chart-1)" animated />
-        <StatCard label="Taxa de conversão" value={`${metrics.conversionRate}%`} sublabel="Clientes por lead" sparklineData={trend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" animated animationDelay={0.06} />
+        <StatCard label="Taxa de conversão" value={`${metrics.conversionRate.replace(".", ",")}%`} sublabel="Clientes por lead" sparklineData={trend.map((value) => Math.round(value * Number(metrics.conversionRate)))} sparklineColor="var(--chart-3)" animated animationDelay={0.06} />
         <StatCard label="Média por corretor" value={metrics.avgClientsPerBroker} sublabel={`${metrics.totalBrokers} responsável(is)`} sparklineData={trend.map((value) => Math.max(0, value / Math.max(1, metrics.totalBrokers)))} sparklineColor="var(--chart-4)" animated animationDelay={0.12} />
         <StatCard label="Renovações próximas" value={metrics.upcomingRenewals} sublabel="Próximos 30 dias" sparklineData={trend.map((value) => Math.max(0, metrics.upcomingRenewals ? value + 1 : value))} sparklineColor="var(--chart-2)" animated animationDelay={0.18} />
       </div>

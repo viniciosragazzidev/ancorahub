@@ -39,7 +39,7 @@ describe("clientes Lite", () => {
     expect(within(table()).getAllByText("20/10/2026")).toHaveLength(2);
     fireEvent.change(screen.getByRole("searchbox", { name: "Buscar cliente" }), { target: { value: "nazareth" } });
     expect(within(table()).getAllByRole("row")).toHaveLength(2);
-    expect(within(table()).getByRole("link", { name: "Ver perfil" })).toHaveAttribute("href", "/clientes/c12");
+    expect(within(table()).getByRole("link", { name: "Nazareth Pereira" })).toHaveAttribute("href", "/clientes/c12");
     fireEvent.click(within(table()).getAllByRole("row")[1]!);
     expect(push).toHaveBeenLastCalledWith("/clientes/c12");
   });

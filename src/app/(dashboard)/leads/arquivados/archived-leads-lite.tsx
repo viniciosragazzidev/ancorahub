@@ -13,6 +13,7 @@ import { LiteResponsiveData, type LiteColumn } from "@/components/lite/data/data
 import { LitePagination } from "@/components/lite/data/pagination";
 import { formatLiteDate } from "@/components/lite/format/date";
 import page from "@/components/lite/page/lite-page.module.css";
+import styles from "./archived-leads-lite.module.css";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
 import { LEAD_QUALIFICATION_LABELS, type LeadQualificationStatus } from "@/features/leads/qualification-status";
 
@@ -27,8 +28,13 @@ export type ArchivedLeadLiteRow = {
   archivedBy: string | null;
 };
 
+/** "Em Atendimento" vira "Em atendimento"; siglas e marcas (IA, WhatsApp, Meta) ficam como estão. */
+const KEEP = new Set(["Meta"]);
 function sentenceCase(label: string) {
-  return label.charAt(0) + label.slice(1).toLocaleLowerCase("pt-BR");
+  return label
+    .split(" ")
+    .map((word, index) => (index > 0 && !KEEP.has(word) && /^\p{Lu}\p{Ll}+$/u.test(word) ? word.toLocaleLowerCase("pt-BR") : word))
+    .join(" ");
 }
 
 function statusLabel(status: string | null) {
@@ -83,7 +89,7 @@ export function ArchivedLeadsLite({ rows, total, page: currentPage, totalPages, 
         <p className={page.cardDescription}>
           {total} {total === 1 ? "lead retirado" : "leads retirados"} da distribuição sem apagar o histórico. O arquivamento é reversível pela administração e só o diretor consulta esta lista.
         </p>
-        <form className={page.toolbar} method="get" role="search" aria-label="Buscar leads arquivados">
+        <form className={`${page.toolbar} ${styles.searchRow}`} method="get" role="search" aria-label="Buscar leads arquivados">
           <label className={page.search}>
             <Search aria-hidden="true" size={18} className={page.searchIcon} />
             <input type="search" name="search" defaultValue={search} placeholder="Buscar nome, telefone ou e-mail" aria-label="Buscar leads arquivados" className={page.searchInput} />

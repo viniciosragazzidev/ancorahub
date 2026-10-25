@@ -70,7 +70,7 @@ describe("visões gerais órfãs com a chave ligada", () => {
     const html = renderToStaticMarkup(await LeadsDashboardPage());
     expect(html).toContain('href="/leads?f=1"');
     expect(html).not.toContain('href="/leads?f=2"');
-    expect(html).toContain("12,3%");
+    expect(html).toContain("12,3</span>%");
     expect(html).toContain("Em contato");
   });
 
