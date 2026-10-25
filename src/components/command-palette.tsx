@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { FEATURE_SEARCH_INDEX, type FeatureIndexItem } from "@/shared/feature-search-index";
 import { getUserDisplayInfo, type UserDisplayInfo } from "@/shared/auth/actions";
 import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { canShowNavigationItem } from "@/shared/navigation-access";
 
 type SearchItem = { id: string; title: string; subtitle: string | null; href: string };
 type SearchGroup = { type: string; label: string; items: SearchItem[] };
@@ -50,7 +51,6 @@ export function CommandPalette() {
     }
     const controller = new AbortController();
     const timer = window.setTimeout(async () => {
-      setSearchLoading(true);
       try {
         const response = await fetch(`/api/search?q=${encodeURIComponent(query.trim())}`, { signal: controller.signal });
         if (!response.ok) throw new Error("Falha na busca");
@@ -69,9 +69,8 @@ export function CommandPalette() {
   }, [directorLite, open, query]);
 
   const userPermissions = user?.permissions ?? [];
-
   const allowedFeatures = FEATURE_SEARCH_INDEX.filter((item) =>
-    userPermissions.includes(item.permission)
+    directorLite ? canShowNavigationItem(item, user) : userPermissions.includes(item.permission),
   );
 
   const filteredFeatures = allowedFeatures.filter((item) => {
@@ -111,7 +110,7 @@ export function CommandPalette() {
   const handleQueryChange = (value: string) => {
     setQuery(value);
     setSearchGroups([]);
-    if (value.trim().length < 2) setSearchLoading(false);
+    setSearchLoading(directorLite && value.trim().length >= 2);
   };
 
   return (

@@ -64,7 +64,7 @@ import { isCurrentUserOnDuty } from "@/features/lead-distribution/on-duty-check"
 import { SuperAdminRoleSwitcher } from "@/components/super-admin-role-switcher";
 import { ViewAsButton } from "@/features/super-admin/components/view-as";
 import { cn } from "@/lib/utils";
-import { routePermissionForPath } from "@/features/custom-roles/routes";
+import { canShowNavigationItem } from "@/shared/navigation-access";
 
 type NavItemConfig = {
   label: string;
@@ -205,64 +205,6 @@ const navigationItems: NavItemConfig[] = [
   },
 ];
 
-const marketingHiddenPaths = [
-  "/conversas",
-  "/tarefas",
-  "/documentos",
-  "/clientes",
-  "/vendas",
-  "/checklist",
-  "/minha-fila",
-  "/dashboard",
-  "/corretor",
-  "/metas",
-  "/relatorios",
-  "/noc",
-  "/filiais",
-  "/unidades",
-  "/gestor",
-  "/diretor",
-];
-
-const brokerHiddenPaths = ["/cotacao", "/automacoes", "/filiais", "/unidades"];
-const managerHiddenPaths = [
-  "/marketing",
-  "/integrations",
-  "/inteligencia",
-  "/qualificacao",
-  "/atendimento",
-  "/leads/distribuicao",
-  "/automacoes",
-];
-
-function canShowItem(item: NavItemConfig, user: UserDisplayInfo | null, roleKey: UserDisplayInfo["roleKey"]) {
-  if (!roleKey) return false;
-  if (item.requires === "relationshipCenter" && (!user?.relationshipCenterEnabled || roleKey === "broker")) return false;
-  if (user?.jobTitle === "marketing" && marketingHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
-    return false;
-  }
-  if (roleKey === "broker" && brokerHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
-    return false;
-  }
-  if (roleKey === "manager" && managerHiddenPaths.some((path) => item.url === path || item.url.startsWith(path + "/"))) {
-    return false;
-  }
-  const permissions = user?.permissions ?? [];
-  const routePermission = routePermissionForPath(item.url);
-  const explicitRoutes = permissions.filter((permission) => permission.startsWith("route:"));
-  if (item.url === "/equipe") {
-    if (explicitRoutes.length > 0) {
-      return Boolean(routePermission && permissions.includes(routePermission))
-        || permissions.includes("route:/filiais")
-        || permissions.includes("route:/unidades")
-        || permissions.includes("acessar_configuracoes_unidade");
-    }
-    return permissions.includes("convidar_corretor") || permissions.includes("acessar_configuracoes_unidade");
-  }
-  if (routePermission && explicitRoutes.length > 0) return permissions.includes(routePermission);
-  return permissions.includes(item.permission);
-}
-
 export function CorreTopSidebar({ logoUrl, initialUser, initialPathname }: { logoUrl?: string | null; initialUser?: UserDisplayInfo | null; initialPathname?: string }) {
   const currentPathname = usePathname();
   const pathname = initialPathname ?? currentPathname;
@@ -280,8 +222,8 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname }: { log
   }, [initialUser]);
 
   useEffect(() => {
-    if (user) chrome?.setProfile(user);
-  }, [chrome, user]);
+    if (directorLite && user) chrome?.setProfile(user);
+  }, [chrome, directorLite, user]);
 
   const userName = user?.name ?? "Usuário";
   const userRole = user?.role ?? "";
@@ -290,7 +232,7 @@ export function CorreTopSidebar({ logoUrl, initialUser, initialPathname }: { log
     (pathname.startsWith("/distribuicao") && pathname.includes("view=plantao")) ||
     pathname.startsWith("/leads/distribuicao/plantao");
 
-  const visibleItems = navigationItems.filter((item) => canShowItem(item, user, roleKey));
+  const visibleItems = navigationItems.filter((item) => canShowNavigationItem(item, user));
 
   async function handleLogout() {
     toast.info("Encerrando sua sessão...");

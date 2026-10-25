@@ -3,6 +3,8 @@ import { inSupervisorTeam, isSupervisorTeamScoped } from "@/features/team/superv
 import { NextRequest } from "next/server";
 
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { getUserDisplayInfo } from "@/shared/auth/actions";
+import { canShowNavigationItem } from "@/shared/navigation-access";
 import { FEATURE_FLAGS, getFeatureFlag, getSystemSetting } from "@/features/system-settings/queries";
 import { getDatabase, schema } from "@/shared/db";
 
@@ -30,13 +32,15 @@ export async function GET(request: NextRequest) {
   const feature = await getSystemSetting("feature_global_search_enabled");
   if (feature === "false") return Response.json({ enabled: false, groups: [] });
 
+  const displayUser = await getUserDisplayInfo();
   const qLower = query.toLowerCase();
   const matchingFeatures = FEATURE_SEARCH_INDEX.filter((feat) => {
-    return (
+    const matchesQuery = (
       feat.title.toLowerCase().includes(qLower) ||
       feat.description.toLowerCase().includes(qLower) ||
       feat.keywords.some((k) => k.toLowerCase().includes(qLower))
     );
+    return matchesQuery && canShowNavigationItem(feat, displayUser);
   }).slice(0, 6);
 
   // A manager without an authenticated unit has no operational search scope.

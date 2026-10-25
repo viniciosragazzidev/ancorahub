@@ -168,7 +168,8 @@
   display: none;
 }
 
-.arc-venancor[data-skin="diretor"] .director-dashboard-header {
+.arc-venancor[data-skin="diretor"] .director-dashboard-header,
+.arc-venancor[data-skin="diretor"].director-dashboard-header {
   position: sticky;
   top: 0;
   z-index: 30;
@@ -349,7 +350,8 @@
   backdrop-filter: none;
 }
 
-.arc-venancor[data-skin="diretor"] .director-command-palette {
+.arc-venancor[data-skin="diretor"] .director-command-palette,
+.arc-venancor[data-skin="diretor"].director-command-palette {
   max-height: min(84dvh, 680px);
   border-color: var(--border);
   border-radius: var(--radius-card);
@@ -357,7 +359,8 @@
   box-shadow: var(--shadow-resting);
 }
 
-.arc-venancor[data-skin="diretor"] .director-command-palette input {
+.arc-venancor[data-skin="diretor"] .director-command-palette input,
+.arc-venancor[data-skin="diretor"].director-command-palette input {
   min-height: var(--control-height-sm, 44px);
   font-size: var(--text-base);
 }
@@ -436,7 +439,9 @@
 }
 
 .arc-venancor[data-skin="diretor"] .director-route-loading,
-.arc-venancor[data-skin="diretor"] .director-route-state {
+.arc-venancor[data-skin="diretor"] .director-route-state,
+.arc-venancor[data-skin="diretor"].director-route-loading,
+.arc-venancor[data-skin="diretor"].director-route-state {
   display: flex;
   width: min(100% - 32px, 1180px);
   min-height: min(64vh, 680px);
@@ -589,7 +594,8 @@
   backdrop-filter: none;
 }
 
-.arc-venancor[data-skin="diretor"] .director-pwa-prompt [data-slot="card"] {
+.arc-venancor[data-skin="diretor"] .director-pwa-prompt [data-slot="card"],
+.arc-venancor[data-skin="diretor"].director-pwa-prompt [data-slot="card"] {
   border-color: var(--border);
   border-radius: var(--radius-card);
   background: var(--surface);
@@ -637,7 +643,8 @@
   color: var(--accent-strong);
 }
 
-.arc-venancor[data-skin="diretor"] .director-agent-drawer {
+.arc-venancor[data-skin="diretor"] .director-agent-drawer,
+.arc-venancor[data-skin="diretor"].director-agent-drawer {
   display: flex;
   width: 100%;
   flex-direction: column;
@@ -671,11 +678,14 @@
 }
 
 .arc-venancor[data-skin="diretor"] .director-agent-drawer button,
-.arc-venancor[data-skin="diretor"] .director-agent-drawer textarea {
+.arc-venancor[data-skin="diretor"] .director-agent-drawer textarea,
+.arc-venancor[data-skin="diretor"].director-agent-drawer button,
+.arc-venancor[data-skin="diretor"].director-agent-drawer textarea {
   min-height: var(--control-height-sm, 44px);
 }
 
-.arc-venancor[data-skin="diretor"] .director-agent-drawer textarea {
+.arc-venancor[data-skin="diretor"] .director-agent-drawer textarea,
+.arc-venancor[data-skin="diretor"].director-agent-drawer textarea {
   padding: 8px;
 }
 
@@ -697,7 +707,9 @@
 }
 
 .arc-venancor[data-skin="diretor"] .director-feedback-drawer,
-.arc-venancor[data-skin="diretor"] .director-feedback-sheet {
+.arc-venancor[data-skin="diretor"] .director-feedback-sheet,
+.arc-venancor[data-skin="diretor"].director-feedback-drawer,
+.arc-venancor[data-skin="diretor"].director-feedback-sheet {
   background: var(--surface);
   color: var(--foreground);
 }
@@ -706,7 +718,21 @@
   min-height: var(--control-height-sm, 44px);
 }
 
+.arc-venancor[data-skin="diretor"].director-feedback-drawer button,
+.arc-venancor[data-skin="diretor"].director-feedback-sheet button {
+  min-height: var(--control-height-sm, 44px);
+}
+
 .arc-venancor[data-skin="diretor"] :is(.director-feedback-drawer, .director-feedback-sheet) textarea {
+  min-height: 140px;
+  border-color: var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.arc-venancor[data-skin="diretor"].director-feedback-drawer textarea,
+.arc-venancor[data-skin="diretor"].director-feedback-sheet textarea {
   min-height: 140px;
   border-color: var(--border);
   border-radius: var(--radius-control);

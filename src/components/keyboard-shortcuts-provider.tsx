@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { getArcScopeProps } from "@/components/arc/arc-scope-context";
+import { cn } from "@/lib/utils";
 
 /* ─── Types ─── */
 
@@ -257,12 +258,13 @@ export function KeyboardShortcutsDialog({ onClose, directorLiteEnabled = false }
   const builtins: { label: string; keys: string }[] = [
     { label: "Ajuda de atalhos", keys: "?" },
   ];
+  const arcScopeProps = getArcScopeProps(directorLiteEnabled);
 
   return (
     <div
-      {...getArcScopeProps(directorLiteEnabled)}
+      {...arcScopeProps}
       data-slot={directorLiteEnabled ? "keyboard-shortcuts-dialog" : undefined}
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+      className={cn(arcScopeProps.className, "fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4")}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
