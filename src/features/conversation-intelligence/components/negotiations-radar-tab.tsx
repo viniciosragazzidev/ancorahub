@@ -28,6 +28,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { buildWhatsAppUrl } from "@/lib/whatsapp-url";
 import { cn } from "@/lib/utils";
 import { triggerManualConversationAnalysisAction } from "../actions";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { NegotiationsRadarLite } from "./negotiations-radar-lite";
 
 export interface RadarDealItem {
   id: string;
@@ -81,7 +83,14 @@ const stageLabelMap: Record<string, string> = {
   UNKNOWN: "Em Andamento",
 };
 
-export function NegotiationsRadarTab({
+/** Radar IA: a versão Lite com a chave do diretor (rota fora do opt-out); a tela atual, sem mudança, nos demais casos. */
+export function NegotiationsRadarTab(props: NegotiationsRadarTabProps) {
+  const litePage = useDirectorLitePage();
+  if (litePage) return <NegotiationsRadarLite {...props} />;
+  return <NegotiationsRadarClassic {...props} />;
+}
+
+function NegotiationsRadarClassic({
   leads,
   branches = [],
   brokers = [],
