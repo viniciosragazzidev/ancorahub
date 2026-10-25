@@ -14,6 +14,9 @@ import { canAccessManagerUnit } from "@/features/broker-workspace/manager-unit-s
 import { isLightRouteAllowed } from "@/components/light/light-routes";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { parsePeriod } from "@/shared/period";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { UnitProfileLite } from "@/features/branches/components/unit-profile-lite";
 
 type Props = {
   params: Promise<{ branchId: string }>;
@@ -73,6 +76,17 @@ export default async function UnitProfilePage({
         : "/corretor";
 
   const canSeeTeam = context.role === "director" || context.role === "manager";
+
+  if (context.role === "director" && members !== null && topBrokers !== null && (await isDirectorLitePageOnServer(context.role, context.tenantId, "/unidades/[branchId]"))) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Unidade" title={branch.name} />
+        <main className={litePage.stack}>
+          <UnitProfileLite data={{ branch: { id: branch.id, name: branch.name, status: branch.status, acceptingLeads: branch.acceptingLeads, autoDistribute: branch.autoDistribute }, metrics, members, topBrokers }} period={period} backHref={backHref} />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

@@ -6,6 +6,7 @@
  */
 import { DashboardHeader } from "@/components/dashboard-header";
 import litePage from "@/components/lite/page/lite-page.module.css";
+import { UnitProfileLite, type UnitProfileLiteData } from "@/features/branches/components/unit-profile-lite";
 import { TeamInviteLite } from "@/app/(dashboard)/equipe/_components/team-invite-lite";
 import { RecoveryLite, type RecoveryLiteRequest } from "@/app/(dashboard)/equipe/recuperacoes/_components/recovery-lite";
 
@@ -65,6 +66,39 @@ export function ConvidarShellScreen() {
           </div>
           <TeamInviteLite branches={BRANCH_FIXTURES} canInviteManager canInviteDirector />
         </section>
+      </main>
+    </>
+  );
+}
+
+const MEMBER_NAMES = ["Maximiliano Cavalcanti Rocha", "Ana Souza", "Roseleia Oliveira Bittencourt", "Bruno Lima", "Carla Dias", "Justiniano Albuquerque de Souza", "Juliana Prado", "Raimundo Nonato Silva"];
+
+export const UNIT_FIXTURE: UnitProfileLiteData = {
+  branch: { id: BRANCH_FIXTURES[1]!.id, name: "Barra da Tijuca", status: "active", acceptingLeads: true, autoDistribute: true },
+  metrics: { period: "outubro de 2026", totalLeads: 1842, leadsConvertidos: 312, leadsPerdidos: 401, leadsAtivos: 655, leadsDistribuidos: 87, taxaConversao: 17, taxaPerda: 22, leadsTrend: [212, 260, 241, 288, 270, 301, 270] },
+  members: [
+    { userId: "m-gestor", name: "Marina Exemplo", email: "marina.exemplo@ancorasaude.com.br", role: "manager", jobTitle: "manager", availabilityStatus: "available", membershipStatus: "active", activeLeads: 0 },
+    { userId: "m-sup", name: "Raimundo Nonato Silva", email: "raimundo.silva@ancorasaude.com.br", role: "supervisor", jobTitle: "supervisor", availabilityStatus: "available", membershipStatus: "active", activeLeads: 4 },
+    ...MEMBER_NAMES.slice(0, 7).map((name, index) => ({
+      userId: `m-${index}`,
+      name,
+      email: `${name.toLowerCase().normalize("NFD").replace(/[^a-z ]/g, "").split(" ").slice(0, 2).join(".")}@ancorasaude.com.br`,
+      role: "broker" as const,
+      jobTitle: "broker",
+      availabilityStatus: index % 3 === 2 ? ("paused" as const) : ("available" as const),
+      membershipStatus: "active" as const,
+      activeLeads: [48, 36, 31, 22, 19, 12, 7][index]!,
+    })),
+  ],
+  topBrokers: MEMBER_NAMES.slice(0, 5).map((name, index) => ({ userId: `m-${index}`, name, totalLeads: [210, 188, 160, 142, 97][index]!, converted: [61, 44, 31, 22, 9][index]!, conversionRate: [29, 23, 19, 15, 9][index]! })),
+};
+
+export function UnidadeShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Unidade" title="Barra da Tijuca" />
+      <main className={litePage.stack}>
+        <UnitProfileLite data={UNIT_FIXTURE} period={30} backHref="/equipe?visao=unidades" />
       </main>
     </>
   );

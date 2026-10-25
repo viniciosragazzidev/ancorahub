@@ -235,11 +235,12 @@
   font-weight: 500;
 }
 
-/* Nome que é link dentro da linha: alvo de 44px de altura, sem sublinhado até o hover. */
+/* Nome que é link dentro da linha: alvo de 44px de altura (margem negativa para a linha não crescer), sem sublinhado até o hover. */
 .cellLink {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
+  margin-block: -12px;
   color: inherit;
   text-decoration: none;
 }

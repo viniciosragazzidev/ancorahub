@@ -68,7 +68,6 @@
   "/settings/meta",
   "/settings/waha-diagnostic",
   "/settings/whatsapp",
-  "/unidades/[branchId]",
   "/vendas/dashboard",
   "/welcome",
 ] as const;
