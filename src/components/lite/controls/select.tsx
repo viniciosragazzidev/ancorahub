@@ -12,7 +12,7 @@ import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 
 import styles from "./select.module.css";
 
-export type LiteOption = { value: string; label: string };
+export type LiteOption = { value: string; label: string; /** Contagem ao lado do rótulo (ex.: leads da fila). */ count?: number };
 
 const PHONE_QUERY = "(max-width: 767px)";
 
@@ -218,6 +218,7 @@ function OptionPanel({ id, label, options, value, searchPlaceholder, onChoose, o
               onClick={() => onChoose(option.value)}
             >
               <span className={styles.optionLabel}>{option.label}</span>
+              {option.count !== undefined ? <span className={styles.optionCount}>{option.count.toLocaleString("pt-BR")}</span> : null}
               {isSelected ? <Check aria-hidden="true" size={16} className={styles.check} /> : null}
             </li>
           );

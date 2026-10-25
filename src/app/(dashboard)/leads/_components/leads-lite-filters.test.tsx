@@ -8,8 +8,9 @@ import { LeadsFilters } from "./leads-filters";
 
 const params = { current: new URLSearchParams() };
 const replace = vi.fn();
+const push = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace, push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ replace, push, refresh: vi.fn() }),
   useSearchParams: () => params.current,
   usePathname: () => "/leads",
 }));
@@ -77,12 +78,28 @@ describe("filtros Lite de /leads (chave ligada)", () => {
     expect(screen.queryByRole("dialog", { name: "Filtros da fila" })).not.toBeInTheDocument();
   });
 
-  it("etapa rápida aplica na hora e fica marcada", () => {
+  it("etapa vira um seletor na barra que aplica na hora, com o mesmo ?status=", () => {
     renderLite();
-    const group = within(screen.getByRole("group", { name: "Etapas" }));
-    fireEvent.click(group.getByRole("button", { name: "Convertidos" }));
+    expect(screen.queryByRole("group", { name: "Etapas" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^Etapa/ }));
+    fireEvent.click(screen.getByRole("option", { name: "Convertidos" }));
     expect(lastTarget()).toBe("/leads?status=converted");
-    expect(group.getByRole("button", { name: "Convertidos" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^Etapa/ })).toHaveTextContent("Convertidos");
+  });
+
+  it("fila e período viram seletores com contagem e os mesmos ?fila= e ?period=", () => {
+    renderLite({
+      queueTabs: { tabs: [{ value: "", label: "Todas", count: 3966 }, { value: "q1", label: "FILA TATIANA", count: 1774 }, { value: "q2", label: "FILA PF - RENAN", count: 912 }], current: "" },
+      period: 30,
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^Fila/ }));
+    const option = screen.getByRole("option", { name: /FILA TATIANA/ });
+    expect(option).toHaveTextContent("1.774");
+    fireEvent.click(option);
+    expect(push).toHaveBeenLastCalledWith("/leads?fila=q1", { scroll: false });
+    fireEvent.click(screen.getByRole("button", { name: /^Período/ }));
+    fireEvent.click(screen.getByRole("option", { name: "7 dias" }));
+    expect(lastTarget()).toBe("/leads?period=7");
   });
 
   it("busca aplica no Enter preservando os demais filtros", () => {
@@ -112,7 +129,7 @@ describe("filtros Lite de /leads (chave ligada)", () => {
     expect(window.localStorage.getItem("teste:filtros")).toBeNull();
   });
 
-  it("as abas de visão entram no fim da mesma barra da busca e dos filtros", () => {
+  it("o fim da barra ainda aceita um conteúdo extra (trailing)", () => {
     renderLite({ trailing: <nav aria-label="Visão">abas</nav> });
     const bar = screen.getByRole("search").parentElement!;
     expect(bar).toContainElement(screen.getByRole("navigation", { name: "Visão" }));

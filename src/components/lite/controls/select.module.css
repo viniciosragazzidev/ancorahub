@@ -158,6 +158,14 @@
   white-space: nowrap;
 }
 
+.optionCount {
+  flex: none;
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
 .check {
   flex: none;
   color: var(--primary);

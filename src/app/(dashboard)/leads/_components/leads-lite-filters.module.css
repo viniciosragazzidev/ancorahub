@@ -286,3 +286,42 @@
     display: inline;
   }
 }
+
+/* Etapa, fila e período: seletores de 44px na barra, larguras fixas no desktop; no celular dividem a linha. */
+.selects {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.selectStage {
+  width: 184px;
+}
+
+.selectQueue {
+  width: 232px;
+}
+
+.selectPeriod {
+  width: 128px;
+}
+
+@media (max-width: 767px) {
+  .selects {
+    flex: 1 1 100%;
+  }
+
+  .selectStage,
+  .selectPeriod {
+    flex: 1 1 calc(50% - 4px);
+    width: auto;
+    min-width: 0;
+  }
+
+  .selectQueue {
+    flex: 1 1 100%;
+    width: auto;
+  }
+}

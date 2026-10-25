@@ -37,6 +37,10 @@ export type LeadsFiltersProps = {
   tags?: LeadFilterTag[];
   /** Só no Lite: o que vai no fim da barra de busca e filtros (as abas de visão do workspace). */
   trailing?: ReactNode;
+  /** Só no Lite: as filas (mesmos dados e mesmo ?fila= das abas de fila de hoje) viram um seletor na barra. */
+  queueTabs?: { tabs: { value: string; label: string; count: number }[]; current: string };
+  /** Só no Lite: o período (?period=) sai do topo e vira um seletor na barra. */
+  period?: number;
 };
 
 export const qualificationLabels: Record<string, string> = {

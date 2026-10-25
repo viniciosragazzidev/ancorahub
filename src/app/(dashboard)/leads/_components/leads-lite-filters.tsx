@@ -4,14 +4,18 @@
  * Filtros de /leads no visual Lite (chave do diretor ligada). Mesmo estado, mesmos parâmetros da URL e mesma memória
  * do localStorage da tela atual (`useLeadFilters`); só muda o visual:
  * busca de 44px, botão "Filtros" que abre o painel (popover no desktop, BottomSheet no celular) com `LiteSelect` com
- * busca para cada seleção, etapas rápidas em chips e os filtros ativos como chips removíveis.
+ * busca para cada seleção; etapa, fila e período como seletores na mesma barra; e os filtros ativos como chips
+ * removíveis.
  * Como hoje, o painel só vale ao tocar em "Aplicar filtros"; etapas rápidas e remoção de chip aplicam na hora.
  */
-import { useEffect, useId, useRef } from "react";
+import { useEffect, useId, useRef, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Search, SlidersHorizontal } from "lucide-react";
 
 import { BottomSheet } from "@/components/arc/bottom-sheet/bottom-sheet";
 import { LiteFilterChips, LiteSelect, useLitePhone } from "@/components/lite/controls";
+
+import { DEFAULT_PERIOD, PERIOD_OPTIONS } from "@/shared/period";
 
 import styles from "./leads-lite-filters.module.css";
 import { useLeadFilters, type LeadsFiltersProps } from "./use-lead-filters";
@@ -68,13 +72,33 @@ const ORIGEM_OPTIONS = [
 const PAGE_SIZES = ["10", "20", "50", "100"];
 
 export function LeadsLiteFilters(props: LeadsFiltersProps) {
-  const { hideOriginFilters = false, branches, brokers, tags = [], trailing } = props;
+  const { hideOriginFilters = false, branches, brokers, tags = [], trailing, queueTabs, period } = props;
   const filters = useLeadFilters(props);
   const {
     open, setOpen, search, setSearch, status, optimisticStatus, activeCount, hasAnyFilter,
     applyFilters, handleReset, chips, handleRemoveChip, selectStatusPill,
   } = filters;
   const phone = useLitePhone();
+  const router = useRouter();
+  const pathname = usePathname();
+  const urlParams = useSearchParams();
+  const [, startNavigation] = useTransition();
+  // Fila: a mesma troca das abas de fila de hoje (?fila=, volta para a página 1, push).
+  const selectQueue = (value: string) => {
+    const next = new URLSearchParams(urlParams.toString());
+    if (value) next.set("fila", value);
+    else next.delete("fila");
+    next.delete("page");
+    startNavigation(() => router.push(next.size ? `${pathname}?${next}` : (pathname ?? "/leads"), { scroll: false }));
+  };
+  // Período: a mesma troca do seletor de período do topo de hoje (?period=, replace, sem o padrão na URL).
+  const selectPeriod = (value: string) => {
+    const next = new URLSearchParams(urlParams.toString());
+    if (Number(value) === DEFAULT_PERIOD) next.delete("period");
+    else next.set("period", value);
+    startNavigation(() => router.replace(`${pathname ?? "/leads"}${next.toString() ? `?${next.toString()}` : ""}`, { scroll: false }));
+  };
+  const showQueues = Boolean(queueTabs && queueTabs.tabs.length > 2);
   const panelWrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelTitleId = useId();
@@ -203,6 +227,39 @@ export function LeadsLiteFilters(props: LeadsFiltersProps) {
             </div>
           ) : null}
         </div>
+        <div className={styles.selects}>
+          <div className={styles.selectStage}>
+            <LiteSelect
+              label="Etapa"
+              hideLabel
+              value={optimisticStatus ?? status}
+              onChange={selectStatusPill}
+              options={STATUS_PILLS.map((pill) => ({ value: pill.id, label: pill.id ? pill.label : "Todas as etapas" }))}
+            />
+          </div>
+          {showQueues && queueTabs ? (
+            <div className={styles.selectQueue}>
+              <LiteSelect
+                label="Fila"
+                hideLabel
+                value={queueTabs.current}
+                onChange={selectQueue}
+                options={queueTabs.tabs.map((tab) => ({ value: tab.value, label: tab.value ? tab.label : "Todas as filas", count: tab.count }))}
+              />
+            </div>
+          ) : null}
+          {period !== undefined ? (
+            <div className={styles.selectPeriod}>
+              <LiteSelect
+                label="Período"
+                hideLabel
+                value={String(period)}
+                onChange={selectPeriod}
+                options={PERIOD_OPTIONS.map((days) => ({ value: String(days), label: `${days} dias` }))}
+              />
+            </div>
+          ) : null}
+        </div>
         {hasAnyFilter ? (
           <button type="button" className={styles.ghostButton} onClick={handleReset}>
             <span className={styles.longLabel}>Limpar tudo</span>
@@ -220,14 +277,6 @@ export function LeadsLiteFilters(props: LeadsFiltersProps) {
           </div>
         </BottomSheet>
       ) : null}
-
-      <LiteFilterChips
-        label="Etapas"
-        scroll
-        chips={STATUS_PILLS}
-        active={[optimisticStatus ?? status]}
-        onToggle={selectStatusPill}
-      />
 
       {chips.length > 0 ? (
         <LiteFilterChips label="Filtros ativos" chips={chips} onRemove={handleRemoveChip} />
