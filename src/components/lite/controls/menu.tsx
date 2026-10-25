@@ -10,9 +10,13 @@ import { MoreHorizontal } from "lucide-react";
 
 import styles from "./controls.module.css";
 
+type LiteMenuTone = "default" | "success" | "danger";
+
 export type LiteMenuItem =
-  | { id: string; label: string; onSelect: () => void; href?: undefined; tone?: "default" | "success" }
-  | { id: string; label: string; href: string; onSelect?: undefined; tone?: "default" | "success" };
+  | { id: string; label: string; onSelect: () => void; href?: undefined; tone?: LiteMenuTone; disabled?: boolean }
+  | { id: string; label: string; href: string; onSelect?: undefined; tone?: LiteMenuTone; disabled?: undefined };
+
+const toneAttr = (tone?: LiteMenuTone) => (tone === "success" || tone === "danger" ? tone : undefined);
 
 export function LiteMenu({ label, items }: { label: string; items: LiteMenuItem[] }) {
   const [open, setOpen] = useState(false);
@@ -51,7 +55,7 @@ export function LiteMenu({ label, items }: { label: string; items: LiteMenuItem[
           {items.map((item) => (
             <li key={item.id} role="none">
               {item.href ? (
-                <Link role="menuitem" href={item.href} className={styles.menuItem} data-tone={item.tone === "success" ? "success" : undefined} onClick={() => setOpen(false)}>
+                <Link role="menuitem" href={item.href} className={styles.menuItem} data-tone={toneAttr(item.tone)} onClick={() => setOpen(false)}>
                   {item.label}
                 </Link>
               ) : (
@@ -59,7 +63,8 @@ export function LiteMenu({ label, items }: { label: string; items: LiteMenuItem[
                   type="button"
                   role="menuitem"
                   className={styles.menuItem}
-                  data-tone={item.tone === "success" ? "success" : undefined}
+                  data-tone={toneAttr(item.tone)}
+                  disabled={item.disabled}
                   onClick={() => {
                     setOpen(false);
                     item.onSelect?.();

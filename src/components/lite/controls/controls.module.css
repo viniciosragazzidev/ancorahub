@@ -204,6 +204,15 @@
   color: var(--success);
 }
 
+.menuItem[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.menuItem:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* Chips numa linha só, com rolagem lateral (celular). */
 .chipsScroll {
   flex-wrap: nowrap;

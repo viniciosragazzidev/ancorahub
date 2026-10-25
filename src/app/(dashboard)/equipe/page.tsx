@@ -21,6 +21,9 @@ import { TransferRequestsPanel } from "@/features/supervisor-workspace/transfer-
 import { getLiteAudience } from "@/features/broker-workspace/lite-audience";
 import { ManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team";
 import { getManagerLiteTeam } from "@/features/manager-workspace/manager-lite-team-queries";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { TeamHeaderActionsLite, TeamLite } from "./_components/team-lite";
 
 export default async function TeamPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
   const context = await getRequiredTenantContext();
@@ -247,6 +250,32 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     // Optional panel: a missing table (0191 not applied) must not take the team screen down.
     ? await getPendingBrokerTransferRequestsAction().catch((error) => { console.error("[equipe] transfer requests unavailable", error instanceof Error ? error.message : error); return []; })
     : [];
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe")) {
+    return (
+      <>
+        <DashboardHeader
+          breadcrumb={tenant[0]?.name ?? "Gestão"}
+          title="Equipe e unidades"
+          rightSlot={<TeamHeaderActionsLite isDirector={context.role === "director"} branches={branches} customRoles={customRoles} />}
+        />
+        <main className={litePage.stack}>
+          <TeamLite
+            members={members}
+            branches={branches}
+            customRoles={customRoles}
+            stats={{ total: members.length, active: activeMembers, unassignedLeads: unassignedCount, salesTotal: totalVolume, membersTrend, leadsTrend, salesTrend }}
+            transferRequests={transferRequests}
+            showTransfers={context.role === "director" || context.role === "manager"}
+            currentRole={context.role}
+            currentBranchId={context.branchId}
+            currentUserId={context.userId}
+            canViewProfile={memberProfileEnabled}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

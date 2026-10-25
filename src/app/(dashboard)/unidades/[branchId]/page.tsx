@@ -77,12 +77,12 @@ export default async function UnitProfilePage({
 
   const canSeeTeam = context.role === "director" || context.role === "manager";
 
-  if (context.role === "director" && members !== null && topBrokers !== null && (await isDirectorLitePageOnServer(context.role, context.tenantId, "/unidades/[branchId]"))) {
+  if (canSeeTeam && members !== null && topBrokers !== null && (await isDirectorLitePageOnServer(context.role, context.tenantId, "/unidades/[branchId]"))) {
     return (
       <>
         <DashboardHeader breadcrumb="Unidade" title={branch.name} />
         <main className={litePage.stack}>
-          <UnitProfileLite data={{ branch: { id: branch.id, name: branch.name, status: branch.status, acceptingLeads: branch.acceptingLeads, autoDistribute: branch.autoDistribute }, metrics, members, topBrokers }} period={period} backHref={backHref} />
+          <UnitProfileLite data={{ branch: { id: branch.id, name: branch.name, status: branch.status, acceptingLeads: branch.acceptingLeads, autoDistribute: branch.autoDistribute }, metrics, members, topBrokers }} period={period} backHref={backHref} canExport={context.role === "director" || context.role === "manager"} canToggleAvailability={context.role === "director" || context.role === "manager"} />
         </main>
       </>
     );

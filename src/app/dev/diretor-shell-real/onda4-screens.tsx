@@ -7,6 +7,9 @@
 import { DashboardHeader } from "@/components/dashboard-header";
 import litePage from "@/components/lite/page/lite-page.module.css";
 import { UnitProfileLite, type UnitProfileLiteData } from "@/features/branches/components/unit-profile-lite";
+import { TeamHeaderActionsLite, TeamLite, TeamTabsLite } from "@/app/(dashboard)/equipe/_components/team-lite";
+import type { TeamMemberLite } from "@/app/(dashboard)/equipe/_components/member-sheets-lite";
+import { UnitsLite, type UnitLite } from "@/features/branches/components/units-lite";
 import { TeamInviteLite } from "@/app/(dashboard)/equipe/_components/team-invite-lite";
 import { RecoveryLite, type RecoveryLiteRequest } from "@/app/(dashboard)/equipe/recuperacoes/_components/recovery-lite";
 
@@ -98,7 +101,91 @@ export function UnidadeShellScreen() {
     <>
       <DashboardHeader breadcrumb="Unidade" title="Barra da Tijuca" />
       <main className={litePage.stack}>
-        <UnitProfileLite data={UNIT_FIXTURE} period={30} backHref="/equipe?visao=unidades" />
+        <UnitProfileLite data={UNIT_FIXTURE} period={30} backHref="/equipe?visao=unidades" canExport canToggleAvailability />
+      </main>
+    </>
+  );
+}
+
+const TEAM_PEOPLE: Array<[string, TeamMemberLite["role"], string, TeamMemberLite["status"], number]> = [
+  ["Marina Exemplo", "director", "director", "active", -1],
+  ["Raimundo Nonato Silva", "manager", "manager", "active", 0],
+  ["Juliana Prado", "supervisor", "supervisor", "active", 1],
+  ["Maximiliano Cavalcanti Rocha", "broker", "broker", "active", 1],
+  ["Ana Souza", "broker", "broker", "active", 0],
+  ["Roseleia Oliveira Bittencourt", "broker", "broker", "pending", 2],
+  ["Bruno Lima", "broker", "broker", "active", 1],
+  ["Carla Dias", "broker", "broker", "disabled", 2],
+  ["Justiniano Albuquerque de Souza", "broker", "broker", "active", 3],
+  ["Patrícia Moura", "manager", "marketing", "active", -1],
+  ["Rafael Teixeira", "broker", "broker", "active", 0],
+  ["Sofia Albuquerque", "broker", "broker", "pending", 1],
+];
+
+export const TEAM_FIXTURE: TeamMemberLite[] = TEAM_PEOPLE.map(([name, role, jobTitle, status, branchIndex], index) => {
+  const branch = branchIndex >= 0 ? BRANCH_FIXTURES[branchIndex] : null;
+  return {
+    id: `member-${index + 1}`,
+    userId: status === "pending" ? null : `user-${index + 1}`,
+    name,
+    email: `${name.toLowerCase().normalize("NFD").replace(/[^a-z ]/g, "").split(" ").slice(0, 2).join(".")}@ancorasaude.com.br`,
+    phone: role === "broker" ? `2199${String(1000000 + index * 7919).slice(0, 7)}` : null,
+    role,
+    jobTitle,
+    status,
+    branchId: branch?.id ?? null,
+    branchName: branch?.name ?? null,
+    customRoleName: jobTitle === "marketing" ? "Marketing digital" : null,
+    supervisorId: role === "broker" && index % 2 === 0 ? "user-3" : null,
+    canEditAuthority: true,
+    canManage: role !== "director",
+  };
+});
+
+export function EquipeShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Âncora Saúde" title="Equipe e unidades" rightSlot={<TeamHeaderActionsLite isDirector branches={BRANCH_FIXTURES} customRoles={[]} />} />
+      <main className={litePage.stack}>
+        <TeamLite
+          members={TEAM_FIXTURE}
+          branches={BRANCH_FIXTURES}
+          customRoles={[]}
+          stats={{ total: 128, active: 117, unassignedLeads: 42, salesTotal: 1284390, membersTrend: [96, 101, 108, 113, 121, 128], leadsTrend: [880, 1020, 990, 1210, 1180, 1302], salesTrend: [180000, 210500, 198000, 232900, 221000, 241990] }}
+          transferRequests={[{ id: "t1", brokerId: "user-4", brokerName: "Maximiliano Cavalcanti Rocha", fromSupervisorId: "user-3", fromSupervisorName: "Juliana Prado", toSupervisorId: "user-2", toSupervisorName: "Raimundo Nonato Silva", branchId: BRANCH_FIXTURES[1]!.id, branchName: "Barra da Tijuca", reason: "Mudou de turno e passa a atender os leads PME da tarde.", createdAt: "2026-10-24T18:20:00.000Z" }]}
+          showTransfers
+          currentRole="director"
+          currentBranchId={null}
+          currentUserId="user-1"
+          canViewProfile
+        />
+      </main>
+    </>
+  );
+}
+
+const UNITS_FIXTURE: UnitLite[] = BRANCH_FIXTURES.map((branch, index) => ({
+  ...branch,
+  externalId: index === 3 ? null : `FIL-0${index + 1}`,
+  status: index === 3 ? "inactive" : "active",
+  memberCount: [42, 31, 18, 0][index]!,
+  acceptingLeads: index !== 2 && index !== 3,
+  autoDistribute: index !== 3,
+  isDistributionHub: index === 0,
+  availableBrokers: [18, 4, 0, 0][index]!,
+  activeLeads: [140, 102, 75, 0][index]!,
+  newLeads: [12, 9, 37, 0][index]!,
+}));
+
+export function UnidadesShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Gestão" title="Equipe e unidades" />
+      <main className={litePage.stack}>
+        <div className={`arc-venancor ${litePage.stack}`} data-skin="diretor">
+          <TeamTabsLite active="unidades" />
+          <UnitsLite branches={UNITS_FIXTURE} canManage />
+        </div>
       </main>
     </>
   );

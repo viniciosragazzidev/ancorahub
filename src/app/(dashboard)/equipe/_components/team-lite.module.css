@@ -1,0 +1,163 @@
+/* Equipe Lite: só tokens. */
+
+.tabs {
+  display: inline-flex;
+  justify-self: start;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tab:hover {
+  color: var(--foreground);
+}
+
+.tab[aria-current="page"] {
+  background: var(--surface);
+  color: var(--foreground);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+.tab:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}
+
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 559px) {
+  .longLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.cardHeadRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.requests {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.request {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.request:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.requestText {
+  display: grid;
+  flex: 1 1 320px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.requestActions {
+  display: flex;
+  gap: 8px;
+}
+
+.member {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+}
+
+.roleCell {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.locked {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.checkName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.error {
+  margin: 0;
+  color: var(--danger);
+  font-size: var(--text-sm);
+}
+
+.deleteBody {
+  display: grid;
+  gap: 12px;
+}
+
+.deleteCard {
+  display: grid;
+  gap: 4px;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-surface) - 12px);
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -6,6 +6,10 @@ import { getBranchDistributionStats } from "@/features/branches/queries";
 import { getDatabase, schema } from "@/shared/db";
 import type { TenantContext } from "@/shared/auth/tenant-context";
 import { TeamManagementTabs } from "./team-management-tabs";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { UnitsLite } from "@/features/branches/components/units-lite";
+import { TeamTabsLite } from "./_components/team-lite";
 
 export async function UnitsView({ context }: { context: TenantContext }) {
   const db = getDatabase();
@@ -33,6 +37,31 @@ export async function UnitsView({ context }: { context: TenantContext }) {
       )).groupBy(schema.tenantMemberships.branchId),
   ]);
   const countsByBranch = new Map(memberCounts.map((entry) => [entry.branchId, Number(entry.count)]));
+
+  const units = branches.map((branch) => {
+    const stats = distributionStats.get(branch.id);
+    return {
+      ...branch,
+      memberCount: countsByBranch.get(branch.id) ?? 0,
+      availableBrokers: stats?.availableBrokers ?? 0,
+      activeLeads: stats?.activeLeads ?? 0,
+      newLeads: stats?.newLeads ?? 0,
+    };
+  });
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Gestão" title="Equipe e unidades" />
+        <main className={litePage.stack}>
+          <div className={`arc-venancor ${litePage.stack}`} data-skin="diretor">
+            <TeamTabsLite active="unidades" />
+            <UnitsLite branches={units} canManage={context.role === "director"} />
+          </div>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

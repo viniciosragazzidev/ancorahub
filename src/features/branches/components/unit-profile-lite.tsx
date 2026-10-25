@@ -31,7 +31,11 @@ export type UnitProfileLiteData = {
 
 const ROLE_LABELS: Record<string, string> = { director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" };
 
-export function UnitProfileLite({ data, period, backHref }: { data: UnitProfileLiteData; period: PeriodValue; backHref: string }) {
+/**
+ * `canExport` e `canToggleAvailability` seguem a regra da tela atual (UnitReportsExporter e UnitMembersTable:
+ * diretor ou gestor). Quem renderiza passa o papel real; nada aqui assume o diretor.
+ */
+export function UnitProfileLite({ data, period, backHref, canExport, canToggleAvailability }: { data: UnitProfileLiteData; period: PeriodValue; backHref: string; canExport: boolean; canToggleAvailability: boolean }) {
   const router = useRouter();
   const { branch, metrics, members, topBrokers } = data;
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -74,7 +78,7 @@ export function UnitProfileLite({ data, period, backHref }: { data: UnitProfileL
     { id: "role", label: "Papel", render: (member) => <span className={page.badge}>{ROLE_LABELS[member.role] ?? member.role}</span> },
     { id: "availability", label: "Disponibilidade", render: (member) => <span className={page.badge} data-tone={member.availabilityStatus === "available" ? "success" : undefined}>{member.availabilityStatus === "available" ? "Disponível" : "Pausado"}</span> },
     { id: "active", label: "Leads ativos", numeric: true, render: (member) => member.activeLeads.toLocaleString("pt-BR") },
-    {
+    ...(canToggleAvailability ? [{
       id: "action",
       label: "Ações",
       numeric: true,
@@ -83,7 +87,7 @@ export function UnitProfileLite({ data, period, backHref }: { data: UnitProfileL
           {member.availabilityStatus === "available" ? <Pause aria-hidden="true" size={18} /> : <Play aria-hidden="true" size={18} />}
         </button>
       ) : <span className={page.muted}>Sem ação</span>,
-    },
+    }] satisfies LiteColumn<BranchMember>[] : []),
   ];
 
   return (
@@ -94,7 +98,7 @@ export function UnitProfileLite({ data, period, backHref }: { data: UnitProfileL
         <span className={page.badge} data-tone={branch.acceptingLeads ? "info" : "warning"}>{branch.acceptingLeads ? "Recebendo leads" : "Pausada para leads"}</span>
         <span className={styles.actions}>
           <LiteUrlSelect className={page.selectNarrow} label="Período" param="period" value={String(period)} defaultValue={String(DEFAULT_PERIOD)} method="replace" options={PERIOD_OPTIONS.map((days) => ({ value: String(days), label: `${days} dias` }))} />
-          <UnitReportsLite branchId={branch.id} branchName={branch.name} />
+          {canExport ? <UnitReportsLite branchId={branch.id} branchName={branch.name} /> : null}
           <Link href="/distribuicao?view=filas" className={page.button}><Settings2 aria-hidden="true" size={16} />Configurar distribuição</Link>
         </span>
       </div>

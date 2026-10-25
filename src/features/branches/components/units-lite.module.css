@@ -1,0 +1,113 @@
+/* Unidades Lite: cartões por unidade, só tokens. */
+
+.toolbarEnd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.card[data-status="inactive"] {
+  border-left: 3px solid var(--border-strong);
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.name {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.metrics > div {
+  display: grid;
+  gap: 2px;
+}
+
+.metrics dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.metrics dd {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.switches {
+  display: grid;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.switchRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.icons {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.legend {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  list-style: none;
+}
+
+@media (max-width: 767px) {
+  .toolbarEnd {
+    width: 100%;
+    margin-left: 0;
+  }
+}

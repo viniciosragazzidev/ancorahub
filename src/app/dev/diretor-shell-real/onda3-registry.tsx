@@ -2,11 +2,13 @@
 import type { ReactNode } from "react";
 
 import { AssistenteShellScreen, DocumentosShellScreen, DrillShellScreen, IntegridadeShellScreen, NocShellScreen, PropostasShellScreen, TarefasShellScreen, VendaShellScreen, VendasShellScreen } from "./onda3-screens";
-import { ConvidarShellScreen, RecuperacoesShellScreen, UnidadeShellScreen } from "./onda4-screens";
+import { ConvidarShellScreen, EquipeShellScreen, RecuperacoesShellScreen, UnidadeShellScreen, UnidadesShellScreen } from "./onda4-screens";
 
 export const ONDA3_SCREENS: Record<string, { path: string; render: () => ReactNode }> = {
   // Onda 4: equipe e unidades.
   convidar: { path: "/equipe/convidar", render: () => <ConvidarShellScreen /> },
+  equipe: { path: "/equipe", render: () => <EquipeShellScreen /> },
+  unidades: { path: "/equipe", render: () => <UnidadesShellScreen /> },
   unidade: { path: "/unidades/22222222-2222-4222-8222-222222222222", render: () => <UnidadeShellScreen /> },
   recuperacoes: { path: "/equipe/recuperacoes", render: () => <RecuperacoesShellScreen /> },
   vendas: { path: "/vendas", render: () => <VendasShellScreen /> },

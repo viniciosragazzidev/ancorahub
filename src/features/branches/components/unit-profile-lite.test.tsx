@@ -26,7 +26,7 @@ const data: UnitProfileLiteData = {
 
 describe("UnitProfileLite", () => {
   it("mostra estado, números, ranking e os mesmos destinos", () => {
-    render(<UnitProfileLite data={data} period={30} backHref="/equipe?visao=unidades" />);
+    render(<UnitProfileLite data={data} period={30} backHref="/equipe?visao=unidades" canExport canToggleAvailability />);
     expect(screen.getByText("Pausada para leads")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Voltar/ })).toHaveAttribute("href", "/equipe?visao=unidades");
     expect(screen.getByRole("link", { name: /Configurar distribuição/ })).toHaveAttribute("href", "/distribuicao?view=filas");
@@ -34,13 +34,19 @@ describe("UnitProfileLite", () => {
   });
 
   it("pausa o corretor pela mesma Server Action; gestor não tem o botão", async () => {
-    render(<UnitProfileLite data={data} period={30} backHref="/equipe" />);
+    render(<UnitProfileLite data={data} period={30} backHref="/equipe" canExport canToggleAvailability />);
     const table = document.querySelector('[data-lite="table"]') as HTMLElement;
     expect(within(table).getAllByRole("button")).toHaveLength(1);
     await act(async () => { fireEvent.click(within(table).getByRole("button", { name: "Pausar recebimento de Ana Souza" })); });
     const formData = (actions.toggleBrokerAvailabilityAction.mock.calls[0] as unknown as [unknown, FormData])[1];
     expect(formData.get("brokerId")).toBe("u1");
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("sem permissão (papel sem gestão), não mostra exportar nem pausar", () => {
+    render(<UnitProfileLite data={data} period={30} backHref="/equipe" canExport={false} canToggleAvailability={false} />);
+    expect(screen.queryByRole("button", { name: /Exportar relatório/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Pausar recebimento/ })).not.toBeInTheDocument();
   });
 
   it("período padrão do relatório usa o dia de Brasília", () => {
