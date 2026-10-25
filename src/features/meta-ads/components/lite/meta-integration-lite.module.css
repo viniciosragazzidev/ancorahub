@@ -215,3 +215,8 @@
     padding: 16px;
   }
 }
+
+/* O html usa 97%: o campo Arc em rem ficaria com 42px. */
+.field.field {
+  --control-height-md: 44px;
+}

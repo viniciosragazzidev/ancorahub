@@ -223,3 +223,21 @@
     grid-column: 1 / -1;
   }
 }
+
+/* A lista Lite rende tabela e cartões em divs irmãos: sem min-width 0 a tabela larga empurra a coluna. */
+.account > * {
+  min-width: 0;
+}
+
+.campaignName {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+/* Seis números: três por linha no desktop, para não sobrar um cartão sozinho. */
+@media (min-width: 1024px) {
+  .stats6.stats6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

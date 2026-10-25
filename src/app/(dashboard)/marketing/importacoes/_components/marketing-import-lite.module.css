@@ -218,3 +218,21 @@
   list-style: none;
   color: var(--danger);
 }
+
+/* Cartões em grid: a coluna implícita cresceria com nomes longos sem quebra (nowrap). */
+.layout > section {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lastImport,
+.facts,
+.history,
+.historyText {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layout > section > *,
+.lastImport > *,
+.facts > * {
+  min-width: 0;
+}

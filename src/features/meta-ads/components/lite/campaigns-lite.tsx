@@ -115,7 +115,7 @@ export function CampaignsLite({ campaigns, totals }: { campaigns: MetaCampaignIt
 
   return (
     <>
-      <div className={page.stats}>
+      <div className={`${page.stats} ${styles.stats6}`}>
         {stats.map((stat) => (
           <div key={stat.label} className={page.stat}>
             <span className={page.statLabel}>{stat.label}</span>
