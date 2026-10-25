@@ -26,7 +26,6 @@
   "/equipe/minha",
   "/equipe/minha/configurar",
   "/equipe/plantao",
-  "/equipe/recuperacoes",
   "/equipe/repassar",
   "/equipe/transferencia",
   "/ferramentas/materiais-operadoras",
@@ -83,8 +82,17 @@ function routePatternMatches(pattern: string, pathname: string) {
   return expected.every((segment, index) => /^\[[^/]+\]$/.test(segment) || segment === actual[index]);
 }
 
+/**
+ * Rotas fixas já revisadas que moram ao lado de uma rota dinâmica ainda em opt-out (ex.: /equipe/recuperacoes ao
+ * lado de /equipe/[id]). Sem esta lista, o padrão dinâmico também pegaria a rota fixa e a deixaria fora do Lite.
+ */
+const DIRECTOR_LITE_REVISED_STATIC_ROUTES: ReadonlySet<string> = new Set([
+  "/equipe/recuperacoes",
+]);
+
 export function isDirectorLiteDashboardRoute(pathname: string) {
   const normalized = normalizePathname(pathname);
+  if (DIRECTOR_LITE_REVISED_STATIC_ROUTES.has(normalized)) return false;
   return DIRECTOR_LITE_OPT_OUT_ROUTES.some((route) => routePatternMatches(route, normalized));
 }
 

@@ -1,0 +1,23 @@
+/* Recuperação de senha Lite: só tokens. */
+
+.review {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.note {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+}

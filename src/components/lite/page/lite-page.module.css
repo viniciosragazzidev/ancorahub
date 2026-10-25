@@ -60,6 +60,20 @@
   color: var(--foreground);
 }
 
+.iconButton[data-tone="danger"] {
+  color: var(--danger);
+}
+
+.iconButton[data-tone="danger"]:hover {
+  background: var(--danger-subtle);
+  color: var(--danger);
+}
+
+.iconButton:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
 .iconButton:focus-visible {
   outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
   outline-offset: 2px;

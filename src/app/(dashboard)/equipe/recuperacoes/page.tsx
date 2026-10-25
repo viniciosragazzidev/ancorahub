@@ -8,6 +8,9 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { RecoveryRequestsTable } from "./recovery-requests-table";
 import { dailyCounts } from "@/shared/trends";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { RecoveryLite } from "./_components/recovery-lite";
 
 export default async function PasswordRecoveryPage() {
   const context = await getRequiredTenantContext();
@@ -30,6 +33,17 @@ export default async function PasswordRecoveryPage() {
     .innerJoin(schema.user, eq(schema.passwordResetRequests.userId, schema.user.id))
     .where(eq(schema.passwordResetRequests.tenantId, context.tenantId))
     .orderBy(schema.passwordResetRequests.createdAt);
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe/recuperacoes")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Equipe" title="Recuperação de senha" />
+        <main className={litePage.stack}>
+          <RecoveryLite requests={requests.map((request) => ({ ...request, createdAt: new Date(request.createdAt).toISOString(), reviewedAt: request.reviewedAt ? new Date(request.reviewedAt).toISOString() : null }))} />
+        </main>
+      </>
+    );
+  }
 
   const pendingCount = requests.filter((r) => r.status === "requested").length;
 
