@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { diagnoseWahaConnection } from "../whatsapp-actions";
+import { WahaDiagnosticLite } from "./waha-diagnostic-lite";
 
 type DiagnosticResult = {
   ok: boolean;
@@ -17,6 +19,7 @@ type DiagnosticResult = {
 export default function WahaDiagnosticPage() {
   const [result, setResult] = useState<DiagnosticResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const lite = useDirectorLitePage();
 
   async function runDiagnostic() {
     setLoading(true);
@@ -34,6 +37,8 @@ export default function WahaDiagnosticPage() {
       setLoading(false);
     }
   }
+
+  if (lite) return <WahaDiagnosticLite />;
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
