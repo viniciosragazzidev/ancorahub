@@ -90,6 +90,7 @@ describe("Qualidade nas bordas", () => {
     expect(screen.getByText(/Nenhum lead foi para os corretores hoje/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Ver plantões/ })).toHaveAttribute("href", "/leads/distribuicao?view=plantao");
     expect(screen.queryByText(/0 leads a menos/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Vendas vindas de leads frios hoje: 0/)).toBeInTheDocument();
     const chart = screen.getByRole("img", { name: /Leads bons e frios que entraram por hora/ });
     expect(chart.children).toHaveLength(24);
     // Só as horas com lead desenham barra (19h: 1 bom e 1 frio; 20h: 2 bons e 2 frios).

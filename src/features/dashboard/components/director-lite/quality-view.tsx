@@ -292,13 +292,13 @@ export function QualityView({ report, unitName, now, widerHref }: { report: Simp
                 );
               })}
             </div>
-            <p className={styles.footnote}>Vendas vindas de leads frios {when}: {n(report.converted.weak)}. De leads bons: {n(report.converted.good)}.</p>
           </>
         ) : (
           <ZeroLine action={<Link href="/leads/distribuicao?view=plantao" className={styles.textLink}>Ver plantões <ArrowRight aria-hidden="true" size={14} /></Link>}>
             Nenhum lead foi para os corretores {when}. A estimativa aparece com a primeira distribuição.
           </ZeroLine>
         )}
+        <p className={styles.footnote}>Vendas vindas de leads frios {when}: {n(report.converted.weak)}. De leads bons: {n(report.converted.good)}.</p>
       </Section>
     </div>
   );
