@@ -18,3 +18,9 @@
 .stack > * {
   min-width: 0;
 }
+
+.note {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}

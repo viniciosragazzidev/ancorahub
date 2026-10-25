@@ -18,6 +18,10 @@ type DirectorDistributionTabsProps = {
   escalaMes?: string;
 };
 
+export function canViewDistributionQueues(role: string) {
+  return role === "director";
+}
+
 /** URL navigation keeps the active area on the server and never sends server-created JSX to a client component. */
 export function DirectorDistributionTabs({ activeView, showQueues, status, escalaMes }: DirectorDistributionTabsProps) {
   const tabs = TABS.filter((tab) => !("directorOnly" in tab) || showQueues);

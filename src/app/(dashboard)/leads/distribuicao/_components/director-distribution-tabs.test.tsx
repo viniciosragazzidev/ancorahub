@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { DirectorDistributionTabs } from "./director-distribution-tabs";
+import { canViewDistributionQueues, DirectorDistributionTabs } from "./director-distribution-tabs";
 
 describe("navegação Lite da distribuição", () => {
   it("mantém filtros da URL e identifica a aba ativa sem conteúdo cliente", () => {
@@ -26,5 +26,12 @@ describe("navegação Lite da distribuição", () => {
     );
 
     expect(html).not.toContain("Filas");
+  });
+
+  it("mantém as permissões atuais das filas por papel", () => {
+    expect(canViewDistributionQueues("director")).toBe(true);
+    expect(canViewDistributionQueues("manager")).toBe(false);
+    expect(canViewDistributionQueues("supervisor")).toBe(false);
+    expect(canViewDistributionQueues("broker")).toBe(false);
   });
 });
