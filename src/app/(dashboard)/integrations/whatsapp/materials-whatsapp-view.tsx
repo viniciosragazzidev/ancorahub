@@ -19,38 +19,8 @@ import { FEATURE_FLAGS } from "@/shared/feature-flags/catalog";
 import { MaterialGroupsCard } from "../whats_alt/_components/material-groups-card";
 import { TenantChannelCard } from "../whats_alt/_components/tenant-channel-card";
 import { WhatsAppIntegrationHeading } from "./whatsapp-integration-heading";
-import compat from "@/components/lite/page/lite-compat.module.css";
-import litePage from "@/components/lite/page/lite-page.module.css";
-import sections from "@/components/lite/page/lite-sections.module.css";
-import { WhatsAppHeadingLite } from "./whatsapp-heading-lite";
-import liteStyles from "./whatsapp-lite.module.css";
-
-const MATERIALS_CARD_TEXTS = {
-  title: "Número de materiais",
-  description:
-    "WhatsApp que já está nos grupos das operadoras. O sistema só lê: não envia mensagens por ele e as conversas dele nunca viram lead. Recomendamos um chip dedicado, separado do canal da diretoria.",
-  subject: "Número de materiais",
-  pairingHint: "No celular que está nos grupos das operadoras, abra o WhatsApp.",
-  idleHint: "Nenhum número conectado. Conecte o celular que já está nos grupos das operadoras para escolher quais grupos ler.",
-};
-
-/** What each capture status means for the person who selected the groups. */
-const CAPTURE_STATUS_LABELS: Record<string, string> = {
-  captured: "Material publicado",
-  duplicate_material: "Arquivo repetido (já publicado)",
-  stored: "Mensagem registrada, sem arquivo",
-  needs_ocr: "PDF escaneado, sem texto",
-  needs_vision: "Imagem sem leitor de imagem configurado",
-  no_text: "Imagem sem texto útil",
-  too_large: "Arquivo grande demais",
-  too_small: "Imagem pequena demais",
-  expired: "Tabela com vigência vencida",
-  error: "Erro ao processar",
-};
-
-function formatDateTime(value: Date) {
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(value);
-}
+import { CAPTURE_STATUS_LABELS, formatDateTime, MATERIALS_CARD_TEXTS } from "./materials-whatsapp-texts";
+import { MaterialsWhatsAppLite } from "./materials-whatsapp-lite";
 
 export async function MaterialsWhatsAppView({ context, lite = false }: { context: TenantContext; lite?: boolean }) {
   // The tables of this screen come from migrations applied by hand: a missing one must not take the page down.
@@ -83,63 +53,7 @@ export async function MaterialsWhatsAppView({ context, lite = false }: { context
 
   // Visual Lite: os mesmos avisos, cartões e o resumo de 7 dias, na página Lite.
   if (lite) {
-    return (
-      <main className={litePage.stack}>
-        <WhatsAppHeadingLite active="materiais" canViewDirector />
-        <div className={sections.notice} data-tone={captureOn ? undefined : "warning"} role="status">
-          <p className={sections.noticeTitle} data-tone={captureOn ? undefined : "warning"}>{captureOn ? "Captura ligada" : "Captura desligada"}</p>
-          <p className={sections.note}>
-            {captureOn
-              ? "A captura está ligada pela plataforma. Só os grupos ativos abaixo são lidos."
-              : "A captura está desligada pela plataforma. Você já pode conectar o número e escolher os grupos, mas nada é lido até ela ser ligada. Peça ao administrador da plataforma."}
-          </p>
-        </div>
-        <div className={compat.compat}>
-          <TenantChannelCard initialChannel={channel} texts={MATERIALS_CARD_TEXTS} actions={{ start: startMaterialsChannelAction, poll: pollMaterialsChannelAction, disconnect: disconnectMaterialsChannelAction }} />
-        </div>
-        {loadFailed ? (
-          <div className={sections.notice} data-tone="warning" role="alert">
-            <p className={sections.note}>
-              {missingTables
-                ? "O banco ainda não tem as tabelas desta função (migrações 0203 e 0204). Peça ao administrador da plataforma para aplicar as migrações e recarregue a página. Você já pode conectar o número acima."
-                : "Não foi possível carregar os grupos e o resumo agora. Tente recarregar a página."}
-            </p>
-          </div>
-        ) : null}
-        {groupsLoad.ok ? (
-          <div className={compat.compat}>
-            <MaterialGroupsCard groups={groups} channelReady={channel?.status === "ready"} actions={{ refresh: refreshMaterialGroupsAction, toggle: setMaterialGroupActiveAction }} />
-          </div>
-        ) : null}
-        {stats ? (
-          <section className={sections.group} aria-labelledby="materials-stats-title">
-            <div className={sections.row}>
-              <div className={sections.rowText}>
-                <h2 id="materials-stats-title" className={sections.rowTitle}>Últimos 7 dias</h2>
-                <p className={sections.rowDescription}>
-                  O que a captura fez com as mensagens dos grupos ativos.
-                  {stats.lastMessageAt ? ` Última mensagem em ${formatDateTime(stats.lastMessageAt)}.` : ""}
-                </p>
-              </div>
-            </div>
-            <div className={sections.formBody}>
-              {stats.total === 0 ? (
-                <p className={sections.note}>Nenhuma mensagem de grupo capturada ainda.</p>
-              ) : (
-                <dl className={liteStyles.stats}>
-                  {statusRows.map(([status, count]) => (
-                    <div key={status} className={liteStyles.stat}>
-                      <dt>{CAPTURE_STATUS_LABELS[status] ?? status}</dt>
-                      <dd>{count}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-            </div>
-          </section>
-        ) : null}
-      </main>
-    );
+    return <MaterialsWhatsAppLite channel={channel} captureOn={captureOn} loadFailed={loadFailed} missingTables={Boolean(missingTables)} groups={groupsLoad.ok ? groups : null} stats={stats} />;
   }
 
   return (
