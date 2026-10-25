@@ -610,7 +610,7 @@ export default async function LeadDistributionPage({
     ? await getColdLeadRequalificationReview(context)
     : null;
 
-  const directorLite = await isDirectorLitePageOnServer(context.role, context.tenantId, "/distribuicao");
+  const directorLite = await isDirectorLitePageOnServer(context.role, context.tenantId, "/leads/distribuicao");
   if (directorLite && ["resumo_dia", "roteamento", "operar", "filas", "plantao", "saude_historico"].includes(view)) {
     const manualAssignmentChoiceEnabled = view === "operar"
       ? (await getSystemSetting("feature_manual_lead_assignment_offer_choice_enabled")) !== "false"

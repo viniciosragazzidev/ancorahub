@@ -8,9 +8,9 @@
 }
 
 .page :global([data-slot="card"]) {
-  border-color: var(--border-subtle);
-  border-radius: var(--radius-panel);
-  box-shadow: var(--shadow-resting);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  box-shadow: none;
 }
 
 .page :global([data-slot="card-content"]) {

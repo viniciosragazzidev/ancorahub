@@ -17,10 +17,10 @@
   gap: 16px;
   min-width: 0;
   padding: 16px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
   background: var(--surface);
-  box-shadow: var(--shadow-resting);
+  box-shadow: none;
 }
 
 .sectionHeading {

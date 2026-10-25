@@ -24,10 +24,10 @@
   min-width: 0;
   min-height: 112px;
   padding: 16px;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--border);
   border-radius: var(--radius-surface);
   background: var(--surface);
-  box-shadow: var(--shadow-resting);
+  box-shadow: none;
 }
 
 .metric h2 {
