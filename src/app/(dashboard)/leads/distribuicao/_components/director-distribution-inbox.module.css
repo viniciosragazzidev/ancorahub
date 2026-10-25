@@ -1,0 +1,136 @@
+.root {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.heading h2 {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.heading p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.headerActions,
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filters > * {
+  flex: 1 1 220px;
+  min-width: min(100%, 220px);
+}
+
+.bulkForms {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bulkForms form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bulkForms form > :first-child {
+  flex: 1 1 220px;
+  min-width: min(100%, 220px);
+}
+
+.rowActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.rowActions > :first-child {
+  flex: 1 1 150px;
+  min-width: min(100%, 150px);
+}
+
+:global([data-lite="list"]) dd:has(.rowActions) {
+  overflow: visible;
+  white-space: normal;
+}
+
+.leadName {
+  display: block;
+  max-width: 26ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  padding: 24px 16px;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.confirmNote {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+@media (max-width: 767px) {
+  .headerActions {
+    width: 100%;
+  }
+
+  .headerActions > * {
+    flex: 1 1 160px;
+  }
+
+  .rowActions {
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .rowActions > :first-child {
+    flex-basis: 100%;
+  }
+
+  .bulkForms form > :last-child {
+    flex: 1 1 100%;
+  }
+}
