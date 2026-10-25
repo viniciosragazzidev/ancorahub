@@ -19,7 +19,6 @@
   "/equipe",
   "/equipe/[id]",
   "/equipe/cargos",
-  "/equipe/convidar",
   "/equipe/dashboard",
   "/equipe/desempenho",
   "/equipe/minha",
@@ -86,6 +85,7 @@ function routePatternMatches(pattern: string, pathname: string) {
  * lado de /equipe/[id]). Sem esta lista, o padrão dinâmico também pegaria a rota fixa e a deixaria fora do Lite.
  */
 const DIRECTOR_LITE_REVISED_STATIC_ROUTES: ReadonlySet<string> = new Set([
+  "/equipe/convidar",
   "/equipe/recuperacoes",
 ]);
 

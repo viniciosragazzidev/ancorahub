@@ -366,6 +366,12 @@
   }
 }
 
+/* Formulário em página: largura de leitura, alinhado à esquerda do container. */
+.narrow {
+  width: 100%;
+  max-width: 720px;
+}
+
 /* Título de seção dentro da página (o h1 é do cabeçalho do app). */
 .sectionTitle {
   margin: 0;

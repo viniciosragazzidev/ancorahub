@@ -6,6 +6,7 @@
  */
 import { DashboardHeader } from "@/components/dashboard-header";
 import litePage from "@/components/lite/page/lite-page.module.css";
+import { TeamInviteLite } from "@/app/(dashboard)/equipe/_components/team-invite-lite";
 import { RecoveryLite, type RecoveryLiteRequest } from "@/app/(dashboard)/equipe/recuperacoes/_components/recovery-lite";
 
 const PEOPLE = [
@@ -40,6 +41,30 @@ export function RecuperacoesShellScreen() {
       <DashboardHeader breadcrumb="Equipe" title="Recuperação de senha" />
       <main className={litePage.stack}>
         <RecoveryLite requests={RECOVERY_FIXTURES} />
+      </main>
+    </>
+  );
+}
+
+export const BRANCH_FIXTURES = [
+  { id: "11111111-1111-4111-8111-111111111111", name: "Centro" },
+  { id: "22222222-2222-4222-8222-222222222222", name: "Barra da Tijuca" },
+  { id: "33333333-3333-4333-8333-333333333333", name: "Niterói 1" },
+  { id: "44444444-4444-4444-8444-444444444444", name: "Campo Grande e Zona Oeste" },
+];
+
+export function ConvidarShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Gestão de equipe" title="Criar membro" />
+      <main className={litePage.stack}>
+        <section className={`arc-venancor ${litePage.card} ${litePage.narrow}`} data-skin="diretor" aria-labelledby="convidar-titulo">
+          <div className={litePage.cardHead}>
+            <h2 id="convidar-titulo" className={litePage.sectionTitle}>Novo funcionário</h2>
+            <p className={litePage.muted}>Você pode criar diretores, gestores e corretores. A senha é criada pelo colaborador no primeiro acesso.</p>
+          </div>
+          <TeamInviteLite branches={BRANCH_FIXTURES} canInviteManager canInviteDirector />
+        </section>
       </main>
     </>
   );
