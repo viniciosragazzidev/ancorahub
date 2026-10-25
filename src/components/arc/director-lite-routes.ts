@@ -7,7 +7,6 @@
   "/atendimento/situacoes",
   "/clientes",
   "/clientes/[clientId]",
-  "/configuracoes/comissoes",
   "/conversas/broker",
   "/conversas/dashboard",
   "/cotacao",
