@@ -12,6 +12,7 @@ import { SaleDetailLite } from "@/app/(dashboard)/vendas/[id]/sale-detail-lite";
 import { PropostasLite } from "@/app/(dashboard)/propostas/_components/propostas-lite";
 import { PROPOSAL_FIXTURES, PROPOSAL_LEADS } from "@/app/(dashboard)/propostas/_components/proposals-fixtures";
 import { DocumentsLite } from "@/features/documents/components/documents-lite";
+import { DomainDashboardLite } from "@/features/dashboard/components/domain-dashboard-lite";
 import { CARRIER_FIXTURES, DOC_FIXTURES, PLAN_FIXTURES, REQUIREMENT_FIXTURES } from "@/features/documents/components/documents-fixtures";
 
 const BRANCHES = [
@@ -127,6 +128,18 @@ export function DocumentosShellScreen() {
       <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />
       <main className={litePage.stack}>
         <DocumentsLite carriers={CARRIER_FIXTURES} plans={PLAN_FIXTURES} initialRequirements={REQUIREMENT_FIXTURES} initialPendingDocs={DOC_FIXTURES} />
+      </main>
+    </>
+  );
+}
+
+export function TarefasShellScreen() {
+  const data = { title: "Visão de tarefas", description: "Execução e pendências do período.", metrics: [{ label: "Em aberto", value: 1284 }, { label: "Com prazo", value: 317 }, { label: "Criadas", value: 942 }], actionHref: "/tarefas" };
+  return (
+    <>
+      <DashboardHeader breadcrumb="Tarefas" title="Visão geral" />
+      <main className={litePage.stack}>
+        <DomainDashboardLite data={data} actionLabel="Abrir tarefas" />
       </main>
     </>
   );

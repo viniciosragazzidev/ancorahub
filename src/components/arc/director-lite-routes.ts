@@ -77,7 +77,6 @@
   "/settings/meta",
   "/settings/waha-diagnostic",
   "/settings/whatsapp",
-  "/tarefas/dashboard",
   "/unidades/[branchId]",
   "/vendas/dashboard",
   "/welcome",
