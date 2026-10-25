@@ -40,6 +40,9 @@ import { getDddRoutingSettings } from "@/features/lead-distribution/ddd-routing-
 import { DisqualifiedLeadsRoutingPanel } from "./_components/disqualified-leads-routing-panel";
 import { ColdLeadRequalificationPanel } from "./_components/cold-lead-requalification-panel";
 import { getColdLeadRequalificationReview } from "@/features/ai-qualification/cold-lead-requalification";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { DirectorDistributionTabs } from "./_components/director-distribution-tabs";
+import directorDistributionStyles from "./_components/director-distribution-page.module.css";
 
 export const dynamic = "force-dynamic";
 
@@ -605,6 +608,51 @@ export default async function LeadDistributionPage({
   const coldLeadReview = context.role === "director"
     ? await getColdLeadRequalificationReview(context)
     : null;
+
+  const directorLite = await isDirectorLitePageOnServer(context.role, context.tenantId, "/distribuicao");
+  if (directorLite && (view === "resumo_dia" || view === "roteamento")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Operação comercial" title="Distribuição" />
+        <main className={directorDistributionStyles.page}>
+          <DirectorDistributionTabs
+            activeView={view}
+            showQueues
+            status={params.status}
+            escalaMes={params.escalaMes}
+          />
+          {view === "resumo_dia" ? (
+            <section className={directorDistributionStyles.stack} aria-label="Resumo diário da distribuição">
+              <BrokerDailySummaryPanel
+                initialData={brokerSummary}
+                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                canFilterBranch
+              />
+            </section>
+          ) : (
+            <section className={directorDistributionStyles.stack} aria-label="Entradas e regras">
+              <DisqualifiedLeadsRoutingPanel
+                initialHoldDisqualifiedLeads={holdDisqualifiedLeads}
+                canEdit
+              />
+              <DddRoutingPanel
+                initialSettings={dddRoutingSettings}
+                queues={queues.map((queue) => ({ id: queue.id, name: queue.name }))}
+                canEdit
+              />
+              <RoutingMatrixPanel
+                rules={routingRules}
+                queues={queues.map((queue) => ({ id: queue.id, name: queue.name }))}
+                branches={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+                brokers={brokers.map((broker) => ({ id: broker.id, name: broker.name }))}
+                canEdit
+              />
+            </section>
+          )}
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
