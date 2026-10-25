@@ -25,6 +25,9 @@ import { LeadsDataTable, QualifyingLeadsDataTable, type LeadsDataTableProps, typ
 import { LeadsLiteBulk, type LeadsLiteBulkConfig } from "./leads-lite-bulk";
 import styles from "./leads-lite-list.module.css";
 import { liteStageLabel } from "./lite-stage-labels";
+import { formatLeadPhone } from "@/features/leads/format-lead-phone";
+
+export { formatLeadPhone };
 
 const chegada = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 
@@ -205,17 +208,6 @@ function LeadName({ lead, hideEntry }: { lead: LeadWorkspaceItem; hideEntry: boo
   );
 }
 
-/**
- * Telefone legível e alinhado: com DDI 55, "(55) 21 99883-6148"; só com DDD, "(21) 99883-6148"; fora desses formatos,
- * como veio.
- */
-export function formatLeadPhone(raw: string) {
-  const digits = raw.replace(/\D/g, "");
-  const local = (ddd: string, number: string) => `${ddd} ${number.slice(0, number.length - 4)}-${number.slice(-4)}`;
-  if (digits.startsWith("55") && (digits.length === 12 || digits.length === 13)) return `(55) ${local(digits.slice(2, 4), digits.slice(4))}`;
-  if (digits.length === 10 || digits.length === 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, digits.length - 4)}-${digits.slice(-4)}`;
-  return raw;
-}
 
 /** Corretor e unidade (numa coluna só, para a tabela caber), com os sinais da tabela atual: plantão ativo,
  * investigação da gestão e devolvido sem aceite. */

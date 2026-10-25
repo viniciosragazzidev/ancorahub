@@ -30,6 +30,33 @@
   gap: 16px;
 }
 
+.stat {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.statLabel {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.statValue {
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.statHint {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -240,6 +267,18 @@
 
   .stats :global(.ui-metric-card-value) {
     font-size: var(--text-lg);
+  }
+
+  .stat {
+    padding: 12px 16px;
+  }
+
+  .statValue {
+    font-size: var(--text-lg);
+  }
+
+  .statHint {
+    display: none;
   }
 
   .card {

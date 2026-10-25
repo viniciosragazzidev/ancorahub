@@ -1,6 +1,11 @@
 import type { Metadata } from "next";
 import { getProposals, getExpiringProposals, getLeadsForProposals } from "@/features/proposals/queries";
 import { PropostasClient } from "./_components/propostas-client";
+import { PropostasLite } from "./_components/propostas-lite";
+import { DashboardHeader } from "@/components/dashboard-header";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 
 export const metadata: Metadata = {
   title: "Propostas Comerciais — AncoraHub",
@@ -13,6 +18,19 @@ export default async function PropostasPage() {
     getExpiringProposals(),
     getLeadsForProposals(),
   ]);
+
+  // Chave do diretor: a mesma tela no visual Lite, com o título no topo da moldura.
+  const context = await getRequiredTenantContext();
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/propostas")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Operação comercial" title="Propostas" />
+        <main className={litePage.stack}>
+          <PropostasLite initialProposals={proposals} expiringProposals={expiringProposals} leads={leads} />
+        </main>
+      </>
+    );
+  }
 
   return (
     <div className="flex-1 space-y-6 p-4 md:p-8">
