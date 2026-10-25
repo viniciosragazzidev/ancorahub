@@ -11,6 +11,8 @@ import { SalesWorkspaceLite, type SaleLiteRow } from "@/app/(dashboard)/vendas/s
 import { SaleDetailLite } from "@/app/(dashboard)/vendas/[id]/sale-detail-lite";
 import { PropostasLite } from "@/app/(dashboard)/propostas/_components/propostas-lite";
 import { PROPOSAL_FIXTURES, PROPOSAL_LEADS } from "@/app/(dashboard)/propostas/_components/proposals-fixtures";
+import { DocumentsLite } from "@/features/documents/components/documents-lite";
+import { CARRIER_FIXTURES, DOC_FIXTURES, PLAN_FIXTURES, REQUIREMENT_FIXTURES } from "@/features/documents/components/documents-fixtures";
 
 const BRANCHES = [
   { id: "branch-centro", name: "Centro" },
@@ -114,6 +116,17 @@ export function PropostasShellScreen() {
       <DashboardHeader breadcrumb="Operação comercial" title="Propostas" />
       <main className={litePage.stack}>
         <PropostasLite initialProposals={PROPOSAL_FIXTURES} expiringProposals={PROPOSAL_FIXTURES.slice(0, 3)} leads={PROPOSAL_LEADS} />
+      </main>
+    </>
+  );
+}
+
+export function DocumentosShellScreen() {
+  return (
+    <>
+      <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />
+      <main className={litePage.stack}>
+        <DocumentsLite carriers={CARRIER_FIXTURES} plans={PLAN_FIXTURES} initialRequirements={REQUIREMENT_FIXTURES} initialPendingDocs={DOC_FIXTURES} />
       </main>
     </>
   );
