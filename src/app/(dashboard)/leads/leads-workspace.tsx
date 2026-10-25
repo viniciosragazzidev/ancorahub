@@ -874,7 +874,8 @@ export function LeadsWorkspace({
                 selectedIds={multiSelect.selectedIds}
                 isAllSelected={false}
                 onToggleRow={multiSelect.toggle}
-                onSelectAll={() => {}}
+                // In Lite this callback is the bulk bar's "clear selection"; the legacy table keeps its no-op.
+                onSelectAll={directorLite ? multiSelect.clear : () => {}}
                 onRowClick={setSelectedLead}
                 liteBulk={directorLite ? { brokers: [], branches: [] } : undefined}
               />
