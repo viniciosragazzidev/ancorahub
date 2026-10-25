@@ -115,17 +115,15 @@
 
 .root[data-skin="diretor"] [data-conversations-part="toolbar"] > div:first-child {
   min-width: 0;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="filter-controls"] {
   min-width: 0;
   width: 100%;
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: none;
+  flex-wrap: wrap;
+  row-gap: 8px;
   white-space: nowrap;
 }
 
@@ -134,8 +132,9 @@
 }
 
 .root[data-skin="diretor"] [data-conversations-part="filter-controls"] > [data-conversations-part="filters"] {
-  max-width: none;
-  flex: 0 0 auto;
+  max-width: 100%;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   overflow: visible;
 }
 
@@ -163,11 +162,16 @@
   display: flex;
   min-width: 0;
   max-width: 100%;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
   white-space: nowrap;
+}
+
+/* Tabs of the page actions never clip: they wrap to a new line when the width runs out. */
+.root[data-skin="diretor"] [data-conversations-part="page-actions"] [data-conversations-nav] {
+  flex-wrap: wrap;
+  max-width: 100%;
 }
 
 .root[data-skin="diretor"] [data-conversations-part="page-actions"] > nav::-webkit-scrollbar {
@@ -637,4 +641,61 @@
 :global(html[data-reduce-motion="1"]) .root[data-skin="diretor"] [data-conversations-part="row"],
 :global(html[data-reduce-motion="1"]) .root[data-skin="diretor"] [data-conversations-nav] > a {
   transition: none;
+}
+
+
+/* Filters toggle: desktop shows the filters inline; below 1024px they open and close from one button. */
+.root[data-skin="diretor"] [data-conversations-part="filter-toggle"] {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .root[data-skin="diretor"] [data-conversations-part="filter-toggle"] {
+    display: inline-flex;
+    align-self: flex-start;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--control-height-md);
+    padding-inline: 16px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-control);
+    background: var(--surface);
+    color: var(--foreground);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="filter-toggle"][aria-expanded="true"] {
+    background: var(--accent-subtle);
+    color: var(--accent-strong);
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="filter-toggle-chevron"] {
+    transition: transform var(--duration-fast) var(--ease-in-out);
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="filter-toggle"][aria-expanded="true"] [data-conversations-part="filter-toggle-chevron"] {
+    transform: rotate(180deg);
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="filter-controls"][data-open="false"] {
+    display: none;
+  }
+
+  .root[data-skin="diretor"] [data-conversations-part="filter-controls"][data-open="true"] {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+:global(html[data-reduce-motion="1"]) .root[data-skin="diretor"] [data-conversations-part="filter-toggle-chevron"] {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root[data-skin="diretor"] [data-conversations-part="filter-toggle-chevron"] {
+    transition: none;
+  }
 }

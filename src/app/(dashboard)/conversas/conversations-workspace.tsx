@@ -81,7 +81,7 @@ import {
 } from "@/components/huge-icons";
 import { EmptyState } from "@/components/empty-state";
 import { LEAD_STATUS_LABELS } from "@/features/leads/lead-status-constants";
-import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot } from "lucide-react";
+import { Sparkles, RefreshCw, PanelRightClose, PanelRightOpen, ChevronDown, UserCheck, Bot, SlidersHorizontal } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -264,6 +264,8 @@ export function ConversationsWorkspace({
   const [filter, setFilter] = useState<ViewFilter>("all");
   const [branchFilter, setBranchFilter] = useState<string>("all");
   const [profileOpen, setProfileOpen] = useState(true);
+  // Director Lite: below desktop the filters and tabs live behind one toggle so they never clip.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [profileSheetOpen, setProfileSheetOpen] = useState(false);
   const reduceMotion = useReducedMotion();
 
@@ -433,9 +435,22 @@ export function ConversationsWorkspace({
         aria-label="Filtros dos atendimentos"
         className="shrink-0 rounded-none border-x-0 border-t-0 px-4 py-2.5 sm:px-5"
         filters={directorSkinEnabled ? (
-          <div data-conversations-part="filter-controls" className="flex min-w-0 flex-1 items-center gap-2">
-            {filterContent}
-            {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
+          <div data-conversations-part="filter-shell" className="flex min-w-0 flex-1 flex-col gap-2">
+            <button
+              type="button"
+              data-conversations-part="filter-toggle"
+              aria-expanded={filtersOpen}
+              aria-controls="conversas-filter-controls"
+              onClick={() => setFiltersOpen((open) => !open)}
+            >
+              <SlidersHorizontal aria-hidden="true" className="size-4" />
+              <span>Filtros</span>
+              <ChevronDown aria-hidden="true" className="size-4" data-conversations-part="filter-toggle-chevron" />
+            </button>
+            <div id="conversas-filter-controls" data-conversations-part="filter-controls" data-open={filtersOpen ? "true" : "false"} className="flex min-w-0 flex-1 items-center gap-2">
+              {filterContent}
+              {directorActions ? <div data-conversations-part="inline-actions">{directorActions}</div> : null}
+            </div>
           </div>
         ) : filterContent}
         results={directorSkinEnabled ? undefined : `${filtered.length} de ${conversations.length} atendimentos`}
