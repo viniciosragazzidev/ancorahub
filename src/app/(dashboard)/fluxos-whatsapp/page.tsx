@@ -26,7 +26,7 @@ export default async function FluxosWhatsappPage() {
   const flows = await getWhatsappFlows(context.tenantId);
 
   // Chave do visual Lite: os mesmos modelos, fluxos e ações, com o cabeçalho da moldura.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/fluxos-whatsapp")) {
+  if (await isDirectorLitePageOnServer(context, "/fluxos-whatsapp")) {
     return (
       <>
         <DashboardHeader breadcrumb="Atendimento" title="Fluxos de WhatsApp" />

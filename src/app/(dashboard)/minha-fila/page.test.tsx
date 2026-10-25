@@ -13,7 +13,7 @@ vi.mock("next/navigation", () => ({ redirect }));
 vi.mock("@/shared/auth/tenant-context", () => ({ getRequiredTenantContext: async () => context }));
 vi.mock("@/features/broker-workspace/experience-mode", () => ({ getExperienceMode }));
 vi.mock("@/shared/db", () => ({ getDatabase: () => ({}), schema: {} }));
-vi.mock("@/features/director-lite/style-flag", () => ({ shouldUseDirectorLiteStyle: async (role: string) => role === "director" && liteKey.on }));
+vi.mock("@/features/director-lite/style-flag", () => ({ shouldUseDirectorLiteStyle: async (context: { role: string }) => context.role === "director" && liteKey.on }));
 
 import MinhaFilaPage from "./page";
 

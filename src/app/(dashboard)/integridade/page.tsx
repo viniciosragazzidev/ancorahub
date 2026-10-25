@@ -130,7 +130,7 @@ export default async function IntegrityPage() {
   const leadsTrend = fillDaySeries(dailyLeads);
   const auditsTrend = fillDaySeries(dailyAudits);
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/integridade")) {
+  if (await isDirectorLitePageOnServer(context, "/integridade")) {
     return (
       <>
         <DashboardHeader breadcrumb="Governança" title="Integridade" />

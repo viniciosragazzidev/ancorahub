@@ -29,7 +29,7 @@ export default async function MarketingImportacoesPage() {
     getLastImportAction(),
   ]);
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/marketing/importacoes")) {
+  if (await isDirectorLitePageOnServer(context, "/marketing/importacoes")) {
     return (
       <>
         <DashboardHeader breadcrumb="Marketing / Importações" title="Importar leads Meta" />

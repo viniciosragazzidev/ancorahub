@@ -219,7 +219,7 @@ export default async function TeamMemberProfilePage({
   const roleName = member.customRoleName ?? ({ director: "Diretor", manager: "Gestor", supervisor: "Supervisor", broker: "Corretor" }[member.role]);
   const firstContactRate = metrics.leads.total > 0 ? Math.round(((metrics.leads.total - metrics.leads.withoutFirstContact) / metrics.leads.total) * 100) : 0;
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe/[id]")) {
+  if (await isDirectorLitePageOnServer(context, "/equipe/[id]")) {
     return (
       <>
         <DashboardHeader breadcrumb="Equipe" title="Perfil do membro" />

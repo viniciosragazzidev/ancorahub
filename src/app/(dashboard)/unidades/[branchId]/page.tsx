@@ -77,7 +77,7 @@ export default async function UnitProfilePage({
 
   const canSeeTeam = context.role === "director" || context.role === "manager";
 
-  if (canSeeTeam && members !== null && topBrokers !== null && (await isDirectorLitePageOnServer(context.role, context.tenantId, "/unidades/[branchId]"))) {
+  if (canSeeTeam && members !== null && topBrokers !== null && (await isDirectorLitePageOnServer(context, "/unidades/[branchId]"))) {
     return (
       <>
         <DashboardHeader breadcrumb="Unidade" title={branch.name} />

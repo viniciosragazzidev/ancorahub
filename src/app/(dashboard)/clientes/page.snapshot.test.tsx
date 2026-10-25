@@ -35,7 +35,7 @@ vi.mock("@/features/broker-workspace/lite-audience", () => ({ getLiteAudience: a
 vi.mock("@/features/broker-workspace/components/light-clients-list", () => ({ LightClientsList: ({ management }: { management?: boolean }) => <div data-stub={`light-clients${management ? "-management" : ""}`} /> }));
 vi.mock("@/features/director-lite/style-flag", async () => {
   const { isDirectorLiteRouteOptedOut } = await import("@/components/arc/director-lite-routes");
-  return { isDirectorLitePageOnServer: async (role: string, _tenantId: string, pathname: string) => role === "director" && state.liteKey.on && !isDirectorLiteRouteOptedOut(pathname) };
+  return { isDirectorLitePageOnServer: async (context: { role: string }, pathname: string) => context.role === "director" && state.liteKey.on && !isDirectorLiteRouteOptedOut(pathname) };
 });
 vi.mock("@/components/dashboard-header", () => ({ DashboardHeader: ({ breadcrumb, title }: { breadcrumb: string; title: string }) => <header data-stub="dashboard-header">{breadcrumb} / {title}</header> }));
 vi.mock("@/components/branch-select", () => ({ BranchSelect: () => <div data-stub="branch-select" /> }));

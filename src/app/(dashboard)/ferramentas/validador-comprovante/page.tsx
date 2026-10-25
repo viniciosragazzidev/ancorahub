@@ -12,7 +12,7 @@ export default async function ValidadorComprovantePage() {
   const context = await getRequiredTenantContext();
   await requireCapability(context, "acessar_ferramentas");
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/ferramentas/validador-comprovante")) {
+  if (await isDirectorLitePageOnServer(context, "/ferramentas/validador-comprovante")) {
     return (
       <>
         <DashboardHeader breadcrumb="Ferramentas" title="Validador de comprovante" />

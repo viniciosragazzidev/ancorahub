@@ -104,7 +104,7 @@ export default async function QualificacaoPage({ searchParams }: { searchParams?
   ]);
 
   // Chave do visual Lite: os mesmos dados e ações, no hub Lite quebrado por aba.
-  const Hub = (await isDirectorLitePageOnServer(context.role, context.tenantId, "/qualificacao")) ? QualificationHubLite : QualificationHubClient;
+  const Hub = (await isDirectorLitePageOnServer(context, "/qualificacao")) ? QualificationHubLite : QualificationHubClient;
 
   return (
     <Hub

@@ -8,7 +8,7 @@ vi.mock("@/shared/auth/tenant-context", () => ({
   getRequiredTenantContext: async () => ({ role: access.role, tenantId: "tenant-a" }),
 }));
 vi.mock("@/features/director-lite/style-flag", () => ({
-  shouldUseDirectorLiteStyle: async (role: string) => role === "director" && access.flag,
+  shouldUseDirectorLiteStyle: async (context: { role: string }) => context.role === "director" && access.flag,
 }));
 
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";

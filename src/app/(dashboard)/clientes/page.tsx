@@ -170,7 +170,7 @@ export default async function CustomersPage({
   };
 
   // Chave do diretor: a mesma carteira no visual Lite (unidade e período vão para a barra da lista).
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/clientes")) {
+  if (await isDirectorLitePageOnServer(context, "/clientes")) {
     return (
       <>
         <DashboardHeader breadcrumb="Pós-venda" title="Clientes" />

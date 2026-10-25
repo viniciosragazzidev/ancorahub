@@ -49,7 +49,7 @@ export default async function WelcomePage() {
     redirect(redirectMap[role]);
   }
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/welcome")) {
+  if (await isDirectorLitePageOnServer(context, "/welcome")) {
     // Saudação pela hora de São Paulo, no servidor: o cliente não lê o relógio no primeiro render.
     const hour = Number(new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", hourCycle: "h23", timeZone: "America/Sao_Paulo" }).format(new Date()));
     const greeting = hour >= 5 && hour < 12 ? "Bom dia" : hour >= 12 && hour < 18 ? "Boa tarde" : "Boa noite";

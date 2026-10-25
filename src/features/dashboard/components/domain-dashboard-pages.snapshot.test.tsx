@@ -28,7 +28,7 @@ vi.mock("@/features/reports/metrics/metrics-service", () => ({
 }));
 vi.mock("@/features/director-lite/style-flag", async () => {
   const { isDirectorLiteRouteOptedOut } = await import("@/components/arc/director-lite-routes");
-  return { isDirectorLitePageOnServer: async (role: string, _tenantId: string, pathname: string) => role === "director" && state.liteKey.on && !isDirectorLiteRouteOptedOut(pathname) };
+  return { isDirectorLitePageOnServer: async (context: { role: string }, pathname: string) => context.role === "director" && state.liteKey.on && !isDirectorLiteRouteOptedOut(pathname) };
 });
 vi.mock("@/components/dashboard-header", () => ({ DashboardHeader: ({ breadcrumb, title }: { breadcrumb: string; title: string }) => <header data-stub="dashboard-header">{breadcrumb} / {title}</header> }));
 

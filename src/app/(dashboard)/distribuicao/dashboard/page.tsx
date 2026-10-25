@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function DistributionDashboardPage() {
   const context = await getRequiredTenantContext();
   const data = await getDomainDashboard(context, "distribution");
-  const directorLite = await isDirectorLitePageOnServer(context.role, context.tenantId, "/distribuicao/dashboard");
+  const directorLite = await isDirectorLitePageOnServer(context, "/distribuicao/dashboard");
 
   if (directorLite) {
     return (

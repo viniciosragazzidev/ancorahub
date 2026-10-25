@@ -27,7 +27,7 @@ export default async function NocPage({
 
   const data = await getNocData(context, period);
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/noc")) {
+  if (await isDirectorLitePageOnServer(context, "/noc")) {
     const urgentLead = await getUrgentLeadForUser().catch(() => null);
     return (
       <>

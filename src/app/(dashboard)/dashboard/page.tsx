@@ -79,7 +79,7 @@ export default async function DashboardPage({
     const canReadQuality = await canAccessLeadQualityCenter(context);
     // Funil de qualificação (qualificação turbo): director and manager with the quality center.
     if (activeTab === "funnel" && canReadQuality && (context.role === "director" || (context.role === "manager" && context.branchId))) {
-      if (context.role === "director" && (await shouldUseDirectorLiteStyle(context.role, context.tenantId))) {
+      if (await shouldUseDirectorLiteStyle(context)) {
         const overviewPeriod = parseOverviewPeriod(singleParam(resolvedSearchParams.periodo) ?? singleParam(resolvedSearchParams.period));
         const funnelPeriod = funnelPeriodForOverview(overviewPeriod);
         const { canCompare, units } = await getDashboardUnitFilter(context);
@@ -99,7 +99,7 @@ export default async function DashboardPage({
       const liteQuality = !singleParam(resolvedSearchParams.dimension)
         && singleParam(resolvedSearchParams.vista) !== "detalhada"
         && singleParam(resolvedSearchParams.legado) !== "1"
-        && (await shouldUseDirectorLiteStyle(context.role, context.tenantId));
+        && (await shouldUseDirectorLiteStyle(context));
       if (liteQuality) {
         return renderDirectorLiteQuality(context, {
           periodo: singleParam(resolvedSearchParams.periodo),
@@ -122,7 +122,7 @@ export default async function DashboardPage({
     }
 
     // Painel do diretor no visual Lite (chave feature_director_lite_style). Com a chave desligada, segue a versão de hoje.
-    if (activeTab !== "quality" && activeTab !== "funnel" && (await shouldUseDirectorLiteStyle(context.role, context.tenantId))) {
+    if (activeTab !== "quality" && activeTab !== "funnel" && (await shouldUseDirectorLiteStyle(context))) {
       const period = parseOverviewPeriod(singleParam(resolvedSearchParams.periodo));
       // Só as unidades autorizadas aparecem; sem permissão de comparar, o filtro some. Unidade fora do escopo cai em "Todas".
       const { canCompare, units } = await getDashboardUnitFilter(context);

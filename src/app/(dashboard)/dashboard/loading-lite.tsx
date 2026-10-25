@@ -6,7 +6,7 @@ import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag"
 export async function isDirectorLiteDashboardLoading() {
   try {
     const context = await getRequiredTenantContext()
-    return await shouldUseDirectorLiteStyle(context.role, context.tenantId)
+    return await shouldUseDirectorLiteStyle(context)
   } catch {
     return false
   }

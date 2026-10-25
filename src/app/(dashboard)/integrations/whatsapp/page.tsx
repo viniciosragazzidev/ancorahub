@@ -20,7 +20,7 @@ export default async function WhatsAppIntegrationPage({ searchParams }: { search
   if (context.role === "broker") redirect("/integrations");
   const { visao } = await searchParams;
   // Chave do visual Lite: as mesmas três visões, com os mesmos dados e regras de acesso.
-  const lite = await isDirectorLitePageOnServer(context.role, context.tenantId, "/integrations/whatsapp");
+  const lite = await isDirectorLitePageOnServer(context, "/integrations/whatsapp");
   if (visao === "diretoria") {
     if (context.role !== "director") redirect("/access-denied");
     return <>

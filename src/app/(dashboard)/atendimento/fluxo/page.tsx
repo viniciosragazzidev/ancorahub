@@ -22,7 +22,7 @@ export default async function AtendimentoFluxoPage() {
   const flow = await getQualificationFlow(context.tenantId);
 
   // Chave do visual Lite: as mesmas perguntas e a mesma regra de edição, com a barra de alterações Lite.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/atendimento/fluxo")) {
+  if (await isDirectorLitePageOnServer(context, "/atendimento/fluxo")) {
     return (
       <>
         <DashboardHeader breadcrumb="Atendimento" title="Fluxo de atendimento" />

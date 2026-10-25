@@ -13,7 +13,7 @@ export default async function IntegrationsPage() {
   await requireCapability(context, "acessar_integracao_meta");
 
   // Chave do visual Lite: o mesmo catálogo (itens e destinos) em grade Lite.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/integrations")) {
+  if (await isDirectorLitePageOnServer(context, "/integrations")) {
     return (
       <>
         <DashboardHeader breadcrumb="Administração" title="Integrações" />

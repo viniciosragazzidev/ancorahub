@@ -38,7 +38,7 @@ export default async function CampaignsPage() {
   const connection = marketing?.connection ?? null;
   const connected = connection?.status === "connected";
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/marketing/campanhas")) {
+  if (await isDirectorLitePageOnServer(context, "/marketing/campanhas")) {
     const sync = connected && connection ? buildMetaSyncInfo(marketing?.logs ?? [], connection.lastSyncedAt, canConfigure, new Date()) : null;
     return (
       <>

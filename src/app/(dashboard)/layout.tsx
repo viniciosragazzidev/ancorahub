@@ -73,9 +73,8 @@ export default async function DashboardLayout({ children }: Readonly<{ children:
   const supervisorLitePromise = isSupervisorLiteAvailable(context);
   const managerLitePromise = isManagerLiteAvailable(context);
   const cleanUiPromise = isCleanUiOperationalEnabled(context.tenantId);
-  const directorLiteStylePromise = context.role === "director"
-    ? shouldUseDirectorLiteStyle(context.role, context.tenantId).catch(() => false)
-    : Promise.resolve(false);
+  // Visual Lite das telas internas: chave da empresa + modo normal (fora de um Lite próprio). Ver style-flag.ts.
+  const directorLiteStylePromise = shouldUseDirectorLiteStyle(context).catch(() => false);
   const headersPromise = headers();
   // Tenant branding, the signed-in user and their membership in one round trip:
   // the layout renders on every navigation and every realtime refresh, and the

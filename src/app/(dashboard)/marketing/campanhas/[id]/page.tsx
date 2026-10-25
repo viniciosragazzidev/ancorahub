@@ -213,7 +213,7 @@ export default async function CampaignDetailPage(props: { params: Promise<{ id: 
     canDisableCapture: context.role === "director",
   };
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/marketing/campanhas/[id]")) {
+  if (await isDirectorLitePageOnServer(context, "/marketing/campanhas/[id]")) {
     return (
       <>
         <DashboardHeader breadcrumb="Marketing / Campanhas" title={campaign.name} />

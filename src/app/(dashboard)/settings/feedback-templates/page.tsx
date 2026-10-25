@@ -13,7 +13,7 @@ export default async function FeedbackTemplatesPage() {
   const templates = await listChecklistTemplatesAction();
 
   // Chave do visual Lite: os mesmos modelos e as mesmas ações, com a lista Lite e o novo modelo no painel lateral.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/settings/feedback-templates")) {
+  if (await isDirectorLitePageOnServer(context, "/settings/feedback-templates")) {
     return (
       <>
         <DashboardHeader breadcrumb="Configurações" title="Checklists de atendimento" />

@@ -21,7 +21,7 @@ export default async function PropostasPage() {
 
   // Chave do diretor: a mesma tela no visual Lite, com o título no topo da moldura.
   const context = await getRequiredTenantContext();
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/propostas")) {
+  if (await isDirectorLitePageOnServer(context, "/propostas")) {
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Propostas" />

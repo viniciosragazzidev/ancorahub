@@ -19,7 +19,7 @@ export default async function CreateTeamMemberPage() {
     .from(schema.branches)
     .where(eq(schema.branches.tenantId, context.tenantId));
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe/convidar")) {
+  if (await isDirectorLitePageOnServer(context, "/equipe/convidar")) {
     return (
       <>
         <DashboardHeader breadcrumb="Gestão de equipe" title="Criar membro" />

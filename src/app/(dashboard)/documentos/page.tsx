@@ -44,7 +44,7 @@ export default async function DocumentsPage() {
   ]);
 
   // Chave do diretor: a mesma tela (fila e requisitos) no visual Lite.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/documentos")) {
+  if (await isDirectorLitePageOnServer(context, "/documentos")) {
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Documentos" />

@@ -21,7 +21,7 @@ export default async function CommissionRulesPage() {
   ]);
 
   // Chave do visual Lite: as mesmas regras, operadoras e pós-venda, com as mesmas ações.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/configuracoes/comissoes")) {
+  if (await isDirectorLitePageOnServer(context, "/configuracoes/comissoes")) {
     return (
       <>
         <DashboardHeader breadcrumb="Configurações / Financeiro" title="Regras de comissão" />

@@ -26,7 +26,7 @@ export default async function AtendimentoMensagensPage() {
   const messages = await getMessageLibrary(context.tenantId);
 
   // Chave do visual Lite: a mesma biblioteca e as mesmas ações, com a lista Lite.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/atendimento/mensagens")) {
+  if (await isDirectorLitePageOnServer(context, "/atendimento/mensagens")) {
     return (
       <>
         <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />

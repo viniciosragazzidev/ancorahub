@@ -73,7 +73,7 @@ export default async function SalesPage({
   const totalRevenue = sales.reduce((sum, row) => sum + Number(row.saleValue), 0);
 
   // Chave do diretor: a mesma página no visual Lite (unidade e período vão para a barra da lista).
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/vendas")) {
+  if (await isDirectorLitePageOnServer(context, "/vendas")) {
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial" title="Vendas" />

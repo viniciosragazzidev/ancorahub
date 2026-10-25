@@ -273,7 +273,7 @@ export function LeadsListSwitch({ liteBulk, ...props }: LeadsDataTableProps & { 
  */
 const QUALIFYING_PAGE_SIZE = 20;
 
-export function QualifyingLeadsListSwitch(props: QualifyingLeadsDataTableProps) {
+export function QualifyingLeadsListSwitch({ contextRole, ...props }: QualifyingLeadsDataTableProps & { contextRole?: string }) {
   const lite = useDirectorLitePage();
   const [page, setPage] = useState(1);
   if (!lite) return <QualifyingLeadsDataTable {...props} />;
@@ -297,7 +297,7 @@ export function QualifyingLeadsListSwitch(props: QualifyingLeadsDataTableProps) 
   return (
     <LeadsLiteList
       leads={rows}
-      contextRole="director"
+      contextRole={contextRole}
       onRowClick={open ? (row) => {
         const original = props.leads.find((lead) => lead.id === row.id);
         if (original) open(original);

@@ -124,7 +124,7 @@ export default async function SubscriptionPage() {
       features: [],
     };
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/assinatura")) {
+  if (await isDirectorLitePageOnServer(context, "/assinatura")) {
     return (
       <>
         <DashboardHeader breadcrumb="Administração" title="Assinatura" />

@@ -33,7 +33,7 @@ export default async function AtendimentoSituacoesPage({ searchParams }: { searc
   ]);
 
   // Chave do visual Lite: os mesmos dados, filtros e ações, com a lista Lite.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/atendimento/situacoes")) {
+  if (await isDirectorLitePageOnServer(context, "/atendimento/situacoes")) {
     return (
       <>
         <DashboardHeader breadcrumb="Atendimento" title="Situações" />

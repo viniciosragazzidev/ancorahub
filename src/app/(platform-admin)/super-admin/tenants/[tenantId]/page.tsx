@@ -161,10 +161,10 @@ export default async function SuperAdminTenantDetailPage({
               <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div className="max-w-2xl">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-medium">Visual Lite do Diretor</h3>
-                    <Badge variant={directorLiteEnabled ? "success" : "outline"}>{directorLiteEnabled ? "Disponível para o Diretor" : "Não liberado"}</Badge>
+                    <h3 className="font-medium">Visual Lite das telas internas</h3>
+                    <Badge variant={directorLiteEnabled ? "success" : "outline"}>{directorLiteEnabled ? "Disponível no modo normal" : "Não liberado"}</Badge>
                   </div>
-                  <p className="mt-1 text-sm text-muted-foreground">Ativa o piloto visual somente para o papel Diretor desta empresa. As rotas seguem protegidas por padrão durante a revisão.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Ativa o piloto visual para todos os papéis do modo normal desta empresa (diretor, marketing, financeiro, cargos personalizados e gestor fora do Lite de gestor). Corretor, supervisor e gestor no Lite próprio continuam iguais.</p>
                 </div>
                 <form action={directorLiteAction}>
                   <input name="enabled" type="hidden" value={directorLiteEnabled ? "false" : "true"} />

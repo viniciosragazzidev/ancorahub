@@ -49,7 +49,7 @@ export async function UnitsView({ context }: { context: TenantContext }) {
     };
   });
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe")) {
+  if (await isDirectorLitePageOnServer(context, "/equipe")) {
     return (
       <>
         <DashboardHeader breadcrumb="Gestão" title="Equipe e unidades" />

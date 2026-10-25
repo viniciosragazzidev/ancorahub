@@ -173,7 +173,7 @@ export default async function SettingsPage() {
   }
 
   // Chave do visual Lite: as mesmas seções (mesmos tabIds, dados e regras de edição de cada papel) no padrão Lite.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/settings")) {
+  if (await isDirectorLitePageOnServer(context, "/settings")) {
     const branch = membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null;
     const nodes: Partial<Record<TabId, SettingsLiteSection>> = {
       conta: { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: <AccountLite name={user[0]?.name ?? "Usuário"} email={user[0]?.email ?? ""} role={context.role} /> },

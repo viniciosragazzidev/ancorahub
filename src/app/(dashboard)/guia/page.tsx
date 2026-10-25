@@ -10,7 +10,7 @@ import { SystemGuideLite } from "@/features/guide/components/system-guide-lite";
 export default async function GuidePage() {
   const context = await getRequiredTenantContext();
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/guia")) {
+  if (await isDirectorLitePageOnServer(context, "/guia")) {
     return (
       <>
         <DashboardHeader breadcrumb="Administração" title="Guia do sistema" />

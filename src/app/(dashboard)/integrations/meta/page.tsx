@@ -29,7 +29,7 @@ export default async function MetaIntegrationPage() {
   // Sending lead stages to Meta is a director decision; it never blocks the page.
   const conversions = context.role === "director" ? await getMetaConversionsPanel(context.tenantId) : null;
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/integrations/meta")) {
+  if (await isDirectorLitePageOnServer(context, "/integrations/meta")) {
     const connection = marketing.connection;
     const connected = connection?.status === "connected";
     return (

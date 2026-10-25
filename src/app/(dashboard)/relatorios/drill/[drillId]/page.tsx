@@ -42,7 +42,7 @@ export default async function DrilldownPage({
 
   // Esta página também responde em /dashboard/drill/[drillId] (reexportada). As duas rotas saem do opt-out juntas
   // (teste em director-lite-routes.test.ts), então checar o padrão de /relatorios vale para as duas URLs.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/relatorios/drill/[drillId]")) {
+  if (await isDirectorLitePageOnServer(context, "/relatorios/drill/[drillId]")) {
     const backHref = `/dashboard?period=${period}&tab=overview${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`;
     return (
       <>

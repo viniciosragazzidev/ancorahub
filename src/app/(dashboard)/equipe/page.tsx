@@ -251,7 +251,7 @@ export default async function TeamPage({ searchParams }: { searchParams: Promise
     ? await getPendingBrokerTransferRequestsAction().catch((error) => { console.error("[equipe] transfer requests unavailable", error instanceof Error ? error.message : error); return []; })
     : [];
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe")) {
+  if (await isDirectorLitePageOnServer(context, "/equipe")) {
     return (
       <>
         <DashboardHeader

@@ -114,7 +114,7 @@ export default async function RootLayout({
   if (!isDirectorDevPreview) {
     try {
       const context = await getRequiredTenantContext();
-      directorLiteEnabled = await shouldUseDirectorLiteStyle(context.role, context.tenantId);
+      directorLiteEnabled = await shouldUseDirectorLiteStyle(context);
     } catch {
       directorLiteEnabled = false;
     }

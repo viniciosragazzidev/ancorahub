@@ -34,7 +34,7 @@ export default async function PasswordRecoveryPage() {
     .where(eq(schema.passwordResetRequests.tenantId, context.tenantId))
     .orderBy(schema.passwordResetRequests.createdAt);
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe/recuperacoes")) {
+  if (await isDirectorLitePageOnServer(context, "/equipe/recuperacoes")) {
     return (
       <>
         <DashboardHeader breadcrumb="Equipe" title="Recuperação de senha" />

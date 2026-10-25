@@ -8,5 +8,5 @@ import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag"
 export const dynamic = "force-dynamic";
 export default async function TeamDashboardPage() { const context = await getRequiredTenantContext(); const data = await getDomainDashboard(context, "team");
   // Chave do diretor: só a pele Lite (container da moldura e cartões do contrato), mesmos dados.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe/dashboard")) return <><DashboardHeader breadcrumb="Equipe" title="Visão geral" /><main className={litePage.stack}><DomainDashboardLite data={data} /></main></>;
+  if (await isDirectorLitePageOnServer(context, "/equipe/dashboard")) return <><DashboardHeader breadcrumb="Equipe" title="Visão geral" /><main className={litePage.stack}><DomainDashboardLite data={data} /></main></>;
   return <><DashboardHeader breadcrumb="Equipe" title="Visão geral" /><main className="flex flex-1 flex-col gap-5 p-(--mobile-page-padding) lg:p-6"><DomainDashboard data={data} /></main></>; }

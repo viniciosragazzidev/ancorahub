@@ -28,7 +28,7 @@ export default async function SaleDetailPage({ params }: { params: Promise<{ id:
   if (!sale) notFound();
 
   // Chave do diretor: o mesmo detalhe no visual Lite, com as mesmas ações.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, `/vendas/${id}`)) {
+  if (await isDirectorLitePageOnServer(context, `/vendas/${id}`)) {
     return (
       <>
         <DashboardHeader breadcrumb="Operação comercial / Vendas" title="Detalhes da venda" />

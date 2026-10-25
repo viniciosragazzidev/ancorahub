@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
   if (feature === "false") return Response.json({ enabled: false, groups: [] });
 
   // The menu-permission filter belongs to the director Lite palette; with the key off the results stay as before.
-  const directorLite = await shouldUseDirectorLiteStyle(context.role, context.tenantId);
+  const directorLite = await shouldUseDirectorLiteStyle(context);
   const displayUser = directorLite ? await getUserDisplayInfo() : null;
   const qLower = query.toLowerCase();
   const matchingFeatures = FEATURE_SEARCH_INDEX.filter((feat) => {

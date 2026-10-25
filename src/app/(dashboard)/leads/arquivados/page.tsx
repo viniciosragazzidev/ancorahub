@@ -78,7 +78,7 @@ export default async function ArchivedLeadsPage({
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Chave do diretor: a mesma lista no visual Lite, com o "Voltar para leads" no topo da moldura.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/leads/arquivados")) {
+  if (await isDirectorLitePageOnServer(context, "/leads/arquivados")) {
     return (
       <>
         <DashboardHeader

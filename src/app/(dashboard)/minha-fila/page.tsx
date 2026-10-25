@@ -40,8 +40,8 @@ export const dynamic = "force-dynamic";
 export default async function MinhaFilaPage() {
   const context = await getRequiredTenantContext();
   // Fila pessoal é do corretor: com a chave do Diretor Lite ligada, o diretor (decisão do Vinicios, 2026-10-25) vai para a
-  // lista de leads. Chave desligada: tudo como antes. Outros papéis seguem iguais.
-  if (await shouldUseDirectorLiteStyle(context.role, context.tenantId)) redirect("/leads");
+  // lista de leads. Chave desligada: tudo como antes. Outros papéis do modo normal seguem na fila de hoje (decisão de 25/10).
+  if (context.role === "director" && (await shouldUseDirectorLiteStyle(context))) redirect("/leads");
   // The Light app streams its own skeleton while the queue loads; the Full screen is unchanged.
   if ((await getExperienceMode(context)) === "LIGHT") {
     return (

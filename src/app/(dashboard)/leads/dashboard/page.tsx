@@ -20,7 +20,7 @@ export default async function LeadsDashboardPage() {
   ]);
   const attentionCount = attention.items.reduce((total, item) => total + item.count, 0);
   // Chave do diretor: só a pele Lite (container da moldura, números e grupos do contrato), mesmos dados.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/leads/dashboard")) {
+  if (await isDirectorLitePageOnServer(context, "/leads/dashboard")) {
     return <>
       <DashboardHeader breadcrumb="Leads" title="Visão geral de leads" rightSlot={<Link href="/leads" className={litePage.button}>Abrir lista <ArrowUpRight className="size-4" aria-hidden="true" /></Link>} />
       <main className={litePage.stack}>

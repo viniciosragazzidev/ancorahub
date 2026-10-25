@@ -52,9 +52,9 @@ export function DirectorMoreSheet({ open, onOpenChange }: { open: boolean; onOpe
     <BottomSheet open={open} onOpenChange={onOpenChange} title="Mais" detents={[0.62, 0.92]} initialDetent={1} closeLabel="Fechar" className="arc-venancor">
       <div className="flex flex-col gap-3 pb-3">
         <div className="flex min-w-0 items-center gap-3 rounded-3xl bg-(--surface-muted) p-3">
-          <Avatar name={chrome?.shellUser?.name || "Diretor"} size="lg" className="light-avatar" />
+          <Avatar name={chrome?.shellUser?.name || "Você"} size="lg" className="light-avatar" />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-(--foreground)">{chrome?.shellUser?.name || "Diretor"}</p>
+            <p className="truncate text-sm font-medium text-(--foreground)">{chrome?.shellUser?.name || "Você"}</p>
             <p className="truncate text-xs text-(--text-secondary)">{chrome?.shellUser?.email || ""}</p>
           </div>
         </div>

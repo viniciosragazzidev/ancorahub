@@ -841,6 +841,7 @@ export function LeadsWorkspace({
             <div className="w-full">
               <QualifyingLeadsListSwitch
                 leads={qualifyingLeads}
+                contextRole={contextRole}
                 queues={queues}
                 pageSize={pageSize}
                 onOpen={(lead) => setSelectedLead(lead as unknown as LeadWorkspaceItem)}

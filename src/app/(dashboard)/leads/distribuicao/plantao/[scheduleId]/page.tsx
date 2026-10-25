@@ -95,7 +95,7 @@ export default async function DutyScheduleProfilePage({ params, searchParams }: 
   const context = await getRequiredTenantContext();
   if (context.role !== "director" && context.role !== "manager") redirect("/access-denied");
   const { scheduleId } = await params;
-  const directorLite = await isDirectorLitePageOnServer(context.role, context.tenantId, `/leads/distribuicao/plantao/${scheduleId}`);
+  const directorLite = await isDirectorLitePageOnServer(context, `/leads/distribuicao/plantao/${scheduleId}`);
   const { situacao, data, canal, fila, desde } = await searchParams;
   const leadsSinceOption = parseDutyLeadsSince(desde);
 

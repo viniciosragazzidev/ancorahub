@@ -17,7 +17,7 @@ export default async function QualificacaoTurboPage() {
   }
   const data = await getTurboAdminData();
   // Chave do visual Lite: os mesmos templates, configurações e ações.
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/qualificacao/turbo")) {
+  if (await isDirectorLitePageOnServer(context, "/qualificacao/turbo")) {
     return (
       <>
         <DashboardHeader breadcrumb="Qualificação" title="Qualificação turbo" />

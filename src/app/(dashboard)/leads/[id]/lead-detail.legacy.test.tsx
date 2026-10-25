@@ -101,7 +101,7 @@ vi.mock("@/features/broker-workspace/chat/lead-script", () => ({ buildLeadConver
 vi.mock("@/features/system-settings/queries", () => ({ getSystemSetting: async () => null }));
 vi.mock("@/features/broker-workspace/experience-mode", () => ({ getExperienceMode: async () => "FULL" }));
 vi.mock("@/features/broker-workspace/lite-audience", () => ({ getLiteAudience: async () => null }));
-vi.mock("@/features/director-lite/style-flag", () => ({ shouldUseDirectorLiteStyle: async () => fixtures.liteStyle.current }));
+vi.mock("@/features/director-lite/style-flag", () => ({ isDirectorLitePageOnServer: async () => fixtures.liteStyle.current }));
 vi.mock("next/navigation", () => ({
   notFound: () => { throw new Error("notFound"); },
   useRouter: () => ({ replace: vi.fn(), push: vi.fn(), refresh: vi.fn() }),

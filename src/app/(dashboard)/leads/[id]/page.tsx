@@ -28,8 +28,7 @@ import { canDirectorMarkLeadInService } from "@/features/leads/director-service-
 import { SupervisionPanel } from "./supervision-panel";
 import { DirectorLiteLeadDetail } from "./director-lite-lead-detail";
 import litePageStyles from "../leads-lite-page.module.css";
-import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
-import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { DeleteLeadControl } from "./delete-lead-control";
 import { getExperienceMode } from "@/features/broker-workspace/experience-mode";
 import { LightLeadDetail, type LightLeadDetailData } from "@/features/broker-workspace/components/light-lead-detail";
@@ -467,10 +466,8 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
     lead.nome = maskName(lead.nome);
   }
 
-  // Chave do diretor (mesma regra do useDirectorLitePage, no servidor): o perfil sai no visual Lite com as mesmas peças.
-  const directorLitePage = context.role === "director"
-    && !isDirectorLiteRouteOptedOut(`/leads/${id}`)
-    && (await shouldUseDirectorLiteStyle(context.role, context.tenantId).catch(() => false));
+  // Visual Lite das telas internas (mesma regra do useDirectorLitePage, no servidor): o perfil sai no Lite com as mesmas peças.
+  const directorLitePage = await isDirectorLitePageOnServer(context, `/leads/${id}`);
   if (directorLitePage) {
     const qualDetails = lead.qualificationDetails as { status?: string; score?: number } | null;
     const leadNextBestAction = resolveLeadNextBestAction({

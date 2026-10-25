@@ -12,7 +12,7 @@ export default async function CustomRolesPage() {
   const context = await getRequiredTenantContext();
   if (context.role !== "director") redirect("/access-denied");
   const workspace = await getCustomRolesWorkspace();
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/equipe/cargos")) {
+  if (await isDirectorLitePageOnServer(context, "/equipe/cargos")) {
     return <>
       <DashboardHeader breadcrumb="Equipe / Cargos e permissões" title="Cargos e permissões" />
       <main className={litePage.stack}>

@@ -22,7 +22,7 @@ export default async function AssistentePage() {
     throw error;
   }
 
-  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/assistente")) {
+  if (await isDirectorLitePageOnServer(context, "/assistente")) {
     return (
       <>
         <DashboardHeader breadcrumb="Inteligência" title="Assistente IA" />

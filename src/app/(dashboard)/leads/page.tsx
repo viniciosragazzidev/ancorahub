@@ -108,7 +108,7 @@ async function LeadsPageContent({
   await connection();
   const context = await withPerfSpan("tenant_context.resolve", () => getRequiredTenantContext());
   // Mesma regra do useDirectorLitePage, no servidor: chave do diretor ligada e /leads fora do opt-out.
-  const directorLitePage = !isDirectorLiteRouteOptedOut("/leads") && (await shouldUseDirectorLiteStyle(context.role, context.tenantId).catch(() => false));
+  const directorLitePage = !isDirectorLiteRouteOptedOut("/leads") && (await shouldUseDirectorLiteStyle(context).catch(() => false));
   const capabilityPromise = withPerfSpan("rbac.leads_access", () => hasEffectiveCapability({
     tenantId: context.tenantId,
     role: context.role,
