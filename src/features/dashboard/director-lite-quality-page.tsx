@@ -41,7 +41,7 @@ export async function renderDirectorLiteQuality(context: TenantContext, params: 
   if (branchId) widerParams.set("unidade", branchId);
   const widerHref = `/dashboard?${widerParams.toString()}`;
   return (
-    <DirectorLiteChrome now={now} tab="quality" period={period} branchId={branchId} branches={canCompare ? units : []} firstName={firstName} availableTabs={liteDashboardTabs(context, true)}>
+    <DirectorLiteChrome now={now} tab="quality" period={period} branchId={branchId} branches={canCompare ? units : []} firstName={firstName} availableTabs={liteDashboardTabs(context, enabled)}>
       {report ? (
         <>
           <QualityToolbar legacyHref={legacyHref} detailedHref={detailedHref} />

@@ -545,11 +545,11 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   {lead.status !== "distributed" && lead.qualificationState !== "QUALIFIED" && (!lead.qualificationStatus || ["pending", "qualifying"].includes(lead.qualificationStatus)) ? (
                     <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="outline" size="xs" />
                   ) : null}
-                  <DeleteLeadControl leadId={lead.id} leadName={lead.nome} />
+                  {context.role === "director" ? <DeleteLeadControl leadId={lead.id} leadName={lead.nome} /> : null}
                   {canDirectorMarkLeadInService({ role: context.role, corretorId: lead.corretorId, status: lead.status }) ? (
                     <MarkLeadInServiceButton leadId={lead.id} brokerName={lead.corretorNome} />
                   ) : null}
-                  {(lead.corretorId ? (context.userId === lead.corretorId && lead.status !== "distributed") : true) ? (
+                  {(lead.corretorId ? (context.userId === lead.corretorId && lead.status !== "distributed") : (context.role !== "broker")) ? (
                     <LeadStatusSelector
                       leadId={lead.id}
                       currentStatus={lead.status}
@@ -564,7 +564,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                 </>
               ),
               nextBestAction: <NextBestActionCard action={leadNextBestAction} />,
-              supervision: (
+              supervision: isManagement ? (
                 <SupervisionPanel
                   leadId={lead.id}
                   currentStatus={lead.status}
@@ -579,7 +579,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   isLost={lead.status === "lost"}
                   currentUserId={context.userId}
                 />
-              ),
+              ) : null,
               insight: (
                 <AiConversationInsightCard
                   leadId={lead.id}
@@ -588,7 +588,7 @@ async function LeadDetailContent({ id, ficha = false }: { id: string; ficha?: bo
                   lastAnalyzedAt={(qualificationDetails as any).aiLastAnalyzedAt}
                   autoMove={(qualificationDetails as any).aiLastAutoMove}
                   leadStatus={lead.status}
-                  canManage
+                  canManage={context.role !== "broker" || lead.corretorId === context.userId}
                 />
               ),
               startQualification: <StartQualificationButton leadId={lead.id} leadName={lead.nome} variant="default" size="sm" />,

@@ -54,6 +54,7 @@ export default async function DocumentsPage() {
             plans={plans}
             initialRequirements={requirements}
             initialPendingDocs={pendingDocs.map((doc) => ({ ...doc, createdAt: new Date(doc.createdAt) }))}
+            canConfigure={context.role === "director"}
           />
         </main>
       </>

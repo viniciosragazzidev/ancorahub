@@ -68,7 +68,9 @@ const STATUS_BADGE: Record<string, { label: string; tone?: "success" | "danger" 
   rejected: { label: "Rejeitado", tone: "danger" },
 };
 
-export function DocumentsLite({ carriers, plans, initialRequirements, initialPendingDocs }: {
+export function DocumentsLite({ carriers, plans, initialRequirements, initialPendingDocs, canConfigure = false }: {
+  /** Aba "Configuração de requisitos": a mesma regra do DocumentsWorkspace (só o diretor). */
+  canConfigure?: boolean;
   carriers: Carrier[];
   plans: Plan[];
   initialRequirements: RequirementLite[];
@@ -215,12 +217,14 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
   return (
     <div className={`arc-venancor ${page.stack}`} data-skin="diretor">
       <Tabs defaultValue="queue" variant="segment" className={styles.tabs}>
-        <div className={styles.views}>
-          <TabsList aria-label="Documentos" className="w-max">
-            <TabsTrigger value="queue">Fila de aprovação</TabsTrigger>
-            <TabsTrigger value="config">Configuração de requisitos</TabsTrigger>
-          </TabsList>
-        </div>
+        {canConfigure ? (
+          <div className={styles.views}>
+            <TabsList aria-label="Documentos" className="w-max">
+              <TabsTrigger value="queue">Fila de aprovação</TabsTrigger>
+              <TabsTrigger value="config">Configuração de requisitos</TabsTrigger>
+            </TabsList>
+          </div>
+        ) : null}
 
         <TabsContent value="queue" className={styles.panel}>
           <div className={page.toolbar}>
@@ -275,6 +279,7 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
           />
         </TabsContent>
 
+        {canConfigure ? (
         <TabsContent value="config" className={styles.panel}>
           <div className={styles.configGrid}>
             <section className={page.card} aria-labelledby="checklist">
@@ -349,6 +354,7 @@ export function DocumentsLite({ carriers, plans, initialRequirements, initialPen
             </section>
           </div>
         </TabsContent>
+        ) : null}
       </Tabs>
 
       <LiteConfirmDialog
