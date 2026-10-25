@@ -284,7 +284,8 @@ html[data-reduce-motion="1"] .fill { transition: none; }
 .legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .legendSwatch { display: inline-block; width: 10px; height: 10px; flex-shrink: 0; border-radius: 3px; background: var(--primary); }
 /* Eixo contínuo (horas vazias ficam só na linha de base); colunas de largura fixa, no máximo 24px por par. */
-.hourBars { display: flex; align-items: stretch; height: 168px; min-width: 0; }
+/* Respiro lateral: o primeiro e o último rótulo do eixo não encostam na borda do card. */
+.hourBars { display: flex; align-items: stretch; height: 168px; min-width: 0; padding-inline: 12px; }
 .hourSlot { display: grid; flex: 1 1 0; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 16px; gap: 6px; min-width: 0; padding: 4px 0 0; border-radius: 6px 6px 0 0; }
 .hourSlot[data-ranout] { background: var(--warning-subtle); }
 .hourSlot[data-future] .hourTick { opacity: 0.6; }
