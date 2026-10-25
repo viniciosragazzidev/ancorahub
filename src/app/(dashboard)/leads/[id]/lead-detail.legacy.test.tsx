@@ -290,3 +290,25 @@ describe("perfil do lead com a chave desligada", () => {
     expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
   }, 30_000);
 });
+
+describe("perfil do lead no Lite para papéis do modo normal que não são diretor", () => {
+  const director = { ...fixtures.context };
+  afterEach(() => { Object.assign(fixtures.context, director); fixtures.liteStyle.current = false; });
+
+  for (const papel of [
+    { nome: "gestor", context: { role: "manager", userId: "manager-1", branchId: "branch-1", jobTitle: "manager" } },
+    { nome: "marketing", context: { role: "manager", userId: "marketing-1", branchId: null, jobTitle: "marketing" } },
+  ]) {
+    it(`${papel.nome}: mostra o Lite sem o botão de excluir (só o diretor exclui, como no legado)`, async () => {
+      Object.assign(fixtures.context, papel.context);
+      fixtures.liteStyle.current = true;
+      const tree = await resolveLeadDetailPage();
+      const { container } = render(<NuqsTestingAdapter><ArcScopeProvider enabled>{tree}</ArcScopeProvider></NuqsTestingAdapter>);
+      expect(container.querySelector('[data-skin="diretor"]')).not.toBeNull();
+      // Marketing de outra unidade vê o nome mascarado, como no legado; o título do perfil existe nos dois casos.
+      expect(screen.getAllByRole("heading", { level: 2 }).length).toBeGreaterThan(0);
+      expect(screen.queryByRole("button", { name: /Excluir lead/ })).not.toBeInTheDocument();
+      expect(container.textContent).not.toContain("Excluir lead");
+    }, 30_000);
+  }
+});
