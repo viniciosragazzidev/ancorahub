@@ -15,6 +15,10 @@ vi.stubGlobal("matchMedia", (media: string) => ({
 }));
 // O cabeçalho navega com o router do Next; nos testes, só a chamada é observada.
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
+// O cabeçalho do chrome (F2b) puxa a sessão do servidor; aqui só importa o título que o painel passa.
+vi.mock("@/components/dashboard-header", () => ({
+  DashboardHeader: ({ breadcrumb, title }: { breadcrumb: string; title: string }) => <header data-testid="director-dashboard-header"><span>{breadcrumb}</span><h1>{title}</h1></header>,
+}));
 vi.mock("motion/react", async (importOriginal) => {
   const actual = await importOriginal<typeof import("motion/react")>();
   const { captureMotion } = await import("@/components/lite/motion/capture-motion");
@@ -116,13 +120,15 @@ describe("filtros do topo na aba Qualidade", () => {
     expect(dashboardHref("funnel", "30", "branch-centro")).toBe("/dashboard?tab=funnel&periodo=30&unidade=branch-centro");
   });
 
-  it("na aba Qualidade, o cabeçalho traz o nome, o período marcado e a unidade escolhida", () => {
+  it("na aba Qualidade, o cabeçalho traz a saudação, o período marcado e a unidade escolhida", () => {
     render(
       <DirectorLiteChrome now={NOW} tab="quality" period="7d" branchId="branch-centro" branches={BRANCHES} firstName="Renata">
         <p>conteúdo</p>
       </DirectorLiteChrome>,
     );
-    expect(screen.getByRole("heading", { level: 1, name: "Olá, Renata" })).toBeInTheDocument();
+    // O título "Painel" mora no topo da moldura; a saudação virou subtítulo de uma linha (contrato de espaçamento).
+    expect(screen.getByRole("heading", { level: 1, name: "Painel" })).toBeInTheDocument();
+    expect(screen.getByText(/^Olá, Renata/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Qualidade dos leads" })).toHaveAttribute("aria-current", "page");
     const periods = within(screen.getByRole("navigation", { name: "Período" }));
     expect(periods.getByRole("link", { name: "7 dias" })).toHaveAttribute("aria-current", "true");
