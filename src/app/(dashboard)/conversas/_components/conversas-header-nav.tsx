@@ -79,7 +79,7 @@ export function ConversasHeaderNav({
             : "text-muted-foreground hover:text-foreground hover:bg-background/40",
         )}
       >
-        <span>{directorSkinEnabled ? <><span className="max-[559px]:hidden">Número </span>oficial</> : "Número oficial"}{directorSkinEnabled ? null : <> <span className="hidden lg:inline">· corretores</span></>}</span>
+        <span>{"Número oficial"}{directorSkinEnabled ? null : <> <span className="hidden lg:inline">· corretores</span></>}</span>
       </Link>
 
       {coexLabel ? (
