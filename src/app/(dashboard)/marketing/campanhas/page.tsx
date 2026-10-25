@@ -12,6 +12,13 @@ import { CampaignsDashboardView } from "@/features/meta-ads/components/campaigns
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { requireCapability } from "@/shared/auth/authorization";
 import { RelatedActions } from "@/components/related-actions";
+import { LiteRelatedLinks } from "@/components/lite/page/related-links";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { CampaignsLite } from "@/features/meta-ads/components/lite/campaigns-lite";
+import { CaptureControlLite } from "@/features/meta-ads/components/lite/capture-control-lite";
+import { buildMetaSyncInfo } from "@/features/meta-ads/components/lite/meta-lite-shared";
+import { MetaStatusLite } from "@/features/meta-ads/components/lite/meta-status-lite";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +37,30 @@ export default async function CampaignsPage() {
   const canConfigure = context.role === "director" || context.jobTitle === "marketing" || context.role === "manager";
   const connection = marketing?.connection ?? null;
   const connected = connection?.status === "connected";
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/marketing/campanhas")) {
+    const sync = connected && connection ? buildMetaSyncInfo(marketing?.logs ?? [], connection.lastSyncedAt, canConfigure, new Date()) : null;
+    return (
+      <>
+        <DashboardHeader breadcrumb="Marketing" title="Campanhas Meta Ads e ROI" />
+        <main className={litePage.stack}>
+          <MetaStatusLite connected={Boolean(connected && connection)} sync={sync} captureModeLabel={connection ? CAPTURE_MODE_LABEL[connection.globalCaptureMode ?? "selective"] : null} />
+          <CampaignsLite campaigns={data.campaigns} totals={data.totals} />
+          {connected && connection ? <CaptureControlLite globalMode={connection.globalCaptureMode ?? "selective"} canConfigure={canConfigure} /> : null}
+          <LiteRelatedLinks
+            title="Ferramentas e integrações de marketing"
+            description="Navegação contextual para captação de leads e anúncios."
+            links={[
+              { label: "Importações de leads Meta", href: "/marketing/importacoes", description: "Logs de entrada e formulários" },
+              { label: "Materiais de divulgação", href: "/materiais-divulgacao", description: "Banners, e-books e artes de apoio" },
+              { label: "Configurar webhooks Meta Lead Ads", href: "/settings?tab=integrations", description: "Token de acesso e formulários" },
+              { label: "Regras de qualificação IA", href: "/qualificacao", description: "Como a IA atende os novos leads" },
+            ]}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

@@ -29,7 +29,7 @@ import type {
   ValidationVerdict,
 } from "../types";
 
-type Slot = {
+export type Slot = {
   kind: DocumentKind;
   label: string;
   hint: string;
@@ -37,7 +37,7 @@ type Slot = {
   required: boolean;
 };
 
-const SLOTS: Slot[] = [
+export const SLOTS: Slot[] = [
   { kind: "proposta", label: "Proposta", hint: "PDF gerado pela operadora", accept: "application/pdf", required: true },
   {
     kind: "comprovante",
@@ -55,7 +55,7 @@ const SLOTS: Slot[] = [
   },
 ];
 
-const VERDICT: Record<ValidationVerdict, { label: string; variant: "success" | "warning" | "destructive"; text: string }> = {
+export const VERDICT: Record<ValidationVerdict, { label: string; variant: "success" | "warning" | "destructive"; text: string }> = {
   aprovavel: {
     label: "Aprovável",
     variant: "success",
@@ -82,7 +82,7 @@ const STATUS_ICON: Record<CheckStatus, { icon: typeof CheckCircle; className: st
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
-async function readDocument(kind: DocumentKind, file: File): Promise<ExtractedDocument> {
+export async function readDocument(kind: DocumentKind, file: File): Promise<ExtractedDocument> {
   const body = new FormData();
   body.set("kind", kind);
   body.set("file", file);

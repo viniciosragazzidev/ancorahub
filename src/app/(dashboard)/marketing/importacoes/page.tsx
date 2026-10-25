@@ -6,6 +6,9 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { hasCapability } from "@/shared/auth/permissions";
 import { getDatabase, schema } from "@/shared/db";
 import { MarketingImportClient } from "./_components/marketing-import-client";
+import { MarketingImportLite } from "./_components/marketing-import-lite";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { getImportHistoryAction, getLastImportAction } from "@/features/marketing-import/actions";
 
 export default async function MarketingImportacoesPage() {
@@ -25,6 +28,23 @@ export default async function MarketingImportacoesPage() {
     getImportHistoryAction(),
     getLastImportAction(),
   ]);
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/marketing/importacoes")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Marketing / Importações" title="Importar leads Meta" />
+        <main className={litePage.stack}>
+          <MarketingImportLite
+            branches={branches}
+            history={history}
+            lastImport={lastImport}
+            canChooseBranch={context.role === "director" || isCentralMarketing}
+            userBranchId={context.branchId}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

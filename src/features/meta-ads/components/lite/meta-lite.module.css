@@ -1,0 +1,257 @@
+/* Telas Meta no visual Lite (Onda 7): só o que lite-page.module.css não cobre. Só tokens, alvos de 44px. */
+
+.statusBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 16px 12px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.statusItems {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.statusText {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.errorDetails {
+  flex-basis: 100%;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.errorDetails summary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--danger);
+  cursor: pointer;
+}
+
+.errorDetails p {
+  max-width: 72ch;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.linkButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  border-radius: 999px;
+  color: var(--chat-action-text, var(--primary));
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.linkButton:hover {
+  background: var(--surface-muted);
+}
+
+.sectionHead,
+.cardHeadRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sectionHead > :first-child,
+.cardHeadRow > :first-child {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.account {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.accountHead {
+  display: grid;
+  gap: 4px;
+}
+
+.accountName {
+  margin: 0;
+  font-size: var(--text-base);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.campaignCell {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+  max-width: 420px;
+}
+
+.campaignName {
+  color: var(--foreground);
+  font-weight: 500;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.campaignName:hover {
+  color: var(--chat-action-text, var(--primary));
+  text-decoration: underline;
+}
+
+.rowActions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.adsButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--chat-action-text, var(--primary));
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.adsButton:hover {
+  background: var(--surface-muted);
+}
+
+.adsButton:focus-visible,
+.linkButton:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: 2px;
+}
+
+.adList {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.adRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.adText {
+  display: grid;
+  min-width: 0;
+}
+
+.adText > :first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adLeads {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.controlRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.controlSelect {
+  flex: 1 1 280px;
+  min-width: 0;
+  max-width: 420px;
+}
+
+.dangerButton {
+  background: var(--danger-subtle, var(--surface-muted));
+  color: var(--danger);
+}
+
+.dangerButton:hover {
+  background: var(--danger-subtle, var(--surface-muted));
+  opacity: 0.88;
+}
+
+@media (max-width: 767px) {
+  .statusBar {
+    padding: 12px 16px;
+  }
+
+  .campaignCell {
+    min-width: 0;
+  }
+
+  .adRow {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .adLeads {
+    grid-column: 1 / -1;
+  }
+}
+
+/* A lista Lite rende tabela e cartões em divs irmãos: sem min-width 0 a tabela larga empurra a coluna. */
+.account > * {
+  min-width: 0;
+}
+
+.campaignName {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+
+/* Seis números: três por linha no desktop, para não sobrar um cartão sozinho. */
+@media (min-width: 1024px) {
+  .stats6.stats6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Linhas de apoio da campanha quebram em vez de cortar no cartão do celular. */
+.wrapLine.wrapLine {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.campaignCell .wrapLine {
+  display: block;
+}
+
+.campaignCell.campaignCell {
+  white-space: normal;
+}

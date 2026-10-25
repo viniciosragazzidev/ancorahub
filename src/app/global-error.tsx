@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react"
 
+import "@/components/arc/venancor-scope.css"
+
 /**
  * Last-resort screen when the root layout itself crashes. Errors raised in the
  * browser have no server digest, so the screen also shows the error name and a
@@ -41,21 +43,21 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
 
   return (
     <html lang="pt-BR">
-      <body>
-        <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: "24px", fontFamily: "system-ui, sans-serif" }}>
-          <section aria-labelledby="global-error-title" style={{ maxWidth: "520px", display: "grid", gap: "12px" }}>
-            <h1 id="global-error-title" style={{ fontSize: "20px", margin: 0 }}>O sistema encontrou um problema</h1>
-            <p style={{ margin: 0 }}>
+      <body className="arc-venancor" style={{ margin: 0, background: "var(--background, #f7f7f9)", color: "var(--foreground, #18181b)", fontFamily: "var(--font-body, system-ui, sans-serif)" }}>
+        <main style={{ minHeight: "100dvh", display: "grid", placeItems: "center", padding: "24px 16px", boxSizing: "border-box" }}>
+          <section aria-labelledby="global-error-title" style={{ maxWidth: "520px", width: "100%", display: "grid", gap: "16px" }}>
+            <h1 id="global-error-title" style={{ fontSize: "var(--text-xl, 22px)", fontWeight: 500, lineHeight: 1.25, margin: 0 }}>O sistema encontrou um problema</h1>
+            <p style={{ margin: 0, color: "var(--text-secondary, #52525b)", fontSize: "var(--text-sm, 14px)", lineHeight: 1.5 }}>
               Toque em &quot;Limpar dados e recarregar&quot;. Se continuar, tire um print desta tela e envie ao suporte.
             </p>
-            <p style={{ margin: 0, fontSize: "13px", color: "#52525b", wordBreak: "break-word" }}>
-              <strong>Referência:</strong> {reference}
+            <p style={{ margin: 0, padding: "12px 16px", borderRadius: "var(--radius-panel, 24px)", background: "var(--surface-muted, #f4f4f5)", fontSize: "var(--text-xs, 12px)", color: "var(--text-secondary, #52525b)", wordBreak: "break-word", lineHeight: 1.6 }}>
+              <strong style={{ fontWeight: 500, color: "var(--foreground, #18181b)" }}>Referência:</strong> {reference}
               <br />
-              <strong>Horário:</strong> {new Date().toLocaleString("pt-BR")}
+              <strong style={{ fontWeight: 500, color: "var(--foreground, #18181b)" }}>Horário:</strong> {new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
               {browser ? (
                 <>
                   <br />
-                  <strong>Navegador:</strong> {browser}
+                  <strong style={{ fontWeight: 500, color: "var(--foreground, #18181b)" }}>Navegador:</strong> {browser}
                 </>
               ) : null}
             </p>
@@ -64,14 +66,14 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
                 type="button"
                 disabled={clearing}
                 onClick={() => void clearSiteDataAndReload()}
-                style={{ padding: "10px 16px", borderRadius: "999px", border: "none", background: "#3b2dff", color: "#fff", fontWeight: 600 }}
+                style={{ minHeight: "44px", padding: "0 16px", borderRadius: "999px", border: "none", background: "var(--primary, #3b2dff)", color: "var(--primary-foreground, #fff)", font: "inherit", fontSize: "var(--text-sm, 14px)", fontWeight: 500, whiteSpace: "nowrap", cursor: "pointer" }}
               >
                 {clearing ? "Limpando..." : "Limpar dados e recarregar"}
               </button>
               <button
                 type="button"
                 onClick={() => (typeof reset === "function" ? reset() : window.location.reload())}
-                style={{ padding: "10px 16px", borderRadius: "999px", border: "1px solid #e4e4e7", background: "#fff" }}
+                style={{ minHeight: "44px", padding: "0 16px", borderRadius: "999px", border: "none", background: "var(--surface-muted, #f4f4f5)", color: "var(--foreground, #18181b)", font: "inherit", fontSize: "var(--text-sm, 14px)", fontWeight: 500, whiteSpace: "nowrap", cursor: "pointer" }}
               >
                 Tentar novamente
               </button>

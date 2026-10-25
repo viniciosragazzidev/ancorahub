@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import { LockKey } from "@/components/huge-icons";
 
 import { authClient, signIn } from "@/shared/auth/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/arc/button/button";
+import { Input } from "@/components/arc/input/input";
+import { PasswordField } from "@/components/arc/password-field/password-field";
+import { LightAuthTitle } from "@/components/light/light-auth-shell";
 import { toast } from "@/components/ui/sonner";
+
+import styles from "../../auth-lite.module.css";
+
+const PASSWORD_MESSAGES = { showPassword: "Mostrar senha", hidePassword: "Ocultar senha" };
 
 export default function AdminLoginPage() {
   const [error, setError] = useState("");
@@ -94,47 +99,31 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="space-y-2 text-center">
-        <p className="text-xs font-medium text-primary">ACESSO INTERNO</p>
-        <h1 className="text-2xl font-semibold">Super administração</h1>
-        <p className="text-sm text-muted-foreground">Use apenas as credenciais da equipe CorreTop.</p>
-      </div>
+    <>
+      <LightAuthTitle title="Super administração" description="Acesso interno. Use apenas as credenciais da equipe CorreTop." />
 
-      <form action={submit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">E-mail</Label>
-          <Input id="email" name="email" type="email" autoComplete={`email${conditionalReady ? " webauthn" : ""}`} required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Senha</Label>
-          <Input id="password" name="password" type="password" autoComplete={`current-password${conditionalReady ? " webauthn" : ""}`} required />
-        </div>
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button className="w-full" disabled={loading} type="submit">
-          {loading ? "Entrando..." : "Entrar como Super Admin"}
+      <form action={submit} className={styles.form}>
+        <Input id="email" label="E-mail" name="email" type="email" autoComplete={`email${conditionalReady ? " webauthn" : ""}`} required />
+        <PasswordField id="password" label="Senha" name="password" autoComplete={`current-password${conditionalReady ? " webauthn" : ""}`} required messages={PASSWORD_MESSAGES} />
+        {error ? <p className={styles.alert} role="alert">{error}</p> : null}
+        <Button className="w-full" loading={loading} disabled={loading} type="submit">
+          {loading ? "Entrando..." : "Entrar como super admin"}
         </Button>
       </form>
 
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 text-muted-foreground">ou</span>
-        </div>
-      </div>
+      <div className={styles.divider} style={{ margin: "20px 0" }}>ou</div>
 
       <Button
         type="button"
-        variant="outline"
-        className="w-full justify-center gap-2"
+        variant="secondary"
+        className="w-full"
+        loading={passkeyLoading}
         disabled={passkeyLoading}
         onClick={handlePasskeySignIn}
       >
-        <LockKey size={16} />
+        <LockKey size={16} aria-hidden="true" />
         {passkeyLoading ? "Autenticando..." : "Entrar com passkey"}
       </Button>
-    </div>
+    </>
   );
 }

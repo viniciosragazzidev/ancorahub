@@ -9,7 +9,7 @@ const { refreshMock, confirmMock, getAssetsMock, trackMock } = vi.hoisted(() => 
   trackMock: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }), usePathname: () => "/integrations/meta" }));
 vi.mock("../actions", () => ({
   confirmMetaConnection: confirmMock,
   disconnectMetaConnection: vi.fn(),

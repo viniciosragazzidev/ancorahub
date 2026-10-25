@@ -1,17 +1,18 @@
+import { LightAuthTitle } from "@/components/light/light-auth-shell";
+
+import styles from "../auth-lite.module.css";
+
+/** Aviso de confirmação de e-mail no visual Lite: o texto passa a usar os tokens da moldura clara (antes era cinza claro sobre fundo claro). */
 export default function VerifyPage() {
   return (
-    <div className="space-y-6 text-center">
-      <h1 className="text-2xl font-semibold text-[#F5F5F5]">
-        Verifique seu e-mail
-      </h1>
-      <p className="text-sm text-[#A1A1AA]">
-        Enviamos um link de confirmação para o seu e-mail. Clique no link para
-        ativar sua conta.
+    <>
+      <LightAuthTitle
+        title="Verifique seu e-mail"
+        description="Enviamos um link de confirmação para o seu e-mail. Clique no link para ativar sua conta."
+      />
+      <p className={styles.note}>
+        Não recebeu? Verifique a pasta de spam ou entre em contato com o administrador.
       </p>
-      <p className="text-xs text-[#52525B]">
-        Não recebeu? Verifique a pasta de spam ou entre em contato com o
-        administrador.
-      </p>
-    </div>
+    </>
   );
 }

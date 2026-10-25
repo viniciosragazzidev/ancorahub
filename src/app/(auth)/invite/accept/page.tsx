@@ -5,9 +5,13 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
 
 import { acceptInviteAction } from "./actions";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from "@/components/arc/button/button";
+import { PasswordField } from "@/components/arc/password-field/password-field";
+import { LightAuthTitle } from "@/components/light/light-auth-shell";
+
+import styles from "../../auth-lite.module.css";
+
+const PASSWORD_MESSAGES = { showPassword: "Mostrar senha", hidePassword: "Ocultar senha" };
 
 export default function AcceptInvitePage() {
   const router = useRouter();
@@ -23,5 +27,14 @@ export default function AcceptInvitePage() {
     toast.success("Acesso ativado. Você já pode entrar.");
     window.setTimeout(() => router.replace("/login"), 500);
   }
-  return <div className="space-y-6"><div className="space-y-2 text-center"><p className="text-xs font-medium text-primary">CONVITE CORRETOP</p><h1 className="text-2xl font-semibold">Defina sua senha</h1><p className="text-sm text-muted-foreground">Use uma senha com pelo menos 8 caracteres para ativar seu acesso.</p></div><form onSubmit={submit} className="space-y-4"><input name="token" type="hidden" value={token} /><div className="space-y-2"><Label htmlFor="invite-password">Senha</Label><Input id="invite-password" minLength={8} name="password" required type="password" /></div><Button className="w-full" disabled={pending} type="submit">{pending ? "Ativando..." : "Ativar acesso"}</Button></form></div>;
+  return (
+    <>
+      <LightAuthTitle title="Defina sua senha" description="Convite CorreTop. Use uma senha com pelo menos 8 caracteres para ativar seu acesso." />
+      <form onSubmit={submit} className={styles.form}>
+        <input name="token" type="hidden" value={token} />
+        <PasswordField id="invite-password" label="Senha" minLength={8} name="password" required messages={PASSWORD_MESSAGES} />
+        <Button className="w-full" loading={pending} disabled={pending} type="submit">{pending ? "Ativando..." : "Ativar acesso"}</Button>
+      </form>
+    </>
+  );
 }

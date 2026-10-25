@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import { CopyCheckIcon } from "@/components/motion/copy-check-icon";
 
-const steps = [
+export const steps = [
   {
     number: "01",
     title: "Criar fonte de captura",
@@ -65,13 +65,13 @@ const steps = [
   },
 ];
 
-const requiredFields = [
+export const requiredFields = [
   { field: "name", type: "string", description: "Nome completo do lead (2-160 caracteres)", example: '"Maria da Silva"' },
   { field: "phone", type: "string", description: "Telefone com DDD (mín. 10 dígitos)", example: '"+5521999999999"' },
   { field: "source", type: "string", description: "Origem do lead (1-100 caracteres)", example: '"landing-page"' },
 ];
 
-const optionalFields = [
+export const optionalFields = [
   { field: "email", type: "string", description: "E-mail do lead", example: '"maria@email.com"' },
   { field: "planInterest", type: "string", description: "Plano de interesse (máx. 160)", example: '"Plano Empresarial"' },
   { field: "externalId", type: "string", description: "ID no seu sistema (máx. 191)", example: '"lead-123"' },
@@ -79,7 +79,7 @@ const optionalFields = [
   { field: "metadata", type: "object", description: "Dados complementares (máx. 20 chaves)", example: '{ "utm_source": "google" }' },
 ];
 
-const responseCodes = [
+export const responseCodes = [
   { code: 201, label: "Lead criado", description: "Lead criado com sucesso no sistema" },
   { code: 200, label: "Replay", description: "Mesmo payload enviado anteriormente (idempotente)" },
   { code: 400, label: "JSON inválido", description: "O corpo da requisição não é JSON válido" },
@@ -91,6 +91,78 @@ const responseCodes = [
   { code: 429, label: "Rate limit", description: "Limite de requisições excedido" },
   { code: 500, label: "Erro interno", description: "Erro inesperado no servidor" },
 ];
+
+export const QUICK_START_CODE = `<!-- 1. Snippet de Inicialização (antes do </body>) -->
+<script>
+  window.CORRETOP_HUB_URL = "https://crm.ancorasaude.cloud/api/webhooks/leads";
+  window.CORRETOP_HUB_TOKEN = "crt_live_SEU_TOKEN";
+</script>
+
+<!-- 2. Formulário -->
+<form id="lead-form">
+  <input name="name" placeholder="Nome completo" required />
+  <input name="phone" placeholder="Telefone com DDD" required />
+  <input name="email" type="email" placeholder="E-mail (opcional)" />
+  <button type="submit">Enviar</button>
+</form>
+
+<!-- 3. Script de envio -->
+<script>
+  document.getElementById("lead-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+
+    const response = await fetch(window.CORRETOP_HUB_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + window.CORRETOP_HUB_TOKEN,
+        "Idempotency-Key": "lead-" + Date.now()
+      },
+      body: JSON.stringify({
+        name: fd.get("name"),
+        phone: fd.get("phone"),
+        email: fd.get("email") || undefined,
+        source: "landing-page"
+      })
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      console.log("Lead criado:", result.data.leadId);
+    } else {
+      console.error("Erro:", result.error);
+    }
+  });
+</script>`;
+
+export const PAYLOAD_CODE = `{
+  "name": "Maria da Silva",
+  "phone": "+5521999999999",
+  "email": "maria.silva@example.com",
+  "source": "landing-page",
+  "planInterest": "Plano Empresarial Premium",
+  "externalId": "src-lead-123",
+  "branchExternalId": "matriz-01",
+  "metadata": {
+    "campaign": "saude-empresarial",
+    "utm_source": "google",
+    "utm_medium": "cpc"
+  }
+}`;
+
+export const CURL_CODE = `curl --request POST \\
+  --url "https://crm.ancorasaude.cloud/api/webhooks/leads" \\
+  --header "Authorization: Bearer crt_live_SEU_TOKEN" \\
+  --header "Content-Type: application/json" \\
+  --header "Idempotency-Key: meu-lead-001" \\
+  --data '{
+    "name": "João Exemplo",
+    "phone": "+5521999999999",
+    "email": "joao@email.com",
+    "source": "landing-page",
+    "planInterest": "Plano familiar"
+  }'`;
 
 function CodeBlock({ code, filename }: { code: string; filename?: string }) {
   const [copied, setCopied] = useState(false);
@@ -151,49 +223,7 @@ export function WebhookTutorial() {
         <CardContent>
           <CodeBlock
             filename="index.html"
-            code={`<!-- 1. Snippet de Inicialização (antes do </body>) -->
-<script>
-  window.CORRETOP_HUB_URL = "https://crm.ancorasaude.cloud/api/webhooks/leads";
-  window.CORRETOP_HUB_TOKEN = "crt_live_SEU_TOKEN";
-</script>
-
-<!-- 2. Formulário -->
-<form id="lead-form">
-  <input name="name" placeholder="Nome completo" required />
-  <input name="phone" placeholder="Telefone com DDD" required />
-  <input name="email" type="email" placeholder="E-mail (opcional)" />
-  <button type="submit">Enviar</button>
-</form>
-
-<!-- 3. Script de envio -->
-<script>
-  document.getElementById("lead-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-
-    const response = await fetch(window.CORRETOP_HUB_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + window.CORRETOP_HUB_TOKEN,
-        "Idempotency-Key": "lead-" + Date.now()
-      },
-      body: JSON.stringify({
-        name: fd.get("name"),
-        phone: fd.get("phone"),
-        email: fd.get("email") || undefined,
-        source: "landing-page"
-      })
-    });
-
-    const result = await response.json();
-    if (result.success) {
-      console.log("Lead criado:", result.data.leadId);
-    } else {
-      console.error("Erro:", result.error);
-    }
-  });
-</script>`}
+            code={QUICK_START_CODE}
           />
         </CardContent>
       </Card>
@@ -305,20 +335,7 @@ export function WebhookTutorial() {
         <h2 className="mb-4 text-xl font-semibold">Exemplo completo de payload</h2>
         <CodeBlock
           filename="payload.json"
-          code={`{
-  "name": "Maria da Silva",
-  "phone": "+5521999999999",
-  "email": "maria.silva@example.com",
-  "source": "landing-page",
-  "planInterest": "Plano Empresarial Premium",
-  "externalId": "src-lead-123",
-  "branchExternalId": "matriz-01",
-  "metadata": {
-    "campaign": "saude-empresarial",
-    "utm_source": "google",
-    "utm_medium": "cpc"
-  }
-}`}
+          code={PAYLOAD_CODE}
         />
       </section>
 
@@ -329,18 +346,7 @@ export function WebhookTutorial() {
         <h2 className="mb-4 text-xl font-semibold">Teste com curl</h2>
         <CodeBlock
           filename="terminal"
-          code={`curl --request POST \\
-  --url "https://crm.ancorasaude.cloud/api/webhooks/leads" \\
-  --header "Authorization: Bearer crt_live_SEU_TOKEN" \\
-  --header "Content-Type: application/json" \\
-  --header "Idempotency-Key: meu-lead-001" \\
-  --data '{
-    "name": "João Exemplo",
-    "phone": "+5521999999999",
-    "email": "joao@email.com",
-    "source": "landing-page",
-    "planInterest": "Plano familiar"
-  }'`}
+          code={CURL_CODE}
         />
       </section>
 

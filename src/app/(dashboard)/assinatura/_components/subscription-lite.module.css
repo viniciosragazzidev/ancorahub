@@ -1,0 +1,162 @@
+/* /assinatura no visual Lite (Onda 8). Só tokens; grupos internos com divisória, sem card dentro de card. */
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 16px;
+}
+
+@media (min-width: 1024px) {
+  .top {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  }
+}
+
+.headRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headRow > :first-child {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.planBlock {
+  display: grid;
+  gap: 4px;
+  padding: 16px 20px;
+  border-radius: max(8px, calc(var(--radius-surface) - 24px));
+  background: var(--surface-muted);
+}
+
+.planName {
+  font-size: var(--text-xl);
+  font-weight: 500;
+}
+
+.features {
+  display: grid;
+  gap: 8px;
+}
+
+.subTitle {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.featureList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 8px 16px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: var(--text-sm);
+}
+
+.featureList li::marker {
+  color: var(--success);
+}
+
+.manage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.usage {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usageRow {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.usageRow:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.usageLine {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: var(--text-sm);
+}
+
+.usageValue {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.percent {
+  font-size: var(--text-xs);
+}
+
+.percent[data-tone="success"],
+.bar[data-tone="success"] { color: var(--success); background-color: currentColor; }
+.percent[data-tone="warning"],
+.bar[data-tone="warning"] { color: var(--warning); background-color: currentColor; }
+.percent[data-tone="danger"],
+.bar[data-tone="danger"] { color: var(--danger); background-color: currentColor; }
+
+.percent[data-tone] {
+  background-color: transparent;
+}
+
+.track {
+  display: block;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 0 24px;
+  margin: 0;
+}
+
+.facts > div {
+  display: grid;
+  gap: 2px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.facts dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.facts dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}

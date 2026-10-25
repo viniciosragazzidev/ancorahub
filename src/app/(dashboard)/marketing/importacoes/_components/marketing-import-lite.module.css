@@ -1,0 +1,238 @@
+/* /marketing/importacoes no visual Lite (Onda 7). Só tokens, alvos de 44px, sem sombra. */
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+@media (min-width: 1200px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 420px);
+  }
+}
+
+.headRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.headRow > :first-child {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.lastImport {
+  display: grid;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.subTitle {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.facts {
+  display: grid;
+  margin: 0;
+}
+
+.facts > div {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: var(--text-sm);
+}
+
+.facts > div:first-child {
+  border-top: 0;
+}
+
+.facts dt {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.facts dd {
+  min-width: 0;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.truncate {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyRow {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.historyRow:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.historyText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.iconSuccess {
+  margin-top: 2px;
+  color: var(--success);
+}
+
+.iconDanger {
+  margin-top: 2px;
+  color: var(--danger);
+}
+
+.iconWarning {
+  margin-top: 2px;
+  color: var(--warning);
+}
+
+.panel {
+  display: grid;
+  gap: 16px;
+}
+
+.drop {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 32px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.drop[data-active="true"] {
+  border-color: var(--primary);
+  background: var(--accent-subtle, var(--surface-muted));
+}
+
+.drop p {
+  margin: 0;
+}
+
+.dropIcon {
+  color: var(--text-muted);
+}
+
+.note {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-panel);
+  background: var(--surface-muted);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+.note code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-xs);
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.result {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.resultGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  text-align: center;
+}
+
+.resultGrid dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.resultGrid dd {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.errors {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.errors summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  cursor: pointer;
+}
+
+.errors ul {
+  display: grid;
+  gap: 4px;
+  max-height: 128px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  color: var(--danger);
+}
+
+/* Cartões em grid: a coluna implícita cresceria com nomes longos sem quebra (nowrap). */
+.layout > section {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.lastImport,
+.facts,
+.history,
+.historyText {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.layout > section > *,
+.lastImport > *,
+.facts > * {
+  min-width: 0;
+}
