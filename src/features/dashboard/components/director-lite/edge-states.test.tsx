@@ -109,7 +109,8 @@ describe("Qualidade nas bordas", () => {
     render(<QualityView report={qualityCase("zerado")} unitName={null} now={CASE_NOW.zerado} widerHref="/dashboard?tab=quality&periodo=7" />);
     expect(screen.getByText("Nenhum lead entrou hoje")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Ver os últimos 7 dias" })).toHaveAttribute("href", "/dashboard?tab=quality&periodo=7");
-    expect(screen.getByText(/Nenhum lead desde as 19h de ontem/)).toBeInTheDocument();
+    // Às 20h42 a janela começou às 19h do mesmo dia: o texto segue a janela real.
+    expect(screen.getByText(/Nenhum lead desde as 19h de hoje/)).toBeInTheDocument();
   });
 
   it("estado vazio nomeia a janela real: na segunda, desde as 19h de sexta-feira", () => {
