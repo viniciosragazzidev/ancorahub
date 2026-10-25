@@ -16,7 +16,7 @@ const { refreshMock, disconnectMock, syncMock, setGlobalModeMock, toggleCampaign
   toastErrorMock: vi.fn(),
 }));
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: refreshMock }), usePathname: () => "/integrations/meta" }));
 vi.mock("sonner", () => ({ toast: { success: toastSuccessMock, warning: toastWarningMock, error: toastErrorMock } }));
 vi.mock("../actions", () => ({
   confirmMetaConnection: vi.fn(),

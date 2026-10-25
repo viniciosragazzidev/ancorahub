@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 
 import {
   ArrowLeft,
@@ -70,6 +71,8 @@ function trackOnboardingStep(event: string) {
 
 export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
   const router = useRouter();
+  // Visual Lite do diretor: só o texto sem travessão; com a chave desligada o texto segue o mesmo.
+  const directorLite = useDirectorLitePage();
   const [step, setStep] = useState<WizardStep>("intro");
   const [authState, setAuthState] = useState<AuthState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -316,7 +319,7 @@ export function MetaMarketingWizard({ onClose }: { onClose: () => void }) {
           <div className="space-y-4 py-2">
             <DialogDescription>
               Autorize com a conta de Facebook que administra o Business Manager da corretora. A
-              Meta vai pedir as permissões abaixo — você só confirma no Facebook.
+              {directorLite ? " Meta vai pedir as permissões abaixo; você só confirma no Facebook." : " Meta vai pedir as permissões abaixo — você só confirma no Facebook."}
             </DialogDescription>
             <div className="space-y-2">
               <PermissionRow
