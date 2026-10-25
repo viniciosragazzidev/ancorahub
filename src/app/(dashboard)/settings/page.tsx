@@ -35,6 +35,18 @@ import { SupervisorLiteSettings } from "@/features/supervisor-workspace/supervis
 import { RankingPreferences } from "@/features/journey/ranking-preferences";
 import { FEATURE_FLAGS, getFeatureFlag } from "@/features/system-settings/queries";
 import type { LightSettingsSection } from "./_components/light-settings";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import compat from "@/components/lite/page/lite-compat.module.css";
+import { LiteRelatedLinks } from "@/components/lite/page/related-links";
+import { SettingsLite, type SettingsLiteSection } from "./_components/lite/settings-lite";
+import { AccountLite } from "./_components/lite/account-lite";
+import { EmpresaLite } from "./_components/lite/empresa-lite";
+import { UnitLite, WhatsappLite } from "./_components/lite/unit-lite";
+import { FeedbackLite, StageModeLite } from "./_components/lite/atendimento-lite";
+import { IntegrationsLite } from "./_components/lite/integrations-lite";
+import { SecurityLite } from "./_components/lite/security-lite";
+import { ExtensionLite } from "./_components/lite/extension-lite";
 
 export default async function SettingsPage() {
   const context = await getRequiredTenantContext();
@@ -157,6 +169,61 @@ export default async function SettingsPage() {
           { id: "acessibilidade", title: "Acessibilidade", description: "Texto maior, menos animação e alto contraste", node: <AccessibilityPreferences /> },
         ]}
       />
+    );
+  }
+
+  // Chave do visual Lite: as mesmas seções (mesmos tabIds, dados e regras de edição de cada papel) no padrão Lite.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/settings")) {
+    const branch = membership[0] ? { id: membership[0].id, name: membership[0].name, status: membership[0].status, acceptingLeads: membership[0].acceptingLeads, autoDistribute: membership[0].autoDistribute, createdAt: membership[0].createdAt } : null;
+    const nodes: Partial<Record<TabId, SettingsLiteSection>> = {
+      conta: { id: "conta", title: "Minha conta", description: "Seus dados de acesso e perfil", node: <AccountLite name={user[0]?.name ?? "Usuário"} email={user[0]?.email ?? ""} role={context.role} /> },
+      empresa: context.role === "director" ? { id: "empresa", title: "Empresa", description: "Dados da corretora e identidade visual", node: <EmpresaLite canEdit tenant={{ name: tenant[0]?.name ?? "", legalName: tenant[0]?.legalName ?? null, cnpj: tenant[0]?.cnpj ?? null, logoUrl: tenant[0]?.logoUrl ?? null, brandColor: tenant[0]?.brandColor ?? null }} /> } : undefined,
+      unidade: { id: "unidade", title: "Unidade", description: branch ? branch.name : "Unidades e distribuição", node: <UnitLite branch={branch} /> },
+      disponibilidade: brokerAvailability ? { id: "disponibilidade", title: "Disponibilidade", description: "Pausa manual e horários para receber leads", node: <div className={compat.compat}><BrokerAvailabilitySettings windows={brokerAvailability.windows} schemaReady={brokerAvailability.availabilitySchemaReady} /></div> } : undefined,
+      atendimento: canEditFeedback ? {
+        id: "atendimento",
+        title: "Atendimento",
+        description: "Lembretes de feedback, distribuição e etapa pela IA",
+        node: (
+          <>
+            <FeedbackLite
+              feedbackReminderInterval={tenantData?.feedbackReminderIntervalMinutes ?? "30"}
+              feedbackReminderMaxAttempts={tenantData?.feedbackReminderMaxAttempts ?? 5}
+              feedbackPushEnabled={tenantData?.feedbackPushEnabled ?? true}
+              feedbackToastEnabled={tenantData?.feedbackToastEnabled ?? true}
+              feedbackRequiredEnabled={tenantData?.feedbackRequiredEnabled ?? true}
+              maxActiveLeadsLimit={tenantData?.maxActiveLeadsLimit ?? 10}
+              canEdit={context.role === "director"}
+            />
+            {aiStageMode ? <StageModeLite initialMode={aiStageMode} /> : null}
+          </>
+        ),
+      } : undefined,
+      whatsapp: { id: "whatsapp", title: "WhatsApp", description: "O número que você usa no atendimento", node: <WhatsappLite /> },
+      integracoes: integrations ? { id: "integracoes", title: "Integrações", description: "Fontes de captura, webhooks e pixels", node: <IntegrationsLite branches={integrations.branches} integrations={integrations.integrations} /> } : undefined,
+      seguranca: { id: "seguranca", title: "Segurança", description: "Autenticação em duas etapas e chaves de acesso", node: <SecurityLite enabled={user[0]?.twoFactorEnabled ?? false} email={user[0]?.email ?? "sua conta"} /> },
+      extensao: { id: "extensao", title: "Extensão", description: "Atendimento contextual no WhatsApp Web", node: <ExtensionLite /> },
+    };
+    const sections = tabIds.map((id) => nodes[id]).filter((section): section is SettingsLiteSection => Boolean(section));
+    return (
+      <>
+        <DashboardHeader breadcrumb="Administração" title="Configurações" />
+        <main className={litePage.stack}>
+          <SettingsLite sections={sections} />
+          {context.role !== "broker" ? (
+            <LiteRelatedLinks
+              title="Configurações relacionadas"
+              description="Atalhos para parâmetros avançados e módulos."
+              links={[
+                { label: "Qualificação e robô IA", href: "/qualificacao", description: "Prompt, diagnóstico do WhatsApp e MCP" },
+                { label: "Equipe e corretores", href: "/equipe", description: "Convites de usuários e permissões" },
+                { label: "Regras de distribuição", href: "/leads?tab=distribuicao", description: "Roleta de atendimento e prioridades" },
+                { label: "Guia e manual do sistema", href: "/guia", description: "Tours e definições de domínio" },
+              ]}
+            />
+          ) : null}
+        </main>
+      </>
     );
   }
 
