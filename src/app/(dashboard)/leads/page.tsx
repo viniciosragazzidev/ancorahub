@@ -9,6 +9,7 @@ import { ManualLeadSheet } from "./_components/manual-lead-sheet";
 import { BulkLeadImportDialog } from "./_components/bulk-lead-import-dialog";
 import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
+import type { LeadsFiltersProps } from "./_components/use-lead-filters";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
 import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import liteStyles from "./leads-lite-page.module.css";
@@ -735,25 +736,25 @@ async function LeadsPageContent({
     || (canViewUnassigned && initialView === "sem-atribuicao")
   );
   const hasWorkspace = Boolean(leads.length || qualifyingLeads.length || unassignedRows.length);
-  const leadsFilters = (
-    <LeadsFilters
-      branches={branches}
-      brokers={brokers}
-      initialBranch={filters.branch}
-      initialCorretor={filters.corretor}
-      initialOrigem={filters.origem}
-      hideOriginFilters={context.role === "broker"}
-      initialPageSize={filters.pageSize}
-      initialQualification={filters.qualification}
-      initialSearch={filters.search}
-      initialStatus={filters.status}
-      initialTipo={filters.tipo}
-      initialEligibleCampaigns={filters.eligibleCampaigns}
-      initialTag={filters.tag}
-      tags={leadTagList}
-      storageKey={`ancorahub:leads-filters:${context.tenantId}:${context.userId}`}
-    />
-  );
+  // Props simples (serializáveis): no Lite o LeadsWorkspace (client) monta o LeadsFilters com as abas no fim da barra.
+  const leadsFiltersProps = {
+    branches,
+    brokers,
+    initialBranch: filters.branch,
+    initialCorretor: filters.corretor,
+    initialOrigem: filters.origem,
+    hideOriginFilters: context.role === "broker",
+    initialPageSize: filters.pageSize,
+    initialQualification: filters.qualification,
+    initialSearch: filters.search,
+    initialStatus: filters.status,
+    initialTipo: filters.tipo,
+    initialEligibleCampaigns: filters.eligibleCampaigns,
+    initialTag: filters.tag,
+    tags: leadTagList,
+    storageKey: `ancorahub:leads-filters:${context.tenantId}:${context.userId}`,
+  } satisfies LeadsFiltersProps;
+  const leadsFilters = <LeadsFilters {...leadsFiltersProps} />;
 
   return (
     <>
@@ -866,7 +867,7 @@ async function LeadsPageContent({
                 totalPages: unassignedTotalPages,
               }}
               queueTabs={queueTabs}
-              liteFilters={directorLitePage ? leadsFilters : undefined}
+              liteFilters={directorLitePage ? leadsFiltersProps : undefined}
             />
           </div>
         ) : (

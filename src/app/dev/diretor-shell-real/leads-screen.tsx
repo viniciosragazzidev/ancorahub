@@ -5,7 +5,6 @@
  * na mesma barra das visões e dados de exemplo. Mesma composição da página /leads com a chave ligada.
  */
 import { DashboardHeader } from "@/components/dashboard-header";
-import { LeadsFilters } from "@/app/(dashboard)/leads/_components/leads-filters";
 import { LeadsWorkspace } from "@/app/(dashboard)/leads/leads-workspace";
 import liteStyles from "@/app/(dashboard)/leads/leads-lite-page.module.css";
 import { LEADS } from "@/app/dev/diretor-leads-real/leads-fixtures";
@@ -40,17 +39,15 @@ export function LeadsShellScreen({ view }: { view: "list" | "kanban" }) {
           branches={BRANCHES}
           pageSize={6}
           pagination={{ currentPage: 1, pageSize: 6, totalItems: 134, totalPages: 23 }}
-          liteFilters={(
-            <LeadsFilters
-              storageKey="dev:diretor-shell-real:filtros"
-              branches={BRANCHES}
-              brokers={BROKERS}
-              tags={TAGS}
-              initialBranch="branch-centro"
-              initialQualification="hot"
-              initialTag="t1"
-            />
-          )}
+          liteFilters={{
+            storageKey: "dev:diretor-shell-real:filtros",
+            branches: BRANCHES,
+            brokers: BROKERS,
+            tags: TAGS,
+            initialBranch: "branch-centro",
+            initialQualification: "hot",
+            initialTag: "t1",
+          }}
         />
       </main>
     </>

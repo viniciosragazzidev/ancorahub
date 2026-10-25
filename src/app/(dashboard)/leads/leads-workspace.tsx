@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { cloneElement, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 
 import {
@@ -41,6 +41,8 @@ import { LeadDistributionRemovedTag } from "./_components/lead-distribution-remo
 import { LeadAssignmentHistory } from "./_components/lead-assignment-history";
 import { StartQualificationButton } from "./_components/qualifying-lead-actions";
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
+import { LeadsFilters } from "./_components/leads-filters";
+import type { LeadsFiltersProps } from "./_components/use-lead-filters";
 import { LeadsListSwitch } from "./leads-lite-list";
 import { LeadsLiteKanban } from "./leads-lite-kanban";
 import litePageStyles from "./leads-lite-page.module.css";
@@ -241,8 +243,13 @@ export function LeadsWorkspace({
   };
   /** Queue tabs, shown right under the view tabs in the same area. */
   queueTabs?: React.ReactNode;
-  /** Chave do diretor: os filtros Lite entram na mesma barra das visões (busca, filtros e lista/kanban numa linha). */
-  liteFilters?: React.ReactElement<{ trailing?: React.ReactNode }>;
+  /**
+   * Chave do diretor: os filtros Lite entram na mesma barra das visões (busca, filtros e lista/kanban numa linha).
+   * São as props do LeadsFilters, não um elemento: o workspace é client e recebe isto do Server Component; um
+   * elemento vindo do RSC pode chegar como lazy (módulo client ainda carregando) e `cloneElement` nele vira tipo
+   * undefined (React #130 em produção).
+   */
+  liteFilters?: Omit<LeadsFiltersProps, "trailing">;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -655,7 +662,7 @@ export function LeadsWorkspace({
       <Tabs value={activeTab} onValueChange={handleViewChange} className={directorLite ? "flex min-h-0 flex-1 flex-col gap-0" : "flex min-h-0 flex-1 flex-col"}>
         {directorLite ? (
           <div className={litePageStyles.bar}>
-            {liteFilters ? cloneElement(liteFilters, { trailing: <>{viewTabs}{columnsMenu}</> }) : (
+            {liteFilters ? <LeadsFilters {...liteFilters} trailing={<>{viewTabs}{columnsMenu}</>} /> : (
               <div className="flex min-w-0 items-center gap-2">{viewTabs}{columnsMenu}</div>
             )}
             {queueTabs}
