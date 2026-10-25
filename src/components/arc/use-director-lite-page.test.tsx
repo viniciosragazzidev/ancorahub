@@ -20,7 +20,7 @@ describe("useDirectorLitePage", () => {
     pathname.current = "/dashboard";
     expect(renderHook(() => useDirectorLitePage(), { wrapper: wrap(true) }).result.current).toBe(true);
     expect(renderHook(() => useDirectorLitePage(), { wrapper: wrap(false) }).result.current).toBe(false);
-    pathname.current = "/atendimento";
+    pathname.current = "/gestao";
     expect(renderHook(() => useDirectorLitePage(), { wrapper: wrap(true) }).result.current).toBe(false);
   });
 
