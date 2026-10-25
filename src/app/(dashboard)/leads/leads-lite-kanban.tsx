@@ -97,19 +97,8 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, hideArrival, slaFirs
   return (
     // Como hoje, puxar o cartão por mais de 8px arrasta a coluna inteira; clique abre o drawer.
     <article className={styles.card} data-selected={selected ? "true" : undefined} data-investigation={lead.isManagementInvestigation ? "true" : undefined}>
-      <div className={styles.cardTop}>
-        <label className={styles.selectBox}>
-          <input type="checkbox" className={styles.checkbox} checked={selected} aria-label={`Selecionar ${lead.nome}`} onChange={() => onToggle(lead.id)} />
-        </label>
-        {phoneDigits ? (
-          <a href={`https://wa.me/55${phoneDigits}`} target="_blank" rel="noreferrer" className={styles.whatsapp} aria-label={`Abrir WhatsApp de ${lead.nome}`} title="Abrir WhatsApp">
-            <MessageCircle aria-hidden="true" size={16} />
-          </a>
-        ) : null}
-      </div>
-      {sla ? <SlaRow sla={sla} /> : null}
-      <button type="button" className={styles.body} onClick={() => onOpen(lead)}>
-        <span className={styles.nameRow}>
+      <div className={styles.cardHead}>
+        <button type="button" className={styles.nameButton} onClick={() => onOpen(lead)}>
           <span className={styles.name}>{lead.nome}</span>
           {lead.queueName ? (
             <span title={`Fila: ${lead.queueName}`} className={styles.queue}>
@@ -117,13 +106,26 @@ function LeadKanbanCard({ lead, selected, onToggle, onOpen, hideArrival, slaFirs
               <span className={styles.srOnly}>Fila {lead.queueName}</span>
             </span>
           ) : null}
+        </button>
+        <span className={styles.cardActions}>
+          {phoneDigits ? (
+            <a href={`https://wa.me/55${phoneDigits}`} target="_blank" rel="noreferrer" className={styles.iconTarget} aria-label={`Abrir WhatsApp de ${lead.nome}`} title="Abrir WhatsApp">
+              <MessageCircle aria-hidden="true" size={16} />
+            </a>
+          ) : null}
+          <label className={styles.iconTarget}>
+            <input type="checkbox" className={styles.checkbox} checked={selected} aria-label={`Selecionar ${lead.nome}`} onChange={() => onToggle(lead.id)} />
+          </label>
         </span>
+      </div>
+      <button type="button" className={styles.body} onClick={() => onOpen(lead)} aria-label={`Abrir ${lead.nome}`}>
         <span className={styles.phone}>{lead.telefone}</span>
         <span className={styles.owner}>
           {lead.corretorNome || lead.branchName
             ? <><strong>{lead.corretorNome ?? "Sem corretor"}</strong> · {lead.branchName ?? "Sem unidade"}</>
             : "Aguardando distribuição"}
         </span>
+        {sla ? <SlaRow sla={sla} /> : null}
         <span className={styles.meta}>
           <span className={styles.badge} data-tone={lead.status === "converted" ? "success" : lead.status === "lost" ? "danger" : "neutral"}>{liteStageLabel(lead.status)}</span>
           {lead.isManagementInvestigation ? <span className={styles.badge} data-tone="neutral">Investigação da gestão</span> : null}
@@ -140,12 +142,12 @@ function SlaRow({ sla }: { sla: NonNullable<SlaInfo> }) {
   const pct = Math.min(100, Math.max(0, sla.ratio * 100));
   const tone = slaTone(sla.ratio);
   return (
-    <div className={styles.sla} title={`${sla.title}. ${sla.deadline}`}>
+    <span className={styles.sla} title={`${sla.title}. ${sla.deadline}`}>
       <span className={styles.slaTrack} aria-hidden="true">
         <span className={styles.slaFill} data-tone={tone} style={{ width: `${pct}%` }} />
       </span>
       <span className={styles.slaLabel} data-tone={tone}>{sla.label}</span>
       <span className={styles.srOnly}>{sla.title}. {sla.deadline}</span>
-    </div>
+    </span>
   );
 }

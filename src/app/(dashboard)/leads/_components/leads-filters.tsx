@@ -23,7 +23,7 @@ export function LeadsFilters(props: LeadsFiltersProps) {
   return <LeadsFiltersClassic {...props} />;
 }
 
-function LeadsFiltersClassic(props: LeadsFiltersProps) {
+function LeadsFiltersClassic({ trailing: _trailing, ...props }: LeadsFiltersProps) {
   // Mesmo comportamento de antes: com o provider ligado numa rota em opt-out, o botão de aplicar é o do Arc.
   const directorLite = useArcScopeEnabled();
   const { hideOriginFilters = false, branches, brokers, tags = [] } = props;

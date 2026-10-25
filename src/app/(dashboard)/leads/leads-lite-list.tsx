@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Lista de /leads no visual Lite (chave ligada e rota fora do opt-out): cabeçalho (contagem total e alternar
- * lista/kanban pela mesma troca de visão do workspace), tabela a partir de 768px e cartões abaixo, paginação pela URL
- * (`?page`, como a tabela atual). As informações da tabela atual: etiquetas, entrada pelo WhatsApp, etapa, fila,
+ * Lista de /leads no visual Lite (chave ligada e rota fora do opt-out): tabela a partir de 768px e cartões abaixo,
+ * paginação pela URL (`?page`, como a tabela atual) com o total do filtro. A troca de visão é a barra do workspace,
+ * na mesma linha da busca e dos filtros. As informações da tabela atual: etiquetas, entrada pelo WhatsApp, etapa, fila,
  * qualificação, corretor com plantão, investigação e devolução sem aceite (com destaque da linha), unidade e chegada.
  * Ações da linha num menu; seleção em massa com a barra de lote. A busca fica nos filtros Lite.
  */
@@ -73,18 +73,12 @@ function stageTone(status: string): Tone {
 type Pagination = { currentPage?: number; pageSize?: number; totalItems?: number; totalPages?: number };
 
 export function LeadsLiteList({
-  leads, contextRole, onRowClick, view = "list", onViewChange, total, pagination, onPageChange, pagePending = false,
+  leads, contextRole, onRowClick, pagination, onPageChange, pagePending = false,
   selectedIds, onToggleRow, onSelectAll, isAllSelected = false, bulk,
 }: {
   leads: LeadWorkspaceItem[];
   contextRole?: string;
   onRowClick?: (lead: LeadWorkspaceItem) => void;
-  /** Visão atual: "list" ou "kanban". */
-  view?: "list" | "kanban";
-  /** Troca de visão do workspace (preserva os filtros da URL). Sem ela, a alternância não aparece. */
-  onViewChange?: (view: "list" | "kanban") => void;
-  /** Total de leads no filtro (contagem do cabeçalho). Padrão: a quantidade recebida. */
-  total?: number;
   pagination?: Pagination;
   onPageChange?: (page: number) => void;
   pagePending?: boolean;
@@ -100,7 +94,7 @@ export function LeadsLiteList({
   const columns = useMemo<LiteColumn<LeadWorkspaceItem>[]>(() => {
     const base: LiteColumn<LeadWorkspaceItem>[] = [
       { id: "lead", label: "Lead", render: (lead) => <LeadName lead={lead} hideEntry={isBroker} />, primary: true },
-      { id: "phone", label: "Telefone", render: (lead) => lead.telefone, secondary: true },
+      { id: "phone", label: "Telefone", render: (lead) => <span className={styles.nowrap}>{lead.telefone}</span>, secondary: true },
       {
         id: "stage",
         label: "Etapa",
@@ -126,8 +120,7 @@ export function LeadsLiteList({
     ];
     if (!isBroker) base.push({ id: "origin", label: "Origem", render: (lead) => lead.origem });
     base.push(
-      { id: "broker", label: "Corretor", render: (lead) => <BrokerCell lead={lead} /> },
-      { id: "branch", label: "Unidade", render: (lead) => lead.branchName ?? "Sem unidade" },
+      { id: "broker", label: "Corretor e unidade", render: (lead) => <BrokerCell lead={lead} /> },
     );
     // Como na tabela atual, o corretor não vê a chegada do lead.
     if (!isBroker) base.push({ id: "arrival", label: "Chegada", render: (lead) => chegada.format(new Date(lead.createdAt)), numeric: true });
@@ -140,7 +133,6 @@ export function LeadsLiteList({
     return base;
   }, [isBroker, onRowClick]);
 
-  const count = total ?? leads.length;
   const selected = useMemo(() => selectedIds ?? [], [selectedIds]);
   const selection = onToggleRow
     ? {
@@ -153,15 +145,6 @@ export function LeadsLiteList({
     : undefined;
   return (
     <div className={`arc-venancor ${styles.root}`} data-skin="diretor">
-      <div className={styles.head}>
-        <p className={styles.count} aria-live="polite">{count} {count === 1 ? "lead" : "leads"}</p>
-        {onViewChange ? (
-          <div role="group" aria-label="Visão" className={styles.views}>
-            <button type="button" className={styles.viewLink} aria-pressed={view === "list"} onClick={() => onViewChange("list")}>Lista</button>
-            <button type="button" className={styles.viewLink} aria-pressed={view === "kanban"} onClick={() => onViewChange("kanban")}>Kanban</button>
-          </div>
-        ) : null}
-      </div>
       <LiteResponsiveData
         caption="Leads"
         columns={columns}
@@ -190,38 +173,43 @@ export function LeadsLiteList({
   );
 }
 
-/** Nome com a entrada pelo WhatsApp e as etiquetas (até 3 e "+N"), como na tabela atual. */
+/** Até 2 etiquetas e "+N" (com os nomes no title): nunca passa de 2 linhas no cartão nem na tabela. */
+const MAX_TAGS = 2;
+
+/** Nome com a entrada pelo WhatsApp e as etiquetas, como na tabela atual. */
 function LeadName({ lead, hideEntry }: { lead: LeadWorkspaceItem; hideEntry: boolean }) {
   const entry = hideEntry ? null : readMetaLeadDisplayDetails(lead.sourceChannel, lead.sourceMetadata);
   const tags = lead.tags ?? [];
   return (
     <span className={styles.leadCell}>
       <span className={styles.nameLine}>
-        <span className={styles.ellipsis}>{lead.nome}</span>
+        <span className={styles.leadName}>{lead.nome}</span>
         {entry?.entry === "whatsapp" ? (
           <span className={styles.tag} title={entry.adsLabel ? `Entrou pelo WhatsApp: ${entry.adsLabel}` : "Entrou pelo WhatsApp"}>WhatsApp</span>
         ) : null}
       </span>
       {tags.length ? (
         <span className={styles.tags}>
-          {tags.slice(0, 3).map((tag) => (
+          {tags.slice(0, MAX_TAGS).map((tag) => (
             <span key={tag.id} className={styles.tag} title={tag.name}>
               <QueueColorDot hue={tag.colorHue} />
               <span className={styles.ellipsis}>{tag.name}</span>
             </span>
           ))}
-          {tags.length > 3 ? <span className={styles.muted}>+{tags.length - 3}</span> : null}
+          {tags.length > MAX_TAGS ? <span className={styles.muted} title={tags.slice(MAX_TAGS).map((tag) => tag.name).join(", ")}>+{tags.length - MAX_TAGS}</span> : null}
         </span>
       ) : null}
     </span>
   );
 }
 
-/** Corretor com os sinais da tabela atual: plantão ativo, investigação da gestão e devolvido sem aceite. */
+/** Corretor e unidade (numa coluna só, para a tabela caber), com os sinais da tabela atual: plantão ativo,
+ * investigação da gestão e devolvido sem aceite. */
 function BrokerCell({ lead }: { lead: LeadWorkspaceItem }) {
   return (
     <span className={styles.brokerCell}>
       <span className={lead.corretorNome ? undefined : styles.muted}>{lead.corretorNome ?? "Sem atribuição"}</span>
+      <span className={styles.subtle}>{lead.branchName ?? "Sem unidade"}</span>
       {lead.isPlantaoAtivo ? <span className={styles.badge} data-tone="warning">Plantão ativo</span> : null}
       {lead.isManagementInvestigation ? <span className={styles.badge} data-tone="neutral">Investigação da gestão</span> : null}
       {lead.returnedUnaccepted && !lead.corretorNome ? (
@@ -242,10 +230,7 @@ function rowActions(lead: LeadWorkspaceItem, onOpen?: (lead: LeadWorkspaceItem) 
 }
 
 /** Escolhe a lista da tela: a Lite com a chave do diretor e a rota fora do opt-out; a tabela atual nos demais casos. */
-export function LeadsListSwitch({ liteBulk, onViewChange, ...props }: LeadsDataTableProps & {
-  liteBulk?: LeadsLiteBulkConfig;
-  onViewChange?: (view: "list" | "kanban") => void;
-}) {
+export function LeadsListSwitch({ liteBulk, ...props }: LeadsDataTableProps & { liteBulk?: LeadsLiteBulkConfig }) {
   const lite = useDirectorLitePage();
   const params = useSearchParams();
   const router = useRouter();
@@ -263,9 +248,6 @@ export function LeadsListSwitch({ liteBulk, onViewChange, ...props }: LeadsDataT
       leads={props.leads}
       contextRole={props.contextRole}
       onRowClick={props.onRowClick}
-      view={params.get("view") === "kanban" ? "kanban" : "list"}
-      onViewChange={onViewChange}
-      total={props.pagination?.totalItems}
       pagination={props.pagination}
       onPageChange={goToPage}
       pagePending={pagePending}

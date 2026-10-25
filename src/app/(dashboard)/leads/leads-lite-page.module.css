@@ -1,0 +1,42 @@
+/*
+ * Container da página /leads com a chave do diretor (contrato de espaçamento, 25/10): o mesmo da moldura do diretor,
+ * 1328px no máximo, 24px no topo, gutter de 16 a 32px e 96px no fim para a barra de lote. Os blocos Lite dentro dele
+ * não somam gutter próprio. Quando a moldura passar a dar este container, esta classe some.
+ */
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 24px;
+  width: 100%;
+  max-width: 1328px;
+  min-height: 0;
+  margin-inline: auto;
+  padding: 24px clamp(16px, 4vw, 32px) 96px;
+}
+
+.page > * {
+  min-width: 0;
+}
+
+/* Ritmo do workspace com a chave: 24px entre regiões em px (o rem do app não é 16px) e 16px dentro da barra. */
+.workspace {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  min-width: 0;
+}
+
+.region {
+  margin-top: 24px;
+  min-width: 0;
+}

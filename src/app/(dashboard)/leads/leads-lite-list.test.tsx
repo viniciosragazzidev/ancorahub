@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
@@ -29,18 +29,29 @@ vi.mock("./status-actions", () => ({
 afterEach(cleanup);
 
 describe("cabeçalho e ações da lista Lite", () => {
-  it("mostra o total do filtro e troca de visão pela troca do workspace; a busca fica nos filtros Lite", () => {
-    const onViewChange = vi.fn();
-    const { container } = render(
+  it("não repete título nem alternância de visão no corpo; a busca fica nos filtros Lite", () => {
+    render(
       <ArcScopeProvider enabled>
-        <LeadsListSwitch {...props} onRowClick={() => {}} onViewChange={onViewChange} pagination={{ currentPage: 1, pageSize: 20, totalItems: 134, totalPages: 7 }} />
+        <LeadsListSwitch {...props} onRowClick={() => {}} pagination={{ currentPage: 1, pageSize: 20, totalItems: 134, totalPages: 7 }} />
       </ArcScopeProvider>,
     );
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
-    expect(container.querySelector("[class*='count']")).toHaveTextContent("134 leads");
-    expect(screen.getByRole("button", { name: "Lista" })).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
-    expect(onViewChange).toHaveBeenCalledWith("kanban");
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Kanban" })).not.toBeInTheDocument();
+    expect(screen.getByText("1 a 20 de 134")).toBeInTheDocument();
+  });
+
+  it("mostra no máximo 2 etiquetas e o resto em +N", () => {
+    const tagged: LeadWorkspaceItem = { ...lead, tags: [1, 2, 3, 4].map((n) => ({ id: `t${n}`, name: `Etiqueta ${n}`, colorHue: n * 40 })) };
+    const { container } = render(
+      <ArcScopeProvider enabled>
+        <LeadsListSwitch {...props} leads={[tagged]} onRowClick={() => {}} />
+      </ArcScopeProvider>,
+    );
+    const table = container.querySelector('[data-lite="table"]')!;
+    expect(table).toHaveTextContent("Etiqueta 2");
+    expect(table).not.toHaveTextContent("Etiqueta 3");
+    expect(within(table as HTMLElement).getByText("+2")).toHaveAttribute("title", "Etiqueta 3, Etiqueta 4");
   });
 
   it("pagina pela URL mantendo os filtros, como a tabela atual", () => {
@@ -174,6 +185,6 @@ describe("LeadsListSwitch", () => {
       </ArcScopeProvider>,
     );
     expect(screen.queryByRole("columnheader", { name: "Origem" })).not.toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Corretor" })).toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Corretor e unidade" })).toBeInTheDocument();
   });
 });

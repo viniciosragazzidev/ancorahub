@@ -13,6 +13,8 @@ import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspa
 import { LeadsFilters } from "@/app/(dashboard)/leads/_components/leads-filters";
 import { LeadsLiteKanban } from "@/app/(dashboard)/leads/leads-lite-kanban";
 import { LeadsListSwitch } from "@/app/(dashboard)/leads/leads-lite-list";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import pageStyles from "@/app/(dashboard)/leads/leads-lite-page.module.css";
 
 const BRANCHES = [
   { id: "branch-centro", name: "Centro" },
@@ -49,8 +51,22 @@ export function LeadsFixtureList({ leads }: { leads: LeadWorkspaceItem[] }) {
   };
   const bulk = { role: "director", brokers: BROKERS, branches: BRANCHES };
   return (
-    <div className="grid min-w-0 grid-cols-1 gap-4">
-      <LeadsFilters storageKey="dev:diretor-leads-real:filtros" branches={BRANCHES} brokers={BROKERS} tags={TAGS} />
+    <Tabs value={view} onValueChange={(next) => changeView(next === "kanban" ? "kanban" : "list")} className="min-w-0">
+      <div className={pageStyles.bar} style={{ gap: 24 }}>
+      {/* Como no workspace: as abas de visão entram no fim da barra de busca e filtros. */}
+      <LeadsFilters
+        storageKey="dev:diretor-leads-real:filtros"
+        branches={BRANCHES}
+        brokers={BROKERS}
+        tags={TAGS}
+        trailing={(
+          <TabsList aria-label="Visualização de leads" className="min-w-0">
+            <TabsTrigger value="list">Todos os leads</TabsTrigger>
+            <TabsTrigger value="kanban">Kanban do funil</TabsTrigger>
+            <TabsTrigger value="qualificacoes">Qualificação IA</TabsTrigger>
+          </TabsList>
+        )}
+      />
       {view === "kanban" ? (
         <LeadsLiteKanban
           statuses={order}
@@ -77,10 +93,10 @@ export function LeadsFixtureList({ leads }: { leads: LeadWorkspaceItem[] }) {
           onToggleRow={toggle}
           onSelectAll={(checked: boolean) => setSelected(checked ? leads.map((lead) => lead.id) : [])}
           onRowClick={() => {}}
-          onViewChange={changeView}
           liteBulk={bulk}
         />
       )}
-    </div>
+      </div>
+    </Tabs>
   );
 }

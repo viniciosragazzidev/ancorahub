@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
+import { cloneElement, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 
 import {
@@ -43,6 +43,7 @@ import { StartQualificationButton } from "./_components/qualifying-lead-actions"
 import { LeadsDataTable, QualifyingLeadsDataTable } from "./leads-data-table";
 import { LeadsListSwitch } from "./leads-lite-list";
 import { LeadsLiteKanban } from "./leads-lite-kanban";
+import litePageStyles from "./leads-lite-page.module.css";
 import { computeSlaInfo, type SlaInfo } from "./lead-sla";
 import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { UserAvatar } from "@/components/ui/user-avatar";
@@ -209,6 +210,7 @@ export function LeadsWorkspace({
   unassignedLeads = [],
   unassignedPagination,
   queueTabs,
+  liteFilters,
 }: {
   leads: LeadWorkspaceItem[];
   qualifyingLeads?: QualifyingLeadItem[];
@@ -239,6 +241,8 @@ export function LeadsWorkspace({
   };
   /** Queue tabs, shown right under the view tabs in the same area. */
   queueTabs?: React.ReactNode;
+  /** Chave do diretor: os filtros Lite entram na mesma barra das visões (busca, filtros e lista/kanban numa linha). */
+  liteFilters?: React.ReactElement<{ trailing?: React.ReactNode }>;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -564,93 +568,110 @@ export function LeadsWorkspace({
     moveKanbanColumn(String(active.id), String(over.id));
   }
 
+  // Abas de visão e menu de colunas: na tela atual ficam na própria linha; com a chave, entram na barra dos filtros.
+  const viewTabs = (
+    <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
+      <TabsTrigger value="list" className="text-xs gap-1.5">
+        <UserList className="size-4" />
+        <span className="hidden sm:inline">Todos os Leads</span>
+        <span className="sm:hidden">Lista</span>
+        {leadCount > 0 ? (
+          <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+            {leadCount}
+          </Badge>
+        ) : null}
+      </TabsTrigger>
+      <TabsTrigger value="kanban" className="text-xs gap-1.5">
+        <SquaresFour className="size-4" />
+        <span className="hidden sm:inline">Kanban do Funil</span>
+        <span className="sm:hidden">Kanban</span>
+      </TabsTrigger>
+      <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
+        <Target className="size-4 text-primary" />
+        <span className="hidden sm:inline">Qualificação IA</span>
+        <span className="sm:hidden">Qualificação</span>
+        {qualifyingLeads.length > 0 ? (
+          <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+            {qualifyingLeads.length}
+          </Badge>
+        ) : null}
+      </TabsTrigger>
+      <TabsTrigger value="radar" className="text-xs gap-1.5">
+        <Sparkle className="size-4 text-primary" />
+        <span className="hidden sm:inline">Radar de Negociações (IA)</span>
+        <span className="sm:hidden">Radar IA</span>
+      </TabsTrigger>
+      <TabsTrigger value="perdidos" className="text-xs gap-1.5 text-muted-foreground data-[state=active]:text-destructive">
+        <XCircle className="size-4 text-destructive" />
+        <span className="hidden sm:inline">Perdidos & Inativos</span>
+        <span className="sm:hidden">Perdidos</span>
+        {workspaceLeads.filter((l) => l.status === "lost").length > 0 ? (
+          <Badge variant="destructive" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+            {workspaceLeads.filter((l) => l.status === "lost").length}
+          </Badge>
+        ) : null}
+      </TabsTrigger>
+      {showUnassignedFilter ? (
+        <TabsTrigger value="sem-atribuicao" className="text-xs gap-1.5">
+          <UserSwitch className="size-4 text-warning" />
+          <span className="hidden sm:inline">Sem Atribuição</span>
+          <span className="sm:hidden">Sem atrib.</span>
+          {unassignedCount > 0 ? (
+            <Badge variant="warning" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
+              {unassignedCount}
+            </Badge>
+          ) : null}
+        </TabsTrigger>
+      ) : null}
+    </TabsList>
+  );
+  const columnsMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
+        <SlidersHorizontal className="size-3.5" />
+        <span className="hidden sm:inline">Colunas</span>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-48">
+        <DropdownMenuLabel className="text-xs">Colunas do Kanban</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {kanbanStatuses.map((status) => (
+          <DropdownMenuCheckboxItem
+            key={status}
+            className="text-xs"
+            checked={!hiddenStatuses.includes(status)}
+            onCheckedChange={() => toggleStatusVisibility(status)}
+          >
+            {statusLabel(status)}
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   return (
     <HideLeadArrivalContext.Provider value={contextRole === "broker"}>
-    <div className="operational-workspace flex min-h-0 flex-1 flex-col gap-4">
+    <div className={directorLite ? `operational-workspace ${litePageStyles.workspace}` : "operational-workspace flex min-h-0 flex-1 flex-col gap-4"}>
       {/* ─── 4. TABS E CONTEÚDO PRINCIPAL ─── */}
       <Tabs value={activeTab} onValueChange={handleViewChange} className="flex min-h-0 flex-1 flex-col">
+        {directorLite ? (
+          <div className={litePageStyles.bar}>
+            {liteFilters ? cloneElement(liteFilters, { trailing: <>{viewTabs}{columnsMenu}</> }) : (
+              <div className="flex min-w-0 items-center gap-2">{viewTabs}{columnsMenu}</div>
+            )}
+            {queueTabs}
+          </div>
+        ) : (
         <div className="grid gap-2 border-b border-border/60 pb-2">
         <div className="flex items-center gap-2">
-          <TabsList aria-label="Visualização de leads" className="min-w-0 flex-1">
-            <TabsTrigger value="list" className="text-xs gap-1.5">
-              <UserList className="size-4" />
-              <span className="hidden sm:inline">Todos os Leads</span>
-              <span className="sm:hidden">Lista</span>
-              {leadCount > 0 ? (
-                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {leadCount}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
-            <TabsTrigger value="kanban" className="text-xs gap-1.5">
-              <SquaresFour className="size-4" />
-              <span className="hidden sm:inline">Kanban do Funil</span>
-              <span className="sm:hidden">Kanban</span>
-            </TabsTrigger>
-            <TabsTrigger value="qualificacoes" className="text-xs gap-1.5">
-              <Target className="size-4 text-primary" />
-              <span className="hidden sm:inline">Qualificação IA</span>
-              <span className="sm:hidden">Qualificação</span>
-              {qualifyingLeads.length > 0 ? (
-                <Badge variant="secondary" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {qualifyingLeads.length}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
-            <TabsTrigger value="radar" className="text-xs gap-1.5">
-              <Sparkle className="size-4 text-primary" />
-              <span className="hidden sm:inline">Radar de Negociações (IA)</span>
-              <span className="sm:hidden">Radar IA</span>
-            </TabsTrigger>
-            <TabsTrigger value="perdidos" className="text-xs gap-1.5 text-muted-foreground data-[state=active]:text-destructive">
-              <XCircle className="size-4 text-destructive" />
-              <span className="hidden sm:inline">Perdidos & Inativos</span>
-              <span className="sm:hidden">Perdidos</span>
-              {workspaceLeads.filter((l) => l.status === "lost").length > 0 ? (
-                <Badge variant="destructive" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                  {workspaceLeads.filter((l) => l.status === "lost").length}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
-            {showUnassignedFilter ? (
-              <TabsTrigger value="sem-atribuicao" className="text-xs gap-1.5">
-                <UserSwitch className="size-4 text-warning" />
-                <span className="hidden sm:inline">Sem Atribuição</span>
-                <span className="sm:hidden">Sem atrib.</span>
-                {unassignedCount > 0 ? (
-                  <Badge variant="warning" className="ml-1 rounded-full px-1.5 py-0 text-[10px]">
-                    {unassignedCount}
-                  </Badge>
-                ) : null}
-              </TabsTrigger>
-            ) : null}
-          </TabsList>
-          <DropdownMenu>
-            <DropdownMenuTrigger render={<Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-xs" />}>
-              <SlidersHorizontal className="size-3.5" />
-              <span className="hidden sm:inline">Colunas</span>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel className="text-xs">Colunas do Kanban</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {kanbanStatuses.map((status) => (
-                <DropdownMenuCheckboxItem
-                  key={status}
-                  className="text-xs"
-                  checked={!hiddenStatuses.includes(status)}
-                  onCheckedChange={() => toggleStatusVisibility(status)}
-                >
-                  {statusLabel(status)}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {viewTabs}
+          {columnsMenu}
         </div>
         {queueTabs}
         </div>
+        )}
 
         {/* ─── TAB 1: LISTA PRINCIPAL (TABELA) ─── */}
-        <TabsContent value="list" className="mt-4">
+        <TabsContent value="list" className={directorLite ? litePageStyles.region : "mt-4"}>
           <div className="space-y-4">
             {directorLite ? null : (
               <SelectionToolbar
@@ -678,7 +699,6 @@ export function LeadsWorkspace({
                   else multiSelect.clear();
                 }}
                 onRowClick={setSelectedLead}
-                onViewChange={directorLite ? handleViewChange : undefined}
                 liteBulk={directorLite ? {
                   role: contextRole,
                   brokers,
@@ -694,7 +714,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 2: KANBAN DO FUNIL ─── */}
-        <TabsContent value="kanban" className={directorLite ? "relative mt-4 min-w-0" : "relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]"}>
+        <TabsContent value="kanban" className={directorLite ? `relative ${litePageStyles.region}` : "relative mt-4 min-h-0 min-w-0 flex-1 overflow-hidden max-h-[80vh]"}>
           {directorLite ? (
             <LeadsLiteKanban
               statuses={visibleStatuses}
@@ -786,7 +806,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 3: QUALIFICAÇÃO IA ─── */}
-        <TabsContent value="qualificacoes" className="mt-4">
+        <TabsContent value="qualificacoes" className={directorLite ? litePageStyles.region : "mt-4"}>
           {qualifyingLeads.length === 0 ? (
             <EmptyState
               variant="ghost"
@@ -807,7 +827,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 4: RADAR DE NEGOCIAÇÕES (IA) ─── */}
-        <TabsContent value="radar" className="mt-4">
+        <TabsContent value="radar" className={directorLite ? litePageStyles.region : "mt-4"}>
           <NegotiationsRadarTab
             leads={workspaceLeads}
             branches={branches}
@@ -817,7 +837,7 @@ export function LeadsWorkspace({
         </TabsContent>
 
         {/* ─── TAB 5: PERDIDOS & INATIVOS ─── */}
-        <TabsContent value="perdidos" className="mt-4">
+        <TabsContent value="perdidos" className={directorLite ? litePageStyles.region : "mt-4"}>
           <div className="space-y-4">
             <div className="w-full">
               <LeadsDataTable
@@ -840,7 +860,7 @@ export function LeadsWorkspace({
 
         {/* ─── TAB 6: SEM ATRIBUIÇÃO (DIREÇÃO) ─── */}
         {showUnassignedFilter ? (
-          <TabsContent value="sem-atribuicao" className="mt-4">
+          <TabsContent value="sem-atribuicao" className={directorLite ? litePageStyles.region : "mt-4"}>
             {unassignedLeads.length === 0 ? (
               <EmptyState
                 variant="ghost"

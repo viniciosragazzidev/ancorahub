@@ -112,6 +112,13 @@ describe("filtros Lite de /leads (chave ligada)", () => {
     expect(window.localStorage.getItem("teste:filtros")).toBeNull();
   });
 
+  it("as abas de visão entram no fim da mesma barra da busca e dos filtros", () => {
+    renderLite({ trailing: <nav aria-label="Visão">abas</nav> });
+    const bar = screen.getByRole("search").parentElement!;
+    expect(bar).toContainElement(screen.getByRole("navigation", { name: "Visão" }));
+    expect(bar).toContainElement(screen.getByRole("button", { name: /Filtros/ }));
+  });
+
   it("corretor não vê origem nem campanhas Meta", () => {
     renderLite({ hideOriginFilters: true });
     fireEvent.click(screen.getByRole("button", { name: /Filtros/ }));

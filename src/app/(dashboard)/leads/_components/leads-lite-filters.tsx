@@ -68,7 +68,7 @@ const ORIGEM_OPTIONS = [
 const PAGE_SIZES = ["10", "20", "50", "100"];
 
 export function LeadsLiteFilters(props: LeadsFiltersProps) {
-  const { hideOriginFilters = false, branches, brokers, tags = [] } = props;
+  const { hideOriginFilters = false, branches, brokers, tags = [], trailing } = props;
   const filters = useLeadFilters(props);
   const {
     open, setOpen, search, setSearch, status, optimisticStatus, activeCount, hasAnyFilter,
@@ -209,6 +209,7 @@ export function LeadsLiteFilters(props: LeadsFiltersProps) {
             <span className={styles.shortLabel}>Limpar</span>
           </button>
         ) : null}
+        {trailing ? <div className={styles.trailing}>{trailing}</div> : null}
       </div>
 
       {phone ? (

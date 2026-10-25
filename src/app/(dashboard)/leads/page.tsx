@@ -9,6 +9,9 @@ import { ManualLeadSheet } from "./_components/manual-lead-sheet";
 import { BulkLeadImportDialog } from "./_components/bulk-lead-import-dialog";
 import { LeadsLiveSync } from "./_components/leads-live-sync";
 import { LeadsFilters } from "./_components/leads-filters";
+import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
+import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
+import liteStyles from "./leads-lite-page.module.css";
 import { LeadsQueueTabs } from "./_components/leads-queue-tabs";
 import { buildQueueTabs, readQueueTab } from "@/features/leads/queue-tabs";
 import { LeadsWorkspace } from "./leads-workspace";
@@ -103,6 +106,8 @@ async function LeadsPageContent({
 }) {
   await connection();
   const context = await withPerfSpan("tenant_context.resolve", () => getRequiredTenantContext());
+  // Mesma regra do useDirectorLitePage, no servidor: chave do diretor ligada e /leads fora do opt-out.
+  const directorLitePage = !isDirectorLiteRouteOptedOut("/leads") && (await shouldUseDirectorLiteStyle(context.role, context.tenantId).catch(() => false));
   const capabilityPromise = withPerfSpan("rbac.leads_access", () => hasEffectiveCapability({
     tenantId: context.tenantId,
     role: context.role,
@@ -729,6 +734,27 @@ async function LeadsPageContent({
     eligibleCampaignsOnly
     || (canViewUnassigned && initialView === "sem-atribuicao")
   );
+  const hasWorkspace = Boolean(leads.length || qualifyingLeads.length || unassignedRows.length);
+  const leadsFilters = (
+    <LeadsFilters
+      branches={branches}
+      brokers={brokers}
+      initialBranch={filters.branch}
+      initialCorretor={filters.corretor}
+      initialOrigem={filters.origem}
+      hideOriginFilters={context.role === "broker"}
+      initialPageSize={filters.pageSize}
+      initialQualification={filters.qualification}
+      initialSearch={filters.search}
+      initialStatus={filters.status}
+      initialTipo={filters.tipo}
+      initialEligibleCampaigns={filters.eligibleCampaigns}
+      initialTag={filters.tag}
+      tags={leadTagList}
+      storageKey={`ancorahub:leads-filters:${context.tenantId}:${context.userId}`}
+    />
+  );
+
   return (
     <>
       <DashboardHeader
@@ -751,7 +777,7 @@ async function LeadsPageContent({
         }
       />
       <LeadsLiveSync />
-      <main className="mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-5 bg-background p-4 pb-28 sm:p-6 lg:gap-6 lg:p-8 lg:pb-8">
+      <main className={directorLitePage ? liteStyles.page : "mx-auto flex min-h-0 w-full max-w-[1400px] flex-1 flex-col gap-5 bg-background p-4 pb-28 sm:p-6 lg:gap-6 lg:p-8 lg:pb-8"}>
         {/* Attention Note */}
         {attentionNote ? <ContextNote variant="warning">{attentionNote}</ContextNote> : null}
 
@@ -776,26 +802,10 @@ async function LeadsPageContent({
         ) : null}
 
         {/* Filters */}
-        <LeadsFilters
-          branches={branches}
-          brokers={brokers}
-          initialBranch={filters.branch}
-          initialCorretor={filters.corretor}
-          initialOrigem={filters.origem}
-          hideOriginFilters={context.role === "broker"}
-          initialPageSize={filters.pageSize}
-          initialQualification={filters.qualification}
-          initialSearch={filters.search}
-          initialStatus={filters.status}
-          initialTipo={filters.tipo}
-          initialEligibleCampaigns={filters.eligibleCampaigns}
-          initialTag={filters.tag}
-          tags={leadTagList}
-          storageKey={`ancorahub:leads-filters:${context.tenantId}:${context.userId}`}
-        />
+        {directorLitePage && hasWorkspace ? null : leadsFilters}
 
         {/* Workspace or RCD Directional Empty State */}
-        {leads.length || qualifyingLeads.length || unassignedRows.length ? (
+        {hasWorkspace ? (
           <div className="space-y-4">
             <LeadsWorkspace
               leads={stripLeadOriginForRole(context.role, leads.map((lead) => ({
@@ -856,6 +866,7 @@ async function LeadsPageContent({
                 totalPages: unassignedTotalPages,
               }}
               queueTabs={queueTabs}
+              liteFilters={directorLitePage ? leadsFilters : undefined}
             />
           </div>
         ) : (

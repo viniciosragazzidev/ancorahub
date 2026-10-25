@@ -68,13 +68,23 @@ describe("kanban Lite de /leads", () => {
 
   it("cartão abre o drawer e a caixa seleciona para o lote", () => {
     const props = renderKanban();
-    fireEvent.click(screen.getByRole("button", { name: /Maria Nova/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Maria Nova" }));
+    expect(props.onOpen).toHaveBeenCalledWith(maria);
+    fireEvent.click(screen.getByRole("button", { name: "Abrir Maria Nova" }));
     expect(props.onOpen).toHaveBeenCalledWith(maria);
     fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Maria Nova" }));
     expect(props.onToggle).toHaveBeenCalledWith("l1");
     expect(screen.getByRole("checkbox", { name: "Selecionar Carlos Mendes" })).toBeChecked();
     const bar = within(screen.getByRole("region", { name: "Ações em lote" }));
     expect(bar.getByText("1 selecionado")).toBeInTheDocument();
+  });
+
+  it("a caixa de seleção fica no cabeçalho do cartão, junto da conversa", () => {
+    renderKanban();
+    const box = screen.getByRole("checkbox", { name: "Selecionar Maria Nova" });
+    const whatsapp = screen.getByRole("link", { name: "Abrir WhatsApp de Maria Nova" });
+    expect(box.closest("[class*='cardActions']")).toBe(whatsapp.closest("[class*='cardActions']"));
+    expect(box.closest("[class*='cardHead']")).toContainElement(screen.getByRole("button", { name: "Maria Nova" }));
   });
 
   it("reordenar pelo teclado usa a mesma regra do arrastar", () => {

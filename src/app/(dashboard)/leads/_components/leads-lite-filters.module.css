@@ -3,25 +3,37 @@
 .root {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
   color: var(--foreground);
 }
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   min-width: 0;
 }
 
+/* Fim da barra (abas de visão do workspace): à direita no desktop, linha própria e rolável no celular. */
+.trailing {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  margin-left: auto;
+}
+
 .search {
   position: relative;
   display: flex;
-  flex: 1 1 320px;
+  flex: 1 1 280px;
   align-items: center;
   min-width: 0;
-  max-width: 520px;
+  max-width: 420px;
 }
 
 .searchIcon {
@@ -47,8 +59,8 @@
 }
 
 .searchInput:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
 }
 
 .searchSubmit {
@@ -118,15 +130,6 @@
   color: var(--primary-foreground);
 }
 
-.filtersButton:focus-visible,
-.ghostButton:focus-visible,
-.primaryButton:focus-visible,
-.searchSubmit:focus-visible,
-.segment:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
 .countBadge {
   display: inline-grid;
   place-items: center;
@@ -166,7 +169,7 @@
 .panelTitle {
   margin: 0;
   font-size: var(--text-base);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .panelHint {
@@ -259,6 +262,11 @@
 
   .searchSubmit {
     display: none;
+  }
+
+  .trailing {
+    flex-basis: 100%;
+    margin-left: 0;
   }
 
   .filtersLabel {

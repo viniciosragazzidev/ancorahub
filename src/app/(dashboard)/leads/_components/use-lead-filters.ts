@@ -4,7 +4,7 @@
  * Estado e navegação dos filtros de /leads, compartilhados pela tela atual e pela versão Lite (chave do diretor).
  * A URL é a fonte da verdade; os mesmos parâmetros, a mesma memória no localStorage e a mesma navegação suave.
  */
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import {
@@ -35,6 +35,8 @@ export type LeadsFiltersProps = {
   brokers: LeadFilterBroker[];
   /** The tenant's lead tags (filter by tag). */
   tags?: LeadFilterTag[];
+  /** Só no Lite: o que vai no fim da barra de busca e filtros (as abas de visão do workspace). */
+  trailing?: ReactNode;
 };
 
 export const qualificationLabels: Record<string, string> = {

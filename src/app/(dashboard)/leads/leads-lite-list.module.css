@@ -1,60 +1,10 @@
 /* Raiz da lista Lite de /leads: fundo e texto da pele do diretor, mesmo com a rota fora do opt-out. */
 .root {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   min-width: 0;
-  background: var(--background);
   color: var(--foreground);
-}
-
-/* Cabeçalho: contagem e alternância lista/kanban. Tudo a 44px, sem quebra de linha. */
-.head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 16px 12px;
-}
-
-.count {
-  margin: 0;
-  color: var(--text-muted);
-  font-size: var(--text-sm);
-  white-space: nowrap;
-}
-
-.views {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border-radius: 999px;
-  background: var(--surface-muted);
-}
-
-.viewLink {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--text-secondary);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.viewLink:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-}
-
-.viewLink[aria-pressed="true"] {
-  background: var(--surface);
-  color: var(--foreground);
-  box-shadow: var(--shadow-resting);
 }
 
 /* Etapa do lead como badge: neutro por padrão, verde para ganho e vermelho para perda. */
@@ -95,6 +45,20 @@
   justify-items: start;
 }
 
+/* O nome quebra em até duas linhas em vez de sumir em reticências; telefone e datas não quebram. */
+.leadCell {
+  min-width: 136px;
+}
+
+.leadName {
+  overflow-wrap: anywhere;
+}
+
+.nowrap {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .nameLine,
 .tags,
 .queue {
@@ -132,4 +96,9 @@
 
 .muted {
   color: var(--text-muted);
+}
+
+.subtle {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
 }

@@ -1,9 +1,12 @@
-/* Kanban Lite de /leads: cartão branco sobre a coluna cinza. Só tokens; alvos de 44px; textos sem quebra. */
+/*
+ * Kanban Lite de /leads: cartão branco sobre a coluna cinza. Só tokens; alvos de 44px; textos sem quebra.
+ * Cartão: 16px de padding, 8px entre linhas, raio concêntrico com a coluna; caixa de seleção e conversa no cabeçalho.
+ */
 
 .root {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
+  gap: 16px;
   min-width: 0;
   color: var(--foreground);
 }
@@ -18,43 +21,76 @@
 }
 
 .hint {
+  max-width: 72ch;
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
 }
 
 .card {
   display: grid;
+  gap: 8px;
   min-width: 0;
-  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius-surface) - 12px);
   background: var(--surface);
-  box-shadow: var(--shadow-resting);
-  cursor: default;
 }
 
 .card[data-selected="true"] {
+  border-color: var(--accent-strong);
   background: var(--accent-subtle);
 }
 
 .card[data-investigation="true"] {
-  outline: 1px solid var(--border-strong);
+  border-color: var(--border-strong);
 }
 
-.cardTop {
+/* Cabeçalho do cartão: nome (abre o lead) e, no canto, conversa e seleção com alvo de 44px. */
+.cardHead {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 4px;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  margin: -12px -12px 0 0;
 }
 
-.selectBox,
-.whatsapp {
+.nameButton {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 44px;
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cardActions {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+}
+
+.iconTarget {
   display: inline-grid;
   place-items: center;
   width: 44px;
   height: 44px;
   border-radius: 999px;
+  color: var(--text-secondary);
   cursor: pointer;
+}
+
+.iconTarget:hover {
+  background: var(--surface-muted);
+  color: var(--foreground);
 }
 
 .checkbox {
@@ -65,26 +101,66 @@
   cursor: pointer;
 }
 
-.whatsapp {
-  color: var(--text-muted);
+.checkbox:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: var(--focus-outline-offset, 2px);
 }
 
-.whatsapp:hover {
-  color: var(--success);
+.name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.checkbox:focus-visible,
-.whatsapp:focus-visible,
-.body:focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+.queue {
+  display: inline-flex;
+  flex: none;
+}
+
+.body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.phone,
+.owner {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+}
+
+.phone {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.owner {
+  color: var(--text-secondary);
+}
+
+.owner strong {
+  color: var(--foreground);
+  font-weight: 500;
 }
 
 .sla {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 14px 4px;
 }
 
 .slaTrack {
@@ -112,7 +188,7 @@
 
 .slaLabel {
   flex: none;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -126,75 +202,17 @@
   color: var(--danger);
 }
 
-.body {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-  padding: 4px 14px 14px;
-  border: 0;
-  border-radius: 0 0 14px 14px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.nameRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.name,
-.phone,
-.owner {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.name {
-  flex: 1 1 auto;
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-
-.queue {
-  display: inline-flex;
-  flex: none;
-}
-
-.phone {
-  color: var(--text-muted);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-}
-
-.owner {
-  color: var(--text-secondary);
-  font-size: var(--text-xs);
-}
-
-.owner strong {
-  color: var(--foreground);
-  font-weight: 500;
-}
-
 .meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 8px;
 }
 
 .badge {
   display: inline-flex;
   align-items: center;
-  min-height: 22px;
+  min-height: 24px;
   padding: 0 8px;
   border-radius: 999px;
   background: var(--surface-muted);
@@ -226,7 +244,8 @@
 
 .arrival {
   margin-left: auto;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

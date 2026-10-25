@@ -8,6 +8,8 @@ import type { CSSProperties } from "react";
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
 
+import pageStyles from "@/app/(dashboard)/leads/leads-lite-page.module.css";
+
 import { LeadsFixtureList } from "./leads-fixture-list";
 
 /**
@@ -45,10 +47,13 @@ export default function DirectorLeadsRealPage() {
     <ArcScopeProvider enabled>
       <div className="arc-venancor" data-skin="diretor" style={skin}>
         <div className="app-shell-canvas h-app overflow-y-auto overflow-x-hidden overscroll-contain arc-venancor" data-slot="app-scroll-frame" data-skin="diretor" style={{ ...skin, background: "var(--background)" }}>
-          <div className="mx-auto w-full max-w-[1328px] px-4 pb-28 pt-4 md:px-6">
-            <h1 className="mb-4 text-xl">Leads</h1>
+          {/* Só um esboço do topo da moldura (o título mora nele, não no corpo); a página usa o container real de /leads. */}
+          <header className="flex h-16 items-center border-b border-[var(--border-subtle)] px-[clamp(16px,4vw,32px)]">
+            <h1 className="text-base font-medium">Leads</h1>
+          </header>
+          <main className={pageStyles.page}>
             <LeadsFixtureList leads={LEADS} />
-          </div>
+          </main>
         </div>
       </div>
     </ArcScopeProvider>
