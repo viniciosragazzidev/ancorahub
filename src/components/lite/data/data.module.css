@@ -144,3 +144,45 @@
     display: none;
   }
 }
+
+/* Seleção em massa: caixa nativa de 18px com alvo de 44px; linha e cartão selecionados em acento suave. */
+.table .selectCell {
+  width: 44px;
+  padding: 0 0 0 6px;
+}
+
+.selectBox {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.checkbox {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.table tbody tr[data-selected="true"],
+.card[data-selected="true"],
+.cardStatic[data-selected="true"] {
+  background: var(--accent-subtle);
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin: -10px -10px -6px 0;
+}

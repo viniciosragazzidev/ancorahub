@@ -71,3 +71,38 @@ describe("LiteResponsiveData", () => {
     expect(container.querySelector('[data-lite="list"]')).not.toBeNull();
   });
 });
+
+describe("seleção em massa", () => {
+  const selection = (selected: string[], onToggle = vi.fn(), onToggleAll = vi.fn()) => ({
+    isSelected: (row: Lead) => selected.includes(row.id),
+    onToggle,
+    allSelected: selected.length === rows.length,
+    onToggleAll,
+    rowLabel: (row: Lead) => `Selecionar ${row.name}`,
+  });
+
+  it("tabela tem caixa por linha e selecionar todos, sem abrir a linha", () => {
+    const onToggle = vi.fn();
+    const onToggleAll = vi.fn();
+    const open = vi.fn();
+    render(<LiteDataTable {...base} onRowOpen={open} selection={selection(["a"], onToggle, onToggleAll)} />);
+    expect(screen.getByRole("checkbox", { name: "Selecionar Ana Souza" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Selecionar Bruno Lima" })).not.toBeChecked();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar Bruno Lima" }));
+    expect(onToggle).toHaveBeenCalledWith(rows[1]);
+    expect(open).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Selecionar todos" }));
+    expect(onToggleAll).toHaveBeenCalledWith(true);
+  });
+
+  it("cartão do celular também seleciona, e espaço na caixa não abre o cartão", () => {
+    const onToggle = vi.fn();
+    const open = vi.fn();
+    render(<LiteDataList {...base} onRowOpen={open} selection={selection([], onToggle)} />);
+    const box = screen.getByRole("checkbox", { name: "Selecionar Ana Souza" });
+    fireEvent.keyDown(box, { key: " " });
+    fireEvent.click(box);
+    expect(onToggle).toHaveBeenCalledWith(rows[0]);
+    expect(open).not.toHaveBeenCalled();
+  });
+});

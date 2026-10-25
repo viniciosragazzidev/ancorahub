@@ -20,6 +20,16 @@ export type LiteColumn<T> = {
   secondary?: boolean;
 };
 
+/** Seleção em massa: uma caixa por linha (44px de alvo) e "selecionar todos" no cabeçalho da tabela. */
+export type LiteSelection<T> = {
+  isSelected: (row: T) => boolean;
+  onToggle: (row: T) => void;
+  allSelected: boolean;
+  onToggleAll: (checked: boolean) => void;
+  /** Nome acessível da caixa da linha, por exemplo "Selecionar Maria Nova". */
+  rowLabel: (row: T) => string;
+};
+
 export type LiteDataProps<T> = {
   caption: string;
   columns: LiteColumn<T>[];
@@ -28,7 +38,17 @@ export type LiteDataProps<T> = {
   /** Abrir o registro (ex.: painel lateral). A linha inteira vira alvo, com Enter e espaço. */
   onRowOpen?: (row: T) => void;
   empty: ReactNode;
+  selection?: LiteSelection<T>;
 };
+
+/** Caixa de seleção nativa dentro de um rótulo de 44px; o clique não abre a linha. */
+function SelectBox({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {
+  return (
+    <label className={styles.selectBox} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+      <input type="checkbox" className={styles.checkbox} checked={checked} aria-label={label} onChange={(event) => onChange(event.target.checked)} />
+    </label>
+  );
+}
 
 function activate(onOpen: () => void) {
   return (event: KeyboardEvent) => {
@@ -39,7 +59,7 @@ function activate(onOpen: () => void) {
   };
 }
 
-export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, empty }: LiteDataProps<T>) {
+export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection }: LiteDataProps<T>) {
   if (!rows.length) return <div className={styles.empty}>{empty}</div>;
   return (
     <div className={styles.tableWrap} data-lite="table">
@@ -47,6 +67,11 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
         <caption className={styles.srOnly}>{caption}</caption>
         <thead>
           <tr>
+            {selection ? (
+              <th scope="col" className={styles.selectCell}>
+                <SelectBox checked={selection.allSelected} label="Selecionar todos" onChange={selection.onToggleAll} />
+              </th>
+            ) : null}
             {columns.map((column) => (
               <th key={column.id} scope="col" className={column.numeric ? styles.numeric : undefined}>{column.label}</th>
             ))}
@@ -57,10 +82,16 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
             <tr
               key={rowKey(row)}
               className={onRowOpen ? styles.clickable : undefined}
+              data-selected={selection?.isSelected(row) ? "true" : undefined}
               tabIndex={onRowOpen ? 0 : undefined}
               onClick={onRowOpen ? () => onRowOpen(row) : undefined}
               onKeyDown={onRowOpen ? activate(() => onRowOpen(row)) : undefined}
             >
+              {selection ? (
+                <td className={styles.selectCell}>
+                  <SelectBox checked={selection.isSelected(row)} label={selection.rowLabel(row)} onChange={() => selection.onToggle(row)} />
+                </td>
+              ) : null}
               {columns.map((column) => (
                 <td key={column.id} className={column.numeric ? styles.numeric : undefined}>{column.render(row)}</td>
               ))}
@@ -73,7 +104,7 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
 }
 
 /** Cartões abaixo de 768px: título (coluna `primary`), apoio (`secondary`) e as demais colunas em pares rótulo e valor. */
-export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, empty }: LiteDataProps<T>) {
+export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection }: LiteDataProps<T>) {
   if (!rows.length) return <div className={styles.empty}>{empty}</div>;
   const primary = columns.find((column) => column.primary) ?? columns[0]!;
   const secondary = columns.find((column) => column.secondary);
@@ -87,8 +118,16 @@ export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, emp
           tabIndex={onRowOpen ? 0 : undefined}
           onClick={onRowOpen ? () => onRowOpen(row) : undefined}
           onKeyDown={onRowOpen ? activate(() => onRowOpen(row)) : undefined}
+          data-selected={selection?.isSelected(row) ? "true" : undefined}
         >
-          <span className={styles.cardTitle}>{primary.render(row)}</span>
+          {selection ? (
+            <div className={styles.cardHead}>
+              <span className={styles.cardTitle}>{primary.render(row)}</span>
+              <SelectBox checked={selection.isSelected(row)} label={selection.rowLabel(row)} onChange={() => selection.onToggle(row)} />
+            </div>
+          ) : (
+            <span className={styles.cardTitle}>{primary.render(row)}</span>
+          )}
           {secondary ? <span className={styles.cardSub}>{secondary.render(row)}</span> : null}
           <dl className={styles.cardDetails}>
             {details.map((column) => (
