@@ -1,0 +1,97 @@
+/*
+ * Moldura de compatibilidade Lite (Onda 6). Envolve um componente compartilhado que outras telas ainda usam como está
+ * (perfil, logo, cor da marca): só dentro do ramo Lite, ele ganha alvos de 44px, cartões de borda sem sombra, sentence
+ * case e as cores de status pelos tokens. Fora desta classe nada muda, então a tela com a chave desligada fica igual.
+ */
+
+.compat {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.compat > * {
+  min-width: 0;
+}
+
+/* Alvos de 44px em tudo que é tocável. */
+.compat :global([data-slot="button"]),
+.compat :global([data-slot="input"]),
+.compat :global([data-slot="select-trigger"]),
+.compat button,
+.compat select,
+.compat input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]) {
+  min-height: 44px;
+}
+
+.compat :global([data-slot="button"][data-size^="icon"]) {
+  min-width: 44px;
+}
+
+.compat :global([data-slot="button"]) {
+  border-radius: 999px;
+}
+
+/* Cartão em repouso: borda de 1px, sem sombra, raio de superfície. */
+.compat :global([data-slot="card"]) {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.compat :global([class*="shadow"]) {
+  box-shadow: none;
+}
+
+.compat :global([class*="bg-gradient"]) {
+  background-image: none;
+}
+
+/* Sem caixa alta e sem espaçamento largo. */
+.compat :global(.uppercase) {
+  text-transform: none;
+}
+
+.compat :global([class*="tracking-"]) {
+  letter-spacing: normal;
+}
+
+/* Status pelos tokens (as cores cruas do componente original viram o token equivalente). */
+.compat :global([class*="text-emerald-"]),
+.compat :global([class*="text-green-"]) {
+  color: var(--success);
+}
+
+.compat :global([class*="bg-emerald-"]),
+.compat :global([class*="bg-green-"]) {
+  background-color: var(--success-subtle);
+}
+
+.compat :global([class*="text-amber-"]),
+.compat :global([class*="text-yellow-"]),
+.compat :global([class*="text-orange-"]) {
+  color: var(--warning);
+}
+
+.compat :global([class*="bg-amber-"]),
+.compat :global([class*="bg-yellow-"]),
+.compat :global([class*="bg-orange-"]) {
+  background-color: var(--warning-subtle);
+}
+
+.compat :global([class*="text-red-"]),
+.compat :global([class*="text-rose-"]) {
+  color: var(--danger);
+}
+
+.compat :global([class*="bg-red-"]),
+.compat :global([class*="bg-rose-"]) {
+  background-color: var(--danger-subtle);
+}
+
+.compat :global([class*="border-emerald-"]),
+.compat :global([class*="border-amber-"]),
+.compat :global([class*="border-red-"]) {
+  border-color: var(--border);
+}
