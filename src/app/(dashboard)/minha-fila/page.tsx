@@ -9,6 +9,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
+import { shouldUseDirectorLiteStyle } from "@/features/director-lite/style-flag";
 import { getDatabase, schema } from "@/shared/db";
 import { BrokerQueueClient } from "./_components/queue-client";
 import { BrokerAvailabilityButton } from "./_components/broker-availability";
@@ -38,8 +39,9 @@ export const dynamic = "force-dynamic";
 
 export default async function MinhaFilaPage() {
   const context = await getRequiredTenantContext();
-  // Fila pessoal é do corretor: o diretor (decisão do Vinicios, 2026-10-25) vai para a lista de leads. Outros papéis seguem iguais.
-  if (context.role === "director") redirect("/leads");
+  // Fila pessoal é do corretor: com a chave do Diretor Lite ligada, o diretor (decisão do Vinicios, 2026-10-25) vai para a
+  // lista de leads. Chave desligada: tudo como antes. Outros papéis seguem iguais.
+  if (await shouldUseDirectorLiteStyle(context.role, context.tenantId)) redirect("/leads");
   // The Light app streams its own skeleton while the queue loads; the Full screen is unchanged.
   if ((await getExperienceMode(context)) === "LIGHT") {
     return (
