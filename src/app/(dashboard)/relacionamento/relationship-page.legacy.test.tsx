@@ -81,4 +81,30 @@ describe("/relacionamento do diretor com a chave desligada", () => {
       expect(container.innerHTML).toMatchSnapshot(`jornada ${name.toLowerCase()}`);
     }
   }, 30_000);
+
+  it("com a chave do diretor, mostra mensagens e jornada no Lite sem peças ds-*", async () => {
+    const { container } = await renderPage(true);
+    expect(screen.getByTestId("dashboard-header")).toHaveTextContent("Central de relacionamento");
+    expect(screen.queryByRole("heading", { level: 1 })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Nova mensagem" })).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Para quem" })).toBeInTheDocument();
+    // Diretor: "Todos" só aparece para o diretor, como hoje.
+    expect(screen.getByRole("radio", { name: "Todos" })).toBeInTheDocument();
+    expect(screen.getByText("Leia a nova regra de repasse de leads da semana")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Jornada da equipe" }));
+    expect(screen.getByText("Pontos na semana")).toBeInTheDocument();
+    expect(screen.getByText("17 de 24")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: /^Campanhas/ }));
+    expect(screen.getByRole("button", { name: /Nova campanha/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pausar" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Regras" }));
+    expect(screen.getByRole("switch", { name: "Desligar Aceite rápido" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("switch", { name: "Ligar Atendimento registrado" })).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(screen.getByRole("tab", { name: /^Auditoria/ }));
+    expect(screen.getByRole("button", { name: "Estornar" })).toBeInTheDocument();
+    expect(screen.getByText("Estornado")).toBeInTheDocument();
+    // Contrato: nenhuma peça ds-* nem caixa alta no ramo Lite, e nenhum travessão.
+    expect(container.innerHTML).not.toMatch(/\bds-|uppercase/);
+    expect(container.textContent).not.toContain("—");
+  }, 30_000);
 });
