@@ -36,9 +36,11 @@ export default async function DirectorShellRealPage({
   if (process.env.NODE_ENV !== "development") notFound();
   const params = await searchParams;
   const isSuperAdminViewingDirector = params.case === "super-admin";
-  // ?tela=dashboard (padrão), leads, kanban ou lead: a mesma moldura real com cada tela do diretor.
+  // ?tela=dashboard (padrão), leads, kanban, qualificacao, sem-atribuicao ou lead: a mesma moldura real com cada tela.
   const screen = typeof params.tela === "string" ? params.tela : "dashboard";
-  const pathname = screen === "leads" || screen === "kanban" ? "/leads" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
+  const leadsViews: Record<string, "list" | "kanban" | "qualificacoes" | "sem-atribuicao"> = { leads: "list", kanban: "kanban", qualificacao: "qualificacoes", "sem-atribuicao": "sem-atribuicao" };
+  const leadsView = leadsViews[screen];
+  const pathname = leadsView ? "/leads" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
   const name = isSuperAdminViewingDirector ? "Alex Exemplo" : "Marina Exemplo";
   const previewUser: UserDisplayInfo = {
     name,
@@ -63,8 +65,8 @@ export default async function DirectorShellRealPage({
       branding={{ brandColor: null, logoUrl: null, tenantName: "\u00c2ncora Sa\u00fade" }}
       viewAs={{ canViewAs: isSuperAdminViewingDirector, viewingAs: null }}
     >
-      {screen === "leads" || screen === "kanban" ? (
-        <LeadsShellScreen view={screen === "kanban" ? "kanban" : "list"} />
+      {leadsView ? (
+        <LeadsShellScreen view={leadsView} />
       ) : screen === "lead" ? (
         <>
           <DashboardHeader breadcrumb="Operação comercial" title="Perfil do lead" />
