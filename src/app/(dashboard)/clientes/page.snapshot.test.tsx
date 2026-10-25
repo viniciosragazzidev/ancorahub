@@ -94,3 +94,28 @@ describe("/clientes com a chave desligada", () => {
     expect(html).toBe('<div data-stub="light-clients-management"></div>');
   });
 });
+
+describe("/clientes com a chave ligada", () => {
+  it("diretor vê a versão Lite com os mesmos dados", async () => {
+    state.liteKey.on = true;
+    queueFullResults();
+    const html = renderToStaticMarkup(await CustomersPage({ searchParams: Promise.resolve({ branch: "b1" }) }));
+    expect(html).toContain('data-skin="diretor"');
+    expect(html).toContain('data-lite="table"');
+    expect(html).toContain("Ana Ribeiro");
+    expect(html).toContain('href="/clientes/c1"');
+    expect(html).not.toContain("Carteira de clientes ativos</div>");
+    expect(html).not.toContain('data-stub="branch-select"');
+  });
+
+  it("gestor normal segue na versão completa, idêntica à de hoje", async () => {
+    state.liteKey.on = true;
+    state.context = { role: "manager", tenantId: "t1", userId: "u2" };
+    queueFullResults();
+    const html = renderToStaticMarkup(await CustomersPage({ searchParams: Promise.resolve({ period: "7" }) }));
+    state.liteKey.on = false;
+    queueFullResults();
+    const off = renderToStaticMarkup(await CustomersPage({ searchParams: Promise.resolve({ period: "7" }) }));
+    expect(html).toBe(off);
+  });
+});

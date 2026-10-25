@@ -6,6 +6,9 @@ import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { getDatabase, schema } from "@/shared/db";
 import { parsePeriod, periodStart } from "@/shared/period";
 import { ClientesList } from "./clientes-list";
+import { ClientesLite } from "./clientes-lite";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
 import { buildClientScopeWhere } from "@/features/customers/customer-authorization";
 import { buildLeadScopeWhere } from "@/features/leads/lead-authorization";
 
@@ -165,6 +168,32 @@ export default async function CustomersPage({
     recentConversions,
     totalBrokers,
   };
+
+  // Chave do diretor: a mesma carteira no visual Lite (unidade e período vão para a barra da lista).
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/clientes")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Pós-venda" title="Clientes" />
+        <main className={litePage.stack}>
+          <ClientesLite
+            clients={clients.map((client) => ({
+              id: client.id,
+              name: client.name,
+              phone: client.phone,
+              email: client.email,
+              convertedAt: new Date(client.convertedAt).toISOString(),
+              brokerName: client.brokerName,
+              branchName: client.branchName,
+            }))}
+            metrics={metrics}
+            period={period}
+            branches={canFilterBranch ? branches : []}
+            branchId={branchParam}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
