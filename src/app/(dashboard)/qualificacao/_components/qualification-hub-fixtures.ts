@@ -1,0 +1,71 @@
+/** Dados de exemplo do hub de qualificação (testes e a moldura real em desenvolvimento). Nunca dados reais. */
+import type { ComponentProps } from "react";
+
+import type { QualificationHubClient } from "./qualification-hub-client";
+
+type HubProps = ComponentProps<typeof QualificationHubClient>;
+
+export const QUALIFICATION_HUB_FIXTURE: HubProps = {
+  settings: {
+    enabled: true,
+    pauseMode: "handoff_active",
+    assistantName: "Ana da Âncora",
+    initialMessage: "Olá! Sou a Ana, assistente da Âncora Saúde. Vou fazer algumas perguntas rápidas para preparar seu atendimento.",
+    finalMessage: null,
+    handoffMessage: "Vou encaminhar você para um corretor da equipe agora.",
+    outOfHoursMessage: "Recebemos sua mensagem. Nossa equipe responde no próximo horário de atendimento.",
+    absenceMessage: "No momento não há um corretor disponível.",
+    tone: "friendly",
+    useEmojis: false,
+    timeoutMinutes: 20,
+    businessContext: "Corretora de planos de saúde individuais, familiares e PME no Rio de Janeiro. Trabalhamos com Amil, Bradesco Saúde, SulAmérica e Unimed.",
+    customInstructions: "Seja cordial e objetiva. Nunca peça CPF ou fotos de documentos no chat.",
+    version: 7,
+    updatedAt: "2026-10-20T15:00:00.000Z",
+    quickReplyCooldownMinutes: 10,
+    quickReplyWaitWindowMinutes: 30,
+    quickReplyWaitLimitCount: 2,
+  },
+  testNumbers: [],
+  whatsappDiagnostic: {
+    channelConnected: true,
+    officialNumber: "+55 21 99999-0000",
+    displayName: "Âncora Saúde",
+    tenantId: "tenant-fixture",
+    wabaId: "1234567890",
+    phoneNumberId: "109876543210987",
+    webhookStatus: "active",
+    tokenStatus: "valid",
+    tokenExpirationDays: 52,
+    lastMessageReceivedAt: null,
+    lastMessageSentAt: null,
+    lastError: null,
+    averageLatencyMs: 412,
+    configVersion: 3,
+    overallHealth: "healthy",
+  } as HubProps["whatsappDiagnostic"],
+  followUpRules: [
+    { id: "rule-1", name: "Lead abandonou a qualificação", enabled: false, trigger: "qualification_abandoned", delayMinutes: 120, maxAttempts: 3, minimumIntervalMinutes: 60, allowedDays: [1, 2, 3, 4, 5], allowedStartTime: "08:00", allowedEndTime: "18:00", timezone: "America/Sao_Paulo", messageMode: "fixed", fixedMessage: "Olá! Ainda posso te ajudar com a cotação?", templateId: null, stopConditions: [], destinationStatus: null },
+    { id: "rule-2", name: "Cotação enviada sem retorno do cliente", enabled: false, trigger: "quote_without_response", delayMinutes: 1440, maxAttempts: 2, minimumIntervalMinutes: 120, allowedDays: [1, 2, 3, 4, 5], allowedStartTime: "09:00", allowedEndTime: "19:00", timezone: "America/Sao_Paulo", messageMode: "ai_generated", fixedMessage: null, templateId: null, stopConditions: [], destinationStatus: null },
+  ],
+  toolPermissions: [
+    { toolName: "lookup_plans", displayName: "Consultar planos", category: "read_only", description: "Lista os planos e operadoras da corretora.", permission: "allowed", maxCallsPerSession: 10, requiresHumanConfirmation: false, isCritical: false },
+    { toolName: "update_lead", displayName: "Atualizar lead", category: "write", description: "Grava as respostas da qualificação no lead.", permission: "blocked", maxCallsPerSession: 10, requiresHumanConfirmation: false, isCritical: false },
+    { toolName: "delete_lead", displayName: "Excluir lead", category: "critical", description: "Remove um lead da base.", permission: "blocked", maxCallsPerSession: 0, requiresHumanConfirmation: true, isCritical: true },
+  ],
+  destinationRules: [],
+  brokerProfiles: [],
+  stats: {
+    operation: { startedToday: 48, active: 9, completed: 31, paused: 2, withError: 1, transferredToHuman: 12 },
+    qualification: { totalQualified: 27, hotLeads: 8, warmLeads: 11, coldLeads: 8, unqualified: 4, noResponse: 6, completionRatePct: 64, abandonmentRatePct: 18 },
+    distribution: { distributed: 25, waitingQueue: 3, noDestination: 0, avgTimeMsToDistribution: 90000, avgTimeMsToBrokerTakeover: 240000, slaRedistributions: 1, distributionFailures: 0 },
+    costs: { messagesSent: 410, aiCalls: 220, inputTokens: 180000, outputTokens: 52000, aiCostBrl: 18.4, whatsappCostBrl: 9.75, avgCostPerSessionBrl: 0.59, avgCostPerQualifiedBrl: 1.04 },
+    followup: { scheduled: 6, sent: 14, responded: 5, interrupted: 2, conversionsPostFollowup: 3, costPerRecoveryBrl: 0.4 },
+  } as HubProps["stats"],
+  alerts: [
+    { id: "alert-1", alertType: "Fila sem corretor", level: "critical", status: "active", message: "A fila PME está sem corretor disponível há 25 minutos.", suggestedAction: "Escalar um corretor de plantão." },
+    { id: "alert-2", alertType: "Token perto de vencer", level: "warning", status: "acknowledged", message: "O token da Meta vence em 7 dias.", suggestedAction: null },
+  ] as unknown as HubProps["alerts"],
+  agentTraining: { enabled: false, canEdit: false, versions: [], brokers: [], distributionPolicy: null },
+  canManageMessages: true,
+};
