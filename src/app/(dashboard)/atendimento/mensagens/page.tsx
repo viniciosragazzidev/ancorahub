@@ -4,6 +4,10 @@ import { AuthorizationError } from "@/shared/auth/errors";
 import { getRequiredTenantContext } from "@/shared/auth/tenant-context";
 import { AtendimentoHeading } from "../_components/atendimento-heading";
 import { MessagesWorkspace } from "./_components/messages-workspace";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { AtendimentoHeadingLite } from "../_components/atendimento-heading-lite";
+import { MessagesWorkspaceLite } from "./_components/messages-workspace-lite";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +24,19 @@ export default async function AtendimentoMensagensPage() {
     throw new AuthorizationError("Apenas Diretores e Gestores podem gerenciar as mensagens do atendimento.");
   }
   const messages = await getMessageLibrary(context.tenantId);
+
+  // Chave do visual Lite: a mesma biblioteca e as mesmas ações, com a lista Lite.
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/atendimento/mensagens")) {
+    return (
+      <>
+        <DashboardHeader breadcrumb="Atendimento" title="Mensagens" />
+        <main className={litePage.stack}>
+          <AtendimentoHeadingLite active="mensagens" />
+          <MessagesWorkspaceLite messages={messages} />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
