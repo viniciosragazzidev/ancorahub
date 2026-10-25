@@ -474,3 +474,7 @@ A aba Funil usa o mesmo `getQualificationFunnel` e as métricas existentes, com 
 ## 2026-10-25 - Refinamento da moldura e painel Diretor Lite
 
 O topo global e o /dashboard agora seguem um container e ritmo Arc comum, com cards por borda, ajuda alinhada, linhas de plantao e alvo minimo de 44px. A rota de desenvolvimento `/dev/diretor-shell-real` valida AppShell e painel reais para diretor e super-admin em 390, 768, 1024 e 1440; prints e checklist linha a linha estao em `docs/implementations/completed/2026-10-25-diretor-lite-f2b.md`.
+
+## 2026-10-25 - Onda 5, distribuicao e plantoes no Lite
+
+OperaÃ§Ã£o, filas, calendÃ¡rio, ocorrÃªncia, saÃºde da distribuiÃ§Ã£o e dashboard reaproveitam consultas, aÃ§Ãµes e permissÃµes existentes, incluindo o papel real do contexto. Vitest, type-check e ESLint foram executados; a inspeÃ§Ã£o visual da prÃ©via real e seus prints seguem pendentes porque a compilaÃ§Ã£o excedeu o tempo limite sob pressÃ£o de memÃ³ria. ExecuÃ§Ã£o: `docs/implementations/active/2026-10-24-diretor-lite/onda5-execution.md`.

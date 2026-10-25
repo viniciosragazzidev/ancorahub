@@ -29,3 +29,11 @@ somente valores serializáveis e não recebe JSX nem callbacks do servidor.
 ## Decisão de acesso (25/10)
 
 As telas internas Lite recebem papel e permissões do contexto autenticado. Restrições por papel repetem os checks da tela atual; o gate isDirectorLitePageOnServer e useDirectorLitePage continua temporário até a troca central da chave.
+
+## Validação desta rodada
+
+- Vitest focado: 9 arquivos, 17 testes aprovados. O teste de Saúde verifica os rótulos exibidos atualmente.
+- `npx tsc --noEmit -p .`: aprovado após as alterações de implementação.
+- ESLint nos arquivos TypeScript alterados: zero erros e 6 avisos de regras já presentes na inbox e no workspace de plantões.
+- `node scripts/check-lite-skin.mjs`: relatório executado. Comparação dos arquivos alterados com a base `d2d80a01` não encontrou novos desvios de estilo.
+- A prévia iniciou, mas `/dev/diretor-shell-real?tela=distribuicao-operar` não terminou de compilar em 120 segundos, sob pressão de memória dos servidores de outras worktrees. O servidor desta worktree foi encerrado. Prints e medições de viewport continuam pendentes; não usar esta validação como aprovação visual.
