@@ -35,15 +35,23 @@
   align-items: center;
   min-height: 44px;
   padding: 0 16px;
+  border: 0;
   border-radius: 999px;
+  background: transparent;
   color: var(--text-secondary);
+  font: inherit;
   font-size: var(--text-sm);
   font-weight: 500;
-  text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
 
-.viewLink[aria-current="page"] {
+.viewLink:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.viewLink[aria-pressed="true"] {
   background: var(--surface);
   color: var(--foreground);
   box-shadow: var(--shadow-resting);
@@ -71,4 +79,57 @@
 .badge[data-tone="danger"] {
   background: var(--danger-subtle);
   color: var(--danger);
+}
+
+.badge[data-tone="warning"] {
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+/* Célula do lead e do corretor: nome, entrada pelo WhatsApp, etiquetas e sinais, sem quebrar dentro de cada peça. */
+.leadCell,
+.brokerCell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  justify-items: start;
+}
+
+.nameLine,
+.tags,
+.queue {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tags {
+  flex-wrap: wrap;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 10rem;
+  min-height: 20px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+.ellipsis {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.muted {
+  color: var(--text-muted);
 }

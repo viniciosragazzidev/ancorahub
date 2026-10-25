@@ -52,13 +52,18 @@ export function LeadsLiteBulk({ selectedIds, onClear, config }: { selectedIds: s
     startRevert(async () => {
       const formData = new FormData();
       for (const id of ids) formData.append("leadIds", id);
-      const result = await bulkRevertToQualificationAction({}, formData);
-      if (result.error) {
-        toast.error(result.error);
-        return;
+      try {
+        const result = await bulkRevertToQualificationAction({}, formData);
+        if (result.error) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success(result.message ?? "Leads devolvidos à fila de qualificação.");
+        if (result.changedLeadIds?.length) config.onRevertCommitted?.({ leadIds: result.changedLeadIds });
+      } catch {
+        // Falha de rede ou do servidor: o mesmo aviso de erro, sem deixar a promessa solta.
+        toast.error("Não foi possível devolver os leads para a qualificação. Tente de novo.");
       }
-      toast.success(result.message ?? "Leads devolvidos à fila de qualificação.");
-      if (result.changedLeadIds?.length) config.onRevertCommitted?.({ leadIds: result.changedLeadIds });
     });
   };
 

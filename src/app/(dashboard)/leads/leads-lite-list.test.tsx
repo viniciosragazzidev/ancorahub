@@ -12,7 +12,12 @@ vi.mock("./leads-data-table", () => ({
   LeadsDataTable: () => <div data-testid="legacy-table" />,
 }));
 
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams("search=Maria") }));
+const replace = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams("search=Maria&branch=b1"),
+  usePathname: () => "/leads",
+  useRouter: () => ({ replace, push: vi.fn(), refresh: vi.fn() }),
+}));
 // Server Actions do lote: fora do teste da lista.
 vi.mock("./status-actions", () => ({
   bulkChangeLeadStatusAction: vi.fn(),
@@ -24,16 +29,60 @@ vi.mock("./status-actions", () => ({
 afterEach(cleanup);
 
 describe("cabeçalho e ações da lista Lite", () => {
-  it("mostra contagem e alternância lista/kanban; a busca fica nos filtros Lite", () => {
+  it("mostra o total do filtro e troca de visão pela troca do workspace; a busca fica nos filtros Lite", () => {
+    const onViewChange = vi.fn();
     const { container } = render(
       <ArcScopeProvider enabled>
-        <LeadsListSwitch {...props} onRowClick={() => {}} />
+        <LeadsListSwitch {...props} onRowClick={() => {}} onViewChange={onViewChange} pagination={{ currentPage: 1, pageSize: 20, totalItems: 134, totalPages: 7 }} />
       </ArcScopeProvider>,
     );
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
-    expect(container.querySelector(".count, [class*='count']")).toHaveTextContent("1 lead");
-    expect(screen.getByRole("link", { name: "Kanban" })).toHaveAttribute("href", "/leads?view=kanban");
-    expect(screen.getByRole("link", { name: "Lista" })).toHaveAttribute("aria-current", "page");
+    expect(container.querySelector("[class*='count']")).toHaveTextContent("134 leads");
+    expect(screen.getByRole("button", { name: "Lista" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Kanban" }));
+    expect(onViewChange).toHaveBeenCalledWith("kanban");
+  });
+
+  it("pagina pela URL mantendo os filtros, como a tabela atual", () => {
+    window.history.replaceState(null, "", "/leads?search=Maria&branch=b1");
+    render(
+      <ArcScopeProvider enabled>
+        <LeadsListSwitch {...props} onRowClick={() => {}} pagination={{ currentPage: 1, pageSize: 20, totalItems: 134, totalPages: 7 }} />
+      </ArcScopeProvider>,
+    );
+    expect(screen.getByText("1 a 20 de 134")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Próxima página" }));
+    expect(replace).toHaveBeenCalledWith("/leads?search=Maria&branch=b1&page=2", { scroll: false });
+  });
+
+  it("traz de volta etiquetas, fila, qualificação, plantão e os destaques de linha", () => {
+    const flagged: LeadWorkspaceItem = {
+      ...lead,
+      id: "l9",
+      nome: "Rita Alves",
+      tags: [{ id: "t1", name: "VIP", colorHue: 120 }],
+      queueName: "Fila PME",
+      queueColorHue: 200,
+      isPlantaoAtivo: true,
+      isManagementInvestigation: true,
+    };
+    const returned: LeadWorkspaceItem = { ...lead, id: "l10", nome: "Rui Costa", returnedUnaccepted: true, qualificationStatus: "warm" };
+    const { container } = render(
+      <ArcScopeProvider enabled>
+        <LeadsListSwitch {...props} leads={[flagged, returned]} onRowClick={() => {}} />
+      </ArcScopeProvider>,
+    );
+    const table = container.querySelector('[data-lite="table"]')!;
+    expect(table).toHaveTextContent("VIP");
+    expect(table).toHaveTextContent("Fila PME");
+    expect(table).toHaveTextContent("Alta aptidão");
+    expect(table).toHaveTextContent("Média aptidão");
+    expect(table).toHaveTextContent("Plantão ativo");
+    expect(table).toHaveTextContent("Investigação da gestão");
+    expect(table).toHaveTextContent("Devolvido, não aceito");
+    const rows = table.querySelectorAll("tbody tr");
+    expect(rows[0]).toHaveAttribute("data-tone", "muted");
+    expect(rows[1]).toHaveAttribute("data-tone", "warning");
   });
 
   it("a etapa aparece como badge", () => {
