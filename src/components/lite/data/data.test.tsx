@@ -40,6 +40,19 @@ describe("LiteDataTable", () => {
     expect(open).toHaveBeenLastCalledWith(rows[1]);
   });
 
+  it("controle dentro da linha não abre o registro; coluna nowrap ganha a classe", () => {
+    const open = vi.fn();
+    const withAction: LiteColumn<Lead>[] = [...columns, { id: "go", label: "Ações", render: (row) => <a href={`/x/${row.id}`}>Abrir {row.name}</a> }];
+    withAction[2] = { ...withAction[2]!, nowrap: true };
+    render(<LiteDataTable {...base} columns={withAction} onRowOpen={open} />);
+    const link = screen.getByRole("link", { name: "Abrir Ana Souza" });
+    link.addEventListener("click", (event) => event.preventDefault());
+    fireEvent.click(link);
+    fireEvent.keyDown(link, { key: "Enter" });
+    expect(open).not.toHaveBeenCalled();
+    expect(screen.getByText("Fila Tatiana").className).toContain("nowrap");
+  });
+
   it("sem linhas, mostra o estado vazio", () => {
     render(<LiteDataTable {...base} rows={[]} />);
     expect(screen.getByText("Nenhum lead")).toBeInTheDocument();

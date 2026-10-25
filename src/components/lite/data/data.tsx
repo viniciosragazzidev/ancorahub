@@ -4,7 +4,7 @@
  * Lista de registros no visual Lite (F3): `LiteDataTable` como tabela a partir de 768px e `LiteDataList` como cartões
  * abaixo disso. As mesmas linhas e as mesmas colunas alimentam as duas; só a apresentação muda.
  */
-import type { KeyboardEvent, ReactNode } from "react";
+import type { KeyboardEvent, MouseEvent, ReactNode } from "react";
 
 import styles from "./data.module.css";
 
@@ -18,6 +18,8 @@ export type LiteColumn<T> = {
   primary?: boolean;
   /** Campo de apoio do cartão (linha pequena abaixo do título). */
   secondary?: boolean;
+  /** Nome curto (ex.: corretor): largura mínima, uma linha só e reticências, nunca quebra "Ana / Souza". */
+  nowrap?: boolean;
 };
 
 /** Seleção em massa: uma caixa por linha (44px de alvo) e "selecionar todos" no cabeçalho da tabela. */
@@ -52,13 +54,30 @@ function SelectBox({ checked, label, onChange }: { checked: boolean; label: stri
   );
 }
 
+const INTERACTIVE = "a, button, input, select, textarea, label, [role='combobox'], [role='menuitem']";
+
+/** Clique na linha abre o registro, exceto quando nasce num controle dentro dela (link, botão, caixa). */
+function openOnClick(onOpen: () => void) {
+  return (event: MouseEvent<HTMLElement>) => {
+    const control = (event.target as HTMLElement).closest(INTERACTIVE);
+    if (control && control !== event.currentTarget && event.currentTarget.contains(control)) return;
+    onOpen();
+  };
+}
+
 function activate(onOpen: () => void) {
   return (event: KeyboardEvent) => {
+    if (event.target !== event.currentTarget) return;
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
       onOpen();
     }
   };
+}
+
+function cellClass<T>(column: LiteColumn<T>) {
+  const names = [column.numeric ? styles.numeric : "", column.nowrap ? styles.nowrap : ""].filter(Boolean);
+  return names.length ? names.join(" ") : undefined;
 }
 
 export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection, rowTone }: LiteDataProps<T>) {
@@ -75,7 +94,7 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
               </th>
             ) : null}
             {columns.map((column) => (
-              <th key={column.id} scope="col" className={column.numeric ? styles.numeric : undefined}>{column.label}</th>
+              <th key={column.id} scope="col" className={cellClass(column)}>{column.label}</th>
             ))}
           </tr>
         </thead>
@@ -87,7 +106,7 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
               data-selected={selection?.isSelected(row) ? "true" : undefined}
               data-tone={rowTone?.(row)}
               tabIndex={onRowOpen ? 0 : undefined}
-              onClick={onRowOpen ? () => onRowOpen(row) : undefined}
+              onClick={onRowOpen ? openOnClick(() => onRowOpen(row)) : undefined}
               onKeyDown={onRowOpen ? activate(() => onRowOpen(row)) : undefined}
             >
               {selection ? (
@@ -96,7 +115,7 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
                 </td>
               ) : null}
               {columns.map((column) => (
-                <td key={column.id} className={column.numeric ? styles.numeric : undefined}>{column.render(row)}</td>
+                <td key={column.id} className={cellClass(column)}>{column.render(row)}</td>
               ))}
             </tr>
           ))}
@@ -119,7 +138,7 @@ export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, emp
           key={rowKey(row)}
           className={onRowOpen ? styles.card : styles.cardStatic}
           tabIndex={onRowOpen ? 0 : undefined}
-          onClick={onRowOpen ? () => onRowOpen(row) : undefined}
+          onClick={onRowOpen ? openOnClick(() => onRowOpen(row)) : undefined}
           onKeyDown={onRowOpen ? activate(() => onRowOpen(row)) : undefined}
           data-selected={selection?.isSelected(row) ? "true" : undefined}
           data-tone={rowTone?.(row)}

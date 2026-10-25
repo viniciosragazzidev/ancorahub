@@ -11,6 +11,7 @@ import styles from "./controls.module.css";
 
 export { LiteMenu, type LiteMenuItem } from "./menu";
 export { LiteSelect, useLitePhone, type LiteOption, type LiteSelectProps } from "./select";
+export { LiteUrlSelect } from "./url-select";
 
 export type FilterChip = { id: string; label: string; count?: number };
 /** Filtro ativo: rótulo do campo e valor escolhido ("Filial" e "Centro"). */
@@ -84,6 +85,8 @@ export type BulkAction = {
   shortLabel?: string;
   onRun: () => void;
   tone?: "default" | "danger";
+  /** Ação em andamento (ex.: exportando): o botão fica desativado até terminar. */
+  disabled?: boolean;
 };
 
 /** Barra de lote: aparece com itens selecionados e leva as ações em massa. `count` 0 esconde a barra. */
@@ -95,7 +98,7 @@ export function LiteBulkBar({ count, actions, onClear }: { count: number; action
       <span className={styles.bulkCount}>{count} {words}</span>
       <div className={styles.bulkActions}>
         {actions.map((action) => (
-          <button key={action.id} type="button" className={styles.bulkButton} data-tone={action.tone === "danger" ? "danger" : undefined} aria-label={action.shortLabel ? action.label : undefined} onClick={action.onRun}>
+          <button key={action.id} type="button" className={styles.bulkButton} data-tone={action.tone === "danger" ? "danger" : undefined} aria-label={action.shortLabel ? action.label : undefined} disabled={action.disabled} onClick={action.onRun}>
             {action.shortLabel ? (
               <>
                 <span className={styles.longLabel}>{action.label}</span>

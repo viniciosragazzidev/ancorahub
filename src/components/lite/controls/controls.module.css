@@ -262,3 +262,8 @@
     flex: none;
   }
 }
+
+.bulkButton:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}

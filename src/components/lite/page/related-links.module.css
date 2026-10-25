@@ -1,0 +1,82 @@
+/* Atalhos relacionados Lite: grupo de borda fina, links de 44px em grade, sem caixa alta. Só tokens. */
+
+.root {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.head {
+  display: grid;
+  gap: 4px;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 500;
+}
+
+.description {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.links {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  height: 100%;
+  padding: 12px 16px;
+  border-radius: calc(var(--radius-surface) - 16px);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  text-decoration: none;
+}
+
+.link:hover {
+  background: var(--border-subtle);
+}
+
+.linkText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.linkLabel {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.linkDescription {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.arrow {
+  flex: none;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 767px) {
+  .root {
+    padding: 16px;
+  }
+}

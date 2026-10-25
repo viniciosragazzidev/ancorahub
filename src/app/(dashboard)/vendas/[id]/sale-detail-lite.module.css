@@ -1,0 +1,179 @@
+/* Detalhe da venda Lite: identidade, progresso do repasse e abas. Só tokens; 24px entre regiões; alvos de 44px. */
+
+.identity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+}
+
+.identityMain {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.code {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.nameRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.name {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.progress {
+  display: grid;
+  gap: 8px;
+  padding: 16px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-surface);
+  background: var(--surface);
+  font-size: var(--text-sm);
+}
+
+.progressHead,
+.progressFoot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.progressFoot {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.track {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+}
+
+.tabs {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.tabsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-width: 0;
+}
+
+.tabList {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabCount {
+  margin-left: 8px;
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabSummary {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+}
+
+.panel {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  align-items: stretch;
+  gap: 16px;
+}
+
+.fields {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+}
+
+.field dt {
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
+.field dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.notes {
+  max-width: 72ch;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 767px) {
+  .identity {
+    padding: 16px;
+  }
+
+  .progress {
+    padding: 16px;
+  }
+}

@@ -11,6 +11,9 @@ import { OverviewBranchNotFoundError, resolveOverviewFilter } from "@/features/d
 import { ArrowLeft } from "@/components/huge-icons";
 import { DataTableFrame } from "@/components/ui/data-table/data-table-frame";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import litePage from "@/components/lite/page/lite-page.module.css";
+import { isDirectorLitePageOnServer } from "@/features/director-lite/style-flag";
+import { DrilldownLite } from "../_components/drilldown-lite";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +39,27 @@ export default async function DrilldownPage({
   });
   const branchId = overview.narrowBranchId;
   const drilldown = await getDrilldown(context, drillId, period, { scope, branchId });
+
+  if (await isDirectorLitePageOnServer(context.role, context.tenantId, "/relatorios/drill/[drillId]")) {
+    const backHref = `/dashboard?period=${period}&tab=overview${branchId ? `&branchId=${encodeURIComponent(branchId)}` : ""}`;
+    return (
+      <>
+        <DashboardHeader
+          breadcrumb={`Relatórios / ${drilldown.title}`}
+          title={drilldown.title}
+          rightSlot={<Link href={backHref} className={litePage.button}><ArrowLeft className="size-4" aria-hidden="true" />Voltar</Link>}
+        />
+        <main className={litePage.stack}>
+          <DrilldownLite
+            explanation={drilldown.explanation}
+            total={drilldown.total}
+            rows={drilldown.rows.map((lead) => ({ id: lead.id, nome: lead.nome, status: lead.status, brokerName: lead.brokerName, branchName: lead.branchName, createdAt: new Date(lead.createdAt).toISOString() }))}
+            brokers={drilldown.brokers.map((broker) => ({ ...broker }))}
+          />
+        </main>
+      </>
+    );
+  }
 
   return (
     <>

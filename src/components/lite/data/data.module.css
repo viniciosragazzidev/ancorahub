@@ -56,7 +56,31 @@
   cursor: pointer;
 }
 
-.numeric {
+/* Linha e cartão que abrem o registro: anel de foco por dentro, para não ser cortado pela moldura. */
+.clickable:focus-visible,
+.card:focus-visible {
+  outline: var(--focus-outline-width, 2px) solid var(--focus-outline, var(--primary));
+  outline-offset: -2px;
+}
+
+/* Nome curto numa linha: largura mínima e reticências (o texto inteiro fica no title de quem renderiza). */
+.table .nowrap {
+  min-width: 144px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Célula de duas linhas (nome e apoio): cada linha corta sozinha. */
+.table td.nowrap > span > span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.numeric,
+.table th.numeric {
   text-align: right;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
