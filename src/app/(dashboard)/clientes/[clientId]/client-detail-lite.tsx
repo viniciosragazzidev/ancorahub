@@ -153,7 +153,7 @@ export function ClientDetailLite({ client, consentimentoLgpd, sales, activeCusto
                           <Field label="Valor"><span className={page.numeric}>{currency(parseFloat(sale.saleValue))}</span></Field>
                           {sale.policyNumber ? <Field label="Apólice">{sale.policyNumber}</Field> : null}
                           {sale.carrierName ? <Field label="Operadora">{sale.carrierName}</Field> : null}
-                          {sale.planName ? <Field label="Plano">{sale.planName}</Field> : null}
+                          
                         </dl>
                         {sale.notes ? <p className={styles.note}>{sale.notes}</p> : null}
                         <div>
@@ -177,7 +177,7 @@ export function ClientDetailLite({ client, consentimentoLgpd, sales, activeCusto
                   <h3 id="cliente-documentos" className={page.cardTitle}>Documentos</h3>
                   <p className={page.cardDescription}>Documentos vinculados ao lead original e aprovados na conversão.</p>
                 </header>
-                {slots.documents}
+                <div className={styles.docs}>{slots.documents}</div>
               </section>
             </TabsContent>
 

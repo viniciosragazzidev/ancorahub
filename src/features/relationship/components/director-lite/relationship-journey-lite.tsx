@@ -19,17 +19,15 @@ import styles from "./relationship-lite.module.css";
 
 type HistoryItem = Omit<BroadcastSummary, "createdAt"> & { createdAt: string };
 
-export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, options, history, data, actions, initialTab = "messages" }: {
+export function RelationshipJourneyLite({ relationshipEnabled, journeyEnabled, options, history, data, actions }: {
   relationshipEnabled: boolean;
   journeyEnabled: boolean;
   options: AudienceOptions | null;
   history: HistoryItem[];
   data: DirectorJourneyData | null;
   actions: DirectorJourneyActions;
-  /** Só para a moldura de desenvolvimento abrir direto na jornada. */
-  initialTab?: "messages" | "journey";
 }) {
-  const [tab, setTab] = useState<string>(initialTab);
+  const [tab, setTab] = useState("messages");
   return (
     <Tabs value={tab} onValueChange={setTab} variant="segment" className={styles.tabs}>
       <div className={styles.tabList}>

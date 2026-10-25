@@ -275,6 +275,20 @@
   margin: 0;
 }
 
+/* No lado, o link de 44px já dá o respiro: rótulo cola no valor. */
+.asideFields .field {
+  gap: 0;
+}
+
+/* Campos da peça de documentos com alvo de 44px dentro da ficha Lite. */
+.docs {
+  min-width: 0;
+}
+
+.docs :global(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"])) {
+  min-height: 44px;
+}
+
 .pairFields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

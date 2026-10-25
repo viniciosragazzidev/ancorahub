@@ -193,7 +193,7 @@ export function RelationshipMessagesLite({ options, history }: { options: Audien
         {audienceKind === "team" && options.role === "supervisor" ? <p className={styles.hint}>Os corretores da sua equipe.</p> : null}
         {audienceKind === "all" ? <p className={styles.hint}>Todos os corretores ativos da empresa.</p> : null}
 
-        <div aria-live="polite" className={styles.block}>
+        <div aria-live="polite" className={`${styles.block} ${styles.live}`}>
           {preview?.error ? <p className={styles.error}>{preview.error}</p> : null}
           {preview && !preview.error ? (
             <p className={styles.preview}>

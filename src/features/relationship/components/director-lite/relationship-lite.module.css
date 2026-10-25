@@ -432,6 +432,12 @@ button.row:hover {
 
 .pair > * {
   min-width: 0;
+  align-content: start;
+}
+
+/* Região de aviso vazia (antes de escolher o público): não soma o vão do card. */
+.live:empty {
+  margin-top: -16px;
 }
 
 .bars {
@@ -580,7 +586,7 @@ button.row:hover {
   gap: 8px;
 }
 
-.ruleField > span {
+.ruleField label {
   color: var(--text-secondary);
   font-size: var(--text-xs);
 }
