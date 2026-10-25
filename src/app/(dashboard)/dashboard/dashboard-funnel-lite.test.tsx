@@ -28,7 +28,7 @@ vi.mock("@/features/qualification-turbo/funnel", () => ({
   getQualificationFunnel: (...args: unknown[]) => state.getFunnel(...args),
 }));
 vi.mock("@/features/reports/metrics/narrow-scope", () => ({ parseBranchIdParam: (value: string | undefined) => value ?? null }));
-vi.mock("@/features/director-lite/style-flag", () => ({ shouldUseDirectorLiteStyle: async () => state.role === "director" && state.flag }));
+vi.mock("@/features/director-lite/style-flag", () => ({ shouldUseDirectorLiteStyle: async () => !["broker", "supervisor"].includes(state.role) && state.flag }));
 vi.mock("@/features/dashboard/director-lite-branches", () => ({
   getDashboardUnitFilter: async () => ({ canCompare: true, units: state.units }),
   resolveRequestedUnit: (requested: string | null, units: Array<{ id: string }>) => requested && units.some((unit) => unit.id === requested) ? requested : null,
@@ -82,8 +82,16 @@ describe("aba Funil de qualificação do Diretor Lite", () => {
     expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ tenantId: "tenant-funil" }), 30);
   });
 
-  it("gestor continua na aba antiga e sua unidade vem da sessão", async () => {
+  it("gestor no modo normal também usa o funil Lite (chave ligada vale para todo o modo normal)", async () => {
     state.role = "manager";
+    const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", periodo: "7", unidade: allowedUnit }) });
+    expect(element.type).toBe(DirectorLiteQualificationFunnelPage);
+    expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ role: "manager", branchId: "unidade-gestor" }), 7, allowedUnit);
+  });
+
+  it("gestor com a chave desligada continua na aba antiga e sua unidade vem da sessão", async () => {
+    state.role = "manager";
+    state.flag = false;
     const element = await DashboardPage({ searchParams: Promise.resolve({ tab: "funnel", period: "7", unidade: allowedUnit }) });
     expect(element.type).toBe(QualificationFunnelView);
     expect(state.getFunnel).toHaveBeenCalledWith(expect.objectContaining({ role: "manager", branchId: "unidade-gestor" }), 7);

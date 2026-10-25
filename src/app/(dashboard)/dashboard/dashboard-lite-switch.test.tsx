@@ -8,7 +8,7 @@ vi.mock("@/shared/auth/tenant-context", () => ({
   getRequiredTenantContext: async () => ({ role: access.role, tenantId: "tenant-a" }),
 }));
 vi.mock("@/features/director-lite/style-flag", () => ({
-  shouldUseDirectorLiteStyle: async (context: { role: string }) => context.role === "director" && access.flag,
+  shouldUseDirectorLiteStyle: async (context: { role: string }) => !["broker", "supervisor"].includes(context.role) && access.flag,
 }));
 
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
@@ -35,8 +35,8 @@ describe("painel do diretor: troca pela chave", () => {
     expect(element.type).toBe(LegacyDashboardLoading);
   });
 
-  it("loading: para outro papel, fica o skeleton de hoje mesmo com a chave ligada", async () => {
-    access.role = "manager";
+  it("loading: para corretor ou supervisor, fica o skeleton de hoje mesmo com a chave ligada", async () => {
+    access.role = "supervisor";
     const element = await Loading();
     expect(element.type).toBe(LegacyDashboardLoading);
   });

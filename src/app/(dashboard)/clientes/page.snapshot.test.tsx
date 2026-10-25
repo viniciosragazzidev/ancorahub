@@ -35,7 +35,7 @@ vi.mock("@/features/broker-workspace/lite-audience", () => ({ getLiteAudience: a
 vi.mock("@/features/broker-workspace/components/light-clients-list", () => ({ LightClientsList: ({ management }: { management?: boolean }) => <div data-stub={`light-clients${management ? "-management" : ""}`} /> }));
 vi.mock("@/features/director-lite/style-flag", async () => {
   const { isDirectorLiteRouteOptedOut } = await import("@/components/arc/director-lite-routes");
-  return { isDirectorLitePageOnServer: async (context: { role: string }, pathname: string) => context.role === "director" && state.liteKey.on && !isDirectorLiteRouteOptedOut(pathname) };
+  return { isDirectorLitePageOnServer: async (context: { role: string }, pathname: string) => !["broker", "supervisor"].includes(context.role) && state.liteKey.on && !isDirectorLiteRouteOptedOut(pathname) };
 });
 vi.mock("@/components/dashboard-header", () => ({ DashboardHeader: ({ breadcrumb, title }: { breadcrumb: string; title: string }) => <header data-stub="dashboard-header">{breadcrumb} / {title}</header> }));
 vi.mock("@/components/branch-select", () => ({ BranchSelect: () => <div data-stub="branch-select" /> }));
@@ -108,7 +108,7 @@ describe("/clientes com a chave ligada", () => {
     expect(html).not.toContain('data-stub="branch-select"');
   });
 
-  it("gestor normal segue na versão completa, idêntica à de hoje", async () => {
+  it("gestor no modo normal também troca para o Lite com a chave ligada", async () => {
     state.liteKey.on = true;
     state.context = { role: "manager", tenantId: "t1", userId: "u2" };
     queueFullResults();
@@ -116,6 +116,6 @@ describe("/clientes com a chave ligada", () => {
     state.liteKey.on = false;
     queueFullResults();
     const off = renderToStaticMarkup(await CustomersPage({ searchParams: Promise.resolve({ period: "7" }) }));
-    expect(html).toBe(off);
+    expect(html).not.toBe(off);
   });
 });

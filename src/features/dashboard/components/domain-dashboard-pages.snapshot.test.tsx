@@ -28,7 +28,7 @@ vi.mock("@/features/reports/metrics/metrics-service", () => ({
 }));
 vi.mock("@/features/director-lite/style-flag", async () => {
   const { isDirectorLiteRouteOptedOut } = await import("@/components/arc/director-lite-routes");
-  return { isDirectorLitePageOnServer: async (context: { role: string }, pathname: string) => context.role === "director" && state.liteKey.on && !isDirectorLiteRouteOptedOut(pathname) };
+  return { isDirectorLitePageOnServer: async (context: { role: string }, pathname: string) => !["broker", "supervisor"].includes(context.role) && state.liteKey.on && !isDirectorLiteRouteOptedOut(pathname) };
 });
 vi.mock("@/components/dashboard-header", () => ({ DashboardHeader: ({ breadcrumb, title }: { breadcrumb: string; title: string }) => <header data-stub="dashboard-header">{breadcrumb} / {title}</header> }));
 
@@ -74,9 +74,9 @@ describe("visões gerais órfãs com a chave ligada", () => {
     expect(html).toContain("Em contato");
   });
 
-  it.each(PAGES)("%s fica igual para quem não é diretor", async (_route, Page) => {
+  it.each(PAGES)("%s fica igual para supervisor (fora do Lite em qualquer modo)", async (_route, Page) => {
     state.liteKey.on = true;
-    state.context = { role: "manager", tenantId: "t1", userId: "u2" };
+    state.context = { role: "supervisor", tenantId: "t1", userId: "u2" };
     const on = renderToStaticMarkup(await Page());
     state.liteKey.on = false;
     expect(on).toBe(renderToStaticMarkup(await Page()));
