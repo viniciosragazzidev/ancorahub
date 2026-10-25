@@ -10,6 +10,7 @@ import { LeadsHeaderActions } from "@/app/(dashboard)/leads/_components/leads-he
 import { LeadsWorkspace, type QualifyingLeadItem } from "@/app/(dashboard)/leads/leads-workspace";
 import liteStyles from "@/app/(dashboard)/leads/leads-lite-page.module.css";
 import type { LeadWorkspaceItem } from "@/features/leads/components/lead-workspace-types";
+import { RADAR_FIXTURES } from "@/features/conversation-intelligence/components/radar-fixtures";
 
 const BRANCHES = [
   { id: "branch-centro", name: "Centro", status: "active", acceptingLeads: true, isDistributionHub: false },
@@ -76,11 +77,15 @@ const LEADS: LeadWorkspaceItem[] = NAMES.map((nome, index) => ({
   corretorId: index > 1 ? "b1" : null,
   corretorNome: index > 1 ? "Ana Souza" : null,
   isPlantaoAtivo: index === 2,
+  // As 3 primeiras trazem a leitura da IA do Radar (quente, em risco, pendente no corretor).
+  qualificationDetails: index < 3 ? (RADAR_FIXTURES[index]?.qualificationDetails ?? null) : null,
   returnedUnaccepted: index === 1,
   createdAt: new Date(Date.UTC(2026, 9, 24, 14 - index, 2)).toISOString(),
 }));
 
-const QUALIFYING: QualifyingLeadItem[] = ["Katia Regina Albuquerque", "Adelair Oliveira dos Santos", "Carlos Souza"].map((nome, index) => ({
+// 60 leads em qualificação: a lista Lite pagina de 20 em 20 no cliente.
+const QUALIFYING_NAMES = ["Katia Regina Albuquerque", "Adelair Oliveira dos Santos", "Carlos Souza", "Maria Eduarda Fontes", "Raimundo Nonato Silva"];
+const QUALIFYING: QualifyingLeadItem[] = Array.from({ length: 60 }, (_, index) => `${QUALIFYING_NAMES[index % QUALIFYING_NAMES.length]} ${index + 1}`).map((nome, index) => ({
   id: `q-${index}`,
   nome,
   telefone: `55229${97502806 - index * 7}`,
@@ -95,12 +100,12 @@ const QUALIFYING: QualifyingLeadItem[] = ["Katia Regina Albuquerque", "Adelair O
   queueName: "FILA TATIANA",
   queueColorHue: 300,
   branchName: "Centro",
-  createdAt: new Date(Date.UTC(2026, 9, 23 - index, 16, 39)).toISOString(),
+  createdAt: new Date(Date.UTC(2026, 9, 23, 16 - (index % 12), 39)).toISOString(),
 }));
 
 const UNASSIGNED: LeadWorkspaceItem[] = LEADS.slice(0, 4).map((lead) => ({ ...lead, id: `u-${lead.id}`, corretorId: null, corretorNome: null, status: "new" }));
 
-export function LeadsShellScreen({ view }: { view: "list" | "kanban" | "qualificacoes" | "sem-atribuicao" }) {
+export function LeadsShellScreen({ view }: { view: "list" | "kanban" | "qualificacoes" | "sem-atribuicao" | "radar" }) {
   return (
     <>
       <DashboardHeader
