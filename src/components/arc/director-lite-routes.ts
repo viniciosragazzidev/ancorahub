@@ -81,8 +81,6 @@
   "/settings/whatsapp",
   "/tarefas/dashboard",
   "/unidades/[branchId]",
-  "/vendas",
-  "/vendas/[id]",
   "/vendas/dashboard",
   "/welcome",
 ] as const;
