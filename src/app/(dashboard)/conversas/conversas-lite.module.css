@@ -247,11 +247,11 @@
 }
 
 .root[data-skin="diretor"] [data-conversations-part="row-time"] {
-  max-width: 3.25rem;
-  flex: 0 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  width: 4rem;
+  flex: 0 0 4rem;
   white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
   font-size: var(--text-xs);
 }
 

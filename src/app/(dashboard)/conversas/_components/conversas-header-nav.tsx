@@ -4,12 +4,12 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 import { Sparkles } from "lucide-react";
 import { BulkQualificationDialog } from "@/features/ai-qualification/components/bulk-qualification-dialog";
 
 export function ConversationsBulkQualificationAction() {
-  const directorSkinEnabled = useArcScopeEnabled();
+  const directorSkinEnabled = useDirectorLitePage();
   if (!directorSkinEnabled) return <BulkQualificationDialog />;
 
   return (
@@ -43,7 +43,7 @@ export function ConversasHeaderNav({
   leadsCount,
   coexLabel,
 }: ConversasHeaderNavProps) {
-  const directorSkinEnabled = useArcScopeEnabled();
+  const directorSkinEnabled = useDirectorLitePage();
   const isLeadsActive = currentTab === "leads";
   const isBrokersActive = currentTab === "corretores";
   const isCoexActive = currentTab === "coex";

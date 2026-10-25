@@ -9,30 +9,65 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
+vi.mock("@/components/dashboard-header", () => ({
+  DashboardHeader: ({ breadcrumb, title, rightSlot }: { breadcrumb: string; title: string; rightSlot?: import("react").ReactNode }) => (
+    <header data-slot="dashboard-header">{breadcrumb} {title}{rightSlot}</header>
+  ),
+}));
+
 import { ArcScopeProvider } from "@/components/arc/arc-scope-context";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { isDirectorLiteRouteOptedOut } from "@/components/arc/director-lite-routes";
 import { ConversationsFrame } from "./conversations-frame";
 import { ConversationsWorkspace, type ConversationItem } from "./conversations-workspace";
 import { OfficialBrokerConversations } from "./official-broker-conversations";
 import { ConversasHeaderNav } from "./_components/conversas-header-nav";
+import styles from "./conversas-lite.module.css";
 
 function renderWorkspace(enabled: boolean, pathname = "/conversas") {
   navigation.pathname = pathname;
   return renderToStaticMarkup(
-    <ArcScopeProvider enabled={enabled && !isDirectorLiteRouteOptedOut(pathname)}>
-      <ConversationsFrame
-        legacyHeader={<header data-slot="dashboard-header">Conversas</header>}
-        directorHeader={<header data-slot="dashboard-header">Conversas</header>}
-      >
-        <ConversationsWorkspace
+    <SidebarProvider>
+      <ArcScopeProvider enabled={enabled && !isDirectorLiteRouteOptedOut(pathname)}>
+        <ConversationsFrame
           role="director"
           branches={[]}
           conversations={[]}
           userId="fixture-director"
           tenantId="fixture-tenant"
-          directorActions={<nav aria-label="Ações da central">Ações</nav>}
+          leadTags={[]}
+          canManageTags={false}
+          officialBrokerEnabled={false}
+          officialBrokerDeliveryChannel="meta"
+          officialBrokerConversations={[]}
+          canSeeBrokerTab
+          currentTab="leads"
+          leadsCount={0}
+          officialBrokerTab={false}
         />
-      </ConversationsFrame>
+      </ArcScopeProvider>
+    </SidebarProvider>,
+  );
+}
+
+function renderLegacyWorkspaceSnapshot() {
+  navigation.pathname = "/conversas";
+  return renderToStaticMarkup(
+    <ArcScopeProvider enabled={false}>
+      <div className={`arc-venancor ${styles.root} flex h-app min-h-0 w-full flex-1 flex-col overflow-hidden`}>
+        <header data-slot="dashboard-header">Conversas</header>
+        <main className="flex min-h-0 w-full flex-1 flex-col overflow-hidden bg-background p-0">
+          <div data-lite="frame" className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-card">
+            <ConversationsWorkspace
+              role="director"
+              branches={[]}
+              conversations={[]}
+              userId="fixture-director"
+              tenantId="fixture-tenant"
+            />
+          </div>
+        </main>
+      </div>
     </ArcScopeProvider>,
   );
 }
@@ -68,30 +103,38 @@ function renderSelectedConversation() {
     tags: [],
   };
   return renderToStaticMarkup(
-    <ArcScopeProvider enabled>
-      <ConversationsFrame
-        legacyHeader={<header data-slot="dashboard-header">Conversas</header>}
-        directorHeader={<header data-slot="dashboard-header">Conversas</header>}
-      >
-        <ConversationsWorkspace
+    <SidebarProvider>
+      <ArcScopeProvider enabled>
+        <ConversationsFrame
           role="director"
           branches={[{ id: "branch-centro", name: "Centro" }]}
           conversations={[conversation]}
           initialLeadId={conversation.id}
           userId="fixture-director"
           tenantId="fixture-tenant"
-          directorActions={<nav aria-label="Tipo de conversa"><a href="/conversas">Leads</a></nav>}
+          leadTags={[]}
+          canManageTags={false}
+          officialBrokerEnabled={false}
+          officialBrokerDeliveryChannel="meta"
+          officialBrokerConversations={[]}
+          canSeeBrokerTab
+          currentTab="leads"
+          leadsCount={1}
+          officialBrokerTab={false}
         />
-      </ConversationsFrame>
-    </ArcScopeProvider>,
+      </ArcScopeProvider>
+    </SidebarProvider>,
   );
 }
 
 function normalizeGeneratedCssModuleHash(html: string) {
-  return html.replace(/\b(?:conversas-lite_root__|_root_)[a-z0-9]+\b/gi, "_root_HASH");
+  return html
+    .replace(/\b(?:conversas-lite_root__|_root_)[a-z0-9]+\b/gi, "_root_HASH")
+    .replace(/\bid="base-ui-[^"]+"/g, 'id="base-ui-HASH"');
 }
 
 function renderOfficialWorkspace(directorSkinEnabled: boolean) {
+  navigation.pathname = "/conversas";
   return renderToStaticMarkup(
     <ArcScopeProvider enabled={directorSkinEnabled}>
       <OfficialBrokerConversations enabled={false} deliveryChannel="meta" conversations={[]} />
@@ -101,7 +144,7 @@ function renderOfficialWorkspace(directorSkinEnabled: boolean) {
 
 describe("pele da central de conversas", () => {
   it("preserva o HTML legado quando a chave está desligada", () => {
-    expect(normalizeGeneratedCssModuleHash(renderWorkspace(false))).toMatchSnapshot();
+    expect(normalizeGeneratedCssModuleHash(renderLegacyWorkspaceSnapshot())).toMatchSnapshot();
   });
 
   it("usa os marcadores da pele Arc quando a chave está ligada", () => {
@@ -127,7 +170,7 @@ describe("pele da central de conversas", () => {
   });
 
   it("mantem a pele desligada enquanto a rota continua no opt-out", () => {
-    const html = renderWorkspace(true, "/conversas");
+    const html = renderWorkspace(true, "/conversas/broker");
     expect(html).not.toContain('data-skin="diretor"');
     expect(html).toContain('data-lite="frame"');
     expect(html).toContain('data-lite="workspace"');

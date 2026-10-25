@@ -3,20 +3,10 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, exists, gte, inArray, isNotNull, isNull, like, lte, notInArray, or, sql } from "drizzle-orm";
 
 import "@/components/arc/venancor-scope.css";
-import { DashboardHeader } from "@/components/dashboard-header";
 
 import { ConversationsFrame } from "./conversations-frame";
-import {
-  ConversationsWorkspace,
-  type ConversationItem,
-  type ConversationMessage,
-} from "./conversations-workspace";
-import {
-  OfficialBrokerConversations,
-  type OfficialBrokerConversation,
-  type OfficialBrokerMessage,
-} from "./official-broker-conversations";
-import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
+import type { ConversationItem, ConversationMessage } from "./conversations-workspace";
+import type { OfficialBrokerConversation, OfficialBrokerMessage } from "./official-broker-conversations";
 import { getLeadTagsByLead, listLeadTags } from "@/features/lead-tags/service";
 import { canManageLeadTags } from "@/features/lead-tags/rules";
 import { isMetaCloudWhatsAppEnabled, samePhone } from "@/features/communication-channels/service";
@@ -1066,43 +1056,25 @@ export default async function ConversationsPage({
     }
   }
 
-  const pageActions = canSeeBrokerTab ? (
-    <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
-      <ConversationsBulkQualificationAction />
-      <ConversasHeaderNav
-        currentTab={officialBrokerTab ? "corretores" : coexTab ? "coex" : "leads"}
-        leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
-        coexLabel={coexLabel}
-      />
-    </nav>
-  ) : undefined;
-
   return (
     <ConversationsFrame
-      legacyHeader={<DashboardHeader breadcrumb="Atendimento" title="Conversas" rightSlot={pageActions} />}
-      directorHeader={<DashboardHeader breadcrumb="Atendimento" title="Conversas" />}
-      pageActions={officialBrokerTab ? pageActions : undefined}
-    >
-      {officialBrokerTab ? (
-        <OfficialBrokerConversations
-          enabled={officialBrokerMessagesEnabled}
-          deliveryChannel={internalBrokerDeliveryChannel}
-          conversations={officialBrokerConversations}
-        />
-      ) : (
-        <ConversationsWorkspace
-          role={context.role}
-          branches={branches}
-          conversations={finalConversations}
-          initialLeadId={leadId}
-          userId={context.userId}
-          tenantId={context.tenantId}
-          leadTags={leadTags}
-          canManageTags={canManageLeadTags(context.role)}
-          directorActions={pageActions}
-        />
-      )}
-    </ConversationsFrame>
+      role={context.role}
+      branches={branches}
+      conversations={finalConversations}
+      initialLeadId={leadId}
+      userId={context.userId}
+      tenantId={context.tenantId}
+      leadTags={leadTags}
+      canManageTags={canManageLeadTags(context.role)}
+      officialBrokerEnabled={officialBrokerMessagesEnabled}
+      officialBrokerDeliveryChannel={internalBrokerDeliveryChannel}
+      officialBrokerConversations={officialBrokerConversations}
+      canSeeBrokerTab={canSeeBrokerTab}
+      currentTab={officialBrokerTab ? "corretores" : coexTab ? "coex" : "leads"}
+      leadsCount={!officialBrokerTab ? finalConversations.length : undefined}
+      coexLabel={coexLabel}
+      officialBrokerTab={officialBrokerTab}
+    />
   );
 }
 

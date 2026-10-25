@@ -9,7 +9,6 @@
   "/clientes",
   "/clientes/[clientId]",
   "/configuracoes/comissoes",
-  "/conversas",
   "/conversas/broker",
   "/conversas/dashboard",
   "/cotacao",

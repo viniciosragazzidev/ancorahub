@@ -2,13 +2,13 @@
 
 Data: 25/10/2026
 Branch: `feat/diretor-lite-conversas`
-Base: `origin/feat/diretor-visual-lite` com merge de `feat/diretor-lite-f2b` (`a1407038`).
+Base: `origin/feat/diretor-visual-lite` em 3e4325fe (rebase conclu?do).
 
 ## Escopo e estado
 
 A rota mantém consultas, validacao de permissao, escopo, filtros, navegacao, mensagens, perfil e acoes existentes. A mudanca concentra-se em apresentacao e estrutura responsiva. O HTML de referência sem a chave foi registrado em snapshot e permanece igual.
 
-Esta base nao possui `useDirectorLitePage`. Por isso `/conversas` continua no opt-out de producao, e o `ArcScopeProvider` desliga a pele nas rotas opt-out. A versao ativa foi validada somente em `/dev/diretor-shell-real?view=conversas`, com o AppShell real e fixtures de Diretor e Super-admin. A retirada do opt-out e a ativacao em producao ficam pendentes da integracao do gate compartilhado.
+A tela usa `useDirectorLitePage` nos pontos visuais Lite; com a chave ligada e a rota liberada, o gate controla a pele. `/conversas` saiu do opt-out. `/conversas/broker` e `/conversas/dashboard` continuam em opt-out. A validacao usa `/dev/diretor-shell-real?view=conversas`, com AppShell real e fixtures de Diretor e Super-admin.
 
 ## O que mudou
 
@@ -20,22 +20,14 @@ Esta base nao possui `useDirectorLitePage`. Por isso `/conversas` continua no op
 
 ## Evidencia visual
 
-Capturas feitas em `/dev/diretor-shell-real?view=conversas`, com AppShell real, 40 conversas de fixture e chave ligada. Diretor comum e Super-admin vendo como Diretor, em 390, 1024 e 1440 px:
+Capturas finais do AppShell e do componente reais, em 390 e 1440 px, com fixtures de Diretor e Super-admin:
 
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-diretor-390.png`
-- `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-diretor-1024.png`
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-diretor-1440.png`
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-super-admin-390.png`
-- `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-super-admin-1024.png`
 - `C:/Users/kyper/AppData/Local/Temp/claude/C--Users-kyper-brain/24b9384d-0a21-4b55-a4b1-9fff1a71d8e4/scratchpad/final-prints/conversas-super-admin-1440.png`
 
-Medições Playwright em `conversas-polish-medidas.json`: título e painel principal compartilham a borda esquerda (390: 16px; 1024 e 1440: 290,4px). A lista mede 300px em 1440px. Não há overflow horizontal da página; o filtro rola dentro da própria faixa em telas menores. `3 mensagens` não quebra, os dois placeholders cabem, “qualified” não aparece cru e “Ações” usa variante neutra. As seis capturas finais não registraram erros e foram abertas para revisão visual.
-
-| Caso | 390 px | 1024 px | 1440 px |
-| --- | --- | --- | --- |
-| Diretor | 48.179 B | 137.791 B | 230.523 B |
-| Super-admin vendo como Diretor | 48.179 B | 140.032 B | 231.337 B |
-
+Medicoes Playwright em `conversas-final-medidas.json`: 40 linhas, nome longo truncado na lista larga, horario com flex-basis fixa e `nowrap`, `3 mensagens` em uma linha, topo e conteudo alinhados (390: 16 px; 1440: 290,4 px), sem overflow horizontal ou erros de navegador.
 ### Polimento pedido pelo Maestro
 
 - O raio do item selecionado e dos grupos do perfil usa cantos de controle/painel, removendo o aspecto de pílula.
@@ -112,9 +104,15 @@ Medições Playwright em `conversas-polish-medidas.json`: título e painel princ
 
 ## Validacao
 
-- Vitest focado: 3 arquivos, 16 testes aprovados (snapshot legado, rota opt-out, skin ativa, rótulos, placeholders, navegação/aba oficial e atalho de contato).
+- Vitest focado: 3 arquivos, 17 testes aprovados (snapshot legado, rota opt-out, skin ativa, rótulos, placeholders, navegação/aba oficial e atalho de contato).
 - `npx tsc --noEmit`: aprovado.
-- ESLint nos arquivos TS/TSX tocados: 0 erros, 13 warnings em codigo legado de conversas.
+- ESLint nos arquivos TS/TSX tocados: 0 erros, 31 warnings em codigo legado de conversas.
 - `node scripts/check-lite-skin.mjs`: relatorio global de 859 arquivos. As classes antigas da conversas permanecem no JSX por paridade do modo desligado e sao mapeadas por seletores da pele ativa; por isso o diagnostico de fonte nao resulta em zero nesta tela.
 - Harness: `agent:docs` válido, segurança sem achados; arquitetura/desempenho apontam apenas os arquivos grandes já acima do limite na base (`conversations-workspace.tsx` 93 KB; `page.tsx` 54 KB). `agent:verify --level full` não foi executado porque inclui suíte global e `next build`, fora da validação focada desta etapa e com risco de renderizar a rota dinâmica de banco.
 - Build nao executado: a rota real `/conversas` usa consultas dinamicas de banco durante renderizacao; respeitei o limite de nao executar testes de banco.
+
+### Fechamento do gate e fronteira servidor/cliente
+
+- `/conversas` foi removida do opt-out e o teste confirma o gate, mantendo `/conversas/broker` e `/conversas/dashboard` opt-out. Todos os pontos visuais Lite consultam `useDirectorLitePage`.
+- `ConversationsFrame` recebe somente dados e flags serializaveis; cabecalho, acoes e workspaces sao criados dentro do componente cliente. A varredura nao encontrou `cloneElement`.
+- A coluna de horario tem largura e flex-basis fixas, `nowrap` e numerais tabulares; o nome usa truncamento.

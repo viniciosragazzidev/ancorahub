@@ -8,8 +8,7 @@ import { DashboardHeader } from "@/components/dashboard-header";
 import liteStyles from "@/app/(dashboard)/leads/leads-lite-page.module.css";
 import { LeadDetailFixture } from "@/app/dev/diretor-lead-real/lead-detail-fixture";
 import { ConversationsFrame } from "@/app/(dashboard)/conversas/conversations-frame";
-import { ConversationsWorkspace, type ConversationItem } from "@/app/(dashboard)/conversas/conversations-workspace";
-import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "@/app/(dashboard)/conversas/_components/conversas-header-nav";
+import type { ConversationItem } from "@/app/(dashboard)/conversas/conversations-workspace";
 
 import { LeadsShellScreen } from "./leads-screen";
 
@@ -161,12 +160,6 @@ export default async function DirectorShellRealPage({
   const leadsView = leadsViews[screen];
   const pathname = showConversations ? "/conversas" : leadsView ? "/leads" : screen === "lead" ? "/leads/11111111-1111-4111-8111-111111111111" : "/dashboard";
   const name = isSuperAdminViewingDirector ? "Alex Exemplo" : "Marina Exemplo";
-  const conversationActions = (
-    <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
-      <ConversationsBulkQualificationAction />
-      <ConversasHeaderNav currentTab="leads" leadsCount={conversationFixtures.length} />
-    </nav>
-  );
   const previewUser: UserDisplayInfo = {
     name,
     role: "Diretor",
@@ -192,22 +185,22 @@ export default async function DirectorShellRealPage({
     >
       {showConversations ? (
         <ConversationsFrame
-          legacyHeader={<DashboardHeader breadcrumb="Atendimento" title="Conversas" rightSlot={conversationActions} />}
-          directorHeader={<DashboardHeader breadcrumb="Atendimento" title="Conversas" />}
-          pageActions={undefined}
-        >
-          <ConversationsWorkspace
-            role="director"
-            branches={demoBranches}
-            conversations={conversationFixtures}
-            initialLeadId="lead-fixture-ana"
-            userId="fixture-director"
-            tenantId="fixture-tenant"
-            leadTags={[]}
-            canManageTags
-            directorActions={conversationActions}
-          />
-        </ConversationsFrame>
+          role="director"
+          branches={demoBranches}
+          conversations={conversationFixtures}
+          initialLeadId="lead-fixture-ana"
+          userId="fixture-director"
+          tenantId="fixture-tenant"
+          leadTags={[]}
+          canManageTags
+          officialBrokerEnabled={false}
+          officialBrokerDeliveryChannel="meta"
+          officialBrokerConversations={[]}
+          canSeeBrokerTab
+          currentTab="leads"
+          leadsCount={conversationFixtures.length}
+          officialBrokerTab={false}
+        />
       ) : leadsView ? (
         <LeadsShellScreen view={leadsView} />
       ) : screen === "lead" ? (

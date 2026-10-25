@@ -5,7 +5,8 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, useRef, type ReactNode } from "react";
 import { toast } from "@/components/ui/sonner";
 import { motion, useReducedMotion } from "motion/react";
-import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
+import { ConversationsBulkQualificationAction, ConversasHeaderNav } from "./_components/conversas-header-nav";
 
 import {
   REALTIME_SYNC_BROWSER_EVENT,
@@ -193,7 +194,9 @@ export function ConversationsWorkspace({
   tenantId,
   leadTags = [],
   canManageTags = false,
-  directorActions,
+  canSeeBrokerTab = false,
+  currentTab = "leads",
+  coexLabel,
 }: {
   role: string;
   branches: { id: string; name: string }[];
@@ -205,10 +208,11 @@ export function ConversationsWorkspace({
   leadTags?: LeadTag[];
   /** Directors and managers create, rename and recolor tags. */
   canManageTags?: boolean;
-  /** Actions and view navigation for the Director toolbar. */
-  directorActions?: ReactNode;
+  canSeeBrokerTab?: boolean;
+  currentTab?: "leads" | "corretores" | "coex";
+  coexLabel?: string | null;
 }) {
-  const directorSkinEnabled = useArcScopeEnabled();
+  const directorSkinEnabled = useDirectorLitePage();
   const router = useRouter();
   const [allTags, setAllTags] = useState(leadTags);
   const [tagFilter, setTagFilter] = useState<string>("all");
@@ -403,6 +407,16 @@ export function ConversationsWorkspace({
         setConversations((prev) => prev.map((item) => ({ ...item, tags: item.tags?.flatMap((tag) => tags.filter((next) => next.id === tag.id)) })));
       }}
     />
+  ) : null;
+  const directorActions = canSeeBrokerTab ? (
+    <nav aria-label="Tipo de conversa" className="flex items-center gap-3">
+      <ConversationsBulkQualificationAction />
+      <ConversasHeaderNav
+        currentTab={currentTab}
+        leadsCount={currentTab === "corretores" ? undefined : conversations.length}
+        coexLabel={coexLabel}
+      />
+    </nav>
   ) : null;
 
   return (
@@ -605,7 +619,7 @@ function ConversationHeader({
   tenantId?: string;
   role?: string;
 }) {
-  const directorSkinEnabled = useArcScopeEnabled();
+  const directorSkinEnabled = useDirectorLitePage();
   const [isPending, setIsPending] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const router = useRouter();
@@ -1117,7 +1131,7 @@ function ChatInput({
     media: { kind: string; mimeType: string; filename: string | null; sizeBytes: number; url: string };
   }) => void;
 }) {
-  const directorSkinEnabled = useArcScopeEnabled();
+  const directorSkinEnabled = useDirectorLitePage();
   const [text, setText] = useState("");
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1808,7 +1822,7 @@ function ClientProfile({
   /** Brokers do not see where the lead came from. */
   hideOrigin?: boolean;
 }) {
-  const directorSkinEnabled = useArcScopeEnabled();
+  const directorSkinEnabled = useDirectorLitePage();
   const approvedDocuments = client.documents.filter((document) => document.status === "approved").length;
   const pendingDocuments = client.documents.filter((document) => document.status === "pending").length;
   const sharedMedia = getSharedMedia(client.messages);

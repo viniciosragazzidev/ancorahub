@@ -3,7 +3,7 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/sonner";
-import { useArcScopeEnabled } from "@/components/arc/arc-scope-context";
+import { useDirectorLitePage } from "@/components/arc/use-director-lite-page";
 
 import { Badge } from "@/components/ui/badge";
 import { Bubble, BubbleContent } from "@/components/ui/bubble";
@@ -122,7 +122,7 @@ export function OfficialBrokerConversations({
   deliveryChannel: "meta" | "waha_direct";
   conversations: OfficialBrokerConversation[];
 }) {
-  const directorSkinEnabled = useArcScopeEnabled();
+  const directorSkinEnabled = useDirectorLitePage();
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
