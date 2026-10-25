@@ -29,7 +29,7 @@ describe("director Lite style flag", () => {
 
   it("keeps the director's light theme active on routes whose page skin is opted out", async () => {
     getSystemSetting.mockResolvedValue("true");
-    const route = "/dashboard";
+    const route = "/atendimento";
 
     expect(isDirectorLiteRouteOptedOut(route)).toBe(true);
     await expect(shouldUseDirectorLiteStyle("director", "tenant-1")).resolves.toBe(true);
