@@ -21,9 +21,9 @@ function pageRoutes(directory = dashboardRoot): string[] {
 }
 
 describe("rotas do Diretor Lite", () => {
-  it("mantém em opt-out todas as páginas ainda não revisadas (saíram o painel e a lista de leads)", () => {
+  it("mantém em opt-out todas as páginas ainda não revisadas (saíram o painel, a lista e o perfil do lead)", () => {
     const revised = pageRoutes().filter((route) => !isDirectorLiteRouteOptedOut(route));
-    expect([...revised].sort()).toEqual(["/dashboard", "/leads"]);
+    expect([...revised].sort()).toEqual(["/dashboard", "/leads", "/leads/[id]"]);
     expect(DIRECTOR_LITE_OPT_OUT_ROUTES.length).toBeGreaterThan(0);
   });
 
@@ -33,15 +33,16 @@ describe("rotas do Diretor Lite", () => {
     expect(isDirectorLiteRouteOptedOut("/dashboard/drill/out-of-sla")).toBe(true);
   });
 
-  it("tira /leads do opt-out, mas mantém o detalhe e as subrotas", () => {
+  it("tira /leads e o perfil do lead do opt-out, mas mantém as demais subrotas", () => {
     expect(isDirectorLiteRouteOptedOut("/leads")).toBe(false);
     expect(isDirectorLiteRouteOptedOut("/leads?view=kanban&page=2")).toBe(false);
-    expect(isDirectorLiteRouteOptedOut("/leads/abc-123")).toBe(true);
+    expect(isDirectorLiteRouteOptedOut("/leads/abc-123")).toBe(false);
+    expect(isDirectorLiteRouteOptedOut("/leads/abc-123/feedback")).toBe(true);
     expect(isDirectorLiteRouteOptedOut("/leads/arquivados")).toBe(true);
   });
 
   it("reconhece rotas dinâmicas e remove query string", () => {
-    expect(isDirectorLiteDashboardRoute("/leads/abc-123?ficha=1")).toBe(true);
+    expect(isDirectorLiteDashboardRoute("/leads/abc-123/feedback?ficha=1")).toBe(true);
     expect(isDirectorLiteRouteOptedOut("/gestao/equipes/supervisor-1/")).toBe(true);
     expect(isDirectorLiteRouteOptedOut("/rota-ainda-nao-revisada")).toBe(false);
   });
