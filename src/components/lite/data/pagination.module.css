@@ -1,0 +1,70 @@
+/* Paginação Lite: só tokens, botões de 44px, texto sem quebra. */
+
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 4px 0;
+}
+
+.root[data-pending="true"] {
+  opacity: 0.6;
+}
+
+.range {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.current {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--foreground);
+  cursor: pointer;
+}
+
+.button:disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.short {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .long {
+    display: none;
+  }
+
+  .short {
+    display: inline;
+  }
+}

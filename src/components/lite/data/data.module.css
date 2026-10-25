@@ -172,6 +172,19 @@
   outline-offset: 2px;
 }
 
+/* Destaques de linha (sempre com texto na própria linha): atenção e cinza. */
+.table tbody tr[data-tone="warning"],
+.card[data-tone="warning"],
+.cardStatic[data-tone="warning"] {
+  background: var(--warning-subtle);
+}
+
+.table tbody tr[data-tone="muted"],
+.card[data-tone="muted"],
+.cardStatic[data-tone="muted"] {
+  background: var(--surface-muted);
+}
+
 .table tbody tr[data-selected="true"],
 .card[data-selected="true"],
 .cardStatic[data-selected="true"] {

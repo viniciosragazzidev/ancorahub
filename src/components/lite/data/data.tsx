@@ -39,6 +39,8 @@ export type LiteDataProps<T> = {
   onRowOpen?: (row: T) => void;
   empty: ReactNode;
   selection?: LiteSelection<T>;
+  /** Destaque da linha (ex.: devolvido sem aceite em atenção, investigação em cinza), sempre com texto junto. */
+  rowTone?: (row: T) => "warning" | "muted" | undefined;
 };
 
 /** Caixa de seleção nativa dentro de um rótulo de 44px; o clique não abre a linha. */
@@ -59,7 +61,7 @@ function activate(onOpen: () => void) {
   };
 }
 
-export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection }: LiteDataProps<T>) {
+export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection, rowTone }: LiteDataProps<T>) {
   if (!rows.length) return <div className={styles.empty}>{empty}</div>;
   return (
     <div className={styles.tableWrap} data-lite="table">
@@ -83,6 +85,7 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
               key={rowKey(row)}
               className={onRowOpen ? styles.clickable : undefined}
               data-selected={selection?.isSelected(row) ? "true" : undefined}
+              data-tone={rowTone?.(row)}
               tabIndex={onRowOpen ? 0 : undefined}
               onClick={onRowOpen ? () => onRowOpen(row) : undefined}
               onKeyDown={onRowOpen ? activate(() => onRowOpen(row)) : undefined}
@@ -104,7 +107,7 @@ export function LiteDataTable<T>({ caption, columns, rows, rowKey, onRowOpen, em
 }
 
 /** Cartões abaixo de 768px: título (coluna `primary`), apoio (`secondary`) e as demais colunas em pares rótulo e valor. */
-export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection }: LiteDataProps<T>) {
+export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, empty, selection, rowTone }: LiteDataProps<T>) {
   if (!rows.length) return <div className={styles.empty}>{empty}</div>;
   const primary = columns.find((column) => column.primary) ?? columns[0]!;
   const secondary = columns.find((column) => column.secondary);
@@ -119,6 +122,7 @@ export function LiteDataList<T>({ caption, columns, rows, rowKey, onRowOpen, emp
           onClick={onRowOpen ? () => onRowOpen(row) : undefined}
           onKeyDown={onRowOpen ? activate(() => onRowOpen(row)) : undefined}
           data-selected={selection?.isSelected(row) ? "true" : undefined}
+          data-tone={rowTone?.(row)}
         >
           {selection ? (
             <div className={styles.cardHead}>
